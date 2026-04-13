@@ -1,258 +1,0 @@
-
-Microsoft Corporation
-
-Enterprise Agent Capability Framework
-Vendor Response to WPP Partner Brief
-
-Prepared for:
-AI Centre of Excellence, WPP Enterprise Technology
-Attn: Tom Kelshaw, Enterprise AI CoE Lead
-Date: 8 April 2026
-Classification: Confidential
-
-
-
-Table of Contents
-Table of Contents	2
-1. Cover Letter	4
-2. Executive Summary [Kalai + James]	4
-3. Partnership Vision [Kalai + James]	5
-3.1 Strategic Alignment with Elevate28 [Kalai + James]	5
-3.2 From Headcount to Horsepower: Our Shared Vision [Kalai + James]	5
-4. Framework Architecture [Scott + Artur]	5
-4.1 Microsoft Agent Stack Overview [Scott + Artur]	6
-4.2 Agent Framework vs Agent Surfaces [Scott + Artur]	6
-4.3 Control Plane Architecture [Scott + Artur]	6
-4.4 Multi-Agent Orchestration [Scott + Artur]	7
-5. Core Capability Mapping	7
-5.1 Core Framework Capabilities (Ref: §6.1) [Scott + Artur]	7
-5.2 Desirable Capabilities (Ref: §6.2) [Scott + Artur]	8
-5.3 Advanced Capabilities (Ref: §6.3) [Scott + Artur]	9
-6. Governance, Security and Compliance [Scott + Artur]	9
-6.1 Agent Identity and Governance [Scott + Artur]	9
-6.2 Observability and OpenTelemetry [Scott + Artur]	9
-6.3 Data Protection and Compliance [Scott + Artur]	10
-7. Protocol Support [Scott + Artur]	10
-8. Enterprise Integration [Scott + Artur]	10
-8.1 LOB Application Integration (Ref: §3.6)	10
-8.2 WPP Current Landscape Integration [Kalai & James]	11
-9. Development Experience [Scott + Artur]	12
-10. Code-as-Truth: Auditability and Transparency [Scott + Artur]	12
-11. Non-Functional Requirements Response [Scott + Artur]	13
-12. POC 1: Finance Intelligent Procure-to-Pay [Separate document response?]	14
-13. POC 2: People Talent Lifecycle Agent Team [Separate document response?]	15
-14. High-Level Delivery Plan [Delivery partner?]	15
-15. Commercial Proposal Overview [Phil / Steve M / Marta?]	16
-16. Customer References [Scott / Artur?]	16
-17. Portability and Exit Strategy [Scott / Artur?]	17
-18. References	17
-
-
-
-1. Cover Letter
-8 April 2026
-
-Tom Kelshaw
-Enterprise AI CoE Lead
-WPP Enterprise Technology
-3 World Trade Center, 175 Greenwich Street, New York, NY 10007
-
-Dear Tom,
-
-Thank you for sharing WPP's Enterprise Agent Capability Framework Partner Brief. We are excited by the ambition, rigour, and architectural clarity of this initiative, and we are confident that Microsoft is uniquely positioned to serve as WPP's primary Enterprise Agent Capability Partner.
-We share your conviction that agentic AI is not a tooling decision but a foundational architecture decision. Your North Star of Autonomy, with its vision of a software-defined enterprise workforce operating under human oversight via a purpose-built Control Plane, aligns directly with the investments Microsoft has made across Azure AI Foundry, Microsoft Agent Framework, Copilot Studio, Microsoft 365, and our enterprise governance platform.
-This response addresses every section of your brief and demonstrates how Microsoft's integrated platform, spanning framework, runtime, governance, and surfaces, can deliver on WPP's vision for its 85,000+ workforce. We bring not only technology but a deep existing relationship with WPP, proven enterprise transformation expertise through our partner ecosystem, and a product roadmap that mirrors the trajectory you have outlined.
-We look forward to a productive partnership.
-
-Yours sincerely,
-
-[Authorised Signatory]
-Microsoft Corporation
-2. Executive Summary [Kalai + James]
-
-Microsoft proposes an integrated, multi-layered solution to serve as the core orchestration, runtime, governance, and platform layer for WPP's enterprise agent workforce. Our response is anchored in the following key propositions:
-
-• Unified Agent Framework: Microsoft Agent Framework 1.0 (GA April 2026) is our production-ready, open-source SDK for building, orchestrating, and deploying AI agents and multi-agent workflows. It provides enterprise-grade multi-agent orchestration, multi-provider model support, and cross-runtime interoperability via A2A and MCP.
-• Foundry Control Plane: Microsoft Foundry Control Plane provides unified fleet management, observability, compliance enforcement, and security for AI agents across the enterprise. It directly addresses WPP's requirement for a purpose-built fleet management interface supporting the 1:20-50 human-to-agent ratio.
-• Full Development Spectrum: From pro-code (Agent Framework for .NET and Python) to low-code (Copilot Studio) to no-code (M365 Copilot Agent Builder), we support every builder persona WPP requires.
-• Enterprise Governance: Microsoft Entra Agent ID, Microsoft Defender, and Microsoft Purview deliver identity, security, and compliance governance purpose-built for autonomous agents.
-• Deep WPP Ecosystem Integration: WPP's existing M365, Power Platform, Dynamics 365, and Azure investments are natively integrated. No rebuild required.
-• Open Standards: Native support for A2A, MCP, and OpenTelemetry ensures interoperability with WPP Open and third-party systems.
-3. Partnership Vision [Kalai + James]
-3.1 Strategic Alignment with Elevate28 [Kalai + James]
-
-Microsoft's agent platform directly enables each pillar of WPP's Elevate28 strategy:
-
-Elevate28 ObjectiveMicrosoft EnablementDeliver superior growth for clientsCopilot 365 and agent-augmented workflows accelerate client delivery velocity while maintaining quality.Become a simpler, integrated companyA single agent framework across all builder personas eliminates fragmented tooling and consolidates orchestration into one platform.Unlock the advantage of WPP OpenA2A protocol support enables seamless interoperability between Enterprise AI agents and WPP Open's agent ecosystem.Create firm foundations for the futureOpen-source, standards-based architecture (A2A, MCP, OTEL) prevents vendor lock-in and supports the 3-5 year investment horizon.
-
-3.2 From Headcount to Horsepower: Our Shared Vision [Kalai + James]
-We are deeply aligned with WPP's vision of shifting from "practitioners using tools" to "experts supervising agent teams." Microsoft's own internal transformation follows this pattern: we have deployed multi-agent systems across finance, HR, IT, and customer service operations, with human operators managing fleet-scale autonomous workflows through the Foundry Control Plane.
-Our platform is purpose-built for the progression WPP describes: from 1-2x productivity (tooling augmentation) to 10-100x productivity (agentic autonomy under human governance).
-4. Framework Architecture [Scott + Artur]
-This section addresses WPP's requirement to clearly distinguish between framework components and surfaces, and to describe how they interact (Ref: §3.5).
-4.1 Microsoft Agent Stack Overview [Scott + Artur]
-Microsoft's agent ecosystem spans three tiers, each addressing a distinct enterprise need:
-
-TierComponentPurposeBuild LayerMicrosoft Agent Framework 1.0 (pro-code) Copilot Studio (low-code) M365 Copilot Agent Builder (no-code)SDK and visual tools for creating agents and multi-agent workflowsRuntime LayerFoundry Agent ServiceManaged hosting with enterprise security, durable execution, state management, and observabilityGovernance LayerFoundry Control Plane Microsoft Entra Agent ID Microsoft Defender Microsoft PurviewFleet management, agent identity, threat protection, and compliance enforcement
-Additionally, for distribution to end users, the Microsoft 365 Agents SDK publishes agents into Teams and Copilot, and REST/webhook/A2A endpoints expose agents to any external surface.
-4.2 Agent Framework vs Agent Surfaces [Scott + Artur]
-Per WPP's requirement in §3.5, we clearly delineate:
-
-LayerWhat It IsMicrosoft ComponentsAgent FrameworkThe runtime, orchestration engine, state store, memory layer, governance plane, tool integration, and observability backbone.Microsoft Agent Framework 1.0, Foundry Agent Service, Foundry Control Plane, Entra Agent IDAgent SurfacesThe channels through which humans interact with agents and agent outputs.MS Teams, Copilot 365, Power Apps, SharePoint, Email, Web (React/.NET), Custom LOB apps, the Control Plane dashboard itself
-Our framework is surface-agnostic. A single agent definition in the framework is deployable to any supported surface via configuration or thin adapter. The same agent workflow can be invoked from Teams, a Power App, a .NET service, a React front-end, or another agent via A2A, without rebuilding the agent per surface.
-4.3 Control Plane Architecture [Scott + Artur] 
-Microsoft Foundry Control Plane is our direct answer to WPP's defining architectural principle. It is a unified management interface providing visibility, governance, and control for AI agents, models, and tools across the enterprise.
-
-Key Control Plane capabilities:
-• Fleet Dashboard: Real-time status across all active agent workflows, filterable by project, domain, risk level, compliance posture, and cost. Provides a searchable inventory of every AI agent, model deployment, and tool across all projects.
-• Exception-Only Filtering: Operators default to seeing only workflows requiring intervention. Autonomous workflows run without cluttering the operator's view.
-• Real-Time Observability: End-to-end tracing with OpenTelemetry, including inputs, reasoning steps, tool calls, outputs, latency, and cost per agent run.
-• Continuous Evaluation: Automated evaluations on production traffic measuring quality, safety, task adherence, tool call accuracy, and sensitive data exposure.
-• Runtime Controls: Configurable intervention points across user input, tool calls, tool responses, and outputs to detect and block PII, prompt injection, task misalignment, and content risks.
-• Bulk Operations: Approve, reject, or redirect batches of similar decisions. Policy enforcement across the entire fleet from a single surface.
-• Autonomy Configuration: Per-agent and per-workflow autonomy thresholds, adjustable at runtime without redeployment, via the governance policy engine.
-
-This is not a single-agent, single-session surface. It is a purpose-built fleet management interface designed for the 1:20-50 human-to-agent ratio WPP requires.
-4.4 Multi-Agent Orchestration [Scott + Artur]
-Microsoft Agent Framework 1.0 provides graph-based workflow orchestration as its core capability:
-• Workflow Graphs: Sequential, parallel, and conditional routing. Dynamic routing based on intermediate data and business rules.
-• Deep Nesting: Sub-workflows within primary workflows for layered logical abstraction.
-• Durable Execution: State checkpointing, fault recovery, and resume from last checkpoint after platform restart.
-• Human-in-the-Loop: Pause, review, approve, modify, and resume at any point via the Control Plane, not just inline chat.
-• Cross-Runtime Interop: A2A and MCP enable agents to collaborate across platforms, including future WPP Open interoperability.
-5. Core Capability Mapping
-5.1 Core Framework Capabilities (Ref: §6.1) [Scott + Artur]
-RequirementMicrosoft SolutionStatusMulti-agent orchestrationAgent Framework 1.0 graph-based workflows with sequential, parallel, and conditional routingGAStateful conversation managementFoundry Agent Service with thread-based state management, multi-session persistence, and resumabilityGATool/function integrationExtensible function tools with MCP server integration, approval workflows, and error handlingGAConnectors1,000+ Power Platform connectors, Microsoft Graph, custom MCP servers, REST/webhook. Prebuilt for M365, Google Workspace, Azure, Workday, ServiceNow, Dynamics 365GAHuman-in-the-loopConfigurable HITL gates at any workflow step, surfaced in the Foundry Control PlaneGADurable executionCheckpoint-based state persistence, fault recovery, resume from last checkpointGAMemorySession state, context providers, knowledge source bindings for structured and unstructured dataGAStructured outputsType-safe, schema-validated agent responses via Agent Framework SDKGAModel-agnosticSupport for Azure OpenAI, OpenAI, Anthropic, Google, Ollama, and 1,900+ models in Foundry catalogGAControl Plane surfaceFoundry Control Plane fleet management dashboardGA
-5.2 Desirable Capabilities (Ref: §6.2) [Scott + Artur]
-RequirementMicrosoft SolutionStatusRollbackDurable execution with checkpoint-based rollback; anti-call patterns supported via framework middlewareGASelf-healing durable executionFault recovery with automatic retry, checkpoint resume, and exception routingGAMulti-user, multi-surface engagementUnified agent definition invocable from Teams, Email, Webhook/API, A2A; all feeding into Foundry Control PlaneGAA2A integration with off-platform agentsNative A2A protocol support for cross-platform agent collaborationGAEvaluation frameworkFoundry built-in evaluators for task adherence, tool call accuracy, safety, groundedness, and sensitive data exposureGAAgent assembly (agent-builds-agent)Supported via Copilot Studio Agent Builder and programmatic agent creation through SDKPreview
-5.3 Advanced Capabilities (Ref: §6.3) [Scott + Artur]
-RequirementMicrosoft SolutionStatusFull-duplex voiceMAI-Transcribe-1 and MAI-Voice-1 (GA April 2026) for speech-to-text and text-to-speech; Azure Communication Services for real-time voice/videoGAPersistent video avatarAzure AI Video (HeyGen/Synthesia integration via MCP connectors); Microsoft's own avatar capabilities in TeamsPreviewFine-tunable analytics modelsAzure AI Foundry fine-tuning; Microsoft Fabric agents for analytics on Databricks, Snowflake, and file storesGAWorkflow crystallisationAgent Framework supports deterministic workflow export to version-controlled code; exception-driven fallback to generative orchestrationPreview6. Governance, Security and Compliance [Scott + Artur]
-This section addresses §5.2 of the brief. Microsoft provides a comprehensive, integrated governance layer purpose-built for autonomous AI agents.
-6.1 Agent Identity and Governance [Scott + Artur]
-Microsoft Entra Agent ID (part of Microsoft Agent 365) introduces formal agent identities in Microsoft Entra ID, treating agents as first-class identities in the organisation:
-• Agent Identity Blueprint: Governs a class of agent identities for lifecycle operations.
-• Agent Registry: Centralized inventory of all agents across Copilot Studio, Azure AI Foundry, and third-party platforms. Framework-agnostic as required.
-• Lifecycle Management: From idea to retirement, with responsible person oversight throughout.
-• Least-Privilege Access: Scoped permissions via Azure RBAC, integrated with Okta federation via Entra External ID.
-• Conditional Access: Apply enterprise Conditional Access, auditing, and lifecycle rules to agent identities.
-• Runtime Authorisation: RBAC + ABAC enforcement at the tool-call level with just-in-time approval injection.
-6.2 Observability and OpenTelemetry [Scott + Artur]
-Foundry Control Plane provides native OpenTelemetry integration:
-• End-to-end tracing from inference through tool calls using OpenTelemetry standards
-• Every agent run traced: inputs, reasoning steps, tool calls, outputs, latency, and cost
-• Continuous evaluation on production traffic with automated quality and safety scoring
-• Integration with Azure Monitor, Application Insights, and Azure Log Analytics
-• Cost tracking and resource consumption monitoring across the entire AI environment
-6.3 Data Protection and Compliance [Scott + Artur]
-• Microsoft Purview: DLP enforcement, data classification, and compliance policies extended to all AI agent interactions.
-• Microsoft Defender: AI threat protection, jailbreak detection, prompt injection detection, and security incident investigation.
-• Compliance: SOC 2, ISO 27001, GDPR compliant with regular third-party audits. Azure's 100+ compliance certifications apply.
-• Data Residency: Platform-level enforcement via Azure region policies. Not developer-configured.
-• Audit Trails: Immutable audit logs with 7+ years retention, queryable via Azure Log Analytics and Microsoft Sentinel.
-7. Protocol Support [Scott + Artur]
-This section addresses §5.3 of the brief.
-
-ProtocolWPP RequirementMicrosoft StatusDetailsA2A (Agent-to-Agent)Must supportGANative A2A support in Foundry Agent Service and Copilot Studio. .NET and Python SDKs for A2A clients and servers. Entra-based authentication for cross-platform agent collaboration.MCP (Model Context Protocol)Must support: HTTP and ToolsGAFull MCP support in Foundry: HTTP and Streamable HTTP transports, tool invocation, Entra/OAuth/key-based auth. Resources and Prompts in preview.OpenTelemetryMust supportGANative OTEL integration throughout the stack. End-to-end tracing across agent runs, tool calls, and model inference.AG-UI or equivalentMust supportPreviewFoundry Control Plane provides dynamic, agent-rendered UI. AG-UI protocol support planned for GA in H2 2026.8. Enterprise Integration [Scott + Artur]
-8.1 LOB Application Integration (Ref: §3.6)
-Platform / StackIntegration PatternMoSCoWStatusMS Teams / Copilot 365M365 Agents SDK native connector; agent responds within Teams UXMustGAPower AppsPower Platform connector, PCF custom controls, embedded agent componentMustGADynamics 365 (F&O, CRM)Agent callable from D365 forms, workflows, plugins via Copilot Studio and Agent Framework SDKMustGAReact (Web)TypeScript SDK for embedding agent interactions in React SPAs with streaming and event callbacksMustGA.NETC# SDK (Agent Framework 1.0) for invoking agents from .NET services, Azure Functions, ASP.NETShouldGAPythonPython SDK (Agent Framework 1.0) for data pipelines, notebooks, and backend servicesShouldGASharePoint SPFxSPFx web part surfacing agent capabilities within SharePoint pages and document librariesShouldGAEmail (inbound/outbound)Power Automate email triggers, Exchange connectors, and agent mailbox monitoring via MCPMustGAWebhook / REST APIStandard HTTP endpoints for event-driven triggering and status callbacksMustGAA2A ProtocolFull A2A client and server support for cross-platform agent collaborationMustGA
-A single agent definition in the framework is deployable to any supported surface via configuration or thin adapter. No rebuilding of agent logic per surface is required.
-8.2 WPP Current Landscape Integration [Kalai & James]
-Microsoft's platform integrates natively with WPP's existing estate:
-• Identity: Okta federation via Entra External ID; Workday as identity source-of-truth via prebuilt HR connectors.
-• M365 (7 tenants): Native multi-tenant support across all 7 WPP tenants via Entra cross-tenant access policies.
-• Power Platform: Dataverse, Power Apps, Cloud Flows, Power Automate Desktop, and Copilot Studio are all first-class surfaces and orchestration points.
-• Multi-Cloud: Azure (primary), GCP, and AWS supported via MCP connectors and A2A cross-platform agents.
-• Data and Analytics: Databricks integration via Microsoft Fabric agents; Snowflake, Google BigQuery via MCP connectors and data pipelines.
-• Business Systems: SAP BFC, Dynamics 365 F&O, Deltek Maconomy, Workday, ServiceNow, and Dynamics 365 CRM all supported via prebuilt connectors or custom MCP servers.
-• WPP Open Interop: A2A protocol and SDK integration for agent interoperability between Enterprise AI and WPP Open's agent ecosystem.
-9. Development Experience [Scott + Artur]
-This section addresses §6.4 of the brief.
-
-ModeBuilder PersonaMicrosoft SolutionMoSCoWPro-code (SDK-first)Platform engineers, data engineers, full-stack developersMicrosoft Agent Framework 1.0 for Python and .NET. Full programmatic access to orchestration graphs, model selection, tool bindings, memory, state, governance hooks, OTEL instrumentation. Local development, debugging, and CLI tooling.MustLow-code (visual designer)Citizen developers, business analysts, process ownersCopilot Studio visual workflow builder with tool bindings, HITL touchpoints, and knowledge source configuration. Produces the same underlying artefact as pro-code.MustHybridPower users, tech-literate analystsCopilot Studio with code underlay; export agent schema as code, modify, and reimport. Declarative agent definitions in YAML/JSON.ShouldAgentic builderAny user with domain knowledgeM365 Copilot Agent Builder; natural language agent creation with automatic build, test, and deploy.Could
-60-Minute Build Benchmark: We are confident a junior developer or seasoned UI user can build, test, and deploy a governed agent with 3 tool connectors and 3 knowledge sources in under 60 minutes using Copilot Studio. We will demonstrate this during POC evaluation.
-
-Code-as-Truth (§6.5): All agent definitions, orchestration graphs, tool bindings, and policy configurations are exportable as structured YAML/JSON configuration files, committable to Git. Low-code artefacts serialize to the same format as pro-code artefacts. No divergent runtimes.
-10. Code-as-Truth: Auditability and Transparency [Scott + Artur]
-This section addresses §6.5 of the brief.
-
-• Agent Definitions: Exportable as structured YAML/JSON configuration files. Includes prompts, model assignments, tool permissions, knowledge source bindings, and autonomy thresholds. All committable to Git.
-• Orchestration Harnesses: Workflow graphs represented as declarative configuration. Inspectable, diffable, and reviewable via standard code review processes. The Agent Framework uses declarative agent definitions that can be version-controlled.
-• Low-Code Parity: Copilot Studio artefacts serialize to the same configuration format as pro-code artefacts. A workflow built in the visual designer produces a repo-committable artefact identical in structure to one built via SDK.
-• Policy-as-Code: Governance rules, autonomy thresholds, approval chains, and data residency constraints are version-controlled with author, timestamp, rationale, and approver per change via Azure Policy and Foundry compliance policies.
-• Full Traceability: Every routing decision, model selection, and tool call is fully traceable in OTEL spans and audit logs. Decision rationale, input context, and policy evaluation are logged.
-
-Git-Based Workflow for 50 Agents: A team of 5 developers manages 50 agents across dev, staging, and production using Azure DevOps or GitHub CI/CD pipelines, with environment-specific configuration stored in branches or environment files. Pull request reviews gate all changes. Non-technical auditors inspect agent authorisations, actions, and rationale via the Foundry Control Plane compliance dashboard and audit log queries.
-11. Non-Functional Requirements Response [Scott + Artur]
-This section addresses §5.4 of the brief.
-
-NFRTargetMicrosoft StatusNotesAgent workflow availability99.9% per regionGAAzure SLA backed. Foundry Agent Service operates within Azure's 99.9%+ availability guarantees.Cross-region failover (RTO)< 5 minutesGAAzure Traffic Manager and paired regions. Foundry supports multi-region deployment with automatic failover.Cross-region failover (RPO)Minimal step and data lossGACheckpoint-based state persistence with geo-replicated storage ensures minimal in-flight state loss.Control Plane dashboard latency< 5 secondsGAFoundry Control Plane real-time dashboard with sub-5-second refresh on fleet status.Workflow state persistenceSurvives full platform restartGADurable execution with checkpoint-based state; resumes from last checkpoint after any restart.Concurrent workflows5,000+ pilot; 50,000+ productionGAAzure autoscaling supports 50,000+ concurrent agent workflows at production scale.Audit log retentionMinimum 7 yearsGAAzure Log Analytics and Microsoft Sentinel with configurable retention up to 12 years.Data residency enforcementPlatform-levelGAAzure region policies enforce data residency at the platform level. 60+ Azure regions globally.12. POC 1: Finance Intelligent Procure-to-Pay [Separate document response?]
-This section provides our proposed solution architecture for POC 1 (Ref: §7.1 and Addendum A).
-
-Objective: Demonstrate core agent orchestration, enterprise system integration, governance, and the Control Plane in a controlled, high-volume Procure-to-Pay process.
-
-Proposed Architecture:
-• Orchestrator Agent: Built on Agent Framework 1.0 (.NET), managing the end-to-end P2P workflow graph.
-• Specialist Agents: Intake Agent (invoice parsing, OCR, data extraction), Validation Agent (PO matching, three-way match), Routing Agent (GL coding, cost centre allocation), Approval Agent (threshold-based routing with HITL gates), Payment Agent (payment file generation, bank integration), Reconciliation Agent (statement matching, exception identification).
-• Integrations: Workday (API connector), Dynamics F&O (native connector), Maconomy (custom MCP server or REST adapter). Sandbox or mock APIs provided by WPP.
-• Control Plane: Finance Controller dashboard managing 30-50 concurrent invoice workflows. Exception-only view as default. Bulk approval capabilities for batched invoices.
-• Governance: Entra Agent ID for all agents, OTEL tracing for every step, DLP enforcement on financial data, full audit trail.
-
-Delivery Approach: 8-week POC sprint with joint Microsoft and WPP engineering team, EY advisory support for process design, weekly demos and checkpoints.
-13. POC 2: People Talent Lifecycle Agent Team [Separate document response?]
-This section provides our proposed solution architecture for POC 2 (Ref: §7.2 and Addendum B).
-
-Objective: Demonstrate the full spectrum of advanced agentic capabilities applied to end-to-end talent acquisition and onboarding.
-
-Proposed Architecture:
-• Orchestrator Agent: Built on Agent Framework 1.0 (Python), managing the full hiring lifecycle workflow graph.
-• 9+ Specialist Agents: Hiring Request Agent, Job Description Agent, Sourcing Agent, Screening Agent, Interview Scheduling Agent, Assessment Agent, Offer Management Agent, Compliance Agent (multi-jurisdiction), Onboarding Agent.
-• Advanced Capabilities: MAI-Voice-1 for voice interview transcription, MAI-Transcribe-1 for multi-language support, Fabric agents for analytics and reporting, A2A integration with external recruitment platforms.
-• Control Plane: HR Business Partner dashboard managing 15-20 concurrent hiring workflows. Real-time status, exception routing, bulk HITL for batch decisions.
-• Multi-Jurisdiction Compliance: Policy-as-code for employment law compliance across WPP's global operations. Data residency enforcement per region. GDPR-compliant candidate data handling.
-
-Delivery Approach: 12-week POC sprint following POC 1. Joint engineering team with dedicated HR domain expertise. Fortnightly demos and go/no-go checkpoint at week 6.
-14. High-Level Delivery Plan [Delivery partner?]
-PhaseTimelineActivitiesDependenciesFoundationWeeks 1-2Environment setup, identity federation (Okta/Entra), Foundry project provisioning, development environment configurationWPP sandbox access, Okta configPOC 1 BuildWeeks 3-10Agent development, system integration (Workday, D365 F&O, Maconomy), Control Plane configuration, testingWPP sandbox APIs, finance SME accessPOC 1 DemoWeek 10Live demonstration of P2P workflow with Control Plane, stakeholder reviewWPP stakeholder availabilityPOC 2 BuildWeeks 11-22Advanced agent development, voice/analytics integration, multi-jurisdiction compliance, Control Plane for HRPOC 1 lessons, HR SME accessPOC 2 DemoWeek 22Live demonstration of talent lifecycle with full advanced capabilitiesWPP stakeholder availabilityEvaluationWeeks 23-24Joint evaluation against scorecard, lessons learned, production roadmap planningAll stakeholders
-Team Composition: Microsoft Technical Lead (Solution Architect), 2-3 Microsoft Engineers (Agent Framework, Foundry), Microsoft AI Specialist, Microsoft Security and Governance Lead, EY Advisory (process design and transformation). WPP to provide domain SMEs, sandbox environments, and engineering counterparts.
-15. Commercial Proposal Overview [Phil / Steve M / Marta?]
-A detailed commercial proposal with TCO breakdown will be provided as a separate deliverable. This section outlines our approach:
-
-• Licensing Model: Consumption-based Azure pricing for Foundry Agent Service (pay-per-agent-run, storage, compute). Microsoft 365 Copilot and Copilot Studio licensing per user. Volume discounts aligned with WPP's existing Enterprise Agreement.
-• Transparency: Full cost breakdowns per agent run, per model call, per storage unit. No hidden orchestration fees.
-• Scalability: Pricing scales linearly. No cliff pricing at volume thresholds.
-• POC Investment: Microsoft will co-invest engineering resources for both POCs as a demonstration of partnership commitment.
-• Partnership Terms: Multi-year strategic partnership with dedicated account engineering, quarterly business reviews, and priority roadmap input.
-16. Customer References [Scott / Artur?]
-Microsoft will provide the following with our full submission:
-
-1. Written testimonials from 3 enterprise customers using Microsoft's agentic framework at scale (comparable to WPP in size and complexity).
-2. Reference contacts: 3 customers available for direct calls, each with Engineering Lead, AI/ML Ops Lead, and Head of Transformation (SVP+).
-
-Reference customers will be confirmed upon mutual NDA execution and will include organisations in media, financial services, and professional services sectors.
-17. Portability and Exit Strategy [Scott / Artur?]
-Per §6.3 of the brief, Microsoft is committed to open standards and portability:
-
-• Agent Definitions: Exportable as YAML/JSON configuration files. Not locked to proprietary formats.
-• Orchestration Graphs: Declarative, human-readable, and portable to other workflow engines.
-• State and Memory: Extractable via standard APIs and data export tools.
-• Open-Source Framework: Microsoft Agent Framework 1.0 is fully open-source (MIT licence). WPP retains the ability to self-host, fork, or migrate.
-• Open Protocols: A2A and MCP are open standards. Agent definitions using these protocols are portable to any compliant platform.
-• Data Export: Full data export capabilities for all agent data, telemetry, and audit logs via Azure APIs.
-18. References
-[1] WPPET-1-Enterprise-Agent-Framework-Vendor-Brief-260331.docx
-[2] Microsoft Agent Framework Version 1.0 - Microsoft Dev Blog
-[3] What is Microsoft Foundry Control Plane - Microsoft Learn
-[4] Copilot Studio Multi-Agent Orchestration Update - Microsoft Copilot Blog
-[5] Manage Agent Identities with Microsoft Entra ID - Microsoft Learn
-[6] Agent Factory: Connecting Agents with MCP and A2A - Azure Blog
-[7] Foundry Control Plane Product Page - Microsoft Azure
-[8] Addressing OWASP Top 10 Risks in Agentic AI with Copilot Studio - Microsoft Security Blog
-[9] Governing Agent Identities - Microsoft Entra ID Governance - Microsoft Learn
-[10] Microsoft Formalizes AI Agent Stack at Build 2025 - Pure AI
-
-
---- End of Document ---
-Microsoft  |  WPP Enterprise Agent Capability Framework Response
-
-Confidential	Page 2
-
