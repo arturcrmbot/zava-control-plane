@@ -8,13 +8,19 @@ These sections replace §4–§13 and §16–§17 in the vendor response documen
 
 ### 4.1 Microsoft Agent Stack Overview
 
-Our architecture has three tiers, a central governance layer, and a custom Control Plane UI.
+Our architecture expresses the **determinism ↔ agentic spectrum** explicitly across three cooperating execution layers, with a Fleet Manager observing from above, a central governance layer, and a custom Control Plane UI.
 
-**Tier 1 — Fleet Managers**: always-on [GHCP SDK](https://github.com/github/copilot-sdk) Hosted Agents on Azure AI Foundry. Domain-scoped (hiring, finance, compliance). Consume telemetry from all workflows via Azure Event Grid. Reason about fleet health, SLA risk, anomalies. Compose the exception queue for the Control Plane. Push assessments via SignalR.
+**Deterministic by default, agentic by exception.** WPP's processes contain both rule-driven steps (three-way match, jurisdiction routing, payment file generation) and reasoning-driven steps (CV triage, voice screening, compliance narrative review). Mixing them cleanly requires a layered substrate:
 
-**Tier 2 — Workflow Orchestration**: [Azure Durable Functions](https://learn.microsoft.com/en-us/azure/azure-functions/durable/durable-functions-overview) (GA). One orchestration instance per workflow. Routes events to agentic loops. HITL waits at zero compute (days or weeks). Timer escalation. Parallel fan-out/fan-in. Checkpoint/replay with geo-replicated state in Azure Storage.
+**Fleet Managers**: always-on [GHCP SDK](https://github.com/github/copilot-sdk) Hosted Agents on Azure AI Foundry. Domain-scoped (hiring, finance, compliance). Consume telemetry from all workflows via Azure Event Grid. Reason about fleet health, SLA risk, anomalies. Compose the exception queue for the Control Plane. Push assessments via SignalR.
 
-**Tier 3 — Agentic Loops**: ephemeral GHCP SDK sessions on [Foundry Hosted Agents](https://learn.microsoft.com/en-us/azure/foundry/agents/concepts/hosted-agents). Triggered per workflow phase. Each session loads [skills](https://github.com/github/copilot-sdk/blob/main/docs/features/skills.md) and [MCP tools](https://github.com/github/copilot-sdk/blob/main/docs/features/mcp.md) for the task, reasons about it, writes state to Cosmos DB, emits [OTEL telemetry](https://github.com/github/copilot-sdk/blob/main/docs/observability/opentelemetry.md), and exits.
+**Layer 1 — Durable envelope**: [Azure Durable Functions](https://learn.microsoft.com/en-us/azure/azure-functions/durable/durable-functions-overview) (GA). One orchestration instance per workflow. Owns phase boundaries, HITL waits at zero compute (days or weeks), timer escalation, parallel fan-out/fan-in, checkpoint/replay with geo-replicated state in Azure Storage. Fully deterministic — code-defined, event-sourced replay.
+
+**Layer 2 — Workflow graph**: [Microsoft Agent Framework (MAF) workflows](https://learn.microsoft.com/en-us/agent-framework/workflows/) (v1.0 GA) connected to DF via the [durable task extension](https://learn.microsoft.com/en-us/agent-framework/integrations/azure-functions) — Microsoft's [Durable Agent Orchestration](https://learn.microsoft.com/en-us/agent-framework/tutorials/agents/orchestrate-durable-agents) pattern (Feb 2026). Each workflow phase is a graph of typed executors: plain-function executors for deterministic operations, agent executors where LLM reasoning is required, and validator executors between them (judge/executor separation expressed as two nodes and an edge). Pregel BSP execution. MAF's own pause/resume and checkpointing are preserved across DF replay.
+
+**Layer 3 — Agent executor contents**: ephemeral GHCP SDK sessions on [Foundry Hosted Agents](https://learn.microsoft.com/en-us/azure/foundry/agents/concepts/hosted-agents). Invoked only from MAF agent executor nodes. Each session loads [skills](https://github.com/github/copilot-sdk/blob/main/docs/features/skills.md) and [MCP tools](https://github.com/github/copilot-sdk/blob/main/docs/features/mcp.md) for the task, reasons about it, calls tools through [hooks](https://github.com/github/copilot-sdk/blob/main/docs/features/hooks.md), writes state to Cosmos DB, emits [OTEL telemetry](https://github.com/github/copilot-sdk/blob/main/docs/observability/opentelemetry.md), and returns a typed result to its MAF executor.
+
+**Skill crystallisation** is the evolution path: proven agent executors graduate from LLM-generated to deterministic code, versioned as skills in API Center, and swapped into the MAF graph as plain-function executors — agent executor preserved as fallback for exceptions.
 
 **Central Governance** sits alongside all three tiers:
 
@@ -32,10 +38,10 @@ Our architecture has three tiers, a central governance layer, and a custom Contr
 
 | Layer | What It Is | Components |
 |-------|-----------|------------|
-| **Framework** | The agentic runtime, orchestration engine, state store, governance, tool integration, knowledge grounding, and observability. | GHCP SDK, Foundry Hosted Agents, Durable Functions, APIM AI Gateway + API Center, Foundry IQ + Fabric IQ + Work IQ (Intelligence Layer), Foundry Control Plane, Agent 365 + Entra, Cosmos DB, Application Insights, Log Analytics |
+| **Framework** | The agent runtime, workflow graph engine, durable orchestration envelope, state store, governance, tool integration, knowledge grounding, and observability. | GHCP SDK (agent runtime), Microsoft Agent Framework (workflow graph), Foundry Hosted Agents, Durable Functions (durable envelope), APIM AI Gateway + API Center, Foundry IQ + Fabric IQ + Work IQ (Intelligence Layer), Foundry Control Plane, Agent 365 + Entra, Cosmos DB, Application Insights, Log Analytics |
 | **Surfaces** | The channels through which humans interact with agents and agent outputs. | M365 Copilot (Teams), Email (Adaptive Cards), Custom Control Plane UI (React), Web Portal, Voice (ACS + GPT-Realtime), ServiceNow |
 
-A single domain agent (e.g. Hiring Agent) is surface-agnostic. The same agentic loop produces outputs that the human's Personal Agent (PA) delivers to whatever surface that human uses. The PA is a GHCP SDK agent surfaced in M365 Copilot via [M365 Agents SDK](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/publish). Every human has one. Humans make all decisions. The PA prepares and executes.
+A single domain agent (e.g. Hiring Agent) is surface-agnostic. The same agent executors inside its MAF workflows produce outputs that the human's Personal Agent (PA) delivers to whatever surface that human uses. The PA is a GHCP SDK agent surfaced in M365 Copilot via [M365 Agents SDK](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/publish). Every human has one. Humans make all decisions. The PA prepares and executes.
 
 ### 4.3 Control Plane Architecture
 
@@ -60,11 +66,16 @@ Data sources for the custom UI: Application Insights APIs (traces, cost), Foundr
 
 ### 4.4 Multi-Agent Orchestration
 
-We do not use separate agent processes for each specialist role. Instead, skills provide specialisation within a single agentic loop per domain.
+We do not use separate agent processes for each specialist role. Instead, skills provide specialisation within agent executors in a MAF workflow graph, per domain.
 
-A domain-scoped Hosted Agent (e.g. Hiring Agent, `hiring-agent@wpp`) runs ephemeral GHCP SDK sessions that load different skills depending on the workflow phase. Each skill defines its own role, allowed tools, model assignment, and governance rules. The outcome — specialised capabilities with distinct roles and model assignments — matches WPP's requirement for heterogeneous teams. The architectural advantages over separate agents: no inter-agent communication overhead, shared workflow context without message passing, simpler governance (one Entra identity per domain), easier operationalisation at fleet scale.
+A domain-scoped Hosted Agent (e.g. Hiring Agent, `hiring-agent@wpp`) runs ephemeral GHCP SDK sessions from MAF agent executors, each loading different skills depending on the workflow phase. Each skill defines its own role, allowed tools, model assignment, and governance rules. The outcome — specialised capabilities with distinct roles and model assignments — matches WPP's requirement for heterogeneous teams. The architectural advantages over separate agents: no inter-agent communication overhead, shared workflow context without message passing, simpler governance (one Entra identity per domain), easier operationalisation at fleet scale.
 
-Durable Functions coordinates phase sequencing. Supported topologies: sequential (interview after screening), parallel fan-out/fan-in (sourcing + job design concurrently), conditional (compliance flag triggers additional review), timer escalation, HITL waits at zero compute. The orchestration adapts based on runtime data — not a static DAG.
+**Two coordination substrates, layered**:
+
+- **Within a phase — MAF workflow graph**: Pregel BSP execution, typed edges, fan-out/fan-in, conditional routing, validator executors, pause/resume. Stable MAF orchestration patterns (sequential, concurrent, handoff, group chat, Magentic-One) cover the multi-agent topologies WPP requires.
+- **Across phases — Azure Durable Functions**: long-running envelope, HITL waits at zero compute (days/weeks), timer escalation, checkpoint/replay, geo-replicated state. Invokes each phase's MAF workflow as a durable activity via the MAF durable task extension.
+
+Both substrates adapt based on runtime data — not static DAGs. Supported topologies end-to-end: sequential (interview after screening), parallel fan-out/fan-in (sourcing + job design concurrently), conditional (compliance flag triggers additional review branch in the MAF graph), timer escalation, bulk HITL.
 
 ---
 
@@ -74,12 +85,12 @@ Durable Functions coordinates phase sequencing. Supported topologies: sequential
 
 | Capability | Solution | Status |
 |-----------|---------|--------|
-| Multi-agent orchestration | Durable Functions + skills-based specialisation within GHCP SDK agentic loops | GA (Durable Functions), Tech Preview (GHCP SDK) |
-| Stateful workflow management | Cosmos DB (workflow state, action ledger) + Durable Functions (orchestration state in Azure Storage) | GA |
+| Multi-agent orchestration | Two-layer: Durable Functions (across phases) + MAF workflows (within phase) + skills-based specialisation in GHCP SDK agent executors | GA (DF, MAF v1.0, MAF Durable Task extension), Tech Preview (GHCP SDK) |
+| Stateful workflow management | Cosmos DB (workflow state, action ledger) + Durable Functions (orchestration state in Azure Storage) + MAF workflow checkpointing preserved across DF replay | GA |
 | Tool/function integration | MCP servers governed through APIM. REST-to-MCP gateway auto-generates tool definitions from OpenAPI specs. | GA (APIM), [MCP preview](https://learn.microsoft.com/en-us/azure/api-management/export-rest-mcp-server) |
 | Connectors | MCP servers for Workday, Greenhouse, LinkedIn, D365 F&O, Maconomy, ServiceNow, MS Graph, ACS, HeyGen — all via APIM | Custom build per connector |
-| Human-in-the-loop | GHCP SDK hooks intercept non-revocable actions. Durable Functions `wait_for_external_event` at zero compute. PA surfaces decisions to humans. Agent 365 routes to right person. | GA (Durable Functions), custom (HITL flow) |
-| Durable execution | Durable Functions checkpoint/replay. Cosmos DB continuous backup with PITR. Geo-replicated state. | GA |
+| Human-in-the-loop | GHCP SDK hooks intercept non-revocable actions inside agent executors. MAF validator executors enforce structural/policy checks before non-revocable executors fire. Durable Functions `wait_for_external_event` at zero compute for long waits. PA surfaces decisions to humans. Agent 365 routes to right person. | GA (Durable Functions, MAF), custom (HITL flow) |
+| Durable execution | Durable Functions checkpoint/replay envelope + MAF native pause/resume preserved across DF replay (via MAF Durable Task extension). Cosmos DB continuous backup with PITR. Geo-replicated state. | GA |
 | Memory | Cosmos DB (facts + episodic), skills (procedural), Foundry IQ (semantic retrieval), Fabric IQ (business ontology), Work IQ (M365 episodic), GHCP SDK session (working) | GA (data stores), Preview (IQ products), custom (memory patterns) |
 | Model-agnostic | GHCP SDK works with any model from Foundry catalog (1900+). Per-skill model assignment. APIM routes and governs. | GA |
 | Control Plane | Foundry Control Plane (platform) + Custom Control Plane UI (operator experience) | GA (Foundry) + custom build |
@@ -89,18 +100,18 @@ Durable Functions coordinates phase sequencing. Supported topologies: sequential
 | Capability | Solution | Status |
 |-----------|---------|--------|
 | Rollback / compensating actions | Action ledger tracks revocable vs non-revocable. Hooks block non-revocable before execution. Durable Functions triggers compensating actions on rollback. | Custom build (proven pattern) |
-| Self-healing | Durable Functions [retry with backoff](https://learn.microsoft.com/en-us/azure/azure-functions/durable/durable-functions-error-handling). APIM [circuit breakers and model failover](https://learn.microsoft.com/en-us/azure/api-management/backends). Fleet Manager routes exceptions to humans. | GA |
-| Multi-surface engagement | PA delivers to Teams, Email, Control Plane UI, ServiceNow, Web, Voice — all from the same agentic loop output | GA (M365 Agents SDK) + custom (Control Plane UI, voice) |
+| Self-healing | Durable Functions [retry with backoff](https://learn.microsoft.com/en-us/azure/azure-functions/durable/durable-functions-error-handling). MAF workflow conditional routing to recovery branches. APIM [circuit breakers and model failover](https://learn.microsoft.com/en-us/azure/api-management/backends). Fleet Manager routes exceptions to humans. | GA |
+| Multi-surface engagement | PA delivers to Teams, Email, Control Plane UI, ServiceNow, Web, Voice — all from the same agent executor output | GA (M365 Agents SDK) + custom (Control Plane UI, voice) |
 | A2A with off-platform agents | [APIM A2A governance](https://learn.microsoft.com/en-us/azure/api-management/agent-to-agent-api): AgentCards, JSON-RPC, SSE | Preview |
 | Evaluation framework | [Foundry Evaluators](https://learn.microsoft.com/en-us/azure/foundry/concepts/built-in-evaluators): task adherence, tool call accuracy, safety, groundedness, sensitive data exposure. Continuous evaluation on production traffic. | GA |
-| Workflow crystallisation | Skills graduate from generative (LLM-driven) to deterministic (code). API Center lifecycle gates (Design → Production). Exception fallback to generative. | Custom build |
+| Workflow crystallisation | Agent executors in the MAF graph graduate from generative (LLM-driven) to deterministic (plain-function) as patterns mature. Skills versioned through API Center lifecycle gates (Design → Production). Agent executor preserved as exception fallback. | Custom build |
 
 ### 5.3 Advanced Capabilities
 
 | Capability | Solution | Status |
 |-----------|---------|--------|
 | Voice screening | [GPT-Realtime](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/realtime-audio) (speech-to-speech) + [ACS Call Automation](https://learn.microsoft.com/en-us/azure/communication-services/concepts/call-automation/call-automation). [MAI-Voice-1](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/mai-voices) (TTS, preview). | GA (GPT-Realtime, ACS), Preview (MAI-Voice-1) |
-| Avatar onboarding video | Agentic loop generates script. HeyGen API MCP produces branded video. | Custom MCP server |
+| Avatar onboarding video | Agent executor drafts script; downstream deterministic executor calls HeyGen API MCP to produce branded video. | Custom MCP server |
 | Fine-tuning | [Azure AI Foundry fine-tuning](https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/fine-tuning-overview). We prioritise skill crystallisation over model fine-tuning. | GA |
 | Knowledge extraction | Threadlight accelerator: creates skills from interviews and unstructured data. | Built, demonstrated |
 
@@ -126,7 +137,7 @@ Agent 365 provides lifecycle management (activate, block, delete), [Conditional 
 
 Three layers of observability:
 
-1. **[Foundry Tracing](https://learn.microsoft.com/en-us/azure/foundry/observability/how-to/trace-agent-setup)**: every agentic loop emits OTEL spans via [GHCP SDK OTEL](https://github.com/github/copilot-sdk/blob/main/docs/observability/opentelemetry.md) TracerProvider. Model calls, tool calls, tokens, latency, cost. Spans carry workflow ID, phase, jurisdiction, model, token count.
+1. **[Foundry Tracing](https://learn.microsoft.com/en-us/azure/foundry/observability/how-to/trace-agent-setup)**: every GHCP SDK session (inside a MAF agent executor) emits OTEL spans via [GHCP SDK OTEL](https://github.com/github/copilot-sdk/blob/main/docs/observability/opentelemetry.md) TracerProvider; MAF workflow execution emits executor-lifecycle spans natively; DF emits orchestration spans. Model calls, tool calls, tokens, latency, cost. Spans carry workflow ID, phase, jurisdiction, model, token count.
 2. **APIM metrics**: [token usage](https://learn.microsoft.com/en-us/azure/api-management/llm-emit-token-metric-policy), latency, errors per model/tool/agent. Central cost tracking.
 3. **Fleet Manager assessment**: event-driven reasoning over telemetry. Fleet health, anomaly detection, SLA risk, exception prioritisation. This is the default Control Plane view.
 
@@ -191,10 +202,10 @@ Supported OAuth 2.0 grant types: Authorization Code, Client Credentials, SAML-br
 | **Low-code agents** | Citizen developers | Copilot Studio visual designer for conversational agents and simpler workflows. Supported via Agent 365 (not Foundry Hosted Agents). Custom Control Plane UI natively supports Copilot Studio agents. Not recommended for complex autonomous workflows. |
 | **Low-code MCP tools** | IT teams adding tools without writing Python | [Azure Logic Apps](https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview) visual workflows chaining 1,400+ prebuilt connectors. Logic App exposed as MCP tool via APIM REST→MCP gateway. Governed identically to hand-written MCP servers. |
 | **Low-code config** | Operators, process owners | Custom Control Plane UI: skill library (browse, fork, customise), tool catalog, governance rules, autonomy dials, template management. No code required. |
-| **Agentic builder** | Domain experts | Agentic loop generates SKILL.md files from natural language specifications. Registered in API Center. Human reviews and approves. Built and demonstrated. |
+| **Agentic builder** | Domain experts | A MAF agent executor generates SKILL.md files from natural language specifications. Registered in API Center. Human reviews and approves. Built and demonstrated. |
 | **Knowledge extraction** | Transitioning staff, SMEs | Threadlight accelerator: creates skills from interviews and unstructured data. Produces machine-actionable SKILL.md files. |
 
-All agent artefacts are Git-committable: skills as SKILL.md, MCP server code, APIM policies as code, Durable Functions orchestrations, autonomy thresholds. Low-code artefacts (Copilot Studio) register through Agent 365 alongside pro-code artefacts.
+All agent artefacts are Git-committable: skills as SKILL.md, MCP server code, APIM policies as code, MAF workflow definitions (Python/.NET), Durable Functions orchestrations, autonomy thresholds. Low-code artefacts (Copilot Studio) register through Agent 365 alongside pro-code artefacts.
 
 ---
 
@@ -240,17 +251,21 @@ A team of 5 developers manages 50 agents across dev, staging, and production usi
 
 **MCP integrations**: Workday, Dynamics 365 F&O, Maconomy — all governed through APIM AI Gateway. Sandbox/mock APIs provided by WPP.
 
+**Execution shape**: a Durable Functions orchestration per invoice. Each phase (intake, validation, routing, approval, payment, reconciliation) is a MAF workflow graph. Most executors are plain functions; agent executors are used only where genuine reasoning is needed; validator executors sit between agent output and any downstream non-revocable action.
+
 **Demonstrates**:
-- Multi-phase workflow orchestration via Durable Functions
-- HITL approval gates (Finance BP interacts via Adaptive Card in Outlook, routed through PA)
+- Deterministic-by-default MAF workflow graph (three-way match, payment file generation, routing are plain functions — no LLM)
+- Agent executors limited to low-confidence OCR extraction, GL coding reasoning, exception classification — each followed by a validator executor
+- Multi-phase orchestration via Durable Functions, with each phase invoked as a durable activity wrapping a MAF workflow
+- HITL approval gates (Finance BP interacts via Adaptive Card in Outlook, routed through PA; DF `wait_for_external_event` at zero compute)
 - Bulk approval for batched low-risk items
-- Rollback and compensating transactions (non-revocable actions gated by hooks)
+- Rollback and compensating transactions (non-revocable actions gated by GHCP SDK hooks inside agent executors AND by MAF validator executors)
 - Fleet Manager monitoring 30–50 concurrent workflows
 - Exception-only Control Plane view
-- OTEL cost attribution per invoice
-- Foundry Guardrails (PII detection, content safety)
+- OTEL cost attribution per invoice across all three layers
+- Foundry Guardrails inside agent executors (PII detection, content safety)
 - Full audit trail from receipt to payment
-- Mid-workflow platform restart with resume from checkpoint
+- Mid-workflow platform restart with DF replay and MAF workflow checkpoint resume
 
 ---
 
@@ -268,18 +283,22 @@ A team of 5 developers manages 50 agents across dev, staging, and production usi
 
 **MCP integrations**: Greenhouse ATS, LinkedIn Recruiter, Workday (hiring), Microsoft Graph (calendar/email), ServiceNow (IT provisioning), Azure Communication Services (voice), HeyGen (avatar) — all governed through APIM AI Gateway.
 
+**Execution shape**: a Durable Functions orchestration per hire. The ~10 phases (budget & approvals, job design, sourcing, CV triage, voice screening, interview coordination, compliance, offer, JML onboarding, avatar welcome) are each MAF workflow graphs. Deterministic executors dominate (sourcing queries, interview scheduling, JML provisioning tickets, offer letter templating, HeyGen video generation). Agent executors are bounded — JD drafting, CV scoring, voice screening, compliance narrative, offer personalisation. Validator executors enforce structural and policy checks between agent output and downstream action.
+
 **Demonstrates** (all POC 1 capabilities plus):
-- Voice screening with structured scoring (GPT-Realtime + ACS)
-- CV parsing with crystallisation pipeline (skill promotion from generative to deterministic via API Center)
-- Episodic memory (recall past hires levelled too low)
+- Layered orchestration: DF envelope across 12 weeks + MAF workflow graphs per phase + GHCP SDK sessions in agent executors
+- Deterministic-by-default graphs annotated per phase (see [solution.md §15](../solution/solution.md)) — transparently shows what is code vs what is LLM
+- Voice screening with structured scoring (GPT-Realtime + ACS) followed by validator executor
+- CV parsing with crystallisation pipeline (agent CV scorer → deterministic classifier in API Center, agent preserved as fallback)
+- Episodic memory (recall past hires levelled too low) via workflow state store + Fabric IQ
 - A2A interop with external candidate agent (APIM-governed)
-- Jurisdiction-aware compliance (USA vs Germany enforcement switching via APIM routing + jurisdiction-specific skills + Foundry Guardrails)
-- Autonomy dials (configurable auto-shortlist thresholds, adjustable at runtime)
+- Jurisdiction-aware compliance (USA vs Germany enforcement switching via APIM routing + jurisdiction-specific skills + Foundry Guardrails + MAF validator executors for GDPR consent, EU AI Act classification)
+- Autonomy dials (configurable auto-shortlist thresholds, adjustable at runtime — controls whether a phase routes to agent executor or falls back to deterministic baseline)
 - Skill amplification (Fleet Manager surfaces policy + precedents)
-- Process evolution (Fleet Manager proposes improvements after completed workflows)
+- Process evolution (Fleet Manager proposes crystallisation candidates after completed workflows)
 - Synthetic CV evaluation (500 CVs via Foundry Evaluators for bias/accuracy testing)
 - Avatar onboarding video (HeyGen API MCP)
-- Threadlight knowledge extraction demo (interview HR SME, produce executable skills)
+- Threadlight knowledge extraction demo (interview HR SME, produce executable skills in the MAF graph)
 - 5 humans across 4 timezones interacting simultaneously via different surfaces
 
 ---
@@ -319,6 +338,7 @@ Exit strategy: export skills (Git), export MCP servers (code), export state (Cos
 | Constraint | Impact | Mitigation |
 |-----------|--------|-----------|
 | GHCP SDK in tech preview | API surface may change | Core patterns (skills, MCP, hooks) proven in production. MIT open-source. |
+| Microsoft Agent Framework v1.0 (Oct 2025) | Framework is young | Core runtime and workflows are GA. MAF durable task extension for Azure Functions is productised by Microsoft as the Durable Agent Orchestration pattern. Orchestration patterns stable. Fallback: GHCP SDK + DF combination works without MAF — MAF adds the deterministic graph primitive. |
 | Foundry Hosted Agents: max 5 replicas (preview) | Scaling ceiling | Multiple deployments, or Azure Container Apps with Foundry telemetry. |
 | Foundry Guardrails tool-call interception (preview) | May not be GA for POC | GHCP SDK session hooks provide equivalent enforcement. Guardrails are additive. |
 | APIM A2A governance (preview) | A2A features maturing | Not required for core architecture. HTTP gateway primitives work today. |
@@ -370,3 +390,10 @@ Exit strategy: export skills (Git), export MCP servers (code), export state (Cos
 | 33 | [Fabric IQ overview](https://learn.microsoft.com/en-us/fabric/iq/overview) |
 | 34 | [Work IQ MCP overview](https://learn.microsoft.com/en-us/microsoft-copilot-studio/use-work-iq) |
 | 35 | [Azure Logic Apps](https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview) |
+| 36 | [Microsoft Agent Framework overview](https://learn.microsoft.com/en-us/agent-framework/overview/) |
+| 37 | [MAF Workflows](https://learn.microsoft.com/en-us/agent-framework/workflows/) |
+| 38 | [MAF Workflow Executors](https://learn.microsoft.com/en-us/agent-framework/workflows/executors) |
+| 39 | [MAF Durable Task Extension for Azure Functions](https://learn.microsoft.com/en-us/agent-framework/integrations/azure-functions) |
+| 40 | [MAF Durable Agent Orchestration tutorial](https://learn.microsoft.com/en-us/agent-framework/tutorials/agents/orchestrate-durable-agents) |
+| 41 | [MAF v1.0 release announcement](https://devblogs.microsoft.com/agent-framework/microsoft-agent-framework-version-1-0/) |
+| 42 | [Building Human-in-the-Loop AI Workflows with MAF](https://techcommunity.microsoft.com/blog/azure-ai-foundry-blog/building-human-in-the-loop-ai-workflows-with-microsoft-agent-framework/4460342) |

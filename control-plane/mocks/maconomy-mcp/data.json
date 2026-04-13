@@ -1,0 +1,7 @@
+{
+  "projects": [
+    { "id": "PRJ-A1", "name": "Ogilvy US — Client A Q3 Campaign", "budget": 250000, "spent": 123400 },
+    { "id": "PRJ-B2", "name": "GroupM — Client B Digital", "budget": 180000, "spent": 45000 },
+    { "id": "PRJ-C3", "name": "Wunderman — Client C Rebrand", "budget": 420000, "spent": 391000 }
+  ]
+}

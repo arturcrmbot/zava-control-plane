@@ -1,0 +1,4 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+export default function PhaseTimeline({ phases }) {
+    return (_jsx("div", { className: "space-y-1", children: phases.map(p => (_jsxs("div", { className: "flex items-center gap-3 text-xs border border-slate-800 rounded px-2 py-1.5 bg-slate-900/30", children: [_jsx("div", { className: "w-32 text-slate-200", children: p.name }), _jsx("div", { className: `text-[10px] uppercase ${p.status === "completed" ? "text-emerald-400" : p.status === "in_progress" ? "text-blue-400" : "text-slate-500"}`, children: p.status }), p.startedAt && p.completedAt && _jsxs("div", { className: "text-slate-500", children: [p.completedAt - p.startedAt, " ms"] }), _jsxs("div", { className: "ml-auto text-slate-500", children: [p.toolCalls.length, " tools"] })] }, p.name))) }));
+}

@@ -1,0 +1,14 @@
+{
+  "purchaseOrders": [
+    { "id": "PO-10001", "vendorId": "V-001", "amount": 12500.00, "currency": "USD", "lineCount": 3, "openBalance": 12500.00 },
+    { "id": "PO-10002", "vendorId": "V-002", "amount": 8400.00, "currency": "USD", "lineCount": 2, "openBalance": 8400.00 },
+    { "id": "PO-10003", "vendorId": "V-003", "amount": 47000.00, "currency": "USD", "lineCount": 5, "openBalance": 47000.00 },
+    { "id": "PO-10004", "vendorId": "V-005", "amount": 3200.00, "currency": "USD", "lineCount": 1, "openBalance": 3200.00 },
+    { "id": "PO-10005", "vendorId": "V-006", "amount": 22000.00, "currency": "USD", "lineCount": 4, "openBalance": 22000.00 }
+  ],
+  "glAccounts": [
+    { "id": "GL-5000", "name": "Media Production Costs" },
+    { "id": "GL-5100", "name": "Talent Fees" },
+    { "id": "GL-5200", "name": "Post-Production" }
+  ]
+}

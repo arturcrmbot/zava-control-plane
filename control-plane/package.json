@@ -1,0 +1,52 @@
+{
+  "name": "wpp-control-plane",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n vite,server,mcp \"npm:dev:client\" \"npm:dev:server\" \"npm:dev:mcp\"",
+    "dev:client": "vite",
+    "dev:server": "tsx watch src/server/index.ts",
+    "dev:mcp": "concurrently -k -n wd,d365,mac,pay \"tsx watch mocks/workday-mcp/server.ts\" \"tsx watch mocks/d365-mcp/server.ts\" \"tsx watch mocks/maconomy-mcp/server.ts\" \"tsx watch mocks/payment-mcp/server.ts\"",
+    "build": "tsc && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "*",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@rollup/rollup-win32-x64-msvc": "^4.60.1",
+    "@tailwindcss/oxide-win32-x64-msvc": "^4.2.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^5.0.0",
+    "js-yaml": "^4.1.0",
+    "lightningcss-win32-x64-msvc": "^1.32.0",
+    "lucide-react": "^0.400.0",
+    "nanoid": "^5.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.0.0",
+    "recharts": "^2.12.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "autoprefixer": "^10.4.0",
+    "concurrently": "^9.0.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "vitest": "^2.0.0"
+  }
+}

@@ -56,19 +56,25 @@
 
         <!-- ================================== -->
         <!-- ORCHESTRATION (Row 3, y=290) -->
+        <!-- Two-layer: Durable envelope (DF) + Workflow graph (MAF) -->
         <!-- ================================== -->
-        <mxCell id="orch_group" value="&lt;b&gt;Orchestration&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;fontSize=11;fontStyle=1;arcSize=6;" vertex="1" parent="1">
-          <mxGeometry x="120" y="290" width="850" height="100" as="geometry"/>
+        <mxCell id="orch_group" value="&lt;b&gt;Orchestration — Durable Envelope + MAF Workflow Graphs&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;fontSize=11;fontStyle=1;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="120" y="290" width="850" height="120" as="geometry"/>
         </mxCell>
-        <mxCell id="df" value="&lt;b&gt;Azure Durable Functions&lt;/b&gt;&lt;br&gt;&lt;i&gt;1 instance per workflow&lt;/i&gt;&lt;br&gt;&lt;i&gt;Checkpoint/replay · HITL waits @ 0 compute&lt;/i&gt;&lt;br&gt;&lt;i&gt;Timer escalation · Fan-out/fan-in&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
-          <mxGeometry x="140" y="315" width="280" height="65" as="geometry"/>
+        <mxCell id="df" value="&lt;b&gt;Azure Durable Functions&lt;/b&gt; &lt;i&gt;(durable envelope)&lt;/i&gt;&lt;br&gt;&lt;i&gt;1 orchestration per workflow · HITL @ 0 compute (days/weeks)&lt;/i&gt;&lt;br&gt;&lt;i&gt;Checkpoint/replay · Timer escalation · Geo-replicated state&lt;/i&gt;&lt;br&gt;&lt;i&gt;Invokes MAF workflows as durable activities&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="140" y="312" width="280" height="65" as="geometry"/>
         </mxCell>
-        <mxCell id="eg" value="&lt;b&gt;Event Grid&lt;/b&gt;&lt;br&gt;&lt;i&gt;Telemetry transport&lt;/i&gt;&lt;br&gt;&lt;i&gt;Loops + DF → Fleet Mgrs&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+        <mxCell id="maf" value="&lt;b&gt;MAF Workflow (v1.0)&lt;/b&gt; &lt;i&gt;(per-phase graph)&lt;/i&gt;&lt;br&gt;&lt;i&gt;Typed executors · Pregel BSP · Fan-out/fan-in&lt;/i&gt;&lt;br&gt;&lt;i&gt;Plain-function / agent / validator nodes&lt;/i&gt;&lt;br&gt;&lt;i&gt;Durable Task extension ↔ DF · Pause/resume preserved&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="140" y="380" width="280" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="eg" value="&lt;b&gt;Event Grid&lt;/b&gt;&lt;br&gt;&lt;i&gt;Telemetry transport&lt;/i&gt;&lt;br&gt;&lt;i&gt;DF + MAF + GHCP SDK → Fleet Mgrs&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
           <mxGeometry x="445" y="315" width="190" height="65" as="geometry"/>
         </mxCell>
         <mxCell id="fm" value="&lt;b&gt;Fleet Managers&lt;/b&gt;&lt;br&gt;&lt;i&gt;GHCP SDK Hosted Agents&lt;/i&gt;&lt;br&gt;&lt;i&gt;Hiring · Finance · Compliance&lt;/i&gt;&lt;br&gt;&lt;i&gt;Exception composition · SLA · Drift&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
           <mxGeometry x="660" y="315" width="280" height="65" as="geometry"/>
         </mxCell>
+        <!-- DF → MAF edge: durable activity invocation -->
+        <mxCell id="a_df_maf" value="Durable activity (MAF Durable Task ext.)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;fontSize=8;startArrow=classic;endArrow=classic;" edge="1" source="df" target="maf" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
 
         <!-- Arrows: Surfaces → Orchestration -->
         <mxCell id="a_pa_df" value="Trigger / Raise events" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;fontSize=8;" edge="1" source="pa" target="df" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
@@ -77,69 +83,88 @@
         <mxCell id="a_eg_fm" value="Telemetry" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;fontSize=8;" edge="1" source="eg" target="fm" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
 
         <!-- ================================== -->
-        <!-- AGENTIC LOOPS (Row 4, y=430) -->
+        <!-- MAF WORKFLOW EXECUTORS (Row 4, y=445) -->
+        <!-- Grey = deterministic plain-function executor -->
+        <!-- Teal = agent executor (GHCP SDK session on Foundry Hosted Agent) -->
         <!-- ================================== -->
-        <!-- Hiring Agent -->
-        <mxCell id="hiring_group" value="&lt;b&gt;Hiring Agent&lt;/b&gt; — hiring-agent@wpp — GHCP SDK on Foundry Hosted Agent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;verticalAlign=top;fontSize=11;fontStyle=1;arcSize=6;" vertex="1" parent="1">
-          <mxGeometry x="120" y="430" width="850" height="75" as="geometry"/>
+        <!-- Hiring MAF Workflow -->
+        <mxCell id="hiring_group" value="&lt;b&gt;Hiring MAF Workflow&lt;/b&gt; — hiring-agent@wpp — agent executors run GHCP SDK sessions on Foundry Hosted Agent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;verticalAlign=top;fontSize=11;fontStyle=1;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="120" y="445" width="850" height="75" as="geometry"/>
         </mxCell>
-        <mxCell id="h1" value="Budget" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="130" y="455" width="70" height="35" as="geometry"/>
+        <mxCell id="h1" value="Budget" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ebebeb;strokeColor=#666666;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="130" y="470" width="70" height="35" as="geometry"/>
         </mxCell>
         <mxCell id="h2" value="Job Design" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="210" y="455" width="75" height="35" as="geometry"/>
+          <mxGeometry x="210" y="470" width="75" height="35" as="geometry"/>
         </mxCell>
-        <mxCell id="h3" value="Sourcing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="295" y="455" width="70" height="35" as="geometry"/>
+        <mxCell id="h3" value="Sourcing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ebebeb;strokeColor=#666666;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="295" y="470" width="70" height="35" as="geometry"/>
         </mxCell>
         <mxCell id="h4" value="Triage" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="375" y="455" width="60" height="35" as="geometry"/>
+          <mxGeometry x="375" y="470" width="60" height="35" as="geometry"/>
         </mxCell>
         <mxCell id="h5" value="Screening" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="445" y="455" width="75" height="35" as="geometry"/>
+          <mxGeometry x="445" y="470" width="75" height="35" as="geometry"/>
         </mxCell>
-        <mxCell id="h6" value="Interview" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="530" y="455" width="70" height="35" as="geometry"/>
+        <mxCell id="h6" value="Interview" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ebebeb;strokeColor=#666666;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="530" y="470" width="70" height="35" as="geometry"/>
         </mxCell>
         <mxCell id="h7" value="Compliance" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="610" y="455" width="80" height="35" as="geometry"/>
+          <mxGeometry x="610" y="470" width="80" height="35" as="geometry"/>
         </mxCell>
         <mxCell id="h8" value="Offer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="700" y="455" width="55" height="35" as="geometry"/>
+          <mxGeometry x="700" y="470" width="55" height="35" as="geometry"/>
         </mxCell>
-        <mxCell id="h9" value="Onboarding" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="765" y="455" width="80" height="35" as="geometry"/>
+        <mxCell id="h9" value="Onboarding" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ebebeb;strokeColor=#666666;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="765" y="470" width="80" height="35" as="geometry"/>
         </mxCell>
         <mxCell id="h10" value="Voice" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="855" y="455" width="55" height="35" as="geometry"/>
+          <mxGeometry x="855" y="470" width="55" height="35" as="geometry"/>
         </mxCell>
 
-        <!-- Finance Agent -->
-        <mxCell id="finance_group" value="&lt;b&gt;Finance Agent&lt;/b&gt; — finance-agent@wpp — GHCP SDK on Foundry Hosted Agent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;verticalAlign=top;fontSize=11;fontStyle=1;arcSize=6;" vertex="1" parent="1">
-          <mxGeometry x="120" y="530" width="600" height="75" as="geometry"/>
+        <!-- Finance MAF Workflow -->
+        <mxCell id="finance_group" value="&lt;b&gt;Finance MAF Workflow&lt;/b&gt; — finance-agent@wpp — agent executors run GHCP SDK sessions on Foundry Hosted Agent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;verticalAlign=top;fontSize=11;fontStyle=1;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="120" y="540" width="600" height="75" as="geometry"/>
         </mxCell>
         <mxCell id="f1" value="Intake/OCR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="135" y="555" width="75" height="35" as="geometry"/>
+          <mxGeometry x="135" y="565" width="75" height="35" as="geometry"/>
         </mxCell>
-        <mxCell id="f2" value="Validation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="220" y="555" width="75" height="35" as="geometry"/>
+        <mxCell id="f2" value="Validation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ebebeb;strokeColor=#666666;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="220" y="565" width="75" height="35" as="geometry"/>
         </mxCell>
         <mxCell id="f3" value="Routing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="305" y="555" width="65" height="35" as="geometry"/>
+          <mxGeometry x="305" y="565" width="65" height="35" as="geometry"/>
         </mxCell>
-        <mxCell id="f4" value="Approval" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="380" y="555" width="70" height="35" as="geometry"/>
+        <mxCell id="f4" value="Approval" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ebebeb;strokeColor=#666666;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="380" y="565" width="70" height="35" as="geometry"/>
         </mxCell>
-        <mxCell id="f5" value="Payment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="460" y="555" width="70" height="35" as="geometry"/>
+        <mxCell id="f5" value="Payment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ebebeb;strokeColor=#666666;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="460" y="565" width="70" height="35" as="geometry"/>
         </mxCell>
         <mxCell id="f6" value="Reconciliation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;fontSize=9;" vertex="1" parent="1">
-          <mxGeometry x="540" y="555" width="90" height="35" as="geometry"/>
+          <mxGeometry x="540" y="565" width="90" height="35" as="geometry"/>
         </mxCell>
 
-        <!-- Arrows: Orchestration ↔ Agentic Loops -->
-        <mxCell id="a_df_hiring" value="Trigger per phase" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#00897b;fontSize=8;" edge="1" source="df" target="hiring_group" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
-        <mxCell id="a_df_finance" value="Trigger per phase" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#00897b;fontSize=8;" edge="1" source="df" target="finance_group" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <!-- Legend: executor colour meaning -->
+        <mxCell id="legend_det" value="&lt;b&gt;■&lt;/b&gt; Deterministic executor (plain function)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="740" y="540" width="230" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="legend_det_swatch" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ebebeb;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="740" y="542" width="14" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="legend_agent" value="&lt;b&gt;■&lt;/b&gt; Agent executor (GHCP SDK + hooks + validator downstream)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;fontSize=9;align=left;" vertex="1" parent="1">
+          <mxGeometry x="740" y="564" width="230" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="legend_agent_swatch" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#00897b;" vertex="1" parent="1">
+          <mxGeometry x="740" y="566" width="14" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="legend_note" value="&lt;i&gt;Deterministic by default, agentic by exception. Validator executors between agent and downstream non-revocable executors.&lt;/i&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;fontSize=8;align=left;" vertex="1" parent="1">
+          <mxGeometry x="740" y="588" width="230" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrows: MAF → MAF workflow graphs (per-phase invocation) -->
+        <mxCell id="a_maf_hiring" value="Agent executors invoke GHCP SDK" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#00897b;fontSize=8;" edge="1" source="maf" target="hiring_group" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="a_maf_finance" value="Agent executors invoke GHCP SDK" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#00897b;fontSize=8;" edge="1" source="maf" target="finance_group" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
         <mxCell id="a_hiring_eg" value="Telemetry" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#aaaaaa;fontSize=8;dashed=1;" edge="1" source="hiring_group" target="eg" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
 
         <!-- ================================== -->
