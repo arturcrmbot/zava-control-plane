@@ -1,0 +1,902 @@
+[
+  {
+    "ticket_id": "INC0001001",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "SQL DB instances unresponsive on ivosql05w",
+    "notes": "Hello Team,Could you please check the mode of sql db instances on host ivosql05w. MSSQL:TPSWebShop MSSQL:ChangeAuditor2014 MSSQL:CTX-ITCLogging MSSQL:ActiveRoles73 MSSQL:TPS_Performance MSSQL:CTX-ITCMonitoring MSSQL:msdb MSSQL:ITC_ICMS MSSQL:ReportServer MSSQL:BDSMgmt MSSQL:CTX-ITCSite MSSQL:master MSSQL:BDSMgmt_UDS MSSQL:ITC MSSQL:Airwatch MSSQL:ReportServerTempDB Thankyou.",
+    "ci_hint": "ivosql05w",
+    "correct_resolver_group": "DBA-SQL-Europe"
+  },
+  {
+    "ticket_id": "INC0001002",
+    "priority": "P3",
+    "category": "Application",
+    "summary": "CRM portal login page returning 502",
+    "notes": "Users reporting 502 Bad Gateway when accessing CRM portal. Looks like tomcat on lnxapp12p might be down. Nginx reverse proxy is returning errors. Started around 06:15 UTC. Approximately 200 users affected in DE region.",
+    "ci_hint": "lnxapp12p",
+    "correct_resolver_group": "App-Support-CRM"
+  },
+  {
+    "ticket_id": "INC0001003",
+    "priority": "P4",
+    "category": "Infrastructure",
+    "summary": "Citrix session freezing intermittently",
+    "notes": "Multiple users in London office reporting Citrix sessions freezing for 10-15 seconds then recovering. Happening since yesterday afternoon. XenApp farm on winctx03p. StoreFront seems fine but app enumeration is slow. No pattern identified yet.",
+    "ci_hint": "winctx03p",
+    "correct_resolver_group": "EUC-Citrix-Support"
+  },
+  {
+    "ticket_id": "INC0001004",
+    "priority": "P3",
+    "category": "Network",
+    "summary": "NetScaler VIP not responding for Citrix gateway",
+    "notes": "Citrix Gateway VIP on netscaler-eu-01 is not responding. SSL offload might be misconfigured after last change window. GlobalProtect users cannot connect to Citrix. Need urgent check on ADC config.",
+    "ci_hint": "netscaler-eu-01",
+    "correct_resolver_group": "Network-LoadBalancer-EU"
+  },
+  {
+    "ticket_id": "INC0001005",
+    "priority": "P3",
+    "category": "Storage",
+    "summary": "SnapMirror replication lag exceeding threshold",
+    "notes": "Monitoring alert: SnapMirror replication on san-stor-eu-04 showing 6 hour lag. Threshold is 1 hour. Affects DB replication for SQL servers. NetApp FAS8200 might need volume cleanup. Please check and remediate.",
+    "ci_hint": "san-stor-eu-04",
+    "correct_resolver_group": "Storage-NetApp-Europe"
+  },
+  {
+    "ticket_id": "INC0001006",
+    "priority": "P4",
+    "category": "Infrastructure",
+    "summary": "VM performance degradation on ESXi cluster",
+    "notes": "Several VMs on esx-cl-eu-05 showing high CPU ready times. vSAN performance seems degraded. NSX-T microsegmentation rules might be contributing. Cluster has 87% memory utilization. Need VMware team to investigate.",
+    "ci_hint": "esx-cl-eu-05",
+    "correct_resolver_group": "Virtualization-VMware-EU"
+  },
+  {
+    "ticket_id": "INC0001007",
+    "priority": "P3",
+    "category": "Application",
+    "summary": "Billing API gateway returning timeout errors",
+    "notes": "billing-api-gateway on azvm-billing-01 throwing 504 timeout errors since 14:00 UTC. Event processor seems backed up. Downstream Azure SQL might be slow. Customer billing portal affected. Need cloud team to check the Azure VM and related services.",
+    "ci_hint": "azvm-billing-01",
+    "correct_resolver_group": "Cloud-Azure-Billing"
+  },
+  {
+    "ticket_id": "INC0001008",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "Azure SQL billing database high DTU consumption",
+    "notes": "AzureSQL:BillingTransactions on azsql-billing-01 running at 98% DTU for past 2 hours. Reporting queries seem to be blocking transaction processing. Need DBA to check query plans and potentially kill long-running sessions.",
+    "ci_hint": "azsql-billing-01",
+    "correct_resolver_group": "Cloud-Azure-DBA"
+  },
+  {
+    "ticket_id": "INC0001009",
+    "priority": "P3",
+    "category": "Identity",
+    "summary": "AD replication failure between domain controllers",
+    "notes": "DCDIAG showing replication failure between ad-dc-eu-01 and ad-dc-eu-02. Last successful replication was 8 hours ago. DNS resolution intermittent. Users in some sites getting stale group policy. Certificate Services also showing warnings.",
+    "ci_hint": "ad-dc-eu-01",
+    "correct_resolver_group": "Identity-ActiveDirectory-EU"
+  },
+  {
+    "ticket_id": "INC0001010",
+    "priority": "P4",
+    "category": "Collaboration",
+    "summary": "Exchange OWA slow for external users",
+    "notes": "Outlook Web Access on exch-mb-eu-03 very slow for users connecting from outside corporate network. Transport queues look normal. Mailbox database might need maintenance. F5 health check is passing but response times are high.",
+    "ci_hint": "exch-mb-eu-03",
+    "correct_resolver_group": "Messaging-Exchange-EU"
+  },
+  {
+    "ticket_id": "INC0001011",
+    "priority": "P3",
+    "category": "Application",
+    "summary": "SAP ECC app server dumps during period-end close",
+    "notes": "SAP ECC application server sap-app-eu-01 generating short dumps during FI period-end closing. ABAP stack showing ST22 dumps with memory allocation errors. Basis team needs to check instance parameters and possibly restart the app server.",
+    "ci_hint": "sap-app-eu-01",
+    "correct_resolver_group": "SAP-Basis-Europe"
+  },
+  {
+    "ticket_id": "INC0001012",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "HANA system replication showing WARNING status",
+    "notes": "SAP HANA on sap-db-eu-01 system replication status changed from ACTIVE to WARNING. Replication mode is SYNCMEM. Log shipping delay increasing. Need HANA DBA to check and ensure DR readiness is maintained.",
+    "ci_hint": "sap-db-eu-01",
+    "correct_resolver_group": "SAP-HANA-DBA-Europe"
+  },
+  {
+    "ticket_id": "INC0001013",
+    "priority": "P4",
+    "category": "Monitoring",
+    "summary": "Splunk search head returning incomplete results",
+    "notes": "Splunk search head on mon-splunk-eu-01 not returning results from last 4 hours. Indexer seems to be running but search peer connection might be broken. Storage on san-stor-eu-04 might be full. Ops team please investigate.",
+    "ci_hint": "mon-splunk-eu-01",
+    "correct_resolver_group": "Monitoring-Splunk-EU"
+  },
+  {
+    "ticket_id": "INC0001014",
+    "priority": "P3",
+    "category": "Security",
+    "summary": "GlobalProtect VPN users cannot authenticate",
+    "notes": "GlobalProtect VPN on fw-palo-eu-01 rejecting authentication attempts. Threat Prevention logs showing false positives. Panorama management connectivity is fine. Users working from home cannot connect. Security team please review firewall policies.",
+    "ci_hint": "fw-palo-eu-01",
+    "correct_resolver_group": "Security-Firewall-EU"
+  },
+  {
+    "ticket_id": "INC0001015",
+    "priority": "P3",
+    "category": "Application",
+    "summary": "Self-service portal API returning 500 errors",
+    "notes": "Customer self-service portal on lnxweb14p returning HTTP 500 on all API calls. Node.js API gateway process crashed. Nginx upstream showing no healthy backends. Might need app restart and log analysis.",
+    "ci_hint": "lnxweb14p",
+    "correct_resolver_group": "App-Support-SelfService"
+  },
+  {
+    "ticket_id": "INC0001016",
+    "priority": "P4",
+    "category": "Infrastructure",
+    "summary": "AKS pods in CrashLoopBackOff state",
+    "notes": "Multiple pods in k8s-cl-eu-prod namespace billing-prod stuck in CrashLoopBackOff. ArgoCD last sync failed. Istio sidecar injection might be causing issues after recent mesh upgrade. Need Kubernetes team to investigate.",
+    "ci_hint": "k8s-cl-eu-prod",
+    "correct_resolver_group": "Cloud-Kubernetes-EU"
+  },
+  {
+    "ticket_id": "INC0001017",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "PostgreSQL replication slot consuming disk space",
+    "notes": "PostgreSQL crm_prod on lnxdb09p replication slot is not being consumed. WAL files accumulating rapidly. Disk at 92%. Need DBA to either drop the orphaned slot or fix the subscriber. Affects CRM database availability.",
+    "ci_hint": "lnxdb09p",
+    "correct_resolver_group": "DBA-PostgreSQL-Europe"
+  },
+  {
+    "ticket_id": "INC0001018",
+    "priority": "P3",
+    "category": "Storage",
+    "summary": "Pure Storage ActiveCluster split-brain detected",
+    "notes": "Pure FlashArray on san-stor-eu-07 showing ActiveCluster mediator connectivity loss. Risk of split-brain scenario. SAP HANA and CRM databases depend on this array. Storage team urgent review needed.",
+    "ci_hint": "san-stor-eu-07",
+    "correct_resolver_group": "Storage-Pure-Europe"
+  },
+  {
+    "ticket_id": "INC0001019",
+    "priority": "P4",
+    "category": "Infrastructure",
+    "summary": "EMC VMAX SRDF replication paused",
+    "notes": "SRDF replication on san-stor-eu-02 shows paused state since last night. EMC VMAX health check passing but replication RPO is not being met. Exchange mailbox stores depend on this. Need storage team to resume and verify consistency.",
+    "ci_hint": "san-stor-eu-02",
+    "correct_resolver_group": "Storage-EMC-Europe"
+  },
+  {
+    "ticket_id": "INC0001020",
+    "priority": "P3",
+    "category": "Network",
+    "summary": "Database VLAN connectivity issues between sites",
+    "notes": "Intermittent connectivity drops on vlan-db-eu-120 between primary and DR sites. SQL replication and HANA system replication both affected. Packet loss around 5%. Network team please check trunk configuration and STP.",
+    "ci_hint": "vlan-db-eu-120",
+    "correct_resolver_group": "Network-Infrastructure-EU"
+  },
+  {
+    "ticket_id": "INC0001021",
+    "priority": "P4",
+    "category": "Database",
+    "summary": "SQL Server TempDB growth on ivosql08w",
+    "notes": "TempDB on ivosql08w growing uncontrollably. BillingCore and RatingEngine databases seem to be generating large temp table operations. Disk space on temp drive at 95%. Need SQL DBA to identify the culprit queries and clean up.",
+    "ci_hint": "ivosql08w",
+    "correct_resolver_group": "DBA-SQL-Europe"
+  },
+  {
+    "ticket_id": "INC0001022",
+    "priority": "P3",
+    "category": "Application",
+    "summary": "CRM batch jobs failing overnight",
+    "notes": "Overnight batch processing on lnxapp12p failed at step 3 of 7. Tomcat logs showing connection pool exhaustion to PostgreSQL backend. crm_prod database on lnxdb09p might have hit connection limits. Need app support to investigate batch scheduler and connection config.",
+    "ci_hint": "lnxapp12p",
+    "correct_resolver_group": "App-Support-CRM"
+  },
+  {
+    "ticket_id": "INC0001023",
+    "priority": "P3",
+    "category": "Network",
+    "summary": "F5 pool member health check failing for CRM",
+    "notes": "F5 LTM on f5-lb-eu-02 showing pool member lnxapp12p as down. iRules for CRM traffic not matching. Health monitor returning HTTP 503. GTM still directing traffic to this pool. Load balancer team please check.",
+    "ci_hint": "f5-lb-eu-02",
+    "correct_resolver_group": "Network-LoadBalancer-EU"
+  },
+  {
+    "ticket_id": "INC0001024",
+    "priority": "P4",
+    "category": "Identity",
+    "summary": "Group Policy not applying to new OU",
+    "notes": "New organizational unit created in AD on ad-dc-eu-02 but GPO inheritance seems blocked. DNS resolution is fine. Global Catalog queries returning stale results for this OU. Need AD team to check replication and GPO links.",
+    "ci_hint": "ad-dc-eu-02",
+    "correct_resolver_group": "Identity-ActiveDirectory-EU"
+  },
+  {
+    "ticket_id": "INC0001025",
+    "priority": "P3",
+    "category": "Application",
+    "summary": "SAP transport import stuck in queue",
+    "notes": "Transport request K900456 stuck in import queue on sap-app-eu-01. STMS showing status 'running' for over 3 hours. Other transports are blocked behind it. Basis team needs to check tp process and potentially reset the queue.",
+    "ci_hint": "sap-app-eu-01",
+    "correct_resolver_group": "SAP-Basis-Europe"
+  },
+  {
+    "ticket_id": "INC0001026",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "HANA backup failing with disk space error",
+    "notes": "SAP HANA backup on sap-db-eu-01 failing with 'insufficient disk space' error. Backup catalog shows last successful full backup was 3 days ago. Log backups also failing. Storage on san-stor-eu-07 needs to be checked. HANA DBA please investigate urgently.",
+    "ci_hint": "sap-db-eu-01",
+    "correct_resolver_group": "SAP-HANA-DBA-Europe"
+  },
+  {
+    "ticket_id": "INC0001027",
+    "priority": "P4",
+    "category": "Monitoring",
+    "summary": "Splunk forwarders not sending data from DB servers",
+    "notes": "Universal forwarders on database servers not sending logs to mon-splunk-eu-01 indexer. Last data received from SQL and PostgreSQL servers was 12 hours ago. Might be a certificate expiry issue on the forwarder. Splunk team please check deployment server config.",
+    "ci_hint": "mon-splunk-eu-01",
+    "correct_resolver_group": "Monitoring-Splunk-EU"
+  },
+  {
+    "ticket_id": "INC0001028",
+    "priority": "P3",
+    "category": "Security",
+    "summary": "Firewall blocking legitimate API traffic",
+    "notes": "Palo Alto fw-palo-eu-01 blocking outbound API calls from billing system to payment gateway. Threat Prevention identifying traffic as suspicious. Started after latest threat signature update. Security team needs to create exception rule.",
+    "ci_hint": "fw-palo-eu-01",
+    "correct_resolver_group": "Security-Firewall-EU"
+  },
+  {
+    "ticket_id": "INC0001029",
+    "priority": "P3",
+    "category": "Infrastructure",
+    "summary": "AKS node pool autoscaler not scaling up",
+    "notes": "k8s-cl-eu-prod cluster autoscaler stuck. Pending pods waiting for scheduling but no new nodes being provisioned. Azure subscription might have hit core quota. Istio control plane also showing resource pressure. Kubernetes team please review.",
+    "ci_hint": "k8s-cl-eu-prod",
+    "correct_resolver_group": "Cloud-Kubernetes-EU"
+  },
+  {
+    "ticket_id": "INC0001030",
+    "priority": "P4",
+    "category": "Application",
+    "summary": "Self-service portal session timeout too aggressive",
+    "notes": "Customers complaining about being logged out of self-service portal after 5 minutes of form filling. lnxweb14p nginx config or node.js session management might need adjustment. This is a config issue not a crash. App team please review session TTL settings.",
+    "ci_hint": "lnxweb14p",
+    "correct_resolver_group": "App-Support-SelfService"
+  },
+  {
+    "ticket_id": "INC0001031",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "SQL Agent jobs failing on billing server",
+    "notes": "Multiple SQL Agent jobs on ivosql08w failing since last night. BillingArchive maintenance job and RatingEngine ETL both affected. Error log shows login failed for service account. Might be a password expiry issue. SQL DBA team please check.",
+    "ci_hint": "ivosql08w",
+    "correct_resolver_group": "DBA-SQL-Europe"
+  },
+  {
+    "ticket_id": "INC0001032",
+    "priority": "P3",
+    "category": "Infrastructure",
+    "summary": "VM cannot vMotion between ESXi hosts",
+    "notes": "vMotion failing on esx-cl-eu-05 cluster. Error: CPU incompatibility between hosts. EVC mode might need reconfiguration after recent host hardware refresh. Several VMs stuck on single host creating resource imbalance. VMware team please investigate.",
+    "ci_hint": "esx-cl-eu-05",
+    "correct_resolver_group": "Virtualization-VMware-EU"
+  },
+  {
+    "ticket_id": "INC0001033",
+    "priority": "P4",
+    "category": "Network",
+    "summary": "Application VLAN high broadcast traffic",
+    "notes": "vlan-app-eu-200 showing unusual broadcast traffic levels. 40% increase since yesterday. Affecting application response times for CRM and self-service portal. Network team please identify source and implement broadcast suppression if needed.",
+    "ci_hint": "vlan-app-eu-200",
+    "correct_resolver_group": "Network-Infrastructure-EU"
+  },
+  {
+    "ticket_id": "INC0001034",
+    "priority": "P3",
+    "category": "Collaboration",
+    "summary": "Exchange transport queues backing up",
+    "notes": "Transport queues on exch-mb-eu-03 growing rapidly. Over 5000 messages in queue. Delivery to external recipients failing. Possible DNS issue or relay restriction. F5 mail relay VIP seems fine. Exchange team please check transport rules and connector config.",
+    "ci_hint": "exch-mb-eu-03",
+    "correct_resolver_group": "Messaging-Exchange-EU"
+  },
+  {
+    "ticket_id": "INC0001035",
+    "priority": "P3",
+    "category": "Storage",
+    "summary": "NetApp aggregate nearly full on production filer",
+    "notes": "NetApp aggregate aggr1 on san-stor-eu-04 at 94% capacity. Auto-grow on several volumes hitting limits. SQL server data volumes and Splunk index volumes on this aggregate. Need storage team to add disks or migrate volumes. SnapMirror destination also affected.",
+    "ci_hint": "san-stor-eu-04",
+    "correct_resolver_group": "Storage-NetApp-Europe"
+  },
+  {
+    "ticket_id": "INC0001036",
+    "priority": "P3",
+    "category": "Application",
+    "summary": "Billing event processor dropping messages",
+    "notes": "billing-event-processor on azvm-billing-01 dropping approximately 15% of incoming events. Event queue depth growing. Azure metrics show high CPU on the VM. Might need vertical scaling or code optimization. Cloud billing team please investigate.",
+    "ci_hint": "azvm-billing-01",
+    "correct_resolver_group": "Cloud-Azure-Billing"
+  },
+  {
+    "ticket_id": "INC0001037",
+    "priority": "P4",
+    "category": "Database",
+    "summary": "Azure SQL long-running query blocking reports",
+    "notes": "AzureSQL:BillingReporting on azsql-billing-01 has a query running for 4+ hours blocking all reporting. session_id 187. Appears to be a full table scan on transactions table. Cloud DBA please check and terminate if appropriate.",
+    "ci_hint": "azsql-billing-01",
+    "correct_resolver_group": "Cloud-Azure-DBA"
+  },
+  {
+    "ticket_id": "INC0001038",
+    "priority": "P3",
+    "category": "Identity",
+    "summary": "Certificate Services CA certificate expiring in 7 days",
+    "notes": "Enterprise CA on ad-dc-eu-01 root certificate expiring in 7 days. All certificate-based authentication will fail. Citrix, VPN, and wireless all depend on this. AD/PKI team needs to renew the CA cert and update all dependent services.",
+    "ci_hint": "ad-dc-eu-01",
+    "correct_resolver_group": "Identity-ActiveDirectory-EU"
+  },
+  {
+    "ticket_id": "INC0001039",
+    "priority": "P3",
+    "category": "Application",
+    "summary": "CRM audit trail not writing to database",
+    "notes": "CRM audit log entries not appearing in crm_audit database. Application on lnxapp12p generating audit events but PostgreSQL writes on lnxdb09p seem to be failing silently. Data retention compliance at risk. App and DBA teams may both need to look.",
+    "ci_hint": "lnxapp12p",
+    "correct_resolver_group": "App-Support-CRM"
+  },
+  {
+    "ticket_id": "INC0001040",
+    "priority": "P4",
+    "category": "Infrastructure",
+    "summary": "Citrix StoreFront not enumerating all published apps",
+    "notes": "StoreFront on winctx03p only showing 12 of 45 published applications. XenApp farm enumeration timing out for some delivery groups. Users in IT department affected most. Citrix team please check delivery controller connectivity and app group config.",
+    "ci_hint": "winctx03p",
+    "correct_resolver_group": "EUC-Citrix-Support"
+  },
+  {
+    "ticket_id": "INC0001041",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "SQL mirroring session disconnected",
+    "notes": "Hi team, the sql mirroring on ivosql05w for MSSQL:ITC_ICMS and MSSQL:BDSMgmt databases shows DISCONNECTED status. Witness server reachable. Endpoint might be blocked by firewall change last night. DBA please check mirroring endpoints and re-establish session. Thanks.",
+    "ci_hint": "ivosql05w",
+    "correct_resolver_group": "DBA-SQL-Europe"
+  },
+  {
+    "ticket_id": "INC0001042",
+    "priority": "P3",
+    "category": "Storage",
+    "summary": "SAN switch port errors causing I/O latency",
+    "notes": "Pure FlashArray san-stor-eu-07 showing intermittent high I/O latency. Root cause appears to be CRC errors on SAN switch san-switch-eu-02 ports. SAP HANA performance affected. Storage team please coordinate with SAN fabric team to replace suspect SFP.",
+    "ci_hint": "san-stor-eu-07",
+    "correct_resolver_group": "Storage-Pure-Europe"
+  },
+  {
+    "ticket_id": "INC0001043",
+    "priority": "P4",
+    "category": "Security",
+    "summary": "Panorama losing connectivity to firewall",
+    "notes": "Panorama management server panorama-mgmt-eu-01 intermittently losing connectivity to fw-palo-eu-01. Config pushes failing. Firewall still operational but policy updates not being applied. Security team please check management plane connectivity.",
+    "ci_hint": "fw-palo-eu-01",
+    "correct_resolver_group": "Security-Firewall-EU"
+  },
+  {
+    "ticket_id": "INC0001044",
+    "priority": "P3",
+    "category": "Application",
+    "summary": "SAP background job RSEOUT00 failing with ORA error",
+    "notes": "Background job RSEOUT00 on sap-app-eu-01 failing with DBIF_RSQL_SQL_ERROR. Error points to HANA connection timeout. Job runs outbound IDoc processing. Basis team please check RFC connections and HANA response times.",
+    "ci_hint": "sap-app-eu-01",
+    "correct_resolver_group": "SAP-Basis-Europe"
+  },
+  {
+    "ticket_id": "INC0001045",
+    "priority": "P3",
+    "category": "Infrastructure",
+    "summary": "ArgoCD sync failing for billing namespace",
+    "notes": "ArgoCD on k8s-cl-eu-prod showing OutOfSync for billing-prod namespace. Git repository accessible but Helm chart rendering failing. Image pull from azacr-eu-01 also timing out. Kubernetes team please investigate sync failure and registry connectivity.",
+    "ci_hint": "k8s-cl-eu-prod",
+    "correct_resolver_group": "Cloud-Kubernetes-EU"
+  },
+  {
+    "ticket_id": "INC0001046",
+    "priority": "P4",
+    "category": "Network",
+    "summary": "NetScaler GSLB health monitor false alarms",
+    "notes": "GSLB service on netscaler-eu-01 marking EU site as down despite all services running. Health monitor probe interval might be too aggressive. DNS failover triggering unnecessarily sending traffic to US site. Load balancer team please tune GSLB monitor.",
+    "ci_hint": "netscaler-eu-01",
+    "correct_resolver_group": "Network-LoadBalancer-EU"
+  },
+  {
+    "ticket_id": "INC0001047",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "PostgreSQL vacuum process blocked by long transaction",
+    "notes": "Autovacuum on lnxdb09p PostgreSQL:crm_prod blocked by a transaction open for 18 hours. Table bloat increasing. Transaction ID wraparound approaching warning threshold. PostgreSQL DBA please identify and terminate the blocking transaction.",
+    "ci_hint": "lnxdb09p",
+    "correct_resolver_group": "DBA-PostgreSQL-Europe"
+  },
+  {
+    "ticket_id": "INC0001048",
+    "priority": "P3",
+    "category": "Infrastructure",
+    "summary": "vSAN disk group decommissioned unexpectedly",
+    "notes": "vSAN disk group on one host in esx-cl-eu-05 showing decommissioned status. Data evacuation in progress causing high I/O on remaining hosts. No change record found for this action. VMware team please investigate and recomission if possible.",
+    "ci_hint": "esx-cl-eu-05",
+    "correct_resolver_group": "Virtualization-VMware-EU"
+  },
+  {
+    "ticket_id": "INC0001049",
+    "priority": "P4",
+    "category": "Collaboration",
+    "summary": "Exchange mailbox database failover during backup",
+    "notes": "Mailbox database on exch-mb-eu-03 failed over to passive copy during VSS backup window. Backup job triggered unexpected dismount. Users experienced brief email outage. Exchange team please review backup configuration and DAG health.",
+    "ci_hint": "exch-mb-eu-03",
+    "correct_resolver_group": "Messaging-Exchange-EU"
+  },
+  {
+    "ticket_id": "INC0001050",
+    "priority": "P3",
+    "category": "Storage",
+    "summary": "EMC VMAX performance advisor showing hotspots",
+    "notes": "Performance advisor on san-stor-eu-02 flagging disk hotspots on FA directors. Exchange mailbox LUNs affected. Response time exceeding 20ms threshold. SRDF replication also impacted. EMC storage team please rebalance workload across directors.",
+    "ci_hint": "san-stor-eu-02",
+    "correct_resolver_group": "Storage-EMC-Europe"
+  },
+  {
+    "ticket_id": "INC0001051",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "SQL Server deadlocks on billing RatingEngine",
+    "notes": "High deadlock rate detected on ivosql08w MSSQL:RatingEngine database. 47 deadlocks in last hour. Appears to be contention between real-time rating and batch reconciliation processes. SQL DBA please capture deadlock graphs and optimize locking strategy.",
+    "ci_hint": "ivosql08w",
+    "correct_resolver_group": "DBA-SQL-Europe"
+  },
+  {
+    "ticket_id": "INC0001052",
+    "priority": "P3",
+    "category": "Application",
+    "summary": "Self-service portal payment integration failing",
+    "notes": "Payment processing on lnxweb14p self-service portal returning errors for all credit card transactions. Node API gateway getting connection refused from payment provider endpoint. SSL certificate on the outbound call might be expired. App team please check.",
+    "ci_hint": "lnxweb14p",
+    "correct_resolver_group": "App-Support-SelfService"
+  },
+  {
+    "ticket_id": "INC0001053",
+    "priority": "P4",
+    "category": "Monitoring",
+    "summary": "Splunk license usage approaching daily limit",
+    "notes": "Splunk license usage on mon-splunk-eu-01 at 90% of daily quota with 6 hours remaining. If exceeded 5 times in 30 days, search will be disabled. Need to identify which sourcetypes are over-indexing and apply filtering. Splunk team please investigate.",
+    "ci_hint": "mon-splunk-eu-01",
+    "correct_resolver_group": "Monitoring-Splunk-EU"
+  },
+  {
+    "ticket_id": "INC0001054",
+    "priority": "P3",
+    "category": "Infrastructure",
+    "summary": "Azure VM billing-01 unresponsive to RDP",
+    "notes": "azvm-billing-01 not responding to RDP connections. Azure portal shows VM running but serial console shows OS hang. Billing API still partially responding. Need cloud team to diagnose via Azure serial console and potentially restart the VM.",
+    "ci_hint": "azvm-billing-01",
+    "correct_resolver_group": "Cloud-Azure-Billing"
+  },
+  {
+    "ticket_id": "INC0001055",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "HANA memory allocation errors during data load",
+    "notes": "SAP HANA sap-db-eu-01 throwing OOM errors during BW data load. Row store allocation failing. Column store memory also high. System replication secondary showing similar pressure. HANA DBA needs to analyze memory consumption and potentially unload unused tables.",
+    "ci_hint": "sap-db-eu-01",
+    "correct_resolver_group": "SAP-HANA-DBA-Europe"
+  },
+  {
+    "ticket_id": "INC0001056",
+    "priority": "P4",
+    "category": "Identity",
+    "summary": "DHCP scope exhausted in office subnet",
+    "notes": "DHCP scope on ad-dc-eu-01 for office subnet 10.50.0.0/23 is 98% utilized. New devices not getting IP addresses. Lease time is set to 8 days which seems too long. AD team please reduce lease duration and clean up stale reservations.",
+    "ci_hint": "ad-dc-eu-01",
+    "correct_resolver_group": "Identity-ActiveDirectory-EU"
+  },
+  {
+    "ticket_id": "INC0001057",
+    "priority": "P3",
+    "category": "Network",
+    "summary": "F5 iRule causing intermittent 503 for billing API",
+    "notes": "F5 f5-lb-eu-02 iRule for billing API traffic occasionally returning 503. Tcpdump shows valid backend responses but iRule HTTP_RESPONSE event dropping some connections. Might be a regex timeout in the rewrite rule. LB team please debug iRule logic.",
+    "ci_hint": "f5-lb-eu-02",
+    "correct_resolver_group": "Network-LoadBalancer-EU"
+  },
+  {
+    "ticket_id": "INC0001058",
+    "priority": "P3",
+    "category": "Application",
+    "summary": "CRM portal search returning stale results",
+    "notes": "CRM search on lnxapp12p returning customer data that was updated 48 hours ago. Elasticsearch index on the app server seems stale. Might be a reindex job failure. lnxdb09p PostgreSQL data is current. CRM app team please check indexing pipeline.",
+    "ci_hint": "lnxapp12p",
+    "correct_resolver_group": "App-Support-CRM"
+  },
+  {
+    "ticket_id": "INC0001059",
+    "priority": "P4",
+    "category": "Infrastructure",
+    "summary": "Citrix license server running low on concurrent licenses",
+    "notes": "Citrix license usage on winctx03p at 95% of available concurrent licenses. Users starting to get denied. Some sessions might be orphaned. Citrix team please check for ghost sessions and consider license reclaim interval adjustment.",
+    "ci_hint": "winctx03p",
+    "correct_resolver_group": "EUC-Citrix-Support"
+  },
+  {
+    "ticket_id": "INC0001060",
+    "priority": "P3",
+    "category": "Storage",
+    "summary": "Pure Storage snapshot schedule not running",
+    "notes": "Scheduled snapshots on san-stor-eu-07 not executing for past 24 hours. Protection group configuration looks intact but schedule shows last run as 'failed'. SAP HANA storage snapshots affected. Pure storage team please investigate scheduler and manual snap.",
+    "ci_hint": "san-stor-eu-07",
+    "correct_resolver_group": "Storage-Pure-Europe"
+  },
+  {
+    "ticket_id": "INC0001061",
+    "priority": "P3",
+    "category": "Security",
+    "summary": "Firewall policy pushing failing from Panorama",
+    "notes": "Policy push from panorama to fw-palo-eu-01 failing with commit error. New rules for billing API egress not being applied. Manual commit on the firewall works. Issue seems to be with Panorama template stack. Security team please investigate.",
+    "ci_hint": "fw-palo-eu-01",
+    "correct_resolver_group": "Security-Firewall-EU"
+  },
+  {
+    "ticket_id": "INC0001062",
+    "priority": "P4",
+    "category": "Infrastructure",
+    "summary": "NSX-T distributed firewall rule not applying",
+    "notes": "NSX-T DFW rule on esx-cl-eu-05 cluster not applying to newly created VMs. Security group membership seems correct but DFW status shows 'not realized'. Might be a transport node issue. VMware/NSX team please check.",
+    "ci_hint": "esx-cl-eu-05",
+    "correct_resolver_group": "Virtualization-VMware-EU"
+  },
+  {
+    "ticket_id": "INC0001063",
+    "priority": "P3",
+    "category": "Application",
+    "summary": "SAP ECC RFC connection pool exhausted",
+    "notes": "RFC connections from sap-app-eu-01 to external systems hitting pool limit. SM59 showing all connections in use. IDoc processing and BAPI calls queuing. Basis team please increase pool size or identify which RFC destination is leaking connections.",
+    "ci_hint": "sap-app-eu-01",
+    "correct_resolver_group": "SAP-Basis-Europe"
+  },
+  {
+    "ticket_id": "INC0001064",
+    "priority": "P3",
+    "category": "Infrastructure",
+    "summary": "Istio sidecar proxy high memory consumption",
+    "notes": "Envoy sidecar proxies in k8s-cl-eu-prod consuming 2x expected memory after mesh upgrade. OOMKilled events increasing. Service mesh control plane istiod also showing resource pressure. Kubernetes team please review proxy resource limits and mesh config.",
+    "ci_hint": "k8s-cl-eu-prod",
+    "correct_resolver_group": "Cloud-Kubernetes-EU"
+  },
+  {
+    "ticket_id": "INC0001065",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "Azure SQL geo-replication lag over 30 minutes",
+    "notes": "Geo-replication on azsql-billing-01 to secondary region showing 35 minute lag. Normally under 5 seconds. Possible network throttling or unusually large transaction batch. Cloud DBA please check replication health and identify blocking operations.",
+    "ci_hint": "azsql-billing-01",
+    "correct_resolver_group": "Cloud-Azure-DBA"
+  },
+  {
+    "ticket_id": "INC0001066",
+    "priority": "P4",
+    "category": "Network",
+    "summary": "DMZ VLAN firewall rules blocking monitoring probes",
+    "notes": "Monitoring probes from mon-splunk-eu-01 being blocked at vlan-dmz-eu-50 boundary. New firewall rules from last change window too restrictive. NetScaler and Palo Alto health checks from Splunk failing. Network team please update ACLs.",
+    "ci_hint": "netscaler-eu-01",
+    "correct_resolver_group": "Network-LoadBalancer-EU"
+  },
+  {
+    "ticket_id": "INC0001067",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "SQL Server log shipping delay on ivosql05w",
+    "notes": "Log shipping from ivosql05w to DR instance showing 4 hour delay. MSSQL:ITC and MSSQL:BDSMgmt databases affected. Backup job running but copy/restore jobs stuck. Network between primary and DR might be saturated. SQL DBA please check log shipping status and network.",
+    "ci_hint": "ivosql05w",
+    "correct_resolver_group": "DBA-SQL-Europe"
+  },
+  {
+    "ticket_id": "INC0001068",
+    "priority": "P3",
+    "category": "Application",
+    "summary": "Self-service portal CDN cache serving stale content",
+    "notes": "Static assets on self-service portal via lnxweb14p serving outdated CSS and JS after yesterday's release. Nginx cache headers might be incorrect. Users seeing broken layout. App team please purge CDN cache and verify cache-control headers.",
+    "ci_hint": "lnxweb14p",
+    "correct_resolver_group": "App-Support-SelfService"
+  },
+  {
+    "ticket_id": "INC0001069",
+    "priority": "P4",
+    "category": "Collaboration",
+    "summary": "Exchange auto-discover returning wrong endpoint",
+    "notes": "Outlook clients connecting to exch-mb-eu-03 getting incorrect autodiscover endpoint. Some users being directed to decommissioned server. SCP in AD might be stale. Exchange team please verify autodiscover SCP records in Active Directory.",
+    "ci_hint": "exch-mb-eu-03",
+    "correct_resolver_group": "Messaging-Exchange-EU"
+  },
+  {
+    "ticket_id": "INC0001070",
+    "priority": "P3",
+    "category": "Storage",
+    "summary": "NetApp volume auto-grow blocked by aggregate space",
+    "notes": "Critical: 3 volumes on san-stor-eu-04 trying to auto-grow but aggregate at max capacity. SQL tempdb volume, Splunk hot index volume, and SnapMirror journal all affected. Writes will start failing within hours. Storage team please expand aggregate urgently.",
+    "ci_hint": "san-stor-eu-04",
+    "correct_resolver_group": "Storage-NetApp-Europe"
+  },
+  {
+    "ticket_id": "INC0001071",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "PostgreSQL extension upgrade needed for CRM",
+    "notes": "CRM application release requires pg_trgm extension upgrade on lnxdb09p PostgreSQL:crm_prod from 1.4 to 1.6. Current version causing incorrect fuzzy search results. DBA team please schedule extension upgrade with minimal downtime.",
+    "ci_hint": "lnxdb09p",
+    "correct_resolver_group": "DBA-PostgreSQL-Europe"
+  },
+  {
+    "ticket_id": "INC0001072",
+    "priority": "P3",
+    "category": "Infrastructure",
+    "summary": "Azure Container Registry throttling image pulls",
+    "notes": "azacr-eu-01 throttling image pulls from k8s-cl-eu-prod AKS cluster. Rate limit exceeded during deployment rollout. Pods stuck in ImagePullBackOff. Kubernetes team please implement image pull caching and consider ACR tier upgrade.",
+    "ci_hint": "k8s-cl-eu-prod",
+    "correct_resolver_group": "Cloud-Kubernetes-EU"
+  },
+  {
+    "ticket_id": "INC0001073",
+    "priority": "P4",
+    "category": "Security",
+    "summary": "GlobalProtect split tunnel config not working",
+    "notes": "GlobalProtect VPN on fw-palo-eu-01 split tunnel configuration not routing internal traffic correctly. Users on VPN cannot reach SAP and CRM applications. Full tunnel works fine. Security team please check split tunnel include/exclude lists.",
+    "ci_hint": "fw-palo-eu-01",
+    "correct_resolver_group": "Security-Firewall-EU"
+  },
+  {
+    "ticket_id": "INC0001074",
+    "priority": "P3",
+    "category": "Application",
+    "summary": "CRM data import job stuck processing large CSV",
+    "notes": "Bulk data import on lnxapp12p CRM portal stuck at 45% processing a 2GB CSV file. Tomcat heap usage at maximum. Java GC pauses exceeding 30 seconds. Application not responding to other requests. CRM app team please increase heap and restart import with smaller batches.",
+    "ci_hint": "lnxapp12p",
+    "correct_resolver_group": "App-Support-CRM"
+  },
+  {
+    "ticket_id": "INC0001075",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "HANA delta merge not completing on large tables",
+    "notes": "Delta merge on sap-db-eu-01 for BW fact tables timing out. Delta store growing unbounded. Memory pressure increasing. HANA DBA please check merge token allocation and consider manual merge during low-activity window.",
+    "ci_hint": "sap-db-eu-01",
+    "correct_resolver_group": "SAP-HANA-DBA-Europe"
+  },
+  {
+    "ticket_id": "INC0001076",
+    "priority": "P4",
+    "category": "Identity",
+    "summary": "Kerberos authentication failing for SQL Server",
+    "notes": "Kerberos auth failing for MSSQL services on ivosql05w and ivosql08w. Applications falling back to NTLM causing performance issues. SPN registration on AD might be incorrect after server migration. AD team please verify and fix SPNs on ad-dc-eu-01.",
+    "ci_hint": "ad-dc-eu-01",
+    "correct_resolver_group": "Identity-ActiveDirectory-EU"
+  },
+  {
+    "ticket_id": "INC0001077",
+    "priority": "P3",
+    "category": "Infrastructure",
+    "summary": "EMC VMAX disk rebuild degrading performance",
+    "notes": "Disk rebuild in progress on san-stor-eu-02 VMAX after drive failure. Rebuild I/O competing with production workload. Exchange and application LUNs affected. ETA for rebuild completion unknown. Storage team please prioritize and monitor.",
+    "ci_hint": "san-stor-eu-02",
+    "correct_resolver_group": "Storage-EMC-Europe"
+  },
+  {
+    "ticket_id": "INC0001078",
+    "priority": "P3",
+    "category": "Application",
+    "summary": "Billing event processor duplicate message detection failing",
+    "notes": "billing-event-processor on azvm-billing-01 processing duplicate events. Idempotency check seems broken after last deployment. Customers being double-charged. Cloud billing team please rollback latest deployment and investigate duplicate detection logic.",
+    "ci_hint": "azvm-billing-01",
+    "correct_resolver_group": "Cloud-Azure-Billing"
+  },
+  {
+    "ticket_id": "INC0001079",
+    "priority": "P4",
+    "category": "Monitoring",
+    "summary": "Splunk dashboard not loading for operations team",
+    "notes": "Operations dashboard on mon-splunk-eu-01 search head timing out. Dashboard panels returning 'search job failed'. Concurrent search limit might be reached. Other dashboards working fine. Splunk team please check scheduled searches and search concurrency limits.",
+    "ci_hint": "mon-splunk-eu-01",
+    "correct_resolver_group": "Monitoring-Splunk-EU"
+  },
+  {
+    "ticket_id": "INC0001080",
+    "priority": "P3",
+    "category": "Network",
+    "summary": "NetScaler SSL certificate expiring on Citrix gateway VIP",
+    "notes": "SSL certificate on netscaler-eu-01 Citrix Gateway VIP expiring in 3 days. Certificate renewal request submitted but not yet installed. If expired, all external Citrix users will be unable to connect. LB team please install renewed certificate urgently.",
+    "ci_hint": "netscaler-eu-01",
+    "correct_resolver_group": "Network-LoadBalancer-EU"
+  },
+  {
+    "ticket_id": "INC0001081",
+    "priority": "P3",
+    "category": "Infrastructure",
+    "summary": "vCenter showing disconnected hosts in cluster",
+    "notes": "Two hosts in esx-cl-eu-05 cluster showing as disconnected in vCenter. Management network seems unreachable. VMs on those hosts still running but cannot be managed. vSAN might be affected. VMware team please check management network and reconnect hosts.",
+    "ci_hint": "esx-cl-eu-05",
+    "correct_resolver_group": "Virtualization-VMware-EU"
+  },
+  {
+    "ticket_id": "INC0001082",
+    "priority": "P4",
+    "category": "Application",
+    "summary": "SAP printer spool filling up causing output delays",
+    "notes": "SAP spool on sap-app-eu-01 has over 50,000 entries. Print output for invoices and delivery notes delayed by hours. SP01 showing many stuck items. Basis team please clean old spool entries and check output device configuration.",
+    "ci_hint": "sap-app-eu-01",
+    "correct_resolver_group": "SAP-Basis-Europe"
+  },
+  {
+    "ticket_id": "INC0001083",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "SQL Server memory pressure causing plan cache eviction",
+    "notes": "ivosql05w showing constant plan cache eviction due to memory pressure. MSSQL:TPSWebShop and MSSQL:ITC databases competing for buffer pool. Query performance degraded across all instances. SQL DBA please review memory allocation and max memory settings per instance.",
+    "ci_hint": "ivosql05w",
+    "correct_resolver_group": "DBA-SQL-Europe"
+  },
+  {
+    "ticket_id": "INC0001084",
+    "priority": "P3",
+    "category": "Infrastructure",
+    "summary": "AKS cluster certificate rotation needed",
+    "notes": "k8s-cl-eu-prod cluster certificates expiring in 14 days. Automatic rotation did not trigger. Manual rotation required. All workloads will be disrupted if certificates expire. Kubernetes team please initiate certificate rotation process.",
+    "ci_hint": "k8s-cl-eu-prod",
+    "correct_resolver_group": "Cloud-Kubernetes-EU"
+  },
+  {
+    "ticket_id": "INC0001085",
+    "priority": "P4",
+    "category": "Application",
+    "summary": "Self-service portal accessibility compliance issues",
+    "notes": "Accessibility audit found WCAG 2.1 violations on lnxweb14p self-service portal. Screen reader navigation broken on account management pages. Missing ARIA labels on form elements. App team please remediate for compliance deadline.",
+    "ci_hint": "lnxweb14p",
+    "correct_resolver_group": "App-Support-SelfService"
+  },
+  {
+    "ticket_id": "INC0001086",
+    "priority": "P3",
+    "category": "Storage",
+    "summary": "Pure Storage firmware upgrade required for CVE patch",
+    "notes": "Pure FlashArray san-stor-eu-07 running firmware version affected by CVE-2026-1234. Vendor advisory recommends immediate upgrade. Non-disruptive upgrade available but needs coordination with SAP HANA maintenance window. Pure storage team please plan and execute.",
+    "ci_hint": "san-stor-eu-07",
+    "correct_resolver_group": "Storage-Pure-Europe"
+  },
+  {
+    "ticket_id": "INC0001087",
+    "priority": "P3",
+    "category": "Collaboration",
+    "summary": "Exchange retention policy not purging deleted items",
+    "notes": "Retention policy on exch-mb-eu-03 not purging deleted items older than 30 days. Mailbox database growing unchecked. MRM assistant log showing errors. Managed Folder Assistant might be stuck. Exchange team please restart MRM and check policy assignments.",
+    "ci_hint": "exch-mb-eu-03",
+    "correct_resolver_group": "Messaging-Exchange-EU"
+  },
+  {
+    "ticket_id": "INC0001088",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "Azure SQL firewall blocking new application server",
+    "notes": "New application server deployed yesterday cannot connect to azsql-billing-01. Connection timeout errors. Azure SQL firewall rules need to include the new server's IP range. Other existing servers connecting fine. Cloud DBA please add firewall rule.",
+    "ci_hint": "azsql-billing-01",
+    "correct_resolver_group": "Cloud-Azure-DBA"
+  },
+  {
+    "ticket_id": "INC0001089",
+    "priority": "P4",
+    "category": "Network",
+    "summary": "Storage VLAN MTU mismatch causing jumbo frame drops",
+    "notes": "vlan-stor-eu-300 showing frame drops for jumbo frames. MTU mismatch between switch ports and storage array interfaces. NetApp and Pure Storage both affected. Network team please verify end-to-end MTU 9000 configuration on storage VLAN.",
+    "ci_hint": "san-stor-eu-04",
+    "correct_resolver_group": "Network-Infrastructure-EU"
+  },
+  {
+    "ticket_id": "INC0001090",
+    "priority": "P3",
+    "category": "Application",
+    "summary": "CRM workflow engine processing queue backed up",
+    "notes": "CRM workflow engine on lnxapp12p has 3,400 pending workflow instances. Approval workflows for contract changes stuck. Tomcat thread pool might be exhausted. PostgreSQL on lnxdb09p showing lock waits. App support please investigate workflow executor and thread config.",
+    "ci_hint": "lnxapp12p",
+    "correct_resolver_group": "App-Support-CRM"
+  },
+  {
+    "ticket_id": "INC0001091",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "HANA license key expiring next week",
+    "notes": "SAP HANA license on sap-db-eu-01 shows expiry date of 2026-04-17. System will switch to reduced mode after expiry limiting database to 32GB. License renewal key has been requested from SAP but not yet received. HANA DBA please follow up and apply when available.",
+    "ci_hint": "sap-db-eu-01",
+    "correct_resolver_group": "SAP-HANA-DBA-Europe"
+  },
+  {
+    "ticket_id": "INC0001092",
+    "priority": "P4",
+    "category": "Infrastructure",
+    "summary": "Citrix profile management corrupting user profiles",
+    "notes": "Some users on winctx03p XenApp farm getting temporary profiles. Citrix Profile Management log showing file lock conflicts on profile store. Antivirus might be scanning profile folders causing locks. Citrix team please check CPM config and AV exclusions.",
+    "ci_hint": "winctx03p",
+    "correct_resolver_group": "EUC-Citrix-Support"
+  },
+  {
+    "ticket_id": "INC0001093",
+    "priority": "P3",
+    "category": "Security",
+    "summary": "Firewall session table approaching maximum capacity",
+    "notes": "fw-palo-eu-01 session table at 85% capacity. If it reaches 100%, new connections will be dropped. Possible DDoS or session exhaustion from misconfigured NAT. Security team please analyze top talkers and implement session limiting if needed.",
+    "ci_hint": "fw-palo-eu-01",
+    "correct_resolver_group": "Security-Firewall-EU"
+  },
+  {
+    "ticket_id": "INC0001094",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "SQL Server Always On secondary showing NOT SYNCHRONIZING",
+    "notes": "Always On AG secondary for ivosql08w BillingCore database stuck in NOT SYNCHRONIZING state. Redo queue building up. Log send queue also growing. Failover capability compromised. SQL DBA please check endpoint connectivity and resume data movement.",
+    "ci_hint": "ivosql08w",
+    "correct_resolver_group": "DBA-SQL-Europe"
+  },
+  {
+    "ticket_id": "INC0001095",
+    "priority": "P4",
+    "category": "Application",
+    "summary": "SAP ABAP dump analysis needed for custom program",
+    "notes": "Custom ABAP program Z_BILLING_EXTRACT on sap-app-eu-01 generating TSV_TNEW_PAGE_ALLOC_FAILED dumps. Internal table growing too large. Runs during month-end billing extraction. Basis team please analyze ST22 dump and coordinate with ABAP developer on fix.",
+    "ci_hint": "sap-app-eu-01",
+    "correct_resolver_group": "SAP-Basis-Europe"
+  },
+  {
+    "ticket_id": "INC0001096",
+    "priority": "P3",
+    "category": "Infrastructure",
+    "summary": "Azure billing VM disk I/O throttled",
+    "notes": "azvm-billing-01 OS disk showing throttled IOPS. Azure metrics confirm sustained throttling for past 3 hours. Billing API response times directly affected. Need to upgrade disk to premium SSD or redistribute I/O. Cloud billing team please remediate.",
+    "ci_hint": "azvm-billing-01",
+    "correct_resolver_group": "Cloud-Azure-Billing"
+  },
+  {
+    "ticket_id": "INC0001097",
+    "priority": "P3",
+    "category": "Network",
+    "summary": "F5 GTM DNSSEC signature expiring",
+    "notes": "DNSSEC signatures on f5-lb-eu-02 GTM expiring in 48 hours. If not renewed, DNS resolution for all GTM-managed FQDNs will fail for DNSSEC-validating resolvers. Billing API and CRM portal DNS affected. LB team please renew DNSSEC keys.",
+    "ci_hint": "f5-lb-eu-02",
+    "correct_resolver_group": "Network-LoadBalancer-EU"
+  },
+  {
+    "ticket_id": "INC0001098",
+    "priority": "P4",
+    "category": "Monitoring",
+    "summary": "Splunk heavy forwarder queue filling up",
+    "notes": "Heavy forwarder feeding mon-splunk-eu-01 showing persistent output queue full. Events being dropped from network and security sourcetypes. Might be a bandwidth issue between forwarder and indexer. Splunk team please check forwarder outputs.conf and network path.",
+    "ci_hint": "mon-splunk-eu-01",
+    "correct_resolver_group": "Monitoring-Splunk-EU"
+  },
+  {
+    "ticket_id": "INC0001099",
+    "priority": "P3",
+    "category": "Database",
+    "summary": "PostgreSQL connection limit reached for CRM",
+    "notes": "PostgreSQL:crm_prod on lnxdb09p hit max_connections limit of 500. New connections being refused. CRM portal and batch jobs both affected. Connection pooler pgbouncer might not be configured. DBA team please increase limit or implement connection pooling.",
+    "ci_hint": "lnxdb09p",
+    "correct_resolver_group": "DBA-PostgreSQL-Europe"
+  },
+  {
+    "ticket_id": "INC0001100",
+    "priority": "P3",
+    "category": "Identity",
+    "summary": "AD Federation Services token signing cert expiring",
+    "notes": "ADFS token signing certificate on ad-dc-eu-02 expiring in 5 days. SSO for cloud applications including Azure portal and M365 will break. Auto-renewal failed due to insufficient permissions on the certificate template. AD team please manually renew and update relying party trusts.",
+    "ci_hint": "ad-dc-eu-02",
+    "correct_resolver_group": "Identity-ActiveDirectory-EU"
+  }
+]

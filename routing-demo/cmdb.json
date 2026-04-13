@@ -1,0 +1,231 @@
+{
+  "configuration_items": {
+    "ivosql05w": {
+      "type": "server",
+      "os": "Windows Server 2019",
+      "environment": "production",
+      "services": ["MSSQL:TPSWebShop", "MSSQL:ChangeAuditor2014", "MSSQL:ActiveRoles73", "MSSQL:CTX-ITCLogging"],
+      "resolver_group": "DBA-SQL-Europe",
+      "business_function": "Cloud & Infrastructure",
+      "dependencies": ["san-stor-eu-04", "vlan-db-eu-120"]
+    },
+    "ivosql08w": {
+      "type": "server",
+      "os": "Windows Server 2022",
+      "environment": "production",
+      "services": ["MSSQL:BillingCore", "MSSQL:BillingArchive", "MSSQL:RatingEngine"],
+      "resolver_group": "DBA-SQL-Europe",
+      "business_function": "Billing & Revenue",
+      "dependencies": ["san-stor-eu-04", "vlan-db-eu-120"]
+    },
+    "lnxapp12p": {
+      "type": "server",
+      "os": "RHEL 8",
+      "environment": "production",
+      "services": ["tomcat-crm-portal", "nginx-reverse-proxy"],
+      "resolver_group": "App-Support-CRM",
+      "business_function": "CRM",
+      "dependencies": ["lnxdb09p", "f5-lb-eu-02", "vlan-app-eu-200"]
+    },
+    "lnxdb09p": {
+      "type": "server",
+      "os": "RHEL 8",
+      "environment": "production",
+      "services": ["PostgreSQL:crm_prod", "PostgreSQL:crm_audit"],
+      "resolver_group": "DBA-PostgreSQL-Europe",
+      "business_function": "CRM",
+      "dependencies": ["san-stor-eu-07", "vlan-db-eu-120"]
+    },
+    "winctx03p": {
+      "type": "server",
+      "os": "Windows Server 2019",
+      "environment": "production",
+      "services": ["Citrix-XenApp-Farm", "Citrix-StoreFront"],
+      "resolver_group": "EUC-Citrix-Support",
+      "business_function": "End User Computing",
+      "dependencies": ["netscaler-eu-01", "san-stor-eu-02", "ad-dc-eu-01"]
+    },
+    "netscaler-eu-01": {
+      "type": "network",
+      "environment": "production",
+      "services": ["Citrix-ADC", "SSL-Offload", "GSLB"],
+      "resolver_group": "Network-LoadBalancer-EU",
+      "business_function": "Network Services",
+      "dependencies": ["vlan-dmz-eu-50"]
+    },
+    "f5-lb-eu-02": {
+      "type": "network",
+      "environment": "production",
+      "services": ["F5-LTM", "F5-GTM", "iRules-CRM"],
+      "resolver_group": "Network-LoadBalancer-EU",
+      "business_function": "Network Services",
+      "dependencies": ["vlan-app-eu-200"]
+    },
+    "san-stor-eu-04": {
+      "type": "storage",
+      "environment": "production",
+      "services": ["NetApp-FAS8200", "SnapMirror-Replication"],
+      "resolver_group": "Storage-NetApp-Europe",
+      "business_function": "Cloud & Infrastructure",
+      "dependencies": ["vlan-stor-eu-300", "san-switch-eu-01"]
+    },
+    "san-stor-eu-07": {
+      "type": "storage",
+      "environment": "production",
+      "services": ["Pure-FlashArray", "Pure-ActiveCluster"],
+      "resolver_group": "Storage-Pure-Europe",
+      "business_function": "Cloud & Infrastructure",
+      "dependencies": ["vlan-stor-eu-300", "san-switch-eu-02"]
+    },
+    "san-stor-eu-02": {
+      "type": "storage",
+      "environment": "production",
+      "services": ["EMC-VMAX", "SRDF-Replication"],
+      "resolver_group": "Storage-EMC-Europe",
+      "business_function": "Cloud & Infrastructure",
+      "dependencies": ["vlan-stor-eu-300"]
+    },
+    "esx-cl-eu-05": {
+      "type": "server",
+      "os": "VMware ESXi 7.0",
+      "environment": "production",
+      "services": ["vCenter-Cluster-EU-Prod", "vSAN", "NSX-T"],
+      "resolver_group": "Virtualization-VMware-EU",
+      "business_function": "Cloud & Infrastructure",
+      "dependencies": ["san-stor-eu-04", "vlan-mgmt-eu-10"]
+    },
+    "azvm-billing-01": {
+      "type": "cloud_vm",
+      "environment": "production",
+      "services": ["billing-api-gateway", "billing-event-processor"],
+      "resolver_group": "Cloud-Azure-Billing",
+      "business_function": "Billing & Revenue",
+      "dependencies": ["azsql-billing-01", "az-vnet-eu-prod"]
+    },
+    "azsql-billing-01": {
+      "type": "cloud_db",
+      "environment": "production",
+      "services": ["AzureSQL:BillingTransactions", "AzureSQL:BillingReporting"],
+      "resolver_group": "Cloud-Azure-DBA",
+      "business_function": "Billing & Revenue",
+      "dependencies": ["az-vnet-eu-prod"]
+    },
+    "ad-dc-eu-01": {
+      "type": "server",
+      "os": "Windows Server 2022",
+      "environment": "production",
+      "services": ["ActiveDirectory-DS", "DNS", "DHCP", "CertificateServices"],
+      "resolver_group": "Identity-ActiveDirectory-EU",
+      "business_function": "Identity & Access",
+      "dependencies": ["vlan-mgmt-eu-10"]
+    },
+    "ad-dc-eu-02": {
+      "type": "server",
+      "os": "Windows Server 2022",
+      "environment": "production",
+      "services": ["ActiveDirectory-DS", "DNS", "GlobalCatalog"],
+      "resolver_group": "Identity-ActiveDirectory-EU",
+      "business_function": "Identity & Access",
+      "dependencies": ["vlan-mgmt-eu-10"]
+    },
+    "exch-mb-eu-03": {
+      "type": "server",
+      "os": "Windows Server 2019",
+      "environment": "production",
+      "services": ["Exchange-Mailbox", "Exchange-Transport", "OWA"],
+      "resolver_group": "Messaging-Exchange-EU",
+      "business_function": "Collaboration",
+      "dependencies": ["ad-dc-eu-01", "san-stor-eu-02", "f5-lb-eu-02"]
+    },
+    "sap-app-eu-01": {
+      "type": "server",
+      "os": "SUSE Linux 15",
+      "environment": "production",
+      "services": ["SAP-ECC-AppServer", "SAP-ABAP-Stack"],
+      "resolver_group": "SAP-Basis-Europe",
+      "business_function": "ERP",
+      "dependencies": ["sap-db-eu-01", "san-stor-eu-07"]
+    },
+    "sap-db-eu-01": {
+      "type": "server",
+      "os": "SUSE Linux 15",
+      "environment": "production",
+      "services": ["SAP-HANA-Primary", "SAP-HANA-SystemReplication"],
+      "resolver_group": "SAP-HANA-DBA-Europe",
+      "business_function": "ERP",
+      "dependencies": ["san-stor-eu-07", "vlan-db-eu-120"]
+    },
+    "mon-splunk-eu-01": {
+      "type": "server",
+      "os": "RHEL 8",
+      "environment": "production",
+      "services": ["Splunk-Indexer", "Splunk-SearchHead"],
+      "resolver_group": "Monitoring-Splunk-EU",
+      "business_function": "Operations",
+      "dependencies": ["san-stor-eu-04"]
+    },
+    "fw-palo-eu-01": {
+      "type": "network",
+      "environment": "production",
+      "services": ["PaloAlto-NGFW", "GlobalProtect-VPN", "Threat-Prevention"],
+      "resolver_group": "Security-Firewall-EU",
+      "business_function": "Security",
+      "dependencies": ["vlan-dmz-eu-50", "panorama-mgmt-eu-01"]
+    },
+    "k8s-cl-eu-prod": {
+      "type": "container_platform",
+      "environment": "production",
+      "services": ["AKS-Cluster-EU", "Istio-ServiceMesh", "ArgoCD"],
+      "resolver_group": "Cloud-Kubernetes-EU",
+      "business_function": "Cloud & Infrastructure",
+      "dependencies": ["az-vnet-eu-prod", "azacr-eu-01"]
+    },
+    "lnxweb14p": {
+      "type": "server",
+      "os": "RHEL 8",
+      "environment": "production",
+      "services": ["nginx-selfservice-portal", "node-api-gateway"],
+      "resolver_group": "App-Support-SelfService",
+      "business_function": "Digital",
+      "dependencies": ["lnxdb09p", "f5-lb-eu-02", "k8s-cl-eu-prod"]
+    },
+    "vlan-db-eu-120": {
+      "type": "network",
+      "environment": "production",
+      "services": ["Database-VLAN-Segment"],
+      "resolver_group": "Network-Infrastructure-EU",
+      "business_function": "Network Services",
+      "dependencies": []
+    },
+    "vlan-app-eu-200": {
+      "type": "network",
+      "environment": "production",
+      "services": ["Application-VLAN-Segment"],
+      "resolver_group": "Network-Infrastructure-EU",
+      "business_function": "Network Services",
+      "dependencies": []
+    }
+  },
+  "resolver_groups": {
+    "DBA-SQL-Europe": {"team_lead": "M. Schmidt", "escalation": "DBA-Management-EU", "sla_hours": 4},
+    "DBA-PostgreSQL-Europe": {"team_lead": "A. Petrov", "escalation": "DBA-Management-EU", "sla_hours": 4},
+    "App-Support-CRM": {"team_lead": "L. Garcia", "escalation": "App-Management-EU", "sla_hours": 8},
+    "EUC-Citrix-Support": {"team_lead": "T. Muller", "escalation": "EUC-Management-EU", "sla_hours": 8},
+    "Network-LoadBalancer-EU": {"team_lead": "R. Janssen", "escalation": "Network-Management-EU", "sla_hours": 4},
+    "Storage-NetApp-Europe": {"team_lead": "K. Novak", "escalation": "Storage-Management-EU", "sla_hours": 4},
+    "Storage-Pure-Europe": {"team_lead": "P. Andersson", "escalation": "Storage-Management-EU", "sla_hours": 4},
+    "Storage-EMC-Europe": {"team_lead": "D. Kowalski", "escalation": "Storage-Management-EU", "sla_hours": 4},
+    "Virtualization-VMware-EU": {"team_lead": "S. Rossi", "escalation": "Infra-Management-EU", "sla_hours": 4},
+    "Cloud-Azure-Billing": {"team_lead": "N. Dubois", "escalation": "Cloud-Management-EU", "sla_hours": 4},
+    "Cloud-Azure-DBA": {"team_lead": "F. Weber", "escalation": "Cloud-Management-EU", "sla_hours": 4},
+    "Identity-ActiveDirectory-EU": {"team_lead": "J. Nielsen", "escalation": "Identity-Management-EU", "sla_hours": 2},
+    "Messaging-Exchange-EU": {"team_lead": "C. Martin", "escalation": "Collaboration-Management-EU", "sla_hours": 8},
+    "SAP-Basis-Europe": {"team_lead": "H. Braun", "escalation": "SAP-Management-EU", "sla_hours": 4},
+    "SAP-HANA-DBA-Europe": {"team_lead": "V. Szabo", "escalation": "SAP-Management-EU", "sla_hours": 2},
+    "Monitoring-Splunk-EU": {"team_lead": "B. Eriksson", "escalation": "Operations-Management-EU", "sla_hours": 8},
+    "Security-Firewall-EU": {"team_lead": "I. Popescu", "escalation": "Security-Management-EU", "sla_hours": 2},
+    "Cloud-Kubernetes-EU": {"team_lead": "E. Silva", "escalation": "Cloud-Management-EU", "sla_hours": 4},
+    "Network-Infrastructure-EU": {"team_lead": "G. Horvath", "escalation": "Network-Management-EU", "sla_hours": 8},
+    "App-Support-SelfService": {"team_lead": "O. Larsson", "escalation": "App-Management-EU", "sla_hours": 8}
+  }
+}
