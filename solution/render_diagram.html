@@ -104,20 +104,20 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: white; padding: 2
   <!-- LEFT COLUMN -->
   <div class="left-col">
 
-    <!-- ORCHESTRATION -->
+    <!-- ORCHESTRATION — Durable envelope (DF) + Workflow graph (MAF) -->
     <div class="group green">
-      <div class="group-label">Orchestration</div>
+      <div class="group-label">Orchestration — Durable Envelope + MAF Workflow Graphs</div>
       <div class="flex-row">
         <div class="bigbox green flex-1">
-          <b>Azure Durable Functions</b>
-          <i>1 instance per workflow</i>
-          <i>Checkpoint/replay · HITL waits @ 0 compute</i>
-          <i>Timer escalation · Fan-out/fan-in</i>
+          <b>Azure Durable Functions</b><i style="font-weight:600;color:#444;">durable envelope</i>
+          <i>1 orchestration per workflow · HITL @ 0 compute (days/weeks)</i>
+          <i>Checkpoint/replay · Timer escalation · Geo-replicated state</i>
+          <i>Invokes MAF workflows as durable activities</i>
         </div>
         <div class="bigbox green" style="width: 170px;">
           <b>Event Grid</b>
           <i>Telemetry transport</i>
-          <i>Loops + DF → Fleet Mgrs</i>
+          <i>DF + MAF + GHCP SDK → Fleet Mgrs</i>
         </div>
         <div class="bigbox green flex-1">
           <b>Fleet Managers</b>
@@ -126,37 +126,46 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: white; padding: 2
           <i>Exception composition · SLA · Drift</i>
         </div>
       </div>
+      <div class="bigbox green" style="margin-top: 8px; border-width: 2px;">
+        <b>MAF Workflow (v1.0)</b><i style="font-weight:600;color:#444;">per-phase graph — invoked by DF via the MAF Durable Task extension</i>
+        <i>Typed executors · Pregel BSP · Fan-out/fan-in · Conditional routing · Native pause/resume</i>
+        <i>Plain-function · Agent · Validator nodes — deterministic by default, agentic by exception</i>
+      </div>
     </div>
 
-    <div class="connector"><div class="line"></div><div class="label">Trigger per phase · State + raise_event · Telemetry</div><div class="line"></div></div>
+    <div class="connector"><div class="line"></div><div class="label">Agent executors invoke GHCP SDK sessions on Foundry Hosted Agent · State + raise_event · Telemetry</div><div class="line"></div></div>
 
-    <!-- HIRING AGENT -->
+    <!-- HIRING MAF WORKFLOW -->
     <div class="group teal">
-      <div class="group-label">Hiring Agent — <span style="font-weight:normal;font-style:italic;">hiring-agent@wpp</span> — GHCP SDK on Foundry Hosted Agent</div>
+      <div class="group-label">Hiring MAF Workflow — <span style="font-weight:normal;font-style:italic;">hiring-agent@wpp</span> — agent executors run GHCP SDK sessions on Foundry Hosted Agent</div>
       <div class="flex-row">
-        <div class="skill">Budget</div>
+        <div class="skill det">Budget</div>
         <div class="skill">Job Design</div>
-        <div class="skill">Sourcing</div>
+        <div class="skill det">Sourcing</div>
         <div class="skill">Triage</div>
         <div class="skill">Screening</div>
-        <div class="skill">Interview</div>
+        <div class="skill det">Interview</div>
         <div class="skill">Compliance</div>
         <div class="skill">Offer</div>
-        <div class="skill">Onboarding</div>
+        <div class="skill det">Onboarding</div>
         <div class="skill">Voice</div>
       </div>
     </div>
 
-    <!-- FINANCE AGENT -->
+    <!-- FINANCE MAF WORKFLOW -->
     <div class="group teal">
-      <div class="group-label">Finance Agent — <span style="font-weight:normal;font-style:italic;">finance-agent@wpp</span> — GHCP SDK on Foundry Hosted Agent</div>
+      <div class="group-label">Finance MAF Workflow — <span style="font-weight:normal;font-style:italic;">finance-agent@wpp</span> — agent executors run GHCP SDK sessions on Foundry Hosted Agent</div>
       <div class="flex-row">
         <div class="skill">Intake/OCR</div>
-        <div class="skill">Validation</div>
+        <div class="skill det">Validation</div>
         <div class="skill">Routing</div>
-        <div class="skill">Approval</div>
-        <div class="skill">Payment</div>
+        <div class="skill det">Approval</div>
+        <div class="skill det">Payment</div>
         <div class="skill">Reconciliation</div>
+      </div>
+      <div style="margin-top: 8px; font-size: 9px; color: #555; display: flex; gap: 16px; align-items: center;">
+        <span style="display: inline-flex; align-items: center; gap: 6px;"><span class="skill det" style="padding: 2px 8px;">&nbsp;</span> Deterministic plain-function executor</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px;"><span class="skill" style="padding: 2px 8px;">&nbsp;</span> Agent executor (GHCP SDK + hooks; validator executor downstream)</span>
       </div>
     </div>
 
