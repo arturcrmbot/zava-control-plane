@@ -1,0 +1,62 @@
+# src/server/services/simulator_orchestrator.py
+"""
+Spawns synthetic invoice workflows by scheduling InvoiceP2POrchestrator instances
+on the Azure Durable Functions host. Background coroutine ramps to a target count
+then steady-states.
+"""
+from __future__ import annotations
+import asyncio
+import os
+import random
+
+from src.server.state import app_state
+from src.server.services.synthetic_data import build_workflow
+from src.server.services.durable_client import schedule_new_orchestration
+
+_seq = 0
+
+
+async def spawn_workflow(scenario: str | None = None) -> str:
+    """Create a new invoice workflow and start its DurableWorkflow instance."""
+    global _seq
+    _seq += 1
+    wid = f"INV-{_seq:04d}"
+    force_fail = scenario == "demo-fail"
+    w = build_workflow(wid, force_demo_fail=force_fail)
+    app_state.store.upsert_workflow(w)
+    payload = {
+        "workflow_id": w.id,
+        "vendor": w.vendor.model_dump(),
+        "invoice": w.invoice.model_dump(),
+        "agency": w.agency,
+        "jurisdiction": w.jurisdiction,
+    }
+    try:
+        result = await schedule_new_orchestration(payload)
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+        # Workflow stays in store with no orchestration_instance_id — visible in UI as "stuck"
+    return wid
+
+
+async def ramp_loop() -> None:
+    """Background coroutine: spawn workflows until target, then steady-state."""
+    target = int(os.getenv("SIMULATOR_TARGET_WORKFLOWS", "30"))
+    ramp_seconds = 90
+    delay_per = ramp_seconds / target
+    print(f"[orchestrator] ramping {target} workflows over {ramp_seconds}s")
+    for _ in range(target):
+        try:
+            await spawn_workflow()
+        except Exception as ex:
+            print(f"[orchestrator] spawn failed: {ex}")
+        await asyncio.sleep(delay_per)
+    print("[orchestrator] ramp complete; steady-state")
+    while True:
+        try:
+            await spawn_workflow()
+        except Exception as ex:
+            print(f"[orchestrator] spawn failed: {ex}")
+        await asyncio.sleep(3 + random.random() * 5)

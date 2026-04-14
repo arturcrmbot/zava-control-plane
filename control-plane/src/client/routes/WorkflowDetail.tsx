@@ -5,13 +5,14 @@ import type { Workflow, Phase, OtelSpan, Exception, SkillAmplification, ActionLe
 import OtelSpanTree from "../components/OtelSpanTree";
 import PhaseTimeline from "../components/PhaseTimeline";
 import SkillAmplificationPanel from "../components/SkillAmplificationPanel";
+import OrchestrationView from "../components/OrchestrationView";
 
 type DetailResp = {
   workflow: Workflow; phases: Phase[]; spans: OtelSpan[];
   amplifications: SkillAmplification[]; activeException: Exception | null;
 };
 
-const tabs = ["Overview", "Phases", "Traces", "Ledger", "Amplification"] as const;
+const tabs = ["Overview", "Phases", "Traces", "Ledger", "Amplification", "Orchestration"] as const;
 
 export default function WorkflowDetail() {
   const { id } = useParams();
@@ -68,6 +69,7 @@ export default function WorkflowDetail() {
         </div>
       )}
       {tab === "Amplification" && <SkillAmplificationPanel items={d.amplifications} />}
+      {tab === "Orchestration" && <OrchestrationView workflowId={id!} />}
     </div>
   );
 }

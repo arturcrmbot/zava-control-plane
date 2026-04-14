@@ -1,0 +1,48 @@
+[project]
+name = "wpp-control-plane-py"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.32",
+  "pydantic>=2.9",
+  "httpx>=0.27",
+  "sse-starlette>=2.1",
+  "pyyaml>=6.0",
+  "python-dotenv>=1.0",
+  "nanoid>=2.0",
+  # azure-functions 1.24+ required by agent-framework-azurefunctions
+  "azure-functions>=1.24",
+  "azure-functions-durable>=1.2",
+  # Phase 0.2 spike resolved: github-copilot-sdk is the Python sibling of @github/copilot-sdk
+  "github-copilot-sdk>=0.2.1",
+  # Microsoft Agent Framework: meta-package pulls in agent-framework-core[all]
+  "agent-framework>=1.0.1",
+  # MAF GitHub Copilot integration (wraps copilot.CopilotClient as a MAF Agent)
+  "agent-framework-github-copilot>=1.0.0b260409",
+  # MAF Azure Durable Functions hosting + Durable Task integration
+  "agent-framework-azurefunctions>=1.0.0b260409",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "pytest-mock>=3.14",
+  "ruff>=0.7"
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

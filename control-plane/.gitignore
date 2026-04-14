@@ -4,3 +4,8 @@ dist
 .env.local
 playwright-report
 test-results
+
+# Compiled TS artifacts (we build via Vite; any .js in src/ is stale tsc output)
+src/**/*.js
+src/**/*.js.map
+src/**/*.d.ts

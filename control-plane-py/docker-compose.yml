@@ -1,0 +1,18 @@
+services:
+  # Azurite — storage backend for Azure Durable Functions runtime
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: cp-py-azurite
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
+    volumes:
+      - ./azurite-data:/data
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --location /data"
+
+  # NOTE: Durable Task Scheduler standalone path was tried but the
+  # mcr.microsoft.com/durabletask/scheduler image is not publicly available
+  # as of 2026-04. Using Azure Functions Core Tools + Azurite instead — a
+  # well-supported public path that aligns with solution.md §13's
+  # "Azure Durable Functions" narrative.

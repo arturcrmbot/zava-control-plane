@@ -1,0 +1,9 @@
+# MCP plugin session/cache data
+.playwright-mcp/
+
+# Claude Code skills cache (if any)
+.claude-cache/
+
+# OS
+Thumbs.db
+.DS_Store

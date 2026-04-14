@@ -1,0 +1,10 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "PYTHON_ISOLATE_WORKER_DEPENDENCIES": "0",
+    "PYTHONPATH": "<absolute-path-to-repo>",
+    "FASTAPI_WEBHOOK_URL": "http://localhost:3001/internal/durable-event"
+  }
+}

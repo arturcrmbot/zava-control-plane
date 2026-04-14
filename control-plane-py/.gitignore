@@ -1,0 +1,11 @@
+.venv/
+.funcvenv/
+__pycache__/
+*.pyc
+.env
+.env.local
+local.settings.json
+.pytest_cache/
+.ruff_cache/
+azurite-data/
+.python_packages/
