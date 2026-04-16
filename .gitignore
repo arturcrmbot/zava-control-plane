@@ -10,3 +10,7 @@ Thumbs.db
 
 # Workbench artefacts (subagent dumps, intermediate extracts, etc.)
 scratch/
+
+# Python bytecode caches
+__pycache__/
+*.py[cod]
