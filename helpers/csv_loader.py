@@ -8,6 +8,7 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class AnswerRow:
+    """A single questionnaire answer row loaded from one of the 29 domain CSVs."""
     ref: str
     section: str
     subsection: str
@@ -27,19 +28,29 @@ EXPECTED_COLUMNS = [
 
 
 def _ref_sort_key(ref: str) -> tuple[int, ...]:
-    return tuple(int(part) for part in ref.split("."))
+    try:
+        return tuple(int(part) for part in ref.split("."))
+    except ValueError as e:
+        raise ValueError(f"Non-numeric Ref part in {ref!r}") from e
 
 
 def load_answer_csvs(directory: Path) -> list[AnswerRow]:
+    """Load all *.csv files in `directory`, validate schema, return rows sorted by natural Ref order.
+
+    Raises ValueError if any file is missing expected columns.
+    """
     directory = Path(directory)
     rows: list[AnswerRow] = []
     for csv_path in sorted(directory.glob("*.csv")):
         with csv_path.open(encoding="utf-8", newline="") as fh:
             reader = csv.DictReader(fh)
-            missing = [c for c in EXPECTED_COLUMNS if c not in reader.fieldnames]
+            fieldnames = reader.fieldnames or []
+            missing = [c for c in EXPECTED_COLUMNS if c not in fieldnames]
             if missing:
                 raise ValueError(f"{csv_path.name} missing columns: {missing}")
             for row in reader:
+                if not row["Ref"].strip():
+                    continue
                 rows.append(AnswerRow(
                     ref=row["Ref"].strip(),
                     section=row["Section"].strip(),
