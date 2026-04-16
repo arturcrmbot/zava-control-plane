@@ -503,6 +503,11 @@ git commit -m "test(xlsx_joiner): failing tests for join, validation, output sha
 - Create: `helpers/xlsx_build/__init__.py`
 - Create: `helpers/xlsx_build/joiner.py`
 
+**Known template quirk (must be handled):** WPP's template `wppetai-agentic-framework-assessment-questionnaire.xlsx` has a Ref label typo — the `Questionnaire` sheet has **two rows both labelled "8.1"** (the legitimate 8.1 at one line and what should be "8.10" mislabelled as "8.1" at a later line). Our answer CSVs correctly use "8.10" for the later question. The builder must:
+1. Preserve WPP's original Ref column values in the output xlsx (so WPP gets back what they sent — duplicate "8.1" stays as "8.1").
+2. When the template has duplicate Refs, match the answer CSV's Ref to the correct template row by **question-text comparison**, not Ref alone. Fallback to positional order if the question text is ambiguous.
+3. Not surface "8.10" as a missing Ref nor as an extra Ref in the report — it's expected to exist in the CSV and absent in the template due to WPP's typo.
+
 - [ ] **Step 1: Implement**
 
 ```python
