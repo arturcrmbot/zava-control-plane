@@ -1,0 +1,1 @@
+Architecture diagrams are supplied as a separate PDF deliverable, covering the Enterprise Architecture Diagram, the C4 Context / Container / Component views, the Control Plane fleet dashboard wireframe, and the agentic loop state diagram.
