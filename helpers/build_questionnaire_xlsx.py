@@ -14,7 +14,7 @@ DEFAULT_TEMPLATE = Path(
     r"\RFx Documentation - Originals\wppetai-agentic-framework-assessment-questionnaire.xlsx"
 )
 DEFAULT_ANSWERS_DIR = REPO_ROOT / "response" / "questionnaire answers"
-DEFAULT_OUTPUT = REPO_ROOT / "response" / "wppetai-agentic-framework-assessment-questionnaire-microsoft-response.xlsx"
+DEFAULT_OUTPUT = REPO_ROOT / "deliverables" / "01-questionnaire-response.xlsx"
 
 
 def main(argv: list[str] | None = None) -> int:
