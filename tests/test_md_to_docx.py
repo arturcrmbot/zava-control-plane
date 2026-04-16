@@ -32,3 +32,25 @@ def test_render_preserves_bold(tmp_path):
     para = doc.paragraphs[-1]
     runs = list(para.runs)
     assert any(r.bold and r.text == "bold" for r in runs)
+
+
+def test_render_uses_custom_style_map(tmp_path):
+    """A caller-supplied style_map overrides the default heading style names."""
+    from docx.enum.style import WD_STYLE_TYPE
+
+    doc = Document()
+    # The target style must exist in the document's style catalogue before
+    # python-docx can apply it. Real masters define their own styles; for this
+    # test we register one explicitly.
+    doc.styles.add_style("heading 20", WD_STYLE_TYPE.PARAGRAPH)
+
+    md = "## Heading\n\nBody"
+    render_md_into_doc(doc, md, style_map={"h2": "heading 20"})
+
+    out = tmp_path / "out.docx"
+    doc.save(out)
+    reloaded = Document(out)
+
+    styled = [(p.style.name, p.text) for p in reloaded.paragraphs if p.text.strip()]
+    heading_entry = next(s for s in styled if s[1] == "Heading")
+    assert heading_entry[0] == "heading 20"

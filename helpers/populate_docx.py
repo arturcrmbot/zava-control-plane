@@ -7,7 +7,6 @@ from datetime import datetime
 from pathlib import Path
 
 from docx import Document
-from docx import Document as _D
 
 from helpers.docx_populate.content_plan import (
     SECTIONS, INLINE_PLACEHOLDERS, CELL_FILLS_BY_HEADER,
@@ -24,13 +23,31 @@ DEFAULT_MASTER = Path(
 )
 
 
-def _append_md_at_section_end(doc, bounds, md_content: str) -> None:
+# Style names used by the real master docx. The master authors used custom
+# heading styles ("heading 10", "heading 20", "heading 30" — lowercase with a
+# trailing zero) rather than the python-docx defaults ("Heading 1", etc.).
+# When we inject MD-rendered content we must match the master's styles so the
+# output looks consistent. Fixture-based tests still use DEFAULT_STYLE_MAP.
+MASTER_STYLE_MAP: dict[str, str] = {
+    "h1": "heading 10",
+    "h2": "heading 20",
+    "h3": "heading 30",
+    "h4": "heading 30",  # master has no heading 40; fall back to 30
+    "h5": "heading 30",
+    "h6": "heading 30",
+    "bullet": "List Paragraph",     # master uses "List Paragraph"
+    "numbered": "List Paragraph",   # no distinct numbered list style in master
+}
+
+
+def _append_md_at_section_end(doc, bounds, md_content: str,
+                              style_map: dict[str, str] | None = None) -> None:
     body = doc.element.body
     children = list(body.iterchildren())
     anchor_el = children[bounds.end_index] if bounds.end_index < len(children) else None
 
-    tmp = _D()
-    render_md_into_doc(tmp, md_content)
+    tmp = Document()
+    render_md_into_doc(tmp, md_content, style_map=style_map)
     new_elements = [p._element for p in tmp.paragraphs if p.text.strip()]
 
     for el in new_elements:
@@ -97,7 +114,8 @@ def main(argv: list[str] | None = None) -> int:
         sections_hit.append(section.heading_text)
 
     for rule in INLINE_PLACEHOLDERS:
-        found = any(p.text.strip().startswith(rule.match_prefix.strip()) for p in doc.paragraphs)
+        needle = rule.match_prefix.strip()
+        found = any(needle in p.text for p in doc.paragraphs)
         if found:
             placeholders_hit.append(rule.match_prefix)
             plan_lines.append(f"{rule.resolution.upper()}: {rule.match_prefix[:60]}...")
@@ -119,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
     doc = Document(args.master)
 
     for rule in INLINE_PLACEHOLDERS:
-        resolve_inline_placeholder(doc, rule)
+        resolve_inline_placeholder(doc, rule, style_map=MASTER_STYLE_MAP)
 
     cells_filled = _apply_cell_fills_by_header(doc)
 
@@ -128,11 +146,17 @@ def main(argv: list[str] | None = None) -> int:
         if bounds is None or not section.content_md_path.exists():
             continue
         md_content = section.content_md_path.read_text(encoding="utf-8")
-        _append_md_at_section_end(doc, bounds, md_content)
+        _append_md_at_section_end(doc, bounds, md_content, style_map=MASTER_STYLE_MAP)
 
     timestamp = datetime.now().strftime("%Y-%m-%d-%H%M")
     output = args.master.parent / f"WPP-RFP-Response-Master-populated-{timestamp}.docx"
-    doc.save(output)
+    try:
+        doc.save(output)
+    except PermissionError as e:
+        print(f"ERROR: cannot write to {output}: {e}", file=sys.stderr)
+        print("Hint: close the file in Word or any program that has it open, then re-run.",
+              file=sys.stderr)
+        return 3
 
     report_path = output.with_suffix(".report.md")
     with report_path.open("w", encoding="utf-8") as fh:
