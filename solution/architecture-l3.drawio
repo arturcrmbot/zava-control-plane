@@ -1,4 +1,4 @@
-<mxfile host="app.diagrams.net" modified="2026-04-13" agent="Claude" version="24.0.0">
+<mxfile host="app.diagrams.net" modified="2026-04-15" agent="Claude" version="24.0.0">
   <diagram id="wpp-l3" name="WPP Solution Architecture">
     <mxGraphModel dx="2200" dy="1600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="2400" pageHeight="1600" math="0" shadow="0">
       <root>
@@ -37,7 +37,7 @@
         <!-- ================================== -->
         <!-- AGENT SURFACES (Row 2, y=180) -->
         <!-- ================================== -->
-        <mxCell id="pa" value="&lt;b&gt;Personal Agents (PA)&lt;/b&gt;&lt;br&gt;GHCP SDK agents in M365 Copilot&lt;br&gt;&lt;i&gt;via M365 Agents SDK&lt;/i&gt;&lt;br&gt;&lt;i&gt;One PA per human role&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=0;" vertex="1" parent="1">
+        <mxCell id="pa" value="&lt;b&gt;Personal Agents (PA)&lt;/b&gt;&lt;br&gt;GHCP SDK agents via M365 Agents SDK&lt;br&gt;&lt;i&gt;Layered on Copilot 365 — not a replacement&lt;/i&gt;&lt;br&gt;&lt;i&gt;No new per-user licence · One PA per role&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=0;" vertex="1" parent="1">
           <mxGeometry x="120" y="180" width="280" height="70" as="geometry"/>
         </mxCell>
         <mxCell id="cpui" value="&lt;b&gt;Custom Control Plane UI&lt;/b&gt;&lt;br&gt;React + SignalR&lt;br&gt;&lt;i&gt;Fleet dashboard · Exception queue&lt;/i&gt;&lt;br&gt;&lt;i&gt;Bulk HITL · Autonomy dials · Skill library&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=0;" vertex="1" parent="1">
@@ -180,20 +180,20 @@
           <mxGeometry x="1030" y="78" width="260" height="15" as="geometry"/>
         </mxCell>
 
-        <mxCell id="apim" value="&lt;b&gt;APIM AI Gateway&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;i&gt;Model routing&lt;/i&gt;&lt;br&gt;Load balance · Failover · Spillover · Caching&lt;br&gt;&lt;br&gt;&lt;i&gt;MCP &amp;amp; A2A governance&lt;/i&gt;&lt;br&gt;Auth injection · Rate limits · Safety&lt;br&gt;&lt;br&gt;&lt;i&gt;Token metrics · Per-team budgets&lt;/i&gt;&lt;br&gt;&lt;i&gt;Jurisdiction-based routing&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=center;" vertex="1" parent="1">
-          <mxGeometry x="1040" y="100" width="240" height="160" as="geometry"/>
+        <mxCell id="apim" value="&lt;b&gt;APIM AI Gateway&lt;/b&gt; &lt;i&gt;(Private Endpoint — sole public edge)&lt;/i&gt;&lt;br&gt;&lt;br&gt;&lt;i&gt;Model routing&lt;/i&gt;&lt;br&gt;Load balance · Failover · Caching&lt;br&gt;&lt;br&gt;&lt;i&gt;MCP · A2A · AG-UI governance&lt;/i&gt;&lt;br&gt;Auth injection · Rate limits · Content safety&lt;br&gt;Per-skill tool allow-list enforcement&lt;br&gt;Structured output schema validation&lt;br&gt;&lt;br&gt;&lt;i&gt;Token metrics · Per-team budgets&lt;/i&gt;&lt;br&gt;&lt;i&gt;Jurisdiction-based routing&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="100" width="240" height="200" as="geometry"/>
         </mxCell>
 
-        <mxCell id="apic" value="&lt;b&gt;Azure API Center&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;i&gt;Unified registry&lt;/i&gt;&lt;br&gt;Models · MCP tools · A2A agents&lt;br&gt;Skills · APIs (cross-cloud)&lt;br&gt;&lt;br&gt;&lt;i&gt;Lifecycle: Design → Preview&lt;/i&gt;&lt;br&gt;&lt;i&gt;→ Production → Deprecated&lt;/i&gt;&lt;br&gt;&lt;i&gt;GitHub Actions sync&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=center;" vertex="1" parent="1">
-          <mxGeometry x="1040" y="280" width="240" height="150" as="geometry"/>
+        <mxCell id="apic" value="&lt;b&gt;Azure API Center&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;i&gt;Unified registry&lt;/i&gt;&lt;br&gt;Models · MCP tools · A2A agents&lt;br&gt;Skills · AG-UI streams · APIs&lt;br&gt;&lt;br&gt;&lt;i&gt;Lifecycle: Design → Preview&lt;/i&gt;&lt;br&gt;&lt;i&gt;→ Production → Deprecated&lt;/i&gt;&lt;br&gt;&lt;i&gt;GitHub Actions sync · APIOps CI/CD&lt;/i&gt;&lt;br&gt;&lt;i&gt;Residency CI gate&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="315" width="240" height="145" as="geometry"/>
         </mxCell>
 
         <mxCell id="fcp" value="&lt;b&gt;Foundry Control Plane&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;i&gt;Agent inventory · Fleet monitoring&lt;/i&gt;&lt;br&gt;&lt;i&gt;Model catalog (1900+)&lt;/i&gt;&lt;br&gt;&lt;i&gt;Guardrails (PII, Task Adherence)&lt;/i&gt;&lt;br&gt;&lt;i&gt;Evaluators (quality, safety, drift)&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=center;" vertex="1" parent="1">
-          <mxGeometry x="1040" y="450" width="240" height="120" as="geometry"/>
+          <mxGeometry x="1040" y="475" width="240" height="115" as="geometry"/>
         </mxCell>
 
-        <mxCell id="a365" value="&lt;b&gt;Agent 365 + Entra&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;i&gt;Entra Agent ID (first-class identity)&lt;/i&gt;&lt;br&gt;&lt;i&gt;Conditional Access&lt;/i&gt;&lt;br&gt;&lt;i&gt;Purview DLP · Defender&lt;/i&gt;&lt;br&gt;&lt;i&gt;Agent registry · Copilot Studio agents&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=center;" vertex="1" parent="1">
-          <mxGeometry x="1040" y="590" width="240" height="120" as="geometry"/>
+        <mxCell id="a365" value="&lt;b&gt;Agent 365 + Entra&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;i&gt;Entra Agent ID (first-class identity)&lt;/i&gt;&lt;br&gt;&lt;i&gt;Conditional Access · MFA (FIDO2, WH)&lt;/i&gt;&lt;br&gt;&lt;i&gt;Purview DLP · Defender&lt;/i&gt;&lt;br&gt;&lt;i&gt;Agent registry · Copilot Studio · Lifecycle&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="605" width="240" height="115" as="geometry"/>
         </mxCell>
 
         <!-- APIM ↔ API Center sync -->
@@ -320,6 +320,65 @@
         <!-- ================================== -->
         <mxCell id="footnote" value="&lt;b&gt;Cross-cloud:&lt;/b&gt; Azure API Center registers MCP servers, skills, A2A agents and APIs hosted on Azure, GCP, AWS or on-prem — single discovery endpoint for agents." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f0f0;strokeColor=#888888;verticalAlign=middle;fontSize=10;align=center;" vertex="1" parent="1">
           <mxGeometry x="600" y="955" width="700" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================== -->
+        <!-- NETWORK PERIMETER (dashed outer frame) -->
+        <!-- ================================== -->
+        <mxCell id="perimeter" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#1a5490;dashed=1;strokeWidth=2;arcSize=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="65" width="1620" height="1100" as="geometry"/>
+        </mxCell>
+        <mxCell id="perimeter_label" value="&lt;b&gt;Azure Tenant · VNet · Private Endpoints · Front Door Premium (WAF ingress) · Azure Firewall (egress) — all roads through APIM · privately&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=#ffffff;fontSize=10;fontColor=#1a5490;" vertex="1" parent="1">
+          <mxGeometry x="110" y="55" width="1000" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================== -->
+        <!-- EGRESS ALLOW-LIST (Azure Firewall, to the right of Governance) -->
+        <!-- ================================== -->
+        <mxCell id="egress_box" value="&lt;b&gt;Egress allow-list&lt;/b&gt; &lt;i&gt;(Azure Firewall Premium)&lt;/i&gt;&lt;br&gt;&lt;br&gt;Workday · LinkedIn · Greenhouse&lt;br&gt;HeyGen · D365 SaaS · Okta · Maconomy&lt;br&gt;&lt;br&gt;&lt;i&gt;FQDN allow-list · TLS inspection&lt;/i&gt;&lt;br&gt;&lt;i&gt;Everything else blocked · Logs → LA&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6e6;strokeColor=#b85450;fontSize=9;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="100" width="260" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_apim_egress" value="Outbound SaaS · FQDN only" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#b85450;fontSize=8;endArrow=classic;strokeWidth=2;" edge="1" source="apim" target="egress_box" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ================================== -->
+        <!-- AG-UI stream from MAF to Control Plane UI -->
+        <!-- ================================== -->
+        <mxCell id="a_maf_cpui_agui" value="AG-UI events (SSE)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#d79b00;fontSize=8;strokeWidth=2;startArrow=none;endArrow=classic;" edge="1" source="maf" target="cpui" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ================================== -->
+        <!-- RUNTIME ASSEMBLY: MAF spawns sub-agent → Entra + API Center (Design state) -->
+        <!-- ================================== -->
+        <mxCell id="a_maf_apic_assembly" value="Runtime sub-agent spawn → Entra + APIC Design state" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#9673a6;fontSize=8;startArrow=none;endArrow=classic;dashed=1;" edge="1" source="maf" target="apic" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ================================== -->
+        <!-- NON-REVOCABLE OPS LEGEND (small note near MAF legend) -->
+        <!-- ================================== -->
+        <mxCell id="nonrevocable_note" value="&lt;b&gt;Non-revocable ops:&lt;/b&gt; GHCP SDK hook + MAF validator + HITL gate; payment, offer letter, external email, A2A outbound. Dual-control for high-risk." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff0f0;strokeColor=#b85450;fontSize=9;align=left;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="740" y="618" width="230" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- ================================== -->
+        <!-- DATA ESTATE BRIDGE (Databricks, Snowflake, OneLake shortcuts) -->
+        <!-- ================================== -->
+        <mxCell id="de_group" value="&lt;b&gt;WPP Data Estate Bridge&lt;/b&gt; — Fabric IQ federates via OneLake shortcuts · direct MCP for SQL · no migration" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d4edda;strokeColor=#28a745;verticalAlign=top;fontSize=11;fontStyle=1;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1030" width="850" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="de_dbx" value="&lt;b&gt;Databricks&lt;/b&gt;&lt;br&gt;&lt;i&gt;Unity Catalog · MLflow · Mosaic AI Gateway&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d4edda;strokeColor=#28a745;fontSize=9;align=center;" vertex="1" parent="1">
+          <mxGeometry x="140" y="1055" width="240" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="de_snow" value="&lt;b&gt;Snowflake&lt;/b&gt;&lt;br&gt;&lt;i&gt;External tables · Snowpark · Cortex&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d4edda;strokeColor=#28a745;fontSize=9;align=center;" vertex="1" parent="1">
+          <mxGeometry x="390" y="1055" width="230" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="de_ol" value="&lt;b&gt;OneLake Shortcuts&lt;/b&gt;&lt;br&gt;&lt;i&gt;Zero-copy federation · UC access preserved&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d4edda;strokeColor=#28a745;fontSize=9;align=center;" vertex="1" parent="1">
+          <mxGeometry x="630" y="1055" width="320" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_fabric_de" value="OneLake shortcuts · zero-copy" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#28a745;fontSize=8;strokeWidth=2;endArrow=classic;" edge="1" source="iq_fabric" target="de_ol" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- ================================== -->
+        <!-- COMPLIANCE CERTIFICATIONS FOOTER (inherited from Azure) -->
+        <!-- ================================== -->
+        <mxCell id="compliance_footer" value="&lt;b&gt;Platform Certifications (inherited from Azure)&lt;/b&gt; — SOC 1 / 2 Type II / 3 · ISO 27001 · ISO 27017 · ISO 27018 · ISO 27701 · HIPAA · PCI DSS L1 · FedRAMP High · GDPR · BSI C5 (Germany) · EU AI Act aligned" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0f4f8;strokeColor=#4a90c2;verticalAlign=middle;fontSize=10;align=center;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1120" width="1460" height="35" as="geometry"/>
         </mxCell>
 
       </root>
