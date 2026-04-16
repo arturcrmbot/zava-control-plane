@@ -1,0 +1,118 @@
+%%{init: {'flowchart': {'htmlLabels': true, 'nodeSpacing': 50, 'rankSpacing': 70, 'padding': 10, 'curve': 'basis'}, 'themeVariables': {'fontSize': '16px'}}}%%
+flowchart LR
+    classDef inputAdapter fill:#2E8B57,stroke:#1E5E3A,stroke-width:1px,color:#FFFFFF
+    classDef composer fill:#6A0DAD,stroke:#430873,stroke-width:1px,color:#FFFFFF
+    classDef amplifier fill:#B8860B,stroke:#6B4F06,stroke-width:1px,color:#FFFFFF
+    classDef output fill:#C25E00,stroke:#7A3A00,stroke-width:1px,color:#FFFFFF
+    classDef external fill:#8B8B8B,stroke:#4C4C4C,stroke-width:1px,color:#FFFFFF,stroke-dasharray: 4 3
+    classDef person fill:#08427B,stroke:#052E55,stroke-width:1px,color:#FFFFFF
+
+    %% ===== Input-side external systems =====
+    subgraph INPUTSRC["External event + state sources"]
+        direction TB
+        EG["<b>Azure Event Grid namespace</b><br/><i>[Azure PaaS]</i><br/>DF lifecycle, GHCP SDK hook,<br/>MAF callback, operator config<br/>change events"]:::external
+        COSMOS_IN["<b>Cosmos DB</b><br/><i>[Azure PaaS — read path]</i><br/>Workflow state, action ledger,<br/>approvals, autonomy config"]:::external
+    end
+
+    %% ===== Fleet Manager container =====
+    subgraph FM["Fleet Manager Agent (domain-scoped: Hiring | Finance | Compliance) &nbsp;—&nbsp; [Container: GHCP SDK Hosted Agent on Azure AI Foundry, one deployment per domain, multi-replica]"]
+        direction TB
+
+        subgraph INPUTS["Input adapters"]
+            direction TB
+            EGS["<b>Event Grid Subscriber</b><br/><i>[Azure Functions trigger]</i><br/>Receives push events;<br/>dispatches to reasoning<br/>components"]:::inputAdapter
+            CDR["<b>Cosmos DB Reader</b><br/><i>[On-demand query client]</i><br/>Fetches workflow state,<br/>ledger, approvals for<br/>context enrichment"]:::inputAdapter
+        end
+
+        subgraph CORE["Core reasoning &amp; composition &nbsp;(GHCP SDK session-based)"]
+            direction TB
+            FHA["<b>Fleet Health Aggregator</b><br/>Aggregates active workflow<br/>telemetry; per-domain /<br/>jurisdiction / agency status"]:::composer
+            EQC["<b>Exception Queue Composer</b><br/>Prioritises flagged workflows<br/>by business impact ×<br/>confidence × SLA urgency"]:::composer
+            SCC["<b>Situational Context Composer</b><br/>Pre-composes per-workflow<br/>summaries: what happened,<br/>why stopped, tried, options"]:::composer
+            CCD["<b>Crystallisation<br/>Candidate Detector</b><br/>Scans completed workflows<br/>for deterministic-graduation<br/>patterns"]:::composer
+        end
+
+        subgraph AMP["Skill amplification"]
+            direction TB
+            SA["<b>Skill Amplifier</b><br/>Proactively surfaces policy,<br/>precedents, recommended<br/>approach when operator<br/>is uncertain"]:::amplifier
+        end
+
+        subgraph OUTP["Output delivery"]
+            direction TB
+            AP["<b>Assessment Persister</b><br/>Writes AG-UI-shaped<br/>assessments to Cosmos DB<br/><i>before</i> SignalR push<br/>(durability + polling fallback)"]:::output
+            SRP["<b>SignalR Publisher</b><br/>Pushes structured JSON<br/>(AG-UI: exception cards,<br/>approval forms, autonomy<br/>dial states, visualisations)"]:::output
+        end
+    end
+
+    %% ===== Output-side + dependency external systems =====
+    subgraph AMPDEP["Amplification dependency"]
+        direction TB
+        APIM["<b>APIM AI Gateway</b><br/><i>[Azure API Management]</i><br/>Mediates all model + tool<br/>calls (auth, rate-limit, audit)"]:::external
+        IQ["<b>Foundry IQ</b><br/><i>[Azure AI Foundry]</i><br/>Policy corpora, precedents,<br/>grounded retrieval (MCP)"]:::external
+    end
+
+    subgraph OUTSRC["Output channels + observability"]
+        direction TB
+        SR["<b>Azure SignalR Service</b><br/><i>[Azure PaaS]</i><br/>WebSocket push; domain +<br/>role scoped channels"]:::external
+        CPUI["<b>Custom Control Plane UI</b><br/><i>[React SPA · Static Web Apps]</i><br/>Operator surface"]:::external
+        COSMOS_OUT["<b>Cosmos DB</b><br/><i>[Azure PaaS — write path]</i><br/>Assessment store +<br/>proposed-crystallisations"]:::external
+        AI["<b>App Insights /<br/>Log Analytics</b><br/><i>[OTEL sink]</i><br/>Fleet Manager self-telemetry"]:::external
+    end
+
+    OP(("<b>Fleet Operator</b><br/>HR BP / Finance Controller /<br/>IT Ops / Compliance")):::person
+
+    %% ===== Input flows =====
+    EG ==>|"<b>sub-second event push</b>"| EGS
+    COSMOS_IN -->|"on-demand read<br/>(context enrichment)"| CDR
+
+    %% ===== Dispatch =====
+    EGS -->|"DF + MAF lifecycle"| FHA
+    EGS -->|"violations, rejections,<br/>HITL waits, SLA flags"| EQC
+    EGS -->|"per-workflow<br/>state changes"| SCC
+    EGS -->|"workflow_completed"| CCD
+
+    %% ===== Context enrichment =====
+    CDR -.->|"ledger + phase status"| FHA
+    CDR -.->|"rejection reason,<br/>SLA posture"| EQC
+    CDR -.->|"full history +<br/>action attempts"| SCC
+    CDR -.->|"completed outcomes<br/>+ skill usage"| CCD
+
+    %% ===== Amplifier calls =====
+    EQC -->|"amplify for<br/>high-uncertainty"| SA
+    SCC -->|"policy context<br/>for recommendation"| SA
+    SA -->|"retrieve policy +<br/>precedents (MCP)"| APIM
+    APIM -.->|"addressable<br/>MCP retrieval"| IQ
+    APIM -->|"grounded chunks<br/>+ citations"| SA
+
+    %% ===== Composer outputs fan out to BOTH persister and publisher =====
+    FHA -->|"fleet health<br/>assessment"| AP
+    FHA -->|"fleet health<br/>assessment"| SRP
+    EQC -->|"exception queue"| AP
+    EQC -->|"exception queue"| SRP
+    SCC -->|"situational<br/>context card"| AP
+    SCC -->|"situational<br/>context card"| SRP
+    SA -->|"amplification<br/>panel"| AP
+    SA -->|"amplification<br/>panel"| SRP
+
+    %% ===== Crystallisation proposals bypass hot path =====
+    CCD -->|"write proposal<br/>(proposed-crystallisations<br/>collection)"| COSMOS_OUT
+
+    %% ===== Output delivery =====
+    AP ==>|"persist assessment<br/>(durable pre-push)"| COSMOS_OUT
+    SRP ==>|"push AG-UI JSON<br/>(domain + role scoped)"| SR
+    SR ==>|"<b>sub-second WebSocket</b>"| CPUI
+    CPUI -.->|"<b>30s polling fallback</b><br/>if SignalR drops"| COSMOS_OUT
+    OP -->|"observes fleet;<br/>acts via Control Plane"| CPUI
+
+    %% ===== Self-telemetry =====
+    FM -.->|"OTEL spans<br/>(self-telemetry)"| AI
+
+    %% ===== Styling the boundaries =====
+    style FM fill:#E8F1FB,stroke:#0B4884,stroke-width:3px,color:#0B4884
+    style INPUTS fill:#EAF5EE,stroke:#1E5E3A,stroke-width:1px,color:#1E5E3A
+    style CORE fill:#F1E6FA,stroke:#430873,stroke-width:1px,color:#430873
+    style AMP fill:#FBF4E2,stroke:#6B4F06,stroke-width:1px,color:#6B4F06
+    style OUTP fill:#FBEEDC,stroke:#7A3A00,stroke-width:1px,color:#7A3A00
+    style INPUTSRC fill:#F4F4F4,stroke:#4C4C4C,stroke-width:1px,color:#333333
+    style OUTSRC fill:#F4F4F4,stroke:#4C4C4C,stroke-width:1px,color:#333333
+    style AMPDEP fill:#F4F4F4,stroke:#4C4C4C,stroke-width:1px,color:#333333

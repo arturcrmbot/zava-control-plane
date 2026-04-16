@@ -1,0 +1,263 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '20px', 'fontFamily': 'Segoe UI, Arial, sans-serif'}, 'flowchart': {'nodeSpacing': 45, 'rankSpacing': 80, 'curve': 'basis', 'padding': 10, 'useMaxWidth': false}}}%%
+%% WPP Enterprise Agent Framework - Enterprise Architecture Diagram
+%% RFP Deliverable §8.3
+%% Two planes: humans operate the Control Plane; agents operate the Data Plane.
+%% APIM is the sole public edge for all agent -> system traffic.
+
+flowchart LR
+
+    %% =========================================================
+    %% TOP BAND - Human operators driving the Control Plane
+    %% =========================================================
+    subgraph HUMANS["HUMAN OPERATORS - Control Plane users (1:20-50 ratio)"]
+        direction LR
+        HR_BP["HR BP"]
+        FIN_CTRL["Finance Controller"]
+        IT_OPS["IT Ops"]
+        COMPL["Compliance Officer"]
+    end
+
+    %% =========================================================
+    %% CONTROL PLANE BAND
+    %% =========================================================
+    subgraph CP["CONTROL PLANE - operator experience (humans operate this)"]
+        direction LR
+        CPUI["Custom Control Plane UI<br/>React SPA on Azure Static Web Apps<br/>Exception queue, Bulk HITL,<br/>Autonomy dials, AG-UI over SSE"]
+        FM["Fleet Manager Agents<br/>Domain-scoped Hosted Agents<br/>Hiring / Finance / Compliance"]
+        FCP["Foundry Control Plane<br/>Agent inventory, model registry,<br/>evaluators, Guardrails config"]
+        SR["Azure SignalR<br/>real-time push"]
+        FM -- "AG-UI JSON" --> SR
+        SR --> CPUI
+        FCP -.read-only.-> CPUI
+    end
+
+    %% =========================================================
+    %% SURFACES BAND - where agents are invoked from
+    %% =========================================================
+    subgraph SURF["AGENT SURFACES - WPP existing estate + custom portals"]
+        direction LR
+        M365["M365 Copilot<br/>Teams / Outlook /<br/>Word / Excel"]
+        SP["SharePoint"]
+        PA["Power Apps<br/>Model-Driven<br/>+ Code Apps"]
+        D365F["D365 Forms<br/>F&O / CRM"]
+        WEB["Custom Web Portal<br/>Candidate / Supplier"]
+        ACS["Voice<br/>(Azure Comms Services)"]
+        EMAIL["Email<br/>(Adaptive Cards)"]
+        SNOW_S["ServiceNow<br/>(webhook)"]
+    end
+
+    %% =========================================================
+    %% APIM HUB - SOLE PUBLIC EDGE - visually central
+    %% =========================================================
+    subgraph GATEWAY["APIM AI GATEWAY + API CENTER - SOLE PUBLIC EDGE (all east/west traffic)"]
+        direction LR
+        APIC["Azure API Center<br/>Registry: models, MCP tools,<br/>A2A agents, skills, APIs<br/>Cross-cloud discovery"]
+        APIM["APIM AI Gateway<br/>Model routing, token limits,<br/>semantic cache, content safety,<br/>MCP + A2A governance,<br/>jurisdiction routing"]
+        APIC --- APIM
+    end
+
+    %% =========================================================
+    %% AGENT FRAMEWORK BAND - Data Plane runtime
+    %% =========================================================
+    subgraph AF["AGENT FRAMEWORK - DATA PLANE runtime (Microsoft / Azure)"]
+        direction LR
+
+        subgraph EXEC["Three-Layer Execution"]
+            direction TB
+            DF["Layer 1 - Durable Functions<br/>Orchestration envelope<br/>HITL waits, checkpoints, replay"]
+            MAF["Layer 2 - MAF Workflows<br/>Typed executor graphs<br/>Validators between agent nodes"]
+            GHCP["Layer 3 - GHCP SDK Sessions<br/>Skills, MCP, hooks, OTEL<br/>on Foundry Hosted Agents<br/>(Container Apps fallback)"]
+            DF --> MAF --> GHCP
+        end
+
+        subgraph IQ["Intelligence Layer"]
+            direction TB
+            FIQ["Foundry IQ<br/>Agentic retrieval"]
+            FABIQ["Fabric IQ<br/>Semantic layer +<br/>OneLake shortcuts"]
+            WIQ["Work IQ<br/>M365 work graph"]
+        end
+
+        subgraph STATE["State / Events / Observability"]
+            direction TB
+            COSMOS[("Cosmos DB<br/>Workflow state,<br/>action ledger,<br/>autonomy config")]
+            EG["Event Grid<br/>Lifecycle + hook events"]
+            AI["Application Insights<br/>OTEL traces, token, cost"]
+            LA["Log Analytics<br/>KQL, audit, 7-yr retention"]
+            AI --> LA
+        end
+    end
+
+    %% =========================================================
+    %% LOW-CODE BUILDERS - compose into framework
+    %% =========================================================
+    subgraph LC["LOW-CODE BUILDERS"]
+        direction LR
+        CS["Copilot Studio<br/>(registered via Agent 365)"]
+        LOGIC["Azure Logic Apps<br/>(REST to MCP via APIM)"]
+    end
+
+    %% =========================================================
+    %% BOTTOM BAND - WPP business systems + data + multi-cloud
+    %% =========================================================
+    subgraph BIZ["WPP BUSINESS SYSTEMS - Data Plane targets (agents operate these)"]
+        direction LR
+        WDAY["Workday HCM<br/>staff identity SoT"]
+        D365C["D365 CRM"]
+        D365FO["D365 F&O"]
+        SAP["SAP BFC"]
+        DELTEK["Deltek Maconomy"]
+        SNOW["ServiceNow"]
+        GH["Greenhouse ATS"]
+        LI["LinkedIn Recruiter"]
+    end
+
+    subgraph DATA["WPP DATA ESTATE - multi-cloud, federated via OneLake"]
+        direction LR
+        DBX[("Databricks<br/>Unity Catalog")]
+        SNOW_DB[("Snowflake")]
+        BQ[("BigQuery")]
+        DV[("Dataverse")]
+        OL[("OneLake shortcuts<br/>via Fabric IQ")]
+    end
+
+    %% =========================================================
+    %% SIDE RAILS - identity (left), governance (right)
+    %% =========================================================
+    subgraph ID["WPP IDENTITY"]
+        direction TB
+        OKTA["Okta<br/>WPP federated IdP"]
+        EXTID["Entra External ID<br/>federation bridge"]
+        ENTRA["Microsoft Entra ID<br/>workforce + Agent ID"]
+        OKTA --> EXTID --> ENTRA
+    end
+
+    subgraph GOV["GOVERNANCE"]
+        direction TB
+        A365["Agent 365 /<br/>Entra Agent ID<br/>Registry + CA"]
+        PURV["Microsoft Purview<br/>DLP + audit"]
+        DEF["Defender for AI<br/>Prompt injection,<br/>jailbreak, leakage"]
+        APIOPS["APIOps<br/>Policy-as-code,<br/>Git-gated promotion"]
+    end
+
+    subgraph CLOUD["MULTI-CLOUD hosting"]
+        direction TB
+        AZ["Azure<br/>primary - framework"]
+        GCP["GCP<br/>primary - WPP data"]
+        AWS["AWS<br/>selected workloads"]
+    end
+
+    subgraph OPEN["WPP OPEN - out of scope, A2A interop expected"]
+        WOPEN["WPP Open Agents<br/>A2A + SDK interop"]
+    end
+
+    %% =========================================================
+    %% PRIMARY FLOWS - Humans -> Control Plane -> Runtime
+    %% =========================================================
+
+    %% Humans operate the Control Plane (only)
+    HR_BP --> CPUI
+    FIN_CTRL --> CPUI
+    IT_OPS --> CPUI
+    COMPL --> CPUI
+
+    %% Surfaces trigger agents - all converge on APIM
+    M365 --> APIM
+    SP --> APIM
+    PA --> APIM
+    D365F --> APIM
+    WEB --> APIM
+    ACS --> APIM
+    EMAIL --> APIM
+    SNOW_S --> APIM
+
+    %% Low-code builders register through API Center / APIM
+    CS --> APIC
+    LOGIC --> APIM
+
+    %% Control Plane -> runtime (enforcement)
+    CPUI -- "raise_external_event" --> DF
+    CPUI -- "autonomy writes" --> COSMOS
+    CPUI -- "policy update" --> APIM
+
+    %% APIM to framework (the hub)
+    APIM ==> DF
+
+    %% Framework -> APIM -> Intelligence Layer (MCP retrieval)
+    GHCP -- "MCP" --> APIM
+    APIM --> FIQ
+    APIM --> FABIQ
+    APIM --> WIQ
+    FABIQ --> OL
+
+    %% Framework telemetry flows to Control Plane
+    GHCP -- "hooks" --> EG
+    GHCP -- "state" --> COSMOS
+    GHCP -- "OTEL" --> AI
+    MAF -- "OTEL" --> AI
+    DF -- "lifecycle" --> EG
+    DF -- "OTEL" --> AI
+    EG ==> FM
+    COSMOS -.context.-> FM
+    AI -.query.-> CPUI
+    COSMOS -.query.-> CPUI
+
+    %% APIM to business systems (MCP tools, east/west via APIM)
+    APIM ==> WDAY
+    APIM ==> D365C
+    APIM ==> D365FO
+    APIM ==> SAP
+    APIM ==> DELTEK
+    APIM ==> SNOW
+    APIM ==> GH
+    APIM ==> LI
+
+    %% APIM to data estate (MCP)
+    APIM --> DBX
+    APIM --> SNOW_DB
+    APIM --> BQ
+    APIM --> DV
+    OL -. shortcut .- DBX
+    OL -. shortcut .- SNOW_DB
+    OL -. shortcut .- BQ
+
+    %% A2A out to WPP Open
+    APIM -- "A2A" --> WOPEN
+
+    %% Identity federation -> APIM authn (single anchor edge to reduce crossings)
+    ENTRA -.authn + Agent IDs.-> APIM
+
+    %% Governance overlays (anchored on APIM and CP UI)
+    GOV -.policy / audit / alerts.-> APIM
+    DEF -.alerts.-> CPUI
+
+    %% Multi-cloud hosting hints (anchored on APIM only)
+    CLOUD -.hosts framework.-> APIM
+
+    %% =========================================================
+    %% STYLING
+    %% =========================================================
+    classDef microsoft fill:#E3F1FB,stroke:#0A5CA8,stroke-width:1px,color:#0A2540
+    classDef controlplane fill:#C8E0F5,stroke:#0A5CA8,stroke-width:2px,color:#0A2540
+    classDef gateway fill:#FFD79A,stroke:#B05A00,stroke-width:3px,color:#3A2200
+    classDef governance fill:#E1D1F2,stroke:#5A2DA5,stroke-width:1px,color:#26114F
+    classDef surface fill:#D3EDD9,stroke:#1F7A3A,stroke-width:1px,color:#0B3318
+    classDef lowcode fill:#EEE0CC,stroke:#7A5A2A,stroke-width:1px,color:#2F1F0A
+    classDef identity fill:#F9D3D3,stroke:#A42020,stroke-width:1px,color:#3A0A0A
+    classDef wppbiz fill:#FFEFB2,stroke:#806400,stroke-width:1px,color:#2F2500
+    classDef wppdata fill:#FFE3B5,stroke:#805300,stroke-width:1px,color:#2F1F00
+    classDef cloud fill:#E6E6E6,stroke:#555555,stroke-width:1px,color:#111111
+    classDef wppopen fill:#F2C9E4,stroke:#8A2472,stroke-width:1px,color:#300024
+    classDef human fill:#FFFFFF,stroke:#111111,stroke-width:2px,color:#111111
+
+    class HR_BP,FIN_CTRL,IT_OPS,COMPL human
+    class CPUI,FM,FCP,SR controlplane
+    class DF,MAF,GHCP,FIQ,FABIQ,WIQ,COSMOS,EG,AI,LA microsoft
+    class APIM,APIC gateway
+    class A365,PURV,DEF,APIOPS governance
+    class M365,SP,PA,D365F,WEB,ACS,EMAIL,SNOW_S surface
+    class CS,LOGIC lowcode
+    class OKTA,EXTID,ENTRA identity
+    class WDAY,D365C,D365FO,SAP,DELTEK,SNOW,GH,LI wppbiz
+    class DBX,SNOW_DB,BQ,DV,OL wppdata
+    class AZ,GCP,AWS cloud
+    class WOPEN wppopen

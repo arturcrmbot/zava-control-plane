@@ -80,17 +80,15 @@ def md_to_html(md_path: Path) -> str:
 
 
 def render_pdf(html_path: Path, pdf_path: Path) -> int:
-    edge = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-    file_url = "file:///" + str(html_path).replace("\\", "/")
-    args = [
-        edge,
-        "--headless=new",
-        "--disable-gpu",
-        "--no-pdf-header-footer",
-        f"--print-to-pdf={pdf_path}",
-        file_url,
-    ]
+    # Render via node/puppeteer (bundled with mermaid-cli). Edge's
+    # --print-to-pdf fails silently (rc=0, no output) on paths with spaces,
+    # even when redirected through a space-free temp dir. Puppeteer's
+    # page.pdf() works reliably.
+    helper = Path(__file__).parent / "_html_to_pdf.mjs"
+    args = ["node", str(helper), str(html_path), str(pdf_path)]
     result = subprocess.run(args, capture_output=True, text=True, timeout=120)
+    if result.returncode != 0:
+        print(result.stderr[:500], file=sys.stderr)
     return result.returncode
 
 
