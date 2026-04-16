@@ -34,6 +34,20 @@ Our architecture expresses the **determinism ↔ agentic spectrum** explicitly a
 - **[Fabric IQ](https://learn.microsoft.com/en-us/fabric/iq/overview)** (preview): semantic intelligence layer over WPP's Fabric / OneLake estate. Business ontology, semantic model, graph engine for multi-hop reasoning. Used by Budget Agent (headcount, cost-centre, agency hierarchy), ROI reporting, cross-entity matrix navigation.
 - **[Work IQ MCP](https://learn.microsoft.com/en-us/microsoft-copilot-studio/use-work-iq)** (preview): M365 work graph + memory layer (collaboration patterns, calendar, expertise). Used by Personal Agents, Interview Coordinator (timezone, availability), Org Topology / Escalation routing.
 
+### 4.1.1 Data Platform Integration: Databricks and Snowflake
+
+WPP's existing data estate on Databricks and Snowflake is integrated without requiring migration. Four patterns, in order of preference:
+
+**Fabric IQ federation via OneLake shortcuts**. [OneLake shortcuts](https://learn.microsoft.com/en-us/fabric/onelake/onelake-shortcuts) provide zero-copy, zero-movement access to Databricks Unity Catalog tables and Snowflake external tables. Fabric IQ's semantic layer reasons over this data in-place — no ETL, no data duplication, no lineage fracture. The Budget Agent, ROI Agent, and analytics workflows query WPP's Databricks / Snowflake estate through Fabric IQ as if it were native. [Unity Catalog](https://learn.microsoft.com/en-us/fabric/onelake/onelake-shortcuts-unity-catalog)'s fine-grained access control is preserved through the shortcut.
+
+**Direct MCP servers**. For workloads that require direct SQL access (ad-hoc analytics, custom data pipelines), purpose-built MCP servers for [Databricks SQL Warehouse](https://learn.microsoft.com/en-us/azure/databricks/sql/) and Snowflake are exposed via APIM. Agent executors query structured and unstructured data in Databricks / Snowflake directly, governed identically to all other MCP tools (auth injection, rate limiting, content safety, audit).
+
+**Fine-tuneable analytics models in-place**. Fine-tuned analytics models deployed on Databricks ([MLflow](https://learn.microsoft.com/en-us/azure/databricks/mlflow/) + Model Serving) or Snowflake ([Snowpark Container Services](https://docs.snowflake.com/en/developer-guide/snowpark-container-services/overview) / [Cortex](https://docs.snowflake.com/en/guides-overview-ai-features)) are callable as MCP tools, enabling Analytics Agents to run predictive models over WPP's data where it already lives. This addresses the §6.3 Advanced requirement for "Fine-tuneable analytics models to run Analytics agents on structured and unstructured data (Databricks, Snowflake, file stores)" without model relocation.
+
+**Inference-side federation (optional)**. Where WPP prefers agent inference to stay inside the data platform, [Databricks Mosaic AI Gateway](https://www.databricks.com/product/ai-gateway) and [Snowflake Cortex](https://docs.snowflake.com/en/guides-overview-ai-features) are callable as MCP tools through APIM — a Databricks-hosted model call is governed identically to a Foundry model call.
+
+**Positioning**: Fabric IQ is the semantic / ontology layer *over* WPP's existing data estate, not a replacement for it. Databricks and Snowflake remain the systems of record; Fabric IQ provides the business ontology, semantic model, and graph engine that agents need to reason across them.
+
 ### 4.2 Agent Framework vs Agent Surfaces
 
 | Layer | What It Is | Components |
@@ -41,7 +55,7 @@ Our architecture expresses the **determinism ↔ agentic spectrum** explicitly a
 | **Framework** | The agent runtime, workflow graph engine, durable orchestration envelope, state store, governance, tool integration, knowledge grounding, and observability. | GHCP SDK (agent runtime), Microsoft Agent Framework (workflow graph), Foundry Hosted Agents, Durable Functions (durable envelope), APIM AI Gateway + API Center, Foundry IQ + Fabric IQ + Work IQ (Intelligence Layer), Foundry Control Plane, Agent 365 + Entra, Cosmos DB, Application Insights, Log Analytics |
 | **Surfaces** | The channels through which humans interact with agents and agent outputs. | M365 Copilot (Teams), Email (Adaptive Cards), Custom Control Plane UI (React), Web Portal, Voice (ACS + GPT-Realtime), ServiceNow |
 
-A single domain agent (e.g. Hiring Agent) is surface-agnostic. The same agent executors inside its MAF workflows produce outputs that the human's Personal Agent (PA) delivers to whatever surface that human uses. The PA is a GHCP SDK agent surfaced in M365 Copilot via [M365 Agents SDK](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/publish). Every human has one. Humans make all decisions. The PA prepares and executes.
+A single domain agent (e.g. Hiring Agent) is surface-agnostic. The same agent executors inside its MAF workflows produce outputs that the human's Personal Agent (PA) delivers to whatever surface that human uses. The PA is a GHCP SDK agent surfaced in M365 Copilot via the [M365 Agents SDK](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/publish) — it is a capability **layered on** Copilot 365, not a replacement, and adds no new per-user licence beyond WPP's existing Copilot 365 entitlement. Every human has one. Humans make all decisions. The PA prepares and executes.
 
 ### 4.3 Control Plane Architecture
 
@@ -61,14 +75,17 @@ Two layers.
 | Skill Amplification | Fleet Manager proactively surfaces policy, precedents, recommended approach when operator is uncertain. | 31.5 |
 | Role-Based Views | HR BP sees hiring. Finance BP sees budget gates. Entra RBAC. | 10.1 |
 | Cost Dashboard | Per-workflow cost attribution from OTEL + APIM token metrics. | 26.4 |
+| AG-UI Dynamic Components | The UI consumes [AG-UI](https://learn.microsoft.com/en-us/agent-framework/user-interface/ag-ui/overview) event streams emitted by MAF agent executors and Fleet Manager — agents render per-workflow approval forms, charts, and wizards without hardcoded UI per workflow type. APIM mediates the stream (auth, rate limit, audit). | 5.3 |
 
-Data sources for the custom UI: Application Insights APIs (traces, cost), Foundry REST APIs (agent inventory), APIM metrics (token consumption), workflow state store in Cosmos DB (phase status, approvals, action ledger), Fleet Manager assessments (SignalR real-time).
+Data sources for the custom UI: Application Insights APIs (traces, cost), Foundry REST APIs (agent inventory), APIM metrics (token consumption), workflow state store in Cosmos DB (phase status, approvals, action ledger), Fleet Manager assessments (SignalR + AG-UI real-time streams).
 
 ### 4.4 Multi-Agent Orchestration
 
-We do not use separate agent processes for each specialist role. Instead, skills provide specialisation within agent executors in a MAF workflow graph, per domain.
+We implement WPP's "9+ specialist agents" requirement with skill-based specialisation inside a domain-scoped Hosted Agent, not with N separate agent processes. The specialisation — distinct roles, tool allow-lists, model assignments per phase — is preserved; the coordination substrate changes from inter-agent protocol to MAF workflow graph. See **§18 Architectural Choice — Skills, Not Separate Agents** for the full side-by-side trade-off analysis (specialisation, coordination, latency, cost, governance, debuggability).
 
 A domain-scoped Hosted Agent (e.g. Hiring Agent, `hiring-agent@wpp`) runs ephemeral GHCP SDK sessions from MAF agent executors, each loading different skills depending on the workflow phase. Each skill defines its own role, allowed tools, model assignment, and governance rules. The outcome — specialised capabilities with distinct roles and model assignments — matches WPP's requirement for heterogeneous teams. The architectural advantages over separate agents: no inter-agent communication overhead, shared workflow context without message passing, simpler governance (one Entra identity per domain), easier operationalisation at fleet scale.
+
+**A2A still applies where it genuinely belongs** — cross-organisation interactions with external agents (partner candidate agents, supplier pricing agents, jurisdictional compliance authorities) go through [APIM A2A governance](https://learn.microsoft.com/en-us/azure/api-management/agent-to-agent-api). What we avoid is fragmenting a single domain's internal specialisation across N network-separated processes when a typed workflow graph achieves the same specialisation with better operational characteristics.
 
 **Two coordination substrates, layered**:
 
@@ -94,6 +111,8 @@ Both substrates adapt based on runtime data — not static DAGs. Supported topol
 | Memory | Cosmos DB (facts + episodic), skills (procedural), Foundry IQ (semantic retrieval), Fabric IQ (business ontology), Work IQ (M365 episodic), GHCP SDK session (working) | GA (data stores), Preview (IQ products), custom (memory patterns) |
 | Model-agnostic | GHCP SDK works with any model from Foundry catalog (1900+). Per-skill model assignment. APIM routes and governs. | GA |
 | Control Plane | Foundry Control Plane (platform) + Custom Control Plane UI (operator experience) | GA (Foundry) + custom build |
+| **Structured outputs** | GHCP SDK skills declare output JSON Schemas; MAF workflow executors are typed end-to-end; APIM validates responses against the declared schema before propagation. Schema violations rejected at gateway and surfaced to Fleet Manager. Addresses §6.1 "Type-safe, schema-validated agent responses". | GA (MAF typed executors), GA (GHCP SDK structured outputs), GA (APIM schema validation) |
+| **Dynamic UI (AG-UI)** | MAF agent executors emit [AG-UI](https://learn.microsoft.com/en-us/agent-framework/user-interface/ag-ui/overview) events (SSE) consumed by the Control Plane UI — dynamic approval forms, charts, wizards rendered per workflow type with no hardcoded UI. APIM-mediated. Addresses §5.3 "AG-UI or equivalent: Must support". | GA (MAF AG-UI), GA (APIM SSE mediation) |
 
 ### 5.2 Desirable Capabilities
 
@@ -112,8 +131,9 @@ Both substrates adapt based on runtime data — not static DAGs. Supported topol
 |-----------|---------|--------|
 | Voice screening | [GPT-Realtime](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/realtime-audio) (speech-to-speech) + [ACS Call Automation](https://learn.microsoft.com/en-us/azure/communication-services/concepts/call-automation/call-automation). [MAI-Voice-1](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/mai-voices) (TTS, preview). | GA (GPT-Realtime, ACS), Preview (MAI-Voice-1) |
 | Avatar onboarding video | Agent executor drafts script; downstream deterministic executor calls HeyGen API MCP to produce branded video. | Custom MCP server |
-| Fine-tuning | [Azure AI Foundry fine-tuning](https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/fine-tuning-overview). We prioritise skill crystallisation over model fine-tuning. | GA |
-| Knowledge extraction | Threadlight accelerator: creates skills from interviews and unstructured data. | Built, demonstrated |
+| Fine-tuning (Foundry) | [Azure AI Foundry fine-tuning](https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/fine-tuning-overview) for Foundry-hosted models. We prioritise skill crystallisation over model fine-tuning. | GA |
+| **Fine-tuneable analytics models on Databricks / Snowflake** | Models fine-tuned on WPP's data stay in-place. Databricks models ([MLflow](https://learn.microsoft.com/en-us/azure/databricks/mlflow/) + Model Serving) and Snowflake models ([Snowpark](https://docs.snowflake.com/en/developer-guide/snowpark-container-services/overview) / [Cortex](https://docs.snowflake.com/en/guides-overview-ai-features)) are callable as MCP tools through APIM — Analytics Agents run predictive models over structured + unstructured data where it already lives. See §4.1.1. | GA |
+| Knowledge extraction | **Threadlight** accelerator — a Microsoft delivery accelerator that captures undocumented procedural knowledge from SMEs via interview, producing executable SKILL.md files, MAF workflow graphs, and MCP tool stubs. Output flows through the same API Center governance pathway as hand-written skills. Not a black-box — all artefacts are Git-inspectable. | Built, demonstrated |
 
 ---
 
@@ -133,6 +153,24 @@ Identity lives on the container, not on individual sessions. When a human trigge
 
 Agent 365 provides lifecycle management (activate, block, delete), [Conditional Access for agents](https://learn.microsoft.com/en-us/entra/identity/conditional-access/agent-id), and integration with [Purview](https://learn.microsoft.com/en-us/purview/ai-agent-365) (DLP, audit) and [Defender](https://learn.microsoft.com/en-us/azure/defender-for-cloud/ai-threat-protection) (threat detection).
 
+**Per-skill tool allow-list (APIM-enforced)**: each SKILL.md declares its allowed tools in frontmatter. On skill promotion (Design → Production), the allow-list is compiled into an APIM policy fragment. APIM rejects any tool call from a session loading `skill.X` to tool `tool.Y` if the allow-list does not permit it — enforcement sits in the gateway, outside the agent runtime, and cannot be bypassed by a prompt-injected tool call. Tool calls that originate from an agent executor carry the skill context (skill ID, skill version, workflow phase, jurisdiction) as JWT claims issued by the Hosted Agent's managed identity; APIM validates these claims against the skill's declared allow-list before forwarding.
+
+**Non-revocable operations catalogue**: each MCP tool declares `revocable: true|false`. Non-revocable invocations route through a hook-enforced HITL gate regardless of which skill or workflow invokes them. The catalogue is Git-committed and PR-reviewed.
+
+| Operation | Domain | Enforcement |
+|-----------|--------|-------------|
+| Send email to external recipient | Hiring, Finance, Onboarding | GHCP SDK hook blocks send; HITL approval via PA |
+| Extend offer letter | Hiring | Hook + MAF validator + dual-control |
+| Submit payment / release funds (amount > threshold) | Finance | Hook + MAF validator + dual-control |
+| Create ServiceNow JML ticket | IT Ops | Hook + HITL approval |
+| Post outbound A2A message to external agent | Multi-domain | Hook + validator; allow-listed destinations only |
+| Write to Workday / D365 F&O master data | HR, Finance | Hook + dual-control + audit link to operator |
+| Commit compliance attestation | Compliance | Dual-control mandatory |
+
+Revocability is a property of the tool, not of the skill — the same tool is non-revocable regardless of which skill invokes it.
+
+**Dual-control (four-eyes)**: high-risk operations require two operator approvals from two distinct Entra identities in two distinct operator groups. Enforced by Durable Functions — the orchestration does not advance until two distinct `raise_event` calls arrive from two distinct operators. Group membership is validated via an APIM policy against Entra group claims; the second approver cannot be the first. Both identities are audit-logged.
+
 ### 6.2 Observability and OpenTelemetry
 
 Three layers of observability:
@@ -143,7 +181,31 @@ Three layers of observability:
 
 Cost attribution is per workflow, per phase, per model, per consumer. Visible in both Foundry dashboards and the custom Control Plane UI.
 
-### 6.3 Data Protection and Compliance
+**Telemetry data classification**: OTEL span attributes carry workflow/phase/jurisdiction/model/token counts — **no prompt or response bodies are stored in App Insights**. Bodies are redacted by Foundry Guardrails and stored in Log Analytics only. Reasoning chain and action ledger are stored in separate tables — a non-revocable action's audit record carries the span ID that produced it, not the model's reasoning tokens. Auditors trace cause and effect without the reasoning chain becoming the audit artefact.
+
+### 6.3 Network and Runtime Isolation
+
+**Principle**: APIM is the only public edge. Everything behind it — Foundry Hosted Agents, Durable Functions, MAF workflow executors, MCP servers, Cosmos DB, Key Vault, AI Search, Log Analytics, Event Grid — is reachable only over Private Endpoints or VNet-integrated paths. Agents have no direct internet access; outbound calls to third-party SaaS traverse Azure Firewall with an FQDN allow-list. **All roads go through APIM — privately.**
+
+| Boundary | Control | Notes |
+|----------|---------|-------|
+| **Public ingress** | [Azure Front Door Premium](https://learn.microsoft.com/en-us/azure/frontdoor/private-link) (WAF, DDoS) → [APIM Private Endpoint](https://learn.microsoft.com/en-us/azure/api-management/private-endpoint) | Single external entry point. WAF blocks OWASP Top-10. APIM gateway has no public IP; Front Door reaches it over Private Link. |
+| **East/west (agent ↔ model/tool)** | APIM AI Gateway as sole addressable endpoint; backends on Private Endpoint | [Foundry model endpoints](https://learn.microsoft.com/en-us/azure/ai-foundry/how-to/configure-private-link), [Cosmos DB](https://learn.microsoft.com/en-us/azure/cosmos-db/how-to-configure-private-endpoints), [Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/general/private-link-service), [AI Search](https://learn.microsoft.com/en-us/azure/search/service-create-private-endpoint), [Log Analytics](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/private-link-security), Event Grid — all private endpoints. |
+| **Egress (agent → SaaS)** | [Azure Firewall Premium](https://learn.microsoft.com/en-us/azure/firewall/premium-features) with FQDN allow-list | Named destinations only: Workday, LinkedIn, Greenhouse, HeyGen, Dynamics 365 SaaS, Okta, Maconomy. Everything else blocked. TLS inspection optional. |
+| **Compute isolation** | Azure Functions VNet integration; Foundry Hosted Agents in dedicated subnets; no public IPs on compute | DF workers and MAF executors resolve APIM and data-plane dependencies over Private DNS only. Subnet NSGs enforce least-privilege. |
+| **Cross-region** | Region-pinned deployments per jurisdiction | EU workflows never resolve US-region endpoints. Log Analytics workspaces, Cosmos DB accounts, and Foundry Hosted Agent pools are regional. |
+| **Residency CI gate** | APIOps pipeline validation | PRs that register a non-EU backend against a DE-tagged skill or model fail CI before deployment. Jurisdiction is an enforced boundary, not a runtime decision. |
+
+**Data classification and retention** — four categories, each with distinct residency and redaction policy:
+
+| Class | Where it lives | Retention | Redaction | Residency |
+|-------|---------------|-----------|-----------|-----------|
+| **Workflow state** (phase state, action ledger, approval records, candidate/invoice data) | Cosmos DB → Storage immutable export | Workflow lifetime + 90d hot; archive thereafter | CMK via Key Vault; per-field Purview labels | Region-pinned to jurisdiction |
+| **Model context** (prompts, tool calls, reasoning chain within a session) | In-memory during the GHCP SDK session; never persisted by default | Ephemeral — discarded at session end | Foundry Guardrails redact at input/output/tool-call/tool-response | Never crosses region |
+| **Audit ledger** (every tool call, model call, enforcement decision, human interaction) | Log Analytics → Azure Storage immutable export | 7–12 years, immutable | Bodies stored with Guardrails PII redaction applied | Regional workspace per jurisdiction |
+| **Telemetry** (OTEL spans, metrics, cost attribution) | Application Insights | 90d (configurable to 2y) | IDs, metadata, token counts only — no bodies | Regional instance |
+
+### 6.4 Data Protection and Compliance
 
 Three enforcement layers. The LLM cannot bypass any of them.
 
@@ -159,6 +221,12 @@ Three enforcement layers. The LLM cannot bypass any of them.
 
 **Audit**: [Azure Log Analytics](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/data-retention-archive) with 7–12 year retention. Immutability enforced via Azure Storage export with immutability policies. Every tool call, model call, enforcement decision, and human interaction logged. Queryable via KQL and [Microsoft Sentinel](https://learn.microsoft.com/en-us/azure/sentinel/quickstart-onboard).
 
+**Platform certifications**: the Azure services in this architecture inherit [SOC 1 / SOC 2 Type II / SOC 3](https://learn.microsoft.com/en-us/compliance/regulatory/offering-soc), [ISO/IEC 27001](https://learn.microsoft.com/en-us/compliance/regulatory/offering-iso-27001), [ISO/IEC 27017](https://learn.microsoft.com/en-us/compliance/regulatory/offering-iso-27017), [ISO/IEC 27018](https://learn.microsoft.com/en-us/compliance/regulatory/offering-iso-27018), [ISO/IEC 27701](https://learn.microsoft.com/en-us/compliance/regulatory/offering-iso-27701), [HIPAA](https://learn.microsoft.com/en-us/compliance/regulatory/offering-hipaa-hitech), [PCI DSS Level 1](https://learn.microsoft.com/en-us/compliance/regulatory/offering-pci-dss), [FedRAMP High](https://learn.microsoft.com/en-us/compliance/regulatory/offering-fedramp), [GDPR](https://learn.microsoft.com/en-us/compliance/regulatory/gdpr), and [BSI C5](https://learn.microsoft.com/en-us/compliance/regulatory/offering-c5-germany) (used in Germany). EU AI Act alignment is maintained through Microsoft's [Responsible AI Standard](https://www.microsoft.com/en-us/ai/principles-and-approach), Foundry Guardrails' classifier coverage of high-risk categories, and Foundry built-in evaluators for bias and safety. Authoritative compliance matrix at the [Microsoft Trust Center](https://www.microsoft.com/en-us/trust-center). WPP's SOC 2 readiness and GDPR evidence inherit from these attestations — no bespoke security certification is required at the WPP application layer. (Addresses §6.3 Enterprise Non-Negotiable.)
+
+**Encryption**: TLS 1.2+ enforced on all ingress and east/west traffic; TLS 1.3 where supported. At-rest encryption defaults to Microsoft-managed keys, with [Customer-Managed Keys (CMK) via Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/keys/customer-managed-keys) available for Cosmos DB, Log Analytics, AI Search, Storage, and Foundry — recommended for regulated jurisdictions. Azure Storage supports [double encryption](https://learn.microsoft.com/en-us/azure/storage/common/infrastructure-encryption-enable) (service + infrastructure layer) for the immutable audit export. Key rotation is automated via Key Vault; agent code never sees raw credentials — APIM injects them at request time from Key Vault references.
+
+**Multi-factor authentication**: enforced by [Entra Conditional Access](https://learn.microsoft.com/en-us/entra/identity/conditional-access/overview) on every human-triggered path — operators accessing the Control Plane UI, business partners approving via their PA, and platform engineers making governance changes. Phishing-resistant methods ([FIDO2, Windows Hello, Microsoft Authenticator with number matching](https://learn.microsoft.com/en-us/entra/identity/authentication/concept-authentication-strengths)) are required; SMS and voice MFA are explicitly blocked via Authentication Strengths policy. Agent-triggered actions use managed identities, not interactive credentials — no shared secret to phish.
+
 ---
 
 ## 7. Protocol Support
@@ -168,6 +236,8 @@ Three enforcement layers. The LLM cannot bypass any of them.
 | **MCP** | GA | Primary integration pattern. GHCP SDK [natively supports MCP](https://github.com/github/copilot-sdk/blob/main/docs/features/mcp.md). All enterprise systems exposed as MCP servers. APIM provides [REST-to-MCP gateway](https://learn.microsoft.com/en-us/azure/api-management/export-rest-mcp-server) (auto-generates tool definitions from OpenAPI specs). [MCP governance via APIM](https://learn.microsoft.com/en-us/azure/api-management/mcp-server-overview). |
 | **A2A** | Preview | [APIM A2A governance](https://learn.microsoft.com/en-us/azure/api-management/agent-to-agent-api): AgentCards, JSON-RPC task lifecycle, SSE streaming. Agents are both A2A clients and servers. A2A is not required for core architecture — used in POC2 for external candidate agent demo. |
 | **OpenTelemetry** | GA | Native throughout. [GHCP SDK OTEL](https://github.com/github/copilot-sdk/blob/main/docs/observability/opentelemetry.md) + [Foundry Tracing](https://learn.microsoft.com/en-us/azure/foundry/observability/how-to/trace-agent-setup). |
+| **[AG-UI](https://learn.microsoft.com/en-us/agent-framework/user-interface/ag-ui/overview)** | GA (MAF native) | Dynamic, agent-rendered UI components within the Control Plane. MAF agent executors emit AG-UI events over SSE; the Control Plane UI consumes and renders them. APIM mediates the SSE stream (auth, rate limit, audit). Addresses §5.3 "AG-UI or equivalent: Must support" in the RFP. |
+| **Structured Outputs** | GA | Type-safe, schema-validated agent responses. GHCP SDK skills declare output JSON Schemas; MAF workflow executors are typed end-to-end; APIM validates every response against the declared schema before forwarding to the next executor. Addresses §6.1 "Type-safe, schema-validated agent responses". |
 
 ---
 
@@ -192,20 +262,43 @@ All enterprise systems are integrated via MCP servers governed through APIM AI G
 
 Supported OAuth 2.0 grant types: Authorization Code, Client Credentials, SAML-bridged (Okta), PKCE, Device Flow, OBO. All via Entra External ID federation with Okta as primary IdP.
 
+### 8.2 Surface-Side Integrations (where agents are invoked from)
+
+§8.1 above covers the backend systems agents reach through MCP. This section addresses the surfaces where agents are **invoked from**, per §3.6 of the RFP. The consistent pattern: the user's Personal Agent is the invocation surface; each platform integrates either directly through Copilot or through a thin connector to the PA.
+
+| Platform | MoSCoW | Invocation pattern | Status |
+|----------|--------|-------------------|--------|
+| **M365 Copilot (Teams / Outlook / Word / Excel)** | Must | PA surfaced via [M365 Agents SDK](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/publish). Primary surface for most WPP users. | GA |
+| **Custom Control Plane UI (React)** | Must | First-class surface. AG-UI component rendering, SignalR real-time, REST for fleet queries. | Custom build |
+| **Web Portal (Angular / React)** | Nice-to-have | Candidate-facing web portal uses the same GHCP SDK + AG-UI pattern. The Angular / React choice is a UI-kit decision — both consume the same AG-UI SSE streams and REST endpoints via APIM. An [Angular AG-UI client](https://learn.microsoft.com/en-us/agent-framework/user-interface/ag-ui/overview) is a routine SSE consumer; no bespoke protocol work. | Custom build |
+| **SharePoint (SPFx web parts)** | Should | A lightweight SPFx web part embeds the PA via the M365 Agents SDK chat surface; the web part can also invoke named skills through a pre-registered APIM endpoint. Agents reach into SharePoint through the Graph MCP. Bidirectional: SharePoint as invocation surface and as knowledge source (Foundry IQ federates SharePoint natively). | GA (SPFx + Graph MCP); custom SPFx web part |
+| **Power Apps (connector / PCF)** | Must | Two patterns: (a) a **custom connector** to APIM exposes named agent skills to Power Apps formulas/flows, so a citizen-dev app can trigger a workflow (e.g. "submit timesheet for review"); (b) a **PCF control** embeds the PA chat into model-driven apps. Governed identically — APIM enforces auth, rate limit, content safety. | GA (custom connector + PCF); skill registration custom |
+| **Dynamics 365 forms / workflows / plugins** | Must | D365 is both a backend (via MCP for reads/writes to master data) **and** a surface. Surface patterns: D365 form embeds the PA via the [Power Platform embedded Copilot surface](https://learn.microsoft.com/en-us/power-platform/admin/copilot-responsible-ai-faqs); D365 workflow steps invoke named agent skills via a custom connector to APIM; D365 plugins call out to APIM for synchronous agent invocation. | GA (D365 + connector); custom D365 resources per workflow |
+| **.NET SDK** | Should | MAF ships with full .NET parity — agent executors, workflow graphs, and durable task integration are available in C#. Teams preferring .NET build against MAF .NET with the same skills, MCPs, and governance; artefacts serialise identically (SKILL.md, MAF workflow definitions). | GA (MAF .NET, DF .NET) |
+| **ServiceNow** | Must | ServiceNow invokes the PA via the ServiceNow MCP server, which is governed through APIM. IT Ops works in their existing surface; the PA writes back provisioning tickets. | Custom MCP server |
+| **Voice (ACS + GPT-Realtime)** | Must | Speech-to-speech front end; tool calls to GHCP SDK backend for reasoning. ACS handles telephony + PSTN. | GA |
+| **Email (Adaptive Cards)** | Must | PA composes Adaptive Cards; responses route back through PA. | GA |
+
+All surface-side patterns share the same invariant: **the agent runtime is invoked through APIM, governed identically regardless of surface.** No surface gets a privileged path around the gateway. No surface bypasses MFA, RBAC, content safety, or audit.
+
 ---
 
 ## 9. Development Experience
 
+All agent artefacts — pro-code, low-code, Threadlight-generated, runtime-spawned — are declarative, Git-committable, and flow through the same APIOps governance pipeline. This is how we meet §6.5 "Low-code artefacts must serialise to the same code/config format as pro-code artefacts": every path produces versioned, reviewable artefacts that register in Azure API Center, are governed by APIM, and carry Entra Agent IDs — regardless of which surface built them.
+
 | Mode | Persona | Solution |
 |------|---------|---------|
-| **Pro-code** | Platform engineers, full-stack developers | [GHCP SDK](https://github.com/github/copilot-sdk) Python (primary) + TypeScript. Full access to [skills](https://github.com/github/copilot-sdk/blob/main/docs/features/skills.md), [MCP](https://github.com/github/copilot-sdk/blob/main/docs/features/mcp.md), [hooks](https://github.com/github/copilot-sdk/blob/main/docs/features/hooks.md), OTEL instrumentation, model selection. MIT open-source. |
-| **Low-code agents** | Citizen developers | Copilot Studio visual designer for conversational agents and simpler workflows. Supported via Agent 365 (not Foundry Hosted Agents). Custom Control Plane UI natively supports Copilot Studio agents. Not recommended for complex autonomous workflows. |
-| **Low-code MCP tools** | IT teams adding tools without writing Python | [Azure Logic Apps](https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview) visual workflows chaining 1,400+ prebuilt connectors. Logic App exposed as MCP tool via APIM REST→MCP gateway. Governed identically to hand-written MCP servers. |
-| **Low-code config** | Operators, process owners | Custom Control Plane UI: skill library (browse, fork, customise), tool catalog, governance rules, autonomy dials, template management. No code required. |
-| **Agentic builder** | Domain experts | A MAF agent executor generates SKILL.md files from natural language specifications. Registered in API Center. Human reviews and approves. Built and demonstrated. |
-| **Knowledge extraction** | Transitioning staff, SMEs | Threadlight accelerator: creates skills from interviews and unstructured data. Produces machine-actionable SKILL.md files. |
+| **Pro-code** | Platform engineers, full-stack developers | [GHCP SDK](https://github.com/github/copilot-sdk) Python (primary) + TypeScript / .NET / Go for [skills](https://github.com/github/copilot-sdk/blob/main/docs/features/skills.md), [MCP servers](https://github.com/github/copilot-sdk/blob/main/docs/features/mcp.md), [hooks](https://github.com/github/copilot-sdk/blob/main/docs/features/hooks.md). MAF for workflow graphs in Python or .NET. MIT open-source. Recommended for complex autonomous multi-step workflows. |
+| **Low-code visual builder (primary, §6.5)** | Citizen developers, domain experts | **[Microsoft Copilot Studio](https://learn.microsoft.com/en-us/microsoft-copilot-studio/)**: Microsoft's flagship low-code agent builder. Visual drag-and-drop designer for conversational and workflow agents — conditional branching, tool bindings (Power Platform connectors + MCP), HITL touchpoints, knowledge grounding. Agents export as declarative YAML / JSON within Power Platform solutions, Git-committable via [Power Platform ALM](https://learn.microsoft.com/en-us/power-platform/alm/overview-alm), versioned through environments (Dev → Test → Prod), and deployed through the same governance pipeline as pro-code agents. Copilot Studio agents register in Agent 365 with first-class Entra Agent ID, are governed by APIM, Purview, and Defender, and appear alongside GHCP SDK agents in the Control Plane — meeting §6.5 parity via declarative serialisation + Git-committable artefacts + shared governance pathway. |
+| **Low-code MCP tools** | IT teams adding integrations without writing Python | [Azure Logic Apps](https://learn.microsoft.com/en-us/azure/logic-apps/logic-apps-overview) visual workflows chaining 1,400+ prebuilt connectors. Logic App exposed as MCP tool via APIM REST→MCP gateway. Governed identically to hand-written MCP servers. |
+| **Low-code config** | Operators, process owners | Custom Control Plane UI: skill library (browse, fork, customise templates backed by Azure API Center), tool catalogue view, governance editor, autonomy dials, template fork-and-customise. For operational tuning by process owners, not agent construction. All changes written back to Git through APIOps. |
+| **60-minute build (§6.4 benchmark)** | Junior developers, seasoned UI users | Copilot Studio hits this benchmark natively: pick a template, add 3 MCP tool connectors from the APIM-governed catalogue (pre-wired auth, rate limits, content safety), add 3 knowledge sources from Foundry IQ, publish to Agent 365. End-to-end build time: **<30 minutes**. Control Plane UI template forge provides a parallel path for consuming pre-wired pro-code templates. Scripted as an observable task for POC evaluation. |
+| **Agentic builder (§6.2 design-time)** | Domain experts | A MAF agent executor generates SKILL.md files from natural-language specifications. Output is a typed skill definition with declared tools, model assignment, and governance rules. Registered in API Center in Design state. Human reviews and approves to promote to Production. **Built and demonstrated.** |
+| **Runtime agent assembly (§6.2 runtime)** | Supervising agents spawning sub-agents | MAF supports dynamic executor creation at runtime — a supervising agent executor can spawn a sub-workflow or persistent sub-agent within a domain's Hosted Agent scope. For persistent spawned agents, a governance-gate callback auto-registers the new agent in [Entra Agent ID](https://learn.microsoft.com/en-us/entra/agent-id/identity-platform/what-is-agent-id) and [API Center](https://learn.microsoft.com/en-us/azure/api-center/key-concepts) (skill in Design state), and writes the spawning decision to the audit ledger. The agent runs in Design state until a human operator promotes it to Production — enforcing the RFP's "persistent agents must be elevated into the same Data Plane storage schema as human-built agents, along the governance pathway." **No runtime escape from governance.** |
+| **Knowledge extraction (Threadlight)** | Transitioning staff, SMEs | **Threadlight** is a Microsoft delivery accelerator, built and demonstrated. Interview-capture agent that runs alongside an SME, transcribes and structures the conversation, and produces executable artefacts: SKILL.md files, MAF workflow graphs, and MCP tool stubs with declared schemas. Output enters the same API Center governance pathway as hand-written skills — Design state, human review, promotion to Production. All artefacts are Git-committable and fully inspectable (SKILL.md / Python / YAML) — not a black box. |
 
-All agent artefacts are Git-committable: skills as SKILL.md, MCP server code, APIM policies as code, MAF workflow definitions (Python/.NET), Durable Functions orchestrations, autonomy thresholds. Low-code artefacts (Copilot Studio) register through Agent 365 alongside pro-code artefacts.
+All agent artefacts are Git-committable: skills as SKILL.md, MCP server code, APIM policies as code, MAF workflow definitions (Python/.NET), Durable Functions orchestrations, autonomy thresholds. Every artefact — pro-code, low-code UI, Threadlight-generated, runtime-spawned — lands in the same Git repository and flows through the same APIOps pipeline. **One truth for how an agent is defined, regardless of who built it.**
 
 ---
 
@@ -266,6 +359,9 @@ A team of 5 developers manages 50 agents across dev, staging, and production usi
 - Foundry Guardrails inside agent executors (PII detection, content safety)
 - Full audit trail from receipt to payment
 - Mid-workflow platform restart with DF replay and MAF workflow checkpoint resume
+- **Private network posture**: Workday / D365 F&O / Maconomy MCPs reached over Private Endpoints; egress to SaaS via Azure Firewall FQDN allow-list; APIM sole public edge
+- **Non-revocable operations demo**: payment file generation with explicit dual-control gate (Finance Controller + Finance BP, distinct Entra identities); catalogue visible in Control Plane
+- **60-minute build close-out**: scripted demo where a junior developer builds, tests, and deploys a new agent (3 MCPs + 3 knowledge sources) via the Control Plane UI template forge in under 30 minutes
 
 ---
 
@@ -300,6 +396,10 @@ A team of 5 developers manages 50 agents across dev, staging, and production usi
 - Avatar onboarding video (HeyGen API MCP)
 - Threadlight knowledge extraction demo (interview HR SME, produce executable skills in the MAF graph)
 - 5 humans across 4 timezones interacting simultaneously via different surfaces
+- **AG-UI dynamic components**: HR BP sees bulk-approval forms, interview scorecards, and escalation cards rendered dynamically per workflow type by MAF agent executors — no hardcoded UI per workflow
+- **Runtime agent assembly demo**: Threadlight captures a new jurisdiction-specific compliance pattern from an SME interview during the POC, generates a SKILL.md, auto-registers it in Entra Agent ID + API Center (Design state), human operator reviews and promotes to Production — new capability live in the next workflow without a redeploy
+- **Databricks / Snowflake federation demo**: Fabric IQ queries levelling-history data residing in Databricks Unity Catalog via OneLake shortcuts — the Hiring Agent's "past hires levelled too low" recall runs against WPP's existing data estate with no migration
+- **Private network + residency posture**: German hiring workflow routes only to EU model endpoints and EU Log Analytics workspace; APIOps pipeline rejects a deliberate PR that registers a US backend to the DE skill (live CI gate demo)
 
 ---
 
@@ -335,9 +435,11 @@ Exit strategy: export skills (Git), export MCP servers (code), export state (Cos
 
 ## Appendix: Known Constraints
 
+The stack separates a **GA foundation** from a **replaceable agent runtime layer**. The foundation — Azure Durable Functions, APIM AI Gateway, Azure API Center, Cosmos DB, Azure AI Foundry runtime, Microsoft Agent Framework v1.0, Entra, Log Analytics, Application Insights — is GA and production-proven. The agent runtime layer is GHCP SDK today; because skills are SKILL.md files and tools are MCP servers (both open standards), the agent runtime is **replaceable without redesigning the stack**. If GHCP SDK stalls or WPP prefers a different runtime, the runtime swaps and skills, tools, workflow graphs, governance, data layer, and Control Plane all remain. This is the honest framing of the preview-dependency question: preview-layer risk is confined to the agent runtime, not distributed across the stack.
+
 | Constraint | Impact | Mitigation |
 |-----------|--------|-----------|
-| GHCP SDK in tech preview | API surface may change | Core patterns (skills, MCP, hooks) proven in production. MIT open-source. |
+| GHCP SDK in tech preview | API surface may change | Core patterns (skills, MCP, hooks) proven in production inside GitHub Copilot serving millions of developers daily. MIT open-source. Replaceable: skills (SKILL.md) and MCP tools port to any MCP-native runtime without redesign. |
 | Microsoft Agent Framework v1.0 (Oct 2025) | Framework is young | Core runtime and workflows are GA. MAF durable task extension for Azure Functions is productised by Microsoft as the Durable Agent Orchestration pattern. Orchestration patterns stable. Fallback: GHCP SDK + DF combination works without MAF — MAF adds the deterministic graph primitive. |
 | Foundry Hosted Agents: max 5 replicas (preview) | Scaling ceiling | Multiple deployments, or Azure Container Apps with Foundry telemetry. |
 | Foundry Guardrails tool-call interception (preview) | May not be GA for POC | GHCP SDK session hooks provide equivalent enforcement. Guardrails are additive. |
@@ -347,7 +449,49 @@ Exit strategy: export skills (Git), export MCP servers (code), export state (Cos
 | Agent 365 GA: May 2026 | Integration with Hosted Agents unclear | Entra Agent ID usable independently. Needs POC validation. |
 | Foundry IQ / Fabric IQ / Work IQ in public preview | Intelligence Layer products are new; APIs evolving | All three are MCP-addressable — fall back to direct Azure AI Search + Fabric SQL + Graph API if needed. The IQ products are an upgrade path, not a single point of failure. |
 | MAI-Voice-1 (preview) | No SLA | GPT-Realtime (GA) is the primary voice path. MAI-Voice-1 is additive. |
-| Copilot Studio on Foundry Hosted Agents | Not supported | Copilot Studio agents supported via Agent 365. Control Plane UI supports both. |
+| Copilot Studio on Foundry Hosted Agents | Not supported | Copilot Studio agents supported via Agent 365 with Entra Agent ID and full Purview/Defender governance. Control Plane UI supports both Copilot Studio and GHCP SDK agents. Copilot Studio artefacts (declarative YAML, Power Platform solutions) are Git-committable via Power Platform ALM and meet §6.5 serialisation parity through the shared governance pathway. |
+
+---
+
+## 18. Architectural Choice — Skills, Not Separate Agents
+
+POC 2 calls for "9+ specialist agents" in the hiring lifecycle: Budget, Job Design, Sourcing, Triage, Screening, Interview Coordinator, Compliance, Offer, Onboarding, Voice Screening. The brief's mental model is that each specialist role is an independent agent process with its own identity, its own tool set, and an inter-agent protocol connecting them.
+
+We implement the same *capabilities* with a different *topology*: one domain-scoped Hosted Agent per domain (Hiring, Finance, Compliance) running ephemeral GHCP SDK sessions from MAF agent executors, each loading a different **skill** per phase. Each skill declares its own role, tool allow-list, model assignment, and governance rules. Specialisation is **preserved**; what changes is the coordination substrate — a MAF workflow graph with typed edges and validator nodes, not an A2A protocol between separate agent processes.
+
+**Side-by-side trade-offs**:
+
+| Dimension | 9 separate specialist agents | Skills-based (our approach) |
+|---|---|---|
+| **Specialisation** | 1 agent per role, distinct identity per role | 1 skill per role, distinct role definition + tool allow-list + model per skill |
+| **Coordination substrate** | A2A protocol between agents (JSON-RPC / SSE) on every handoff | MAF workflow graph edges — in-process, typed, deterministic |
+| **Identity surface** | 9 Entra Agent IDs per domain, 9 Conditional Access policies, 9 audit identities | 1 domain Entra Agent ID; policy + audit segmentation at the skill layer via APIM |
+| **Context sharing** | Each agent re-grounds or serialises context across the A2A boundary | Shared workflow state in the MAF graph; no re-grounding |
+| **Latency** | N × retrieval + N × inference + N × network hops | 1 × shared retrieval + N × inference; zero inter-agent network hops within the graph |
+| **Cost** | N × working-memory tokens; every A2A handoff re-establishes context | Amortised working memory; context flows down MAF edges |
+| **Failure modes** | Network partition between agents; protocol version drift; handoff races | In-process graph execution; Pregel BSP guarantees deterministic fan-in |
+| **Debuggability** | N separate OTEL traces per workflow; stitching via correlation IDs | Single MAF workflow trace per phase; natural parent-child span hierarchy |
+| **Governance surface** | Per-agent governance — 9 APIM policy sets to keep aligned | Per-skill governance with one shared domain identity; fewer drift points |
+| **Operationalisation at fleet scale** | 9 × N workflows of agent instances to monitor, scale, restart | N workflows × one domain pool of Hosted Agents; skills load in ~ms |
+| **Matches "specialist team" mental model** | Yes | Yes — skills are the specialists; the graph is the team |
+
+**Where A2A still applies**. We are not against agent-to-agent protocols. A2A is the right choice when an agent is genuinely **off-platform** — a partner's candidate agent, an external supplier's pricing agent, a jurisdictional authority's compliance agent owned by a different organisation. These cross-boundary interactions go through [APIM A2A governance](https://learn.microsoft.com/en-us/azure/api-management/agent-to-agent-api) (JSON-RPC, AgentCards, SSE). What we avoid is **fragmenting a single domain's internal specialisation** across N network-separated processes when a typed workflow graph achieves the same specialisation with better operational characteristics.
+
+**What WPP gets either way**:
+
+- Heterogeneous expertise per phase — as skills with distinct models and tools
+- Role-based authority and tool access — as skill-declared allow-lists enforced at APIM
+- Auditability per role — as skill-tagged OTEL spans and audit ledger entries
+- Independent evolution per role — as skill-versioned artefacts in API Center
+
+**What WPP avoids**:
+
+- 9× identity / governance / operational overhead per domain
+- Inter-agent protocol failure modes
+- Latency and cost of re-grounding across every handoff
+- Debugging a correlation-ID graph instead of a single workflow trace
+
+This is not an argument against multi-agent systems. It is an argument for applying agent-process separation at the **organisational boundary** where it creates value, and skill-based specialisation at the **domain boundary** where it reduces cost and complexity without giving up any capability. If WPP evaluators prefer the separate-agent topology after reviewing the trade-offs, both approaches are supported by MAF — we can compose a hybrid: skills inside a domain, A2A across domains.
 
 ---
 
