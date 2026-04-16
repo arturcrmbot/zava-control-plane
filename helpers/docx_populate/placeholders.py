@@ -82,22 +82,29 @@ def resolve_inline_placeholder(
             continue
 
         assert rule.content is not None, "replace_with requires content"
-        tmp = Document()
-        render_md_into_doc(tmp, rule.content, style_map=style_map)
-        new_elements = [p._element for p in tmp.paragraphs]
+        # Render into the master doc directly so custom style names (e.g.
+        # "heading 20") resolve against the master's style definitions. A
+        # fresh Document() lacks the master's custom styles and would raise
+        # KeyError at add_paragraph(style=...).
+        body = doc.element.body
+        paragraphs_before_count = len(doc.paragraphs)
+        render_md_into_doc(doc, rule.content, style_map=style_map)
+        new_elements = [p._element for p in doc.paragraphs[paragraphs_before_count:]]
 
+        # Move new elements from the end of body to the correct insertion
+        # point next to the target paragraph.
         if at_start:
-            # Remove the placeholder paragraph and insert replacements in its slot.
             target_index = list(parent).index(target_el)
             for new_el in new_elements:
+                body.remove(new_el)
                 parent.insert(target_index, new_el)
                 target_index += 1
             parent.remove(target_el)
         else:
-            # Leave paragraph in place; strip the marker; insert replacements AFTER.
             _clear_marker_from_paragraph(target_para, needle)
             target_index = list(parent).index(target_el) + 1
             for new_el in new_elements:
+                body.remove(new_el)
                 parent.insert(target_index, new_el)
                 target_index += 1
 

@@ -42,18 +42,29 @@ MASTER_STYLE_MAP: dict[str, str] = {
 
 def _append_md_at_section_end(doc, bounds, md_content: str,
                               style_map: dict[str, str] | None = None) -> None:
+    """Render `md_content` into the master doc and place new paragraphs at the
+    section's end (before the next same-or-higher heading).
+
+    We render into the master doc directly — not a temp Document — so that
+    custom style names in the style_map (e.g. "heading 10", "List Paragraph")
+    resolve against the master's style definitions. A temp Document lacks the
+    master's custom styles and would raise KeyError.
+    """
     body = doc.element.body
-    children = list(body.iterchildren())
-    anchor_el = children[bounds.end_index] if bounds.end_index < len(children) else None
+    children_before = list(body.iterchildren())
+    anchor_el = children_before[bounds.end_index] if bounds.end_index < len(children_before) else None
 
-    tmp = Document()
-    render_md_into_doc(tmp, md_content, style_map=style_map)
-    new_elements = [p._element for p in tmp.paragraphs if p.text.strip()]
+    # Render appends paragraphs to the body. Record paragraph count so we can
+    # identify the newly-appended elements afterwards.
+    paragraphs_before_count = len(doc.paragraphs)
+    render_md_into_doc(doc, md_content, style_map=style_map)
+    new_elements = [p._element for p in doc.paragraphs[paragraphs_before_count:] if p.text.strip()]
 
-    for el in new_elements:
-        if anchor_el is None:
-            body.append(el)
-        else:
+    # If there's an anchor, move each new element from its appended position
+    # at the end of body to immediately before the anchor.
+    if anchor_el is not None:
+        for el in new_elements:
+            body.remove(el)
             anchor_el.addprevious(el)
 
 
