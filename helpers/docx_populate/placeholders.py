@@ -83,13 +83,18 @@ def resolve_inline_placeholder(
 
         assert rule.content is not None, "replace_with requires content"
         # Render into the master doc directly so custom style names (e.g.
-        # "heading 20") resolve against the master's style definitions. A
-        # fresh Document() lacks the master's custom styles and would raise
-        # KeyError at add_paragraph(style=...).
+        # "heading 20", custom table style) resolve against the master's
+        # style definitions.
+        #
+        # Capture all body children appended during rendering (paragraphs
+        # AND tables) via identity-based set difference. python-docx inserts
+        # new paragraphs BEFORE the body's sectPr, so slice-by-count would
+        # include the (stationary-but-shifted) sectPr instead of the new
+        # content.
         body = doc.element.body
-        paragraphs_before_count = len(doc.paragraphs)
+        children_before = set(body.iterchildren())
         render_md_into_doc(doc, rule.content, style_map=style_map)
-        new_elements = [p._element for p in doc.paragraphs[paragraphs_before_count:]]
+        new_elements = [el for el in body.iterchildren() if el not in children_before]
 
         # Move new elements from the end of body to the correct insertion
         # point next to the target paragraph.

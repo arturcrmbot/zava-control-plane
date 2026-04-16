@@ -42,28 +42,37 @@ MASTER_STYLE_MAP: dict[str, str] = {
 
 def _append_md_at_section_end(doc, bounds, md_content: str,
                               style_map: dict[str, str] | None = None) -> None:
-    """Render `md_content` into the master doc and place new paragraphs at the
+    """Render `md_content` into the master doc and place new content at the
     section's end (before the next same-or-higher heading).
 
-    We render into the master doc directly — not a temp Document — so that
-    custom style names in the style_map (e.g. "heading 10", "List Paragraph")
-    resolve against the master's style definitions. A temp Document lacks the
-    master's custom styles and would raise KeyError.
+    Render happens directly into the master doc so custom style names in the
+    style_map (e.g. "heading 10", "List Paragraph", custom table style)
+    resolve against the master's style definitions. A temp Document lacks
+    the master's custom styles and would raise KeyError.
+
+    Captures ALL body children appended during rendering (paragraphs and
+    tables), not just paragraphs — pipe tables in the MD produce `w:tbl`
+    siblings of `w:p` at the body level.
     """
     body = doc.element.body
-    children_before = list(body.iterchildren())
-    anchor_el = children_before[bounds.end_index] if bounds.end_index < len(children_before) else None
+    children_before_list = list(body.iterchildren())
+    anchor_el = children_before_list[bounds.end_index] if bounds.end_index < len(children_before_list) else None
+    # Identity snapshot (python-docx inserts new paragraphs BEFORE the body's
+    # sectPr, not at the end, so a slice-by-count doesn't identify the new
+    # elements correctly. Using set-by-identity.)
+    children_before = set(children_before_list)
 
-    # Render appends paragraphs to the body. Record paragraph count so we can
-    # identify the newly-appended elements afterwards.
-    paragraphs_before_count = len(doc.paragraphs)
     render_md_into_doc(doc, md_content, style_map=style_map)
-    new_elements = [p._element for p in doc.paragraphs[paragraphs_before_count:] if p.text.strip()]
+    new_elements = [el for el in body.iterchildren() if el not in children_before]
 
-    # If there's an anchor, move each new element from its appended position
-    # at the end of body to immediately before the anchor.
+    # Move new elements (paragraphs and tables) to the anchor position.
     if anchor_el is not None:
         for el in new_elements:
+            if el.tag.endswith("}p"):
+                text = "".join(el.itertext()).strip()
+                if text == "":
+                    body.remove(el)
+                    continue
             body.remove(el)
             anchor_el.addprevious(el)
 

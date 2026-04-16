@@ -34,6 +34,43 @@ def test_render_preserves_bold(tmp_path):
     assert any(r.bold and r.text == "bold" for r in runs)
 
 
+def test_render_gfm_table(tmp_path):
+    doc = Document()
+    md = """## Table test
+
+| Header A | Header B | Header C |
+|---|---|---|
+| row 1 a | row 1 b | row 1 c |
+| row 2 a | row 2 b | row 2 c |
+
+Trailing paragraph.
+"""
+    render_md_into_doc(doc, md)
+    out = tmp_path / "out.docx"
+    doc.save(out)
+    reloaded = Document(out)
+
+    # Exactly one table with 3 rows × 3 cols.
+    assert len(reloaded.tables) == 1
+    table = reloaded.tables[0]
+    assert len(table.rows) == 3
+    assert len(table.columns) == 3
+
+    # Header cells populated and bolded.
+    assert table.cell(0, 0).text == "Header A"
+    assert table.cell(0, 2).text == "Header C"
+    header_runs = table.cell(0, 0).paragraphs[0].runs
+    assert any(r.bold for r in header_runs)
+
+    # Data cells populated.
+    assert table.cell(1, 1).text == "row 1 b"
+    assert table.cell(2, 2).text == "row 2 c"
+
+    # Trailing paragraph rendered after the table.
+    texts = [p.text for p in reloaded.paragraphs]
+    assert any(t == "Trailing paragraph." for t in texts)
+
+
 def test_render_uses_custom_style_map(tmp_path):
     """A caller-supplied style_map overrides the default heading style names."""
     from docx.enum.style import WD_STYLE_TYPE
