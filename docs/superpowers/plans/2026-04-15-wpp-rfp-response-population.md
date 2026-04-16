@@ -797,9 +797,20 @@ Source: spec §5 §4 (~800 words). Port from `response-technical-sections.md` §
 Output: `content/authored/section-4-reference-architecture.md`.
 
 ### Task 3.4: §5 Control Plane (HIGHEST PRIORITY)
-Source: spec §5 §5 (~1200 words). Uses `response-technical-sections.md` §4.3 and `solution.md` §11.
+**Primary source:** `C:\Users\arzielinski\OneDrive - Microsoft\WPP Account Team - WPP_ET_AgenticAI_RFP\MSFT_Response\WPP-Control-Plane-Integration-Architecture-v7.pdf` (11 pages, §4.3.2). Per spec source-precedence rule #0 this outranks the MDs.
+Supporting sources: `response-technical-sections.md` §4.3 and `solution.md` §11 for the §5.1–§5.3 narrative framing only.
+Target content: spec §5 §5 subsections 5.1 through 5.15 (~2500 words — larger than original estimate). Must include:
+- §5.5 autonomy-dial framing (per spec).
+- §5.9 telemetry ingestion pathways (9-row table from v7 PDF §1) + correlation-attributes block.
+- §5.10 three integration hooks with dual-path pattern (v7 PDF §2).
+- §5.11 Fleet Manager internals — inputs, outputs, SignalR delivery with Cosmos DB fallback (v7 PDF §3).
+- §5.12 enforcement pathways — 6-row table; bidirectional data-flow summary (v7 PDF §4).
+- §5.13 infrastructure topology — 10-row component table including Defender for AI Services GA claim (v7 PDF §5).
+- §5.14 platform plug-in model — minimum telemetry contract + integration-effort table (v7 PDF §6).
+- §5.15 co-creation partnership framing — 5-row commitment table including H2 2027 Foundry roadmap items (v7 PDF §7).
 Output: `content/authored/section-5-control-plane.md`.
-**Include §5.5 autonomy-dial framing per spec.**
+Numbering: re-label PDF's `§4.3.2.*` subsection headings to `§5.*` in the output MD (master places Control Plane at §5, not §4.3).
+**Before writing: re-read the v7 PDF end-to-end. Do not paraphrase from memory; many claims are load-bearing (Defender for AI GA, H2 2027 roadmap, SignalR fallback interval, infrastructure-scaling-independence).**
 
 ### Task 3.5: §6 Multi-Agent Orchestration
 Source: spec §5 §6 (~900 words). Uses `response-technical-sections.md` §§4.4, 18; `solution.md` §7.

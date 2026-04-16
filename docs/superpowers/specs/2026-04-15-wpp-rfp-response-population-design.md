@@ -64,7 +64,12 @@ Before defining per-section content, the spec fixes the **overall argument shape
 
 ## 4. Source-of-truth precedence
 
-When `response-technical-sections.md`, `solution.md`, and the 29 questionnaire CSVs disagree:
+When sources disagree:
+
+**0. Topic-specific authored v-PDFs in `MSFT_Response/`** — the account team has authored stand-alone submission-grade documents (e.g. `WPP-Control-Plane-Integration-Architecture-v7.pdf`, dated 2026-04-15). Where one of these exists for a section, it is the highest authority and outranks the MD sources. **Known v-PDFs as of 2026-04-16:**
+   - `WPP-Control-Plane-Integration-Architecture-v7.pdf` — §4.3.2 Control Plane Integration Architecture (primary source for master §5 Control Plane)
+
+   **Backlog — not in scope for this iteration, but required before final submission:** inventory pass over the entire `MSFT_Response/` folder (and related Account Team OneDrive folders) to catalogue all authored v-PDFs. Each v-PDF discovered must be added to this precedence list and the corresponding master section updated to match. Without this pass, we risk shipping a response that contradicts content the Account Team has already written and circulated. Tracked as **open deliverable B-1**.
 
 **1. Questionnaire CSVs** — these are the most recent, most commitment-bearing artefacts. If we told WPP in writing that we "can do X today," the main-document narrative must not soften to "we will be able to do X."
 
@@ -154,7 +159,11 @@ Source priority: `response-technical-sections.md` §4.1 for narrative; `solution
 
 **Master status:** Empty body after the lead-in sentence.
 
-**Content to inject (authored, ~1200 words, structured as):**
+**Primary source: `WPP-Control-Plane-Integration-Architecture-v7.pdf`** (11 pages, authored 2026-04-15, positioned as §4.3.2 Control Plane Integration Architecture). Per source-precedence rule #0, this PDF's content outranks `response-technical-sections.md` §4.3 and `solution.md` §11 for the Control Plane section. The MDs are now supporting source material, not primary. The PDF's structure defines §5.x subsection numbering below.
+
+**Numbering note:** the PDF labels itself §4.3.2, which implies an outline where Control Plane is §4.3 (inside Reference Architecture §4). The current master docx places Control Plane at §5 (top-level). The populator must adopt the master's numbering — inject at master §5, re-label PDF subsection headings from §4.3.2.* to §5.*. Flag to the account team so the PDF-as-attachment (if it also ships standalone) and the master-document numbering reconcile before submission.
+
+**Content to inject (authored, ~2500 words — larger than original estimate because the v7 PDF has substantially more detail; structured as):**
 
 **5.1 Why the Control Plane is the product.** Open by quoting the WPP anti-requirement verbatim: vendors showing only Teams chat / Copilot Studio bots / email approval flows score **zero** on Control Plane criteria. State our thesis: the Control Plane is where WPP's managers supervise digital labour at 1:20–50 ratios. It is not a dashboard. It is not Copilot Studio. It is a purpose-built operator experience powered by Fleet Manager agents.
 
@@ -174,7 +183,41 @@ Source priority: `response-technical-sections.md` §4.1 for narrative; `solution
 
 **5.8 Cross-references.** Points to §9 (builder experiences) for how Copilot Studio agents and GHCP SDK agents both appear in the Control Plane; to §10 for live demo evidence; to Appendix C for wireframes.
 
-Source priority: `response-technical-sections.md` §4.3, `solution.md` §11. Conflict: the questionnaire-index agent flagged `§06 9.1` and `§15 19.2` as naming Copilot Studio as the "primary" low-code builder, while `§01 2.1` names "Control Plane UI skill library + template forge". **Resolution before docx populate:** We keep **Copilot Studio as the primary low-code builder for agent construction** (§9) and **the Control Plane UI skill library as the primary operator-facing tool for operational configuration** (§5). These are different personas, different tools. Update `response/questionnaire answers/01-platform-vendor.csv` to align (remove the "primary low-code builder surface" framing from the Control Plane skill library description).
+**5.9 Telemetry ingestion pathways** (from v7 PDF §1). Port the 9-row source × transport × data points × latency × consumer table verbatim (GHCP SDK sessions, MAF workflow graph, Durable Functions with dual-path Event Grid + App Insights, APIM AI Gateway, Cosmos DB, Foundry Agent Service, Foundry Evaluations, Content Safety / Guardrail config, Microsoft Defender for AI Services). Include the **standard correlation attributes** block verbatim: `workflow_id, phase, jurisdiction, model, agent_identity, skill, token_count` propagated across OTEL spans, Cosmos DB action ledger entries, and Event Grid event payloads.
+
+**5.10 Integration hooks** (from v7 PDF §2). Three hooks with the **dual-path pattern** explicit: all hooks write state to Cosmos DB for persistence and publish events to Event Grid for real-time Fleet Manager consumption.
+- **Hook 1 — GHCP SDK session hooks** (agent-executor level): intercept tool calls, model calls, non-revocable action attempts; write action-ledger entries classifying revocable vs non-revocable; detect violations (non-revocable without validator approval) and publish to Event Grid → Fleet Manager exception queue; **first enforcement boundary — agent cannot bypass it.**
+- **Hook 2 — MAF workflow event callbacks** (workflow-graph level): executor lifecycle events (start/complete/fail/pause/resume); validator rejection events with reason + input + triggering policy; phase transition spans. Validator rejections become pre-built Fleet Manager exception-queue items.
+- **Hook 3 — Durable Functions external events** (orchestration level): dual-path. Path 1 = Event Grid push (sub-second) for Fleet Manager real-time situational awareness. Path 2 = OTEL → App Insights for queryable analytics, SLA tracking, audit. Explicitly address "why both paths": Fleet Manager needs sub-second push; CP UI needs queryable indexed telemetry.
+
+Capacity note: at 50 concurrent workflows, Event Grid carries ~200–500 events/hour; Event Grid auto-scales transparently; App Insights requires capacity planning (commitment tier, adaptive sampling, daily cap).
+
+**5.11 Fleet Manager internals** (from v7 PDF §3). Not a pass-through — a domain-scoped GHCP SDK Hosted Agent that reasons over incoming signals and produces structured assessments.
+- **Inputs** (Event Grid single push channel): DF lifecycle events, hook state-change events, operator config-change events. No polling of App Insights; Cosmos DB queried on-demand for context enrichment.
+- **Outputs**: fleet health assessment; exception queue (prioritised by business impact × confidence × SLA urgency); situational context per workflow (pre-composed for <5s operator comprehension); crystallisation candidates (patterns suitable for deterministic graduation).
+- **Delivery** (SignalR push): domain-and-role-scoped channels; AG-UI-shaped JSON payloads; Cosmos DB polling fallback if SignalR drops (30s interval, no data loss because assessments persist before push).
+
+**5.12 Enforcement pathways** (from v7 PDF §4). The Control Plane is a control surface, not a monitoring dashboard. Operator actions flow back into the runtime through defined channels. Port the 6-row operator-action × mechanism × target × effect table verbatim (approve/reject HITL via DF `raise_external_event`; bulk approve via batch `raise_external_event`; adjust autonomy dial via Cosmos DB config write; trigger rollback via action-ledger-driven compensating actions; override model/tool via APIM policy update through APIOps; block/unblock agent via Agent 365 / API Center).
+
+**Bidirectional data-flow summary:** telemetry flows IN (read-only, high-volume, real-time — OTEL to App Insights + Event Grid events to Fleet Manager). Enforcement flows OUT (write, low-volume, operator-initiated, audit-logged — DF events, Cosmos DB writes, APIM policy updates). Architecturally separated — telemetry pipeline cannot be affected by enforcement actions; enforcement actions produce their own Event Grid events for audit.
+
+**5.13 Infrastructure topology** (from v7 PDF §5). Stable Azure PaaS resources per WPP tenant, scaling independently of runtime workloads. Port the 10-row component table (Azure SignalR, Event Grid namespace, Fleet Manager Hosted Agents, Application Insights workspace with 90d hot / 2y warm / 7–12yr archive tiering, Cosmos DB, Azure Functions Event Grid triggers, Custom CP UI as Azure Static Web Apps, Foundry resource + projects, Azure AI Content Safety, Microsoft Defender for AI Services — **GA for Foundry agents**). **Scaling independence** paragraph: adding concurrent workflows scales runtime (more DF instances, Hosted Agent replicas, APIM throughput) but does not change Control Plane infrastructure topology. Event Grid + SignalR + Cosmos DB auto-scale transparently. App Insights needs operational attention at scale (commitment tier upgrades, adaptive sampling, daily cap). **Infrastructure footprint is the same from 50 to 50,000 concurrent workflows.**
+
+**5.14 Platform plug-in model — framework-agnostic onboarding** (from v7 PDF §6). A major differentiator.
+
+> Any agent type that fulfils three requirements is visible and governable in the Control Plane: (1) OTEL spans with standard correlation attributes to App Insights, (2) Event Grid lifecycle events to the shared namespace, (3) Cosmos DB state writes using the standard schema.
+
+Port the integration-effort-by-agent-type table (Foundry Hosted Agent: zero effort; Copilot Studio via Agent 365: thin Azure Functions adapter, reusable template; External agent via A2A + APIM: AgentCard + optional webhook; Custom third-party runtime: implement contract explicitly, SDK-agnostic, reference adapter provided). **Conclusion:** Control Plane infrastructure is framework-agnostic, consumes telemetry via open standards, does not require agents to use a specific SDK.
+
+**5.15 Co-creation partnership framing** (from v7 PDF §7). The key strategic framing.
+
+> *"WPP's Control Plane requirements exceed any out-of-the-box product available today. The 1:20–50 human-to-agent ratio, fleet-level exception surfacing, and intelligent autonomy management represent frontier capabilities that no vendor ships as a product. **This is not a product procurement. It is a co-creation partnership.**"*
+
+Port the 5-row dimension × Microsoft provides × WPP provides × outcome table (platform infrastructure, custom CP UI, Fleet Manager agents, codebase ownership — **WPP owns the code, standard React + Azure PaaS, no proprietary lock-in** — and productisation — **Microsoft evaluates proven patterns for Foundry Control Plane roadmap H2 2027 candidates: exception-only queuing, bulk HITL, autonomy dials**).
+
+This section cross-links to §12 Commercial & Partnership and to §13 Portability. **Flag to account team:** the commitments in the co-creation partnership table (WPP owns code, H2 2027 productisation roadmap, MCS engineering resources) are specific and contractually meaningful. Confirm endorsement before shipping — these claims must match §12 (Commercial & Partnership) and must not contradict anything in the Commercial Proposal the account team owns.
+
+Source priority: **v7 PDF is primary.** `response-technical-sections.md` §4.3 and `solution.md` §11 supplement where the PDF is silent (e.g. the broad narrative framing in §§5.1–5.3 above). Conflict: the questionnaire-index agent flagged `§06 9.1` and `§15 19.2` as naming Copilot Studio as the "primary" low-code builder, while `§01 2.1` names "Control Plane UI skill library + template forge". **Resolution before docx populate:** We keep **Copilot Studio as the primary low-code builder for agent construction** (§9) and **the Control Plane UI skill library as the primary operator-facing tool for operational configuration** (§5). These are different personas, different tools. Update `response/questionnaire answers/01-platform-vendor.csv` to align (remove the "primary low-code builder surface" framing from the Control Plane skill library description).
 
 ### §6. Multi-Agent Orchestration and Durable Execution
 
@@ -570,6 +613,14 @@ Rough ordering for the execution phase:
 4. **Deliverable 1 (docx populator) second** — depends on (1) and (2) being stable.
 5. **Produce populated docx.** Dry-run, review diff report, produce real output, open in Word, spot-check.
 6. **Architecture diagram deliverables** (out of scope here; parallel track).
+
+## 10a. Open deliverables tracked outside this spec
+
+| ID | Description | Owner | Blocking? |
+|---|---|---|---|
+| B-1 | Inventory pass over `MSFT_Response/` and related Account Team OneDrive folders to catalogue all authored v-PDFs and other submission-grade documents. Add each to source-precedence rule #0 and update affected master sections. Required before final submission. | User / Account team coordinated | Yes — must complete before final submit, not blocking spec-to-plan handoff today |
+| B-2 | Validate with the account team that the v7 PDF's co-creation partnership commitments (WPP owns code; H2 2027 Foundry Control Plane roadmap items; MCS engineering resources) are endorsed and consistent with the Commercial Proposal in §12. | Account team (Scott + commercial lead) | Yes before submit |
+| B-3 | Reconcile numbering: v7 PDF labels itself §4.3.2 while master places Control Plane at §5. Either re-label the PDF (if it ships standalone) or make master §5 align to "§4.3" structure. | User | Before populator run |
 
 ## 11. Risks
 
