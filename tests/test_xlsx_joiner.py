@@ -105,3 +105,19 @@ def test_duplicate_template_ref_matched_by_question_text(tmp_path, fixtures_dir)
     # No Ref mismatches reported — the answer CSV's 5.99 is consumed by the
     # template's second "1.1" row via question-text match
     assert report.extra_refs == []
+
+
+def test_reference_pipe_renders_as_newline(tmp_path, fixtures_dir):
+    out = tmp_path / "out.xlsx"
+    build_questionnaire_xlsx(
+        template_xlsx=fixtures_dir / "mini-template.xlsx",
+        answers_dir=fixtures_dir / "mini-answers",
+        output_xlsx=out,
+    )
+    wb = openpyxl.load_workbook(out)
+    ws = wb["Questionnaire"]
+    # Row 4 is Ref 2.1 with Reference "https://example.com | https://example.org"
+    # Column 10 is Reference. Value should have newline, not pipe.
+    ref_cell = ws.cell(row=4, column=10).value
+    assert "\n" in ref_cell, f"Expected newline in Reference cell, got: {ref_cell!r}"
+    assert "|" not in ref_cell, f"Expected pipes to be replaced, got: {ref_cell!r}"

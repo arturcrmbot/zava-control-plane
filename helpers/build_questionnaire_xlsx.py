@@ -1,6 +1,7 @@
 """Build the submission-ready WPP questionnaire xlsx from the 29 answer CSVs."""
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -8,26 +9,37 @@ from helpers.xlsx_build.joiner import build_questionnaire_xlsx
 
 
 REPO_ROOT = Path(__file__).parent.parent
-TEMPLATE = Path(
+DEFAULT_TEMPLATE = Path(
     r"C:\Users\arzielinski\OneDrive - Microsoft\WPP Account Team - WPP_ET_AgenticAI_RFP"
     r"\RFx Documentation - Originals\wppetai-agentic-framework-assessment-questionnaire.xlsx"
 )
-ANSWERS_DIR = REPO_ROOT / "response" / "questionnaire answers"
-OUTPUT = REPO_ROOT / "response" / "wppetai-agentic-framework-assessment-questionnaire-microsoft-response.xlsx"
+DEFAULT_ANSWERS_DIR = REPO_ROOT / "response" / "questionnaire answers"
+DEFAULT_OUTPUT = REPO_ROOT / "response" / "wppetai-agentic-framework-assessment-questionnaire-microsoft-response.xlsx"
 
 
-def main() -> int:
-    if not TEMPLATE.exists():
-        print(f"ERROR: template not found: {TEMPLATE}", file=sys.stderr)
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Join WPP questionnaire template with Microsoft answer CSVs.",
+    )
+    parser.add_argument("--template", type=Path, default=DEFAULT_TEMPLATE,
+                        help="Path to WPP's original questionnaire xlsx (default: OneDrive path).")
+    parser.add_argument("--answers-dir", type=Path, default=DEFAULT_ANSWERS_DIR,
+                        help="Directory containing the 29 answer CSVs.")
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT,
+                        help="Output xlsx path.")
+    args = parser.parse_args(argv)
+
+    if not args.template.exists():
+        print(f"ERROR: template not found: {args.template}", file=sys.stderr)
         return 2
-    if not ANSWERS_DIR.exists():
-        print(f"ERROR: answers dir not found: {ANSWERS_DIR}", file=sys.stderr)
+    if not args.answers_dir.exists():
+        print(f"ERROR: answers dir not found: {args.answers_dir}", file=sys.stderr)
         return 2
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
 
-    report = build_questionnaire_xlsx(TEMPLATE, ANSWERS_DIR, OUTPUT)
+    report = build_questionnaire_xlsx(args.template, args.answers_dir, args.output)
 
-    print(f"Wrote: {OUTPUT}")
+    print(f"Wrote: {args.output}")
     print(f"  Rows written (matched): {report.row_count}")
     if report.missing_refs:
         print(f"  WARNING: {len(report.missing_refs)} template Refs without answers:")
