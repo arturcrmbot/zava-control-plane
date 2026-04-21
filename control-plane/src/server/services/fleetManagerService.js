@@ -79,13 +79,18 @@ export class FleetManagerService {
         // Subscribe to fleet events
         this.busUnsub = this.bus.onAny((event) => {
             this.triage.observe(event);
-            const anomaly = this.triage.detectAnomaly();
-            if (anomaly) {
-                this.bus.emit({
-                    type: "fleet.anomaly.detected",
-                    pattern: anomaly.pattern,
-                    workflowIds: anomaly.workflowIds,
-                });
+            // Only run anomaly detection for non-anomaly events to prevent recursive re-entry:
+            // emitting fleet.anomaly.detected would re-invoke this handler via bus.emit("*"),
+            // which would call detectAnomaly again while recentDups is still populated → stack overflow.
+            if (event.type !== "fleet.anomaly.detected") {
+                const anomaly = this.triage.detectAnomaly();
+                if (anomaly) {
+                    this.bus.emit({
+                        type: "fleet.anomaly.detected",
+                        pattern: anomaly.pattern,
+                        workflowIds: anomaly.workflowIds,
+                    });
+                }
             }
             if (this.triage.shouldWake(event) && "workflowId" in event) {
                 this.queue.enqueue({
