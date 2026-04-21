@@ -1,4 +1,4 @@
-.PHONY: install dev mcp server functions funcvenv test clean azurite-up azurite-down
+.PHONY: install dev mcp server functions funcvenv test clean azurite-up azurite-down reset
 
 install:
 	uv sync
@@ -8,6 +8,12 @@ azurite-up:
 
 azurite-down:
 	docker compose down
+
+reset:
+	docker compose stop azurite
+	rm -rf azurite-data/*
+	docker compose up -d azurite
+	@echo "azurite reset — restart func + uvicorn to clear in-memory state"
 
 mcp:
 	cd "../control-plane" && npm run dev:mcp

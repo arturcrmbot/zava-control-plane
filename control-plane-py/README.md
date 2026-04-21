@@ -123,6 +123,16 @@ Both back ends listen on port 3001. Pick one to run at a time.
 
 Ctrl-C all processes. FastAPI + Fleet Manager + simulator state is in-memory (lost on restart). Durable Workflow state persists in Azurite (`./azurite-data/` directory; delete to reset).
 
+## Reset between demo takes
+
+Durable Functions state accumulates across runs. To wipe it:
+
+```bash
+make reset
+```
+
+Stops Azurite, wipes `azurite-data/`, brings Azurite back up. Then Ctrl-C and restart `func start` + `uvicorn` to clear in-memory Fleet Manager / simulator state.
+
 ## Known limitations
 
 - HTTP-triggered orchestration starter requires `func start` running. If the Functions host is down, the simulator gracefully logs "failed to schedule" and the workflow appears in the store without an orchestration instance.
