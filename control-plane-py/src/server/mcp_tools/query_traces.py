@@ -4,6 +4,7 @@ import json
 from pydantic import BaseModel, Field
 from copilot.tools import define_tool, ToolInvocation, ToolResult
 from src.server.services.state_store import StateStore
+from ._otel import traced_tool
 
 
 class QueryTracesParams(BaseModel):
@@ -13,6 +14,7 @@ class QueryTracesParams(BaseModel):
 
 def make_query_traces_tool(store: StateStore):
     @define_tool(description="OTEL spans for a workflow.", skip_permission=True)
+    @traced_tool("query_traces")
     def query_traces(params: QueryTracesParams, invocation: ToolInvocation) -> ToolResult:
         spans = store.get_spans(params.workflow_id)
         if params.phase:

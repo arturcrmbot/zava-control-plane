@@ -8,6 +8,7 @@ from nanoid import generate as nanoid
 from copilot.tools import define_tool, ToolInvocation, ToolResult
 from src.server.services.state_store import StateStore
 from src.shared.types import SkillAmplification, PolicyRef
+from ._otel import traced_tool
 
 
 class ProposeSkillAmpParams(BaseModel):
@@ -19,6 +20,7 @@ class ProposeSkillAmpParams(BaseModel):
 
 def make_propose_skill_amp_tool(store: StateStore):
     @define_tool(description="Emit a coach card for an operator with policy context and precedents.", skip_permission=True)
+    @traced_tool("propose_skill_amplification")
     def propose_skill_amplification(params: ProposeSkillAmpParams, invocation: ToolInvocation) -> ToolResult:
         a = SkillAmplification(
             id=f"AMP-{nanoid(size=8)}",

@@ -22,6 +22,10 @@ dependencies = [
   "agent-framework-github-copilot>=1.0.0b260409",
   # MAF Azure Durable Functions hosting + Durable Task integration
   "agent-framework-azurefunctions>=1.0.0b260409",
+  # OpenTelemetry → Azure Monitor (App Insights) for Foundry Tracing tab
+  "azure-monitor-opentelemetry>=1.6.0",
+  "opentelemetry-instrumentation-httpx>=0.48b0",
+  "opentelemetry-instrumentation-fastapi>=0.48b0",
 ]
 
 [dependency-groups]

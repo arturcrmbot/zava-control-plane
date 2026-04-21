@@ -4,6 +4,7 @@ import json
 from pydantic import BaseModel, Field
 from copilot.tools import define_tool, ToolInvocation, ToolResult
 from src.server.services.state_store import StateStore
+from ._otel import traced_tool
 
 
 class QueryFleetParams(BaseModel):
@@ -14,6 +15,7 @@ class QueryFleetParams(BaseModel):
 
 def make_query_fleet_tool(store: StateStore):
     @define_tool(description="Aggregated state of the workflow fleet.", skip_permission=True)
+    @traced_tool("query_fleet")
     def query_fleet(params: QueryFleetParams, invocation: ToolInvocation) -> ToolResult:
         items = store.list_workflows(
             phase=params.phase, agency=params.agency, has_exception=params.has_exception

@@ -4,11 +4,15 @@ from __future__ import annotations
 import azure.functions as func
 import azure.durable_functions as df
 
+from src.shared.otel import init_otel
 from src.functions.workflows.invoice_p2p import invoice_p2p_orchestration
 from src.functions.workflows.activities import (
     intake_activity, validation_activity, routing_activity, approval_activity,
     payment_activity, reconciliation_activity, checkpoint_activity,
 )
+
+# Wire OTEL at worker module-load; DF orchestrator + activity spans export to Foundry.
+init_otel("control-plane-functions")
 
 
 app = df.DFApp(http_auth_level=func.AuthLevel.ANONYMOUS)

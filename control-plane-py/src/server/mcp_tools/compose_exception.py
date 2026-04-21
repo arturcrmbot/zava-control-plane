@@ -9,6 +9,7 @@ from copilot.tools import define_tool, ToolInvocation, ToolResult
 from src.server.services.state_store import StateStore
 from src.server.services.audit_logger import AuditLogger
 from src.shared.types import Exception_ as Exception, ExceptionOption, PolicyRef
+from ._otel import traced_tool
 
 
 class ComposeExceptionParams(BaseModel):
@@ -25,6 +26,7 @@ class ComposeExceptionParams(BaseModel):
 
 def make_compose_exception_tool(store: StateStore, audit: AuditLogger):
     @define_tool(description="Write an exception to the operator's queue.", skip_permission=True)
+    @traced_tool("compose_exception")
     def compose_exception(params: ComposeExceptionParams, invocation: ToolInvocation) -> ToolResult:
         # Hook-gated non-revocable action: pre-audit BEFORE write.
         audit.log("compose-exception.pre", {"workflow_id": params.workflow_id})

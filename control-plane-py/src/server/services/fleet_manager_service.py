@@ -15,6 +15,8 @@ from copilot import CopilotClient
 from copilot.client import SubprocessConfig
 from copilot.session import PermissionHandler
 from copilot.generated.session_events import SessionEventType
+from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
 
 from src.server.services.event_bus import EventBus
 from src.server.services.state_store import StateStore
@@ -27,6 +29,9 @@ from src.shared.events import FleetEvent
 
 def _gh_token() -> str:
     return subprocess.check_output(["gh", "auth", "token"], text=True).strip()
+
+
+_tracer = trace.get_tracer("wpp.fleet_manager")
 
 
 class FleetManagerService:
@@ -42,6 +47,10 @@ class FleetManagerService:
         self._session = None
         self._unsub_session_events: Callable[[], None] | None = None
         self._unsub_bus: Callable[[], None] | None = None
+        # Tool spans opened by TOOL_EXECUTION_START, closed by TOOL_EXECUTION_COMPLETE;
+        # parented to the current reasoning span opened in _process_batch.
+        self._open_tool_spans: dict[str, object] = {}
+        self._reasoning_parent_ctx = None
         self._triage = Triage()
         self._queue = FleetManagerQueue(self._process_batch, debounce_ms=2000)
         self._tick_task: asyncio.Task | None = None
@@ -87,26 +96,55 @@ class FleetManagerService:
     def _on_session_event(self, event) -> None:
         if event.type == SessionEventType.TOOL_EXECUTION_START:
             data = event.data
+            name = getattr(data, "tool_name", None)
+            call_id = getattr(data, "tool_call_id", None)
+            # Open a child span under the current reasoning span (if any)
+            parent_ctx = self._reasoning_parent_ctx
+            try:
+                span = _tracer.start_span(
+                    f"tool.{name or 'unknown'}",
+                    context=parent_ctx,
+                )
+                if name is not None:
+                    span.set_attribute("wpp.tool.name", str(name))
+                if call_id is not None:
+                    span.set_attribute("wpp.tool.call_id", str(call_id))
+                    self._open_tool_spans[call_id] = span
+                else:
+                    # Without a call_id we cannot correlate the complete event; end immediately.
+                    span.end()
+            except Exception:
+                pass
             self._on_live({
                 "kind": "tool_call",
                 "timestamp": time.time(),
                 "data": {
                     "stage": "start",
-                    "name": getattr(data, "tool_name", None),
+                    "name": name,
                     "args": getattr(data, "arguments", None),
-                    "tool_call_id": getattr(data, "tool_call_id", None),
+                    "tool_call_id": call_id,
                 }
             })
         elif event.type == SessionEventType.TOOL_EXECUTION_COMPLETE:
             data = event.data
             result_obj = getattr(data, "result", None)
+            call_id = getattr(data, "tool_call_id", None)
+            success = getattr(data, "success", None)
+            try:
+                span = self._open_tool_spans.pop(call_id, None) if call_id else None
+                if span is not None:
+                    if success is False:
+                        span.set_status(Status(StatusCode.ERROR, "tool reported failure"))
+                    span.end()
+            except Exception:
+                pass
             self._on_live({
                 "kind": "tool_call",
                 "timestamp": time.time(),
                 "data": {
                     "stage": "complete",
-                    "tool_call_id": getattr(data, "tool_call_id", None),
-                    "success": getattr(data, "success", None),
+                    "tool_call_id": call_id,
+                    "success": success,
                     "result": getattr(result_obj, "content", None) if result_obj else None,
                 }
             })
@@ -158,22 +196,35 @@ class FleetManagerService:
             + "\n\nFollow the SKILL instructions. Call tools as needed. Prefer bulk grouping."
         )
 
-        try:
-            event = await self._session.send_and_wait(prompt, timeout=120.0)
-            preview = ""
-            if event and getattr(event, "data", None):
-                preview = (getattr(event.data, "content", "") or "")[:200]
-            self._on_live({
-                "kind": "reasoning_done",
-                "timestamp": time.time(),
-                "data": {"preview": preview, "batch_size": len(batch)},
-            })
-        except Exception as ex:
-            self._on_live({
-                "kind": "error",
-                "timestamp": time.time(),
-                "data": {"message": str(ex)},
-            })
+        with _tracer.start_as_current_span("gen_ai.agent.run") as span:
+            span.set_attribute("gen_ai.agent.name", "fleet-manager-agent")
+            span.set_attribute("wpp.fleet_manager.batch_size", len(batch))
+            span.set_attribute(
+                "wpp.fleet_manager.workflow_ids",
+                [b.workflow_id for b in batch],
+            )
+            # Capture context so session-event tool spans attach as children.
+            self._reasoning_parent_ctx = trace.set_span_in_context(span)
+            try:
+                event = await self._session.send_and_wait(prompt, timeout=120.0)
+                preview = ""
+                if event and getattr(event, "data", None):
+                    preview = (getattr(event.data, "content", "") or "")[:200]
+                self._on_live({
+                    "kind": "reasoning_done",
+                    "timestamp": time.time(),
+                    "data": {"preview": preview, "batch_size": len(batch)},
+                })
+            except Exception as ex:
+                span.record_exception(ex)
+                span.set_status(Status(StatusCode.ERROR, str(ex)))
+                self._on_live({
+                    "kind": "error",
+                    "timestamp": time.time(),
+                    "data": {"message": str(ex)},
+                })
+            finally:
+                self._reasoning_parent_ctx = None
 
     async def stop(self) -> None:
         if self._tick_task:

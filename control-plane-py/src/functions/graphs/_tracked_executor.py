@@ -11,10 +11,14 @@ from __future__ import annotations
 import time
 from typing import Awaitable, Callable
 from agent_framework import Executor, WorkflowContext, handler
+from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
 from src.functions.webhook import emit
 
 
 ExecuteFn = Callable[[dict], Awaitable[dict]]
+
+_tracer = trace.get_tracer("wpp.graphs.executor")
 
 
 class TrackedExecutor(Executor):
@@ -31,18 +35,38 @@ class TrackedExecutor(Executor):
     async def process(self, input: dict, ctx: WorkflowContext) -> None:
         wid = input.get("workflow_id", "?")
         iid = input.get("instance_id")
+        phase = input.get("phase")
         t0 = time.time()
         await emit(wid, iid, "executor.invoked", {
             "name": self._name, "type": self._executor_type, "stage": "start"
         })
-        try:
-            result = await self._fn(input)
-        except Exception as ex:
-            await emit(wid, iid, "executor.invoked", {
-                "name": self._name, "type": self._executor_type, "stage": "error",
-                "error": str(ex), "duration_ms": int((time.time() - t0) * 1000)
-            })
-            raise
+        with _tracer.start_as_current_span(f"executor.{self._name}") as span:
+            span.set_attribute("wpp.workflow.id", str(wid))
+            if iid is not None:
+                span.set_attribute("wpp.workflow.instance_id", str(iid))
+            if phase is not None:
+                span.set_attribute("wpp.workflow.phase", str(phase))
+            span.set_attribute("wpp.executor.type", self._executor_type)
+            span.set_attribute("wpp.executor.name", self._name)
+            if self._executor_type == "agent":
+                span.set_attribute("gen_ai.agent.name", "finance-agent")
+
+            try:
+                result = await self._fn(input)
+            except Exception as ex:
+                span.record_exception(ex)
+                span.set_status(Status(StatusCode.ERROR, str(ex)))
+                await emit(wid, iid, "executor.invoked", {
+                    "name": self._name, "type": self._executor_type, "stage": "error",
+                    "error": str(ex), "duration_ms": int((time.time() - t0) * 1000)
+                })
+                raise
+
+            if self._executor_type == "validator" and result.get("ok") is False:
+                reason = result.get("blocked_reason") or result.get("missing") or "validation failed"
+                span.set_status(Status(StatusCode.ERROR, str(reason)))
+                span.add_event("validator.blocked", {"reason": str(reason)})
+
         await emit(wid, iid, "executor.invoked", {
             "name": self._name, "type": self._executor_type, "stage": "complete",
             "duration_ms": int((time.time() - t0) * 1000)

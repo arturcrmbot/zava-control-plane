@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 from copilot.tools import define_tool, ToolInvocation, ToolResult
 from src.server.services.state_store import StateStore
+from ._otel import traced_tool
 
 
 class DryRunPolicyParams(BaseModel):
@@ -36,6 +37,7 @@ def dry_run_policy_impl(store: StateStore, policy_id: str, proposed_value: Any, 
 
 def make_dry_run_policy_tool(store: StateStore):
     @define_tool(description="Simulate a policy value change against completed workflows.", skip_permission=True)
+    @traced_tool("dry_run_policy")
     def dry_run_policy(params: DryRunPolicyParams, invocation: ToolInvocation) -> ToolResult:
         result = dry_run_policy_impl(store, params.policy_id, params.proposed_value, params.scope_days)
         return ToolResult(text_result_for_llm=json.dumps(result), result_type="success")

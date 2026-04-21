@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.server.state import app_state
 from src.server.services.fleet_manager_service import FleetManagerService
 from src.server.services import simulator_orchestrator
+from src.shared.otel import init_otel
 
 load_dotenv()
 
@@ -24,6 +25,7 @@ app_state.fm = FleetManagerService(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_otel("control-plane-server")
     try:
         await app_state.fm.start()
     except Exception as ex:
