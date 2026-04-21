@@ -29,12 +29,37 @@ trap cleanup INT TERM EXIT
 echo "==> azurite"
 docker compose up -d azurite
 
+# Wait for Azurite to actually accept connections on 10000 before starting
+# func — otherwise the host aborts with "Value cannot be null (provider)".
+echo "    waiting for azurite on 10000..."
+for i in $(seq 1 30); do
+  if powershell.exe -Command "(Test-NetConnection -ComputerName localhost -Port 10000 -WarningAction SilentlyContinue -InformationLevel Quiet)" 2>/dev/null | grep -q True; then
+    echo "    azurite ready"
+    break
+  fi
+  sleep 1
+done
+
 echo "==> mock MCPs"
 ( cd ../control-plane && npm run dev:mcp ) &
 pids+=($!)
 
 echo "==> functions host"
-( PATH="$(pwd)/.funcvenv/Scripts:$PATH" PYTHONPATH="$(pwd)" func start --port 7071 ) &
+# 1. `source activate` sets VIRTUAL_ENV so func's Python worker uses .funcvenv
+#    (with azure-functions-durable etc.) instead of the system Python 3.11.
+# 2. Prepend npm's bin so `func` resolves to 4.9.0 (npm) not 4.0.5455 (MSI).
+#    The MSI version ships .NET 6 which can't load the Durable extension
+#    bundle v4 that requires .NET 8.
+#    cygpath converts Windows-style $APPDATA to MSYS Unix style so PATH works.
+# 3. PYTHONUTF8=1 / PYTHONIOENCODING=utf-8 side-steps a StringBuilder overflow
+#    in func 4.9.0's Python version probe on Windows.
+NPM_BIN="$(cygpath -u "$APPDATA")/npm"
+( source .funcvenv/Scripts/activate \
+    && PATH="$NPM_BIN:$PATH" \
+       PYTHONUTF8=1 \
+       PYTHONIOENCODING=utf-8 \
+       PYTHONPATH="$(pwd)" \
+       func start --port 7071 ) &
 pids+=($!)
 
 echo "==> fastapi + fleet manager"
