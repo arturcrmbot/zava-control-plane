@@ -12,6 +12,8 @@ from typing import Any
 
 import azure.durable_functions as df
 
+from src.shared.constants import DECISION_REJECTED
+
 
 def invoice_p2p_orchestration(context: df.DurableOrchestrationContext) -> Generator[Any, Any, dict]:
     """Orchestrate the 6 POC1 phases for one invoice. HITL on Approval."""
@@ -60,6 +62,22 @@ def invoice_p2p_orchestration(context: df.DurableOrchestrationContext) -> Genera
         timeout_event.cancel()
 
         decision = decision_event.result
+        decision_type = (
+            (decision.get("decision") or "") if isinstance(decision, dict) else ""
+        ).lower()
+
+        if decision_type in DECISION_REJECTED:
+            yield context.call_activity("checkpoint_activity_trigger", {
+                "workflow_id": workflow_id, "instance_id": context.instance_id,
+                "kind": "workflow.rejected",
+                "payload": {
+                    "by": decision.get("resolved_by") if isinstance(decision, dict) else None,
+                    "reason": "operator rejected",
+                },
+            })
+            return {"status": "rejected", "phase": "Approval", "decision": decision}
+
+        # else: approved path — record decision on approval result + synthetic ledger entry
         approval_result["decision"] = decision
         approval_result["via_hitl"] = True
         enriched["approval"] = approval_result

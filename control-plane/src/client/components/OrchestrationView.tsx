@@ -38,6 +38,7 @@ interface StepView {
   failed?: HistoryEntry;
   suspended?: HistoryEntry;
   resumed?: HistoryEntry;
+  rejected?: HistoryEntry;
   executors: HistoryEntry[];
   blocked?: HistoryEntry;
 }
@@ -54,6 +55,7 @@ function deriveStepView(history: HistoryEntry[], name: string): StepView {
   let suspended: HistoryEntry | undefined;
   let resumed: HistoryEntry | undefined;
   let blocked: HistoryEntry | undefined;
+  let rejected: HistoryEntry | undefined;
   const executors: HistoryEntry[] = [];
   history.forEach((h, idx) => {
     if (!stepStart || !inWindow(h, idx)) return;
@@ -61,11 +63,12 @@ function deriveStepView(history: HistoryEntry[], name: string): StepView {
     if (h.kind === "validator.blocked") blocked = h;
     if (h.kind === "suspended" && name === "Approval") suspended = h;
     if (h.kind === "resumed" && name === "Approval") resumed = h;
+    if (h.kind === "workflow.rejected" && name === "Approval") rejected = h;
   });
   return {
     name: name as typeof stepNames[number],
     started: stepStart, completed: stepEnd, failed: stepFailed,
-    suspended, resumed, executors, blocked,
+    suspended, resumed, rejected, executors, blocked,
   };
 }
 
@@ -97,7 +100,8 @@ export default function OrchestrationView({ workflowId }: { workflowId: string }
           <div key={s.name} className="border border-slate-800 rounded bg-slate-900/30">
             <div className="px-3 py-1.5 flex items-center gap-2">
               <div className="w-32 text-slate-200">{s.name}</div>
-              {s.failed ? <div className="text-red-400">✗ failed</div>
+              {s.rejected ? <div className="text-red-400">✗ rejected</div>
+                : s.failed ? <div className="text-red-400">✗ failed</div>
                 : s.completed ? <div className="text-emerald-400">✓ completed</div>
                 : s.suspended && !s.resumed ? <div className="text-amber-400">⏸ suspended</div>
                 : s.blocked ? <div className="text-red-400">✗ blocked</div>
@@ -107,7 +111,7 @@ export default function OrchestrationView({ workflowId }: { workflowId: string }
                 <div className="text-slate-500 ml-auto">{s.completed.payload.duration_ms} ms</div>
               )}
             </div>
-            {(s.executors.length > 0 || s.blocked || s.suspended) && (
+            {(s.executors.length > 0 || s.blocked || s.suspended || s.rejected) && (
               <div className="border-t border-slate-800 px-3 py-2 space-y-0.5">
                 {s.executors.map((e, i) => (
                   <div key={i} className="flex items-center gap-2 text-[11px]">
@@ -126,6 +130,12 @@ export default function OrchestrationView({ workflowId }: { workflowId: string }
                 )}
                 {s.resumed && (
                   <div className="text-emerald-300 mt-1">↳ resumed with operator decision</div>
+                )}
+                {s.rejected && (
+                  <div className="text-red-400 mt-1">
+                    ↳ rejected by {String(s.rejected.payload.by ?? "operator")}
+                    {s.rejected.payload.reason ? ` (${String(s.rejected.payload.reason)})` : ""}
+                  </div>
                 )}
                 {s.failed?.payload?.error && (
                   <div className="text-red-400 mt-1">↳ error: {String(s.failed.payload.error)}</div>

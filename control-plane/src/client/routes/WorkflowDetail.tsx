@@ -41,19 +41,30 @@ export default function WorkflowDetail() {
           </button>
         ))}
       </div>
-      {tab === "Overview" && (
-        <div className="text-xs text-slate-300 space-y-1">
-          <div>status: {w.status}</div>
-          <div>phase: {w.currentPhase}</div>
-          {d.activeException && (
-            <div className="mt-2 border border-amber-700 rounded p-2 bg-amber-950/30">
-              <div className="text-amber-300 font-medium">⚠ {d.activeException.category} · {d.activeException.severity}</div>
-              <div>{d.activeException.summary}</div>
-              <div className="text-emerald-300">→ {d.activeException.recommendation}</div>
-            </div>
-          )}
-        </div>
-      )}
+      {tab === "Overview" && (() => {
+        const rejectedEntry = [...w.actionLedger].reverse().find(
+          a => a.action === "bulk-resolve:reject" || a.action === "bulk-resolve:rejected"
+        );
+        const isRejected = w.status === "failed" && w.currentPhase === "Approval" && !!rejectedEntry;
+        return (
+          <div className="text-xs text-slate-300 space-y-1">
+            <div>status: <span className={isRejected ? "text-red-400" : undefined}>{w.status}</span></div>
+            <div>phase: <span className={isRejected ? "text-red-400" : undefined}>{w.currentPhase}</span></div>
+            {isRejected && (
+              <div className="mt-2 border border-red-700 rounded p-2 bg-red-950/30 text-red-300">
+                Rejected by {rejectedEntry?.actor.id ?? "operator"}
+              </div>
+            )}
+            {d.activeException && (
+              <div className="mt-2 border border-amber-700 rounded p-2 bg-amber-950/30">
+                <div className="text-amber-300 font-medium">⚠ {d.activeException.category} · {d.activeException.severity}</div>
+                <div>{d.activeException.summary}</div>
+                <div className="text-emerald-300">→ {d.activeException.recommendation}</div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
       {tab === "Phases" && <PhaseTimeline phases={d.phases} />}
       {tab === "Traces" && <OtelSpanTree spans={d.spans} />}
       {tab === "Ledger" && (

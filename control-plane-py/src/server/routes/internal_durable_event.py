@@ -35,4 +35,12 @@ async def receive_durable_event(body: DurableEventBody):
         app_state.bus.emit(FleetEvent(type="workflow.hitl.requested", workflow_id=body.workflow_id, reason=body.payload.get("reason", "approval")))
     elif body.kind == "workflow.completed":
         app_state.bus.emit(FleetEvent(type="workflow.resolved", workflow_id=body.workflow_id, resolution="completed"))
+    elif body.kind == "workflow.rejected":
+        app_state.bus.emit(FleetEvent(
+            type="workflow.resolved", workflow_id=body.workflow_id, resolution="rejected"
+        ))
+        w = app_state.store.get_workflow(body.workflow_id)
+        if w:
+            w.status = "failed"
+            w.current_phase = "Approval"
     return {"received": True}

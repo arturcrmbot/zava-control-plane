@@ -1,5 +1,6 @@
 from __future__ import annotations
 import time
+from typing import Literal
 from fastapi import APIRouter
 from pydantic import BaseModel
 from src.server.state import app_state
@@ -10,7 +11,7 @@ router = APIRouter(prefix="/api/exceptions")
 
 class BulkResolveBody(BaseModel):
     exception_ids: list[str]
-    resolution: str
+    resolution: Literal["approve", "reject", "escalate"]
     resolved_by: str
 
 
