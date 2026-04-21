@@ -109,7 +109,10 @@ class PolicyRef(BaseModel):
 class Exception_(BaseModel):
     id: str
     workflow_id: str
-    composed_by: Literal["fleet-manager", "guardrail", "simulator-injected", "validator"]
+    composed_by: Literal[
+        "fleet-manager", "guardrail", "simulator-injected", "validator",
+        "deterministic", "fleet-manager-augmented"
+    ]
     severity: Severity
     category: ExceptionCategory
     summary: str

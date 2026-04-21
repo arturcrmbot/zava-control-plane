@@ -26,5 +26,10 @@ On each trigger event:
 Never call `compose-exception` twice for the same root cause in the same
 debounce window. Prefer bulk-candidate grouping.
 
+An exception is already created for every suspended or validator-blocked
+workflow. Your job is to *enrich* it — better recommendation, relevant
+policy refs — not recreate it. Calling `compose-exception` on a workflow
+that already has one will merge.
+
 Your output is visible to the operator in near-real-time. Be concise.
 Recommendations go in `recommendation`, not in prose.

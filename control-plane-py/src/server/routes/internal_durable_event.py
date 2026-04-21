@@ -3,6 +3,9 @@ import time
 from fastapi import APIRouter
 from pydantic import BaseModel
 from src.server.state import app_state
+from src.server.services.exception_factory import (
+    compose_hitl_exception, compose_validator_exception
+)
 from src.shared.events import FleetEvent
 
 router = APIRouter(prefix="/internal")
@@ -30,8 +33,19 @@ async def receive_durable_event(body: DurableEventBody):
     elif body.kind == "step.completed":
         app_state.bus.emit(FleetEvent(type="workflow.phase.completed", workflow_id=body.workflow_id, phase=body.payload.get("step"), durationMs=body.payload.get("duration_ms", 0)))
     elif body.kind == "validator.blocked":
+        compose_validator_exception(
+            app_state.store,
+            body.workflow_id,
+            body.payload.get("validator", "unknown"),
+            body.payload.get("reason", "validation failed"),
+        )
         app_state.bus.emit(FleetEvent(type="workflow.exception.detected", workflow_id=body.workflow_id, category="validator-blocked", severity="high"))
     elif body.kind == "suspended":
+        compose_hitl_exception(
+            app_state.store,
+            body.workflow_id,
+            body.payload.get("reason", "approval"),
+        )
         app_state.bus.emit(FleetEvent(type="workflow.hitl.requested", workflow_id=body.workflow_id, reason=body.payload.get("reason", "approval")))
     elif body.kind == "workflow.completed":
         app_state.bus.emit(FleetEvent(type="workflow.resolved", workflow_id=body.workflow_id, resolution="completed"))
