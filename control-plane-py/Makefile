@@ -1,4 +1,4 @@
-.PHONY: install dev mcp server functions funcvenv test clean azurite-up azurite-down reset
+.PHONY: install dev mcp server functions funcvenv test clean azurite-up azurite-down reset up
 
 install:
 	uv sync
@@ -39,6 +39,11 @@ functions:
 
 dev: azurite-up
 	@echo "Start in 3 terminals: 'make mcp' / 'make server' / 'make functions'"
+
+# One command to boot the entire stack (azurite + mocks + func + fastapi + vite).
+# Ctrl-C stops everything.
+up:
+	bash scripts/boot-demo.sh
 
 test:
 	uv run pytest -v
