@@ -17,20 +17,34 @@ _seq = 0
 
 
 async def spawn_workflow(scenario: str | None = None) -> str:
-    """Create a new invoice workflow and start its DurableWorkflow instance."""
+    """Create a new invoice workflow and start its DurableWorkflow instance.
+
+    ``scenario`` selects a deterministic demo path:
+      * ``"demo-fail"`` — inject ``force_gl_fail=True`` so agent_gl_coder returns
+        GL-9999; validate_gl_active then blocks at Routing.
+      * ``"demo-hitl"`` — inject ``force_hitl=True`` so apply_threshold_routing
+        suspends regardless of amount. Amount is also bumped well above any
+        reasonable threshold as belt-and-braces.
+      * ``None`` / anything else — normal synthetic workflow.
+    """
     global _seq
     _seq += 1
     wid = f"INV-{_seq:04d}"
-    force_fail = scenario == "demo-fail"
-    w = build_workflow(wid, force_demo_fail=force_fail)
+    w = build_workflow(wid)
     app_state.store.upsert_workflow(w)
-    payload = {
+    payload: dict = {
         "workflow_id": w.id,
         "vendor": w.vendor.model_dump(),
         "invoice": w.invoice.model_dump(),
         "agency": w.agency,
         "jurisdiction": w.jurisdiction,
     }
+    if scenario == "demo-fail":
+        payload["force_gl_fail"] = True
+    elif scenario == "demo-hitl":
+        payload["force_hitl"] = True
+        # Belt-and-braces: make the invoice amount obviously over any threshold.
+        payload["invoice"]["amount"] = 12500.00
     try:
         result = await schedule_new_orchestration(payload)
         w.orchestration_instance_id = result.get("id")

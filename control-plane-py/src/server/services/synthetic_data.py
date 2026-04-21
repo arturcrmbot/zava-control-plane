@@ -21,13 +21,14 @@ PURCHASE_ORDERS = _load_json("purchase-orders.json")
 AGENCIES = _load_json("agencies.json")
 
 
-def build_workflow(workflow_id: str, force_demo_fail: bool = False) -> Workflow:
+def build_workflow(workflow_id: str) -> Workflow:
     """Generate a fresh synthetic Workflow with random vendor/PO/agency.
-    If force_demo_fail, append 'DEMO_FAIL' to vendor name — triggers the
-    bounded-probabilism demo path in agent_gl_coder."""
+
+    Demo-scenario determinism (``demo-fail`` / ``demo-hitl``) is injected by
+    the caller via orchestration-payload force flags, not by mutating the
+    synthesised workflow. See ``simulator_orchestrator.spawn_workflow``.
+    """
     vendor_data = random.choice(VENDORS)
-    if force_demo_fail:
-        vendor_data = {**vendor_data, "name": vendor_data["name"] + " DEMO_FAIL"}
     po = random.choice(PURCHASE_ORDERS)
     agency = random.choice(AGENCIES)
     now = time.time()

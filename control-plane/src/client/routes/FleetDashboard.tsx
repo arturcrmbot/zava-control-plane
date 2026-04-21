@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import { useWorkflows } from "../hooks/useWorkflows";
 import WorkflowCard from "../components/WorkflowCard";
+import DevPanel from "../components/DevPanel";
 
 export default function FleetDashboard() {
   const workflows = useWorkflows();
@@ -27,6 +28,7 @@ export default function FleetDashboard() {
 
   return (
     <div className="space-y-4">
+      <DevPanel />
       <div className="grid grid-cols-5 gap-3">
         {Object.entries(counts).map(([k, v]) => (
           <div key={k} className="border border-slate-800 rounded p-3 bg-slate-900/50">

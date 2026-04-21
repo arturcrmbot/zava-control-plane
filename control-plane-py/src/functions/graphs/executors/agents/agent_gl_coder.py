@@ -5,6 +5,16 @@ from ._wrapper import run_agent_skill
 
 
 async def execute(input: dict) -> dict:
+    # Deterministic demo-fail injection: short-circuit the LLM and return an
+    # inactive GL code so validate_gl_active blocks downstream. Keeps the
+    # ``demo-fail`` scenario reproducible without any model variance.
+    if input.get("force_gl_fail"):
+        return {
+            "gl_decision": {
+                "gl_account_id": "GL-9999",
+                "rationale": "demo-fail injection",
+            }
+        }
     classification = input["classification"]["category"]
     vendor = input["vendor"]
     active_gls = input["active_gls"]
