@@ -51,21 +51,26 @@ echo "==> mock MCPs"
 pids+=($!)
 
 echo "==> functions host"
-# 1. `source activate` sets VIRTUAL_ENV so func's Python worker uses .funcvenv
-#    (with azure-functions-durable etc.) instead of the system Python 3.11.
-# 2. Prepend npm's bin so `func` resolves to 4.9.0 (npm) not 4.0.5455 (MSI).
-#    The MSI version ships .NET 6 which can't load the Durable extension
-#    bundle v4 that requires .NET 8.
-#    cygpath converts Windows-style $APPDATA to MSYS Unix style so PATH works.
-# 3. PYTHONUTF8=1 / PYTHONIOENCODING=utf-8 side-steps a StringBuilder overflow
-#    in func 4.9.0's Python version probe on Windows.
-NPM_BIN="$(cygpath -u "$APPDATA")/npm"
-( source .funcvenv/Scripts/activate \
-    && PATH="$NPM_BIN:$PATH" \
-       PYTHONUTF8=1 \
-       PYTHONIOENCODING=utf-8 \
-       PYTHONPATH="$(pwd)" \
-       func start --port 7071 ) &
+# Branch by OS. On Windows (git-bash/MSYS) we need the .funcvenv dance + the
+# npm-vs-MSI func shim + PYTHONUTF8 workaround. On Linux (devcontainer /
+# Codespaces) the uv-created `.venv` is Python 3.11, func@4.9.0 is on PATH
+# from post-create, and PYTHONUTF8 is already exported.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    NPM_BIN="$(cygpath -u "$APPDATA")/npm"
+    ( source .funcvenv/Scripts/activate \
+        && PATH="$NPM_BIN:$PATH" \
+           PYTHONUTF8=1 \
+           PYTHONIOENCODING=utf-8 \
+           PYTHONPATH="$(pwd)" \
+           func start --port 7071 ) &
+    ;;
+  *)
+    ( source .venv/bin/activate \
+        && PYTHONPATH="$(pwd)" \
+           func start --port 7071 ) &
+    ;;
+esac
 pids+=($!)
 
 echo "==> fastapi + fleet manager"
