@@ -1,7 +1,7 @@
 from __future__ import annotations
 from api.shared.types import (
     Workflow, Phase, OtelSpan, Exception_ as Exception, ActionLedgerEntry,
-    AutonomyPolicy, SkillAmplification
+    AutonomyPolicy, SkillAmplification, McpCall
 )
 
 
@@ -13,6 +13,7 @@ class StateStore:
         self._exceptions: dict[str, Exception] = {}
         self._policies: dict[str, AutonomyPolicy] = {}
         self._amplifications: dict[str, list[SkillAmplification]] = {}
+        self._mcp_calls: dict[str, list[McpCall]] = {}
 
     def upsert_workflow(self, w: Workflow) -> None:
         self._workflows[w.id] = w
@@ -57,6 +58,12 @@ class StateStore:
 
     def get_spans(self, workflow_id: str) -> list[OtelSpan]:
         return self._spans.get(workflow_id, [])
+
+    def append_mcp_call(self, c: McpCall) -> None:
+        self._mcp_calls.setdefault(c.workflow_id, []).append(c)
+
+    def get_mcp_calls(self, workflow_id: str) -> list[McpCall]:
+        return self._mcp_calls.get(workflow_id, [])
 
     def upsert_exception(self, e: Exception) -> None:
         self._exceptions[e.id] = e

@@ -105,6 +105,18 @@ class OtelSpan(BaseModel):
     status: Literal["ok", "error"] = "ok"
 
 
+class McpCall(BaseModel):
+    workflow_id: str
+    timestamp: float
+    tool: str
+    url: str
+    method: str = "POST"
+    request: dict
+    response: dict
+    status_code: int
+    duration_ms: int
+
+
 class ExceptionOption(BaseModel):
     label: str
     action: str
