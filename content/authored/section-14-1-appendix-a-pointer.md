@@ -1,1 +1,0 @@
-The completed assessment questionnaire is submitted separately as `wppetai-agentic-framework-assessment-questionnaire-microsoft-response.xlsx`. Every answer cross-references by Ref ID to WPP's questionnaire and traces to a specific capability or service described in §4.
