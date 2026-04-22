@@ -29,12 +29,18 @@ trap cleanup INT TERM EXIT
 echo "==> azurite"
 docker compose up -d azurite
 
-# Wait for Azurite to actually accept connections on 10000 before starting
-# func — otherwise the host aborts with "Value cannot be null (provider)".
-echo "    waiting for azurite on 10000..."
-for i in $(seq 1 30); do
-  if powershell.exe -Command "(Test-NetConnection -ComputerName localhost -Port 10000 -WarningAction SilentlyContinue -InformationLevel Quiet)" 2>/dev/null | grep -q True; then
-    echo "    azurite ready"
+# Wait for Azurite's Blob, Queue, Table services to respond. Port-bind alone
+# is not enough — func's Durable Task extension aborts with "Value cannot be
+# null (provider)" if Azurite is bound but not yet serving. Probe each service
+# with a curl that expects HTTP 400 (missing auth). Also add a small buffer.
+echo "    waiting for azurite (blob/queue/table)..."
+for i in $(seq 1 40); do
+  b=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:10000/devstoreaccount1 2>/dev/null)
+  q=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:10001/devstoreaccount1 2>/dev/null)
+  t=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:10002/devstoreaccount1 2>/dev/null)
+  if [ "$b" = "400" ] && [ "$q" = "400" ] && [ "$t" = "400" ]; then
+    echo "    azurite ready (blob=$b queue=$q table=$t)"
+    sleep 2
     break
   fi
   sleep 1
