@@ -1,8 +1,0 @@
-[
-  { "id": "V-001", "name": "Acme Media Supplies", "country": "US", "sanctioned": false, "creditRating": "A" },
-  { "id": "V-002", "name": "Globex Productions", "country": "US", "sanctioned": false, "creditRating": "B" },
-  { "id": "V-003", "name": "Initech Studios", "country": "UK", "sanctioned": false, "creditRating": "A" },
-  { "id": "V-004", "name": "Umbrella Creative", "country": "DE", "sanctioned": true, "creditRating": "C" },
-  { "id": "V-005", "name": "Stark Industries", "country": "US", "sanctioned": false, "creditRating": "A" },
-  { "id": "V-006", "name": "Wayne Enterprises", "country": "US", "sanctioned": false, "creditRating": "A" }
-]

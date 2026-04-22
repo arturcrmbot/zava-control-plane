@@ -1,6 +1,0 @@
-[
-  { "id": "P-DUP", "title": "Duplicate Invoice Policy", "snippet": "Duplicate invoices within 30 days are auto-flagged. Legitimate duplicates (e.g., split billings) must be approved by Finance BP with written rationale.", "source": "finance/handbook/p2p.md#duplicates" },
-  { "id": "P-VAR", "title": "PO Variance Tolerance", "snippet": "Invoice amounts must not exceed PO by more than 2%. Variances 2-5% require Finance BP approval. Variances above 5% must be returned to vendor.", "source": "finance/handbook/p2p.md#variance" },
-  { "id": "P-THR", "title": "Approval Thresholds", "snippet": "Invoices under $5,000 auto-approve on PO match. $5,000-$25,000 require Finance BP. Above $25,000 require CFO office.", "source": "finance/handbook/p2p.md#approval-thresholds" },
-  { "id": "P-SANC", "title": "Sanctions Screening", "snippet": "Any vendor on the OFAC SDN list or EU sanctions list must be blocked. Non-revocable. Requires Legal clearance.", "source": "compliance/handbook/sanctions.md" }
-]

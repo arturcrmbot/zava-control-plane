@@ -6,11 +6,11 @@ export default defineConfig({
   resolve: {
     alias: {
       "@shared": path.resolve(__dirname, "src/shared"),
-      "@server": path.resolve(__dirname, "src/server"),
       "@client": path.resolve(__dirname, "src/client")
     }
   },
   test: {
-    environment: "node"
+    environment: "node",
+    exclude: ["**/node_modules/**", "**/dist/**", "tests/e2e/**"]
   }
 });
