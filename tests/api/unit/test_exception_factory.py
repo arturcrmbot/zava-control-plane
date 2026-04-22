@@ -30,7 +30,7 @@ def test_compose_hitl_exception_creates_deterministic_record():
     assert e.confidence == 1.0
     assert e.related_policy_refs == []
     actions = sorted(o.action for o in e.options)
-    assert actions == ["approve", "reject"]
+    assert actions == ["approve", "escalate", "reject", "request-info"]
     # Persisted and discoverable via list_exceptions
     assert s.get_exception(e.id) is e
     assert e in s.list_exceptions()
@@ -83,3 +83,24 @@ def test_deterministic_factory_does_not_duplicate_store_entries():
     assert after - before == 1
     # Workflow's active_exception_id is now set
     assert s.get_workflow("WF-5").active_exception_id == e.id
+
+
+def test_validator_exception_has_recommended_reroute_option() -> None:
+    store = StateStore()
+    _mk_workflow(store, "W-X")
+    e = compose_validator_exception(store, "W-X",
+                                    "validate_gl_active",
+                                    "GL-9999 not active")
+    actions = {(o.action, o.recommended) for o in e.options}
+    assert any(a == "reroute-gl" for a, _ in actions)
+    assert any(a == "escalate" for a, _ in actions)
+    assert ("reroute-gl", True) in actions
+
+
+def test_hitl_exception_has_approve_recommended() -> None:
+    store = StateStore()
+    _mk_workflow(store, "W-Y")
+    e = compose_hitl_exception(store, "W-Y", "amount > threshold")
+    actions = {(o.action, o.recommended) for o in e.options}
+    assert ("approve", True) in actions
+    assert any(a == "escalate" for a, _ in actions)

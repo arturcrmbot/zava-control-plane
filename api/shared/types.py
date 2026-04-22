@@ -121,6 +121,7 @@ class ExceptionOption(BaseModel):
     label: str
     action: str
     non_revocable: bool = False
+    recommended: bool = False
 
 
 class PolicyRef(BaseModel):
