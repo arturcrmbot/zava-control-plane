@@ -1,0 +1,52 @@
+import { PHASE_ORDER, type Phase, type Workflow } from "@shared/types";
+import { Check, Loader2, Ban, CircleDashed } from "lucide-react";
+
+type Status = "completed" | "in_progress" | "blocked" | "pending";
+
+function classify(
+  name: string, phases: Phase[], currentPhase: string,
+  hasException: boolean,
+): Status {
+  const p = phases.find(x => x.name === name);
+  if (p?.status === "completed") return "completed";
+  if (name === currentPhase && hasException) return "blocked";
+  if (name === currentPhase) return "in_progress";
+  return "pending";
+}
+
+const Icon = ({ s }: { s: Status }) => {
+  if (s === "completed") return <Check size={14} className="text-emerald-600" />;
+  if (s === "in_progress") return <Loader2 size={14} className="text-blue-600 animate-spin" />;
+  if (s === "blocked") return <Ban size={14} className="text-red-600" />;
+  return <CircleDashed size={14} className="text-slate-400" />;
+};
+
+const PILL: Record<Status, string> = {
+  completed: "bg-emerald-50 border-emerald-200 text-emerald-800",
+  in_progress: "bg-blue-50 border-blue-200 text-blue-800",
+  blocked: "bg-red-50 border-red-200 text-red-800",
+  pending: "bg-slate-50 border-slate-200 text-slate-500",
+};
+
+export default function PhaseRibbon({ workflow, phases }: {
+  workflow: Workflow; phases: Phase[];
+}) {
+  const hasException = !!workflow.activeExceptionId;
+  return (
+    <div className="flex items-center gap-2" data-testid="phase-ribbon">
+      {PHASE_ORDER.map((name, i) => {
+        const s = classify(name, phases, workflow.currentPhase, hasException);
+        return (
+          <div key={name} className="flex items-center gap-2">
+            <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 border ${PILL[s]}`}>
+              <Icon s={s} />
+              <span className="text-xs font-medium">{name}</span>
+            </div>
+            {i < PHASE_ORDER.length - 1 &&
+              <div className="h-px w-4 bg-slate-300" />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
