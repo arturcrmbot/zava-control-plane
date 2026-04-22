@@ -10,5 +10,9 @@ async def execute(input: dict) -> dict:
     if input.get("requires_hitl") and not has_human_approval:
         return {"ok": False, "blocked": "requires human approval"}
     file_id = input["payment_file"]["paymentFileId"]
-    res = await call_mcp(PAYMENT_URL, "submitPayment", {"paymentFileId": file_id, "simulateTimeout": False})
+    res = await call_mcp(
+        PAYMENT_URL, "submitPayment", {"paymentFileId": file_id, "simulateTimeout": False},
+        workflow_id=input.get("workflow_id"),
+        instance_id=input.get("instance_id"),
+    )
     return {"ok": True, "result": res}
