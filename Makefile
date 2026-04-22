@@ -1,7 +1,8 @@
-.PHONY: install dev mcp server functions funcvenv test clean azurite-up azurite-down reset up
+.PHONY: install dev mcp server functions funcvenv test test-e2e clean azurite-up azurite-down reset up
 
 install:
 	uv sync
+	npm install
 
 azurite-up:
 	docker compose up -d azurite
@@ -16,10 +17,10 @@ reset:
 	@echo "azurite reset — restart func + uvicorn to clear in-memory state"
 
 mcp:
-	cd "../control-plane" && npm run dev:mcp
+	npm run dev:mcp
 
 server:
-	uv run uvicorn src.server.main:app --port 3001 --reload
+	uv run uvicorn api.server.main:app --port 3001 --reload
 
 # One-time setup: create a Python 3.11 venv for Azure Functions Core Tools.
 # Core Tools bundles Python 3.11; our main uv venv is Python 3.13 (incompatible C extensions).
@@ -30,8 +31,7 @@ funcvenv:
 
 # Start Azure Functions host.
 # Prerequisites: make funcvenv && make azurite-up
-# On Windows activate .funcvenv first, then run this target, or run manually:
-#   source .funcvenv/Scripts/activate && PYTHONPATH=$(pwd) func start --port 7071
+# On Windows activate .funcvenv first, then run this target.
 # NOTE: requires Core Tools v4.0.6000+ (ships .NET 8) for Durable extension bundle v4.
 #       Update: npm install -g azure-functions-core-tools@4 --unsafe-perm true
 functions:
@@ -45,16 +45,14 @@ dev: azurite-up
 up:
 	bash scripts/boot-demo.sh
 
-# End-to-end harness: Playwright navigates every UI route, asserts no blank
-# pages + zero console errors, checks API response shapes use camelCase, and
-# runs one pipeline test (inject demo-fail -> deterministic exception).
-# Requires the stack to already be running (`make up` in another terminal).
-test-e2e:
-	cd ../control-plane && npx playwright test --reporter=list
-
 test:
-	uv run pytest -v
+	uv run pytest -q
+	npm test --silent
+
+# Playwright — requires the stack to already be running (`make up` in another terminal).
+test-e2e:
+	npx playwright test --reporter=list
 
 clean:
 	docker compose down -v
-	rm -rf .venv .funcvenv .python_packages __pycache__ .pytest_cache .ruff_cache azurite-data
+	rm -rf .venv .funcvenv .python_packages node_modules dist __pycache__ .pytest_cache .ruff_cache azurite-data test-results

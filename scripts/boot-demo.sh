@@ -5,16 +5,15 @@
 # UI served from built bundle.
 #
 # Prereqs:
-#   (cd control-plane-py && uv sync)
+#   uv sync && npm install && npm run build
 #   make funcvenv                           (Windows only)
 #   cp local.settings.json.example local.settings.json
-#   (cd control-plane && npm install && npm run build)
 #   npm install -g azurite
 #   gh auth login
 
 set -u
 
-cd "$(dirname "$0")/.."  # control-plane-py/
+cd "$(dirname "$0")/.."  # repo root
 [[ -f .env ]] || cp .env.example .env
 
 pids=()
@@ -46,15 +45,15 @@ echo "    azurite ready; warming up 10s"
 sleep 10
 
 echo "==> mock MCPs (no watch)"
-( cd ../control-plane && npm run demo:mcp ) &
+npm run demo:mcp &
 pids+=($!)
 
 echo "==> fastapi + fleet manager (no reload)"
-uv run uvicorn src.server.main:app --port 3001 &
+uv run uvicorn api.server.main:app --port 3001 &
 pids+=($!)
 
 echo "==> vite preview (static)"
-( cd ../control-plane && npm run demo:ui ) &
+npm run demo:ui &
 pids+=($!)
 
 launch_func() {
