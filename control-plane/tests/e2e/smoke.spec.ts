@@ -195,6 +195,33 @@ test.describe("Interactions", () => {
   });
 });
 
+// --- Data-population tests (phases, spans, ledger) -------------------------
+
+test.describe("Workflow data population", () => {
+  test("after a workflow progresses, phases + spans + ledger are populated", async ({ request }) => {
+    test.setTimeout(180_000);
+    const inj = await request.post(`${API}/api/simulator/inject`, {
+      data: { scenario: "demo-fail" },
+    });
+    const { workflow_id: wid } = await inj.json();
+
+    // Poll until at least one phase exists.
+    const deadline = Date.now() + 150_000;
+    let payload: { workflow: { actionLedger: unknown[] }; phases: unknown[]; spans: unknown[] } | null = null;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 3000));
+      const r = await request.get(`${API}/api/workflows/${wid}`);
+      if (!r.ok()) continue;
+      const body = await r.json();
+      if (body.phases && body.phases.length > 0) { payload = body; break; }
+    }
+    expect(payload, `no phases populated for ${wid} within 150s`).not.toBeNull();
+    expect(payload!.phases.length, "phases should have at least 1 entry").toBeGreaterThan(0);
+    expect(payload!.workflow.actionLedger.length, "ledger should have at least 1 entry").toBeGreaterThan(0);
+    expect(payload!.spans.length, "spans should have at least 1 entry").toBeGreaterThan(0);
+  });
+});
+
 test.describe("Pipeline E2E", () => {
   test("demo-fail inject produces deterministic validator-blocked exception", async ({ request }) => {
     test.setTimeout(180_000);  // 3 min — workflow needs to progress through Intake + Validation + Routing

@@ -9,9 +9,9 @@ interface AnalyticsData {
 export default function Analytics() {
   const [d, setD] = useState<AnalyticsData | null>(null);
   useEffect(() => {
-    void fetch("/api/workflows").then(r => r.json()).then((ws: Array<{ status: string; actionLedger: Array<{ actor: { kind: string } }> }>) => {
+    void fetch("/api/workflows").then(r => r.json()).then((ws: Array<{ status: string; actionLedger: Array<{ actorKind: string }> }>) => {
       const total = ws.length || 1;
-      const humanTouched = ws.filter(w => w.actionLedger.some(a => a.actor.kind === "human")).length;
+      const humanTouched = ws.filter(w => w.actionLedger.some(a => a.actorKind === "human")).length;
       setD({
         interventionRate: humanTouched / total,
         avgResolutionMs: 240_000,

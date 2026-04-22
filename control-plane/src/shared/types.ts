@@ -47,7 +47,8 @@ export interface ToolCall {
 export interface ActionLedgerEntry {
   workflowId: string;
   timestamp: number;
-  actor: { kind: "agent" | "human"; id: string };
+  actorKind: "agent" | "human";
+  actorId: string;
   action: string;
   revocable: boolean;
   details: Record<string, unknown>;

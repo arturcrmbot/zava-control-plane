@@ -20,7 +20,7 @@ export function exceptionsRouter(store: StateStore): Router {
         w.status = "in_progress";
         w.actionLedger.push({
           workflowId: w.id, timestamp: Date.now(),
-          actor: { kind: "human", id: resolvedBy },
+          actorKind: "human", actorId: resolvedBy,
           action: `bulk-resolve:${resolution}`, revocable: false, details: { exceptionId: id }
         });
       }

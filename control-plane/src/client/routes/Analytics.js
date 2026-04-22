@@ -6,7 +6,7 @@ export default function Analytics() {
     useEffect(() => {
         void fetch("/api/workflows").then(r => r.json()).then((ws) => {
             const total = ws.length || 1;
-            const humanTouched = ws.filter(w => w.actionLedger.some(a => a.actor.kind === "human")).length;
+            const humanTouched = ws.filter(w => w.actionLedger.some(a => a.actorKind === "human")).length;
             setD({
                 interventionRate: humanTouched / total,
                 avgResolutionMs: 240_000,

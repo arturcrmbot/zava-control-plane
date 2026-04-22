@@ -52,7 +52,7 @@ export default function WorkflowDetail() {
             <div>phase: <span className={isRejected ? "text-red-400" : undefined}>{w.currentPhase}</span></div>
             {isRejected && (
               <div className="mt-2 border border-red-700 rounded p-2 bg-red-950/30 text-red-300">
-                Rejected by {rejectedEntry?.actor.id ?? "operator"}
+                Rejected by {rejectedEntry?.actorId ?? "operator"}
               </div>
             )}
             {d.activeException && (
@@ -73,7 +73,7 @@ export default function WorkflowDetail() {
             <div key={i} className="border border-slate-800 rounded p-2 bg-slate-900/30">
               <div className="text-slate-200">{a.action}</div>
               <div className="text-slate-500">
-                {new Date(a.timestamp).toLocaleString()} · {a.actor.kind}:{a.actor.id} · {a.revocable ? "revocable" : "non-revocable"}
+                {new Date(a.timestamp * 1000).toLocaleString()} · {a.actorKind}:{a.actorId} · {a.revocable ? "revocable" : "non-revocable"}
               </div>
             </div>
           ))}

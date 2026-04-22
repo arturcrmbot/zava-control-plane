@@ -30,7 +30,7 @@ describe("StateStore", () => {
   it("appends action ledger entries", () => {
     store.upsertWorkflow(mkWorkflow("A"));
     store.appendLedger("A", {
-      workflowId: "A", timestamp: 1, actor: { kind: "agent", id: "finance-agent" },
+      workflowId: "A", timestamp: 1, actorKind: "agent", actorId: "finance-agent",
       action: "intake.started", revocable: true, details: {}
     });
     expect(store.getWorkflow("A")?.actionLedger).toHaveLength(1);
