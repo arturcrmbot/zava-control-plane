@@ -66,8 +66,9 @@ from api.server.routes.audit import router as audit_router
 from api.server.routes.evals import router as evals_router
 from api.server.routes.orchestration import router as orchestration_router
 from api.server.routes.internal_durable_event import router as durable_event_router
+from api.server.routes.fleet import router as fleet_router
 
 for r in (stream_router, workflows_router, exceptions_router, policy_router,
           simulator_router, audit_router, evals_router, orchestration_router,
-          durable_event_router):
+          durable_event_router, fleet_router):
     app.include_router(r)
