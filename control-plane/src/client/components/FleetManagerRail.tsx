@@ -36,6 +36,12 @@ export default function FleetManagerRail() {
   const fmEvents = useFleetManagerStream();
   const orchEvents = useOrchestrationStream();
   const [tab, setTab] = useState<"fm" | "orch">("fm");
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const toggle = (i: number) => setExpanded(prev => {
+    const next = new Set(prev);
+    next.has(i) ? next.delete(i) : next.add(i);
+    return next;
+  });
 
   return (
     <div className="p-3 space-y-2">
@@ -57,20 +63,34 @@ export default function FleetManagerRail() {
         <div className="space-y-1.5">
           <div className="text-[11px] text-slate-500">GHCP SDK session · {fmEvents.length} recent events</div>
           {fmEvents.length === 0 && <div className="text-xs text-slate-500">idle</div>}
-          {fmEvents.map((e, i) => (
-            <div key={i} className="flex gap-2 text-xs border border-slate-800 rounded p-2">
-              {fmIconFor(e.kind)}
-              <div className="flex-1 min-w-0">
-                <div className="text-slate-200 font-medium truncate">{e.kind}</div>
-                <div className="text-[11px] text-slate-500 truncate">
-                  {e.data ? JSON.stringify(e.data).slice(0, 160) : ""}
-                </div>
+          {fmEvents.map((e, i) => {
+            const open = expanded.has(i);
+            return (
+              <div key={i} className="text-xs border border-slate-800 rounded">
+                <button
+                  type="button"
+                  onClick={() => toggle(i)}
+                  className="w-full flex gap-2 p-2 text-left hover:bg-slate-900/60"
+                >
+                  {fmIconFor(e.kind)}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-slate-200 font-medium truncate">{e.kind}</div>
+                    <div className={`text-[11px] text-slate-500 ${open ? "" : "truncate"}`}>
+                      {e.data ? (open ? "" : JSON.stringify(e.data).slice(0, 160)) : ""}
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-slate-600 whitespace-nowrap">
+                    {new Date(e.timestamp).toLocaleTimeString()}
+                  </div>
+                </button>
+                {open && e.data != null && (
+                  <pre className="text-[10px] text-slate-300 bg-slate-950 p-2 border-t border-slate-800 whitespace-pre-wrap break-all max-h-96 overflow-auto">
+{JSON.stringify(e.data, null, 2)}
+                  </pre>
+                )}
               </div>
-              <div className="text-[10px] text-slate-600 whitespace-nowrap">
-                {new Date(e.timestamp).toLocaleTimeString()}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
       {tab === "orch" && (

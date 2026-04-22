@@ -14,6 +14,13 @@ export default defineConfig(({ mode }) => {
         "/internal": apiTarget,
       }
     },
+    preview: {
+      port: 5173,
+      proxy: {
+        "/api": apiTarget,
+        "/internal": apiTarget,
+      }
+    },
     resolve: {
       alias: {
         "@shared": path.resolve(__dirname, "src/shared"),
