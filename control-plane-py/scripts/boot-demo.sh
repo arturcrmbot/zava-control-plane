@@ -34,17 +34,17 @@ trap cleanup INT TERM EXIT
 echo "==> azurite (native npm, no docker)"
 mkdir -p azurite-data
 ( azurite --silent --location azurite-data \
-    --blobHost 127.0.0.1 --queueHost 127.0.0.1 --tableHost 127.0.0.1 ) &
+    --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 ) &
 pids+=($!)
 
 echo "    waiting for azurite (blob/queue/table)..."
 for i in $(seq 1 40); do
-  b=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:10000/devstoreaccount1 2>/dev/null)
-  q=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:10001/devstoreaccount1 2>/dev/null)
-  t=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:10002/devstoreaccount1 2>/dev/null)
+  b=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:10000/devstoreaccount1 2>/dev/null || echo 000)
+  q=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:10001/devstoreaccount1 2>/dev/null || echo 000)
+  t=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:10002/devstoreaccount1 2>/dev/null || echo 000)
   if [ "$b" = "400" ] && [ "$q" = "400" ] && [ "$t" = "400" ]; then
-    echo "    azurite ready"
-    sleep 1
+    echo "    azurite ready; warming up (5s)"
+    sleep 5
     break
   fi
   sleep 1
@@ -54,24 +54,46 @@ echo "==> mock MCPs (no watch)"
 ( cd ../control-plane && npm run demo:mcp ) &
 pids+=($!)
 
-echo "==> functions host"
-case "$(uname -s)" in
-  MINGW*|MSYS*|CYGWIN*)
-    NPM_BIN="$(cygpath -u "$APPDATA")/npm"
-    ( source .funcvenv/Scripts/activate \
-        && PATH="$NPM_BIN:$PATH" \
-           PYTHONUTF8=1 \
-           PYTHONIOENCODING=utf-8 \
-           PYTHONPATH="$(pwd)" \
-           func start --port 7071 ) &
-    ;;
-  *)
-    ( source .venv/bin/activate \
-        && PYTHONPATH="$(pwd)" \
-           func start --port 7071 ) &
-    ;;
-esac
-pids+=($!)
+start_func() {
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+      NPM_BIN="$(cygpath -u "$APPDATA")/npm"
+      ( source .funcvenv/Scripts/activate \
+          && PATH="$NPM_BIN:$PATH" \
+             PYTHONUTF8=1 \
+             PYTHONIOENCODING=utf-8 \
+             PYTHONPATH="$(pwd)" \
+             func start --port 7071 ) &
+      ;;
+    *)
+      ( source .venv/bin/activate \
+          && PYTHONPATH="$(pwd)" \
+             func start --port 7071 ) &
+      ;;
+  esac
+  echo $!
+}
+
+func_bound() {
+  curl -s -o /dev/null -w "%{http_code}" http://localhost:7071/ 2>/dev/null | grep -qE '^(2|3|4|5)' && return 0 || return 1
+}
+
+echo "==> functions host (attempt 1)"
+FPID=$(start_func)
+pids+=($FPID)
+# Watchdog: func often dies on cold-start with "Value cannot be null (provider)".
+# If 7071 isn't bound within 30s, retry once — second attempt reliably succeeds.
+for i in $(seq 1 15); do
+  sleep 2
+  if func_bound; then echo "    func bound"; break; fi
+done
+if ! func_bound; then
+  echo "==> functions host died on first attempt, retrying..."
+  kill -9 $FPID 2>/dev/null || true
+  sleep 2
+  FPID=$(start_func)
+  pids+=($FPID)
+fi
 
 echo "==> fastapi + fleet manager (no reload)"
 uv run uvicorn src.server.main:app --port 3001 &
