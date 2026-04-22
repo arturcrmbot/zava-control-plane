@@ -1,19 +1,39 @@
 # Git worktrees
 .worktrees/
 
+# Node
+node_modules/
+dist/
+test-results/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.funcvenv/
+.python_packages/
+.pytest_cache/
+.ruff_cache/
+
+# Azure Functions / Azurite
+azurite-data/
+local.settings.json
+.env
+.env.local
+
+# Examples are tracked
+!.env.example
+!local.settings.json.example
+
 # MCP plugin session/cache data
 .playwright-mcp/
 
-# Claude Code skills cache (if any)
+# Claude Code skills cache
 .claude-cache/
 
 # OS
 Thumbs.db
 .DS_Store
 
-# Workbench artefacts (subagent dumps, intermediate extracts, etc.)
+# Old workbench dir (deleted, leave rule defensive)
 scratch/
-
-# Python bytecode caches
-__pycache__/
-*.py[cod]
