@@ -106,6 +106,7 @@ export interface ExceptionOption {
   label: string;
   action: string;
   nonRevocable: boolean;
+  recommended?: boolean;
 }
 
 export interface PolicyRef {
@@ -153,4 +154,49 @@ export function nextPhase(p: PhaseName): PhaseName | null {
   const i = PHASE_ORDER.indexOf(p);
   if (i === -1 || i === PHASE_ORDER.length - 1) return null;
   return PHASE_ORDER[i + 1];
+}
+
+export interface McpCall {
+  workflowId: string;
+  timestamp: number;
+  tool: string;
+  url: string;
+  method: string;
+  request: Record<string, unknown>;
+  response: Record<string, unknown>;
+  statusCode: number;
+  durationMs: number;
+}
+
+export interface Economics {
+  computeCostUsd: number;
+  modelCalls: number;
+  toolCalls: number;
+  daysElapsed: number;
+  slaToken: string;
+}
+
+export interface Narrative {
+  whatHappened: string;
+  whatAgentTried: string[];
+  agentRecommendation: string;
+}
+
+export interface FleetEconomics {
+  activeWorkflowCount: number;
+  totalComputeCostUsd: number;
+  totalModelCalls: number;
+  totalToolCalls: number;
+  averageCostPerWorkflow: number;
+}
+
+export interface WorkflowDetail {
+  workflow: Workflow;
+  phases: Phase[];
+  spans: OtelSpan[];
+  amplifications: SkillAmplification[];
+  activeException: Exception | null;
+  mcpCalls: McpCall[];
+  economics: Economics;
+  narrative: Narrative | null;
 }
