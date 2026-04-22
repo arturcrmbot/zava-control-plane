@@ -9,3 +9,9 @@ test-results
 src/**/*.js
 src/**/*.js.map
 src/**/*.d.ts
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

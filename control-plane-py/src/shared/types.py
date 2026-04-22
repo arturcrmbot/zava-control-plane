@@ -1,7 +1,18 @@
 # src/shared/types.py
 from __future__ import annotations
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel as _PydBaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
+
+
+class BaseModel(_PydBaseModel):
+    """All shared models serialize as camelCase for the React UI but still
+    accept snake_case on construction. Route handlers must call
+    `model_dump(by_alias=True)` to emit camelCase."""
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
 
 PhaseName = Literal["Intake", "Validation", "Routing", "Approval", "Payment", "Reconciliation"]
 

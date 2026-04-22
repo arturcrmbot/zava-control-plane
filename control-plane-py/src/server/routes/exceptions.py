@@ -17,7 +17,7 @@ class BulkResolveBody(BaseModel):
 
 @router.get("/")
 async def list_exceptions(include_resolved: bool = False):
-    return [e.model_dump() for e in app_state.store.list_exceptions(include_resolved=include_resolved)]
+    return [e.model_dump(by_alias=True) for e in app_state.store.list_exceptions(include_resolved=include_resolved)]
 
 
 @router.post("/bulk-resolve")

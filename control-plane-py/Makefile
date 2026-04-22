@@ -45,6 +45,13 @@ dev: azurite-up
 up:
 	bash scripts/boot-demo.sh
 
+# End-to-end harness: Playwright navigates every UI route, asserts no blank
+# pages + zero console errors, checks API response shapes use camelCase, and
+# runs one pipeline test (inject demo-fail -> deterministic exception).
+# Requires the stack to already be running (`make up` in another terminal).
+test-e2e:
+	cd ../control-plane && npx playwright test --reporter=list
+
 test:
 	uv run pytest -v
 

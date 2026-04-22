@@ -41,7 +41,7 @@ class ProposeChangeBody(BaseModel):
 
 @router.get("/")
 async def list_policies():
-    return [p.model_dump() for p in app_state.store.list_policies()]
+    return [p.model_dump(by_alias=True) for p in app_state.store.list_policies()]
 
 
 @router.post("/dry-run")
