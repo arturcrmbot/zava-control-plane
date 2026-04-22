@@ -21,13 +21,28 @@ cleanup() {
   for pid in "${pids[@]}"; do
     kill "$pid" 2>/dev/null || true
   done
-  docker compose stop azurite >/dev/null 2>&1 || true
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) docker compose stop azurite >/dev/null 2>&1 || true ;;
+  esac
   wait 2>/dev/null || true
 }
 trap cleanup INT TERM EXIT
 
 echo "==> azurite"
-docker compose up -d azurite
+# On Windows we use the docker-compose Azurite (one container). On Linux
+# (Codespaces / devcontainer) we run the npm-installed azurite binary
+# natively — avoids docker-in-docker, which is fragile in Codespaces.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    docker compose up -d azurite
+    ;;
+  *)
+    mkdir -p azurite-data
+    ( azurite --silent --location azurite-data \
+        --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 ) &
+    pids+=($!)
+    ;;
+esac
 
 # Wait for Azurite's Blob, Queue, Table services to respond. Port-bind alone
 # is not enough — func's Durable Task extension aborts with "Value cannot be

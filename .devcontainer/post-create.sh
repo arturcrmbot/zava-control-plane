@@ -8,9 +8,10 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
 
-echo "==> installing azure-functions-core-tools@4.9.0 (global)"
-sudo npm install -g azure-functions-core-tools@4.9.0 --unsafe-perm true
+echo "==> installing azure-functions-core-tools@4.9.0 + azurite (npm global)"
+sudo npm install -g azure-functions-core-tools@4.9.0 azurite --unsafe-perm true
 func --version
+azurite --version
 
 echo "==> uv sync (control-plane-py)"
 (cd control-plane-py && uv sync)
