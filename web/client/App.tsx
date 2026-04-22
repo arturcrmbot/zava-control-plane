@@ -1,61 +1,85 @@
 // src/client/App.tsx
-import { NavLink, Routes, Route, Navigate } from "react-router-dom";
-import { LayoutDashboard, AlertTriangle, Shield, BarChart3, FlaskConical } from "lucide-react";
+import { NavLink, Route, Routes, Navigate } from "react-router-dom";
 import FleetDashboard from "./routes/FleetDashboard";
 import ExceptionQueue from "./routes/ExceptionQueue";
-import WorkflowDetail from "./routes/WorkflowDetail";
 import PolicyAndAutonomy from "./routes/PolicyAndAutonomy";
 import Analytics from "./routes/Analytics";
 import Evaluations from "./routes/Evaluations";
+import WorkflowDetail from "./routes/WorkflowDetail";
 import FleetManagerRail from "./components/FleetManagerRail";
 
-const navItems = [
-  { to: "/fleet", label: "Fleet", icon: LayoutDashboard },
-  { to: "/exceptions", label: "Exceptions", icon: AlertTriangle },
-  { to: "/policy", label: "Policy", icon: Shield },
-  { to: "/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/evals", label: "Evaluations", icon: FlaskConical },
+const leftNav = [
+  { to: "/fleet",       label: "Dashboard" },
+  { to: "/exceptions",  label: "Exceptions" },
+  { to: "/policy",      label: "Policy" },
+  { to: "/analytics",   label: "Analytics" },
+  { to: "/evals",       label: "Evaluations" },
 ];
+
+const topNav = [
+  { to: "/fleet",   label: "Dashboard" },
+  { to: "/fleet",   label: "Workflows" },
+  { to: "/agents",  label: "Agents" },
+  { to: "/library", label: "Library" },
+  { to: "/economics", label: "Economics" },
+];
+
+function Stub({ title }: { title: string }) {
+  return <div className="panel panel-body text-sm text-slate-600">{title} — coming soon.</div>;
+}
 
 export default function App() {
   return (
-    <div className="h-screen flex flex-col bg-slate-950 text-slate-100">
-      <header className="h-12 border-b border-slate-800 flex items-center px-4 gap-4">
-        <div className="font-semibold tracking-tight">WPP Control Plane</div>
-        <div className="text-xs text-slate-400">Finance Controller · Ogilvy-US · US-CA</div>
-        <div className="ml-auto text-xs text-slate-400">role: Finance Controller</div>
-      </header>
-      <div className="flex-1 flex overflow-hidden">
-        <nav className="w-48 border-r border-slate-800 p-2 space-y-1">
-          {navItems.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                `flex items-center gap-2 px-2 py-1.5 rounded text-sm ${
-                  isActive ? "bg-slate-800 text-slate-50" : "text-slate-400 hover:bg-slate-900"
-                }`
-              }
-            >
-              <Icon size={14} /> {label}
+    <>
+      <header className="flex items-center gap-6 px-6 h-12 border-b border-slate-200 bg-white">
+        <div className="font-semibold">Project Apex</div>
+        <span className="text-slate-300">|</span>
+        <div className="text-sm text-slate-600">Control Plane</div>
+        <nav className="flex gap-4 ml-8">
+          {topNav.map(n => (
+            <NavLink key={n.label} to={n.to}
+                     className={({ isActive }) => `text-sm ${isActive ?
+                       "text-blue-700 font-medium" : "text-slate-500 hover:text-slate-800"}`}>
+              {n.label}
             </NavLink>
           ))}
         </nav>
-        <main className="flex-1 overflow-auto p-4">
+        <div className="ml-auto text-xs text-slate-500">role: Finance Controller</div>
+      </header>
+
+      <div className="grid grid-cols-[220px_1fr_360px] h-[calc(100vh-3rem)]">
+        <aside className="bg-white border-r border-slate-200 p-3 space-y-1">
+          <div className="text-[10px] uppercase tracking-wide text-slate-500 px-2 mb-2">
+            Control Plane
+          </div>
+          {leftNav.map(n => (
+            <NavLink key={n.to} to={n.to}
+                     className={({ isActive }) => `block text-sm px-3 py-1.5 rounded ${isActive ?
+                       "bg-blue-50 text-blue-700 font-medium" : "text-slate-700 hover:bg-slate-100"}`}>
+              {n.label}
+            </NavLink>
+          ))}
+        </aside>
+
+        <main className="p-6 overflow-auto">
           <Routes>
             <Route path="/" element={<Navigate to="/fleet" replace />} />
             <Route path="/fleet" element={<FleetDashboard />} />
-            <Route path="/exceptions" element={<ExceptionQueue />} />
             <Route path="/workflows/:id" element={<WorkflowDetail />} />
+            <Route path="/exceptions" element={<ExceptionQueue />} />
             <Route path="/policy" element={<PolicyAndAutonomy />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/evals" element={<Evaluations />} />
+            <Route path="/agents" element={<Stub title="Agents" />} />
+            <Route path="/library" element={<Stub title="Library" />} />
+            <Route path="/economics" element={<Stub title="Economics" />} />
           </Routes>
         </main>
-        <aside className="w-80 border-l border-slate-800 overflow-auto">
+
+        <aside className="border-l border-slate-200 bg-white overflow-auto">
           <FleetManagerRail />
         </aside>
       </div>
-    </div>
+    </>
   );
 }
