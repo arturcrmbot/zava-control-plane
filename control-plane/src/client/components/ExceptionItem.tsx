@@ -2,10 +2,30 @@
 import type { Exception } from "@shared/types";
 import { useState } from "react";
 
-export default function ExceptionItem({ e, selected, onToggle }: {
+export default function ExceptionItem({ e, selected, onToggle, onResolved }: {
   e: Exception; selected: boolean; onToggle: (id: string) => void;
+  onResolved?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const resolveOne = async (action: string) => {
+    setBusy(true);
+    try {
+      await fetch("/api/exceptions/bulk-resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          exceptionIds: [e.id],
+          resolution: action,
+          resolvedBy: "finance-controller@wpp",
+        }),
+      });
+      onResolved?.();
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <div className="border border-slate-800 rounded bg-slate-900/50">
       <div className="flex items-start gap-2 p-3">
@@ -40,7 +60,13 @@ export default function ExceptionItem({ e, selected, onToggle }: {
           )}
           <div className="flex gap-2 pt-2">
             {e.options.map((o, i) => (
-              <button key={i} className="text-xs px-2 py-1 border border-slate-700 rounded hover:bg-slate-800">
+              <button
+                key={i}
+                disabled={busy}
+                onClick={() => resolveOne(o.action)}
+                data-testid={`resolve-${o.action}`}
+                className="text-xs px-2 py-1 border border-slate-700 rounded hover:bg-slate-800 disabled:opacity-40"
+              >
                 {o.label}{o.nonRevocable ? " ⚠" : ""}
               </button>
             ))}

@@ -2,9 +2,8 @@ from __future__ import annotations
 import time
 from typing import Literal
 from fastapi import APIRouter
-from pydantic import BaseModel
 from src.server.state import app_state
-from src.shared.types import ActionLedgerEntry
+from src.shared.types import ActionLedgerEntry, BaseModel  # BaseModel here = camelCase-aliased
 
 router = APIRouter(prefix="/api/exceptions")
 

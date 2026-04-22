@@ -38,7 +38,15 @@ export default function ExceptionQueue() {
         </div>
       </div>
       <div className="space-y-2">
-        {items.map(e => <ExceptionItem key={e.id} e={e} selected={selected.has(e.id)} onToggle={toggle} />)}
+        {items.map(e => (
+          <ExceptionItem
+            key={e.id}
+            e={e}
+            selected={selected.has(e.id)}
+            onToggle={toggle}
+            onResolved={refresh}
+          />
+        ))}
       </div>
       {modal && <BulkHitlModal ids={[...selected]} onClose={() => setModal(false)} onConfirm={confirm} />}
     </div>

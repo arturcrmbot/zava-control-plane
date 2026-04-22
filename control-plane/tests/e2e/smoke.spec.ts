@@ -101,8 +101,7 @@ test.describe("UI smoke", () => {
     // Pick an existing workflow (or inject one).
     let list = await (await request.get(`${API}/api/workflows/`)).json();
     if (list.length === 0) {
-      const inj = await request.post(`${API}/api/simulator/inject`, { data: { scenario: "demo-fail" } });
-      const body = await inj.json();
+      await request.post(`${API}/api/simulator/inject`, { data: { scenario: "demo-fail" } });
       await new Promise(r => setTimeout(r, 1500));
       list = await (await request.get(`${API}/api/workflows/`)).json();
     }
@@ -127,11 +126,78 @@ test.describe("UI smoke", () => {
 
 // --- End-to-end pipeline ----------------------------------------------------
 
+// --- Interaction tests that actually click things --------------------------
+
+test.describe("Interactions", () => {
+  test("workflow detail: all tabs switch without errors", async ({ page, request }) => {
+    // Ensure at least one workflow exists.
+    let list = await (await request.get(`${API}/api/workflows/`)).json();
+    if (list.length === 0) {
+      await request.post(`${API}/api/simulator/inject`, { data: { scenario: "demo-fail" } });
+      await new Promise(r => setTimeout(r, 1500));
+      list = await (await request.get(`${API}/api/workflows/`)).json();
+    }
+    const id = list[0].id;
+    const cap = wireConsoleCapture(page);
+    await page.goto(`/workflows/${id}`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1500);
+
+    // Scope tab clicks to the main panel — the right rail has its own
+    // "Orchestration" tab which would otherwise match ambiguously.
+    const main = page.getByRole("main");
+    for (const tabName of ["Overview", "Phases", "Traces", "Ledger", "Amplification", "Orchestration"]) {
+      await main.getByRole("button", { name: new RegExp(`^${tabName}$`) }).click();
+      await page.waitForTimeout(500);
+      const mainBody = await main.innerText();
+      expect(mainBody, `${tabName} tab produced no content`).not.toEqual("");
+    }
+    const realErrors = [...cap.errors, ...cap.pageErrors].filter(e => !/favicon\.ico/i.test(e));
+    expect(realErrors).toEqual([]);
+  });
+
+  test("exception queue: per-item Approve button resolves and removes the row", async ({ page, request }) => {
+    test.setTimeout(180_000);
+    // Ensure an exception exists (inject demo-fail and wait).
+    let exs = await (await request.get(`${API}/api/exceptions/`)).json();
+    if (exs.length === 0) {
+      await request.post(`${API}/api/simulator/inject`, { data: { scenario: "demo-fail" } });
+      const dead = Date.now() + 120_000;
+      while (Date.now() < dead) {
+        await new Promise(r => setTimeout(r, 3000));
+        exs = await (await request.get(`${API}/api/exceptions/`)).json();
+        if (exs.length > 0) break;
+      }
+    }
+    expect(exs.length, "need at least 1 open exception").toBeGreaterThan(0);
+    const startCount = exs.length;
+    const targetId = exs[0].id;
+
+    const cap = wireConsoleCapture(page);
+    await page.goto("/exceptions", { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1500);
+
+    // Expand the first exception card so its per-option buttons are visible.
+    const firstHeader = page.locator("button").filter({ hasText: new RegExp(exs[0].workflowId) }).first();
+    await firstHeader.click();
+    await page.waitForTimeout(300);
+
+    // Click Approve.
+    await page.getByTestId("resolve-approve").first().click();
+    await page.waitForTimeout(2000);
+
+    // Verify backend: targeted exception should be resolved.
+    const after = await (await request.get(`${API}/api/exceptions/`)).json();
+    expect(after.length, "total open count must drop by 1").toBeLessThan(startCount);
+    expect(after.map((e: { id: string }) => e.id)).not.toContain(targetId);
+
+    const realErrors = [...cap.errors, ...cap.pageErrors].filter(e => !/favicon\.ico/i.test(e));
+    expect(realErrors).toEqual([]);
+  });
+});
+
 test.describe("Pipeline E2E", () => {
   test("demo-fail inject produces deterministic validator-blocked exception", async ({ request }) => {
     test.setTimeout(180_000);  // 3 min — workflow needs to progress through Intake + Validation + Routing
-    const before = await (await request.get(`${API}/api/exceptions/`)).json();
-    const beforeIds = new Set<string>(before.map((e: { id: string }) => e.id));
 
     const inj = await request.post(`${API}/api/simulator/inject`, {
       data: { scenario: "demo-fail" },
@@ -140,7 +206,7 @@ test.describe("Pipeline E2E", () => {
     const { workflow_id: wid } = await inj.json();
 
     // Poll exceptions up to 120s.
-    const deadline = Date.now() + 120_000;
+    const deadline = Date.now() + 150_000;  // 2.5 min — cold intake path can be slow
     let found: { category: string; composedBy: string; severity: string; workflowId: string } | null = null;
     while (Date.now() < deadline) {
       await new Promise(r => setTimeout(r, 3000));
