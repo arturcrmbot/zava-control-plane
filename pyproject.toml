@@ -38,7 +38,7 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests-py-tmp"]
+testpaths = ["tests/api"]
 
 [tool.ruff]
 line-length = 110
