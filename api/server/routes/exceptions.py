@@ -10,7 +10,10 @@ router = APIRouter(prefix="/api/exceptions")
 
 class BulkResolveBody(BaseModel):
     exception_ids: list[str]
-    resolution: Literal["approve", "reject", "escalate"]
+    resolution: Literal[
+        "approve", "reject", "escalate",
+        "reroute-gl", "request-info",
+    ]
     resolved_by: str
 
 
