@@ -247,3 +247,132 @@ test.describe("Pipeline E2E", () => {
     expect(found!.composedBy).toBe("deterministic");
   });
 });
+
+// --- Apex redesign tests ----------------------------------------------------
+
+test.describe("Apex API contract", () => {
+  test("workflow detail carries mcpCalls, economics, narrative when exception present", async ({ request }) => {
+    test.setTimeout(180_000);
+    const inj = await request.post(`${API}/api/simulator/inject`, {
+      data: { scenario: "demo-fail" },
+    });
+    const { workflow_id: wid } = await inj.json();
+    const deadline = Date.now() + 150_000;
+    let body: any = null;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 3000));
+      const r = await request.get(`${API}/api/workflows/${wid}`);
+      if (!r.ok()) continue;
+      body = await r.json();
+      if (body.economics && (body.narrative || body.activeException === null)) break;
+    }
+    expect(body).not.toBeNull();
+    expect(body.economics).toBeTruthy();
+    for (const k of ["computeCostUsd", "modelCalls", "toolCalls", "daysElapsed", "slaToken"]) {
+      expect(body.economics).toHaveProperty(k);
+    }
+    expect(Array.isArray(body.mcpCalls)).toBeTruthy();
+    if (body.activeException) {
+      expect(body.narrative).toBeTruthy();
+      for (const k of ["whatHappened", "whatAgentTried", "agentRecommendation"]) {
+        expect(body.narrative).toHaveProperty(k);
+      }
+    }
+  });
+
+  test("fleet economics endpoint returns rollup", async ({ request }) => {
+    const r = await request.get(`${API}/api/fleet/economics`);
+    expect(r.ok()).toBeTruthy();
+    const body = await r.json();
+    for (const k of ["activeWorkflowCount", "totalComputeCostUsd",
+                     "totalModelCalls", "totalToolCalls", "averageCostPerWorkflow"]) {
+      expect(body).toHaveProperty(k);
+    }
+  });
+
+  test("exception options carry a recommended action", async ({ request }) => {
+    const r = await request.get(`${API}/api/exceptions/`);
+    const list = await r.json();
+    if (list.length > 0) {
+      expect(list[0].options.some((o: any) => o.recommended === true)).toBeTruthy();
+    }
+  });
+});
+
+test.describe("Apex UI smoke", () => {
+  test("/fleet renders KPI tiles + exceptions block", async ({ page }) => {
+    await page.goto("/fleet", { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(2000);
+    await expect(page.getByTestId("kpi-tile-row")).toBeVisible();
+    await expect(page.getByText(/Exceptions Requiring Attention/i)).toBeVisible();
+  });
+
+  test("workflow detail shows Apex widgets", async ({ page, request }) => {
+    test.setTimeout(180_000);
+    let list = await (await request.get(`${API}/api/workflows/`)).json();
+    if (list.length === 0) {
+      await request.post(`${API}/api/simulator/inject`, { data: { scenario: "demo-fail" } });
+      const deadline = Date.now() + 30_000;
+      while (Date.now() < deadline && list.length === 0) {
+        await new Promise(r => setTimeout(r, 2000));
+        list = await (await request.get(`${API}/api/workflows/`)).json();
+      }
+    }
+    expect(list.length).toBeGreaterThan(0);
+    const id = list[0].id;
+    await page.goto(`/workflows/${id}`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(2500);
+    for (const tid of ["workflow-header-tiles", "phase-ribbon", "economics-panel",
+                       "fleet-assignment", "audit-trail"]) {
+      await expect(page.getByTestId(tid)).toBeVisible();
+    }
+  });
+
+  test("execution timeline shows MCP steps after the workflow progresses", async ({ page, request }) => {
+    test.setTimeout(180_000);
+    const inj = await request.post(`${API}/api/simulator/inject`, { data: { scenario: "demo-fail" } });
+    const { workflow_id: wid } = await inj.json();
+    const deadline = Date.now() + 150_000;
+    let body: any = null;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 3000));
+      const r = await request.get(`${API}/api/workflows/${wid}`);
+      if (!r.ok()) continue;
+      body = await r.json();
+      if (body.mcpCalls && body.mcpCalls.length > 0) break;
+    }
+    expect(body?.mcpCalls?.length ?? 0).toBeGreaterThan(0);
+    await page.goto(`/workflows/${wid}`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1500);
+    await page.getByRole("main").getByRole("button", { name: /^Execution Timeline$/ }).click();
+    await page.waitForTimeout(500);
+    await expect(page.getByTestId("execution-timeline")).toBeVisible();
+    await expect(page.getByTestId("timeline-step-0")).toBeVisible();
+    await page.getByTestId("timeline-step-0").click();
+    await expect(page.getByTestId("api-configuration")).toContainText(/Request/i);
+  });
+
+  test("intervention protocols: clicking recommended action resolves exception", async ({ page, request }) => {
+    test.setTimeout(180_000);
+    let exs = await (await request.get(`${API}/api/exceptions/`)).json();
+    if (exs.length === 0) {
+      await request.post(`${API}/api/simulator/inject`, { data: { scenario: "demo-fail" } });
+      const deadline = Date.now() + 150_000;
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 3000));
+        exs = await (await request.get(`${API}/api/exceptions/`)).json();
+        if (exs.length > 0) break;
+      }
+    }
+    expect(exs.length).toBeGreaterThan(0);
+    const wid = exs[0].workflowId;
+    const startId = exs[0].id;
+    await page.goto(`/workflows/${wid}`, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1500);
+    const recommended = exs[0].options.find((o: any) => o.recommended)?.action ?? "approve";
+    await page.getByTestId(`protocol-${recommended}`).click();
+    await page.waitForTimeout(1500);
+    const after = await (await request.get(`${API}/api/exceptions/`)).json();
+    expect(after.map((e: any) => e.id)).not.toContain(startId);
+  });
+});
