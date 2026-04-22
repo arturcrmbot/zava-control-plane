@@ -8,7 +8,7 @@ from api.server.services.exception_factory import (
     compose_hitl_exception, compose_validator_exception
 )
 from api.shared.events import FleetEvent
-from api.shared.types import Phase, OtelSpan, ActionLedgerEntry
+from api.shared.types import Phase, OtelSpan, ActionLedgerEntry, McpCall
 
 router = APIRouter(prefix="/internal")
 
@@ -100,6 +100,20 @@ async def receive_durable_event(body: DurableEventBody):
                 },
                 status="error" if stage == "error" else "ok",
             ))
+
+    elif body.kind == "mcp.call":
+        p = body.payload
+        app_state.store.append_mcp_call(McpCall(
+            workflow_id=wid,
+            timestamp=now,
+            tool=p.get("tool", "?"),
+            url=p.get("url", ""),
+            method=p.get("method", "POST"),
+            request=p.get("request", {}),
+            response=p.get("response", {}),
+            status_code=int(p.get("status_code", 0)),
+            duration_ms=int(p.get("duration_ms", 0)),
+        ))
 
     elif body.kind == "validator.blocked":
         compose_validator_exception(
