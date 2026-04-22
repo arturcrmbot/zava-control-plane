@@ -15,52 +15,52 @@
 ## File Structure
 
 **Python (backend) — new:**
-- `control-plane-py/src/server/services/economics.py` — derive per-workflow cost / model calls / tool calls.
-- `control-plane-py/src/server/services/exception_narrative.py` — template-driven Exception Analysis narrative.
-- `control-plane-py/src/server/routes/fleet.py` — `GET /api/fleet/economics` aggregate endpoint.
+- `api/server/services/economics.py` — derive per-workflow cost / model calls / tool calls.
+- `api/server/services/exception_narrative.py` — template-driven Exception Analysis narrative.
+- `api/server/routes/fleet.py` — `GET /api/fleet/economics` aggregate endpoint.
 
 **Python (backend) — modified:**
-- `control-plane-py/src/shared/types.py` — add `McpCall` type; add `recommended` field on `ExceptionOption`.
-- `control-plane-py/src/server/services/state_store.py` — add `_mcp_calls` storage + getters/setters.
-- `control-plane-py/src/server/services/exception_factory.py` — emit enriched Finance-flavored option sets.
-- `control-plane-py/src/functions/graphs/_common.py` — instrument `call_mcp` to emit `mcp.call` events.
-- `control-plane-py/src/functions/graphs/executors/deterministic/*.py` — pass `workflow_id` / `instance_id` into `call_mcp` (~10 files, mechanical).
-- `control-plane-py/src/server/routes/internal_durable_event.py` — handle `kind == "mcp.call"`.
-- `control-plane-py/src/server/routes/workflows.py` — return `economics`, `narrative`, `mcpCalls` on detail response.
-- `control-plane-py/src/server/routes/exceptions.py` — accept extended `action` enum values.
-- `control-plane-py/src/server/main.py` — register the new `fleet` router.
+- `api/shared/types.py` — add `McpCall` type; add `recommended` field on `ExceptionOption`.
+- `api/server/services/state_store.py` — add `_mcp_calls` storage + getters/setters.
+- `api/server/services/exception_factory.py` — emit enriched Finance-flavored option sets.
+- `api/functions/graphs/_common.py` — instrument `call_mcp` to emit `mcp.call` events.
+- `api/functions/graphs/executors/deterministic/*.py` — pass `workflow_id` / `instance_id` into `call_mcp` (~10 files, mechanical).
+- `api/server/routes/internal_durable_event.py` — handle `kind == "mcp.call"`.
+- `api/server/routes/workflows.py` — return `economics`, `narrative`, `mcpCalls` on detail response.
+- `api/server/routes/exceptions.py` — accept extended `action` enum values.
+- `api/server/main.py` — register the new `fleet` router.
 
-**React (frontend) — new under `control-plane/src/client/components/apex/`:**
+**React (frontend) — new under `web/client/components/apex/`:**
 - `PhaseRibbon.tsx`, `WorkflowHeaderTiles.tsx`, `ExceptionAnalysisCard.tsx`, `InterventionProtocols.tsx`, `EconomicsPanel.tsx`, `FleetAssignment.tsx`, `AuditTrail.tsx`, `ExecutionTimelineTab.tsx`, `ExceptionCardCompact.tsx`, `KpiTileRow.tsx`, `FleetEconomicsPanel.tsx`, `PolicyAutonomyPanel.tsx`.
 
 **React (frontend) — modified:**
-- `control-plane/src/client/styles.css` — light theme palette swap.
-- `control-plane/src/client/App.tsx` — Apex shell chrome (top bar + left nav).
-- `control-plane/src/client/routes/WorkflowDetail.tsx` — Overview tab composes Apex components; Orchestration tab replaced with Execution Timeline.
-- `control-plane/src/client/routes/FleetDashboard.tsx` — Apex Dashboard layout.
-- `control-plane/src/shared/types.ts` — `McpCall`, `Economics`, `Narrative`, `ExceptionOption.recommended`, `WorkflowDetail` response shape.
+- `web/client/styles.css` — light theme palette swap.
+- `web/client/App.tsx` — Apex shell chrome (top bar + left nav).
+- `web/client/routes/WorkflowDetail.tsx` — Overview tab composes Apex components; Orchestration tab replaced with Execution Timeline.
+- `web/client/routes/FleetDashboard.tsx` — Apex Dashboard layout.
+- `web/shared/types.ts` — `McpCall`, `Economics`, `Narrative`, `ExceptionOption.recommended`, `WorkflowDetail` response shape.
 
 **Tests:**
-- `control-plane/tests/e2e/smoke.spec.ts` — 8 new tests.
-- `control-plane-py/tests/unit/test_economics.py` — new.
-- `control-plane-py/tests/unit/test_exception_narrative.py` — new.
-- `control-plane-py/tests/unit/test_mcp_call_event.py` — new.
+- `tests/e2e/smoke.spec.ts` — 8 new tests.
+- `tests/api/unit/test_economics.py` — new.
+- `tests/api/unit/test_exception_narrative.py` — new.
+- `tests/api/unit/test_mcp_call_event.py` — new.
 
 ---
 
 ### Task 1: McpCall type + store plumbing
 
 **Files:**
-- Modify: `control-plane-py/src/shared/types.py`
-- Modify: `control-plane-py/src/server/services/state_store.py`
-- Test: `control-plane-py/tests/unit/test_mcp_call_event.py`
+- Modify: `api/shared/types.py`
+- Modify: `api/server/services/state_store.py`
+- Test: `tests/api/unit/test_mcp_call_event.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# control-plane-py/tests/unit/test_mcp_call_event.py
-from src.server.services.state_store import StateStore
-from src.shared.types import McpCall
+# tests/api/unit/test_mcp_call_event.py
+from api.server.services.state_store import StateStore
+from api.shared.types import McpCall
 
 
 def test_append_and_get_mcp_calls() -> None:
@@ -82,7 +82,7 @@ def test_append_and_get_mcp_calls() -> None:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_mcp_call_event.py -v`
+Run: `uv run pytest tests/unit/test_mcp_call_event.py -v`
 Expected: FAIL — `McpCall` / `append_mcp_call` missing.
 
 - [ ] **Step 3: Add `McpCall` to `src/shared/types.py`** (insert after the existing `OtelSpan` class):
@@ -111,7 +111,7 @@ self._mcp_calls: dict[str, list[McpCall]] = {}
 Add the import at the top near other type imports:
 
 ```python
-from src.shared.types import (  # existing imports...
+from api.shared.types import (  # existing imports...
     McpCall,
 )
 ```
@@ -128,19 +128,19 @@ def get_mcp_calls(self, workflow_id: str) -> list[McpCall]:
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_mcp_call_event.py -v`
+Run: `uv run pytest tests/unit/test_mcp_call_event.py -v`
 Expected: 1 passed.
 
 - [ ] **Step 6: Run full test suite — no regressions**
 
-Run: `cd control-plane-py && uv run pytest -q`
+Run: `uv run pytest -q`
 Expected: all passing.
 
 - [ ] **Step 7: Commit**
 
 ```bash
 cd "c:/dev/ghcp sdk stuff"
-git add control-plane-py/src/shared/types.py control-plane-py/src/server/services/state_store.py control-plane-py/tests/unit/test_mcp_call_event.py
+git add api/shared/types.py api/server/services/state_store.py tests/api/unit/test_mcp_call_event.py
 git commit -m "feat(types): add McpCall + state store plumbing for MCP-call events"
 ```
 
@@ -149,20 +149,20 @@ git commit -m "feat(types): add McpCall + state store plumbing for MCP-call even
 ### Task 2: Instrument `call_mcp` to emit webhook event
 
 **Files:**
-- Modify: `control-plane-py/src/functions/graphs/_common.py`
-- Test: extend `control-plane-py/tests/unit/test_mcp_call_event.py`
+- Modify: `api/functions/graphs/_common.py`
+- Test: extend `tests/api/unit/test_mcp_call_event.py`
 
 - [ ] **Step 1: Write the failing test (append to existing file)**
 
 ```python
-# Append to control-plane-py/tests/unit/test_mcp_call_event.py
+# Append to tests/api/unit/test_mcp_call_event.py
 import pytest
 from unittest.mock import AsyncMock, patch
 
 
 @pytest.mark.asyncio
 async def test_call_mcp_emits_webhook(monkeypatch) -> None:
-    from src.functions.graphs import _common
+    from api.functions.graphs import _common
 
     # Fake httpx.AsyncClient: returns a dummy 200 response.
     class FakeResp:
@@ -201,7 +201,7 @@ async def test_call_mcp_emits_webhook(monkeypatch) -> None:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_mcp_call_event.py::test_call_mcp_emits_webhook -v`
+Run: `uv run pytest tests/unit/test_mcp_call_event.py::test_call_mcp_emits_webhook -v`
 Expected: FAIL — `call_mcp` does not accept `workflow_id`.
 
 - [ ] **Step 3: Rewrite `call_mcp` in `src/functions/graphs/_common.py`**
@@ -241,7 +241,7 @@ async def call_mcp(
 
     if workflow_id is not None:
         # Local import avoids circular deps during module load.
-        from src.functions.webhook import emit
+        from api.functions.webhook import emit
         await emit(workflow_id, instance_id, "mcp.call", {
             "tool": tool, "url": url, "method": "POST",
             "request": args, "response": resp_json,
@@ -255,13 +255,13 @@ async def call_mcp(
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_mcp_call_event.py -v`
+Run: `uv run pytest tests/unit/test_mcp_call_event.py -v`
 Expected: both tests pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add control-plane-py/src/functions/graphs/_common.py control-plane-py/tests/unit/test_mcp_call_event.py
+git add api/functions/graphs/_common.py tests/api/unit/test_mcp_call_event.py
 git commit -m "feat(mcp): instrument call_mcp to emit mcp.call durable events"
 ```
 
@@ -270,19 +270,19 @@ git commit -m "feat(mcp): instrument call_mcp to emit mcp.call durable events"
 ### Task 3: Pass `workflow_id` from deterministic executors
 
 **Files (modify all that call `call_mcp`):**
-- `control-plane-py/src/functions/graphs/executors/deterministic/lookup_vendor_context.py`
-- `control-plane-py/src/functions/graphs/executors/deterministic/lookup_active_gls.py`
-- `control-plane-py/src/functions/graphs/executors/deterministic/lookup_cost_centre_policy.py`
-- `control-plane-py/src/functions/graphs/executors/deterministic/doc_intelligence_extract.py`
-- `control-plane-py/src/functions/graphs/executors/deterministic/three_way_match.py`
-- `control-plane-py/src/functions/graphs/executors/deterministic/generate_payment_file.py`
-- `control-plane-py/src/functions/graphs/executors/deterministic/submit_payment.py`
-- `control-plane-py/src/functions/graphs/executors/deterministic/bank_statement_match.py`
-- `control-plane-py/src/functions/graphs/executors/deterministic/load_authority_policy.py`
+- `api/functions/graphs/executors/deterministic/lookup_vendor_context.py`
+- `api/functions/graphs/executors/deterministic/lookup_active_gls.py`
+- `api/functions/graphs/executors/deterministic/lookup_cost_centre_policy.py`
+- `api/functions/graphs/executors/deterministic/doc_intelligence_extract.py`
+- `api/functions/graphs/executors/deterministic/three_way_match.py`
+- `api/functions/graphs/executors/deterministic/generate_payment_file.py`
+- `api/functions/graphs/executors/deterministic/submit_payment.py`
+- `api/functions/graphs/executors/deterministic/bank_statement_match.py`
+- `api/functions/graphs/executors/deterministic/load_authority_policy.py`
 
 - [ ] **Step 1: Identify every caller**
 
-Run: `grep -rn "call_mcp(" control-plane-py/src/functions/graphs/executors/deterministic/`
+Run: `grep -rn "call_mcp(" api/functions/graphs/executors/deterministic/`
 Expected: a small set of one-line call sites per file, each receiving `input: dict` in its `execute` function.
 
 - [ ] **Step 2: Update each call site to pass `workflow_id` + `instance_id`**
@@ -307,13 +307,13 @@ Repeat in every listed file, passing through `input.get("workflow_id")` / `input
 
 - [ ] **Step 3: Verify unit tests still pass**
 
-Run: `cd control-plane-py && uv run pytest -q`
+Run: `uv run pytest -q`
 Expected: same pass count as before.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add control-plane-py/src/functions/graphs/executors/deterministic/
+git add api/functions/graphs/executors/deterministic/
 git commit -m "feat(mcp): thread workflow_id through deterministic executor MCP calls"
 ```
 
@@ -322,15 +322,15 @@ git commit -m "feat(mcp): thread workflow_id through deterministic executor MCP 
 ### Task 4: Route `mcp.call` kind into the store
 
 **Files:**
-- Modify: `control-plane-py/src/server/routes/internal_durable_event.py`
-- Test: add unit test under `control-plane-py/tests/unit/test_internal_durable_event.py` (new)
+- Modify: `api/server/routes/internal_durable_event.py`
+- Test: add unit test under `tests/api/unit/test_internal_durable_event.py` (new)
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# control-plane-py/tests/unit/test_internal_durable_event.py
+# tests/api/unit/test_internal_durable_event.py
 from fastapi.testclient import TestClient
-from src.server.main import app
+from api.server.main import app
 
 
 def test_mcp_call_event_appends_to_store() -> None:
@@ -350,7 +350,7 @@ def test_mcp_call_event_appends_to_store() -> None:
         },
     })
     assert r.status_code == 200
-    from src.server.state import app_state
+    from api.server.state import app_state
     calls = app_state.store.get_mcp_calls("W-T1")
     assert len(calls) == 1
     assert calls[0].tool == "getVendor"
@@ -359,7 +359,7 @@ def test_mcp_call_event_appends_to_store() -> None:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_internal_durable_event.py -v`
+Run: `uv run pytest tests/unit/test_internal_durable_event.py -v`
 Expected: FAIL — no mcp.call handling.
 
 - [ ] **Step 3: Add handler branch in `internal_durable_event.py`**
@@ -385,18 +385,18 @@ elif body.kind == "mcp.call":
 Add the import at the top (beside the existing `Phase, OtelSpan, ActionLedgerEntry`):
 
 ```python
-from src.shared.types import Phase, OtelSpan, ActionLedgerEntry, McpCall
+from api.shared.types import Phase, OtelSpan, ActionLedgerEntry, McpCall
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_internal_durable_event.py -v`
+Run: `uv run pytest tests/unit/test_internal_durable_event.py -v`
 Expected: 1 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add control-plane-py/src/server/routes/internal_durable_event.py control-plane-py/tests/unit/test_internal_durable_event.py
+git add api/server/routes/internal_durable_event.py tests/api/unit/test_internal_durable_event.py
 git commit -m "feat(events): handle kind=mcp.call; append to store"
 ```
 
@@ -405,16 +405,16 @@ git commit -m "feat(events): handle kind=mcp.call; append to store"
 ### Task 5: Economics derivation service
 
 **Files:**
-- Create: `control-plane-py/src/server/services/economics.py`
-- Test: `control-plane-py/tests/unit/test_economics.py`
+- Create: `api/server/services/economics.py`
+- Test: `tests/api/unit/test_economics.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# control-plane-py/tests/unit/test_economics.py
+# tests/api/unit/test_economics.py
 import time
-from src.shared.types import Workflow, OtelSpan, McpCall, Vendor, InvoiceData
-from src.server.services.economics import compute
+from api.shared.types import Workflow, OtelSpan, McpCall, Vendor, InvoiceData
+from api.server.services.economics import compute
 
 
 def _wf(wid: str, age_s: float = 100.0) -> Workflow:
@@ -460,17 +460,17 @@ def test_compute_accumulates_agent_and_tool_counts() -> None:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_economics.py -v`
+Run: `uv run pytest tests/unit/test_economics.py -v`
 Expected: FAIL — module missing.
 
 - [ ] **Step 3: Create `economics.py`**
 
 ```python
-# control-plane-py/src/server/services/economics.py
+# api/server/services/economics.py
 from __future__ import annotations
 import hashlib
 import time
-from src.shared.types import Workflow, OtelSpan, McpCall
+from api.shared.types import Workflow, OtelSpan, McpCall
 
 
 COMPUTE_RATE_PER_SECOND = 0.0001   # $ per second of executor wall-clock
@@ -501,13 +501,13 @@ def compute(workflow: Workflow, *, spans: list[OtelSpan],
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_economics.py -v`
+Run: `uv run pytest tests/unit/test_economics.py -v`
 Expected: 2 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add control-plane-py/src/server/services/economics.py control-plane-py/tests/unit/test_economics.py
+git add api/server/services/economics.py tests/api/unit/test_economics.py
 git commit -m "feat(economics): derive per-workflow cost/calls/days from events"
 ```
 
@@ -516,18 +516,18 @@ git commit -m "feat(economics): derive per-workflow cost/calls/days from events"
 ### Task 6: Exception Narrative service
 
 **Files:**
-- Create: `control-plane-py/src/server/services/exception_narrative.py`
-- Test: `control-plane-py/tests/unit/test_exception_narrative.py`
+- Create: `api/server/services/exception_narrative.py`
+- Test: `tests/api/unit/test_exception_narrative.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# control-plane-py/tests/unit/test_exception_narrative.py
+# tests/api/unit/test_exception_narrative.py
 import time
-from src.shared.types import (
+from api.shared.types import (
     Workflow, Vendor, InvoiceData, ActionLedgerEntry, Exception_ as Exception
 )
-from src.server.services.exception_narrative import compose
+from api.server.services.exception_narrative import compose
 
 
 def _wf() -> Workflow:
@@ -583,15 +583,15 @@ def test_compose_threshold_exceeded() -> None:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_exception_narrative.py -v`
+Run: `uv run pytest tests/unit/test_exception_narrative.py -v`
 Expected: FAIL — module missing.
 
 - [ ] **Step 3: Create `exception_narrative.py`**
 
 ```python
-# control-plane-py/src/server/services/exception_narrative.py
+# api/server/services/exception_narrative.py
 from __future__ import annotations
-from src.shared.types import Workflow, Exception_ as Exception, ActionLedgerEntry
+from api.shared.types import Workflow, Exception_ as Exception, ActionLedgerEntry
 
 
 def _fmt_amount(amount: float, currency: str) -> str:
@@ -655,13 +655,13 @@ def compose(workflow: Workflow, exception: Exception,
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_exception_narrative.py -v`
+Run: `uv run pytest tests/unit/test_exception_narrative.py -v`
 Expected: 2 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add control-plane-py/src/server/services/exception_narrative.py control-plane-py/tests/unit/test_exception_narrative.py
+git add api/server/services/exception_narrative.py tests/api/unit/test_exception_narrative.py
 git commit -m "feat(narrative): Exception Analysis assembler (template-driven)"
 ```
 
@@ -670,16 +670,16 @@ git commit -m "feat(narrative): Exception Analysis assembler (template-driven)"
 ### Task 7: Extend `ExceptionOption` + enrich factory options
 
 **Files:**
-- Modify: `control-plane-py/src/shared/types.py`
-- Modify: `control-plane-py/src/server/services/exception_factory.py`
-- Test: extend `control-plane-py/tests/unit/test_exception_factory.py` (existing)
+- Modify: `api/shared/types.py`
+- Modify: `api/server/services/exception_factory.py`
+- Test: extend `tests/api/unit/test_exception_factory.py` (existing)
 
 - [ ] **Step 1: Write the failing test (append to existing file)**
 
 ```python
-# Append to control-plane-py/tests/unit/test_exception_factory.py
-from src.server.services.state_store import StateStore
-from src.server.services.exception_factory import (
+# Append to tests/api/unit/test_exception_factory.py
+from api.server.services.state_store import StateStore
+from api.server.services.exception_factory import (
     compose_validator_exception, compose_hitl_exception
 )
 
@@ -707,7 +707,7 @@ def test_hitl_exception_has_approve_recommended() -> None:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_exception_factory.py -v`
+Run: `uv run pytest tests/unit/test_exception_factory.py -v`
 Expected: the two new tests FAIL (`recommended` attribute missing and / or actions missing).
 
 - [ ] **Step 3: Add `recommended` to `ExceptionOption` in `src/shared/types.py`**
@@ -752,13 +752,13 @@ options=[
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_exception_factory.py -v`
+Run: `uv run pytest tests/unit/test_exception_factory.py -v`
 Expected: all tests pass.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add control-plane-py/src/shared/types.py control-plane-py/src/server/services/exception_factory.py control-plane-py/tests/unit/test_exception_factory.py
+git add api/shared/types.py api/server/services/exception_factory.py tests/api/unit/test_exception_factory.py
 git commit -m "feat(exceptions): add recommended flag + finance-flavored Intervention Protocol options"
 ```
 
@@ -767,18 +767,18 @@ git commit -m "feat(exceptions): add recommended flag + finance-flavored Interve
 ### Task 8: Extend bulk-resolve to accept new action strings
 
 **Files:**
-- Modify: `control-plane-py/src/server/routes/exceptions.py`
-- Test: extend `control-plane-py/tests/unit/test_internal_durable_event.py` (or new `test_bulk_resolve.py`)
+- Modify: `api/server/routes/exceptions.py`
+- Test: extend `tests/api/unit/test_internal_durable_event.py` (or new `test_bulk_resolve.py`)
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# control-plane-py/tests/unit/test_bulk_resolve.py
+# tests/api/unit/test_bulk_resolve.py
 import time
 from fastapi.testclient import TestClient
-from src.server.main import app
-from src.server.state import app_state
-from src.shared.types import Exception_ as Exception, ExceptionOption
+from api.server.main import app
+from api.server.state import app_state
+from api.shared.types import Exception_ as Exception, ExceptionOption
 
 
 def test_bulk_resolve_accepts_reroute_gl_action() -> None:
@@ -805,12 +805,12 @@ def test_bulk_resolve_accepts_reroute_gl_action() -> None:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_bulk_resolve.py -v`
+Run: `uv run pytest tests/unit/test_bulk_resolve.py -v`
 Expected: FAIL — `resolution` `Literal` rejects `reroute-gl`.
 
 - [ ] **Step 3: Loosen the Literal in `BulkResolveBody`**
 
-In `control-plane-py/src/server/routes/exceptions.py`, change:
+In `api/server/routes/exceptions.py`, change:
 
 ```python
 resolution: Literal["approve", "reject", "escalate"]
@@ -827,13 +827,13 @@ resolution: Literal[
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_bulk_resolve.py -v`
+Run: `uv run pytest tests/unit/test_bulk_resolve.py -v`
 Expected: 1 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add control-plane-py/src/server/routes/exceptions.py control-plane-py/tests/unit/test_bulk_resolve.py
+git add api/server/routes/exceptions.py tests/api/unit/test_bulk_resolve.py
 git commit -m "feat(exceptions): accept reroute-gl/request-info resolutions on bulk-resolve"
 ```
 
@@ -842,18 +842,18 @@ git commit -m "feat(exceptions): accept reroute-gl/request-info resolutions on b
 ### Task 9: Workflow detail response injects economics, narrative, mcpCalls
 
 **Files:**
-- Modify: `control-plane-py/src/server/routes/workflows.py`
-- Test: extend `control-plane-py/tests/unit/test_internal_durable_event.py` or new
+- Modify: `api/server/routes/workflows.py`
+- Test: extend `tests/api/unit/test_internal_durable_event.py` or new
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# control-plane-py/tests/unit/test_workflow_detail_response.py
+# tests/api/unit/test_workflow_detail_response.py
 import time
 from fastapi.testclient import TestClient
-from src.server.main import app
-from src.server.state import app_state
-from src.shared.types import (
+from api.server.main import app
+from api.server.state import app_state
+from api.shared.types import (
     Workflow, Vendor, InvoiceData, McpCall, Exception_ as Exception,
 )
 
@@ -907,7 +907,7 @@ def test_detail_response_includes_narrative_when_exception_present() -> None:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_workflow_detail_response.py -v`
+Run: `uv run pytest tests/unit/test_workflow_detail_response.py -v`
 Expected: FAIL — `economics` / `mcpCalls` / `narrative` not in response.
 
 - [ ] **Step 3: Update `workflows.py`**
@@ -915,11 +915,11 @@ Expected: FAIL — `economics` / `mcpCalls` / `narrative` not in response.
 Replace the body of `get_workflow` with:
 
 ```python
-# control-plane-py/src/server/routes/workflows.py
+# api/server/routes/workflows.py
 from __future__ import annotations
 from fastapi import APIRouter, HTTPException
-from src.server.state import app_state
-from src.server.services import economics, exception_narrative
+from api.server.state import app_state
+from api.server.services import economics, exception_narrative
 
 router = APIRouter(prefix="/api/workflows")
 
@@ -966,13 +966,13 @@ async def get_workflow(id: str):
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_workflow_detail_response.py -v`
+Run: `uv run pytest tests/unit/test_workflow_detail_response.py -v`
 Expected: both tests pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add control-plane-py/src/server/routes/workflows.py control-plane-py/tests/unit/test_workflow_detail_response.py
+git add api/server/routes/workflows.py tests/api/unit/test_workflow_detail_response.py
 git commit -m "feat(workflows): inject economics/narrative/mcpCalls into detail response"
 ```
 
@@ -981,19 +981,19 @@ git commit -m "feat(workflows): inject economics/narrative/mcpCalls into detail 
 ### Task 10: Fleet economics aggregate endpoint
 
 **Files:**
-- Create: `control-plane-py/src/server/routes/fleet.py`
-- Modify: `control-plane-py/src/server/main.py`
-- Test: `control-plane-py/tests/unit/test_fleet_economics.py`
+- Create: `api/server/routes/fleet.py`
+- Modify: `api/server/main.py`
+- Test: `tests/api/unit/test_fleet_economics.py`
 
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# control-plane-py/tests/unit/test_fleet_economics.py
+# tests/api/unit/test_fleet_economics.py
 import time
 from fastapi.testclient import TestClient
-from src.server.main import app
-from src.server.state import app_state
-from src.shared.types import Workflow, Vendor, InvoiceData, OtelSpan
+from api.server.main import app
+from api.server.state import app_state
+from api.shared.types import Workflow, Vendor, InvoiceData, OtelSpan
 
 
 def _wf(wid: str, status: str = "in_progress") -> Workflow:
@@ -1030,17 +1030,17 @@ def test_fleet_economics_endpoint_rolls_up_active_only() -> None:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_fleet_economics.py -v`
+Run: `uv run pytest tests/unit/test_fleet_economics.py -v`
 Expected: FAIL — endpoint not mounted.
 
 - [ ] **Step 3: Create `fleet.py`**
 
 ```python
-# control-plane-py/src/server/routes/fleet.py
+# api/server/routes/fleet.py
 from __future__ import annotations
 from fastapi import APIRouter
-from src.server.state import app_state
-from src.server.services import economics
+from api.server.state import app_state
+from api.server.services import economics
 
 router = APIRouter(prefix="/api/fleet")
 
@@ -1072,23 +1072,23 @@ async def fleet_economics():
 
 - [ ] **Step 4: Register router in `main.py`**
 
-In `control-plane-py/src/server/main.py`, add alongside existing router registrations:
+In `api/server/main.py`, add alongside existing router registrations:
 
 ```python
-from src.server.routes import fleet as fleet_routes
+from api.server.routes import fleet as fleet_routes
 # ... app.include_router(...) lines:
 app.include_router(fleet_routes.router)
 ```
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `cd control-plane-py && uv run pytest tests/unit/test_fleet_economics.py -v`
+Run: `uv run pytest tests/unit/test_fleet_economics.py -v`
 Expected: 1 passed.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add control-plane-py/src/server/routes/fleet.py control-plane-py/src/server/main.py control-plane-py/tests/unit/test_fleet_economics.py
+git add api/server/routes/fleet.py api/server/main.py tests/api/unit/test_fleet_economics.py
 git commit -m "feat(fleet): GET /api/fleet/economics rollup of active workflows"
 ```
 
@@ -1097,11 +1097,11 @@ git commit -m "feat(fleet): GET /api/fleet/economics rollup of active workflows"
 ### Task 11: TS shared types for new response fields
 
 **Files:**
-- Modify: `control-plane/src/shared/types.ts`
+- Modify: `web/shared/types.ts`
 
 - [ ] **Step 1: Add new type declarations**
 
-At the end of `control-plane/src/shared/types.ts` append:
+At the end of `web/shared/types.ts` append:
 
 ```ts
 export interface McpCall {
@@ -1169,13 +1169,13 @@ export interface WorkflowDetail {
 
 - [ ] **Step 2: Verify TS still compiles**
 
-Run: `cd control-plane && npm run build 2>&1 | tail -5`
+Run: `npm run build 2>&1 | tail -5`
 Expected: a clean build (may show existing unused-local warnings, but no errors). If errors about `Workflow` / `Phase` / `OtelSpan` / `SkillAmplification` / `Exception` come up, add missing `import` / keep references to whatever names already exist in the file.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add control-plane/src/shared/types.ts
+git add web/shared/types.ts
 git commit -m "feat(types): TS shapes for McpCall, Economics, Narrative, FleetEconomics"
 ```
 
@@ -1184,12 +1184,12 @@ git commit -m "feat(types): TS shapes for McpCall, Economics, Narrative, FleetEc
 ### Task 12: Light theme CSS + top-level background swap
 
 **Files:**
-- Modify: `control-plane/src/client/styles.css`
-- Modify: `control-plane/index.html` (body class)
+- Modify: `web/client/styles.css`
+- Modify: `index.html` (body class)
 
 - [ ] **Step 1: Replace `styles.css` with the Apex light palette**
 
-Full contents of `control-plane/src/client/styles.css`:
+Full contents of `web/client/styles.css`:
 
 ```css
 @import "tailwindcss";
@@ -1239,22 +1239,22 @@ body {
 
 - [ ] **Step 2: Update `index.html` body class (if needed)**
 
-Ensure `control-plane/index.html`'s `<body>` tag does **not** carry a hard-coded dark class. If it does (e.g. `class="bg-slate-950 text-slate-100"`), remove those classes so CSS wins.
+Ensure `index.html`'s `<body>` tag does **not** carry a hard-coded dark class. If it does (e.g. `class="bg-slate-950 text-slate-100"`), remove those classes so CSS wins.
 
 - [ ] **Step 3: Build UI + verify visually**
 
-Run: `cd control-plane && npm run build 2>&1 | tail -5`
+Run: `npm run build 2>&1 | tail -5`
 Expected: build succeeds.
 
 Start preview if not running:
-Run: `cd control-plane && npm run demo:ui &`
+Run: `npm run demo:ui &`
 
 Open http://localhost:5173 — page background is off-white; existing text is legible dark-on-light. Many component-level `bg-slate-900` / `text-slate-*` classes will still render darkly in places; later tasks replace them per-component.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add control-plane/src/client/styles.css control-plane/index.html
+git add web/client/styles.css index.html
 git commit -m "feat(theme): Apex light palette base + panel/chip/button utilities"
 ```
 
@@ -1263,12 +1263,12 @@ git commit -m "feat(theme): Apex light palette base + panel/chip/button utilitie
 ### Task 13: `PhaseRibbon` component
 
 **Files:**
-- Create: `control-plane/src/client/components/apex/PhaseRibbon.tsx`
+- Create: `web/client/components/apex/PhaseRibbon.tsx`
 
 - [ ] **Step 1: Create the component**
 
 ```tsx
-// control-plane/src/client/components/apex/PhaseRibbon.tsx
+// web/client/components/apex/PhaseRibbon.tsx
 import { PHASE_ORDER, type Phase, type Workflow } from "@shared/types";
 import { Check, Loader2, Ban, CircleDashed } from "lucide-react";
 
@@ -1325,13 +1325,13 @@ export default function PhaseRibbon({ workflow, phases }: {
 
 - [ ] **Step 2: Verify build**
 
-Run: `cd control-plane && npm run build 2>&1 | tail -5`
+Run: `npm run build 2>&1 | tail -5`
 Expected: build succeeds.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add control-plane/src/client/components/apex/PhaseRibbon.tsx
+git add web/client/components/apex/PhaseRibbon.tsx
 git commit -m "feat(apex): PhaseRibbon component"
 ```
 
@@ -1342,14 +1342,14 @@ git commit -m "feat(apex): PhaseRibbon component"
 Three small, presentational, right-rail siblings. Grouped to one task for velocity.
 
 **Files:**
-- Create: `control-plane/src/client/components/apex/WorkflowHeaderTiles.tsx`
-- Create: `control-plane/src/client/components/apex/EconomicsPanel.tsx`
-- Create: `control-plane/src/client/components/apex/AuditTrail.tsx`
+- Create: `web/client/components/apex/WorkflowHeaderTiles.tsx`
+- Create: `web/client/components/apex/EconomicsPanel.tsx`
+- Create: `web/client/components/apex/AuditTrail.tsx`
 
 - [ ] **Step 1: Create `WorkflowHeaderTiles.tsx`**
 
 ```tsx
-// control-plane/src/client/components/apex/WorkflowHeaderTiles.tsx
+// web/client/components/apex/WorkflowHeaderTiles.tsx
 import type { Workflow } from "@shared/types";
 
 function riskFactor(w: Workflow): "low" | "medium" | "high" {
@@ -1398,7 +1398,7 @@ export default function WorkflowHeaderTiles({ workflow }: { workflow: Workflow }
 - [ ] **Step 2: Create `EconomicsPanel.tsx`**
 
 ```tsx
-// control-plane/src/client/components/apex/EconomicsPanel.tsx
+// web/client/components/apex/EconomicsPanel.tsx
 import type { Economics } from "@shared/types";
 
 export default function EconomicsPanel({ e }: { e: Economics }) {
@@ -1428,7 +1428,7 @@ export default function EconomicsPanel({ e }: { e: Economics }) {
 - [ ] **Step 3: Create `AuditTrail.tsx`**
 
 ```tsx
-// control-plane/src/client/components/apex/AuditTrail.tsx
+// web/client/components/apex/AuditTrail.tsx
 import type { ActionLedgerEntry } from "@shared/types";
 
 export default function AuditTrail({ ledger }: { ledger: ActionLedgerEntry[] }) {
@@ -1457,13 +1457,13 @@ export default function AuditTrail({ ledger }: { ledger: ActionLedgerEntry[] }) 
 
 - [ ] **Step 4: Verify build**
 
-Run: `cd control-plane && npm run build 2>&1 | tail -5`
+Run: `npm run build 2>&1 | tail -5`
 Expected: build succeeds.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add control-plane/src/client/components/apex/WorkflowHeaderTiles.tsx control-plane/src/client/components/apex/EconomicsPanel.tsx control-plane/src/client/components/apex/AuditTrail.tsx
+git add web/client/components/apex/WorkflowHeaderTiles.tsx web/client/components/apex/EconomicsPanel.tsx web/client/components/apex/AuditTrail.tsx
 git commit -m "feat(apex): WorkflowHeaderTiles + EconomicsPanel + AuditTrail"
 ```
 
@@ -1472,14 +1472,14 @@ git commit -m "feat(apex): WorkflowHeaderTiles + EconomicsPanel + AuditTrail"
 ### Task 15: `ExceptionAnalysisCard` + `InterventionProtocols` + `FleetAssignment`
 
 **Files:**
-- Create: `control-plane/src/client/components/apex/ExceptionAnalysisCard.tsx`
-- Create: `control-plane/src/client/components/apex/InterventionProtocols.tsx`
-- Create: `control-plane/src/client/components/apex/FleetAssignment.tsx`
+- Create: `web/client/components/apex/ExceptionAnalysisCard.tsx`
+- Create: `web/client/components/apex/InterventionProtocols.tsx`
+- Create: `web/client/components/apex/FleetAssignment.tsx`
 
 - [ ] **Step 1: Create `ExceptionAnalysisCard.tsx`**
 
 ```tsx
-// control-plane/src/client/components/apex/ExceptionAnalysisCard.tsx
+// web/client/components/apex/ExceptionAnalysisCard.tsx
 import type { Narrative } from "@shared/types";
 
 function highlight(text: string): React.ReactNode {
@@ -1523,7 +1523,7 @@ export default function ExceptionAnalysisCard({ narrative }: { narrative: Narrat
 - [ ] **Step 2: Create `InterventionProtocols.tsx`**
 
 ```tsx
-// control-plane/src/client/components/apex/InterventionProtocols.tsx
+// web/client/components/apex/InterventionProtocols.tsx
 import { useState } from "react";
 import type { Exception } from "@shared/types";
 
@@ -1569,7 +1569,7 @@ export default function InterventionProtocols({ exception, onResolved }: {
 - [ ] **Step 3: Create `FleetAssignment.tsx`**
 
 ```tsx
-// control-plane/src/client/components/apex/FleetAssignment.tsx
+// web/client/components/apex/FleetAssignment.tsx
 import type { OtelSpan } from "@shared/types";
 
 export default function FleetAssignment({ spans }: { spans: OtelSpan[] }) {
@@ -1606,13 +1606,13 @@ export default function FleetAssignment({ spans }: { spans: OtelSpan[] }) {
 
 - [ ] **Step 4: Build**
 
-Run: `cd control-plane && npm run build 2>&1 | tail -5`
+Run: `npm run build 2>&1 | tail -5`
 Expected: build succeeds.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add control-plane/src/client/components/apex/ExceptionAnalysisCard.tsx control-plane/src/client/components/apex/InterventionProtocols.tsx control-plane/src/client/components/apex/FleetAssignment.tsx
+git add web/client/components/apex/ExceptionAnalysisCard.tsx web/client/components/apex/InterventionProtocols.tsx web/client/components/apex/FleetAssignment.tsx
 git commit -m "feat(apex): ExceptionAnalysisCard + InterventionProtocols + FleetAssignment"
 ```
 
@@ -1621,12 +1621,12 @@ git commit -m "feat(apex): ExceptionAnalysisCard + InterventionProtocols + Fleet
 ### Task 16: `ExecutionTimelineTab` component
 
 **Files:**
-- Create: `control-plane/src/client/components/apex/ExecutionTimelineTab.tsx`
+- Create: `web/client/components/apex/ExecutionTimelineTab.tsx`
 
 - [ ] **Step 1: Create the component**
 
 ```tsx
-// control-plane/src/client/components/apex/ExecutionTimelineTab.tsx
+// web/client/components/apex/ExecutionTimelineTab.tsx
 import { useState } from "react";
 import type { McpCall } from "@shared/types";
 import { useFleetManagerStream } from "../../hooks/useFleetManagerStream";
@@ -1742,13 +1742,13 @@ export default function ExecutionTimelineTab({ mcpCalls, workflowId, onLogAction
 
 - [ ] **Step 2: Build**
 
-Run: `cd control-plane && npm run build 2>&1 | tail -5`
+Run: `npm run build 2>&1 | tail -5`
 Expected: build succeeds.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add control-plane/src/client/components/apex/ExecutionTimelineTab.tsx
+git add web/client/components/apex/ExecutionTimelineTab.tsx
 git commit -m "feat(apex): ExecutionTimelineTab with step cards + API config + thought stream"
 ```
 
@@ -1757,14 +1757,14 @@ git commit -m "feat(apex): ExecutionTimelineTab with step cards + API config + t
 ### Task 17: Rebuild `WorkflowDetail.tsx` with Apex Overview + Execution Timeline tabs
 
 **Files:**
-- Modify: `control-plane/src/client/routes/WorkflowDetail.tsx`
+- Modify: `web/client/routes/WorkflowDetail.tsx`
 
 - [ ] **Step 1: Rewrite the component**
 
-Full contents of `control-plane/src/client/routes/WorkflowDetail.tsx`:
+Full contents of `web/client/routes/WorkflowDetail.tsx`:
 
 ```tsx
-// control-plane/src/client/routes/WorkflowDetail.tsx
+// web/client/routes/WorkflowDetail.tsx
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import type {
@@ -1899,7 +1899,7 @@ export default function WorkflowDetail() {
 
 - [ ] **Step 2: Build**
 
-Run: `cd control-plane && npm run build 2>&1 | tail -6`
+Run: `npm run build 2>&1 | tail -6`
 Expected: build succeeds.
 
 - [ ] **Step 3: Visual smoke**
@@ -1918,7 +1918,7 @@ Wait ~60s, then open `http://localhost:5173/workflows/INV-0001`. Verify:
 - [ ] **Step 4: Commit**
 
 ```bash
-git add control-plane/src/client/routes/WorkflowDetail.tsx
+git add web/client/routes/WorkflowDetail.tsx
 git commit -m "feat(ui): rebuild WorkflowDetail with Apex Overview + Execution Timeline"
 ```
 
@@ -1927,15 +1927,15 @@ git commit -m "feat(ui): rebuild WorkflowDetail with Apex Overview + Execution T
 ### Task 18: Dashboard widgets
 
 **Files:**
-- Create: `control-plane/src/client/components/apex/KpiTileRow.tsx`
-- Create: `control-plane/src/client/components/apex/ExceptionCardCompact.tsx`
-- Create: `control-plane/src/client/components/apex/FleetEconomicsPanel.tsx`
-- Create: `control-plane/src/client/components/apex/PolicyAutonomyPanel.tsx`
+- Create: `web/client/components/apex/KpiTileRow.tsx`
+- Create: `web/client/components/apex/ExceptionCardCompact.tsx`
+- Create: `web/client/components/apex/FleetEconomicsPanel.tsx`
+- Create: `web/client/components/apex/PolicyAutonomyPanel.tsx`
 
 - [ ] **Step 1: `KpiTileRow.tsx`**
 
 ```tsx
-// control-plane/src/client/components/apex/KpiTileRow.tsx
+// web/client/components/apex/KpiTileRow.tsx
 import type { Workflow } from "@shared/types";
 
 export default function KpiTileRow({ workflows, exceptionsCount }: {
@@ -1964,7 +1964,7 @@ export default function KpiTileRow({ workflows, exceptionsCount }: {
 - [ ] **Step 2: `ExceptionCardCompact.tsx`**
 
 ```tsx
-// control-plane/src/client/components/apex/ExceptionCardCompact.tsx
+// web/client/components/apex/ExceptionCardCompact.tsx
 import { Link } from "react-router-dom";
 import type { Exception } from "@shared/types";
 
@@ -1987,7 +1987,7 @@ export default function ExceptionCardCompact({ e }: { e: Exception }) {
 - [ ] **Step 3: `FleetEconomicsPanel.tsx`**
 
 ```tsx
-// control-plane/src/client/components/apex/FleetEconomicsPanel.tsx
+// web/client/components/apex/FleetEconomicsPanel.tsx
 import { useEffect, useState } from "react";
 import type { FleetEconomics } from "@shared/types";
 
@@ -2021,7 +2021,7 @@ export default function FleetEconomicsPanel() {
 - [ ] **Step 4: `PolicyAutonomyPanel.tsx`**
 
 ```tsx
-// control-plane/src/client/components/apex/PolicyAutonomyPanel.tsx
+// web/client/components/apex/PolicyAutonomyPanel.tsx
 import { useEffect, useState } from "react";
 
 type Policy = { id: string; description: string; currentValue: number | string | boolean };
@@ -2058,13 +2058,13 @@ export default function PolicyAutonomyPanel() {
 
 - [ ] **Step 5: Build**
 
-Run: `cd control-plane && npm run build 2>&1 | tail -5`
+Run: `npm run build 2>&1 | tail -5`
 Expected: build succeeds.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add control-plane/src/client/components/apex/KpiTileRow.tsx control-plane/src/client/components/apex/ExceptionCardCompact.tsx control-plane/src/client/components/apex/FleetEconomicsPanel.tsx control-plane/src/client/components/apex/PolicyAutonomyPanel.tsx
+git add web/client/components/apex/KpiTileRow.tsx web/client/components/apex/ExceptionCardCompact.tsx web/client/components/apex/FleetEconomicsPanel.tsx web/client/components/apex/PolicyAutonomyPanel.tsx
 git commit -m "feat(apex): dashboard widgets (KPI row, compact exception, fleet economics, policy autonomy)"
 ```
 
@@ -2073,12 +2073,12 @@ git commit -m "feat(apex): dashboard widgets (KPI row, compact exception, fleet 
 ### Task 19: Rebuild `FleetDashboard.tsx`
 
 **Files:**
-- Modify: `control-plane/src/client/routes/FleetDashboard.tsx`
+- Modify: `web/client/routes/FleetDashboard.tsx`
 
 - [ ] **Step 1: Rewrite**
 
 ```tsx
-// control-plane/src/client/routes/FleetDashboard.tsx
+// web/client/routes/FleetDashboard.tsx
 import { useWorkflows } from "../hooks/useWorkflows";
 import { useExceptions } from "../hooks/useExceptions";
 import WorkflowCard from "../components/WorkflowCard";
@@ -2136,7 +2136,7 @@ export default function FleetDashboard() {
 
 - [ ] **Step 2: Build**
 
-Run: `cd control-plane && npm run build 2>&1 | tail -5`
+Run: `npm run build 2>&1 | tail -5`
 Expected: build succeeds.
 
 - [ ] **Step 3: Visual smoke**
@@ -2146,7 +2146,7 @@ Open `http://localhost:5173/fleet`. Verify KPI row, Exceptions Requiring Attenti
 - [ ] **Step 4: Commit**
 
 ```bash
-git add control-plane/src/client/routes/FleetDashboard.tsx
+git add web/client/routes/FleetDashboard.tsx
 git commit -m "feat(ui): rebuild FleetDashboard with Apex layout"
 ```
 
@@ -2155,14 +2155,14 @@ git commit -m "feat(ui): rebuild FleetDashboard with Apex layout"
 ### Task 20: Shell chrome (top bar + left nav)
 
 **Files:**
-- Modify: `control-plane/src/client/App.tsx`
+- Modify: `web/client/App.tsx`
 
 - [ ] **Step 1: Rewrite**
 
-Full contents of `control-plane/src/client/App.tsx`:
+Full contents of `web/client/App.tsx`:
 
 ```tsx
-// control-plane/src/client/App.tsx
+// web/client/App.tsx
 import { NavLink, Route, Routes, BrowserRouter, Navigate } from "react-router-dom";
 import FleetDashboard from "./routes/FleetDashboard";
 import ExceptionQueue from "./routes/ExceptionQueue";
@@ -2255,7 +2255,7 @@ export default function App() {
 
 - [ ] **Step 2: Build + visual smoke**
 
-Run: `cd control-plane && npm run build 2>&1 | tail -5`
+Run: `npm run build 2>&1 | tail -5`
 Expected: build succeeds.
 
 Open `http://localhost:5173/` — redirects to `/fleet`, top bar + left nav + right rail render, all routes navigate.
@@ -2263,7 +2263,7 @@ Open `http://localhost:5173/` — redirects to `/fleet`, top bar + left nav + ri
 - [ ] **Step 3: Commit**
 
 ```bash
-git add control-plane/src/client/App.tsx
+git add web/client/App.tsx
 git commit -m "feat(ui): Apex shell chrome (top bar + left nav + right rail)"
 ```
 
@@ -2272,11 +2272,11 @@ git commit -m "feat(ui): Apex shell chrome (top bar + left nav + right rail)"
 ### Task 21: Extend Playwright harness
 
 **Files:**
-- Modify: `control-plane/tests/e2e/smoke.spec.ts`
+- Modify: `tests/e2e/smoke.spec.ts`
 
 - [ ] **Step 1: Append the new tests**
 
-Append to `control-plane/tests/e2e/smoke.spec.ts` (before the final closing of the file, after the existing `test.describe("Pipeline E2E", ...)`):
+Append to `tests/e2e/smoke.spec.ts` (before the final closing of the file, after the existing `test.describe("Pipeline E2E", ...)`):
 
 ```ts
 // --- Apex redesign tests ----------------------------------------------------
@@ -2418,13 +2418,13 @@ test.describe("Apex UI smoke", () => {
 
 Ensure `make up` is running. Then:
 
-Run: `cd control-plane && npx playwright test --reporter=list 2>&1 | tail -20`
+Run: `npx playwright test --reporter=list 2>&1 | tail -20`
 Expected: all new tests pass alongside existing ones. Target total runtime under 5 min.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add control-plane/tests/e2e/smoke.spec.ts
+git add tests/e2e/smoke.spec.ts
 git commit -m "test(e2e): Apex harness additions (contract, UI smoke, timeline, protocols)"
 ```
 
