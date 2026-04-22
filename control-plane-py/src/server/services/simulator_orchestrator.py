@@ -56,8 +56,15 @@ async def spawn_workflow(scenario: str | None = None) -> str:
 
 
 async def ramp_loop() -> None:
-    """Background coroutine: spawn workflows until target, then steady-state."""
-    target = int(os.getenv("SIMULATOR_TARGET_WORKFLOWS", "30"))
+    """Background coroutine: spawn workflows until target, then steady-state.
+    SIMULATOR_TARGET_WORKFLOWS=0 disables both ramp and steady-state
+    (use this on laptops; the stack can't sustain 30 concurrent MAF workflows
+    because each agent step spawns GHCP SDK subprocesses that multiply fast).
+    """
+    target = int(os.getenv("SIMULATOR_TARGET_WORKFLOWS", "0"))
+    if target <= 0:
+        print("[orchestrator] simulator disabled (SIMULATOR_TARGET_WORKFLOWS=0); inject manually via /api/simulator/inject")
+        return
     ramp_seconds = 90
     delay_per = ramp_seconds / target
     print(f"[orchestrator] ramping {target} workflows over {ramp_seconds}s")
