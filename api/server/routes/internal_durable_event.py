@@ -62,6 +62,12 @@ async def receive_durable_event(body: DurableEventBody):
                     workflow_id=wid, name=step,  # type: ignore[arg-type]
                     status="in_progress", started_at=now,
                 ))
+            # Sync the workflow's current_phase so the UI reflects progression
+            # past Intake. The orchestrator advances through phases internally,
+            # but nothing was lifting that state up to the workflow record.
+            w = app_state.store.get_workflow(wid)
+            if w:
+                w.current_phase = step  # type: ignore[assignment]
             app_state.bus.emit(FleetEvent(
                 type="workflow.phase.started", workflow_id=wid, phase=step
             ))
@@ -138,14 +144,27 @@ async def receive_durable_event(body: DurableEventBody):
         _ledger(wid, kind="agent", actor_id="orchestrator",
                 action="suspended",
                 details={"reason": body.payload.get("reason", "approval")})
+        w = app_state.store.get_workflow(wid)
+        if w:
+            w.status = "awaiting_hitl"
         app_state.bus.emit(FleetEvent(
             type="workflow.hitl.requested", workflow_id=wid,
             reason=body.payload.get("reason", "approval"),
         ))
 
+    elif body.kind == "resumed":
+        _ledger(wid, kind="agent", actor_id="orchestrator",
+                action="resumed", details={})
+        w = app_state.store.get_workflow(wid)
+        if w:
+            w.status = "in_progress"
+
     elif body.kind == "workflow.completed":
         _ledger(wid, kind="agent", actor_id="orchestrator",
                 action="workflow.completed", details={})
+        w = app_state.store.get_workflow(wid)
+        if w:
+            w.status = "completed"
         app_state.bus.emit(FleetEvent(
             type="workflow.resolved", workflow_id=wid, resolution="completed"
         ))
