@@ -169,6 +169,14 @@ async def receive_durable_event(body: DurableEventBody):
             type="workflow.resolved", workflow_id=wid, resolution="completed"
         ))
 
+    elif body.kind == "log.action":
+        # Ledger-only event from the UI (Fork/Rollback illustrative stubs).
+        # Must not mutate workflow.status or current_phase.
+        _ledger(wid, kind="human",
+                actor_id=body.payload.get("by") or "operator",
+                action=str(body.payload.get("action") or "log.action"),
+                details={})
+
     elif body.kind == "workflow.rejected":
         _ledger(wid, kind="human",
                 actor_id=body.payload.get("by") or "operator",

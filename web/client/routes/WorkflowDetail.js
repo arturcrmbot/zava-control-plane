@@ -32,14 +32,11 @@ export default function WorkflowDetail() {
     const logAction = useCallback(async (action) => {
         if (!id)
             return;
-        // Log-only: reuse the existing `workflow.rejected` handler to append an
-        // audit-trail entry with the illustrative action name. No other state
-        // change happens; Fork/Rollback are visual stubs for the demo.
         await fetch("/internal/durable-event", {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                workflow_id: id, kind: "workflow.rejected",
-                payload: { by: "operator", reason: `illustrative ${action}` },
+                workflow_id: id, kind: "log.action",
+                payload: { by: "operator", action },
             }),
         }).catch(() => { });
         await refresh();
