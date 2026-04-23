@@ -44,7 +44,7 @@ export default function App() {
           ))}
         </aside>
 
-        <main className="p-6 overflow-auto">
+        <main className="p-6 overflow-y-auto overflow-x-hidden min-w-0">
           <Routes>
             <Route path="/" element={<Navigate to="/fleet" replace />} />
             <Route path="/fleet" element={<FleetDashboard />} />

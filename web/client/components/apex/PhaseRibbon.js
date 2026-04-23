@@ -28,9 +28,9 @@ const PILL = {
 };
 export default function PhaseRibbon({ workflow, phases }) {
     const hasException = !!workflow.activeExceptionId;
-    return (_jsx("div", { className: "flex items-center gap-2", "data-testid": "phase-ribbon", children: PHASE_ORDER.map((name, i) => {
+    return (_jsx("div", { className: "flex flex-wrap items-center gap-y-2 gap-x-1.5", "data-testid": "phase-ribbon", children: PHASE_ORDER.map((name, i) => {
             const s = classify(name, phases, workflow.currentPhase, hasException);
-            return (_jsxs("div", { className: "flex items-center gap-2", children: [_jsxs("div", { className: `flex items-center gap-1.5 rounded-full px-3 py-1 border ${PILL[s]}`, children: [_jsx(Icon, { s: s }), _jsx("span", { className: "text-xs font-medium", children: name })] }), i < PHASE_ORDER.length - 1 &&
-                        _jsx("div", { className: "h-px w-4 bg-slate-300" })] }, name));
+            return (_jsxs("div", { className: "flex items-center gap-1.5", children: [_jsxs("div", { className: `flex items-center gap-1.5 rounded-full px-2.5 py-1 border ${PILL[s]}`, children: [_jsx(Icon, { s: s }), _jsx("span", { className: "text-xs font-medium whitespace-nowrap", children: name })] }), i < PHASE_ORDER.length - 1 &&
+                        _jsx("div", { className: "h-px w-3 bg-slate-300" })] }, name));
         }) }));
 }

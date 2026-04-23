@@ -4,6 +4,23 @@ import { useFleetManagerStream } from "../hooks/useFleetManagerStream";
 import { useOrchestrationStream } from "../hooks/useOrchestrationStream";
 import { Activity, Loader2, Wrench, CheckCircle2, AlertCircle } from "lucide-react";
 
+const summarizeFm = (kind: string, data: unknown): string => {
+  if (data == null || typeof data !== "object") return "";
+  const d = data as Record<string, unknown>;
+  const wfIds = Array.isArray(d.workflow_ids) ? (d.workflow_ids as string[]).join(", ") : undefined;
+  const wfId = typeof d.workflow_id === "string" ? d.workflow_id : undefined;
+  const tool = typeof d.tool === "string" ? d.tool : typeof d.name === "string" ? d.name : undefined;
+  const reason = typeof d.reason === "string" ? d.reason : undefined;
+  if (kind === "wakeup") return `${wfId ?? "?"}${reason ? ` · ${reason}` : ""}`;
+  if (kind === "reasoning_start" || kind === "reasoning_done") {
+    const batch = typeof d.batch_size === "number" ? `${d.batch_size}` : undefined;
+    return [wfIds, batch ? `batch ${batch}` : null].filter(Boolean).join(" · ");
+  }
+  if (kind === "tool_call") return tool ?? "";
+  if (kind === "error") return typeof d.error === "string" ? d.error : "";
+  return wfId ?? wfIds ?? "";
+};
+
 const fmIconFor = (kind: string) => {
   switch (kind) {
     case "wakeup": return <Activity size={14} className="text-amber-600" />;
@@ -76,7 +93,7 @@ export default function FleetManagerRail() {
                   <div className="flex-1 min-w-0">
                     <div className="text-slate-800 font-medium truncate">{e.kind}</div>
                     <div className={`text-[11px] text-slate-500 ${open ? "" : "truncate"}`}>
-                      {e.data ? (open ? "" : JSON.stringify(e.data).slice(0, 160)) : ""}
+                      {open ? "tap to collapse" : summarizeFm(e.kind, e.data)}
                     </div>
                   </div>
                   <div className="text-[10px] text-slate-400 whitespace-nowrap">

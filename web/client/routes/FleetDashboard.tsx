@@ -14,11 +14,11 @@ export default function FleetDashboard() {
   const topExceptions = exceptions.slice(0, 3);
 
   return (
-    <div className="grid grid-cols-4 gap-4">
-      <div className="col-span-3 space-y-4">
+    <div className="grid grid-cols-4 gap-4 min-w-0">
+      <div className="col-span-3 space-y-4 min-w-0">
         <div className="flex items-center gap-3">
           <div>
-            <div className="text-xl font-semibold">Control Plane Overview</div>
+            <div className="text-xl font-semibold text-slate-900">Control Plane Overview</div>
             <div className="text-xs text-slate-500">
               Operational status for Finance Controller's fleet
             </div>
@@ -28,9 +28,9 @@ export default function FleetDashboard() {
         <KpiTileRow workflows={workflows} exceptionsCount={exceptions.length} />
         <div className="panel">
           <div className="panel-header">Exceptions Requiring Attention</div>
-          <div className="panel-body grid grid-cols-3 gap-3">
+          <div className="panel-body grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {topExceptions.length === 0 &&
-              <div className="text-xs text-slate-500 col-span-3">No open exceptions.</div>}
+              <div className="text-xs text-slate-500 col-span-full italic">No open exceptions.</div>}
             {topExceptions.map(e => <ExceptionCardCompact key={e.id} e={e} />)}
           </div>
         </div>
@@ -39,7 +39,10 @@ export default function FleetDashboard() {
             <span>Active Workflows</span>
             <span className="text-[11px] text-slate-500">{workflows.length} shown</span>
           </div>
-          <div className="panel-body grid grid-cols-3 gap-2">
+          <div className="panel-body grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
+            {workflows.length === 0 && (
+              <div className="text-xs text-slate-500 italic col-span-full">No active workflows.</div>
+            )}
             {workflows.map(w => <WorkflowCard key={w.id} w={w} />)}
           </div>
         </div>

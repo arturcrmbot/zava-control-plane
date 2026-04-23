@@ -39,7 +39,11 @@ export default function WorkflowDetail() {
     setD(await r.json());
   }, [id]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    void refresh();
+    const i = setInterval(() => { void refresh(); }, 2500);
+    return () => clearInterval(i);
+  }, [refresh]);
 
   const logAction = useCallback(async (action: string) => {
     if (!id) return;
@@ -60,11 +64,11 @@ export default function WorkflowDetail() {
   const w = d.workflow;
 
   return (
-    <div className="grid grid-cols-4 gap-4">
-      <div className="col-span-3 space-y-4">
+    <div className="grid grid-cols-4 gap-4 min-w-0">
+      <div className="col-span-3 space-y-4 min-w-0">
         <div>
           <div className="text-xs text-slate-500">{w.id}</div>
-          <div className="text-xl font-semibold">{w.id} · {w.vendor.name}</div>
+          <div className="text-xl font-semibold text-slate-900">{w.id} · {w.vendor.name}</div>
           <div className="text-xs text-slate-500">
             {w.invoice.currency} {w.invoice.amount.toLocaleString()} · PO {w.invoice.poRef} · {w.agency}
           </div>

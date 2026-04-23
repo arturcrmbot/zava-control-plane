@@ -21,12 +21,26 @@ const RISK_COLOR = {
   high:   "text-red-700 bg-red-50 border-red-200",
 };
 
+const STATUS_HUMAN: Record<Workflow["status"], string> = {
+  in_progress: "In progress",
+  awaiting_hitl: "Awaiting operator",
+  completed: "Completed",
+  failed: "Failed",
+};
+
+const STATUS_COLOR: Record<Workflow["status"], string> = {
+  in_progress: "text-blue-700 bg-blue-50 border-blue-200",
+  awaiting_hitl: "text-amber-700 bg-amber-50 border-amber-200",
+  completed: "text-emerald-700 bg-emerald-50 border-emerald-200",
+  failed: "text-red-700 bg-red-50 border-red-200",
+};
+
 export default function WorkflowHeaderTiles({ workflow }: { workflow: Workflow }) {
   const risk = riskFactor(workflow);
   const stalled = !!workflow.activeExceptionId;
   const statusTile = stalled
     ? { label: "STATUS · STALLED", value: `Exception at ${workflow.currentPhase}`, cls: "text-red-700 bg-red-50 border-red-200" }
-    : { label: "STATUS", value: workflow.status, cls: "text-blue-700 bg-blue-50 border-blue-200" };
+    : { label: "STATUS", value: STATUS_HUMAN[workflow.status], cls: STATUS_COLOR[workflow.status] };
   return (
     <div className="grid grid-cols-3 gap-3" data-testid="workflow-header-tiles">
       {[

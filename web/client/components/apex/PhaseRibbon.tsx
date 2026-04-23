@@ -33,17 +33,17 @@ export default function PhaseRibbon({ workflow, phases }: {
 }) {
   const hasException = !!workflow.activeExceptionId;
   return (
-    <div className="flex items-center gap-2" data-testid="phase-ribbon">
+    <div className="flex flex-wrap items-center gap-y-2 gap-x-1.5" data-testid="phase-ribbon">
       {PHASE_ORDER.map((name, i) => {
         const s = classify(name, phases, workflow.currentPhase, hasException);
         return (
-          <div key={name} className="flex items-center gap-2">
-            <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 border ${PILL[s]}`}>
+          <div key={name} className="flex items-center gap-1.5">
+            <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border ${PILL[s]}`}>
               <Icon s={s} />
-              <span className="text-xs font-medium">{name}</span>
+              <span className="text-xs font-medium whitespace-nowrap">{name}</span>
             </div>
             {i < PHASE_ORDER.length - 1 &&
-              <div className="h-px w-4 bg-slate-300" />}
+              <div className="h-px w-3 bg-slate-300" />}
           </div>
         );
       })}
