@@ -6,20 +6,20 @@ import { Activity, Loader2, Wrench, CheckCircle2, AlertCircle } from "lucide-rea
 
 const fmIconFor = (kind: string) => {
   switch (kind) {
-    case "wakeup": return <Activity size={14} className="text-amber-400" />;
-    case "reasoning_start": return <Loader2 size={14} className="text-blue-400 animate-spin" />;
-    case "tool_call": return <Wrench size={14} className="text-purple-300" />;
-    case "reasoning_done": return <CheckCircle2 size={14} className="text-emerald-400" />;
-    case "error": return <AlertCircle size={14} className="text-red-400" />;
+    case "wakeup": return <Activity size={14} className="text-amber-600" />;
+    case "reasoning_start": return <Loader2 size={14} className="text-blue-600 animate-spin" />;
+    case "tool_call": return <Wrench size={14} className="text-purple-600" />;
+    case "reasoning_done": return <CheckCircle2 size={14} className="text-emerald-600" />;
+    case "error": return <AlertCircle size={14} className="text-red-600" />;
     default: return <Activity size={14} className="text-slate-400" />;
   }
 };
 
 const orchTypeIcon = (t: string | undefined) => {
-  if (t === "agent") return <span className="text-purple-300 text-[10px] font-mono">[agt]</span>;
-  if (t === "validator") return <span className="text-amber-300 text-[10px] font-mono">[val]</span>;
-  if (t === "deterministic") return <span className="text-slate-400 text-[10px] font-mono">[det]</span>;
-  return <span className="text-slate-500 text-[10px] font-mono">[stp]</span>;
+  if (t === "agent") return <span className="text-purple-700 text-[10px] font-mono">[agt]</span>;
+  if (t === "validator") return <span className="text-amber-700 text-[10px] font-mono">[val]</span>;
+  if (t === "deterministic") return <span className="text-slate-500 text-[10px] font-mono">[det]</span>;
+  return <span className="text-slate-400 text-[10px] font-mono">[stp]</span>;
 };
 
 const orchSummary = (e: { kind: string; payload: { name?: string; stage?: string; step?: string } }) => {
@@ -45,16 +45,16 @@ export default function FleetManagerRail() {
 
   return (
     <div className="p-3 space-y-2">
-      <div className="flex gap-1 border-b border-slate-800 mb-1">
+      <div className="flex gap-1 border-b border-slate-200 mb-2">
         <button
           onClick={() => setTab("fm")}
-          className={`text-[11px] px-2 py-1 ${tab === "fm" ? "text-slate-100 border-b-2 border-blue-400" : "text-slate-400"}`}
+          className={`text-[11px] px-2 py-1 ${tab === "fm" ? "text-blue-700 font-medium border-b-2 border-blue-600" : "text-slate-500 hover:text-slate-700"}`}
         >
           Fleet Manager
         </button>
         <button
           onClick={() => setTab("orch")}
-          className={`text-[11px] px-2 py-1 ${tab === "orch" ? "text-slate-100 border-b-2 border-blue-400" : "text-slate-400"}`}
+          className={`text-[11px] px-2 py-1 ${tab === "orch" ? "text-blue-700 font-medium border-b-2 border-blue-600" : "text-slate-500 hover:text-slate-700"}`}
         >
           Orchestration
         </button>
@@ -62,29 +62,29 @@ export default function FleetManagerRail() {
       {tab === "fm" && (
         <div className="space-y-1.5">
           <div className="text-[11px] text-slate-500">GHCP SDK session · {fmEvents.length} recent events</div>
-          {fmEvents.length === 0 && <div className="text-xs text-slate-500">idle</div>}
+          {fmEvents.length === 0 && <div className="text-xs text-slate-400 italic">idle</div>}
           {fmEvents.map((e, i) => {
             const open = expanded.has(i);
             return (
-              <div key={i} className="text-xs border border-slate-800 rounded">
+              <div key={i} className="text-xs border border-slate-200 rounded bg-white">
                 <button
                   type="button"
                   onClick={() => toggle(i)}
-                  className="w-full flex gap-2 p-2 text-left hover:bg-slate-900/60"
+                  className="w-full flex gap-2 p-2 text-left hover:bg-slate-50"
                 >
                   {fmIconFor(e.kind)}
                   <div className="flex-1 min-w-0">
-                    <div className="text-slate-200 font-medium truncate">{e.kind}</div>
+                    <div className="text-slate-800 font-medium truncate">{e.kind}</div>
                     <div className={`text-[11px] text-slate-500 ${open ? "" : "truncate"}`}>
                       {e.data ? (open ? "" : JSON.stringify(e.data).slice(0, 160)) : ""}
                     </div>
                   </div>
-                  <div className="text-[10px] text-slate-600 whitespace-nowrap">
+                  <div className="text-[10px] text-slate-400 whitespace-nowrap">
                     {new Date(e.timestamp).toLocaleTimeString()}
                   </div>
                 </button>
                 {open && e.data != null && (
-                  <pre className="text-[10px] text-slate-300 bg-slate-950 p-2 border-t border-slate-800 whitespace-pre-wrap break-all max-h-96 overflow-auto">
+                  <pre className="text-[10px] text-slate-700 bg-slate-50 p-2 border-t border-slate-200 whitespace-pre-wrap break-all max-h-96 overflow-auto">
 {JSON.stringify(e.data, null, 2)}
                   </pre>
                 )}
@@ -96,13 +96,13 @@ export default function FleetManagerRail() {
       {tab === "orch" && (
         <div className="space-y-1">
           <div className="text-[11px] text-slate-500">MAF Durable Workflows · {orchEvents.length} recent events</div>
-          {orchEvents.length === 0 && <div className="text-xs text-slate-500">idle</div>}
+          {orchEvents.length === 0 && <div className="text-xs text-slate-400 italic">idle</div>}
           {orchEvents.map((e, i) => (
-            <div key={i} className="flex items-center gap-2 text-[11px] border border-slate-800 rounded px-2 py-1">
+            <div key={i} className="flex items-center gap-2 text-[11px] border border-slate-200 rounded px-2 py-1 bg-white">
               {orchTypeIcon(e.payload.type)}
-              <span className="text-slate-300 font-mono truncate">{e.workflow_id}</span>
-              <span className="text-slate-200 truncate flex-1">{orchSummary(e)}</span>
-              {e.payload.duration_ms != null && <span className="text-slate-500">{e.payload.duration_ms} ms</span>}
+              <span className="text-slate-700 font-mono truncate">{e.workflow_id}</span>
+              <span className="text-slate-800 truncate flex-1">{orchSummary(e)}</span>
+              {e.payload.duration_ms != null && <span className="text-slate-400">{e.payload.duration_ms} ms</span>}
             </div>
           ))}
         </div>

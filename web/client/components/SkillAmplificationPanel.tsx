@@ -6,19 +6,19 @@ export default function SkillAmplificationPanel({ items }: { items: SkillAmplifi
   return (
     <div className="space-y-2">
       {items.map(a => (
-        <div key={a.id} className="border border-slate-800 rounded p-2 bg-slate-900/30 text-xs">
-          <div className="text-emerald-300 font-medium">→ {a.recommendedApproach}</div>
+        <div key={a.id} className="panel panel-body text-xs space-y-2">
+          <div className="text-emerald-700 font-medium">→ {a.recommendedApproach}</div>
           {a.policyContext.map((p, i) => (
-            <div key={i} className="mt-1">
-              <div className="font-medium text-slate-200">{p.title}</div>
-              <div className="text-slate-400">{p.snippet}</div>
+            <div key={i}>
+              <div className="font-medium text-slate-800">{p.title}</div>
+              <div className="text-slate-500">{p.snippet}</div>
             </div>
           ))}
           {a.precedents.length > 0 && (
-            <div className="mt-1">
-              <div className="text-[10px] uppercase text-slate-500">Precedents</div>
+            <div>
+              <div className="text-[10px] uppercase tracking-wide text-slate-500">Precedents</div>
               {a.precedents.map((p, i) => (
-                <div key={i} className="text-slate-400">· {p.workflowId} → {p.outcome}: {p.rationale}</div>
+                <div key={i} className="text-slate-600">· {p.workflowId} → {p.outcome}: {p.rationale}</div>
               ))}
             </div>
           )}

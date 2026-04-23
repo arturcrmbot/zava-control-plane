@@ -26,18 +26,21 @@ export default function ExceptionQueue() {
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <div className="text-sm font-semibold">Exception Queue</div>
+    <div className="space-y-4">
+      <div className="flex items-baseline gap-3">
+        <div className="text-lg font-semibold text-slate-900">Exception Queue</div>
         <div className="text-xs text-slate-500">{items.length} open</div>
         <div className="ml-auto flex gap-2">
           <button disabled={selected.size === 0} onClick={() => setModal(true)}
-            className="text-xs px-3 py-1.5 bg-amber-600 rounded hover:bg-amber-500 disabled:opacity-40">
+            className="btn-primary text-xs py-1.5 disabled:opacity-40">
             Bulk resolve ({selected.size})
           </button>
         </div>
       </div>
       <div className="space-y-2">
+        {items.length === 0 && (
+          <div className="panel panel-body text-sm text-slate-500 italic">No open exceptions.</div>
+        )}
         {items.map(e => (
           <ExceptionItem
             key={e.id}

@@ -23,5 +23,5 @@ export default function Analytics() {
         { label: "Override frequency", v: `${(d.overrideFrequency * 100).toFixed(1)}%` },
         { label: "Quality Δ vs baseline", v: `+${(d.qualityDelta * 100).toFixed(1)}%` }
     ];
-    return (_jsxs("div", { className: "space-y-3", children: [_jsx("div", { className: "text-sm font-semibold", children: "Analytics \u2014 last 24h" }), _jsx("div", { className: "grid grid-cols-4 gap-3", children: cards.map(c => (_jsxs("div", { className: "border border-slate-800 rounded p-3 bg-slate-900/30", children: [_jsx("div", { className: "text-[11px] uppercase text-slate-500", children: c.label }), _jsx("div", { className: "text-xl font-semibold", children: c.v })] }, c.label))) })] }));
+    return (_jsxs("div", { className: "space-y-4", children: [_jsxs("div", { children: [_jsx("div", { className: "text-lg font-semibold text-slate-900", children: "Analytics" }), _jsx("div", { className: "text-xs text-slate-500", children: "Rolling 24h fleet telemetry" })] }), _jsx("div", { className: "grid grid-cols-4 gap-3", children: cards.map(c => (_jsxs("div", { className: "panel panel-body", children: [_jsx("div", { className: "text-[11px] uppercase tracking-wide text-slate-500", children: c.label }), _jsx("div", { className: "text-2xl font-semibold text-slate-900 mt-1", children: c.v })] }, c.label))) })] }));
 }

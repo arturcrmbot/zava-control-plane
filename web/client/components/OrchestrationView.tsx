@@ -25,10 +25,10 @@ interface OrchestrationData {
 const stepNames = ["Intake", "Validation", "Routing", "Approval", "Payment", "Reconciliation"] as const;
 
 const exTypeLabel = (t: string | undefined) => {
-  if (t === "agent") return <span className="text-purple-300 font-mono text-[10px]">[agt]</span>;
-  if (t === "validator") return <span className="text-amber-300 font-mono text-[10px]">[val]</span>;
-  if (t === "deterministic") return <span className="text-slate-400 font-mono text-[10px]">[det]</span>;
-  return <span className="text-slate-500 font-mono text-[10px]">[ ?]</span>;
+  if (t === "agent") return <span className="text-purple-700 font-mono text-[10px]">[agt]</span>;
+  if (t === "validator") return <span className="text-amber-700 font-mono text-[10px]">[val]</span>;
+  if (t === "deterministic") return <span className="text-slate-500 font-mono text-[10px]">[det]</span>;
+  return <span className="text-slate-400 font-mono text-[10px]">[ ?]</span>;
 };
 
 interface StepView {
@@ -90,55 +90,55 @@ export default function OrchestrationView({ workflowId }: { workflowId: string }
 
   return (
     <div className="space-y-3 text-xs">
-      <div className="border border-slate-800 rounded p-3 bg-slate-900/30">
-        <div>Durable Workflow: <span className="text-slate-200">InvoiceP2POrchestrator</span></div>
-        <div>instance: <span className="text-slate-300 font-mono">{data.instance_id || "—"}</span></div>
-        <div>status: <span className="text-slate-200">{data.status}</span></div>
+      <div className="panel panel-body space-y-0.5">
+        <div className="text-slate-700">Durable Workflow: <span className="text-slate-900 font-medium">InvoiceP2POrchestrator</span></div>
+        <div className="text-slate-700">instance: <span className="text-slate-600 font-mono">{data.instance_id || "—"}</span></div>
+        <div className="text-slate-700">status: <span className="text-slate-900 font-medium">{data.status}</span></div>
       </div>
       <div className="space-y-2">
         {stepViews.map(s => (
-          <div key={s.name} className="border border-slate-800 rounded bg-slate-900/30">
-            <div className="px-3 py-1.5 flex items-center gap-2">
-              <div className="w-32 text-slate-200">{s.name}</div>
-              {s.rejected ? <div className="text-red-400">✗ rejected</div>
-                : s.failed ? <div className="text-red-400">✗ failed</div>
-                : s.completed ? <div className="text-emerald-400">✓ completed</div>
-                : s.suspended && !s.resumed ? <div className="text-amber-400">⏸ suspended</div>
-                : s.blocked ? <div className="text-red-400">✗ blocked</div>
-                : s.started ? <div className="text-blue-400">running</div>
-                : <div className="text-slate-500">not started</div>}
+          <div key={s.name} className="panel">
+            <div className="px-3 py-2 flex items-center gap-2">
+              <div className="w-32 text-slate-800 font-medium">{s.name}</div>
+              {s.rejected ? <div className="text-red-700">✗ rejected</div>
+                : s.failed ? <div className="text-red-700">✗ failed</div>
+                : s.completed ? <div className="text-emerald-700">✓ completed</div>
+                : s.suspended && !s.resumed ? <div className="text-amber-700">⏸ suspended</div>
+                : s.blocked ? <div className="text-red-700">✗ blocked</div>
+                : s.started ? <div className="text-blue-700">running</div>
+                : <div className="text-slate-400">not started</div>}
               {s.completed?.payload?.duration_ms != null && (
                 <div className="text-slate-500 ml-auto">{s.completed.payload.duration_ms} ms</div>
               )}
             </div>
             {(s.executors.length > 0 || s.blocked || s.suspended || s.rejected) && (
-              <div className="border-t border-slate-800 px-3 py-2 space-y-0.5">
+              <div className="border-t border-slate-200 px-3 py-2 space-y-0.5 bg-slate-50">
                 {s.executors.map((e, i) => (
                   <div key={i} className="flex items-center gap-2 text-[11px]">
                     {exTypeLabel(e.payload.type)}
-                    <span className="text-slate-300 font-mono">{e.payload.name}</span>
+                    <span className="text-slate-700 font-mono">{e.payload.name}</span>
                     <span className="text-slate-500 ml-auto">{e.payload.duration_ms} ms</span>
                   </div>
                 ))}
                 {s.blocked && (
-                  <div className="text-red-400 mt-1">
+                  <div className="text-red-700 mt-1">
                     ↳ {String(s.blocked.payload.name ?? "")} blocked: {String(s.blocked.payload.reason ?? "")} → routed to Fleet Manager
                   </div>
                 )}
                 {s.suspended && !s.resumed && (
-                  <div className="text-amber-300 mt-1">↳ awaiting `approval_decision` (zero compute)</div>
+                  <div className="text-amber-700 mt-1">↳ awaiting `approval_decision` (zero compute)</div>
                 )}
                 {s.resumed && (
-                  <div className="text-emerald-300 mt-1">↳ resumed with operator decision</div>
+                  <div className="text-emerald-700 mt-1">↳ resumed with operator decision</div>
                 )}
                 {s.rejected && (
-                  <div className="text-red-400 mt-1">
+                  <div className="text-red-700 mt-1">
                     ↳ rejected by {String(s.rejected.payload.by ?? "operator")}
                     {s.rejected.payload.reason ? ` (${String(s.rejected.payload.reason)})` : ""}
                   </div>
                 )}
                 {s.failed?.payload?.error && (
-                  <div className="text-red-400 mt-1">↳ error: {String(s.failed.payload.error)}</div>
+                  <div className="text-red-700 mt-1">↳ error: {String(s.failed.payload.error)}</div>
                 )}
               </div>
             )}

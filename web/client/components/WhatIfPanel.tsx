@@ -22,23 +22,23 @@ export default function WhatIfPanel({ policyId }: { policyId: string }) {
   };
 
   return (
-    <div className="border border-slate-800 rounded p-3 bg-slate-900/30 space-y-2">
-      <div className="text-xs uppercase text-slate-500">What-if analysis</div>
+    <div className="panel panel-body space-y-3">
+      <div className="text-[11px] uppercase tracking-wide text-slate-500">What-if analysis</div>
       <div className="flex gap-2 items-center">
         <input value={value} onChange={e => setValue(e.target.value)} placeholder="proposed value"
-          className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs w-40" />
-        <button onClick={run} className="text-xs px-3 py-1.5 border border-slate-700 rounded hover:bg-slate-800">Run dry-run</button>
+          className="bg-white border border-slate-300 rounded px-2 py-1 text-xs w-40 focus:outline-none focus:ring-2 focus:ring-blue-300" />
+        <button onClick={run} className="btn-secondary text-xs py-1">Run dry-run</button>
       </div>
       {result && (
-        <div className="text-xs text-slate-300 space-y-1">
+        <div className="text-xs text-slate-700 space-y-1">
           <div>Scope: last 7 days. Evaluated {result.totalEvaluated} workflows.</div>
-          <div className="text-emerald-300">
+          <div className="text-emerald-700 font-medium">
             {result.wouldBeDifferent} would have decided differently.
           </div>
           {result.impactedWorkflowIds.length > 0 && (
-            <div className="text-slate-400">Impacted: {result.impactedWorkflowIds.join(", ")}</div>
+            <div className="text-slate-500">Impacted: {result.impactedWorkflowIds.join(", ")}</div>
           )}
-          <button onClick={propose} className="mt-2 text-xs px-3 py-1.5 bg-blue-600 rounded hover:bg-blue-500">
+          <button onClick={propose} className="btn-primary text-xs mt-2 py-1">
             Propose as change (opens PR)
           </button>
         </div>

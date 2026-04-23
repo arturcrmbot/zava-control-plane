@@ -30,13 +30,16 @@ export default function Analytics() {
   ];
 
   return (
-    <div className="space-y-3">
-      <div className="text-sm font-semibold">Analytics — last 24h</div>
+    <div className="space-y-4">
+      <div>
+        <div className="text-lg font-semibold text-slate-900">Analytics</div>
+        <div className="text-xs text-slate-500">Rolling 24h fleet telemetry</div>
+      </div>
       <div className="grid grid-cols-4 gap-3">
         {cards.map(c => (
-          <div key={c.label} className="border border-slate-800 rounded p-3 bg-slate-900/30">
-            <div className="text-[11px] uppercase text-slate-500">{c.label}</div>
-            <div className="text-xl font-semibold">{c.v}</div>
+          <div key={c.label} className="panel panel-body">
+            <div className="text-[11px] uppercase tracking-wide text-slate-500">{c.label}</div>
+            <div className="text-2xl font-semibold text-slate-900 mt-1">{c.v}</div>
           </div>
         ))}
       </div>
