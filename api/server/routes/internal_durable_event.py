@@ -36,6 +36,16 @@ def _ledger(wid: str, *, kind: str, actor_id: str, action: str, details: dict, r
     ))
 
 
+def _auto_resolve_open(workflow_id: str, resolved_by: str) -> None:
+    """Mark every still-open exception for a workflow as resolved. Used on
+    resumed / workflow.completed / workflow.rejected so the operator queue
+    doesn't leak stale entries once the orchestrator has moved past HITL or
+    finished the run."""
+    for e in app_state.store.list_exceptions(include_resolved=False):
+        if e.workflow_id == workflow_id:
+            app_state.store.resolve_exception(e.id, resolved_by)
+
+
 @router.post("/durable-event")
 async def receive_durable_event(body: DurableEventBody):
     wid = body.workflow_id
@@ -158,6 +168,10 @@ async def receive_durable_event(body: DurableEventBody):
         w = app_state.store.get_workflow(wid)
         if w:
             w.status = "in_progress"
+        # When the orchestrator resumes via raiseEvent, the HITL exception that
+        # gated the suspension is defunct. Resolve any still-open exceptions
+        # for this workflow so the operator queue doesn't leak stale entries.
+        _auto_resolve_open(wid, "auto-resolved:resumed")
 
     elif body.kind == "workflow.completed":
         _ledger(wid, kind="agent", actor_id="orchestrator",
@@ -165,6 +179,7 @@ async def receive_durable_event(body: DurableEventBody):
         w = app_state.store.get_workflow(wid)
         if w:
             w.status = "completed"
+        _auto_resolve_open(wid, "auto-resolved:completed")
         app_state.bus.emit(FleetEvent(
             type="workflow.resolved", workflow_id=wid, resolution="completed"
         ))
@@ -189,5 +204,6 @@ async def receive_durable_event(body: DurableEventBody):
         if w:
             w.status = "failed"
             w.current_phase = "Approval"
+        _auto_resolve_open(wid, "auto-resolved:rejected")
 
     return {"received": True}
