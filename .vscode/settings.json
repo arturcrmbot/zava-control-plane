@@ -1,0 +1,52 @@
+{
+  "//": "Hide gitignored noise from the explorer / search / file watcher. The files still exist on disk; VS Code just stops showing them.",
+
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true,
+    "**/*.pyc": true,
+    "**/*.pyo": true,
+    ".venv": true,
+    ".funcvenv": true,
+    ".python_packages": true,
+    "node_modules": true,
+    "dist": true,
+    "test-results": true,
+    "azurite-data": true,
+    ".worktrees": true,
+    ".playwright-mcp": true,
+    ".claude-cache": true,
+    ".claude": true,
+    ".env": true,
+    "local.settings.json": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true
+  },
+
+  "search.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    ".venv": true,
+    ".funcvenv": true,
+    "node_modules": true,
+    "dist": true,
+    "test-results": true,
+    "azurite-data": true,
+    "package-lock.json": true,
+    "uv.lock": true,
+    "requirements.txt": true
+  },
+
+  "files.watcherExclude": {
+    "**/__pycache__/**": true,
+    "**/.pytest_cache/**": true,
+    "**/.venv/**": true,
+    "**/.funcvenv/**": true,
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/test-results/**": true,
+    "**/azurite-data/**": true,
+    "**/.worktrees/**": true
+  }
+}
