@@ -6,18 +6,11 @@ async MAF Workflow run inside asyncio.run.
 
 Activities are the I/O boundary — they call out to MCP servers (via the executors)
 and fire webhooks back to FastAPI. The orchestration generator stays pure / deterministic.
-
-NOTE: validation/routing/payment/reconciliation activities raise NotImplementedError
-after the expense-compliance pivot (Week 2 will reshape the orchestrator into the
-7-phase expense-compliance flow). The trigger registrations in function_app.py are
-preserved so the worker still loads.
 """
 from __future__ import annotations
 import asyncio
 
-from api.functions.graphs import (
-    build_intake_workflow, build_approval_workflow,
-)
+from api.functions.graphs import build_intake_workflow, build_approval_workflow
 from api.functions.webhook import emit
 
 
@@ -41,29 +34,12 @@ async def _run_workflow(workflow_factory, payload: dict, step_name: str) -> dict
     return result
 
 
-# Activity functions — single-arg signature for Azure Durable Functions
 def intake_activity(payload: dict) -> dict:
     return asyncio.run(_run_workflow(build_intake_workflow, payload, "Intake"))
 
 
-def validation_activity(payload: dict) -> dict:
-    raise NotImplementedError("expense pivot — see Week 2 plan (orchestrator reshape)")
-
-
-def routing_activity(payload: dict) -> dict:
-    raise NotImplementedError("expense pivot — see Week 2 plan (orchestrator reshape)")
-
-
 def approval_activity(payload: dict) -> dict:
     return asyncio.run(_run_workflow(build_approval_workflow, payload, "Approval"))
-
-
-def payment_activity(payload: dict) -> dict:
-    raise NotImplementedError("expense pivot — see Week 2 plan (orchestrator reshape)")
-
-
-def reconciliation_activity(payload: dict) -> dict:
-    raise NotImplementedError("expense pivot — see Week 2 plan (orchestrator reshape)")
 
 
 def checkpoint_activity(payload: dict) -> dict:

@@ -7,8 +7,7 @@ import azure.durable_functions as df
 from api.shared.otel import init_otel
 from api.functions.workflows.invoice_p2p import invoice_p2p_orchestration
 from api.functions.workflows.activities import (
-    intake_activity, validation_activity, routing_activity, approval_activity,
-    payment_activity, reconciliation_activity, checkpoint_activity,
+    intake_activity, approval_activity, checkpoint_activity,
 )
 
 # Wire OTEL at worker module-load; DF orchestrator + activity spans export to Foundry.
@@ -31,28 +30,8 @@ def intake_activity_trigger(payload: dict) -> dict:
 
 
 @app.activity_trigger(input_name="payload")
-def validation_activity_trigger(payload: dict) -> dict:
-    return validation_activity(payload)
-
-
-@app.activity_trigger(input_name="payload")
-def routing_activity_trigger(payload: dict) -> dict:
-    return routing_activity(payload)
-
-
-@app.activity_trigger(input_name="payload")
 def approval_activity_trigger(payload: dict) -> dict:
     return approval_activity(payload)
-
-
-@app.activity_trigger(input_name="payload")
-def payment_activity_trigger(payload: dict) -> dict:
-    return payment_activity(payload)
-
-
-@app.activity_trigger(input_name="payload")
-def reconciliation_activity_trigger(payload: dict) -> dict:
-    return reconciliation_activity(payload)
 
 
 @app.activity_trigger(input_name="payload")
