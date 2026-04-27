@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSSE } from "../hooks/useSSE";
 
 type CMRow = { green: number; amber: number; red: number };
 type Report = {
@@ -18,9 +19,16 @@ type Report = {
   }>;
 };
 
+type AccuracyEvent = {
+  type?: string;
+  index?: number;
+  total?: number;
+};
+
+const LABELS = ["green", "amber", "red"] as const;
+
 export function AccuracyReport() {
-  const [report, setReport] = useState<Report | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [report, setReport] = useState<Report | null | undefined>(undefined);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ index: number; total: number } | null>(null);
   const [drillCell, setDrillCell] = useState<{ gold: string; pred: string } | null>(null);
@@ -28,42 +36,37 @@ export function AccuracyReport() {
   useEffect(() => {
     fetch("/api/accuracy/last")
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => setReport(data))
-      .finally(() => setLoading(false));
+      .then((data) => setReport(data));
   }, []);
 
-  useEffect(() => {
-    if (!running) return;
-    const sse = new EventSource("/api/stream/fleet");
-    sse.addEventListener("message", (ev) => {
-      let data: any = {};
-      try {
-        data = JSON.parse((ev as MessageEvent).data || "{}");
-      } catch {
-        return;
-      }
-      if (data.type === "accuracy.progress") {
-        setProgress({ index: data.index, total: data.total });
-      } else if (data.type === "accuracy.complete") {
-        fetch("/api/accuracy/last").then((r) => r.json()).then(setReport);
-        setRunning(false);
-        setProgress(null);
-      }
-    });
-    return () => sse.close();
-  }, [running]);
+  const onEvent = useCallback((data: AccuracyEvent) => {
+    if (data.type === "accuracy.progress" && data.index !== undefined && data.total !== undefined) {
+      setProgress({ index: data.index, total: data.total });
+    } else if (data.type === "accuracy.complete") {
+      fetch("/api/accuracy/last").then((r) => r.json()).then(setReport);
+      setRunning(false);
+      setProgress(null);
+    }
+  }, []);
+
+  useSSE<AccuracyEvent>("/api/stream/fleet", onEvent);
 
   async function startRun() {
     setRunning(true);
-    await fetch("/api/accuracy/run", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
+    try {
+      await fetch("/api/accuracy/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+    } catch {
+      setRunning(false);
+      setProgress(null);
+    }
   }
 
-  if (loading) return <div className="p-4">Loading…</div>;
-  const labels = ["green", "amber", "red"] as const;
+  if (report === undefined) return <div className="p-4">Loading…</div>;
+
   const drillRows =
     drillCell && report
       ? report.per_claim.filter(
@@ -111,7 +114,7 @@ export function AccuracyReport() {
               <thead>
                 <tr>
                   <th></th>
-                  {labels.map((l) => (
+                  {LABELS.map((l) => (
                     <th key={l} className="px-3 py-1 capitalize text-slate-500 font-normal">
                       predicted {l}
                     </th>
@@ -119,12 +122,12 @@ export function AccuracyReport() {
                 </tr>
               </thead>
               <tbody>
-                {labels.map((row) => (
+                {LABELS.map((row) => (
                   <tr key={row}>
                     <th className="px-3 py-1 text-right capitalize text-slate-500 font-normal">
                       gold {row}
                     </th>
-                    {labels.map((col) => {
+                    {LABELS.map((col) => {
                       const v = report.confusion_matrix[row][col];
                       const isDiagonal = row === col;
                       return (

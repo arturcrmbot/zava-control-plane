@@ -8,10 +8,11 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from opentelemetry import trace
+from sentence_transformers import SentenceTransformer
 
-_tracer = trace.get_tracer("wpp.mcp.policy_search")
+from ._otel import traced_tool
+
 _POLICY_PATH = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "policy.md"
 
 
@@ -62,8 +63,6 @@ def _ensure_index() -> list[_Chunk]:
         raise FileNotFoundError(f"policy.md not found at {_POLICY_PATH}")
     text = _POLICY_PATH.read_text(encoding="utf-8")
     chunks = _split_into_sections(text)
-    # If any section body is very long, split it at paragraph boundaries to
-    # improve top-1 retrieval. Threshold: 600 chars.
     expanded: list[tuple[str, str]] = []
     for label, body in chunks:
         if len(body) > 600:
@@ -73,14 +72,11 @@ def _ensure_index() -> list[_Chunk]:
         else:
             expanded.append((label, body))
     model = _load_model()
-    # Prepend the section label to each body for embedding so the section
-    # title (e.g. "Meals", "Travel") informs the cosine match — and so it
-    # appears in the returned chunk text too.
+    # Prepend the section label so the title (Meals/Travel/...) informs the cosine
+    # match and shows up in returned chunk text.
     embed_inputs = [f"{label}\n{body}" for label, body in expanded]
     embeddings = model.encode(
-        embed_inputs,
-        convert_to_numpy=True,
-        normalize_embeddings=True,
+        embed_inputs, convert_to_numpy=True, normalize_embeddings=True,
     )
     _index_cache = [
         _Chunk(section=label, text=f"{label}\n{body}", embedding=emb)
@@ -95,22 +91,20 @@ def reset_cache() -> None:
     _index_cache = None
 
 
+@traced_tool("policy.search")
 def search(query: str, k: int = 5) -> list[dict]:
     """Return top-k policy chunks ranked by cosine similarity to query."""
-    with _tracer.start_as_current_span("mcp.policy.search") as span:
-        span.set_attribute("wpp.mcp.tool", "policy.search")
-        span.set_attribute("wpp.mcp.query", query)
-        span.set_attribute("wpp.mcp.k", k)
-        chunks = _ensure_index()
-        model = _load_model()
-        q_emb = model.encode(
-            [query], convert_to_numpy=True, normalize_embeddings=True
-        )[0]
-        scored = [(float(np.dot(q_emb, c.embedding)), c) for c in chunks]
-        scored.sort(key=lambda t: t[0], reverse=True)
-        out = [
-            {"section": c.section, "text": c.text, "score": s}
-            for s, c in scored[:k]
-        ]
-        span.set_attribute("wpp.mcp.result_count", len(out))
-        return out
+    span = trace.get_current_span()
+    span.set_attribute("wpp.mcp.query", query)
+    span.set_attribute("wpp.mcp.k", k)
+    chunks = _ensure_index()
+    model = _load_model()
+    q_emb = model.encode([query], convert_to_numpy=True, normalize_embeddings=True)[0]
+    scored = [(float(np.dot(q_emb, c.embedding)), c) for c in chunks]
+    scored.sort(key=lambda t: t[0], reverse=True)
+    out = [
+        {"section": c.section, "text": c.text, "score": s}
+        for s, c in scored[:k]
+    ]
+    span.set_attribute("wpp.mcp.result_count", len(out))
+    return out
