@@ -1,6 +1,0 @@
-{
-  "statements": [
-    { "id": "STMT-2026-04-10", "entries": [{ "ref": "PAY-0001", "amount": 12500 }, { "ref": "PAY-0002", "amount": 8400 }] }
-  ],
-  "timeoutSeed": 0
-}

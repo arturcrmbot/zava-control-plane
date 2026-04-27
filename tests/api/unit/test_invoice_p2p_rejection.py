@@ -1,16 +1,16 @@
 """
 Unit test for the HITL rejection branch in invoice_p2p orchestration.
 
-We drive the generator function directly with a hand-rolled context stub that
-mimics the minimal Durable Functions surface the orchestration uses. The goal
-is to prove that when the external approval_decision event carries a
-`decision` value in DECISION_REJECTED, the generator:
-
-  1. Yields a `workflow.rejected` checkpoint
-  2. Returns a rejection result
-  3. Never calls payment_activity_trigger or reconciliation_activity_trigger
+Skipped at module level after the expense-compliance pivot removed the invoice
+phases. Revisit in Week 2 once the orchestrator is reshaped into the 7-phase
+expense-compliance flow.
 """
 from __future__ import annotations
+import pytest
+pytest.skip(
+    "Invoice phases removed in expense pivot; revisit in Week 2 orchestrator reshape.",
+    allow_module_level=True,
+)
 from datetime import datetime, timezone
 from typing import Any
 
