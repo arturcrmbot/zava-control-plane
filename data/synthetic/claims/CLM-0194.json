@@ -13,5 +13,6 @@
   "ems_source": "workday",
   "gold_label": "green",
   "gold_reasoning": "Conference fee of EUR 980.48 is within the DE conference/training cap of EUR 1600, vendor recognisable, business purpose annotated — Green per §3.5.",
-  "gold_policy_clause": "§3.5 Miscellaneous — DE conference/training cap EUR 1600"
+  "gold_policy_clause": "§3.5 Miscellaneous — DE conference/training cap EUR 1600",
+  "receipt_mismatch_flavour": "correct"
 }

@@ -13,5 +13,6 @@
   "ems_source": "workday",
   "gold_label": "green",
   "gold_reasoning": "Munich hotel at EUR 182.09/night is at or below the Tier 1 cap of EUR 240, with itemised hotel folio and dates aligned to itinerary — Green per §3.3.",
-  "gold_policy_clause": "§3.3 Accommodation — DE Tier 1 cap EUR 240"
+  "gold_policy_clause": "§3.3 Accommodation — DE Tier 1 cap EUR 240",
+  "receipt_mismatch_flavour": "correct"
 }

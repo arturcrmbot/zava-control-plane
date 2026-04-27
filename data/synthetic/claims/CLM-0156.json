@@ -13,5 +13,6 @@
   "ems_source": "workday",
   "gold_label": "green",
   "gold_reasoning": "Claim of GBP 657.67 is at or below the UK long-haul economy cap of GBP 900, booked in economy with itinerary — Green per §3.2.",
-  "gold_policy_clause": "§3.2 Travel — UK long-haul economy cap GBP 900"
+  "gold_policy_clause": "§3.2 Travel — UK long-haul economy cap GBP 900",
+  "receipt_mismatch_flavour": "correct"
 }

@@ -13,5 +13,6 @@
   "ems_source": "concur",
   "gold_label": "amber",
   "gold_reasoning": "New York hotel at USD 390.86/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-  "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)"
+  "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
+  "receipt_mismatch_flavour": "correct"
 }

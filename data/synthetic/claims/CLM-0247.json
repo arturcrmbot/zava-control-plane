@@ -13,5 +13,6 @@
   "ems_source": "concur",
   "gold_label": "amber",
   "gold_reasoning": "Mumbai hotel at INR 16979.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-  "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)"
+  "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
+  "receipt_mismatch_flavour": "correct"
 }

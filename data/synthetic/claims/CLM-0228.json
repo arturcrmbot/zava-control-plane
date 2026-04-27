@@ -13,5 +13,6 @@
   "ems_source": "workday",
   "gold_label": "amber",
   "gold_reasoning": "Client entertainment at GBP 118.63/head is above the per-head cap (GBP 110) but at or below 110% of cap — Amber per §3.4, reviewer attention required.",
-  "gold_policy_clause": "§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)"
+  "gold_policy_clause": "§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)",
+  "receipt_mismatch_flavour": "correct"
 }

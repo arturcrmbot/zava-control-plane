@@ -13,5 +13,6 @@
   "ems_source": "workday",
   "gold_label": "green",
   "gold_reasoning": "Claim of EUR 648.17 is at or below the DE long-haul economy cap of EUR 950, booked in economy with itinerary — Green per §3.2.",
-  "gold_policy_clause": "§3.2 Travel — DE long-haul economy cap EUR 950"
+  "gold_policy_clause": "§3.2 Travel — DE long-haul economy cap EUR 950",
+  "receipt_mismatch_flavour": "correct"
 }

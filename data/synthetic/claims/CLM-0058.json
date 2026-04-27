@@ -13,5 +13,6 @@
   "ems_source": "workday",
   "gold_label": "amber",
   "gold_reasoning": "Client entertainment at EUR 108.22/head is above the per-head cap (EUR 100) but at or below 110% of cap — Amber per §3.4, reviewer attention required.",
-  "gold_policy_clause": "§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)"
+  "gold_policy_clause": "§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)",
+  "receipt_mismatch_flavour": "correct"
 }

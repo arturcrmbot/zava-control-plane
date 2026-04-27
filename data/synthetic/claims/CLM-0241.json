@@ -13,5 +13,6 @@
   "ems_source": "concur",
   "gold_label": "green",
   "gold_reasoning": "Claim of USD 944.44 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
-  "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200"
+  "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200",
+  "receipt_mismatch_flavour": "correct"
 }

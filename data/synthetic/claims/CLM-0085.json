@@ -13,5 +13,6 @@
   "ems_source": "concur",
   "gold_label": "green",
   "gold_reasoning": "Claim of USD 40.47 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-  "gold_policy_clause": "§3.1 Meals — US solo cap USD 50"
+  "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
+  "receipt_mismatch_flavour": "correct"
 }

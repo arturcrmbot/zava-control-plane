@@ -13,5 +13,6 @@
   "ems_source": "concur",
   "gold_label": "green",
   "gold_reasoning": "Client entertainment at USD 173.79 for 2 attendees (USD 86.89/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-  "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130"
+  "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
+  "receipt_mismatch_flavour": "correct"
 }

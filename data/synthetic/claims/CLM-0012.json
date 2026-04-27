@@ -13,5 +13,6 @@
   "ems_source": "workday",
   "gold_label": "green",
   "gold_reasoning": "London hotel at GBP 246.34/night is at or below the Tier 1 cap of GBP 280, with itemised hotel folio and dates aligned to itinerary — Green per §3.3.",
-  "gold_policy_clause": "§3.3 Accommodation — UK Tier 1 cap GBP 280"
+  "gold_policy_clause": "§3.3 Accommodation — UK Tier 1 cap GBP 280",
+  "receipt_mismatch_flavour": "wrong-amount"
 }

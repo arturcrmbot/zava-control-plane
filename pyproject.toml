@@ -26,6 +26,7 @@ dependencies = [
   "azure-monitor-opentelemetry>=1.6.0",
   "opentelemetry-instrumentation-httpx>=0.48b0",
   "opentelemetry-instrumentation-fastapi>=0.48b0",
+  "pillow>=10.0",
 ]
 
 [dependency-groups]
