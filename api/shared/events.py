@@ -26,6 +26,9 @@ FleetEventType = Literal[
     "durable.suspended",
     "durable.resumed",
     "durable.workflow.completed",
+    # Accuracy harness events (one-shot evaluation runs; do NOT wake the fleet manager)
+    "accuracy.progress",
+    "accuracy.complete",
 ]
 
 
