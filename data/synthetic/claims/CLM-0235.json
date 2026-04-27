@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0235",
+  "employee_id": "EMP-0023",
+  "submitted_at": "2026-04-24T10:09:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "meals",
+  "vendor": "Indian Accent",
+  "amount": 1557.0,
+  "attendees": 1,
+  "narrative": "Solo dinner at Indian Accent",
+  "receipt_filename": "CLM-0235.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of INR 1557.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
+  "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500"
+}

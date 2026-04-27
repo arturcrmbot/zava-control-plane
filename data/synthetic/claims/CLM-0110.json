@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0110",
+  "employee_id": "EMP-0016",
+  "submitted_at": "2026-04-12T14:00:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "meals",
+  "vendor": "L'Osteria",
+  "amount": 38.75,
+  "attendees": 1,
+  "narrative": "Solo dinner at L'Osteria",
+  "receipt_filename": "CLM-0110.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of EUR 38.75 is within the DE solo meal cap of EUR 45. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
+  "gold_policy_clause": "§3.1 Meals — DE solo cap EUR 45"
+}

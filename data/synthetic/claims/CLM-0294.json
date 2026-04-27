@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0294",
+  "employee_id": "EMP-0016",
+  "submitted_at": "2026-04-30T12:17:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "miscellaneous",
+  "vendor": "Adobe Creative Cloud",
+  "amount": 1090.6,
+  "attendees": 1,
+  "narrative": "Conference registration via Adobe Creative Cloud",
+  "receipt_filename": "CLM-0294.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Conference fee of EUR 1090.60 is within the DE conference/training cap of EUR 1600, vendor recognisable, business purpose annotated — Green per §3.5.",
+  "gold_policy_clause": "§3.5 Miscellaneous — DE conference/training cap EUR 1600"
+}

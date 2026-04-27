@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0214",
+  "employee_id": "EMP-0022",
+  "submitted_at": "2026-04-22T13:34:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "miscellaneous",
+  "vendor": "Office Discount DE",
+  "amount": 1115.08,
+  "attendees": 1,
+  "narrative": "Conference registration via Office Discount DE",
+  "receipt_filename": "CLM-0214.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Conference fee of EUR 1115.08 is within the DE conference/training cap of EUR 1600, vendor recognisable, business purpose annotated — Green per §3.5.",
+  "gold_policy_clause": "§3.5 Miscellaneous — DE conference/training cap EUR 1600"
+}

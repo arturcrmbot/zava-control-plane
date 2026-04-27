@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0141",
+  "employee_id": "EMP-0009",
+  "submitted_at": "2026-04-15T16:33:00",
+  "market": "US",
+  "currency": "USD",
+  "category": "travel",
+  "vendor": "Delta Airlines",
+  "amount": 1012.39,
+  "attendees": 1,
+  "narrative": "Long-haul return booking via Delta Airlines",
+  "receipt_filename": "CLM-0141.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of USD 1012.39 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
+  "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200"
+}

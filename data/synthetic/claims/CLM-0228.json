@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0228",
+  "employee_id": "EMP-0006",
+  "submitted_at": "2026-04-23T14:38:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "entertainment",
+  "vendor": "The Ned",
+  "amount": 355.89,
+  "attendees": 3,
+  "narrative": "Client dinner at The Ned, business-development discussion",
+  "receipt_filename": "CLM-0228.png",
+  "ems_source": "workday",
+  "gold_label": "amber",
+  "gold_reasoning": "Client entertainment at GBP 118.63/head is above the per-head cap (GBP 110) but at or below 110% of cap — Amber per §3.4, reviewer attention required.",
+  "gold_policy_clause": "§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)"
+}

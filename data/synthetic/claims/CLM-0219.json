@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0219",
+  "employee_id": "EMP-0027",
+  "submitted_at": "2026-04-22T09:26:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "miscellaneous",
+  "vendor": "Croma Business",
+  "amount": 96486.0,
+  "attendees": 1,
+  "narrative": "Conference registration via Croma Business",
+  "receipt_filename": "CLM-0219.png",
+  "ems_source": "concur",
+  "gold_label": "red",
+  "gold_reasoning": "Conference fee of INR 96486.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
+  "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)"
+}

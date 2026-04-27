@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0091",
+  "employee_id": "EMP-0030",
+  "submitted_at": "2026-04-10T15:19:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "travel",
+  "vendor": "Vistara",
+  "amount": 35541.0,
+  "attendees": 1,
+  "narrative": "Long-haul return booking via Vistara",
+  "receipt_filename": "CLM-0091.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of INR 35541.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
+  "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000"
+}

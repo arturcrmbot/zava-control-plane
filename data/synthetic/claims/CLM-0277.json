@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0277",
+  "employee_id": "EMP-0010",
+  "submitted_at": "2026-04-28T12:35:00",
+  "market": "US",
+  "currency": "USD",
+  "category": "accommodation",
+  "vendor": "Hyatt Regency Boston",
+  "amount": 391.48,
+  "attendees": 1,
+  "narrative": "New York stay at Hyatt Regency Boston",
+  "receipt_filename": "CLM-0277.png",
+  "ems_source": "concur",
+  "gold_label": "amber",
+  "gold_reasoning": "New York hotel at USD 391.48/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
+  "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)"
+}

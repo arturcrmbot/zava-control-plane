@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0157",
+  "employee_id": "EMP-0009",
+  "submitted_at": "2026-04-16T17:49:00",
+  "market": "US",
+  "currency": "USD",
+  "category": "accommodation",
+  "vendor": "Hilton SF Union Square",
+  "amount": 398.61,
+  "attendees": 1,
+  "narrative": "New York stay at Hilton SF Union Square",
+  "receipt_filename": "CLM-0157.png",
+  "ems_source": "concur",
+  "gold_label": "amber",
+  "gold_reasoning": "New York hotel at USD 398.61/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
+  "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)"
+}

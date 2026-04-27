@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0221",
+  "employee_id": "EMP-0012",
+  "submitted_at": "2026-04-23T08:28:00",
+  "market": "US",
+  "currency": "USD",
+  "category": "travel",
+  "vendor": "Amtrak Acela",
+  "amount": 1030.93,
+  "attendees": 1,
+  "narrative": "Long-haul return booking via Amtrak Acela",
+  "receipt_filename": "CLM-0221.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of USD 1030.93 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
+  "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200"
+}

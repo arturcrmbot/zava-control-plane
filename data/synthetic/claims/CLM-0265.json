@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0265",
+  "employee_id": "EMP-0008",
+  "submitted_at": "2026-04-27T13:05:00",
+  "market": "US",
+  "currency": "USD",
+  "category": "meals",
+  "vendor": "Shake Shack",
+  "amount": 39.88,
+  "attendees": 1,
+  "narrative": "Solo dinner at Shake Shack",
+  "receipt_filename": "CLM-0265.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of USD 39.88 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
+  "gold_policy_clause": "§3.1 Meals — US solo cap USD 50"
+}

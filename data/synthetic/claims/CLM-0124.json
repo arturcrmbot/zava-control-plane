@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0124",
+  "employee_id": "EMP-0006",
+  "submitted_at": "2026-04-13T16:01:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "miscellaneous",
+  "vendor": "Eventbrite UK",
+  "amount": 1376.04,
+  "attendees": 1,
+  "narrative": "Conference registration via Eventbrite UK",
+  "receipt_filename": "CLM-0124.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Conference fee of GBP 1376.04 is within the UK conference/training cap of GBP 1500, vendor recognisable, business purpose annotated — Green per §3.5.",
+  "gold_policy_clause": "§3.5 Miscellaneous — UK conference/training cap GBP 1500"
+}

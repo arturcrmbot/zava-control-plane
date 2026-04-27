@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0255",
+  "employee_id": "EMP-0028",
+  "submitted_at": "2026-04-26T15:45:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "meals",
+  "vendor": "Mahesh Lunch Home",
+  "amount": 1840.0,
+  "attendees": 1,
+  "narrative": "Solo dinner at Mahesh Lunch Home",
+  "receipt_filename": "CLM-0255.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of INR 1840.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
+  "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500"
+}

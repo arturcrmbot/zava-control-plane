@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0107",
+  "employee_id": "EMP-0024",
+  "submitted_at": "2026-04-11T17:29:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "accommodation",
+  "vendor": "JW Marriott Mumbai",
+  "amount": 17483.0,
+  "attendees": 1,
+  "narrative": "Mumbai stay at JW Marriott Mumbai",
+  "receipt_filename": "CLM-0107.png",
+  "ems_source": "concur",
+  "gold_label": "amber",
+  "gold_reasoning": "Mumbai hotel at INR 17483.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
+  "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)"
+}

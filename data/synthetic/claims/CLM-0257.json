@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0257",
+  "employee_id": "EMP-0008",
+  "submitted_at": "2026-04-26T11:45:00",
+  "market": "US",
+  "currency": "USD",
+  "category": "accommodation",
+  "vendor": "Westin Chicago",
+  "amount": 401.62,
+  "attendees": 1,
+  "narrative": "New York stay at Westin Chicago",
+  "receipt_filename": "CLM-0257.png",
+  "ems_source": "concur",
+  "gold_label": "amber",
+  "gold_reasoning": "New York hotel at USD 401.62/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
+  "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)"
+}

@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0193",
+  "employee_id": "EMP-0008",
+  "submitted_at": "2026-04-20T09:45:00",
+  "market": "US",
+  "currency": "USD",
+  "category": "entertainment",
+  "vendor": "Eleven Madison Park",
+  "amount": 465.02,
+  "attendees": 4,
+  "narrative": "Client dinner at Eleven Madison Park, business-development discussion",
+  "receipt_filename": "CLM-0193.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Client entertainment at USD 465.02 for 4 attendees (USD 116.26/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
+  "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130"
+}

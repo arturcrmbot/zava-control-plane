@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0208",
+  "employee_id": "EMP-0005",
+  "submitted_at": "2026-04-21T18:10:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "entertainment",
+  "vendor": "The Wolseley",
+  "amount": 457.55,
+  "attendees": 4,
+  "narrative": "Client dinner at The Wolseley, business-development discussion",
+  "receipt_filename": "CLM-0208.png",
+  "ems_source": "workday",
+  "gold_label": "amber",
+  "gold_reasoning": "Client entertainment at GBP 114.39/head is above the per-head cap (GBP 110) but at or below 110% of cap — Amber per §3.4, reviewer attention required.",
+  "gold_policy_clause": "§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)"
+}

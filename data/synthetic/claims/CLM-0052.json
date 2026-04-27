@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0052",
+  "employee_id": "EMP-0005",
+  "submitted_at": "2026-04-06T14:38:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "accommodation",
+  "vendor": "Premier Inn London",
+  "amount": 179.93,
+  "attendees": 1,
+  "narrative": "London stay at Premier Inn London",
+  "receipt_filename": "CLM-0052.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "London hotel at GBP 179.93/night is at or below the Tier 1 cap of GBP 280, with itemised hotel folio and dates aligned to itinerary — Green per §3.3.",
+  "gold_policy_clause": "§3.3 Accommodation — UK Tier 1 cap GBP 280"
+}

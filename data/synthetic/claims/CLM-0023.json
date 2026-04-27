@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0023",
+  "employee_id": "EMP-0025",
+  "submitted_at": "2026-04-03T11:00:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "entertainment",
+  "vendor": "Indigo Mumbai",
+  "amount": 7072.0,
+  "attendees": 2,
+  "narrative": "Client dinner at Indigo Mumbai, business-development discussion",
+  "receipt_filename": "CLM-0023.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Client entertainment at INR 7072.00 for 2 attendees (INR 3535.91/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
+  "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500"
+}

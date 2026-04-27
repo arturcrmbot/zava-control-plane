@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0281",
+  "employee_id": "EMP-0015",
+  "submitted_at": "2026-04-29T12:43:00",
+  "market": "US",
+  "currency": "USD",
+  "category": "travel",
+  "vendor": "JetBlue",
+  "amount": 1093.72,
+  "attendees": 1,
+  "narrative": "Long-haul return booking via JetBlue",
+  "receipt_filename": "CLM-0281.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of USD 1093.72 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
+  "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200"
+}

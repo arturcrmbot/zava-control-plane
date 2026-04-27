@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0156",
+  "employee_id": "EMP-0003",
+  "submitted_at": "2026-04-16T14:02:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "travel",
+  "vendor": "Heathrow Express",
+  "amount": 657.67,
+  "attendees": 1,
+  "narrative": "Long-haul return booking via Heathrow Express",
+  "receipt_filename": "CLM-0156.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of GBP 657.67 is at or below the UK long-haul economy cap of GBP 900, booked in economy with itinerary — Green per §3.2.",
+  "gold_policy_clause": "§3.2 Travel — UK long-haul economy cap GBP 900"
+}

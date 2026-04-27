@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0210",
+  "employee_id": "EMP-0017",
+  "submitted_at": "2026-04-22T15:53:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "meals",
+  "vendor": "Nordsee",
+  "amount": 27.7,
+  "attendees": 1,
+  "narrative": "Solo dinner at Nordsee",
+  "receipt_filename": "CLM-0210.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of EUR 27.70 is within the DE solo meal cap of EUR 45. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
+  "gold_policy_clause": "§3.1 Meals — DE solo cap EUR 45"
+}

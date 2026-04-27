@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0232",
+  "employee_id": "EMP-0006",
+  "submitted_at": "2026-04-24T13:02:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "accommodation",
+  "vendor": "Hotel Indigo Edinburgh",
+  "amount": 170.44,
+  "attendees": 1,
+  "narrative": "London stay at Hotel Indigo Edinburgh",
+  "receipt_filename": "CLM-0232.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "London hotel at GBP 170.44/night is at or below the Tier 1 cap of GBP 280, with itemised hotel folio and dates aligned to itinerary — Green per §3.3.",
+  "gold_policy_clause": "§3.3 Accommodation — UK Tier 1 cap GBP 280"
+}

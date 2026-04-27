@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0256",
+  "employee_id": "EMP-0003",
+  "submitted_at": "2026-04-26T09:45:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "travel",
+  "vendor": "Addison Lee",
+  "amount": 601.06,
+  "attendees": 1,
+  "narrative": "Long-haul return booking via Addison Lee",
+  "receipt_filename": "CLM-0256.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of GBP 601.06 is at or below the UK long-haul economy cap of GBP 900, booked in economy with itinerary — Green per §3.2.",
+  "gold_policy_clause": "§3.2 Travel — UK long-haul economy cap GBP 900"
+}

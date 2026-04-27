@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0102",
+  "employee_id": "EMP-0020",
+  "submitted_at": "2026-04-11T15:02:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "accommodation",
+  "vendor": "Hyatt Hamburg",
+  "amount": 155.14,
+  "attendees": 1,
+  "narrative": "Munich stay at Hyatt Hamburg",
+  "receipt_filename": "CLM-0102.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Munich hotel at EUR 155.14/night is at or below the Tier 1 cap of EUR 240, with itemised hotel folio and dates aligned to itinerary — Green per §3.3.",
+  "gold_policy_clause": "§3.3 Accommodation — DE Tier 1 cap EUR 240"
+}

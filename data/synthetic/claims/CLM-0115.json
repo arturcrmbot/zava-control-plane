@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0115",
+  "employee_id": "EMP-0030",
+  "submitted_at": "2026-04-12T15:04:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "meals",
+  "vendor": "Saravana Bhavan",
+  "amount": 2266.0,
+  "attendees": 1,
+  "narrative": "Solo dinner at Saravana Bhavan",
+  "receipt_filename": "CLM-0115.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of INR 2266.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
+  "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500"
+}

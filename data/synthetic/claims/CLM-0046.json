@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0046",
+  "employee_id": "EMP-0020",
+  "submitted_at": "2026-04-05T10:50:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "travel",
+  "vendor": "Deutsche Bahn ICE",
+  "amount": 630.87,
+  "attendees": 1,
+  "narrative": "Long-haul return booking via Deutsche Bahn ICE",
+  "receipt_filename": "CLM-0046.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of EUR 630.87 is at or below the DE long-haul economy cap of EUR 950, booked in economy with itinerary — Green per §3.2.",
+  "gold_policy_clause": "§3.2 Travel — DE long-haul economy cap EUR 950"
+}

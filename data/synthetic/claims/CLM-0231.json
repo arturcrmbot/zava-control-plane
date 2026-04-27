@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0231",
+  "employee_id": "EMP-0028",
+  "submitted_at": "2026-04-24T16:35:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "travel",
+  "vendor": "Ola Cabs",
+  "amount": 35632.0,
+  "attendees": 1,
+  "narrative": "Long-haul return booking via Ola Cabs",
+  "receipt_filename": "CLM-0231.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of INR 35632.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
+  "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000"
+}

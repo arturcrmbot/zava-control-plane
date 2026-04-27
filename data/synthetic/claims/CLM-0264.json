@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0264",
+  "employee_id": "EMP-0002",
+  "submitted_at": "2026-04-27T17:22:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "miscellaneous",
+  "vendor": "John Lewis Business",
+  "amount": 933.81,
+  "attendees": 1,
+  "narrative": "Conference registration via John Lewis Business",
+  "receipt_filename": "CLM-0264.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Conference fee of GBP 933.81 is within the UK conference/training cap of GBP 1500, vendor recognisable, business purpose annotated — Green per §3.5.",
+  "gold_policy_clause": "§3.5 Miscellaneous — UK conference/training cap GBP 1500"
+}

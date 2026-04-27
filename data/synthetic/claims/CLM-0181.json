@@ -1,0 +1,17 @@
+{
+  "claim_id": "CLM-0181",
+  "employee_id": "EMP-0009",
+  "submitted_at": "2026-04-19T15:17:00",
+  "market": "US",
+  "currency": "USD",
+  "category": "travel",
+  "vendor": "Uber",
+  "amount": 661.4,
+  "attendees": 1,
+  "narrative": "Long-haul return booking via Uber",
+  "receipt_filename": "CLM-0181.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of USD 661.40 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
+  "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200"
+}
