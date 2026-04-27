@@ -15,12 +15,10 @@ import asyncio
 from typing import Awaitable, Callable, Optional
 
 from api.server.mcp_tools.claim_get_structured import get_structured
+from api.shared.expense_taxonomy import CATEGORIES, VERDICTS
 
 ClassifierFn = Callable[[str], Awaitable[dict]]
 PublishFn = Callable[[dict], None]
-
-VERDICTS = ("green", "amber", "red")
-CATEGORIES = ("meals", "travel", "accommodation", "entertainment", "miscellaneous")
 
 
 def _empty_confusion_matrix() -> dict[str, dict[str, int]]:

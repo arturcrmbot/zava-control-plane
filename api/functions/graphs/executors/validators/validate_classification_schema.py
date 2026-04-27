@@ -1,12 +1,11 @@
 """validate_classification_schema — guardrail edge over rag_classifier output."""
 from __future__ import annotations
 
+from api.shared.expense_taxonomy import VERDICTS
+
 
 class ClassificationSchemaError(ValueError):
     """Raised when a classifier payload does not conform to the spec."""
-
-
-_VALID_VERDICTS = {"green", "amber", "red"}
 
 
 def validate(payload: dict) -> None:
@@ -19,9 +18,9 @@ def validate(payload: dict) -> None:
         if required not in payload:
             raise ClassificationSchemaError(f"missing field: {required}")
 
-    if payload["verdict"] not in _VALID_VERDICTS:
+    if payload["verdict"] not in VERDICTS:
         raise ClassificationSchemaError(
-            f"verdict must be one of {_VALID_VERDICTS}, got {payload['verdict']!r}"
+            f"verdict must be one of {VERDICTS}, got {payload['verdict']!r}"
         )
 
     if not isinstance(payload["policy_clause"], str) or not payload["policy_clause"].startswith("§"):

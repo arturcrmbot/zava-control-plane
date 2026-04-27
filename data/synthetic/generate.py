@@ -14,14 +14,13 @@ import random
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from api.shared.expense_taxonomy import CATEGORIES, CURRENCY_BY_MARKET as CURRENCY, MARKETS
+
 DATA = Path(__file__).parent
 CLAIMS = DATA / "claims"
 LABELS = DATA / "labels.csv"
 EMPLOYEES = DATA / "employees.json"
 
-CATEGORIES = ("meals", "travel", "accommodation", "entertainment", "miscellaneous")
-MARKETS = ("UK", "US", "DE", "IN")
-CURRENCY = {"UK": "GBP", "US": "USD", "DE": "EUR", "IN": "INR"}
 EMS = ("workday", "concur")
 
 # ----------------------------------------------------------------------------
