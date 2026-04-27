@@ -41,6 +41,10 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests/api"]
+addopts = "-m 'not smoke'"
+markers = [
+  "smoke: requires GHCP credentials and live model calls; opt-in via -m smoke (overrides default deselection)",
+]
 
 [tool.ruff]
 line-length = 110
