@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1170" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="11">
+<defs>
+<linearGradient id="grad-experience" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E8358E"/><stop offset="1" stop-color="#6A1A8A"/></linearGradient>
+<linearGradient id="grad-agent" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F46B1F"/><stop offset="1" stop-color="#B72C5C"/></linearGradient>
+<linearGradient id="grad-business" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A98AC9"/><stop offset="1" stop-color="#7C5BA8"/></linearGradient>
+<linearGradient id="grad-data" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3FA0A8"/><stop offset="1" stop-color="#1E6E78"/></linearGradient>
+<linearGradient id="grad-identity" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3FA88A"/><stop offset="1" stop-color="#1E7858"/></linearGradient>
+<linearGradient id="grad-governance" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7456B8"/><stop offset="1" stop-color="#3E2378"/></linearGradient>
+<filter id="sh" x="-2%" y="-5%" width="104%" height="120%"><feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-color="#000" flood-opacity="0.10"/></filter>
+</defs>
+<rect width="1400" height="1170" fill="#F5F6F8"/>
+<text x="700" y="32" text-anchor="middle" font-size="20" font-weight="700" fill="#1F1F1F">POC 1 — Intelligent Procure-to-Pay</text>
+<text x="700" y="52" text-anchor="middle" font-size="12" fill="#6A6E78">8-week sprint · single Finance Controller · 30–50 concurrent invoice workflows · Workday + 2 additional EMSes</text>
+<rect x="1020" y="14" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4"/>
+<text x="1040" y="25" font-size="11" fill="#1F1F1F">Built in this POC</text>
+<rect x="1170" y="14" width="14" height="14" rx="3" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="3,2" opacity="0.85"/>
+<text x="1190" y="25" font-size="11" fill="#1F1F1F">Platform foundation</text>
+<rect x="14" y="70" width="150" height="198" rx="6" fill="url(#grad-experience)"/>
+<text x="89" y="166" text-anchor="middle" font-size="13" font-weight="700" fill="#FFFFFF">Experience</text>
+<text x="89" y="183" text-anchor="middle" font-size="10.5" font-weight="400" fill="#FFFFFF">Layer</text>
+<rect x="174" y="70" width="1212" height="90" fill="#FBE5F0" rx="6"/>
+<rect x="182" y="78" width="393" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="378" y="100" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Finance Controller</text>
+<text x="378" y="118" text-anchor="middle" font-size="10.5" fill="#3A3F48">Control Plane UI · London</text>
+<text x="378" y="132" text-anchor="middle" font-size="10.5" fill="#3A3F48">Primary operator · 30–50 workflows</text>
+<rect x="583" y="78" width="393" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="779" y="100" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Finance BP</text>
+<text x="779" y="118" text-anchor="middle" font-size="10.5" fill="#3A3F48">Adaptive Cards in Outlook</text>
+<text x="779" y="132" text-anchor="middle" font-size="10.5" fill="#3A3F48">HITL approvals (acc. #3)</text>
+<rect x="984" y="78" width="393" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="1180" y="100" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">SSC Reviewer</text>
+<text x="1180" y="118" text-anchor="middle" font-size="10.5" fill="#3A3F48">Purpose-built queue · Manila</text>
+<text x="1180" y="132" text-anchor="middle" font-size="10.5" fill="#3A3F48">Severity · Value · SLA (acc. #8)</text>
+<rect x="174" y="164" width="1212" height="104" fill="#FBE5F0" rx="6"/>
+<rect x="182" y="172" width="1196" height="88" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="780" y="194" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Custom Control Plane UI</text>
+<text x="780" y="212" text-anchor="middle" font-size="10.5" fill="#3A3F48">React + SignalR · Fleet dashboard (acc. #1)</text>
+<text x="780" y="226" text-anchor="middle" font-size="10.5" fill="#3A3F48">Exception-only view · Bulk approvals (acc. #2, #3)</text>
+<text x="780" y="240" text-anchor="middle" font-size="10.5" fill="#3A3F48">R/A/G filter · Action ledger drill-down (acc. #12)</text>
+<rect x="14" y="278" width="150" height="358" rx="6" fill="url(#grad-agent)"/>
+<text x="89" y="454" text-anchor="middle" font-size="13" font-weight="700" fill="#FFFFFF">Microsoft</text>
+<text x="89" y="471" text-anchor="middle" font-size="10.5" font-weight="400" fill="#FFFFFF">Agent Platform</text>
+<rect x="174" y="278" width="1212" height="104" fill="#FFE9D9" rx="6"/>
+<rect x="182" y="286" width="485" height="88" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="424" y="308" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">InvoiceP2POrchestrator</text>
+<text x="424" y="326" text-anchor="middle" font-size="10.5" fill="#3A3F48">1 invoice = 1 Durable Functions orchestration</text>
+<text x="424" y="340" text-anchor="middle" font-size="10.5" fill="#3A3F48">function_app.py · wait_for_external_event for HITL</text>
+<text x="424" y="354" text-anchor="middle" font-size="10.5" fill="#3A3F48">Region-failover replay (acc. #11)</text>
+<rect x="675" y="286" width="347" height="88" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
+<text x="848" y="308" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">Azure Durable Functions</text>
+<text x="848" y="326" text-anchor="middle" font-size="10.5" fill="#6A6E78">Runtime · checkpoint/replay</text>
+<text x="848" y="340" text-anchor="middle" font-size="10.5" fill="#6A6E78">Geo-replicated state</text>
+<rect x="1030" y="286" width="347" height="88" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
+<text x="1203" y="308" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">MAF Workflow v1.0</text>
+<text x="1203" y="326" text-anchor="middle" font-size="10.5" fill="#6A6E78">Per-phase typed graph framework</text>
+<text x="1203" y="340" text-anchor="middle" font-size="10.5" fill="#6A6E78">Pregel BSP · validator nodes</text>
+<rect x="174" y="386" width="1212" height="62" fill="#FFE9D9" rx="6"/>
+<rect x="182" y="394" width="1196" height="46" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="780" y="416" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">finance-agent@wpp · 6 MAF phase graphs · Agent executors invoke GHCP SDK sessions; validator executor before every non-revocable action</text>
+<rect x="174" y="452" width="1212" height="90" fill="#FFE9D9" rx="6"/>
+<rect x="182" y="460" width="192" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="278" y="482" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Intake / OCR</text>
+<text x="278" y="500" text-anchor="middle" font-size="10.5" fill="#3A3F48">intake.py</text>
+<text x="278" y="514" text-anchor="middle" font-size="10.5" fill="#3A3F48">Doc Intelligence</text>
+<rect x="382" y="460" width="192" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="478" y="482" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Validation</text>
+<text x="478" y="500" text-anchor="middle" font-size="10.5" fill="#3A3F48">validation.py</text>
+<text x="478" y="514" text-anchor="middle" font-size="10.5" fill="#3A3F48">3-way match · dup</text>
+<rect x="582" y="460" width="192" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="678" y="482" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Routing</text>
+<text x="678" y="500" text-anchor="middle" font-size="10.5" fill="#3A3F48">routing.py</text>
+<text x="678" y="514" text-anchor="middle" font-size="10.5" fill="#3A3F48">GL · cost-centre</text>
+<rect x="782" y="460" width="192" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="878" y="482" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Approval</text>
+<text x="878" y="500" text-anchor="middle" font-size="10.5" fill="#3A3F48">approval.py</text>
+<text x="878" y="514" text-anchor="middle" font-size="10.5" fill="#3A3F48">Threshold · HITL</text>
+<rect x="982" y="460" width="192" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="1078" y="482" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Payment</text>
+<text x="1078" y="500" text-anchor="middle" font-size="10.5" fill="#3A3F48">payment.py</text>
+<text x="1078" y="514" text-anchor="middle" font-size="10.5" fill="#3A3F48">Dual-control gate</text>
+<rect x="1182" y="460" width="192" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="1278" y="482" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Reconciliation</text>
+<text x="1278" y="500" text-anchor="middle" font-size="10.5" fill="#3A3F48">reconciliation.py</text>
+<text x="1278" y="514" text-anchor="middle" font-size="10.5" fill="#3A3F48">Statement match</text>
+<rect x="174" y="546" width="1212" height="90" fill="#FFE9D9" rx="6"/>
+<rect x="182" y="554" width="792" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="578" y="576" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Fleet Manager (GHCP SDK Hosted Agent)</text>
+<text x="578" y="594" text-anchor="middle" font-size="10.5" fill="#3A3F48">Exception composition · R/A/G classification (acc. #4)</text>
+<text x="578" y="608" text-anchor="middle" font-size="10.5" fill="#3A3F48">Arbitration skill · autonomy proposals (acc. #7) · Drift</text>
+<rect x="982" y="554" width="396" height="74" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
+<text x="1180" y="576" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">Foundry Hosted Agents</text>
+<text x="1180" y="594" text-anchor="middle" font-size="10.5" fill="#6A6E78">GHCP SDK runtime (preview)</text>
+<text x="1180" y="608" text-anchor="middle" font-size="10.5" fill="#6A6E78">ACA fallback</text>
+<rect x="14" y="646" width="150" height="90" rx="6" fill="url(#grad-business)"/>
+<text x="89" y="688" text-anchor="middle" font-size="13" font-weight="700" fill="#FFFFFF">Business Platforms</text>
+<text x="89" y="705" text-anchor="middle" font-size="10.5" font-weight="400" fill="#FFFFFF">MCP via APIM</text>
+<rect x="174" y="646" width="1212" height="90" fill="#EFE6F6" rx="6"/>
+<rect x="182" y="654" width="192" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="278" y="676" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Workday MCP</text>
+<text x="278" y="694" text-anchor="middle" font-size="10.5" fill="#3A3F48">mocks/workday-mcp</text>
+<text x="278" y="708" text-anchor="middle" font-size="10.5" fill="#3A3F48">Primary EMS</text>
+<rect x="382" y="654" width="192" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="478" y="676" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">D365 F&amp;O MCP</text>
+<text x="478" y="694" text-anchor="middle" font-size="10.5" fill="#3A3F48">mocks/d365-mcp</text>
+<text x="478" y="708" text-anchor="middle" font-size="10.5" fill="#3A3F48">Secondary EMS (acc. #9)</text>
+<rect x="582" y="654" width="192" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="678" y="676" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Maconomy MCP</text>
+<text x="678" y="694" text-anchor="middle" font-size="10.5" fill="#3A3F48">mocks/maconomy-mcp</text>
+<text x="678" y="708" text-anchor="middle" font-size="10.5" fill="#3A3F48">Tertiary EMS (acc. #10)</text>
+<rect x="782" y="654" width="192" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
+<text x="878" y="676" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Payment Rails MCP</text>
+<text x="878" y="694" text-anchor="middle" font-size="10.5" fill="#3A3F48">mocks/payment-mcp</text>
+<rect x="982" y="654" width="192" height="74" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
+<text x="1078" y="676" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">Doc Intelligence</text>
+<text x="1078" y="694" text-anchor="middle" font-size="10.5" fill="#6A6E78">Receipt OCR (acc. #5)</text>
+<rect x="1182" y="654" width="192" height="74" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
+<text x="1278" y="676" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">MS Graph (Outlook)</text>
+<text x="1278" y="694" text-anchor="middle" font-size="10.5" fill="#6A6E78">Adaptive Card delivery</text>
+<rect x="14" y="746" width="150" height="90" rx="6" fill="url(#grad-data)"/>
+<text x="89" y="788" text-anchor="middle" font-size="13" font-weight="700" fill="#FFFFFF">Data &amp;</text>
+<text x="89" y="805" text-anchor="middle" font-size="10.5" font-weight="400" fill="#FFFFFF">Observability</text>
+<rect x="174" y="746" width="1212" height="90" fill="#DCEFF1" rx="6"/>
+<rect x="182" y="754" width="232" height="74" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
+<text x="298" y="776" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">Cosmos DB</text>
+<text x="298" y="794" text-anchor="middle" font-size="10.5" fill="#6A6E78">Workflow state · Action ledger</text>
+<text x="298" y="808" text-anchor="middle" font-size="10.5" fill="#6A6E78">R/A/G policy config · PITR</text>
+<rect x="422" y="754" width="232" height="74" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
+<text x="538" y="776" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">Azure Storage</text>
+<text x="538" y="794" text-anchor="middle" font-size="10.5" fill="#6A6E78">DF checkpoints · GRS</text>
+<text x="538" y="808" text-anchor="middle" font-size="10.5" fill="#6A6E78">Audit WORM export</text>
+<rect x="662" y="754" width="232" height="74" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
+<text x="778" y="776" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">AI Search</text>
+<text x="778" y="794" text-anchor="middle" font-size="10.5" fill="#6A6E78">100+ local policies</text>
+<text x="778" y="808" text-anchor="middle" font-size="10.5" fill="#6A6E78">Receipt cache</text>
+<rect x="902" y="754" width="232" height="74" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
+<text x="1018" y="776" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">App Insights</text>
+<text x="1018" y="794" text-anchor="middle" font-size="10.5" fill="#6A6E78">OTEL · per-invoice cost (acc. #13)</text>
+<rect x="1142" y="754" width="232" height="74" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
+<text x="1258" y="776" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">Log Analytics</text>
+<text x="1258" y="794" text-anchor="middle" font-size="10.5" fill="#6A6E78">7–12 yr immutable audit</text>
+<text x="1258" y="808" text-anchor="middle" font-size="10.5" fill="#6A6E78">KQL · Sentinel</text>
+<rect x="14" y="846" width="150" height="76" rx="6" fill="url(#grad-identity)"/>
+<text x="89" y="881" text-anchor="middle" font-size="13" font-weight="700" fill="#FFFFFF">Identity</text>
+<text x="89" y="898" text-anchor="middle" font-size="10.5" font-weight="400" fill="#FFFFFF">+ Secrets</text>
+<rect x="174" y="846" width="1212" height="76" fill="#DCF1E6" rx="6"/>
+<rect x="182" y="854" width="393" height="60" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
+<text x="378" y="876" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">Okta</text>
+<text x="378" y="894" text-anchor="middle" font-size="10.5" fill="#6A6E78">Primary IdP · federated to Entra</text>
+<rect x="583" y="854" width="393" height="60" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
+<text x="779" y="876" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">Azure Key Vault</text>
+<text x="779" y="894" text-anchor="middle" font-size="10.5" fill="#6A6E78">EMS API keys · rotation</text>
+<rect x="984" y="854" width="393" height="60" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
+<text x="1180" y="876" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">API Center</text>
+<text x="1180" y="894" text-anchor="middle" font-size="10.5" fill="#6A6E78">Skill lifecycle · Policy versioning</text>
+<rect x="14" y="932" width="150" height="90" rx="6" fill="url(#grad-governance)"/>
+<text x="89" y="974" text-anchor="middle" font-size="13" font-weight="700" fill="#FFFFFF">Governance</text>
+<text x="89" y="991" text-anchor="middle" font-size="10.5" font-weight="400" fill="#FFFFFF">Plane</text>
+<rect x="174" y="932" width="1212" height="90" fill="#E5DEF4" rx="6"/>
+<rect x="182" y="940" width="393" height="74" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
+<text x="378" y="962" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">APIM AI Gateway</text>
+<text x="378" y="980" text-anchor="middle" font-size="10.5" fill="#6A6E78">MCP tool governance · Auth injection · Rate limit</text>
+<text x="378" y="994" text-anchor="middle" font-size="10.5" fill="#6A6E78">Token metrics · Cost tracking · Sole public edge</text>
+<rect x="583" y="940" width="393" height="74" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
+<text x="779" y="962" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">Foundry Control Plane</text>
+<text x="779" y="980" text-anchor="middle" font-size="10.5" fill="#6A6E78">Guardrails (PII · content safety)</text>
+<text x="779" y="994" text-anchor="middle" font-size="10.5" fill="#6A6E78">Foundry Evaluators · Agent inventory</text>
+<rect x="984" y="940" width="393" height="74" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
+<text x="1180" y="962" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">Entra Agent ID</text>
+<text x="1180" y="980" text-anchor="middle" font-size="10.5" fill="#6A6E78">finance-agent@wpp first-class identity</text>
+<text x="1180" y="994" text-anchor="middle" font-size="10.5" fill="#6A6E78">Conditional Access · Purview DLP · Defender</text>
+<rect x="14" y="1038" width="1372" height="118" rx="8" fill="#FFFFFF" stroke="#D6D9DE"/>
+<rect x="14" y="1038" width="6" height="118" rx="3" fill="#1F1F1F"/>
+<text x="36" y="1060" font-size="13" font-weight="700" fill="#1F1F1F">POC scope</text>
+<text x="36" y="1082" font-size="11" font-weight="700" fill="#1F7A45">In:</text>
+<text x="64" y="1082" font-size="11" fill="#1F1F1F">InvoiceP2POrchestrator + 6 phase graphs · finance-agent@wpp + Fleet Manager · Custom Control Plane UI + SSC queue</text>
+<text x="64" y="1098" font-size="11" fill="#1F1F1F">Workday/D365/Maconomy/Payment MCP servers (mocked) · R/A/G policy classification + arbitration</text>
+<text x="36" y="1118" font-size="11" font-weight="700" fill="#A02C2C">Out:</text>
+<text x="72" y="1118" font-size="11" fill="#1F1F1F">Multi-jurisdiction routing (POC2) · Voice (GPT-Realtime / ACS) (POC2) · HeyGen avatar (POC2) · A2A protocol (POC2) · Threadlight knowledge capture (POC2)</text>
+<text x="72" y="1134" font-size="11" fill="#1F1F1F">Personal Agents per role (POC2) · Agent 365 GA features (May 2026) · Production EMS API connections (sandbox/mocks only) · 5,000+ workflow scale demo</text>
+</svg>
