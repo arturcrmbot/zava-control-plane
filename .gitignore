@@ -31,6 +31,10 @@ local.settings.json
 # Claude Code skills cache
 .claude-cache/
 
+# Claude Code per-machine state
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+
 # OS
 Thumbs.db
 .DS_Store
