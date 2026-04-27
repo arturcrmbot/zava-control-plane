@@ -1,5 +1,6 @@
 // src/client/routes/Evaluations.tsx
 import { useEffect, useState } from "react";
+import { AccuracyReport } from "../components/AccuracyReport";
 
 interface Eval {
   id: string; workflowId: string; ranAt: number;
@@ -42,6 +43,7 @@ export default function Evaluations() {
           ))}
         </div>
       </div>
+      <AccuracyReport />
     </div>
   );
 }
