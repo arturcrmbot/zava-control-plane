@@ -22,6 +22,7 @@ from api.functions.graphs import (
     build_route_workflow,
     build_notify_workflow,
     build_arbitrate_workflow,
+    build_audit_workflow,
     build_approval_workflow,
 )
 from api.functions.webhook import emit
@@ -81,13 +82,8 @@ def arbitrate_activity(payload: dict) -> dict:
 
 
 def audit_activity(payload: dict) -> dict:
-    """Phase 7 — stub until Week 3 wires the audit graph.
-
-    Returns a no-op marker rather than raising so workflows can complete
-    end-to-end during Week 2 demos. Week 3 replaces the body with
-    build_audit_workflow.
-    """
-    return {"status": "stub", "phase": "Audit"}
+    """Phase 7 — narrative audit summary over the workflow's ledger."""
+    return asyncio.run(_run_workflow(build_audit_workflow, payload, "Audit"))
 
 
 # Approval activity retained for the legacy invoice-p2p orchestrator (broken at runtime

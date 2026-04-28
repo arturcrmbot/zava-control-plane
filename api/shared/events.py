@@ -37,6 +37,9 @@ FleetEventType = Literal[
     "escalation.tier.assigned",
     "notification.sent",
     "justification.received",
+    "arbitration.recommended",
+    "audit.summary.composed",
+    "region.failure.simulated",
 ]
 
 

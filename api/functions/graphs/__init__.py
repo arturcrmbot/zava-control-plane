@@ -12,6 +12,7 @@ from .receipt import build_receipt_workflow
 from .route import build_route_workflow
 from .notify import build_notify_workflow
 from .arbitrate import build_arbitrate_workflow
+from .audit import build_audit_workflow
 from .approval import build_approval_workflow
 
 
@@ -24,4 +25,5 @@ __all__ = [
     "build_route_workflow",
     "build_notify_workflow",
     "build_arbitrate_workflow",
+    "build_audit_workflow",
 ]
