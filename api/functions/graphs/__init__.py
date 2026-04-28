@@ -11,11 +11,8 @@ from .intake_expense import build_intake_expense_workflow
 from .classify import build_classify_workflow
 from .receipt import build_receipt_workflow
 from .route import build_route_workflow
+from .notify import build_notify_workflow
 from .approval import build_approval_workflow
-
-
-def build_notify_workflow():
-    raise NotImplementedError("Phase 5 (Notify) — Day 10")
 
 
 __all__ = [

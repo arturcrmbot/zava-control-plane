@@ -15,7 +15,9 @@ from pathlib import Path
 
 from api.server.state import app_state
 from api.server.services.synthetic_data import build_workflow, build_expense_workflow
-from api.server.services.durable_client import schedule_new_orchestration
+from api.server.services.durable_client import (
+    schedule_new_orchestration, raise_orchestration_event,
+)
 
 _seq = 0
 _exp_seq = 0
@@ -147,6 +149,50 @@ async def spawn_expense_workflow(
     except Exception as ex:
         print(f"[orchestrator] failed to schedule {wid}: {ex}")
     return wid
+
+
+async def simulate_justification(
+    workflow_id: str,
+    text: str = "Client dinner with VP-level stakeholder; named attendees on the receipt; business reason annotated post-hoc.",
+    submitted_by: str | None = None,
+) -> None:
+    """Day 10 round-trip: fire a `justification` external event into a Red
+    workflow that's currently suspended at the Phase 5 HITL wait. The
+    orchestrator resumes and proceeds to Phase 6 (Arbitrate, Week 3).
+
+    Also emits a `justification.received` FleetEvent so the Control Plane
+    surfaces the round-trip in real time.
+    """
+    w = app_state.store.get_workflow(workflow_id)
+    if not w:
+        raise KeyError(f"workflow {workflow_id!r} not found in store")
+    if not w.orchestration_instance_id:
+        raise ValueError(f"workflow {workflow_id!r} has no orchestration_instance_id")
+    submitter = submitted_by or (
+        w.claim.employee_id if getattr(w, "claim", None) else "operator"
+    )
+    payload = {
+        "claim_id": getattr(w.claim, "claim_id", workflow_id) if getattr(w, "claim", None) else workflow_id,
+        "text": text,
+        "submitted_by": submitter,
+        "submitted_at": _utcnow_iso(),
+    }
+    await raise_orchestration_event(w.orchestration_instance_id, "justification", payload)
+    try:
+        from api.shared.events import FleetEvent
+        app_state.bus.emit(FleetEvent(
+            type="justification.received",
+            workflow_id=workflow_id,
+            claim_id=payload["claim_id"],
+            submitted_by=submitter,
+        ))
+    except Exception:
+        pass
+
+
+def _utcnow_iso() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
 
 
 async def spawn_repeat_offender_ramp(

@@ -20,6 +20,7 @@ from api.functions.graphs import (
     build_classify_workflow,
     build_receipt_workflow,
     build_route_workflow,
+    build_notify_workflow,
     build_approval_workflow,
 )
 from api.functions.webhook import emit
@@ -69,7 +70,8 @@ def route_activity(payload: dict) -> dict:
 
 
 def notify_activity(payload: dict) -> dict:
-    raise NotImplementedError("Phase 5 graph wired in Day 10 (build_notify_workflow)")
+    """Phase 5 — compose breach notification (Red path only)."""
+    return asyncio.run(_run_workflow(build_notify_workflow, payload, "Notify"))
 
 
 def arbitrate_activity(payload: dict) -> dict:
