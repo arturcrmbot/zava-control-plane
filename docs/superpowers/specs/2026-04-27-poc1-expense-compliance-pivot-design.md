@@ -57,7 +57,7 @@ The current 6-phase invoice orchestrator becomes a **7-phase expense orchestrato
 | 6 | **Arbitrate** | Justification routed to SSC Reviewer; reviewer accepts / requires-repayment / warns / escalates; arbitration agent observes and emits autonomy proposals | `agent_arbitration`, `validate_recommendation_authority` (existing), `wait_for_external_event:reviewer_decision` |
 | 7 | **Audit** | Append immutable ledger entry; emit `workflow.completed` | `record_decision` (existing) |
 
-Escalate is **not** a per-claim phase. It is cross-workflow state: `escalation_advisor` skill reads `employee.history` (prior breaches in the state store) and emits a tier (warning / escalation / major-violation). The tier influences notification tone and SSC routing on the *current* claim.
+Escalate is **not** a per-claim phase. It is cross-workflow state: `escalation_advisor` skill reads `employee_history` (prior breaches in the state store) and emits a tier (warning / escalation / major-violation). The tier influences notification tone and SSC routing on the *current* claim.
 
 ### 4.2 Three tiers (unchanged)
 
@@ -104,18 +104,20 @@ Durable Functions runtime, `_common.py`, `_tracked_executor.py`, Fleet Manager s
 
 | Skill | Purpose | `allowed-tools` |
 |---|---|---|
-| `rag_classifier.skill.md` | R/A/G verdict + policy clause + confidence + competing_interpretations[] | `policy.search`, `claim.getStructured` |
-| `receipt_validator.skill.md` | Multimodal cross-check of image vs structured fields | `claim.getReceipt`, `claim.getStructured` |
-| `escalation_advisor.skill.md` | Given employee history + current claim → tier + reasoning | `employee.history` |
-| `arbitration.skill.md` | Given justification text + policy clause → recommended SSC reviewer options | `policy.search`, `precedents.search` |
-| `notification_composer.skill.md` | Compose Adaptive Card / email body from breach + policy citation | `claim.summary`, `policy.cite` |
-| `audit_summariser.skill.md` | Narrative compliance report from ledger query results | `audit.query` |
+| `rag_classifier.skill.md` | R/A/G verdict + policy clause + confidence + competing_interpretations[] | `policy_search`, `claim_get_structured` |
+| `receipt_validator.skill.md` | Multimodal cross-check of image vs structured fields | `claim_get_receipt`, `claim_get_structured` |
+| `escalation_advisor.skill.md` | Given employee history + current claim → tier + reasoning | `employee_history` |
+| `arbitration.skill.md` | Given justification text + policy clause → recommended SSC reviewer options | `policy_search`, `precedents_search` |
+| `notification_composer.skill.md` | Compose Adaptive Card / email body from breach + policy citation | `claim_summary`, `policy_cite` |
+| `audit_summariser.skill.md` | Narrative compliance report from ledger query results | `audit_query` |
 
 **Fleet Manager skill (existing) — extend**, not replace. Add one prompt paragraph for behaviour-change loop on `fleet.tick`, and one paragraph for cost-per-task report on `report.cost_per_task`. New `allowed-tools` entries: `query_reviewer_decisions`, `query_economics`. No new service; the existing FleetManagerService runs both behaviours.
 
 **SDK-native tools** (small Python modules under `api/server/mcp_tools/`, each ~20–30 lines wrapping the state store / synthetic data / audit ledger). Each tool is declared with `@define_tool(name=..., description=...)` from `copilot.tools` with a Pydantic params model; the SDK generates the JSON schema, registers it on the session via `tools=[...]`, and the model invokes it natively. Skills declare which tools they may call via `allowed-tools` frontmatter.
 
-Tools to land: `policy.search`, `claim.lookup`, `claim.getReceipt`, `claim.getStructured`, `claim.summary`, `policy.cite`, `employee.history`, `precedents.search`, `audit.query`, `query_reviewer_decisions`, `query_economics`.
+> **Tool naming:** the OpenAI Function Calling spec restricts tool names to `^[a-zA-Z0-9_-]+$` (no dots). All SDK-registered tool names use underscores: `policy_search`, `claim_get_structured`, `claim_lookup`, `claim_get_receipt`, `claim_summary`, `policy_cite`, `employee_history`, `precedents_search`, `audit_query`. FleetEvent type names (`claim.routed.green`, `receipt.mismatch.detected`, etc.) keep their dotted form — those flow on the bus, not the LLM tool channel.
+
+Tools to land: `policy_search`, `claim_lookup`, `claim_get_receipt`, `claim_get_structured`, `claim_summary`, `policy_cite`, `employee_history`, `precedents_search`, `audit_query`, `query_reviewer_decisions`, `query_economics`.
 
 > Implementation note (2026-04-28): an earlier Week 1 attempt registered these as plain `@traced_tool` Python helpers and pre-fetched their results in the agent executor, embedding them in the prompt. That was a misuse of the SDK — the SDK takes `tools=[Tool, ...]` directly on `create_session`, and the model calls them autonomously. The refactor in commit *(forthcoming)* replaces the prompt-stuffing pattern with native registration. Agent executors are reduced to: build the user prompt, hand the SDK a tool list, parse the response.
 
@@ -141,7 +143,7 @@ Tools to land: `policy.search`, `claim.lookup`, `claim.getReceipt`, `claim.getSt
 - `data/synthetic/labels.csv` — committed to repo, swappable with `data/wpp/labels.csv`.
 - `data/synthetic/receipts/*.png` — receipt PNG generator emits 300 receipts with controllable mismatch flavours (correct, wrong-amount, wrong-date, wrong-vendor, missing-line). PIL/templated. Run once.
 - `data/synthetic/employees.json` — small population including ≥3 repeat-offender profiles with seeded breach histories.
-- `data/synthetic/precedents.json` — ~50 historical SSC reviewer decisions for the behaviour-change loop seed (acceptance #7) and the `precedents.search` tool.
+- `data/synthetic/precedents.json` — ~50 historical SSC reviewer decisions for the behaviour-change loop seed (acceptance #7) and the `precedents_search` tool.
 
 The data directory layout enforces a **drop-in WPP swap path**: when WPP supplies their 3,430-claim benchmark + real T&E policy + ground-truth labels, they land in `data/wpp/` with the same internal structure and a `--dataset` flag flips the harness over. No code change.
 
@@ -149,7 +151,7 @@ The data directory layout enforces a **drop-in WPP swap path**: when WPP supplie
 
 Brief §4.5 makes accuracy the dominant scoring criterion (40% weight) and acceptance #4 the dominant evidence hook (≥95% with policy-based reasoning per line). The plan:
 
-1. **Synthetic policy as single source of truth.** The same policy markdown grounds the classifier *and* generates ground-truth labels. This is a tautology only if we make it one — the policy is rich (4 markets × 5 categories × multiple sub-rules), the generator emits genuinely ambiguous Amber cases (boundary thresholds, missing-receipt-with-auto-reclaim, cash-no-receipt-under-limit), and the gold reasoning is the *literal policy clause text*, not a code-level rule expression. The classifier reads the policy markdown via the `policy.search` tool and must produce reasoning that matches the gold clause.
+1. **Synthetic policy as single source of truth.** The same policy markdown grounds the classifier *and* generates ground-truth labels. This is a tautology only if we make it one — the policy is rich (4 markets × 5 categories × multiple sub-rules), the generator emits genuinely ambiguous Amber cases (boundary thresholds, missing-receipt-with-auto-reclaim, cash-no-receipt-under-limit), and the gold reasoning is the *literal policy clause text*, not a code-level rule expression. The classifier reads the policy markdown via the `policy_search` tool and must produce reasoning that matches the gold clause.
 
 2. **Volume.** 300 claims is enough for a credible confusion matrix. Distribution: ~70% Green / ~20% Amber / ~10% Red. We caveat in the demo as "300-line subset following the structure of WPP's 3,430-line benchmark; same harness runs the full set, longer wall-clock."
 
@@ -173,14 +175,14 @@ All 13 items from brief §7 have a demo path. Carrier types: **skill** (`.skill.
 | 2 | Exception-only surfacing; Green hidden | 3 Amber + 2 Red surface; toggle reveals 25 silent Greens | Existing default filter; verdict from `rag_classifier` |
 | 3 | Bulk approval of 10+ in one action | 12 Amber items grouped by policy clause; spot-check 2; bulk-approve all 12 | Existing BulkHitlModal + `/api/exceptions/bulk-resolve`; rebound action labels |
 | 4 | ≥95% R/A/G accuracy with per-line reasoning | AccuracyReport panel + live policy-edit-and-re-run | `rag_classifier` skill · `accuracy_harness_workflow` · AccuracyReport panel · synthetic policy + claims + labels |
-| 5 | Receipt cross-validation | 6 mismatch flavours injected; `receipt_validator` flags each; side-by-side image + structured fields | `receipt_validator` skill · `claim.getReceipt` + `claim.getStructured` tools · receipt-image generator · simulator scenarios |
-| 6 | Progressive enforcement (warning → escalation → major) | Three claims from same employee in succession; ramping tier visible | `escalation_advisor` skill · `employee.history` MCP tool · Phase 4 in-line call · synthetic repeat-offender profiles |
+| 5 | Receipt cross-validation | 6 mismatch flavours injected; `receipt_validator` flags each; side-by-side image + structured fields | `receipt_validator` skill · `claim_get_receipt` + `claim_get_structured` tools · receipt-image generator · simulator scenarios |
+| 6 | Progressive enforcement (warning → escalation → major) | Three claims from same employee in succession; ramping tier visible | `escalation_advisor` skill · `employee_history` MCP tool · Phase 4 in-line call · synthetic repeat-offender profiles |
 | 7 | Autonomous learning curve | Initial: all Amber to SSC. After 50 reviewer decisions, Fleet Manager (on `fleet.tick`) detects cluster and proposes autonomy via `propose_skill_amp` | Fleet Manager skill prompt extension · `query_reviewer_decisions` tool · existing `propose_skill_amp` tool · existing SkillAmplificationPanel |
-| 8 | SSC Reviewer operational interface | New `/reviewer-queue` route; severity/value/SLA sort; receipt thumbnail; verdict + reasoning + competing interpretations; arbitration skill recommends pre-selected option | `/reviewer-queue` route (~150 lines composing existing components) · `arbitration` skill · `precedents.search` MCP tool |
+| 8 | SSC Reviewer operational interface | New `/reviewer-queue` route; severity/value/SLA sort; receipt thumbnail; verdict + reasoning + competing interpretations; arbitration skill recommends pre-selected option | `/reviewer-queue` route (~150 lines composing existing components) · `arbitration` skill · `precedents_search` MCP tool |
 | 9 | System-agnostic Control Plane (2+ EMS) | 30 claims 50/50 Workday / Concur; cards show no source-system marker; surfaces only in audit drawer | New `concur-mcp` mock · extended `workday-mcp` · existing FleetDashboard with EMS field hidden |
 | 10 | Integration extensibility (new EMS, no agent changes) | Narrated live: Maconomy mock acting as third EMS; show 3-step pattern (register MCP → add to skill manifest → publish); single skill-manifest diff on screen | Existing Maconomy mock (rebound) · existing skill manifest format · narration |
 | 11 | Workflow recovery after region failure | Live: 30 claims running, `docker compose stop functions`, 12 paused, restart, Durable replays, ledger continuity. Recorded backup video | Existing Durable runtime · new simulator command `simulate-region-failure` |
-| 12 | Immutable audit trail + compliance reporting | Live `audit.query`; `audit_summariser` skill renders narrative summary in Fleet Manager rail | `audit_summariser` skill · `audit.query` MCP tool · existing audit_logger · existing rail |
+| 12 | Immutable audit trail + compliance reporting | Live `audit_query`; `audit_summariser` skill renders narrative summary in Fleet Manager rail | `audit_summariser` skill · `audit_query` MCP tool · existing audit_logger · existing rail |
 | 13 | Cost-per-task report | On `report.cost_per_task` trigger, Fleet Manager composes weekly summary; renders in existing rail | Fleet Manager skill prompt extension · new `query_economics` MCP tool · existing economics service · existing rail |
 
 ## 8. Phasing (≈3 weeks)
@@ -193,7 +195,7 @@ Sequenced **risk-first**: the 40%-weight accuracy story must be working at end o
 |---|---|---|
 | 1 | Tag `v0.5-invoice-poc`. Delete D-bucket code. Rename invoice phase graphs to placeholders. Draft synthetic T&E policy markdown (4 markets, 5 categories, R/A/G rules) | scaffold |
 | 2 | `data/synthetic/generate.py` → 300 labelled claims + `labels.csv`. Receipt PNG generator → 300 receipts with mismatch flavours | scaffold |
-| 3 | `rag_classifier.skill.md` + MCP tools `policy.search` + `claim.getStructured`. Single-claim end-to-end test on 5 samples | #4 partial |
+| 3 | `rag_classifier.skill.md` + MCP tools `policy_search` + `claim_get_structured`. Single-claim end-to-end test on 5 samples | #4 partial |
 | 4 | `accuracy_harness_workflow` MAF Workflow (parallel fan-out) + SSE progress streaming | #4 partial |
 | 5 | `AccuracyReport` panel under `/evaluations`. **Internal milestone:** confusion matrix ≥95%; cell drill-down; live policy-edit-and-re-run | **#4 ✅** |
 
@@ -204,16 +206,16 @@ Sequenced **risk-first**: the 40%-weight accuracy story must be working at end o
 | 6 | Workday mock claim endpoints. Reshape Durable orchestrator to 7 expense phases. Wire Phase 1 (Intake) + Phase 2 (Classify) | #1, #2 |
 | 7 | `receipt_validator.skill.md` + Phase 3 graph + simulator scenarios for the 5 mismatch flavours | **#5 ✅** |
 | 8 | `mocks/concur-mcp/` Node mock. Inject 30 claims 50/50 Workday/Concur. FleetDashboard hides source field | **#9 ✅** |
-| 9 | `escalation_advisor.skill.md` + `employee.history` MCP tool + Phase 4 in-line call. Repeat-offender ramp demo | **#6 ✅** |
+| 9 | `escalation_advisor.skill.md` + `employee_history` MCP tool + Phase 4 in-line call. Repeat-offender ramp demo | **#6 ✅** |
 | 10 | `notification_composer.skill.md` + Phase 5 (Notify, Red path) + hook-gated send. Breach → notification → justification round-trip simulator | foundation for #7 |
 
 ### Week 3 — Operator surfaces + behaviour change + polish
 
 | Day | Work | AC |
 |---|---|---|
-| 11 | `arbitration.skill.md` + `precedents.search` MCP tool. New `/reviewer-queue` route composing existing components | **#8 ✅** |
+| 11 | `arbitration.skill.md` + `precedents_search` MCP tool. New `/reviewer-queue` route composing existing components | **#8 ✅** |
 | 12 | Fleet Manager skill prompt extension (one paragraph). New `query_reviewer_decisions` MCP tool. Seed 50 historical reviewer decisions; `fleet.tick` → autonomy proposal in SkillAmplificationPanel; approve → steady-state batch | **#7 ✅** |
-| 13 | `audit_summariser.skill.md` + `audit.query` MCP tool. Then Fleet Manager extension for `report.cost_per_task` + `query_economics` MCP tool | **#12 ✅** **#13 ✅** |
+| 13 | `audit_summariser.skill.md` + `audit_query` MCP tool. Then Fleet Manager extension for `report.cost_per_task` + `query_economics` MCP tool | **#12 ✅** **#13 ✅** |
 | 14 | `simulate-region-failure` simulator command. Live failover demo + recorded backup video. EMS extensibility narration practice with Maconomy mock | **#11 ✅** **#10 ✅** |
 | 15 | End-to-end demo dry run (30 min, all 13 ACs). Bug fixes. Final demo recording | all 13 ✅ |
 
@@ -247,7 +249,7 @@ These don't block design sign-off but should be answered before Day 1:
 
 - **What model do we use for `rag_classifier`?** GPT-4.1 (matches existing Fleet Manager) is the default; cheaper model for screening + frontier for ambiguous Amber is the brief's expressed pattern.
 - **What multimodal model for `receipt_validator`?** GPT-4.1 vision or equivalent. Validate availability + per-call cost on Day 6 before Day 7 work.
-- **Is Foundry IQ realistic in the POC timeframe**, or does `policy.search` hit an in-memory chunked retriever (sentence-transformers + FAISS) in `c:/dev/ghcp sdk stuff`? Default to in-memory; Foundry IQ swap is a tool implementation detail later.
+- **Is Foundry IQ realistic in the POC timeframe**, or does `policy_search` hit an in-memory chunked retriever (sentence-transformers + FAISS) in `c:/dev/ghcp sdk stuff`? Default to in-memory; Foundry IQ swap is a tool implementation detail later.
 - **Demo audience and timing.** This spec assumes "internal show-and-tell at end of Week 3 to counter the 8-week narrative". If WPP themselves see this, the polish bar in Week 3 raises.
 - **Autonomy-dial governance** (carried over from PRD §17). The brief asks for runtime-adjustable thresholds; our memory carries a "no live-tuning autonomy sliders" position. The POC demo shows the runtime-adjustable path; the PR-gated production hardening is a narrated framing alongside, not a built feature.
 

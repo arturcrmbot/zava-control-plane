@@ -129,7 +129,7 @@ class _PolicySearchParams(BaseModel):
 
 
 @define_tool(
-    name="policy.search",
+    name="policy_search",
     description=(
         "Search the WPP T&E policy markdown by semantic similarity. Returns the "
         "top-k matching chunks (each with section label and similarity score). "

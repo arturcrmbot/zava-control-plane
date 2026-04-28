@@ -32,6 +32,12 @@ from opentelemetry.trace import Status, StatusCode
 _SKILLS_DIR = Path(__file__).resolve().parents[4] / "server" / "skills"
 _tracer = trace.get_tracer("wpp.agents.finance")
 
+
+def _load_skill(skill_dir: Path) -> str:
+    """Read the SKILL.md body for a skill (skill_dir is the skill's own
+    directory, e.g. .../skills/rag-classifier/)."""
+    return (skill_dir / "SKILL.md").read_text(encoding="utf-8")
+
 # 4KB cap on response-text span-event payload (OTEL event attr size safety).
 _MAX_RESPONSE_EVENT_BYTES = 4096
 
@@ -101,30 +107,28 @@ async def run_agent_session(
     prompt: str,
     *,
     tools: list[Tool] | None = None,
+    skill_dir: Path | None = None,
     skill_label: str | None = None,
     model: str = "gpt-4.1",
     attachments: list[dict] | None = None,
-    skill_directories: list[str] | None = None,
 ) -> dict:
     """Run a finance-agent ephemeral session and return the parsed JSON response.
 
     Args:
-        prompt: The user prompt. The skill markdown is loaded by the SDK from
-            `skill_directories`; the prompt provides the per-call context.
+        prompt: The user prompt — per-call context.
         tools: SDK-native tools (each created via `@define_tool`) registered on
-            the session. Skills declare which they may call via `allowed-tools`
-            frontmatter.
-        skill_label: Optional label for OTEL span tagging only — the SDK
-            discovers skills from `skill_directories`.
+            the session via `tools=[...]`. The model invokes them autonomously.
+        skill_dir: Path to the skill's directory (containing SKILL.md). The
+            SKILL.md body is read and appended to the session's system message
+            so the model strongly follows the role + output schema. The
+            directory is also passed to the SDK's `skill_directories` so the
+            skill is discoverable.
+        skill_label: Optional OTEL span tag.
         model: Model id (default `gpt-4.1`).
-        attachments: Optional multimodal attachments forwarded to
-            `session.send_and_wait` (e.g. inline base64 PNG for receipt
-            validation).
-        skill_directories: Override skill search paths. Defaults to the repo's
-            `api/server/skills/` directory.
+        attachments: Optional multimodal attachments for `send_and_wait`.
     """
-    skill_dirs = skill_directories or [str(_SKILLS_DIR)]
     tools = tools or []
+    skill_text = _load_skill(skill_dir) if skill_dir else None
 
     with _tracer.start_as_current_span("gen_ai.generate_content") as span:
         span.set_attribute("gen_ai.system", "github_copilot")
@@ -139,12 +143,16 @@ async def run_agent_session(
         config = SubprocessConfig(github_token=_gh_token(), log_level="warning")
         client = CopilotClient(config)
         async with client:
-            session = await client.create_session(
-                on_permission_request=PermissionHandler.approve_all,
-                model=model,
-                tools=tools,
-                skill_directories=skill_dirs,
-            )
+            session_kwargs: dict = {
+                "on_permission_request": PermissionHandler.approve_all,
+                "model": model,
+                "tools": tools,
+            }
+            if skill_text:
+                session_kwargs["system_message"] = {"mode": "append", "content": skill_text}
+            if skill_dir:
+                session_kwargs["skill_directories"] = [str(skill_dir)]
+            session = await client.create_session(**session_kwargs)
             unsub = _install_session_otel_bridge(session)
             try:
                 if attachments:
@@ -183,23 +191,28 @@ async def run_agent_session(
     return _extract_json(text)
 
 
-# Backwards-compatible alias; tests that mock `run_agent_skill` continue to
-# work, but new code should call `run_agent_session(prompt, tools=[...])`
-# directly. Day 7+ agents use the new name.
+# Backwards-compatible alias for legacy agents that pass a skill_name string.
+# Resolves the name (e.g. "rag_classifier" or "rag-classifier") to the
+# corresponding skill directory under api/server/skills/. New code should call
+# run_agent_session(skill_dir=..., tools=[...]) directly.
 async def run_agent_skill(
     skill_name: str,
     prompt: str,
     model: str = "gpt-4.1",
     attachments: list[dict] | None = None,
 ) -> dict:
-    """Deprecated alias kept until all agents migrate to run_agent_session.
+    """Deprecated alias — prefer `run_agent_session(skill_dir=..., tools=[...])`.
 
-    Loads the named skill purely for OTEL labelling — tools are not registered
-    here. Caller-provided tool data should be embedded in the prompt or, better,
-    the caller should switch to `run_agent_session(tools=[...])`.
+    Resolves a skill name to a directory under api/server/skills/, allowing
+    underscore→hyphen normalisation (so legacy callers using
+    "anomaly_flagger" still find the "anomaly-flagger/" directory).
     """
+    candidate = _SKILLS_DIR / skill_name
+    if not candidate.is_dir():
+        candidate = _SKILLS_DIR / skill_name.replace("_", "-")
     return await run_agent_session(
         prompt=prompt,
+        skill_dir=candidate if candidate.is_dir() else None,
         skill_label=skill_name,
         model=model,
         attachments=attachments,

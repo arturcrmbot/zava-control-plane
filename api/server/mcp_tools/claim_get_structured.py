@@ -40,7 +40,7 @@ class _ClaimGetStructuredParams(BaseModel):
 
 
 @define_tool(
-    name="claim.getStructured",
+    name="claim_get_structured",
     description=(
         "Fetch a normalised expense claim record by id. Returns category, market, "
         "currency, amount, attendees, vendor, ems_source, and metadata. "

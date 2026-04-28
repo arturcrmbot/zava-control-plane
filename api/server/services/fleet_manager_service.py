@@ -69,7 +69,7 @@ class FleetManagerService:
         self._client = CopilotClient(config)
         await self._client.start()  # explicit start (alternative to async-with for long-lived)
 
-        skill_path = Path(__file__).resolve().parents[1] / "skills" / "fleet-manager.skill.md"
+        skill_path = Path(__file__).resolve().parents[1] / "skills" / "fleet-manager" / "SKILL.md"
         skill_text = skill_path.read_text(encoding="utf-8")
         tools = build_fleet_manager_tools(self._store, self._audit)
 

@@ -23,9 +23,9 @@ async def test_returns_classifier_payload():
     mock_run.assert_awaited_once()
     _, kwargs = mock_run.call_args
     assert "CLM-0007" in kwargs["prompt"]
-    assert kwargs["skill_label"] == "rag_classifier"
+    assert kwargs["skill_label"] == "rag-classifier"
     tool_names = {t.name for t in kwargs["tools"]}
-    assert tool_names == {"policy.search", "claim.getStructured"}
+    assert tool_names == {"policy_search", "claim_get_structured"}
 
 
 @pytest.mark.asyncio

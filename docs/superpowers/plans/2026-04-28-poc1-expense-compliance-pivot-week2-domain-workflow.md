@@ -4,9 +4,9 @@
 
 **Goal:** Reshape the Durable orchestrator from the broken 6-phase invoice flow to the 7-phase expense-claim flow per spec §4.1. Wire phases 1–5 (Intake, Classify, Validate Receipt, Route by Verdict, Notify) end-to-end with Workday + a new Concur EMS mock; demonstrate breach → notification → justification round-trip. Land AC #1, #2, #5, #6, #9 (and AC #3 falls out for free once claims flow through the dashboard).
 
-**Architecture:** Skills-first, SDK-native. New skills (`receipt_validator`, `escalation_advisor`, `notification_composer`) live in `api/server/skills/*.skill.md` and are auto-discovered by the GHCP SDK via `client.create_session(skill_directories=[...])`. Tools (`claim.lookup`, `claim.getReceipt`, `claim.summary`, `policy.cite`, `employee.history`, plus the existing `policy.search` + `claim.getStructured`) are declared with `@define_tool(name=..., description=...)` from `copilot.tools` with Pydantic params models, and registered on the session via `tools=[...]` — the model invokes them autonomously per the skill's `allowed-tools` frontmatter. **No prompt-stuffing of tool results in Python.** Each new graph node is a `TrackedExecutor` so phase events emit on the existing event bus; new event types (`receipt.mismatch.detected`, `escalation.tier.assigned`, `notification.sent`, `justification.received`) extend `FleetEventType` so SSE fan-out works without code changes elsewhere.
+**Architecture:** Skills-first, SDK-native. New skills (`receipt_validator`, `escalation_advisor`, `notification_composer`) live in `api/server/skills/*.skill.md` and are auto-discovered by the GHCP SDK via `client.create_session(skill_directories=[...])`. Tools (`claim_lookup`, `claim_get_receipt`, `claim_summary`, `policy_cite`, `employee_history`, plus the existing `policy_search` + `claim_get_structured`) are declared with `@define_tool(name=..., description=...)` from `copilot.tools` with Pydantic params models, and registered on the session via `tools=[...]` — the model invokes them autonomously per the skill's `allowed-tools` frontmatter. **No prompt-stuffing of tool results in Python.** Each new graph node is a `TrackedExecutor` so phase events emit on the existing event bus; new event types (`receipt.mismatch.detected`, `escalation.tier.assigned`, `notification.sent`, `justification.received`) extend `FleetEventType` so SSE fan-out works without code changes elsewhere.
 
-> **2026-04-28 retrofit:** the original Week 1 `agent_rag_classifier` pre-fetched `policy.search` and `claim.getStructured` results in Python and embedded them in the prompt — that was a misuse of the SDK. The refactor before any Day 7+ work converts the existing tools to `@define_tool` and the existing agent to `client.create_session(skill_directories=[...], tools=[...])` + `session.send_and_wait(prompt)`. Day 7+ tasks below are written assuming the refactor has landed.
+> **2026-04-28 retrofit:** the original Week 1 `agent_rag_classifier` pre-fetched `policy_search` and `claim_get_structured` results in Python and embedded them in the prompt — that was a misuse of the SDK. The refactor before any Day 7+ work converts the existing tools to `@define_tool` and the existing agent to `client.create_session(skill_directories=[...], tools=[...])` + `session.send_and_wait(prompt)`. Day 7+ tasks below are written assuming the refactor has landed.
 
 **Tech Stack:** Python 3.11 (FastAPI + Azure Durable Functions + Microsoft Agent Framework Pregel graphs + GHCP SDK), `httpx` for Python→Node mock dispatch, Pillow for receipt-image base64 round-trips, Node + TypeScript + Express for the new Concur mock, React + Vite + TypeScript + Vitest for UI, pytest + pytest-asyncio for backend tests.
 
@@ -17,8 +17,8 @@
 - Accuracy runbook: [docs/poc1-accuracy-runbook.md](../../poc1-accuracy-runbook.md) — Day 0 pre-flight gate
 
 **Out of scope for this plan (covered in Week 3):**
-- Phase 6 (Arbitrate) — `arbitration.skill.md`, `precedents.search` MCP tool, `/reviewer-queue` route — *Week 3*
-- Phase 7 (Audit) — `audit_summariser.skill.md`, `audit.query` MCP tool — *Week 3*
+- Phase 6 (Arbitrate) — `arbitration.skill.md`, `precedents_search` MCP tool, `/reviewer-queue` route — *Week 3*
+- Phase 7 (Audit) — `audit_summariser.skill.md`, `audit_query` MCP tool — *Week 3*
 - Fleet Manager skill prompt extension for `fleet.tick` behaviour-change loop — *Week 3*
 - `query_reviewer_decisions`, `query_economics` MCP tools — *Week 3*
 - Region failover demo and recorded backup video — *Week 3*
@@ -665,16 +665,16 @@ EOF
 
 ---
 
-## Task 3: MCP tool — `claim.lookup` (Workday/Concur dispatcher)
+## Task 3: MCP tool — `claim_lookup` (Workday/Concur dispatcher)
 
 **Files:**
 - Create: `api/server/mcp_tools/claim_lookup.py`
 - Create: `tests/api/unit/test_claim_lookup_tool.py`
 - Modify: `api/server/mcp_tools/__init__.py` to re-export
 
-`claim.lookup` is the Phase 1 (Intake) entry point. It takes a `claim_id` and an optional `ems_source` ("workday" | "concur"); when `ems_source` is omitted it reads `data/synthetic/claims/{claim_id}.json` and dispatches based on the `ems_source` field there. The HTTP target (port) is read from environment variables — the same pattern the Node mocks use.
+`claim_lookup` is the Phase 1 (Intake) entry point. It takes a `claim_id` and an optional `ems_source` ("workday" | "concur"); when `ems_source` is omitted it reads `data/synthetic/claims/{claim_id}.json` and dispatches based on the `ems_source` field there. The HTTP target (port) is read from environment variables — the same pattern the Node mocks use.
 
-This bridges the Python orchestrator world to the Node EMS-mock world. We use `httpx` (already in dependencies), wrap in `@traced_tool("claim.lookup")`, set tool-specific span attributes, and return the JSON dict. Read [api/server/mcp_tools/policy_search.py](../../../api/server/mcp_tools/policy_search.py) and [api/server/mcp_tools/claim_get_structured.py](../../../api/server/mcp_tools/claim_get_structured.py) for the canonical span/decorator stacking.
+This bridges the Python orchestrator world to the Node EMS-mock world. We use `httpx` (already in dependencies), wrap in `@traced_tool("claim_lookup")`, set tool-specific span attributes, and return the JSON dict. Read [api/server/mcp_tools/policy_search.py](../../../api/server/mcp_tools/policy_search.py) and [api/server/mcp_tools/claim_get_structured.py](../../../api/server/mcp_tools/claim_get_structured.py) for the canonical span/decorator stacking.
 
 For Day 8, when Concur arrives, this tool already does the right thing — the dispatch table just adds `concur` and the rest of the code is unchanged.
 
@@ -683,7 +683,7 @@ For Day 8, when Concur arrives, this tool already does the right thing — the d
 Create `tests/api/unit/test_claim_lookup_tool.py`:
 
 ```python
-"""claim.lookup MCP tool tests — uses respx to mock the Node EMS HTTP."""
+"""claim_lookup MCP tool tests — uses respx to mock the Node EMS HTTP."""
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -781,7 +781,7 @@ If `httpx` is missing, add `"httpx>=0.27"` to `dependencies`. If `respx` is miss
 - [ ] **Step 3: Implement `api/server/mcp_tools/claim_lookup.py`**
 
 ```python
-"""claim.lookup MCP tool — dispatch a claim id to the appropriate EMS mock.
+"""claim_lookup MCP tool — dispatch a claim id to the appropriate EMS mock.
 
 Reads `ems_source` from the synthetic claim JSON to decide whether to call
 Workday's `getExpenseClaim` or Concur's `getExpenseLine`. The HTTP target
@@ -818,7 +818,7 @@ def _resolve_ems(claim_id: str) -> str:
     return ems
 
 
-@traced_tool("claim.lookup")
+@traced_tool("claim_lookup")
 def lookup(claim_id: str, ems_source: str | None = None) -> dict:
     """Fetch a claim record from the EMS named in ems_source (or auto-detect)."""
     span = trace.get_current_span()
@@ -854,10 +854,10 @@ Expected: 5 PASS.
 ```bash
 git add api/server/mcp_tools/claim_lookup.py api/server/mcp_tools/__init__.py tests/api/unit/test_claim_lookup_tool.py pyproject.toml uv.lock
 git commit -m "$(cat <<'EOF'
-feat(mcp): claim.lookup tool — Workday/Concur dispatcher
+feat(mcp): claim_lookup tool — Workday/Concur dispatcher
 
 Reads ems_source from the synthetic claim JSON and dispatches to the
-appropriate Node mock via httpx. Stacks @traced_tool('claim.lookup')
+appropriate Node mock via httpx. Stacks @traced_tool('claim_lookup')
 on the function body; span attributes wpp.claim.id and wpp.claim.ems
 land on every span. respx-mocked tests cover both dispatch arms,
 explicit ems override, unknown claim, and remote 404 propagation.
@@ -1429,7 +1429,7 @@ Expected: FAIL with `ImportError`.
 # api/functions/graphs/executors/deterministic/lookup_claim.py
 """Phase 1a in-graph adaptor.
 
-The orchestrator already called the claim.lookup MCP tool before the intake
+The orchestrator already called the claim_lookup MCP tool before the intake
 graph runs (see lookup_claim_activity in activities.py). This executor's job
 is to surface the looked-up record under the keys the rest of the intake
 pipeline expects: `raw_text` and `structure` (matching doc_intelligence_extract's
@@ -1971,7 +1971,7 @@ Expected: 15/15 PASS (no UI changes yet).
 
 # Day 7 — Receipt validator + Phase 3
 
-## Task 8: MCP tool — `claim.getReceipt`
+## Task 8: MCP tool — `claim_get_receipt`
 
 **Files:**
 - Create: `api/server/mcp_tools/claim_get_receipt.py`
@@ -1988,7 +1988,7 @@ Reads `data/synthetic/receipts/{claim_id}.png`, returns base64 + size + mismatch
 Create `tests/api/unit/test_claim_get_receipt_tool.py`:
 
 ```python
-"""claim.getReceipt MCP tool tests."""
+"""claim_get_receipt MCP tool tests."""
 from __future__ import annotations
 import base64
 import json
@@ -2054,7 +2054,7 @@ Expected: FAIL with `ImportError`.
 - [ ] **Step 2: Implement `api/server/mcp_tools/claim_get_receipt.py`**
 
 ```python
-"""claim.getReceipt MCP tool — base64-encode the receipt PNG + return metadata."""
+"""claim_get_receipt MCP tool — base64-encode the receipt PNG + return metadata."""
 from __future__ import annotations
 import base64
 import json
@@ -2069,7 +2069,7 @@ _RECEIPTS_DIR = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "re
 _MAX_B64_BYTES = 1_500_000  # ~1MB raw → ~1.4MB b64; cap for prompt size sanity
 
 
-@traced_tool("claim.getReceipt")
+@traced_tool("claim_get_receipt")
 def get_receipt(claim_id: str) -> dict:
     """Return base64 image + flavour metadata. Zero-byte file → missing-receipt."""
     span = trace.get_current_span()
@@ -2114,7 +2114,7 @@ Expected: 4 PASS.
 ```bash
 git add api/server/mcp_tools/claim_get_receipt.py tests/api/unit/test_claim_get_receipt_tool.py
 git commit -m "$(cat <<'EOF'
-feat(mcp): claim.getReceipt tool — base64 + flavour metadata
+feat(mcp): claim_get_receipt tool — base64 + flavour metadata
 
 Returns base64-encoded receipt PNG + receipt_mismatch_flavour from the
 synthetic dataset, with zero-byte handling for missing-receipt. Caps
@@ -2924,7 +2924,7 @@ feat(mocks): concur-mcp Node mock with OAuth-flavoured surface
 listExpenseReports, getExpenseLine, getReceipt, submitJustification
 backed by data.json (seeded from synthetic corpus filtered to
 ems_source=concur). getReceipt reads synthetic PNGs from disk and
-returns base64 + flavour metadata so claim.lookup's Concur dispatch
+returns base64 + flavour metadata so claim_lookup's Concur dispatch
 arm works symmetrically with Workday's getExpenseClaim arm.
 
 Spec ref: §5.4 (mocks/concur-mcp/); brief §7 #9.
@@ -3091,7 +3091,7 @@ Both expected: all PASS. AC #9 is locked.
 
 # Day 9 — Escalation advisor + Phase 4 (Route by Verdict)
 
-## Task 15: MCP tool — `employee.history`
+## Task 15: MCP tool — `employee_history`
 
 **Files:**
 - Create: `api/server/mcp_tools/employee_history.py`
@@ -3103,7 +3103,7 @@ Reads `data/synthetic/employees.json`, filters by `employee_id`, returns `breach
 
 ```python
 # tests/api/unit/test_employee_history_tool.py
-"""employee.history MCP tool tests."""
+"""employee_history MCP tool tests."""
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -3155,7 +3155,7 @@ Expected: FAIL with `ImportError`.
 - [ ] **Step 2: Implement `api/server/mcp_tools/employee_history.py`**
 
 ```python
-"""employee.history MCP tool — breach history + recent-claim summary by employee_id."""
+"""employee_history MCP tool — breach history + recent-claim summary by employee_id."""
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -3181,7 +3181,7 @@ def reset_cache() -> None:
     _cache = None
 
 
-@traced_tool("employee.history")
+@traced_tool("employee_history")
 def history(employee_id: str) -> dict:
     """Return breach_history + breach_count + employee record for employee_id."""
     span = trace.get_current_span()
@@ -3216,7 +3216,7 @@ Expected: 3 PASS.
 ```bash
 git add api/server/mcp_tools/employee_history.py tests/api/unit/test_employee_history_tool.py
 git commit -m "$(cat <<'EOF'
-feat(mcp): employee.history tool — breach summary by employee_id
+feat(mcp): employee_history tool — breach summary by employee_id
 
 Reads data/synthetic/employees.json once (in-process cache; reset_cache
 exposed for tests). Returns breach_history + breach_count + identity
@@ -3242,7 +3242,7 @@ EOF
 
 The escalation advisor reads (a) the employee's breach history and (b) the current claim's classifier verdict, and emits a tier: `none` | `warning` | `escalation` | `major-violation`. The tier influences notification tone (Day 10) and SSC routing.
 
-Per spec §4.1: "Escalate is **not** a per-claim phase. It is cross-workflow state... `escalation_advisor` skill reads `employee.history` (prior breaches in the state store) and emits a tier."
+Per spec §4.1: "Escalate is **not** a per-claim phase. It is cross-workflow state... `escalation_advisor` skill reads `employee_history` (prior breaches in the state store) and emits a tier."
 
 The skill output schema:
 
@@ -3457,7 +3457,7 @@ git commit -m "$(cat <<'EOF'
 feat(skill): escalation_advisor + agent_escalation executor
 
 Skill applies progressive enforcement per policy §6: none | warning |
-escalation | major-violation. Executor pre-fetches employee.history
+escalation | major-violation. Executor pre-fetches employee_history
 and policy §6 excerpt, embeds both in prompt. Green verdicts short-
 circuit to tier=none without a skill call (cost optimisation).
 
@@ -3937,7 +3937,7 @@ Expected: all PASS. AC #6 ready (final demo path needs the live ramp run, which 
 
 # Day 10 — Notification composer + Phase 5 + cleanup
 
-## Task 20: MCP tools — `claim.summary` and `policy.cite`
+## Task 20: MCP tools — `claim_summary` and `policy_cite`
 
 **Files:**
 - Create: `api/server/mcp_tools/claim_summary.py`
@@ -3945,12 +3945,12 @@ Expected: all PASS. AC #6 ready (final demo path needs the live ramp run, which 
 - Create: `tests/api/unit/test_claim_summary_tool.py`
 - Create: `tests/api/unit/test_policy_cite_tool.py`
 
-Both tiny. `claim.summary` takes a claim id and returns a one-liner suitable for the notification body. `policy.cite` takes a clause id (e.g. `§3.1`) and returns the section text for quoting in notifications.
+Both tiny. `claim_summary` takes a claim id and returns a one-liner suitable for the notification body. `policy_cite` takes a clause id (e.g. `§3.1`) and returns the section text for quoting in notifications.
 
 - [ ] **Step 1: Write `test_claim_summary_tool.py`**
 
 ```python
-"""claim.summary MCP tool tests."""
+"""claim_summary MCP tool tests."""
 from __future__ import annotations
 import pytest
 
@@ -3974,7 +3974,7 @@ def test_unknown_claim_raises():
 - [ ] **Step 2: Implement `api/server/mcp_tools/claim_summary.py`**
 
 ```python
-"""claim.summary MCP tool — terse one-liner for use in notifications."""
+"""claim_summary MCP tool — terse one-liner for use in notifications."""
 from __future__ import annotations
 from opentelemetry import trace
 
@@ -3982,7 +3982,7 @@ from . import claim_get_structured
 from ._otel import traced_tool
 
 
-@traced_tool("claim.summary")
+@traced_tool("claim_summary")
 def summarise(claim_id: str) -> dict:
     span = trace.get_current_span()
     span.set_attribute("wpp.claim.id", claim_id)
@@ -4005,7 +4005,7 @@ def summarise(claim_id: str) -> dict:
 - [ ] **Step 3: Write `test_policy_cite_tool.py`**
 
 ```python
-"""policy.cite MCP tool tests."""
+"""policy_cite MCP tool tests."""
 from __future__ import annotations
 import pytest
 
@@ -4027,7 +4027,7 @@ def test_cite_unknown_section_returns_empty_text():
 - [ ] **Step 4: Implement `api/server/mcp_tools/policy_cite.py`**
 
 ```python
-"""policy.cite MCP tool — return the section text given a clause id like '§3.1'."""
+"""policy_cite MCP tool — return the section text given a clause id like '§3.1'."""
 from __future__ import annotations
 from opentelemetry import trace
 
@@ -4035,9 +4035,9 @@ from . import policy_search
 from ._otel import traced_tool
 
 
-@traced_tool("policy.cite")
+@traced_tool("policy_cite")
 def cite(clause: str) -> dict:
-    """Best-effort: searches policy.search for the clause and returns the top
+    """Best-effort: searches policy_search for the clause and returns the top
     chunk's text. Returns empty text if no chunk matches well."""
     span = trace.get_current_span()
     span.set_attribute("wpp.policy.clause", clause)
@@ -4061,10 +4061,10 @@ Expected: all PASS.
 ```bash
 git add api/server/mcp_tools/claim_summary.py api/server/mcp_tools/policy_cite.py tests/api/unit/test_claim_summary_tool.py tests/api/unit/test_policy_cite_tool.py
 git commit -m "$(cat <<'EOF'
-feat(mcp): claim.summary + policy.cite tools
+feat(mcp): claim_summary + policy_cite tools
 
-Tiny helpers for the notification composer: claim.summary returns a
-one-liner with amount/category/vendor; policy.cite returns the section
+Tiny helpers for the notification composer: claim_summary returns a
+one-liner with amount/category/vendor; policy_cite returns the section
 text given a §-style clause id, falling back to empty text if no
 similarity match (avoids notifications full of policy garbage).
 
@@ -4717,11 +4717,11 @@ Walk back through the spec with fresh eyes.
 - [x] `receipt_validator.skill.md` — Task 9
 - [x] `escalation_advisor.skill.md` — Task 16
 - [x] `notification_composer.skill.md` — Task 21
-- [x] `claim.lookup` MCP tool — Task 3
-- [x] `claim.getReceipt` MCP tool — Task 8
-- [x] `claim.summary` MCP tool — Task 20
-- [x] `policy.cite` MCP tool — Task 20
-- [x] `employee.history` MCP tool — Task 15
+- [x] `claim_lookup` MCP tool — Task 3
+- [x] `claim_get_receipt` MCP tool — Task 8
+- [x] `claim_summary` MCP tool — Task 20
+- [x] `policy_cite` MCP tool — Task 20
+- [x] `employee_history` MCP tool — Task 15
 - [x] `mocks/concur-mcp/` — Task 12
 - [x] Workday mock extended — Task 2
 

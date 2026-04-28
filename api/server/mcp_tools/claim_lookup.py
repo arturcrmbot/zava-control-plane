@@ -64,7 +64,7 @@ class _ClaimLookupParams(BaseModel):
 
 
 @define_tool(
-    name="claim.lookup",
+    name="claim_lookup",
     description=(
         "Fetch a claim record from the upstream EMS (Workday or Concur) by id. "
         "Use when you need EMS-side metadata that isn't in the structured claim JSON."
