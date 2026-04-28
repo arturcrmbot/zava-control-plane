@@ -1,7 +1,19 @@
 {
-  "projects": [
-    { "id": "PRJ-A1", "name": "Ogilvy US — Client A Q3 Campaign", "budget": 250000, "spent": 123400 },
-    { "id": "PRJ-B2", "name": "GroupM — Client B Digital", "budget": 180000, "spent": 45000 },
-    { "id": "PRJ-C3", "name": "Wunderman — Client C Rebrand", "budget": 420000, "spent": 391000 }
+  "claims": [
+    {
+      "claim_id": "MAC-0001",
+      "employee_id": "EMP-0042",
+      "submitted_at": "2026-04-15T11:30:00",
+      "market": "DK",
+      "currency": "DKK",
+      "category": "meals",
+      "vendor": "Restaurant Schønnemann",
+      "amount": 412.50,
+      "attendees": 2,
+      "narrative": "Client lunch with creative agency lead, Copenhagen.",
+      "receipt_filename": "MAC-0001.png",
+      "ems_source": "maconomy",
+      "receipt_mismatch_flavour": "correct"
+    }
   ]
 }

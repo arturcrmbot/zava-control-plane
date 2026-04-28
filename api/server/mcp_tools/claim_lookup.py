@@ -31,7 +31,7 @@ def _resolve_ems(claim_id: str) -> str:
         raise KeyError(f"claim {claim_id!r} not found in synthetic corpus")
     record = json.loads(path.read_text(encoding="utf-8"))
     ems = record.get("ems_source")
-    if ems not in {"workday", "concur"}:
+    if ems not in {"workday", "concur", "maconomy"}:
         raise KeyError(f"claim {claim_id!r} has unknown ems_source {ems!r}")
     return ems
 
@@ -60,6 +60,15 @@ def lookup(claim_id: str, ems_source: str | None = None) -> dict:
         body = resp.json()
         # Concur wraps the original synthetic record under `_normalised`.
         return body.get("_normalised") or body
+
+    if ems == "maconomy":
+        port = int(os.environ.get("MACONOMY_MCP_PORT", "4103"))
+        url = f"http://127.0.0.1:{port}/mcp/call/getExpenseLine"
+        resp = httpx.post(url, json={"claimId": claim_id}, timeout=5.0)
+        if resp.status_code == 404:
+            raise KeyError(f"claim {claim_id!r} not found at maconomy mock")
+        resp.raise_for_status()
+        return resp.json()
 
     # workday
     port = int(os.environ.get("WORKDAY_MCP_PORT", "4101"))
