@@ -18,6 +18,7 @@ from api.functions.graphs import (
     build_intake_workflow,
     build_intake_expense_workflow,
     build_classify_workflow,
+    build_receipt_workflow,
     build_approval_workflow,
 )
 from api.functions.webhook import emit
@@ -57,7 +58,8 @@ def classify_activity(payload: dict) -> dict:
 
 
 def receipt_activity(payload: dict) -> dict:
-    raise NotImplementedError("Phase 3 graph wired in Day 7 (build_receipt_workflow)")
+    """Phase 3 — multimodal receipt cross-validation graph."""
+    return asyncio.run(_run_workflow(build_receipt_workflow, payload, "Validate Receipt"))
 
 
 def route_activity(payload: dict) -> dict:

@@ -8,8 +8,10 @@ by the ramp loop.
 """
 from __future__ import annotations
 import asyncio
+import json
 import os
 import random
+from pathlib import Path
 
 from api.server.state import app_state
 from api.server.services.synthetic_data import build_workflow, build_expense_workflow
@@ -17,6 +19,43 @@ from api.server.services.durable_client import schedule_new_orchestration
 
 _seq = 0
 _exp_seq = 0
+
+_CLAIMS_DIR = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "claims"
+
+# Maps a Day 7 simulator scenario to the receipt_mismatch_flavour stamped on
+# the claim by the receipt PNG generator. spawn_expense_workflow picks a
+# deterministic claim from the synthetic corpus matching the scenario's
+# flavour so the Phase 3 receipt validator has known content to classify.
+_SCENARIO_TO_FLAVOUR: dict[str, str] = {
+    "receipt-mismatch-correct": "correct",
+    "receipt-mismatch-amount": "wrong-amount",
+    "receipt-mismatch-date": "wrong-date",
+    "receipt-mismatch-vendor": "wrong-vendor",
+    "receipt-missing-line": "missing-line-item",
+    "receipt-missing": "missing-receipt",
+}
+
+# Module-level RNG keyed off the synthetic-data seed so picks are deterministic
+# within a process and reproducible across restarts.
+_scenario_rng = random.Random(20260427)
+
+
+def _pick_claim_for_flavour(flavour: str) -> str:
+    """Pick a deterministic claim_id whose receipt_mismatch_flavour matches.
+
+    Reads the corpus once per scenario; cheap (~300 small JSONs) and avoids
+    smuggling state across invocations. Raises if no claim has the requested
+    flavour."""
+    candidates = []
+    for path in sorted(_CLAIMS_DIR.glob("CLM-*.json")):
+        record = json.loads(path.read_text(encoding="utf-8"))
+        if record.get("receipt_mismatch_flavour") == flavour:
+            candidates.append(record["claim_id"])
+    if not candidates:
+        raise ValueError(
+            f"no claim with receipt_mismatch_flavour={flavour!r} in {_CLAIMS_DIR}"
+        )
+    return _scenario_rng.choice(candidates)
 
 
 async def spawn_workflow(scenario: str | None = None) -> str:
@@ -69,6 +108,12 @@ async def spawn_expense_workflow(
     global _exp_seq
     _exp_seq += 1
     wid = f"EXP-{_exp_seq:04d}"
+
+    # Day 7 receipt-mismatch scenarios: pick a claim whose flavour matches.
+    # Explicit claim_id arg wins (used by repeat-offender ramps, Day 9).
+    if claim_id is None and scenario in _SCENARIO_TO_FLAVOUR:
+        claim_id = _pick_claim_for_flavour(_SCENARIO_TO_FLAVOUR[scenario])
+
     w = build_expense_workflow(wid, claim_id=claim_id)
     app_state.store.upsert_workflow(w)
     payload: dict = {
