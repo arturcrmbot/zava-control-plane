@@ -4,6 +4,7 @@ from .query_traces import make_query_traces_tool
 from .compose_exception import make_compose_exception_tool
 from .propose_skill_amp import make_propose_skill_amp_tool
 from .dry_run_policy import make_dry_run_policy_tool, dry_run_policy_impl
+from .query_reviewer_decisions import query_reviewer_decisions_tool
 from . import claim_lookup  # noqa: F401  (Phase 1 Intake — Workday/Concur dispatcher)
 
 
@@ -14,4 +15,7 @@ def build_fleet_manager_tools(store, audit):
         make_compose_exception_tool(store, audit),
         make_propose_skill_amp_tool(store),
         make_dry_run_policy_tool(store),
+        # Behaviour-change loop: surface SSC reviewer decision clusters
+        # so the FM can propose autonomy on stable patterns.
+        query_reviewer_decisions_tool,
     ]

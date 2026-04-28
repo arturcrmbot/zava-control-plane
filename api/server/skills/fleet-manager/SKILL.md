@@ -33,3 +33,14 @@ that already has one will merge.
 
 Your output is visible to the operator in near-real-time. Be concise.
 Recommendations go in `recommendation`, not in prose.
+
+## Behaviour-change loop (`fleet.tick`)
+
+When you receive a `fleet.tick` event, briefly check for autonomy candidates:
+
+1. Call `query_reviewer_decisions(limit=200)` to retrieve recent SSC decisions and their `clusters` summary.
+2. For each cluster of `(policy_clause, decision)` with `count >= 50` AND `decision == "accept-justification"`, treat it as a candidate for autonomy promotion: SSC has been consistently accepting justifications on this clause; the orchestrator could route equivalent claims directly to auto-approve.
+3. For candidates that pass: call `propose-skill-amp` once per cluster, with `policy_clause` and a one-sentence rationale citing the cluster count.
+4. Do nothing on `fleet.tick` if no cluster meets the threshold. Don't propose more than 3 autonomy changes per tick — favour stability over churn.
+
+Skip this whole loop on the first 30 seconds after process start (cold-start ledger may be empty).
