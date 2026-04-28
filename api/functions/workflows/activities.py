@@ -17,6 +17,7 @@ import asyncio
 from api.functions.graphs import (
     build_intake_workflow,
     build_intake_expense_workflow,
+    build_classify_workflow,
     build_approval_workflow,
 )
 from api.functions.webhook import emit
@@ -51,7 +52,8 @@ def intake_activity(payload: dict) -> dict:
 
 
 def classify_activity(payload: dict) -> dict:
-    raise NotImplementedError("Phase 2 graph wired in Day 6 subagent (build_classify_workflow)")
+    """Phase 2 — Classify (R/A/G) graph: agent_rag_classifier + schema validator."""
+    return asyncio.run(_run_workflow(build_classify_workflow, payload, "Classify"))
 
 
 def receipt_activity(payload: dict) -> dict:
