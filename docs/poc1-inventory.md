@@ -1,6 +1,14 @@
 # POC 1 Inventory — what's built, graded against the brief
 
-> **Question this answers:** for every artifact in the repo, can it be reused as-is for the *expense compliance* POC1 the brief asks for, does it need adapting, or is it invoice-specific dead weight?
+> **Snapshot at the pivot moment (2026-04-27).** This inventory was the
+> input to the pivot decision; the codebase has since been migrated to
+> expense compliance per the pivot plans. **Do not read the R/A/D
+> grades as current state** — for that, see [poc1-status.md](poc1-status.md).
+>
+> **Question this answers:** for every artifact in the repo as of
+> 2026-04-27, can it be reused as-is for the *expense compliance* POC1
+> the brief asks for, does it need adapting, or is it invoice-specific
+> dead weight?
 > **Source:** code at `c:\dev\ghcp sdk stuff` as of 2026-04-27. Brief: [poc1-brief.md](poc1-brief.md). Submitted PRD: [poc1-prd-submitted.md](poc1-prd-submitted.md).
 
 ## Grading legend

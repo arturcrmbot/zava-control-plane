@@ -1,5 +1,8 @@
 # Architecture
 
+Canonical reference for how the codebase hangs together. For acceptance-
+criteria status and the per-claim flow, see [poc1-status.md](poc1-status.md).
+
 ## Three tiers
 
 ```
@@ -11,31 +14,34 @@
            │                                             │
 ┌──────────┴────────────────────┐            ┌───────────┴──────────┐
 │  MAF Durable Workflow (func)  │            │   React UI (Vite)    │
-│  InvoiceP2POrchestrator per   │◀──────────▶│   workflows · queue  │
-│  invoice · 6 phase activities │   HTTP+SSE │   phases · traces    │
+│  ExpenseClaimOrchestrator per │◀──────────▶│   workflows · queue  │
+│  claim · 7 phase activities   │   HTTP+SSE │   phases · traces    │
 └──────────▲────────────────────┘            └──────────────────────┘
            │
            │ per-phase MAF Pregel graphs
            ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│             Mock MCP servers (Workday, D365, Maconomy, Payment)   │
+│         Mock MCP servers (Workday, SAP Concur, Maconomy)          │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
 ### 1. MAF Durable Workflow orchestration
 
-One `InvoiceP2POrchestrator` generator per invoice, defined in
-[api/functions/workflows/invoice_p2p.py](../api/functions/workflows/invoice_p2p.py)
-and registered in [function_app.py](../function_app.py). Six phase
-activities execute in sequence: **Intake → Validation → Routing →
-Approval → Payment → Reconciliation**. Each activity wraps a per-phase
-MAF Pregel graph (see tier 2).
+One `ExpenseClaimOrchestrator` generator per expense claim, defined in
+[api/functions/workflows/expense_claim.py](../api/functions/workflows/expense_claim.py)
+and registered in [function_app.py](../function_app.py). Seven phase
+activities execute in sequence: **Intake → Classify → Validate Receipt
+→ Route → Notify → Arbitrate → Audit**. Each activity wraps a per-phase
+MAF Pregel graph (see tier 2). On a Green/Amber verdict the flow
+short-circuits to Audit; the Red path runs Notify → HITL → Arbitrate →
+HITL → Audit. The full per-claim flow chart lives in
+[poc1-status.md §2](poc1-status.md#2-architecture).
 
 Human-in-the-loop checkpoints use Azure Durable Functions'
 `wait_for_external_event` — the orchestrator parks until the
 [FastAPI `/internal/durable_event` route](../api/server/routes/internal_durable_event.py)
-raises the matching event, which the exception UI triggers when an
-operator approves or rejects from the queue.
+raises the matching event, which the reviewer UI triggers when an
+operator submits a justification or a reviewer decision.
 
 Checkpointing is automatic via the Azure Durable runtime; state
 persists in Azurite locally (`./azurite-data/`), in Azure Storage in
@@ -45,25 +51,26 @@ production. `make reset` wipes local state.
 
 Each phase activity calls into a typed `WorkflowBuilder` graph in
 [api/functions/graphs/](../api/functions/graphs/) (`intake.py`,
-`validation.py`, `routing.py`, `approval.py`, `payment.py`,
-`reconciliation.py`).
+`intake_expense.py`, `classify.py`, `receipt.py`, `route.py`,
+`notify.py`, `arbitrate.py`).
 
 Graphs mix three executor kinds:
 - **Deterministic** — [executors/deterministic/](../api/functions/graphs/executors/deterministic/):
-  three-way match, GL lookup, payment-file generation, etc.
+  document intelligence extract, threshold routing, decision recording, etc.
 - **Agent** — [executors/agents/](../api/functions/graphs/executors/agents/):
-  nine `finance-agent` skills (field extractor, GL coder, anomaly
-  flagger, cost-centre assigner, exception classifier, resolution
-  recommender, root-cause explainer, invoice classifier, line-item
-  extractor). Each loads its `*.skill.md` via `GitHubCopilotAgent`.
+  finance-agent skills loaded via `GitHubCopilotAgent`. Skills live in
+  [api/server/skills/](../api/server/skills/) — `field-extractor`,
+  `line-item-extractor`, `rag-classifier`, `receipt-validator`,
+  `escalation-advisor`, `notification-composer`, `arbitration`,
+  `anomaly-flagger`, `exception-classifier`, `resolution-recommender`,
+  `root-cause-explainer`, plus the always-on `fleet-manager`.
 - **Validator** — [executors/validators/](../api/functions/graphs/executors/validators/):
   guardrails between agent output and the next deterministic step
-  (e.g. `validate_gl_active`, `validate_recommendation_authority`).
+  (e.g. `validate_required_fields`, `validate_recommendation_authority`).
 
 Validators are the "bounded probabilism" edge — when an agent picks a
-bad value (e.g. GL-9999 inactive), the validator blocks and emits an
-exception event; Fleet Manager wakes and composes a recoverable
-exception card.
+bad value, the validator blocks and emits an exception event; Fleet
+Manager wakes and composes a recoverable exception card.
 
 ### 3. Fleet Manager (FastAPI-side)
 
@@ -82,13 +89,16 @@ Flow:
 4. The session calls MCP tools from
    [api/server/mcp_tools/](../api/server/mcp_tools/):
    `query_fleet`, `query_traces`, `compose_exception`,
-   `propose_skill_amp`, `dry_run_policy`.
+   `propose_skill_amp`, `dry_run_policy`, `precedents_search`,
+   `policy_search`, `policy_cite`, `claim_lookup`,
+   `claim_get_structured`, `claim_get_receipt`, `claim_summary`,
+   `employee_history`.
 5. Reasoning + tool-call deltas stream through the
    [SSE hub](../api/server/services/sse_hub.py) to the UI right rail
    (`/api/stream/fleet-manager`).
 
 One Hosted Agent identity (`fleet-manager-agent`) powers this; a
-separate `finance-agent` identity (nine skills) powers tier 2.
+separate `finance-agent` identity (twelve skills) powers tier 2.
 
 ## Runtime boundaries
 
@@ -98,28 +108,28 @@ separate `finance-agent` identity (nine skills) powers tier 2.
 | FastAPI | 3001 | Fleet Manager, simulator, REST, SSE hub |
 | Azure Functions host | 7071 | Durable orchestrator + activities |
 | Azurite | 10000-10002 | Durable Functions state backing |
-| Mock MCPs | 4101-4104 | Workday, D365, Maconomy, Payment |
+| Mock MCPs | 4101-4103 | Workday, SAP Concur, Maconomy |
 
 All inter-process traffic is HTTP; SSE runs FastAPI → UI.
 
 ## Event flow end-to-end
 
 ```
-POST /api/simulator/inject
+POST /api/simulator/inject   (or simulator ramp loop)
    │
    ▼
 simulator → durable_client.start_new (→ Functions host :7071)
    │
    ▼
-InvoiceP2POrchestrator — activity 1 (intake)
-   │   ├── graphs/intake.py — doc_intelligence_extract → field_extractor → classifier
-   │   └── emits `invoice.intake.*` events
+ExpenseClaimOrchestrator — activity 1 (Intake)
+   │   ├── graphs/intake_expense.py — doc_intelligence_extract → field_extractor → required_fields
+   │   └── emits `claim.intake.*` events
    ▼
-activity 2 (validation)
-   │   ├── graphs/validation.py — three_way_match → validators
-   │   └── emits `validation.*` events
+activity 2 (Classify)
+   │   ├── graphs/classify.py — agent_rag_classifier → schema validator
+   │   └── emits `classify.*` events
    ▼
-…routing → approval (HITL) → payment → reconciliation…
+…receipt validation → route → (red path) notify → HITL → arbitrate → HITL → audit…
 ```
 
 At each step the FastAPI-side EventBus receives events; triage +
@@ -144,8 +154,8 @@ The contract is enforced by an e2e test in
 
 | Identity | Where | Skills |
 |---|---|---|
-| `finance-agent` | Per-phase graph agent executors | `api/server/skills/*.skill.md` — 9 skills |
-| `fleet-manager-agent` | Fleet Manager FastAPI session | `fleet-manager.skill.md` |
+| `finance-agent` | Per-phase graph agent executors | [api/server/skills/](../api/server/skills/) — 12 skills |
+| `fleet-manager-agent` | Fleet Manager FastAPI session | [skills/fleet-manager/SKILL.md](../api/server/skills/fleet-manager/SKILL.md) |
 
 Both are GHCP Hosted Agents authenticated via the single `gh auth token`
 at boot.
@@ -166,8 +176,10 @@ at boot.
 
 ## POC1 scope
 
-- Finance P2P only. POC2 HR views are out of scope for this branch —
-  architecture supports them via role switcher.
+- Expense compliance only. POC2 HR Talent Lifecycle is the next sprint;
+  see [poc2-status.md](poc2-status.md). The platform layer (Fleet
+  Manager, Durable runtime, validators, OTEL, audit ledger, bulk HITL)
+  is intentionally domain-agnostic so POC2 reuses ~75%.
 - No persistence across restarts (Fleet Manager + simulator state).
 - No production auth — local single-operator implicit identity.
 - Cuttable screens (Analytics, Evaluations) exist but lightweight.

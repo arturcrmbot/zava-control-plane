@@ -1,7 +1,15 @@
 # POC 1 PRD — Finance: Intelligent Procure-to-Pay
 
+> **ARCHIVED 2026-04-27.** This is the PRD as submitted to WPP on 2026-04-16,
+> framed around invoice procure-to-pay. POC1 was subsequently re-scoped to
+> **expense compliance** (the brief that followed). Kept as audit artefact.
+>
+> **Canonical current truth:** [poc1-brief.md](poc1-brief.md) (the addendum
+> that drove the pivot) and [poc1-status.md](poc1-status.md) (build state).
+> Pivot rationale: [superpowers/specs/2026-04-27-poc1-expense-compliance-pivot-design.md](superpowers/specs/2026-04-27-poc1-expense-compliance-pivot-design.md).
+
 **Owner:** Microsoft (delivery); WPP AI CoE (acceptance)
-**Status:** Draft for WPP review
+**Status:** Submitted to WPP (superseded by expense-compliance pivot)
 **Date:** 2026-04-16
 **Timeline:** 8-week sprint from kick-off
 

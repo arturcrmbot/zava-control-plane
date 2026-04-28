@@ -2,6 +2,7 @@
 import { NavLink, Route, Routes, Navigate } from "react-router-dom";
 import FleetDashboard from "./routes/FleetDashboard";
 import ExceptionQueue from "./routes/ExceptionQueue";
+import ReviewerQueue from "./routes/ReviewerQueue";
 import PolicyAndAutonomy from "./routes/PolicyAndAutonomy";
 import Analytics from "./routes/Analytics";
 import Evaluations from "./routes/Evaluations";
@@ -9,14 +10,15 @@ import WorkflowDetail from "./routes/WorkflowDetail";
 import FleetManagerRail from "./components/FleetManagerRail";
 
 const nav = [
-  { to: "/fleet",       label: "Dashboard" },
-  { to: "/exceptions",  label: "Exceptions" },
-  { to: "/policy",      label: "Policy" },
-  { to: "/analytics",   label: "Analytics" },
-  { to: "/evals",       label: "Evaluations" },
-  { to: "/agents",      label: "Agents" },
-  { to: "/library",     label: "Library" },
-  { to: "/economics",   label: "Economics" },
+  { to: "/fleet",          label: "Dashboard" },
+  { to: "/exceptions",     label: "Exceptions" },
+  { to: "/reviewer-queue", label: "Reviewer queue" },
+  { to: "/policy",         label: "Policy" },
+  { to: "/analytics",      label: "Analytics" },
+  { to: "/evals",          label: "Evaluations" },
+  { to: "/agents",         label: "Agents" },
+  { to: "/library",        label: "Library" },
+  { to: "/economics",      label: "Economics" },
 ];
 
 function Stub({ title }: { title: string }) {
@@ -50,6 +52,7 @@ export default function App() {
             <Route path="/fleet" element={<FleetDashboard />} />
             <Route path="/workflows/:id" element={<WorkflowDetail />} />
             <Route path="/exceptions" element={<ExceptionQueue />} />
+            <Route path="/reviewer-queue" element={<ReviewerQueue />} />
             <Route path="/policy" element={<PolicyAndAutonomy />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/evals" element={<Evaluations />} />

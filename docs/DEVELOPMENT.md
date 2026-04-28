@@ -39,7 +39,7 @@ debugging.
 | # | Terminal | Port |
 |---|---|---|
 | 1 | `docker compose up -d azurite` (or `azurite --silent --location azurite-data`) | 10000-10002 |
-| 2 | `make mcp` — 4 mock MCPs (tsx watch) | 4101-4104 |
+| 2 | `make mcp` — 3 mock MCPs (tsx watch) | 4101-4103 |
 | 3 | `make functions` — Azure Functions host | 7071 |
 | 4 | `make server` — FastAPI + Fleet Manager (uvicorn --reload) | 3001 |
 | 5 | `npm run dev:client` — Vite HMR | 5173 |
@@ -95,7 +95,7 @@ Manager + simulator state (not persisted).
   shows uvicorn boot.
 - **Functions host logs** — the `make functions` terminal. Look for
   `Worker process started` (Python worker OK), `Host lock lease
-  acquired` (singleton election OK), and `InvoiceP2POrchestrator:
+  acquired` (singleton election OK), and `ExpenseClaimOrchestrator:
   Started` on orchestrator start.
 - **Fleet Manager trace** — the `/api/stream/fleet-manager` SSE feed;
   UI right rail subscribes.

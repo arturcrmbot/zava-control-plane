@@ -1,14 +1,17 @@
-# WPP Control Plane — POC1 (Finance Procure-to-Pay)
+# WPP Control Plane — POC1 (Finance Expense Compliance)
 
-Production-shaped demo of a six-phase invoice P2P pipeline driven by
+Production-shaped demo of a 7-phase expense compliance pipeline driven by
 [Microsoft Agent Framework](https://learn.microsoft.com/agent-framework)
 durable workflows, with a GHCP-SDK-powered Fleet Manager supervising
 every exception in real time.
 
+Brief: [docs/poc1-brief.md](docs/poc1-brief.md). Status + canonical
+architecture: [docs/poc1-status.md](docs/poc1-status.md).
+
 **Stack**
 - Python 3.11 · FastAPI · Azure Durable Functions · MAF · GHCP SDK Python
 - React 19 · Vite 6 · TailwindCSS 4
-- Node mock MCP servers (Workday, D365, Maconomy, Payment)
+- Node mock MCP servers (Workday, SAP Concur, Maconomy)
 
 ## Ports
 
@@ -18,7 +21,7 @@ every exception in real time.
 | FastAPI         | 3001        |
 | Functions host  | 7071        |
 | Azurite         | 10000-10002 |
-| Mock MCPs       | 4101-4104   |
+| Mock MCPs       | 4101-4103   |
 
 ## Quickstart
 
@@ -35,24 +38,18 @@ gh auth login
 make up                                        # boots the full stack in one terminal
 ```
 
-UI at http://localhost:5173. Inject a scenario:
-
-```bash
-curl -X POST http://localhost:3001/api/simulator/inject \
-  -H "Content-Type: application/json" \
-  -d '{"scenario":"demo-fail"}'
-```
+UI at http://localhost:5173. The simulator ramps expense-claim workflows
+into the dashboard automatically when `SIMULATOR_TARGET_WORKFLOWS` is set.
 
 ## Layout
 
 ```
 api/     — Python: FastAPI + Durable Functions + MAF graphs + skills
 web/     — React 19 + Vite 6 UI
-mocks/   — Node MCP servers (Workday, D365, Maconomy, Payment)
+mocks/   — Node MCP servers (Workday, Concur, Maconomy)
 tests/   — pytest (api/), vitest (web/), Playwright (e2e/)
-docs/    — ARCHITECTURE, DEVELOPMENT, DEMO
+docs/    — poc1-brief, poc1-status, ARCHITECTURE, DEVELOPMENT, DEMO
 scripts/ — boot-demo.sh
-spike/   — Phase 0.2 MAF/GHCP de-risk artefacts
 ```
 
 Root-level configs (`pyproject.toml`, `package.json`, `host.json`,
@@ -61,9 +58,10 @@ serve the whole repo.
 
 ## More
 
+- [docs/poc1-status.md](docs/poc1-status.md) — canonical state, acceptance criteria, what's left
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — three tiers + how events flow
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — local dev, terminals, debugging
-- [docs/DEMO.md](docs/DEMO.md) — injection scenarios + expected UI flow
+- [docs/DEMO.md](docs/DEMO.md) — demo scenarios + expected UI flow
 
 ## Stop
 

@@ -1,8 +1,13 @@
 # Demo
 
-3–5 minute walkthrough of the Finance P2P pipeline with Durable
+Walkthrough of the POC1 expense compliance pipeline with Durable
 Functions orchestration, per-phase MAF Pregel graphs, and a live
 Fleet Manager supervising every exception.
+
+> **Canonical state of the demo, including which acceptance criteria
+> are live, partial, or to-build, lives in
+> [poc1-status.md](poc1-status.md).** This doc is the operational
+> "how to run it" companion.
 
 ## Pre-flight
 
@@ -12,12 +17,10 @@ make up             # boot azurite + mocks + functions + fastapi + vite
 # wait for "All services should be up" banner + 30s for simulator warm-up
 ```
 
-Open http://localhost:5173 — you should see the Fleet Dashboard with
-a handful of workflows and the right-rail Fleet Manager idle.
+Open http://localhost:5173 — Fleet Dashboard with a fleet of expense
+workflows ramping in, right-rail Fleet Manager idle.
 
-## Scenario catalogue
-
-All scenarios inject via:
+## Injection
 
 ```bash
 curl -X POST http://localhost:3001/api/simulator/inject \
@@ -25,64 +28,51 @@ curl -X POST http://localhost:3001/api/simulator/inject \
   -d '{"scenario":"<name>"}'
 ```
 
-Passing `{}` runs the happy path.
+Passing `{}` or omitting the body runs the default ramp claim.
 
-| Scenario | What happens | UI signal |
-|---|---|---|
-| *(default `{}`)* | Invoice completes all six phases cleanly | Workflow ticks Intake → Validation → Routing → Approval → Payment → Reconciliation; status `completed` |
-| `demo-fail` | `agent_gl_coder` picks GL-9999 (inactive); `validate_gl_active` blocks in Routing | Right-rail Fleet Manager wakes, composes exception; card lands in Exception Queue |
-| `duplicate-invoice` | Three injections with the same invoice number in rapid succession | Triage coalesces, Fleet Manager composes a bulk-of-3 exception |
-| `sanctions-flag` | Vendor flagged during three-way match | Validation phase halts; exception card with policy-ref citation |
-| `po-mismatch` | Invoice total exceeds PO allowance | Three-way-match validator blocks; Fleet Manager recommends PO amendment |
-| `threshold-exceeded` | Amount above `auto_threshold` policy | Approval phase suspends via `wait_for_external_event`; awaits HITL |
-| `payment-timeout` | Mock Payment MCP first-call timeout | Payment phase retries; if still fails, exception with rollback plan |
-| `compliance` | Bundled compliance-flag case (legal-flag vendor) | Multiple validators fire; Fleet Manager produces a summary exception |
-
-The full scenario list lives in the switch block in
+The full scenario list and routing logic lives in
 [api/server/services/simulator_orchestrator.py](../api/server/services/simulator_orchestrator.py).
+Receipt-mismatch flavours (`receipt-mismatch-amount`,
+`receipt-mismatch-date`, `receipt-mismatch-vendor`,
+`receipt-missing-line`, `receipt-missing`) deterministically pick a
+claim from the synthetic corpus stamped with that flavour, so the
+Phase 3 receipt validator has known content to classify. The Day 9
+repeat-offender ramp (`spawn_repeat_offender_ramp`) walks one
+employee's claims through warning → escalation → major-violation tiers.
 
 ## UI tour
 
-Left-nav routes, all visible in the demo:
+Left-nav routes:
 
 - **Fleet Dashboard** (`/`) — workflow card grid, counters, agency
   filter, right-rail Fleet Manager + Orchestration feeds.
-- **Workflow Detail** (`/workflows/:id`) — per-workflow six-tab
+- **Workflow Detail** (`/workflows/:id`) — per-workflow tabbed
   breakdown (Overview · Phases · Traces · Ledger · Amplification ·
   Orchestration). The Orchestration tab is the durable-runtime view:
   instance ID, step-by-step timeline with executors.
 - **Exception Queue** — unresolved exceptions with bulk-resolve and
-  policy-reference expansions.
+  policy-reference expansions (acceptance #3).
 - **Policy** — live policies with dry-run and "propose as change" CTA.
-- **Evaluations** — skill-amplification tracker (lightweight view).
-- **Analytics** — aggregate counters (lightweight view).
+- **Evaluations** — skill-amplification tracker.
+- **Analytics** — aggregate counters.
 
-## Shot list (record + screenshots)
+## What's demoable today
 
-1. **Fleet Dashboard wide shot** — counters + grid + right rail.
-2. **Inject `demo-fail`** — watch right-rail Orchestration feed scroll
-   (workflow.started → step.started:Intake → executor.invoked ×N →
-   step.completed:Intake → … → step.started:Routing → validator
-   blocked). Fleet Manager tab then wakes and composes exception.
-3. **Workflow Detail Orchestration tab (HERO)** — click the demo-fail
-   workflow, open Orchestration tab. `InvoiceP2POrchestrator` header,
-   instance ID, six-step timeline; Routing is blocked with the failed
-   `validate_gl_active` validator.
-4. **Right-rail Orchestration feed (HERO)** — during a busy moment,
-   screenshot the interleaved executor.invoked stream from multiple
-   workflows.
-5. **Exception Queue with Fleet-Manager-composed exception** — expand
-   to show summary + recommendation + policy refs.
-6. **Workflow Detail Traces tab** — OTEL span tree from per-phase
-   graphs (TrackedExecutor emits these).
-7. **HITL workflow suspended** — Workflow Detail → Orchestration →
-   Approval step shows `suspended · awaiting approval_decision`.
-8. **Resume HITL via bulk-resolve** — Exception Queue → bulk-approve;
-   right rail shows `resumed`; Orchestration tab updates Approval →
-   completed, Payment → running.
-9. **(Optional) Azurite Storage Explorer** — show
-   `InvoiceP2PHubInstances` table with persisted orchestration rows —
-   proves the durable runtime is real, not in-memory.
+Per [poc1-status.md §1](poc1-status.md#1-acceptance-criteria--status):
+
+- ✅ AC #1 Single Controller view across 30+ workflows
+- ✅ AC #2 Exception-only surfacing
+- ✅ AC #3 Bulk approval 10+
+- 🟡 AC #4 Accuracy gate (pipeline live; full corpus run pending)
+- ✅ AC #5 Receipt cross-validation
+- ✅ AC #6 Progressive enforcement
+- 🟡 AC #7 Autonomous learning (Fleet Manager extension still to wire)
+- 🟡 AC #8 SSC Reviewer interface (agent + tool landed; UI route pending)
+- ✅ AC #9 Multi-EMS Control Plane (Workday + Concur)
+- 🟡 AC #10 EMS extensibility narration
+- ❌ AC #11 Region failure recovery
+- ❌ AC #12 Audit + reporting
+- ❌ AC #13 Cost-per-task report
 
 ## Between takes
 

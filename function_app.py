@@ -14,7 +14,6 @@ from api.functions.workflows.activities import (
     notify_activity,
     arbitrate_activity,
     audit_activity,
-    approval_activity,
     checkpoint_activity,
 )
 
@@ -29,26 +28,6 @@ app = df.DFApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 @app.orchestration_trigger(context_name="context")
 def ExpenseClaimOrchestrator(context: df.DurableOrchestrationContext):
     return expense_claim_orchestration(context)
-
-
-# Deprecated invoice orchestrator — kept registered as a no-op so any
-# in-flight Durable history rows from before the Week 2 pivot can rehydrate
-# and complete cleanly instead of failing on replay. Returns a deprecation
-# marker on first activation. Remove after the storage account has been
-# confirmed clean of invoice-p2p instances.
-@app.orchestration_trigger(context_name="context")
-def InvoiceP2POrchestrator(context: df.DurableOrchestrationContext):
-    return _invoice_p2p_deprecated(context)
-
-
-def _invoice_p2p_deprecated(context: df.DurableOrchestrationContext):
-    yield context.call_activity("checkpoint_activity_trigger", {
-        "workflow_id": (context.get_input() or {}).get("workflow_id", "?"),
-        "instance_id": context.instance_id,
-        "kind": "workflow.completed",
-        "payload": {"status": "deprecated", "note": "InvoiceP2POrchestrator retired in Week 2 pivot"},
-    })
-    return {"status": "deprecated", "phase": "Sunset"}
 
 
 # Activity registrations — Azure DF requires each as a decorated function in function_app.py
@@ -85,12 +64,6 @@ def arbitrate_activity_trigger(payload: dict) -> dict:
 @app.activity_trigger(input_name="payload")
 def audit_activity_trigger(payload: dict) -> dict:
     return audit_activity(payload)
-
-
-# Approval activity retained for any in-flight invoice-p2p orchestrators (none in steady state).
-@app.activity_trigger(input_name="payload")
-def approval_activity_trigger(payload: dict) -> dict:
-    return approval_activity(payload)
 
 
 @app.activity_trigger(input_name="payload")
