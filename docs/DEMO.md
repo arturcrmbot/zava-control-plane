@@ -58,21 +58,9 @@ Left-nav routes:
 
 ## What's demoable today
 
-Per [poc1-status.md §1](poc1-status.md#1-acceptance-criteria--status):
-
-- ✅ AC #1 Single Controller view across 30+ workflows
-- ✅ AC #2 Exception-only surfacing
-- ✅ AC #3 Bulk approval 10+
-- 🟡 AC #4 Accuracy gate (pipeline live; full corpus run pending)
-- ✅ AC #5 Receipt cross-validation
-- ✅ AC #6 Progressive enforcement
-- 🟡 AC #7 Autonomous learning (Fleet Manager extension still to wire)
-- 🟡 AC #8 SSC Reviewer interface (agent + tool landed; UI route pending)
-- ✅ AC #9 Multi-EMS Control Plane (Workday + Concur)
-- 🟡 AC #10 EMS extensibility narration
-- ❌ AC #11 Region failure recovery
-- ❌ AC #12 Audit + reporting
-- ❌ AC #13 Cost-per-task report
+For the AC #1–13 status table — what's live, partial, or to-build —
+see [poc1-status.md §1](poc1-status.md#1-acceptance-criteria--status).
+That table is the single source; do not re-state it here.
 
 ## Between takes
 

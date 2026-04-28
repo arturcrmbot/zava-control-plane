@@ -58,6 +58,8 @@ serve the whole repo.
 
 ## More
 
+- [docs/README.md](docs/README.md) — index of every doc in this repo + what each is for
+- [docs/CODEBASE-TOUR.md](docs/CODEBASE-TOUR.md) — narrative walkthrough for first-time visitors
 - [docs/poc1-status.md](docs/poc1-status.md) — canonical state, acceptance criteria, what's left
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — three tiers + how events flow
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — local dev, terminals, debugging
