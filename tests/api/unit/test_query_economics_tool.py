@@ -12,11 +12,12 @@ from api.shared.types import ClaimData, Workflow
 
 @pytest.fixture(autouse=True)
 def _isolate_app_state_store():
-    pre = {w.id for w in app_state.store.list_workflows()}
+    """Save, clear, and restore app_state.store for full isolation."""
+    saved = dict(app_state.store._workflows)
+    app_state.store._workflows.clear()
     yield
-    for w in list(app_state.store.list_workflows()):
-        if w.id not in pre:
-            app_state.store._workflows.pop(w.id, None)
+    app_state.store._workflows.clear()
+    app_state.store._workflows.update(saved)
 
 
 def _make_claim(claim_id: str = "CLM-1") -> ClaimData:
