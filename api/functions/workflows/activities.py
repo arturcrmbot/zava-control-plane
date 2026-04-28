@@ -14,7 +14,11 @@ their graphs land in Days 7-10 and Week 3.
 from __future__ import annotations
 import asyncio
 
-from api.functions.graphs import build_intake_workflow, build_approval_workflow
+from api.functions.graphs import (
+    build_intake_workflow,
+    build_intake_expense_workflow,
+    build_approval_workflow,
+)
 from api.functions.webhook import emit
 
 
@@ -39,7 +43,11 @@ async def _run_workflow(workflow_factory, payload: dict, step_name: str) -> dict
 
 
 def intake_activity(payload: dict) -> dict:
-    return asyncio.run(_run_workflow(build_intake_workflow, payload, "Intake"))
+    """Phase 1 — runs the expense-claim Intake graph by default. Falls back
+    to the legacy invoice graph only when payload.type == 'invoice-p2p'."""
+    if payload.get("type") == "invoice-p2p":
+        return asyncio.run(_run_workflow(build_intake_workflow, payload, "Intake"))
+    return asyncio.run(_run_workflow(build_intake_expense_workflow, payload, "Intake"))
 
 
 def classify_activity(payload: dict) -> dict:
