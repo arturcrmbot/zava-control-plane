@@ -21,6 +21,7 @@ from api.functions.graphs import (
     build_receipt_workflow,
     build_route_workflow,
     build_notify_workflow,
+    build_arbitrate_workflow,
     build_approval_workflow,
 )
 from api.functions.webhook import emit
@@ -75,13 +76,8 @@ def notify_activity(payload: dict) -> dict:
 
 
 def arbitrate_activity(payload: dict) -> dict:
-    """Phase 6 — stub until Week 3 wires the arbitration graph.
-
-    Returns a no-op marker rather than raising so a Red workflow that reaches
-    Phase 6 doesn't crash the orchestrator. Week 3 replaces the body with
-    build_arbitrate_workflow.
-    """
-    return {"status": "stub", "phase": "Arbitrate"}
+    """Phase 6 — SSC reviewer arbitration on Red claims (post-justification)."""
+    return asyncio.run(_run_workflow(build_arbitrate_workflow, payload, "Arbitrate"))
 
 
 def audit_activity(payload: dict) -> dict:
