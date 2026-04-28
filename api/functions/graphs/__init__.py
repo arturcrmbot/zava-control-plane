@@ -10,11 +10,8 @@ from .intake import build_intake_workflow
 from .intake_expense import build_intake_expense_workflow
 from .classify import build_classify_workflow
 from .receipt import build_receipt_workflow
+from .route import build_route_workflow
 from .approval import build_approval_workflow
-
-
-def build_route_workflow():
-    raise NotImplementedError("Phase 4 (Route by Verdict) — Day 9")
 
 
 def build_notify_workflow():

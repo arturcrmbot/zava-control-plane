@@ -40,6 +40,17 @@ _SCENARIO_TO_FLAVOUR: dict[str, str] = {
 _scenario_rng = random.Random(20260427)
 
 
+def _claims_for_employee(employee_id: str) -> list[str]:
+    """Return all claim_ids for a given employee, sorted by claim_id (which is
+    chronological by construction). Used by the repeat-offender ramp."""
+    out: list[str] = []
+    for path in sorted(_CLAIMS_DIR.glob("CLM-*.json")):
+        record = json.loads(path.read_text(encoding="utf-8"))
+        if record.get("employee_id") == employee_id:
+            out.append(record["claim_id"])
+    return out
+
+
 def _pick_claim_for_flavour(flavour: str) -> str:
     """Pick a deterministic claim_id whose receipt_mismatch_flavour matches.
 
@@ -136,6 +147,35 @@ async def spawn_expense_workflow(
     except Exception as ex:
         print(f"[orchestrator] failed to schedule {wid}: {ex}")
     return wid
+
+
+async def spawn_repeat_offender_ramp(
+    employee_id: str = "EMP-0001",
+    count: int = 3,
+    delay_seconds: float = 1.0,
+) -> list[str]:
+    """Day 9 ramp demo: spawn `count` consecutive claims from the same employee
+    so the escalation_advisor's tier visibly ramps warning -> escalation ->
+    major-violation across the three workflows.
+
+    The seeded synthetic data has at least three employees (EMP-0001 et al.)
+    with prior breach histories of length 2+, so the third claim should land
+    in major-violation when the same-category override applies.
+    """
+    claim_ids = _claims_for_employee(employee_id)
+    if len(claim_ids) < count:
+        raise ValueError(
+            f"employee {employee_id!r} has only {len(claim_ids)} claims in the corpus "
+            f"(need {count}); seed more in data/synthetic/employees.json"
+        )
+    spawned: list[str] = []
+    for cid in claim_ids[:count]:
+        wid = await spawn_expense_workflow(
+            scenario="repeat-offender", claim_id=cid,
+        )
+        spawned.append(wid)
+        await asyncio.sleep(delay_seconds)
+    return spawned
 
 
 async def ramp_loop() -> None:

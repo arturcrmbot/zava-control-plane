@@ -19,6 +19,7 @@ from api.functions.graphs import (
     build_intake_expense_workflow,
     build_classify_workflow,
     build_receipt_workflow,
+    build_route_workflow,
     build_approval_workflow,
 )
 from api.functions.webhook import emit
@@ -63,7 +64,8 @@ def receipt_activity(payload: dict) -> dict:
 
 
 def route_activity(payload: dict) -> dict:
-    raise NotImplementedError("Phase 4 graph wired in Day 9 (build_route_workflow)")
+    """Phase 4 — escalation advisor + verdict routing."""
+    return asyncio.run(_run_workflow(build_route_workflow, payload, "Route"))
 
 
 def notify_activity(payload: dict) -> dict:
