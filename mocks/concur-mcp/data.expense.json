@@ -13,9 +13,6 @@
       "narrative": "Long-haul return booking via JetBlue",
       "receipt_filename": "CLM-0001.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 1058.12 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -31,9 +28,6 @@
       "narrative": "Client dinner at Bukhara Delhi, business-development discussion",
       "receipt_filename": "CLM-0003.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at INR 17096.00 for 4 attendees (INR 4273.92/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -49,9 +43,6 @@
       "narrative": "Solo dinner at Sweetgreen",
       "receipt_filename": "CLM-0005.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 38.03 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -67,9 +58,6 @@
       "narrative": "Mumbai stay at The Oberoi Bangalore",
       "receipt_filename": "CLM-0007.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "Mumbai hotel at INR 16217.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
       "receipt_mismatch_flavour": "wrong-vendor"
     },
     {
@@ -85,9 +73,6 @@
       "narrative": "Conference registration via Atlassian Subscriptions",
       "receipt_filename": "CLM-0009.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of USD 2868.99 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
       "receipt_mismatch_flavour": "missing-receipt"
     },
     {
@@ -103,9 +88,6 @@
       "narrative": "Long-haul return booking via IndiGo",
       "receipt_filename": "CLM-0011.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 37426.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -121,9 +103,6 @@
       "narrative": "Client dinner at RPM Steak Chicago, business-development discussion",
       "receipt_filename": "CLM-0013.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at USD 385.88 for 4 attendees (USD 96.47/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
       "receipt_mismatch_flavour": "wrong-vendor"
     },
     {
@@ -139,9 +118,6 @@
       "narrative": "Solo dinner at Indian Accent",
       "receipt_filename": "CLM-0015.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 1691.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -157,9 +133,6 @@
       "narrative": "New York stay at Marriott Marquis NYC",
       "receipt_filename": "CLM-0017.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "New York hotel at USD 408.41/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -175,9 +148,6 @@
       "narrative": "Conference registration via Croma Business",
       "receipt_filename": "CLM-0019.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of INR 100144.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -193,9 +163,6 @@
       "narrative": "Long-haul return booking via Delta Airlines",
       "receipt_filename": "CLM-0021.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 719.61 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -211,9 +178,6 @@
       "narrative": "Client dinner at Indigo Mumbai, business-development discussion",
       "receipt_filename": "CLM-0023.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at INR 7072.00 for 2 attendees (INR 3535.91/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -229,9 +193,6 @@
       "narrative": "Solo dinner at Joe's Pizza",
       "receipt_filename": "CLM-0025.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 44.60 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -247,9 +208,6 @@
       "narrative": "Mumbai stay at Trident Hyderabad",
       "receipt_filename": "CLM-0027.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "Mumbai hotel at INR 17317.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
       "receipt_mismatch_flavour": "missing-receipt"
     },
     {
@@ -265,9 +223,6 @@
       "narrative": "Conference registration via Atlassian Subscriptions",
       "receipt_filename": "CLM-0029.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of USD 2652.39 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -283,9 +238,6 @@
       "narrative": "Long-haul return booking via Air India",
       "receipt_filename": "CLM-0031.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 36010.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -301,9 +253,6 @@
       "narrative": "Client dinner at The Polo Bar, business-development discussion",
       "receipt_filename": "CLM-0033.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at USD 184.86 for 2 attendees (USD 92.43/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -319,9 +268,6 @@
       "narrative": "Solo dinner at Saravana Bhavan",
       "receipt_filename": "CLM-0035.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 1759.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -337,9 +283,6 @@
       "narrative": "New York stay at Kimpton LA",
       "receipt_filename": "CLM-0037.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "New York hotel at USD 412.99/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -355,9 +298,6 @@
       "narrative": "Conference registration via Adobe Creative Cloud",
       "receipt_filename": "CLM-0039.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of INR 115062.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
       "receipt_mismatch_flavour": "wrong-date"
     },
     {
@@ -373,9 +313,6 @@
       "narrative": "Long-haul return booking via Uber",
       "receipt_filename": "CLM-0041.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 980.08 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -391,9 +328,6 @@
       "narrative": "Client dinner at Wasabi by Morimoto, business-development discussion",
       "receipt_filename": "CLM-0043.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at INR 7515.00 for 2 attendees (INR 3757.74/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -409,9 +343,6 @@
       "narrative": "Solo dinner at The Capital Grille",
       "receipt_filename": "CLM-0045.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 44.27 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -427,9 +358,6 @@
       "narrative": "Mumbai stay at The Oberoi Bangalore",
       "receipt_filename": "CLM-0047.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "Mumbai hotel at INR 17575.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
       "receipt_mismatch_flavour": "wrong-amount"
     },
     {
@@ -445,9 +373,6 @@
       "narrative": "Conference registration via Atlassian Subscriptions",
       "receipt_filename": "CLM-0049.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of USD 2390.31 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
       "receipt_mismatch_flavour": "wrong-date"
     },
     {
@@ -463,9 +388,6 @@
       "narrative": "Long-haul return booking via IRCTC AC1",
       "receipt_filename": "CLM-0051.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 44693.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -481,9 +403,6 @@
       "narrative": "Client dinner at Nobu NYC, business-development discussion",
       "receipt_filename": "CLM-0053.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at USD 173.79 for 2 attendees (USD 86.89/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -499,9 +418,6 @@
       "narrative": "Solo dinner at Saravana Bhavan",
       "receipt_filename": "CLM-0055.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 1836.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -517,9 +433,6 @@
       "narrative": "New York stay at Marriott Marquis NYC",
       "receipt_filename": "CLM-0057.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "New York hotel at USD 390.86/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -535,9 +448,6 @@
       "narrative": "Conference registration via BookMyShow Events",
       "receipt_filename": "CLM-0059.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of INR 94439.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -553,9 +463,6 @@
       "narrative": "Long-haul return booking via United Airlines",
       "receipt_filename": "CLM-0061.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 899.39 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -571,9 +478,6 @@
       "narrative": "Client dinner at Karavalli Bangalore, business-development discussion",
       "receipt_filename": "CLM-0063.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at INR 8838.00 for 2 attendees (INR 4419.04/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -589,9 +493,6 @@
       "narrative": "Solo dinner at Chipotle",
       "receipt_filename": "CLM-0065.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 35.22 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
       "receipt_mismatch_flavour": "missing-receipt"
     },
     {
@@ -607,9 +508,6 @@
       "narrative": "Mumbai stay at Trident Hyderabad",
       "receipt_filename": "CLM-0067.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "Mumbai hotel at INR 17404.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
       "receipt_mismatch_flavour": "wrong-vendor"
     },
     {
@@ -625,9 +523,6 @@
       "narrative": "Conference registration via Atlassian Subscriptions",
       "receipt_filename": "CLM-0069.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of USD 2874.65 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
       "receipt_mismatch_flavour": "wrong-vendor"
     },
     {
@@ -643,9 +538,6 @@
       "narrative": "Long-haul return booking via IRCTC AC1",
       "receipt_filename": "CLM-0071.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 49827.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -661,9 +553,6 @@
       "narrative": "Client dinner at The Polo Bar, business-development discussion",
       "receipt_filename": "CLM-0073.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at USD 212.94 for 2 attendees (USD 106.47/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -679,9 +568,6 @@
       "narrative": "Solo dinner at Mahesh Lunch Home",
       "receipt_filename": "CLM-0075.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 2185.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -697,9 +583,6 @@
       "narrative": "New York stay at Westin Chicago",
       "receipt_filename": "CLM-0077.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "New York hotel at USD 384.63/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -715,9 +598,6 @@
       "narrative": "Conference registration via Adobe Creative Cloud",
       "receipt_filename": "CLM-0079.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of INR 96274.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -733,9 +613,6 @@
       "narrative": "Long-haul return booking via JetBlue",
       "receipt_filename": "CLM-0081.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 707.11 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200",
       "receipt_mismatch_flavour": "missing-line-item"
     },
     {
@@ -751,9 +628,6 @@
       "narrative": "Client dinner at Bukhara Delhi, business-development discussion",
       "receipt_filename": "CLM-0083.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at INR 7095.00 for 2 attendees (INR 3547.67/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -769,9 +643,6 @@
       "narrative": "Solo dinner at Chipotle",
       "receipt_filename": "CLM-0085.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 40.47 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -787,9 +658,6 @@
       "narrative": "Mumbai stay at ITC Maurya Delhi",
       "receipt_filename": "CLM-0087.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "Mumbai hotel at INR 16386.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -805,9 +673,6 @@
       "narrative": "Conference registration via Best Buy Business",
       "receipt_filename": "CLM-0089.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of USD 2491.07 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -823,9 +688,6 @@
       "narrative": "Long-haul return booking via Vistara",
       "receipt_filename": "CLM-0091.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 35541.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -841,9 +703,6 @@
       "narrative": "Client dinner at The Polo Bar, business-development discussion",
       "receipt_filename": "CLM-0093.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at USD 326.38 for 3 attendees (USD 108.79/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
       "receipt_mismatch_flavour": "wrong-amount"
     },
     {
@@ -859,9 +718,6 @@
       "narrative": "Solo dinner at Bombay Canteen",
       "receipt_filename": "CLM-0095.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 1695.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -877,9 +733,6 @@
       "narrative": "New York stay at Marriott Marquis NYC",
       "receipt_filename": "CLM-0097.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "New York hotel at USD 416.04/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -895,9 +748,6 @@
       "narrative": "Conference registration via Atlassian Subscriptions",
       "receipt_filename": "CLM-0099.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of INR 102111.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -913,9 +763,6 @@
       "narrative": "Long-haul return booking via JetBlue",
       "receipt_filename": "CLM-0101.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 670.72 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -931,9 +778,6 @@
       "narrative": "Client dinner at Karavalli Bangalore, business-development discussion",
       "receipt_filename": "CLM-0103.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at INR 7404.00 for 2 attendees (INR 3701.77/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -949,9 +793,6 @@
       "narrative": "Solo dinner at Sweetgreen",
       "receipt_filename": "CLM-0105.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 29.52 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -967,9 +808,6 @@
       "narrative": "Mumbai stay at JW Marriott Mumbai",
       "receipt_filename": "CLM-0107.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "Mumbai hotel at INR 17483.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -985,9 +823,6 @@
       "narrative": "Conference registration via Adobe Creative Cloud",
       "receipt_filename": "CLM-0109.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of USD 2514.44 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1003,9 +838,6 @@
       "narrative": "Long-haul return booking via IRCTC AC1",
       "receipt_filename": "CLM-0111.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 36846.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
       "receipt_mismatch_flavour": "missing-receipt"
     },
     {
@@ -1021,9 +853,6 @@
       "narrative": "Client dinner at The Polo Bar, business-development discussion",
       "receipt_filename": "CLM-0113.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at USD 471.17 for 4 attendees (USD 117.79/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1039,9 +868,6 @@
       "narrative": "Solo dinner at Saravana Bhavan",
       "receipt_filename": "CLM-0115.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 2266.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1057,9 +883,6 @@
       "narrative": "New York stay at Kimpton LA",
       "receipt_filename": "CLM-0117.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "New York hotel at USD 404.04/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1075,9 +898,6 @@
       "narrative": "Conference registration via Adobe Creative Cloud",
       "receipt_filename": "CLM-0119.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of INR 93502.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1093,9 +913,6 @@
       "narrative": "Long-haul return booking via Uber",
       "receipt_filename": "CLM-0121.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 1025.17 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1111,9 +928,6 @@
       "narrative": "Client dinner at Karavalli Bangalore, business-development discussion",
       "receipt_filename": "CLM-0123.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at INR 13697.00 for 4 attendees (INR 3424.13/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1129,9 +943,6 @@
       "narrative": "Solo dinner at Shake Shack",
       "receipt_filename": "CLM-0125.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 45.55 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1147,9 +958,6 @@
       "narrative": "Mumbai stay at JW Marriott Mumbai",
       "receipt_filename": "CLM-0127.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "Mumbai hotel at INR 16584.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1165,9 +973,6 @@
       "narrative": "Conference registration via Atlassian Subscriptions",
       "receipt_filename": "CLM-0129.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of USD 2743.71 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1183,9 +988,6 @@
       "narrative": "Long-haul return booking via IndiGo",
       "receipt_filename": "CLM-0131.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 43772.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
       "receipt_mismatch_flavour": "wrong-date"
     },
     {
@@ -1201,9 +1003,6 @@
       "narrative": "Client dinner at The Polo Bar, business-development discussion",
       "receipt_filename": "CLM-0133.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at USD 184.99 for 2 attendees (USD 92.50/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1219,9 +1018,6 @@
       "narrative": "Solo dinner at Bombay Canteen",
       "receipt_filename": "CLM-0135.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 2113.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1237,9 +1033,6 @@
       "narrative": "New York stay at Marriott Marquis NYC",
       "receipt_filename": "CLM-0137.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "New York hotel at USD 402.52/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1255,9 +1048,6 @@
       "narrative": "Conference registration via Adobe Creative Cloud",
       "receipt_filename": "CLM-0139.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of INR 102486.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1273,9 +1063,6 @@
       "narrative": "Long-haul return booking via Delta Airlines",
       "receipt_filename": "CLM-0141.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 1012.39 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1291,9 +1078,6 @@
       "narrative": "Client dinner at Bukhara Delhi, business-development discussion",
       "receipt_filename": "CLM-0143.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at INR 12766.00 for 3 attendees (INR 4255.26/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1309,9 +1093,6 @@
       "narrative": "Solo dinner at Chipotle",
       "receipt_filename": "CLM-0145.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 43.02 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1327,9 +1108,6 @@
       "narrative": "Mumbai stay at Trident Hyderabad",
       "receipt_filename": "CLM-0147.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "Mumbai hotel at INR 16433.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1345,9 +1123,6 @@
       "narrative": "Conference registration via Atlassian Subscriptions",
       "receipt_filename": "CLM-0149.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of USD 2553.61 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1363,9 +1138,6 @@
       "narrative": "Long-haul return booking via Vistara",
       "receipt_filename": "CLM-0151.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 54370.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1381,9 +1153,6 @@
       "narrative": "Client dinner at Eleven Madison Park, business-development discussion",
       "receipt_filename": "CLM-0153.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at USD 191.08 for 2 attendees (USD 95.54/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1399,9 +1168,6 @@
       "narrative": "Solo dinner at Indian Accent",
       "receipt_filename": "CLM-0155.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 1933.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1417,9 +1183,6 @@
       "narrative": "New York stay at Hilton SF Union Square",
       "receipt_filename": "CLM-0157.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "New York hotel at USD 398.61/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1435,9 +1198,6 @@
       "narrative": "Conference registration via BookMyShow Events",
       "receipt_filename": "CLM-0159.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of INR 113968.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
       "receipt_mismatch_flavour": "wrong-vendor"
     },
     {
@@ -1453,9 +1213,6 @@
       "narrative": "Long-haul return booking via Delta Airlines",
       "receipt_filename": "CLM-0161.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 797.65 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1471,9 +1228,6 @@
       "narrative": "Client dinner at Le Cirque Delhi, business-development discussion",
       "receipt_filename": "CLM-0163.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at INR 17682.00 for 4 attendees (INR 4420.43/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1489,9 +1243,6 @@
       "narrative": "Solo dinner at The Capital Grille",
       "receipt_filename": "CLM-0165.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 31.43 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1507,9 +1258,6 @@
       "narrative": "Mumbai stay at ITC Maurya Delhi",
       "receipt_filename": "CLM-0167.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "Mumbai hotel at INR 17318.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1525,9 +1273,6 @@
       "narrative": "Conference registration via Adobe Creative Cloud",
       "receipt_filename": "CLM-0169.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of USD 2738.84 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1543,9 +1288,6 @@
       "narrative": "Long-haul return booking via Vistara",
       "receipt_filename": "CLM-0171.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 48801.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1561,9 +1303,6 @@
       "narrative": "Client dinner at RPM Steak Chicago, business-development discussion",
       "receipt_filename": "CLM-0173.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at USD 450.88 for 4 attendees (USD 112.72/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1579,9 +1318,6 @@
       "narrative": "Solo dinner at Saravana Bhavan",
       "receipt_filename": "CLM-0175.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 1405.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1597,9 +1333,6 @@
       "narrative": "New York stay at Kimpton LA",
       "receipt_filename": "CLM-0177.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "New York hotel at USD 389.63/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
       "receipt_mismatch_flavour": "wrong-amount"
     },
     {
@@ -1615,9 +1348,6 @@
       "narrative": "Conference registration via Adobe Creative Cloud",
       "receipt_filename": "CLM-0179.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of INR 108536.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1633,9 +1363,6 @@
       "narrative": "Long-haul return booking via Uber",
       "receipt_filename": "CLM-0181.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 661.40 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1651,9 +1378,6 @@
       "narrative": "Client dinner at Wasabi by Morimoto, business-development discussion",
       "receipt_filename": "CLM-0183.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at INR 17778.00 for 4 attendees (INR 4444.41/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
       "receipt_mismatch_flavour": "missing-receipt"
     },
     {
@@ -1669,9 +1393,6 @@
       "narrative": "Solo dinner at The Capital Grille",
       "receipt_filename": "CLM-0185.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 35.85 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
       "receipt_mismatch_flavour": "wrong-vendor"
     },
     {
@@ -1687,9 +1408,6 @@
       "narrative": "Mumbai stay at ITC Maurya Delhi",
       "receipt_filename": "CLM-0187.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "Mumbai hotel at INR 16890.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1705,9 +1423,6 @@
       "narrative": "Conference registration via Best Buy Business",
       "receipt_filename": "CLM-0189.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of USD 2595.53 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
       "receipt_mismatch_flavour": "wrong-amount"
     },
     {
@@ -1723,9 +1438,6 @@
       "narrative": "Long-haul return booking via IRCTC AC1",
       "receipt_filename": "CLM-0191.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 45635.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
       "receipt_mismatch_flavour": "missing-line-item"
     },
     {
@@ -1741,9 +1453,6 @@
       "narrative": "Client dinner at Eleven Madison Park, business-development discussion",
       "receipt_filename": "CLM-0193.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at USD 465.02 for 4 attendees (USD 116.26/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1759,9 +1468,6 @@
       "narrative": "Solo dinner at Karavalli",
       "receipt_filename": "CLM-0195.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 1612.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1777,9 +1483,6 @@
       "narrative": "New York stay at Hyatt Regency Boston",
       "receipt_filename": "CLM-0197.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "New York hotel at USD 409.55/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1795,9 +1498,6 @@
       "narrative": "Conference registration via Croma Business",
       "receipt_filename": "CLM-0199.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of INR 96634.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
       "receipt_mismatch_flavour": "wrong-date"
     },
     {
@@ -1813,9 +1513,6 @@
       "narrative": "Long-haul return booking via Amtrak Acela",
       "receipt_filename": "CLM-0201.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 859.10 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1831,9 +1528,6 @@
       "narrative": "Client dinner at Bukhara Delhi, business-development discussion",
       "receipt_filename": "CLM-0203.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at INR 13501.00 for 4 attendees (INR 3375.24/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1849,9 +1543,6 @@
       "narrative": "Solo dinner at Joe's Pizza",
       "receipt_filename": "CLM-0205.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 29.47 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1867,9 +1558,6 @@
       "narrative": "Mumbai stay at JW Marriott Mumbai",
       "receipt_filename": "CLM-0207.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "Mumbai hotel at INR 16743.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1885,9 +1573,6 @@
       "narrative": "Conference registration via Atlassian Subscriptions",
       "receipt_filename": "CLM-0209.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of USD 2432.10 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1903,9 +1588,6 @@
       "narrative": "Long-haul return booking via IndiGo",
       "receipt_filename": "CLM-0211.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 42659.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
       "receipt_mismatch_flavour": "wrong-amount"
     },
     {
@@ -1921,9 +1603,6 @@
       "narrative": "Client dinner at The Polo Bar, business-development discussion",
       "receipt_filename": "CLM-0213.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at USD 273.58 for 3 attendees (USD 91.19/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1939,9 +1618,6 @@
       "narrative": "Solo dinner at Indian Accent",
       "receipt_filename": "CLM-0215.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 1915.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1957,9 +1633,6 @@
       "narrative": "New York stay at Kimpton LA",
       "receipt_filename": "CLM-0217.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "New York hotel at USD 391.81/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1975,9 +1648,6 @@
       "narrative": "Conference registration via Croma Business",
       "receipt_filename": "CLM-0219.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of INR 96486.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -1993,9 +1663,6 @@
       "narrative": "Long-haul return booking via Amtrak Acela",
       "receipt_filename": "CLM-0221.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 1030.93 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2011,9 +1678,6 @@
       "narrative": "Client dinner at Bukhara Delhi, business-development discussion",
       "receipt_filename": "CLM-0223.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at INR 15886.00 for 4 attendees (INR 3971.47/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2029,9 +1693,6 @@
       "narrative": "Solo dinner at Sweetgreen",
       "receipt_filename": "CLM-0225.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 41.86 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2047,9 +1708,6 @@
       "narrative": "Mumbai stay at Trident Hyderabad",
       "receipt_filename": "CLM-0227.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "Mumbai hotel at INR 16056.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
       "receipt_mismatch_flavour": "wrong-amount"
     },
     {
@@ -2065,9 +1723,6 @@
       "narrative": "Conference registration via Atlassian Subscriptions",
       "receipt_filename": "CLM-0229.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of USD 2720.84 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
       "receipt_mismatch_flavour": "wrong-amount"
     },
     {
@@ -2083,9 +1738,6 @@
       "narrative": "Long-haul return booking via Ola Cabs",
       "receipt_filename": "CLM-0231.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 35632.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2101,9 +1753,6 @@
       "narrative": "Client dinner at RPM Steak Chicago, business-development discussion",
       "receipt_filename": "CLM-0233.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at USD 325.83 for 3 attendees (USD 108.61/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2119,9 +1768,6 @@
       "narrative": "Solo dinner at Indian Accent",
       "receipt_filename": "CLM-0235.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 1557.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500",
       "receipt_mismatch_flavour": "missing-line-item"
     },
     {
@@ -2137,9 +1783,6 @@
       "narrative": "New York stay at Marriott Marquis NYC",
       "receipt_filename": "CLM-0237.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "New York hotel at USD 400.40/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2155,9 +1798,6 @@
       "narrative": "Conference registration via Atlassian Subscriptions",
       "receipt_filename": "CLM-0239.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of INR 92323.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
       "receipt_mismatch_flavour": "wrong-vendor"
     },
     {
@@ -2173,9 +1813,6 @@
       "narrative": "Long-haul return booking via JetBlue",
       "receipt_filename": "CLM-0241.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 944.44 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2191,9 +1828,6 @@
       "narrative": "Client dinner at Karavalli Bangalore, business-development discussion",
       "receipt_filename": "CLM-0243.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at INR 13484.00 for 3 attendees (INR 4494.51/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2209,9 +1843,6 @@
       "narrative": "Solo dinner at Shake Shack",
       "receipt_filename": "CLM-0245.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 39.65 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2227,9 +1858,6 @@
       "narrative": "Mumbai stay at The Oberoi Bangalore",
       "receipt_filename": "CLM-0247.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "Mumbai hotel at INR 16979.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2245,9 +1873,6 @@
       "narrative": "Conference registration via Atlassian Subscriptions",
       "receipt_filename": "CLM-0249.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of USD 2869.13 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2263,9 +1888,6 @@
       "narrative": "Long-haul return booking via IRCTC AC1",
       "receipt_filename": "CLM-0251.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 41093.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2281,9 +1903,6 @@
       "narrative": "Client dinner at The Polo Bar, business-development discussion",
       "receipt_filename": "CLM-0253.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at USD 330.10 for 3 attendees (USD 110.03/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
       "receipt_mismatch_flavour": "wrong-vendor"
     },
     {
@@ -2299,9 +1918,6 @@
       "narrative": "Solo dinner at Mahesh Lunch Home",
       "receipt_filename": "CLM-0255.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 1840.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2317,9 +1933,6 @@
       "narrative": "New York stay at Westin Chicago",
       "receipt_filename": "CLM-0257.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "New York hotel at USD 401.62/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2335,9 +1948,6 @@
       "narrative": "Conference registration via BookMyShow Events",
       "receipt_filename": "CLM-0259.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of INR 109055.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2353,9 +1963,6 @@
       "narrative": "Long-haul return booking via Amtrak Acela",
       "receipt_filename": "CLM-0261.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 1020.75 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2371,9 +1978,6 @@
       "narrative": "Client dinner at Wasabi by Morimoto, business-development discussion",
       "receipt_filename": "CLM-0263.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at INR 16222.00 for 4 attendees (INR 4055.44/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2389,9 +1993,6 @@
       "narrative": "Solo dinner at Shake Shack",
       "receipt_filename": "CLM-0265.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 39.88 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2407,9 +2008,6 @@
       "narrative": "Mumbai stay at ITC Maurya Delhi",
       "receipt_filename": "CLM-0267.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "Mumbai hotel at INR 16601.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2425,9 +2023,6 @@
       "narrative": "Conference registration via Adobe Creative Cloud",
       "receipt_filename": "CLM-0269.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of USD 2365.64 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2443,9 +2038,6 @@
       "narrative": "Long-haul return booking via Ola Cabs",
       "receipt_filename": "CLM-0271.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 41126.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2461,9 +2053,6 @@
       "narrative": "Client dinner at Spago LA, business-development discussion",
       "receipt_filename": "CLM-0273.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at USD 188.66 for 2 attendees (USD 94.33/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2479,9 +2068,6 @@
       "narrative": "Solo dinner at Indian Accent",
       "receipt_filename": "CLM-0275.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 1982.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2497,9 +2083,6 @@
       "narrative": "New York stay at Hyatt Regency Boston",
       "receipt_filename": "CLM-0277.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "New York hotel at USD 391.48/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2515,9 +2098,6 @@
       "narrative": "Conference registration via Reliance Digital",
       "receipt_filename": "CLM-0279.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of INR 104829.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2533,9 +2113,6 @@
       "narrative": "Long-haul return booking via JetBlue",
       "receipt_filename": "CLM-0281.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 1093.72 is at or below the US long-haul economy cap of USD 1200, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — US long-haul economy cap USD 1200",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2551,9 +2128,6 @@
       "narrative": "Client dinner at Bukhara Delhi, business-development discussion",
       "receipt_filename": "CLM-0283.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at INR 7780.00 for 2 attendees (INR 3890.22/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2569,9 +2143,6 @@
       "narrative": "Solo dinner at Shake Shack",
       "receipt_filename": "CLM-0285.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of USD 31.22 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2587,9 +2158,6 @@
       "narrative": "Mumbai stay at ITC Maurya Delhi",
       "receipt_filename": "CLM-0287.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "Mumbai hotel at INR 16094.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2605,9 +2173,6 @@
       "narrative": "Conference registration via Atlassian Subscriptions",
       "receipt_filename": "CLM-0289.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of USD 2775.70 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2623,9 +2188,6 @@
       "narrative": "Long-haul return booking via IRCTC AC1",
       "receipt_filename": "CLM-0291.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 44781.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
-      "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2641,9 +2203,6 @@
       "narrative": "Client dinner at Eleven Madison Park, business-development discussion",
       "receipt_filename": "CLM-0293.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Client entertainment at USD 188.94 for 2 attendees (USD 94.47/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
-      "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2659,9 +2218,6 @@
       "narrative": "Solo dinner at Saravana Bhavan",
       "receipt_filename": "CLM-0295.png",
       "ems_source": "concur",
-      "gold_label": "green",
-      "gold_reasoning": "Claim of INR 1896.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
-      "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500",
       "receipt_mismatch_flavour": "missing-receipt"
     },
     {
@@ -2677,9 +2233,6 @@
       "narrative": "New York stay at Kimpton LA",
       "receipt_filename": "CLM-0297.png",
       "ems_source": "concur",
-      "gold_label": "amber",
-      "gold_reasoning": "New York hotel at USD 395.56/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
-      "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
       "receipt_mismatch_flavour": "correct"
     },
     {
@@ -2695,9 +2248,6 @@
       "narrative": "Conference registration via BookMyShow Events",
       "receipt_filename": "CLM-0299.png",
       "ems_source": "concur",
-      "gold_label": "red",
-      "gold_reasoning": "Conference fee of INR 111433.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
-      "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
       "receipt_mismatch_flavour": "correct"
     }
   ],

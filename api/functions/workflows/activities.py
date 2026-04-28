@@ -75,11 +75,23 @@ def notify_activity(payload: dict) -> dict:
 
 
 def arbitrate_activity(payload: dict) -> dict:
-    raise NotImplementedError("Phase 6 graph wired in Week 3 (build_arbitrate_workflow)")
+    """Phase 6 — stub until Week 3 wires the arbitration graph.
+
+    Returns a no-op marker rather than raising so a Red workflow that reaches
+    Phase 6 doesn't crash the orchestrator. Week 3 replaces the body with
+    build_arbitrate_workflow.
+    """
+    return {"status": "stub", "phase": "Arbitrate"}
 
 
 def audit_activity(payload: dict) -> dict:
-    raise NotImplementedError("Phase 7 graph wired in Week 3 (build_audit_workflow)")
+    """Phase 7 — stub until Week 3 wires the audit graph.
+
+    Returns a no-op marker rather than raising so workflows can complete
+    end-to-end during Week 2 demos. Week 3 replaces the body with
+    build_audit_workflow.
+    """
+    return {"status": "stub", "phase": "Audit"}
 
 
 # Approval activity retained for the legacy invoice-p2p orchestrator (broken at runtime
