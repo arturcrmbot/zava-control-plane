@@ -65,10 +65,30 @@ export default function WorkflowDetail() {
       <div className="col-span-3 space-y-4 min-w-0">
         <div>
           <div className="text-xs text-slate-500">{w.id}</div>
-          <div className="text-xl font-semibold text-slate-900">{w.id} · {w.vendor.name}</div>
-          <div className="text-xs text-slate-500">
-            {w.invoice.currency} {w.invoice.amount.toLocaleString()} · PO {w.invoice.poRef} · {w.agency}
-          </div>
+          {w.claim ? (
+            <>
+              <div className="text-xl font-semibold text-slate-900">
+                {w.id} · {w.claim.employeeId} <span className="text-sm text-slate-500 capitalize">({w.claim.category})</span>
+              </div>
+              <div className="text-xs text-slate-500">
+                {w.claim.currency} {w.claim.amount.toLocaleString()} · {w.claim.market} · {w.claim.emsSource} · {w.agency}
+                {w.verdict && <span className={`ml-2 uppercase tracking-wide px-1.5 py-0.5 rounded ${
+                  w.verdict === "green" ? "bg-emerald-50 text-emerald-700" :
+                  w.verdict === "amber" ? "bg-amber-50 text-amber-700" :
+                  "bg-red-50 text-red-700"
+                }`}>{w.verdict}</span>}
+              </div>
+            </>
+          ) : w.vendor && w.invoice ? (
+            <>
+              <div className="text-xl font-semibold text-slate-900">{w.id} · {w.vendor.name}</div>
+              <div className="text-xs text-slate-500">
+                {w.invoice.currency} {w.invoice.amount.toLocaleString()} · PO {w.invoice.poRef} · {w.agency}
+              </div>
+            </>
+          ) : (
+            <div className="text-xl font-semibold text-slate-900">{w.id}</div>
+          )}
         </div>
 
         <WorkflowHeaderTiles workflow={w} />

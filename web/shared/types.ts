@@ -1,11 +1,18 @@
 // control-plane/src/shared/types.ts
 
 export type PhaseName =
+  // Invoice P2P (legacy)
   | "Intake" | "Validation" | "Routing"
-  | "Approval" | "Payment" | "Reconciliation";
+  | "Approval" | "Payment" | "Reconciliation"
+  // Expense compliance (current)
+  | "Classify" | "Validate Receipt" | "Route" | "Notify" | "Arbitrate" | "Audit";
 
 export const PHASE_ORDER: PhaseName[] = [
   "Intake", "Validation", "Routing", "Approval", "Payment", "Reconciliation"
+];
+
+export const EXPENSE_PHASE_ORDER: PhaseName[] = [
+  "Intake", "Classify", "Validate Receipt", "Route", "Notify", "Arbitrate", "Audit"
 ];
 
 export type WorkflowStatus =
@@ -37,6 +44,23 @@ export interface InvoiceData {
   poRef: string;
 }
 
+export type Verdict = "green" | "amber" | "red";
+
+export interface ClaimData {
+  claimId: string;
+  employeeId: string;
+  submittedAt: string;
+  market: "UK" | "US" | "DE" | "IN";
+  currency: string;
+  category: "meals" | "travel" | "accommodation" | "entertainment" | "miscellaneous";
+  vendor: string;
+  amount: number;
+  attendees: number;
+  receiptFilename?: string;
+  receiptMismatchFlavour?: string;
+  emsSource: "workday" | "concur";
+}
+
 export interface ToolCall {
   tool: string;
   argsPreview: string;
@@ -56,13 +80,17 @@ export interface ActionLedgerEntry {
 
 export interface Workflow {
   id: string;
-  type: "invoice-p2p";
+  type: "invoice-p2p" | "expense-claim";
   status: WorkflowStatus;
   currentPhase: PhaseName;
   createdAt: number;
   slaDueAt: number;
-  vendor: Vendor;
-  invoice: InvoiceData;
+  // Invoice payload — set on type="invoice-p2p"
+  vendor?: Vendor;
+  invoice?: InvoiceData;
+  // Expense payload — set on type="expense-claim"
+  claim?: ClaimData;
+  verdict?: Verdict;
   jurisdiction: string;
   agency: string;
   activeExceptionId?: string;

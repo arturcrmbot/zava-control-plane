@@ -14,10 +14,19 @@ class BaseModel(_PydBaseModel):
         populate_by_name=True,
     )
 
-PhaseName = Literal["Intake", "Validation", "Routing", "Approval", "Payment", "Reconciliation"]
+PhaseName = Literal[
+    # Invoice P2P (legacy — orchestrator deleted, kept for any in-flight workflow records)
+    "Intake", "Validation", "Routing", "Approval", "Payment", "Reconciliation",
+    # Expense compliance (current — see api/functions/workflows/expense_claim.py)
+    "Classify", "Validate Receipt", "Route", "Notify", "Arbitrate", "Audit",
+]
 
 PHASE_ORDER: list[PhaseName] = [
     "Intake", "Validation", "Routing", "Approval", "Payment", "Reconciliation"
+]
+
+EXPENSE_PHASE_ORDER: list[PhaseName] = [
+    "Intake", "Classify", "Validate Receipt", "Route", "Notify", "Arbitrate", "Audit",
 ]
 
 WorkflowStatus = Literal["in_progress", "awaiting_hitl", "completed", "failed"]
@@ -48,6 +57,22 @@ class InvoiceData(BaseModel):
     po_ref: str
 
 
+class ClaimData(BaseModel):
+    """Expense claim payload — replaces InvoiceData on Workflow.type='expense-claim'."""
+    claim_id: str
+    employee_id: str
+    submitted_at: str
+    market: Literal["UK", "US", "DE", "IN"]
+    currency: str
+    category: Literal["meals", "travel", "accommodation", "entertainment", "miscellaneous"]
+    vendor: str
+    amount: float
+    attendees: int = 1
+    receipt_filename: str | None = None
+    receipt_mismatch_flavour: str | None = None
+    ems_source: Literal["workday", "concur"]
+
+
 class ToolCall(BaseModel):
     tool: str
     args_preview: str
@@ -67,13 +92,17 @@ class ActionLedgerEntry(BaseModel):
 
 class Workflow(BaseModel):
     id: str
-    type: Literal["invoice-p2p"] = "invoice-p2p"
+    type: Literal["invoice-p2p", "expense-claim"] = "expense-claim"
     status: WorkflowStatus = "in_progress"
     current_phase: PhaseName = "Intake"
     created_at: float
     sla_due_at: float
-    vendor: Vendor
-    invoice: InvoiceData
+    # Invoice payload — set on type="invoice-p2p"; absent on expense claims.
+    vendor: Vendor | None = None
+    invoice: InvoiceData | None = None
+    # Expense payload — set on type="expense-claim"; absent on invoice workflows.
+    claim: ClaimData | None = None
+    verdict: Literal["green", "amber", "red"] | None = None
     jurisdiction: str
     agency: str
     active_exception_id: str | None = None

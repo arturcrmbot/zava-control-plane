@@ -17,7 +17,7 @@ import httpx
 
 
 FUNCTIONS_HOST = os.getenv("FUNCTIONS_HOST", "http://localhost:7071")
-ORCHESTRATOR_NAME = "InvoiceP2POrchestrator"
+ORCHESTRATOR_NAME = "ExpenseClaimOrchestrator"
 
 # Cache of instance_id -> sendEventPostUri template
 # (templates have {eventName} placeholder)

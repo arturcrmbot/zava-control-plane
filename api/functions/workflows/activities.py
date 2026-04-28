@@ -5,7 +5,11 @@ Each runs synchronously (Azure Durable Functions Python convention) and wraps an
 async MAF Workflow run inside asyncio.run.
 
 Activities are the I/O boundary — they call out to MCP servers (via the executors)
-and fire webhooks back to FastAPI. The orchestration generator stays pure / deterministic.
+and fire webhooks back to FastAPI. The orchestration generator stays pure /
+deterministic.
+
+Phases 3-7 are stubbed (`NotImplementedError`); they get wired progressively as
+their graphs land in Days 7-10 and Week 3.
 """
 from __future__ import annotations
 import asyncio
@@ -38,6 +42,32 @@ def intake_activity(payload: dict) -> dict:
     return asyncio.run(_run_workflow(build_intake_workflow, payload, "Intake"))
 
 
+def classify_activity(payload: dict) -> dict:
+    raise NotImplementedError("Phase 2 graph wired in Day 6 subagent (build_classify_workflow)")
+
+
+def receipt_activity(payload: dict) -> dict:
+    raise NotImplementedError("Phase 3 graph wired in Day 7 (build_receipt_workflow)")
+
+
+def route_activity(payload: dict) -> dict:
+    raise NotImplementedError("Phase 4 graph wired in Day 9 (build_route_workflow)")
+
+
+def notify_activity(payload: dict) -> dict:
+    raise NotImplementedError("Phase 5 graph wired in Day 10 (build_notify_workflow)")
+
+
+def arbitrate_activity(payload: dict) -> dict:
+    raise NotImplementedError("Phase 6 graph wired in Week 3 (build_arbitrate_workflow)")
+
+
+def audit_activity(payload: dict) -> dict:
+    raise NotImplementedError("Phase 7 graph wired in Week 3 (build_audit_workflow)")
+
+
+# Approval activity retained for the legacy invoice-p2p orchestrator (broken at runtime
+# until either rewired or removed in Week 3).
 def approval_activity(payload: dict) -> dict:
     return asyncio.run(_run_workflow(build_approval_workflow, payload, "Approval"))
 
