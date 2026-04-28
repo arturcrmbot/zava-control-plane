@@ -43,28 +43,54 @@ _SCENARIO_TO_FLAVOUR: dict[str, ReceiptFlavour] = {
 _scenario_rng = random.Random(20260427)
 
 
+# Lazy-loaded indices over the synthetic claim corpus. The corpus is
+# immutable at runtime (300 files committed to git); reading + parsing them
+# on every spawn was costing ~300 file reads per ramp call.
+_corpus_by_employee: dict[str, list[str]] | None = None
+_corpus_by_flavour: dict[str, list[str]] | None = None
+
+
+def _build_corpus_indices() -> None:
+    """Walk the claim corpus once and populate both indices."""
+    global _corpus_by_employee, _corpus_by_flavour
+    by_employee: dict[str, list[str]] = {}
+    by_flavour: dict[str, list[str]] = {}
+    for path in sorted(_CLAIMS_DIR.glob("CLM-*.json")):
+        record = json.loads(path.read_text(encoding="utf-8"))
+        cid = record["claim_id"]
+        emp = record.get("employee_id")
+        flav = record.get("receipt_mismatch_flavour")
+        if emp:
+            by_employee.setdefault(emp, []).append(cid)
+        if flav:
+            by_flavour.setdefault(flav, []).append(cid)
+    _corpus_by_employee = by_employee
+    _corpus_by_flavour = by_flavour
+
+
+def reset_corpus_cache() -> None:
+    """Invalidate the lazy indices — call after regenerating synthetic data."""
+    global _corpus_by_employee, _corpus_by_flavour
+    _corpus_by_employee = None
+    _corpus_by_flavour = None
+
+
 def _claims_for_employee(employee_id: str) -> list[str]:
     """Return all claim_ids for a given employee, sorted by claim_id (which is
     chronological by construction). Used by the repeat-offender ramp."""
-    out: list[str] = []
-    for path in sorted(_CLAIMS_DIR.glob("CLM-*.json")):
-        record = json.loads(path.read_text(encoding="utf-8"))
-        if record.get("employee_id") == employee_id:
-            out.append(record["claim_id"])
-    return out
+    if _corpus_by_employee is None:
+        _build_corpus_indices()
+    assert _corpus_by_employee is not None
+    return list(_corpus_by_employee.get(employee_id, []))
 
 
 def _pick_claim_for_flavour(flavour: str) -> str:
     """Pick a deterministic claim_id whose receipt_mismatch_flavour matches.
-
-    Reads the corpus once per scenario; cheap (~300 small JSONs) and avoids
-    smuggling state across invocations. Raises if no claim has the requested
-    flavour."""
-    candidates = []
-    for path in sorted(_CLAIMS_DIR.glob("CLM-*.json")):
-        record = json.loads(path.read_text(encoding="utf-8"))
-        if record.get("receipt_mismatch_flavour") == flavour:
-            candidates.append(record["claim_id"])
+    Raises if no claim has the requested flavour."""
+    if _corpus_by_flavour is None:
+        _build_corpus_indices()
+    assert _corpus_by_flavour is not None
+    candidates = _corpus_by_flavour.get(flavour, [])
     if not candidates:
         raise ValueError(
             f"no claim with receipt_mismatch_flavour={flavour!r} in {_CLAIMS_DIR}"

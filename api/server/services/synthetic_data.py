@@ -23,6 +23,19 @@ PURCHASE_ORDERS = _load_json("purchase-orders.json")
 AGENCIES = _load_json("agencies.json")
 
 
+_employees_cache: list[dict] | None = None
+
+
+def _employees() -> list[dict]:
+    """Lazy module-level cache of the employees fixture. The fixture is
+    immutable at runtime (~10KB JSON committed to git); reading it on every
+    build_expense_workflow call was costing ~300 redundant reads per ramp."""
+    global _employees_cache
+    if _employees_cache is None:
+        _employees_cache = json.loads(_EMPLOYEES_PATH.read_text(encoding="utf-8"))
+    return _employees_cache
+
+
 def build_workflow(workflow_id: str) -> Workflow:
     """Generate a fresh synthetic Workflow with random vendor/PO/agency.
 
@@ -67,8 +80,7 @@ def build_expense_workflow(workflow_id: str, claim_id: str | None = None) -> Wor
             raise FileNotFoundError(f"no claims under {_CLAIMS_DIR}")
         claim_id = random.choice(candidates)
     raw = json.loads((_CLAIMS_DIR / f"{claim_id}.json").read_text(encoding="utf-8"))
-    employees = json.loads(_EMPLOYEES_PATH.read_text(encoding="utf-8"))
-    emp = next((e for e in employees if e["id"] == raw["employee_id"]), None)
+    emp = next((e for e in _employees() if e["id"] == raw["employee_id"]), None)
     agency_id = (emp or {}).get("agency", "GroupM")
     market = raw["market"]
     now = time.time()

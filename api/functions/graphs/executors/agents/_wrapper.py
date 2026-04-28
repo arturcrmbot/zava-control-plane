@@ -46,8 +46,22 @@ def _load_skill(skill_dir: Path) -> str:
 _MAX_RESPONSE_EVENT_BYTES = 4096
 
 
+_gh_token_cache: str | None = None
+
+
 def _gh_token() -> str:
-    return subprocess.check_output(["gh", "auth", "token"], text=True).strip()
+    """Return the gh CLI auth token, cached for the lifetime of the process.
+
+    Spawning `gh auth token` per session was the dominant per-call overhead
+    in the 300-claim accuracy harness — 300 subprocess spawns + tear-downs
+    on top of the actual model calls. The token is process-stable; cache it.
+    """
+    global _gh_token_cache
+    if _gh_token_cache is None:
+        _gh_token_cache = subprocess.check_output(
+            ["gh", "auth", "token"], text=True,
+        ).strip()
+    return _gh_token_cache
 
 
 def _install_session_otel_bridge(session) -> callable:
