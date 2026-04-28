@@ -65,15 +65,56 @@ def test_lookup_explicit_workday_overrides_synthetic_lookup(monkeypatch):
     assert out["claim_id"] == cid
 
 
-def test_lookup_concur_raises_not_implemented(monkeypatch):
+def test_lookup_concur_dispatches_via_oauth_bearer(monkeypatch):
+    """Concur dispatch hits getExpenseLine on CONCUR_MCP_PORT with a Bearer
+    header, then unwraps the `_normalised` payload."""
+    monkeypatch.setenv("CONCUR_MCP_PORT", "4102")
     cid = _pick_claim_with("concur")
-    with pytest.raises(NotImplementedError, match="concur"):
+    normalised = {"claim_id": cid, "ems_source": "concur", "amount": 88.0, "category": "travel"}
+    concur_response = {
+        "reportItemId": cid, "submitter": "EMP-1",
+        "totalAmount": 88.0, "currencyCode": "USD",
+        "_normalised": normalised,
+    }
+    captured: dict = {}
+
+    def fake_post(url, json=None, headers=None, timeout=None, **kwargs):
+        captured["url"] = url
+        captured["json"] = json
+        captured["headers"] = headers or {}
+        return _FakeResponse(200, concur_response)
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    out = claim_lookup.lookup(cid)
+    assert out == normalised
+    assert captured["url"] == "http://127.0.0.1:4102/mcp/call/getExpenseLine"
+    assert captured["json"] == {"reportItemId": cid}
+    auth = captured["headers"].get("Authorization", "")
+    assert auth.lower().startswith("bearer "), auth
+
+
+def test_lookup_explicit_concur_uses_concur_dispatch(monkeypatch):
+    monkeypatch.setenv("CONCUR_MCP_PORT", "4102")
+    normalised = {"claim_id": "CLM-XXXX", "ems_source": "concur"}
+
+    def fake_post(url, json=None, headers=None, timeout=None, **kwargs):
+        return _FakeResponse(200, {"_normalised": normalised})
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    out = claim_lookup.lookup("CLM-XXXX", ems_source="concur")
+    assert out == normalised
+
+
+def test_lookup_concur_404_raises_key_error(monkeypatch):
+    monkeypatch.setenv("CONCUR_MCP_PORT", "4102")
+    cid = _pick_claim_with("concur")
+
+    def fake_post(url, json=None, headers=None, timeout=None, **kwargs):
+        return _FakeResponse(404, {"error": "expense_line_not_found"})
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    with pytest.raises(KeyError):
         claim_lookup.lookup(cid)
-
-
-def test_lookup_explicit_concur_raises_not_implemented():
-    with pytest.raises(NotImplementedError, match="concur"):
-        claim_lookup.lookup("CLM-XXXX", ems_source="concur")
 
 
 def test_lookup_unknown_claim_id_raises_key_error():

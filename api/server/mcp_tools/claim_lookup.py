@@ -5,7 +5,10 @@ synthetic claim JSON to auto-detect `ems_source` when the caller doesn't
 supply one. The HTTP target ports come from `WORKDAY_MCP_PORT` /
 `CONCUR_MCP_PORT` env vars (defaults 4101 / 4102).
 
-Concur dispatch is reserved for Day 8 — currently raises NotImplementedError.
+The two EMSs use different terminology — Workday's `getExpenseClaim` returns
+the claim record verbatim; Concur's `getExpenseLine` returns a re-shaped view
+with the original record under `_normalised`. This adapter normalises both
+into the same shape (the synthetic claim record) before returning.
 """
 from __future__ import annotations
 import json
@@ -35,15 +38,28 @@ def _resolve_ems(claim_id: str) -> str:
 
 @traced_tool("claim.lookup")
 def lookup(claim_id: str, ems_source: str | None = None) -> dict:
-    """Fetch a claim record from the EMS named in ems_source (or auto-detect)."""
+    """Fetch a claim record from the EMS named in ems_source (or auto-detect).
+
+    Both EMSs return the same normalised claim record shape — Workday returns
+    it directly, Concur returns it under `_normalised` and we unwrap.
+    """
     span = trace.get_current_span()
     span.set_attribute("wpp.claim.id", claim_id)
     ems = ems_source or _resolve_ems(claim_id)
     span.set_attribute("wpp.ems.source", ems)
 
     if ems == "concur":
-        # Day 8 will wire the Concur mock; for Day 6 this is a hard branch.
-        raise NotImplementedError("concur dispatch — Day 8")
+        port = int(os.environ.get("CONCUR_MCP_PORT", "4102"))
+        url = f"http://127.0.0.1:{port}/mcp/call/getExpenseLine"
+        # Concur enforces an OAuth bearer; the mock accepts any non-empty token.
+        headers = {"Authorization": "Bearer concur-mock-dev-token"}
+        resp = httpx.post(url, json={"reportItemId": claim_id}, headers=headers, timeout=5.0)
+        if resp.status_code == 404:
+            raise KeyError(f"claim {claim_id!r} not found at concur mock")
+        resp.raise_for_status()
+        body = resp.json()
+        # Concur wraps the original synthetic record under `_normalised`.
+        return body.get("_normalised") or body
 
     # workday
     port = int(os.environ.get("WORKDAY_MCP_PORT", "4101"))
@@ -75,8 +91,5 @@ def claim_lookup_tool(params: _ClaimLookupParams) -> ToolResult:
         record = lookup(params.claim_id, params.ems_source)
     except KeyError as e:
         return ToolResult(text_result_for_llm=f"claim not found: {params.claim_id}",
-                          result_type="failure", error=str(e))
-    except NotImplementedError as e:
-        return ToolResult(text_result_for_llm=f"concur dispatch not yet wired",
                           result_type="failure", error=str(e))
     return ToolResult(text_result_for_llm=json.dumps(record, ensure_ascii=False))
