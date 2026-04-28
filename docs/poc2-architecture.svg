@@ -205,6 +205,6 @@
 <text x="64" y="1098" font-size="11" fill="#1F1F1F">Multi-jurisdiction (USA vs Germany) compliance + A2A at candidate boundary · Greenhouse/LinkedIn/Workday-HR/Graph/ServiceNow/ACS/HeyGen MCP servers</text>
 <text x="64" y="1114" font-size="11" fill="#1F1F1F">Voice screening (GPT-Realtime) + HeyGen avatar onboarding</text>
 <text x="36" y="1134" font-size="11" font-weight="700" fill="#A02C2C">Out:</text>
-<text x="72" y="1134" font-size="11" fill="#1F1F1F">POC1 P2P workflow (separate POC) · Citizen-developer Copilot Studio agents at scale · Cross-domain agent coordination</text>
+<text x="72" y="1134" font-size="11" fill="#1F1F1F">POC1 expense compliance workflow (separate POC) · Citizen-developer Copilot Studio agents at scale · Cross-domain agent coordination</text>
 <text x="72" y="1150" font-size="11" fill="#1F1F1F">Production ATS/HRIS API connections (sandbox only) · Agent 365 GA features (May 2026) · 5,000+ concurrent workflow scale demo · Full WPP Open / GCP integration</text>
 </svg>

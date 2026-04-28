@@ -39,6 +39,7 @@ The single source for "what's true today". When facts change, edit here.
 |---|---|---|
 | [poc1-status.md](poc1-status.md) | POC1 build state | The AC #1–13 table, per-claim 7-phase flow, remaining-work plan |
 | [poc2-status.md](poc2-status.md) | POC2 build plan | The 22-capability matrix, six work tracks, 12-week shape |
+| [poc1-architecture.svg](poc1-architecture.svg) | POC1 cloud-target architecture diagram (Apex 6-layer view). Mirrors `poc2-architecture.svg`. |
 | [poc2-architecture.svg](poc2-architecture.svg) | POC2 cloud-target architecture diagram. Referenced from `poc2-status.md`. |
 
 ### 3. Reference (how the codebase works)
@@ -90,9 +91,12 @@ plan per executable track.
 | Mock MCP list | Many places — fine, mocks come up everywhere | — |
 | POC2 capability matrix (22 demos) | [poc2-status.md §1](poc2-status.md#1-capability-matrix--starting-state) | — |
 
-## Removed / superseded
+## History
 
-- `poc1-architecture.svg` — was the pre-pivot Procure-to-Pay diagram
-  (InvoiceP2POrchestrator, D365 mock, six phases). Deleted 2026-04-28.
-  Use the mermaid diagram in [poc1-status.md §2](poc1-status.md#2-architecture)
-  or the ASCII tier diagram in [CODEBASE-TOUR.md](CODEBASE-TOUR.md) instead.
+- `poc1-architecture.svg` — the pre-pivot Procure-to-Pay diagram
+  (InvoiceP2POrchestrator, D365 mock, six phases) was deleted on
+  2026-04-28 and **rewritten the same day** to reflect the
+  expense-compliance design. The current SVG is the canonical cloud-
+  target view; the per-claim flow chart (Mermaid) lives in
+  [poc1-status.md §2](poc1-status.md#2-architecture); the ASCII tier
+  diagram lives in [CODEBASE-TOUR.md](CODEBASE-TOUR.md).
