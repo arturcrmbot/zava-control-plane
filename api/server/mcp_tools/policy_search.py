@@ -1,14 +1,24 @@
 """policy.search MCP tool — in-memory chunked retriever over the synthetic
-T&E policy. Foundry IQ swap-in is a later detail; this is the demo-grade
-implementation."""
+T&E policy. Exposed two ways:
+
+  - `search(query, k)` — plain Python function (used by tests and any
+    direct-call paths like the accuracy harness's retrieval-only flow).
+  - `policy_search_tool` — SDK-native `Tool` registered on a session via
+    `tools=[policy_search_tool]`; the model invokes it autonomously when
+    a skill's `allowed-tools` lists `policy.search`.
+
+Foundry IQ swap-in is a later detail; this is the demo-grade implementation."""
 from __future__ import annotations
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
+from copilot.tools import ToolResult, define_tool
 from opentelemetry import trace
+from pydantic import BaseModel, Field
 from sentence_transformers import SentenceTransformer
 
 from ._otel import traced_tool
@@ -111,3 +121,21 @@ def search(query: str, k: int = 5) -> list[dict]:
     ]
     span.set_attribute("wpp.mcp.result_count", len(out))
     return out
+
+
+class _PolicySearchParams(BaseModel):
+    query: str = Field(description="Natural-language query about the WPP T&E policy")
+    k: int = Field(default=5, description="Number of top chunks to return", ge=1, le=20)
+
+
+@define_tool(
+    name="policy.search",
+    description=(
+        "Search the WPP T&E policy markdown by semantic similarity. Returns the "
+        "top-k matching chunks (each with section label and similarity score). "
+        "Use to ground R/A/G classification and arbitration in policy text."
+    ),
+)
+def policy_search_tool(params: _PolicySearchParams) -> ToolResult:
+    out = search(params.query, params.k)
+    return ToolResult(text_result_for_llm=json.dumps(out, ensure_ascii=False))

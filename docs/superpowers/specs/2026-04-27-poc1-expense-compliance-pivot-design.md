@@ -65,7 +65,7 @@ Escalate is **not** a per-claim phase. It is cross-workflow state: `escalation_a
 |---|---|---|---|
 | **Fleet Manager** | Always-on GHCP SDK Hosted Agent. Reads OTEL/event telemetry, composes exception queue, surfaces autonomy + cost reports. | Process-long | Yes — frontier model on triage-filtered events |
 | **Workflow Orchestration** | Azure Durable Functions, one instance per claim. HITL waits at zero compute, timer escalation, parallel coordination, checkpoint/replay. | Days–weeks | No |
-| **Agentic Loops** | Ephemeral GHCP SDK sessions, one per phase. Loads skills + MCP tools, emits OTEL, exits. Stateless. | Seconds | Yes — model varies by skill (cheap for OCR/keyword screen; frontier for policy reasoning) |
+| **Agentic Loops** | Ephemeral GHCP SDK sessions, one per phase. `client.create_session(skill_directories=[...], tools=[...])` — the SDK auto-discovers `*.skill.md` files and registers `@define_tool`-decorated tools natively; the model calls the tools via the skill's `allowed-tools` frontmatter. Emits OTEL, exits. Stateless. | Seconds | Yes — model varies by skill (cheap for OCR/keyword screen; frontier for policy reasoning) |
 
 ## 5. Components
 
@@ -113,9 +113,11 @@ Durable Functions runtime, `_common.py`, `_tracked_executor.py`, Fleet Manager s
 
 **Fleet Manager skill (existing) — extend**, not replace. Add one prompt paragraph for behaviour-change loop on `fleet.tick`, and one paragraph for cost-per-task report on `report.cost_per_task`. New `allowed-tools` entries: `query_reviewer_decisions`, `query_economics`. No new service; the existing FleetManagerService runs both behaviours.
 
-**MCP tools** (small Python modules under `api/server/mcp_tools/`, each ~20–30 lines wrapping the state store / synthetic data / audit ledger):
+**SDK-native tools** (small Python modules under `api/server/mcp_tools/`, each ~20–30 lines wrapping the state store / synthetic data / audit ledger). Each tool is declared with `@define_tool(name=..., description=...)` from `copilot.tools` with a Pydantic params model; the SDK generates the JSON schema, registers it on the session via `tools=[...]`, and the model invokes it natively. Skills declare which tools they may call via `allowed-tools` frontmatter.
 
-`policy.search`, `claim.lookup`, `claim.getReceipt`, `claim.getStructured`, `claim.summary`, `policy.cite`, `employee.history`, `precedents.search`, `audit.query`, `query_reviewer_decisions`, `query_economics`.
+Tools to land: `policy.search`, `claim.lookup`, `claim.getReceipt`, `claim.getStructured`, `claim.summary`, `policy.cite`, `employee.history`, `precedents.search`, `audit.query`, `query_reviewer_decisions`, `query_economics`.
+
+> Implementation note (2026-04-28): an earlier Week 1 attempt registered these as plain `@traced_tool` Python helpers and pre-fetched their results in the agent executor, embedding them in the prompt. That was a misuse of the SDK — the SDK takes `tools=[Tool, ...]` directly on `create_session`, and the model calls them autonomously. The refactor in commit *(forthcoming)* replaces the prompt-stuffing pattern with native registration. Agent executors are reduced to: build the user prompt, hand the SDK a tool list, parse the response.
 
 **MAF Workflow** (one new):
 

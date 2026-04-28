@@ -1,58 +1,30 @@
-"""agent_rag_classifier — pre-fetches claim and policy context in Python, then
-invokes the rag_classifier skill via the GHCP wrapper.
+"""agent_rag_classifier — invokes the rag_classifier skill via the GHCP SDK.
 
-The MCP tools (policy.search, claim.getStructured) are pure Python helpers in
-this POC, not GHCP-wired tool servers, so the model cannot call them at runtime.
-Instead, we resolve the tool calls in process and embed the results in the user
-prompt — the model receives the claim JSON and the top-k relevant policy chunks
-as context and returns a structured verdict.
-
-For OTEL fidelity the helper calls still emit their own spans, so the trace
-still shows policy.search and claim.getStructured side-by-side per claim.
+The session is created with `skill_directories=[skills/]` so the SDK
+auto-discovers `rag_classifier.skill.md`, and `tools=[policy_search_tool,
+claim_get_structured_tool]` so the model can call them autonomously per the
+skill's `allowed-tools` frontmatter. No prompt-stuffing of tool results.
 """
 from __future__ import annotations
-import json
 
-from api.server.mcp_tools import claim_get_structured, policy_search
+from api.server.mcp_tools.claim_get_structured import claim_get_structured_tool
+from api.server.mcp_tools.policy_search import policy_search_tool
 
-from ._wrapper import run_agent_skill
-
-_TOP_K_POLICY_CHUNKS = 15
-
-
-def _build_query(claim: dict) -> str:
-    """Bias retrieval toward §3 rules over §7 examples.
-
-    Including the claim's amount in the query causes §7 example chunks (which
-    contain numbers) to score higher than §3 rule chunks (which contain
-    threshold tables). The query intentionally omits numbers and uses
-    rule-flavoured terminology ("rule", "cap", "threshold")."""
-    category = claim.get("category", "")
-    market = claim.get("market", "")
-    return f"{category} {market} rule cap threshold per-attendee per-night"
-
-
-def _format_chunks(chunks: list[dict]) -> str:
-    out: list[str] = []
-    for c in chunks:
-        out.append(f"### {c['section']}\n{c['text']}")
-    return "\n\n".join(out)
+from ._wrapper import run_agent_session
 
 
 async def execute(input: dict) -> dict:
     claim_id = input["claim_id"]
-
-    claim = claim_get_structured.get_structured(claim_id, include_gold=False)
-    chunks = policy_search.search(_build_query(claim), k=_TOP_K_POLICY_CHUNKS)
-
     prompt = (
-        f"Classify the following expense claim per your role.\n\n"
-        f"## Claim ({claim_id})\n"
-        f"```json\n{json.dumps(claim, indent=2, ensure_ascii=False)}\n```\n\n"
-        f"## Relevant policy excerpts\n{_format_chunks(chunks)}\n\n"
-        f"Return exactly one JSON object matching the schema in your instructions. "
-        f"No prose, no markdown — JSON only."
+        f"Classify expense claim `{claim_id}` per your role.\n\n"
+        f"Use `claim.getStructured` to load the claim record, then use "
+        f"`policy.search` to retrieve the relevant §3 rule chunks for the "
+        f"claim's category and market. Return exactly the JSON object specified "
+        f"in your skill instructions — no prose, no markdown."
     )
-
-    classification = await run_agent_skill("rag_classifier", prompt)
+    classification = await run_agent_session(
+        prompt=prompt,
+        tools=[policy_search_tool, claim_get_structured_tool],
+        skill_label="rag_classifier",
+    )
     return {"classification": classification}

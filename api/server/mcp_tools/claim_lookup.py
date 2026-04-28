@@ -13,7 +13,9 @@ import os
 from pathlib import Path
 
 import httpx
+from copilot.tools import ToolResult, define_tool
 from opentelemetry import trace
+from pydantic import BaseModel, Field
 
 from ._otel import traced_tool
 
@@ -51,3 +53,30 @@ def lookup(claim_id: str, ems_source: str | None = None) -> dict:
         raise KeyError(f"claim {claim_id!r} not found at workday mock")
     resp.raise_for_status()
     return resp.json()
+
+
+class _ClaimLookupParams(BaseModel):
+    claim_id: str = Field(description="Claim identifier (e.g. CLM-0042)")
+    ems_source: str | None = Field(
+        default=None,
+        description="Optional EMS override: 'workday' or 'concur'. Auto-detected from the claim record if omitted.",
+    )
+
+
+@define_tool(
+    name="claim.lookup",
+    description=(
+        "Fetch a claim record from the upstream EMS (Workday or Concur) by id. "
+        "Use when you need EMS-side metadata that isn't in the structured claim JSON."
+    ),
+)
+def claim_lookup_tool(params: _ClaimLookupParams) -> ToolResult:
+    try:
+        record = lookup(params.claim_id, params.ems_source)
+    except KeyError as e:
+        return ToolResult(text_result_for_llm=f"claim not found: {params.claim_id}",
+                          result_type="failure", error=str(e))
+    except NotImplementedError as e:
+        return ToolResult(text_result_for_llm=f"concur dispatch not yet wired",
+                          result_type="failure", error=str(e))
+    return ToolResult(text_result_for_llm=json.dumps(record, ensure_ascii=False))
