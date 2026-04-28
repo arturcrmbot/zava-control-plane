@@ -18,6 +18,7 @@ from api.server.services.synthetic_data import build_workflow, build_expense_wor
 from api.server.services.durable_client import (
     schedule_new_orchestration, raise_orchestration_event,
 )
+from api.shared.expense_taxonomy import ReceiptFlavour
 
 _seq = 0
 _exp_seq = 0
@@ -28,7 +29,7 @@ _CLAIMS_DIR = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "clai
 # the claim by the receipt PNG generator. spawn_expense_workflow picks a
 # deterministic claim from the synthetic corpus matching the scenario's
 # flavour so the Phase 3 receipt validator has known content to classify.
-_SCENARIO_TO_FLAVOUR: dict[str, str] = {
+_SCENARIO_TO_FLAVOUR: dict[str, ReceiptFlavour] = {
     "receipt-mismatch-correct": "correct",
     "receipt-mismatch-amount": "wrong-amount",
     "receipt-mismatch-date": "wrong-date",

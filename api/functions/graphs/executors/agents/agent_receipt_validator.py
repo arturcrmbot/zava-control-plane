@@ -11,14 +11,13 @@ mismatch verdict. Saves tokens and avoids spurious vision attempts on a
 zero-byte image.
 """
 from __future__ import annotations
-from pathlib import Path
 
 from api.server.mcp_tools.claim_get_receipt import get_receipt
 from api.server.mcp_tools.claim_get_structured import claim_get_structured_tool
 
-from ._wrapper import run_agent_session
+from ._wrapper import SKILLS_DIR, run_agent_session
 
-_SKILL_DIR = Path(__file__).resolve().parents[4] / "server" / "skills" / "receipt-validator"
+_SKILL_DIR = SKILLS_DIR / "receipt-validator"
 
 
 async def execute(input: dict) -> dict:

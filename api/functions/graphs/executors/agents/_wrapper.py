@@ -30,6 +30,10 @@ from opentelemetry.trace import Status, StatusCode
 
 
 _SKILLS_DIR = Path(__file__).resolve().parents[4] / "server" / "skills"
+
+# Public alias — agents reference this rather than recomputing parents[4]
+# magic with their own path arithmetic.
+SKILLS_DIR = _SKILLS_DIR
 _tracer = trace.get_tracer("wpp.agents.finance")
 
 

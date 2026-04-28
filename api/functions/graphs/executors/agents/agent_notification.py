@@ -7,14 +7,13 @@ emit a `notification.sent` FleetEvent so the Control Plane shows the breach
 notification in real time.
 """
 from __future__ import annotations
-from pathlib import Path
 
 from api.server.mcp_tools.claim_summary import claim_summary_tool
 from api.server.mcp_tools.policy_cite import policy_cite_tool
 
-from ._wrapper import run_agent_session
+from ._wrapper import SKILLS_DIR, run_agent_session
 
-_SKILL_DIR = Path(__file__).resolve().parents[4] / "server" / "skills" / "notification-composer"
+_SKILL_DIR = SKILLS_DIR / "notification-composer"
 
 
 def _emit_notification_event(claim_id: str, payload: dict) -> None:

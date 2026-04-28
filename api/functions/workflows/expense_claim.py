@@ -14,13 +14,16 @@ call activity triggers that exist registered in function_app.py; the activity
 bodies for Phases 3-7 will be wired progressively over Days 7-10 / Week 3.
 """
 from __future__ import annotations
-from datetime import timedelta
 from collections.abc import Generator
 from typing import Any
 
 import azure.durable_functions as df
 
-from api.shared.constants import DECISION_REJECTED
+from api.shared.constants import (
+    DECISION_REJECTED,
+    JUSTIFICATION_TIMEOUT,
+    REVIEWER_DECISION_TIMEOUT,
+)
 
 
 def expense_claim_orchestration(context: df.DurableOrchestrationContext) -> Generator[Any, Any, dict]:
@@ -64,7 +67,7 @@ def expense_claim_orchestration(context: df.DurableOrchestrationContext) -> Gene
         })
 
         justification_event = context.wait_for_external_event("justification")
-        timeout_event = context.create_timer(context.current_utc_datetime + timedelta(hours=72))
+        timeout_event = context.create_timer(context.current_utc_datetime + JUSTIFICATION_TIMEOUT)
         winner = yield context.task_any([justification_event, timeout_event])
 
         if winner == timeout_event:
@@ -92,7 +95,7 @@ def expense_claim_orchestration(context: df.DurableOrchestrationContext) -> Gene
         })
 
         decision_event = context.wait_for_external_event("reviewer_decision")
-        timeout_event = context.create_timer(context.current_utc_datetime + timedelta(hours=72))
+        timeout_event = context.create_timer(context.current_utc_datetime + REVIEWER_DECISION_TIMEOUT)
         winner = yield context.task_any([decision_event, timeout_event])
 
         if winner == timeout_event:

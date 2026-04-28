@@ -6,14 +6,13 @@ multiple loaded skills don't fight over the output schema. Tools are SDK-native
 model per the skill's `allowed-tools` frontmatter. No prompt-stuffing.
 """
 from __future__ import annotations
-from pathlib import Path
 
 from api.server.mcp_tools.claim_get_structured import claim_get_structured_tool
 from api.server.mcp_tools.policy_search import policy_search_tool
 
-from ._wrapper import run_agent_session
+from ._wrapper import SKILLS_DIR, run_agent_session
 
-_SKILL_DIR = Path(__file__).resolve().parents[4] / "server" / "skills" / "rag-classifier"
+_SKILL_DIR = SKILLS_DIR / "rag-classifier"
 
 
 async def execute(input: dict) -> dict:

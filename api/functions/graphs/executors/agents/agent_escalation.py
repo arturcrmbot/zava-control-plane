@@ -5,13 +5,12 @@ The skill reads `employee_history` natively to decide progressive-enforcement
 tier; the agent executor just builds the prompt and registers the tool.
 """
 from __future__ import annotations
-from pathlib import Path
 
 from api.server.mcp_tools.employee_history import employee_history_tool
 
-from ._wrapper import run_agent_session
+from ._wrapper import SKILLS_DIR, run_agent_session
 
-_SKILL_DIR = Path(__file__).resolve().parents[4] / "server" / "skills" / "escalation-advisor"
+_SKILL_DIR = SKILLS_DIR / "escalation-advisor"
 
 
 async def execute(input: dict) -> dict:

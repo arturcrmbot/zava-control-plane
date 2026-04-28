@@ -6,11 +6,9 @@ Two-surface pattern (mirrors validate_classification_schema):
 """
 from __future__ import annotations
 
+from api.shared.expense_taxonomy import RECEIPT_FLAVOURS
 
-VALID_FLAVOURS = {
-    "correct", "wrong-amount", "wrong-date", "wrong-vendor",
-    "missing-line-item", "missing-receipt",
-}
+VALID_FLAVOURS = set(RECEIPT_FLAVOURS)
 
 
 class ReceiptSchemaError(ValueError):
