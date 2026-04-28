@@ -251,6 +251,36 @@ async def spawn_repeat_offender_ramp(
     return spawned
 
 
+async def simulate_region_failure(stop_seconds: int = 10) -> dict:
+    """Demo-only: emit a `region.failure.simulated` event marking the
+    wall-clock window during which the operator stops the Functions host.
+
+    Durable Functions handles checkpoint/replay natively against Azurite;
+    this helper does not stop or restart anything itself — it only marks
+    the audit trail and returns a snapshot of in-flight workflows so the
+    UI can show before/after counts.
+    """
+    from api.shared.events import FleetEvent
+
+    workflows = app_state.store.list_workflows()
+    in_flight = len(workflows)
+    paused = sum(1 for w in workflows if w.status == "awaiting_hitl")
+
+    app_state.bus.emit(FleetEvent(
+        type="region.failure.simulated",
+        workflow_id="*",
+        stop_seconds=stop_seconds,
+        in_flight_count=in_flight,
+        paused_at_hitl=paused,
+    ))
+    await asyncio.sleep(stop_seconds)
+    return {
+        "in_flight": in_flight,
+        "paused_at_hitl": paused,
+        "stop_seconds": stop_seconds,
+    }
+
+
 async def ramp_loop() -> None:
     """Background coroutine: spawn ExpenseClaim workflows until target, then steady-state.
 
