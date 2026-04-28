@@ -17,18 +17,19 @@ from api.server.mcp_tools import claim_get_structured, policy_search
 
 from ._wrapper import run_agent_skill
 
-_TOP_K_POLICY_CHUNKS = 6
+_TOP_K_POLICY_CHUNKS = 15
 
 
 def _build_query(claim: dict) -> str:
-    parts = [claim.get("category", ""), claim.get("market", "")]
-    cur = claim.get("currency")
-    amt = claim.get("amount")
-    if cur and amt is not None:
-        parts.append(f"{cur} {amt}")
-    if claim.get("attendees"):
-        parts.append(f"{claim['attendees']} attendees")
-    return " ".join(p for p in parts if p)
+    """Bias retrieval toward §3 rules over §7 examples.
+
+    Including the claim's amount in the query causes §7 example chunks (which
+    contain numbers) to score higher than §3 rule chunks (which contain
+    threshold tables). The query intentionally omits numbers and uses
+    rule-flavoured terminology ("rule", "cap", "threshold")."""
+    category = claim.get("category", "")
+    market = claim.get("market", "")
+    return f"{category} {market} rule cap threshold per-attendee per-night"
 
 
 def _format_chunks(chunks: list[dict]) -> str:

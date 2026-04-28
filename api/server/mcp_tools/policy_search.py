@@ -63,9 +63,12 @@ def _ensure_index() -> list[_Chunk]:
         raise FileNotFoundError(f"policy.md not found at {_POLICY_PATH}")
     text = _POLICY_PATH.read_text(encoding="utf-8")
     chunks = _split_into_sections(text)
+    # Keep §3.X rule sections whole so the rate table stays adjacent to its rule
+    # body (otherwise retrieval can return the rule prose without the threshold
+    # numbers). Only split sections that are truly large (>2000 chars).
     expanded: list[tuple[str, str]] = []
     for label, body in chunks:
-        if len(body) > 600:
+        if len(body) > 2000:
             paras = [p.strip() for p in body.split("\n\n") if p.strip()]
             for para in paras:
                 expanded.append((label, para))
