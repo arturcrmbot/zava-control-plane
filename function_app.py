@@ -6,6 +6,7 @@ import azure.durable_functions as df
 
 from api.shared.otel import init_otel
 from api.functions.workflows.expense_claim import expense_claim_orchestration
+from api.functions.workflows.hiring import hiring_orchestration
 from api.functions.workflows.activities import (
     intake_activity,
     classify_activity,
@@ -15,6 +16,17 @@ from api.functions.workflows.activities import (
     arbitrate_activity,
     audit_activity,
     checkpoint_activity,
+    # POC2 hiring spine
+    hiring_budget_activity,
+    hiring_job_design_activity,
+    hiring_sourcing_activity,
+    hiring_triage_activity,
+    hiring_screening_activity,
+    hiring_voice_activity,
+    hiring_interview_activity,
+    hiring_compliance_activity,
+    hiring_offer_activity,
+    hiring_onboarding_activity,
 )
 
 # Wire OTEL at worker module-load; DF orchestrator + activity spans export to Foundry.
@@ -24,10 +36,16 @@ init_otel("control-plane-functions")
 app = df.DFApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 
-# Orchestrator — 7-phase expense claim
+# Orchestrator — 7-phase expense claim (POC1)
 @app.orchestration_trigger(context_name="context")
 def ExpenseClaimOrchestrator(context: df.DurableOrchestrationContext):
     return expense_claim_orchestration(context)
+
+
+# Orchestrator — 10-phase hiring (POC2 spine; runs alongside POC1 orchestrator)
+@app.orchestration_trigger(context_name="context")
+def HiringOrchestrator(context: df.DurableOrchestrationContext):
+    return hiring_orchestration(context)
 
 
 # Activity registrations — Azure DF requires each as a decorated function in function_app.py
@@ -69,6 +87,58 @@ def audit_activity_trigger(payload: dict) -> dict:
 @app.activity_trigger(input_name="payload")
 def checkpoint_activity_trigger(payload: dict) -> dict:
     return checkpoint_activity(payload)
+
+
+# --- POC2 hiring activity triggers ---------------------------------------
+
+@app.activity_trigger(input_name="payload")
+def hiring_budget_activity_trigger(payload: dict) -> dict:
+    return hiring_budget_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def hiring_job_design_activity_trigger(payload: dict) -> dict:
+    return hiring_job_design_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def hiring_sourcing_activity_trigger(payload: dict) -> dict:
+    return hiring_sourcing_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def hiring_triage_activity_trigger(payload: dict) -> dict:
+    return hiring_triage_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def hiring_screening_activity_trigger(payload: dict) -> dict:
+    return hiring_screening_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def hiring_voice_activity_trigger(payload: dict) -> dict:
+    return hiring_voice_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def hiring_interview_activity_trigger(payload: dict) -> dict:
+    return hiring_interview_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def hiring_compliance_activity_trigger(payload: dict) -> dict:
+    return hiring_compliance_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def hiring_offer_activity_trigger(payload: dict) -> dict:
+    return hiring_offer_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def hiring_onboarding_activity_trigger(payload: dict) -> dict:
+    return hiring_onboarding_activity(payload)
 
 
 # HTTP trigger to start a new orchestration. Used by FastAPI's simulator route.

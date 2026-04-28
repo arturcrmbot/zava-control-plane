@@ -24,6 +24,17 @@ from api.functions.graphs import (
     build_arbitrate_workflow,
     build_audit_workflow,
     build_approval_workflow,
+    # POC2 hiring spine
+    build_hiring_budget_workflow,
+    build_hiring_job_design_workflow,
+    build_hiring_sourcing_workflow,
+    build_hiring_triage_workflow,
+    build_hiring_screening_workflow,
+    build_hiring_voice_workflow,
+    build_hiring_interview_workflow,
+    build_hiring_compliance_workflow,
+    build_hiring_offer_workflow,
+    build_hiring_onboarding_workflow,
 )
 from api.functions.webhook import emit
 
@@ -90,6 +101,86 @@ def audit_activity(payload: dict) -> dict:
 # until either rewired or removed in Week 3).
 def approval_activity(payload: dict) -> dict:
     return asyncio.run(_run_workflow(build_approval_workflow, payload, "Approval"))
+
+
+# ---------------------------------------------------------------------------
+# POC2 hiring activities — one per phase. Each tags the payload with `phase`
+# so the stub agent + UI can show the current phase in spans/events. Every
+# activity follows the same shape as the expense-claim activities above.
+# ---------------------------------------------------------------------------
+
+def _with_phase(payload: dict, phase: str) -> dict:
+    return {**payload, "phase": phase}
+
+
+def hiring_budget_activity(payload: dict) -> dict:
+    """POC2 Phase 1 — Budget (Workday position + Finance BP HITL upstream)."""
+    return asyncio.run(_run_workflow(
+        build_hiring_budget_workflow, _with_phase(payload, "Budget"), "Budget",
+    ))
+
+
+def hiring_job_design_activity(payload: dict) -> dict:
+    """POC2 Phase 2 — Job Design (jd-drafter)."""
+    return asyncio.run(_run_workflow(
+        build_hiring_job_design_workflow, _with_phase(payload, "JobDesign"), "Job Design",
+    ))
+
+
+def hiring_sourcing_activity(payload: dict) -> dict:
+    """POC2 Phase 3 — Sourcing (linkedin_search + greenhouse_post)."""
+    return asyncio.run(_run_workflow(
+        build_hiring_sourcing_workflow, _with_phase(payload, "Sourcing"), "Sourcing",
+    ))
+
+
+def hiring_triage_activity(payload: dict) -> dict:
+    """POC2 Phase 4 — Triage / CV crystallisation (multimodal)."""
+    return asyncio.run(_run_workflow(
+        build_hiring_triage_workflow, _with_phase(payload, "Triage"), "Triage",
+    ))
+
+
+def hiring_screening_activity(payload: dict) -> dict:
+    """POC2 Phase 5 — Screening (auto-shortlister, verdict drives Voice gating)."""
+    return asyncio.run(_run_workflow(
+        build_hiring_screening_workflow, _with_phase(payload, "Screening"), "Screening",
+    ))
+
+
+def hiring_voice_activity(payload: dict) -> dict:
+    """POC2 Phase 6 — Voice screen (acs_dial + transcript_score)."""
+    return asyncio.run(_run_workflow(
+        build_hiring_voice_workflow, _with_phase(payload, "Voice"), "Voice",
+    ))
+
+
+def hiring_interview_activity(payload: dict) -> dict:
+    """POC2 Phase 7 — Interview (graph_calendar + graph_mail panel scheduling)."""
+    return asyncio.run(_run_workflow(
+        build_hiring_interview_workflow, _with_phase(payload, "Interview"), "Interview",
+    ))
+
+
+def hiring_compliance_activity(payload: dict) -> dict:
+    """POC2 Phase 8 — Compliance (jurisdiction-router; BetrVG on DE)."""
+    return asyncio.run(_run_workflow(
+        build_hiring_compliance_workflow, _with_phase(payload, "Compliance"), "Compliance",
+    ))
+
+
+def hiring_offer_activity(payload: dict) -> dict:
+    """POC2 Phase 9 — Offer (offer-personaliser; non-revocable send hook-gated)."""
+    return asyncio.run(_run_workflow(
+        build_hiring_offer_workflow, _with_phase(payload, "Offer"), "Offer",
+    ))
+
+
+def hiring_onboarding_activity(payload: dict) -> dict:
+    """POC2 Phase 10 — Onboarding (servicenow_jml + heygen_avatar + graph_invite)."""
+    return asyncio.run(_run_workflow(
+        build_hiring_onboarding_workflow, _with_phase(payload, "Onboarding"), "Onboarding",
+    ))
 
 
 def checkpoint_activity(payload: dict) -> dict:
