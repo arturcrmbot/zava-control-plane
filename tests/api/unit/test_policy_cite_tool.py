@@ -16,7 +16,8 @@ def test_section_id_extraction():
 
 def test_cite_resolves_section_3_1_meals():
     """Exact §3.1 lookup should hit the policy index without falling back."""
-    policy_cite._ensure_index.__globals__["_index_cache"] = None  # reset
+    from api.server.mcp_tools.policy_search import reset_cache
+    reset_cache()
     record = cite("§3.1 Meals — UK per-attendee cap GBP 75")
     assert record["section"].startswith("§3.1")
     assert "Meals" in record["section"]

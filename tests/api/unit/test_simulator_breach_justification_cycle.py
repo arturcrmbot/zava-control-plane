@@ -8,6 +8,19 @@ from api.server.services import simulator_orchestrator
 from api.shared.types import Workflow, ClaimData
 
 
+@pytest.fixture(autouse=True)
+def _isolate_app_state_store():
+    """Each test starts with the workflows the test creates removed at
+    teardown — prevents order-dependent failures once a parallel test
+    runner reads the process-global app_state.store."""
+    store = simulator_orchestrator.app_state.store
+    pre_existing = {w.id for w in store.list_workflows()}
+    yield
+    for w in list(store.list_workflows()):
+        if w.id not in pre_existing:
+            store._workflows.pop(w.id, None)
+
+
 def _make_workflow_in_store(workflow_id: str = "EXP-9001") -> Workflow:
     w = Workflow(
         id=workflow_id,

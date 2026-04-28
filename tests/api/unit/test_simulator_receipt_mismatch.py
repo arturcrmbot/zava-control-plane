@@ -13,6 +13,18 @@ import pytest
 from api.server.services import simulator_orchestrator
 
 
+@pytest.fixture(autouse=True)
+def _isolate_app_state_store():
+    """Reset app_state.store after each test so order-dependent failures
+    don't appear once parallel test runners read the global store."""
+    store = simulator_orchestrator.app_state.store
+    pre_existing = {w.id for w in store.list_workflows()}
+    yield
+    for w in list(store.list_workflows()):
+        if w.id not in pre_existing:
+            store._workflows.pop(w.id, None)
+
+
 SCENARIO_TO_FLAVOUR = {
     "receipt-mismatch-correct": "correct",
     "receipt-mismatch-amount": "wrong-amount",
