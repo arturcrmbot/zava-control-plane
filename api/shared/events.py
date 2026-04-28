@@ -29,6 +29,14 @@ FleetEventType = Literal[
     # Accuracy harness events (one-shot evaluation runs; do NOT wake the fleet manager)
     "accuracy.progress",
     "accuracy.complete",
+    # Week 2 — expense-claim domain events
+    "claim.routed.green",
+    "claim.routed.amber",
+    "claim.routed.red",
+    "receipt.mismatch.detected",
+    "escalation.tier.assigned",
+    "notification.sent",
+    "justification.received",
 ]
 
 
