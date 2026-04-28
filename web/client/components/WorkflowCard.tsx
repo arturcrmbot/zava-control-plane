@@ -1,7 +1,7 @@
 // src/client/components/WorkflowCard.tsx
 import type { Workflow } from "@shared/types";
 import { Link } from "react-router-dom";
-import { PHASE_ORDER, EXPENSE_PHASE_ORDER } from "@shared/types";
+import { PHASE_ORDER, EXPENSE_PHASE_ORDER, HIRING_PHASE_ORDER } from "@shared/types";
 
 const statusColor: Record<Workflow["status"], string> = {
   in_progress: "text-blue-700", awaiting_hitl: "text-amber-700",
@@ -15,7 +15,10 @@ const verdictColor: Record<NonNullable<Workflow["verdict"]>, string> = {
 };
 
 export default function WorkflowCard({ w }: { w: Workflow }) {
-  const phaseOrder = w.type === "expense-claim" ? EXPENSE_PHASE_ORDER : PHASE_ORDER;
+  const phaseOrder =
+    w.type === "expense-claim" ? EXPENSE_PHASE_ORDER :
+    w.type === "hiring" ? HIRING_PHASE_ORDER :
+    PHASE_ORDER;
   const phaseIdx = phaseOrder.indexOf(w.currentPhase);
   const pct = ((phaseIdx + 1) / phaseOrder.length) * 100;
   const subtitle = w.claim ? w.claim.employeeId : w.vendor?.name ?? w.id;

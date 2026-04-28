@@ -1,0 +1,40 @@
+{
+  "candidate_id": "C-SE-DE-00",
+  "name": "Lara Schmidt",
+  "current_title": "Senior Data Engineer",
+  "tenure_years_total": 1.5,
+  "education": [
+    {
+      "institution": "Synthetic University",
+      "degree": "BSc CS",
+      "year": 2018
+    }
+  ],
+  "work_history": [
+    {
+      "employer": "Synth Corp 0",
+      "title": "Senior Data Engineer",
+      "start": "2020-01",
+      "end": "2024-06"
+    }
+  ],
+  "skills": [
+    "python",
+    "spark",
+    "airflow",
+    "dbt",
+    "kubernetes"
+  ],
+  "right_to_work": {
+    "jurisdiction": "DE",
+    "evidence": "eu_citizen"
+  },
+  "inconsistencies": [
+    {
+      "kind": "date_overlap",
+      "detail": "two roles both list 2022 as end date"
+    }
+  ],
+  "level_target": "L5",
+  "jurisdiction_target": "DE"
+}

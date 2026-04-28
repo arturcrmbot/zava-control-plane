@@ -1,0 +1,33 @@
+{
+  "candidate_id": "C-CR-USA-01",
+  "name": "Priya Mehta",
+  "current_title": "Creative Director",
+  "tenure_years_total": 2.6,
+  "education": [
+    {
+      "institution": "Synthetic University",
+      "degree": "BSc CS",
+      "year": 2017
+    }
+  ],
+  "work_history": [
+    {
+      "employer": "Synth Corp 1",
+      "title": "Creative Director",
+      "start": "2020-01",
+      "end": "2024-06"
+    }
+  ],
+  "skills": [
+    "brand-strategy",
+    "campaign-design",
+    "shoot-direction"
+  ],
+  "right_to_work": {
+    "jurisdiction": "USA",
+    "evidence": "green_card"
+  },
+  "inconsistencies": [],
+  "level_target": "L6",
+  "jurisdiction_target": "USA"
+}

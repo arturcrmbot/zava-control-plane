@@ -4,8 +4,11 @@ export type PhaseName =
   // Invoice P2P (legacy)
   | "Intake" | "Validation" | "Routing"
   | "Approval" | "Payment" | "Reconciliation"
-  // Expense compliance (current)
-  | "Classify" | "Validate Receipt" | "Route" | "Notify" | "Arbitrate" | "Audit";
+  // POC1 Expense compliance
+  | "Classify" | "Validate Receipt" | "Route" | "Notify" | "Arbitrate" | "Audit"
+  // POC2 Hiring (Talent Lifecycle)
+  | "Budget" | "Job Design" | "Sourcing" | "Triage" | "Screening"
+  | "Voice" | "Interview" | "Compliance" | "Offer" | "Onboarding";
 
 export const PHASE_ORDER: PhaseName[] = [
   "Intake", "Validation", "Routing", "Approval", "Payment", "Reconciliation"
@@ -13,6 +16,11 @@ export const PHASE_ORDER: PhaseName[] = [
 
 export const EXPENSE_PHASE_ORDER: PhaseName[] = [
   "Intake", "Classify", "Validate Receipt", "Route", "Notify", "Arbitrate", "Audit"
+];
+
+export const HIRING_PHASE_ORDER: PhaseName[] = [
+  "Budget", "Job Design", "Sourcing", "Triage", "Screening",
+  "Voice", "Interview", "Compliance", "Offer", "Onboarding"
 ];
 
 export type WorkflowStatus =
@@ -80,7 +88,7 @@ export interface ActionLedgerEntry {
 
 export interface Workflow {
   id: string;
-  type: "invoice-p2p" | "expense-claim";
+  type: "invoice-p2p" | "expense-claim" | "hiring";
   status: WorkflowStatus;
   currentPhase: PhaseName;
   createdAt: number;
