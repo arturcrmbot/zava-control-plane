@@ -108,3 +108,40 @@ def build_expense_workflow(workflow_id: str, claim_id: str | None = None) -> Wor
         jurisdiction=f"{market}-WPP",
         agency=agency_id,
     )
+
+
+_HIRING_CVS_DIR = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "hiring" / "cvs"
+
+
+def build_hiring_workflow(workflow_id: str, candidate_id: str | None = None) -> Workflow:
+    """Generate a Workflow record for a POC2 hiring run, picking a synthetic CV.
+
+    If `candidate_id` is provided, that specific CV file is loaded; otherwise
+    a random one is chosen from data/synthetic/hiring/cvs/.
+    """
+    if candidate_id is None:
+        candidates = sorted(p.stem for p in _HIRING_CVS_DIR.glob("C-*.json"))
+        if not candidates:
+            raise FileNotFoundError(f"no hiring CVs under {_HIRING_CVS_DIR}")
+        candidate_id = random.choice(candidates)
+    raw = json.loads((_HIRING_CVS_DIR / f"{candidate_id}.json").read_text(encoding="utf-8"))
+    jurisdiction = raw.get("jurisdiction_target") or raw.get("right_to_work", {}).get("jurisdiction") or "USA"
+    market = "London" if jurisdiction == "USA" else "Berlin"
+    now = time.time()
+    return Workflow(
+        id=workflow_id,
+        type="hiring",
+        current_phase="Budget",
+        created_at=now,
+        sla_due_at=now + 7 * 86400,  # 7-day SLA per BetrVG/HR BP windows
+        jurisdiction=f"{market}-WPP",
+        agency="WPP-HR",
+        metadata={
+            "candidate_id": candidate_id,
+            "candidate_name": raw.get("name"),
+            "role_family": raw.get("current_title"),
+            "level_target": raw.get("level_target"),
+            "jurisdiction": jurisdiction,
+            "right_to_work": raw.get("right_to_work"),
+        },
+    )

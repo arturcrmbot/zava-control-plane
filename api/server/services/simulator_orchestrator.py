@@ -14,7 +14,9 @@ import random
 from pathlib import Path
 
 from api.server.state import app_state
-from api.server.services.synthetic_data import build_workflow, build_expense_workflow
+from api.server.services.synthetic_data import (
+    build_workflow, build_expense_workflow, build_hiring_workflow,
+)
 from api.server.services.durable_client import (
     schedule_new_orchestration, raise_orchestration_event,
 )
@@ -22,6 +24,7 @@ from api.shared.expense_taxonomy import ReceiptFlavour
 
 _seq = 0
 _exp_seq = 0
+_hire_seq = 0
 
 _CLAIMS_DIR = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "claims"
 
@@ -170,6 +173,46 @@ async def spawn_expense_workflow(
     try:
         result = await schedule_new_orchestration(
             payload, function_name="ExpenseClaimOrchestrator"
+        )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    return wid
+
+
+async def spawn_hiring_workflow(
+    candidate_id: str | None = None,
+    scenario: str | None = None,
+) -> str:
+    """Create a hiring workflow and start a HiringOrchestrator instance.
+
+    POC2 simulator entry point — analogue of `spawn_expense_workflow`. Picks
+    a synthetic CV, builds the Workflow record, and schedules a Durable
+    `HiringOrchestrator` run. `scenario` is forwarded as a tag so per-track
+    work can override behaviour deterministically (e.g.
+    "rtw-unknown" forces the `right_to_work_unverified` block at Phase 8).
+    """
+    global _hire_seq
+    _hire_seq += 1
+    wid = f"HIRE-{_hire_seq:04d}"
+    w = build_hiring_workflow(wid, candidate_id=candidate_id)
+    app_state.store.upsert_workflow(w)
+    payload: dict = {
+        "workflow_id": w.id,
+        "type": "hiring",
+        "candidate_id": w.metadata.get("candidate_id"),
+        "candidate_name": w.metadata.get("candidate_name"),
+        "role_family": w.metadata.get("role_family"),
+        "level_target": w.metadata.get("level_target"),
+        "jurisdiction": w.metadata.get("jurisdiction"),
+        "agency": w.agency,
+    }
+    if scenario:
+        payload["scenario"] = scenario
+    try:
+        result = await schedule_new_orchestration(
+            payload, function_name="HiringOrchestrator",
         )
         w.orchestration_instance_id = result.get("id")
         app_state.store.upsert_workflow(w)
