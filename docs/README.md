@@ -9,6 +9,7 @@ canonical truth lives for any topic. Read top-down: each section answers
 | If you want… | Go to |
 |---|---|
 | A walking tour of the codebase | [CODEBASE-TOUR.md](CODEBASE-TOUR.md) |
+| **Lab build vs engagement POC — what we ship locally vs what the bid commits to** | **[SCOPE-DELTA.md](SCOPE-DELTA.md)** |
 | Acceptance-criteria status + remaining work | [poc1-status.md](poc1-status.md) |
 | Code-anchored architecture reference | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | To run the demo | [DEMO.md](DEMO.md) |
