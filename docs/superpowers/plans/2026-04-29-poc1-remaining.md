@@ -2,15 +2,18 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Land the remaining 5 acceptance criteria (#7, #8, #10, #11, #12, #13) plus the deferred AC #4 corpus gate, ending at `v0.8-poc1-feature-complete` with a 30-minute end-to-end demo dry-run.
+**Goal:** Land the platform work needed to test-drive POC1 end-to-end — Phases 6+7 wired, `/reviewer-queue` demoable, Fleet Manager extensions for behaviour-change + cost-per-task, region-failover scenario, EMS extensibility narration, demo dry-run, tag.
+
+**Acceptance criteria covered by this plan:** #7, #8, #10, #11, #12, #13.
+
+**Out of this plan:** AC #4 corpus accuracy gate. The pipeline is already shipped (smoke 5/6); the corpus-wide ≥95% number is one ~25-minute model run captured by [docs/poc1-accuracy-runbook.md](../../poc1-accuracy-runbook.md). It does **not** block the test drive or the tag — run it post-`v0.8`.
 
 **Reference docs (read before starting):**
 
 - Status + architecture: [docs/poc1-status.md](../../poc1-status.md)
-- Pivot design spec: [docs/superpowers/specs/2026-04-27-poc1-expense-compliance-pivot-design.md](../specs/2026-04-27-poc1-expense-compliance-pivot-design.md) (`§4.1` orchestrator phases; `§7` AC table; `§8` original Day 11–15 schedule)
+- Pivot design spec: [docs/superpowers/specs/2026-04-27-poc1-expense-compliance-pivot-design.md](../specs/2026-04-27-poc1-expense-compliance-pivot-design.md) (`§4.1` orchestrator phases; `§7` AC table)
 - Brief verbatim: [docs/poc1-brief.md](../../poc1-brief.md) (`§7` acceptance criteria)
 - GHCP SDK conventions: `~/.claude/skills/ghcp-sdk-python/SKILL.md` (the canonical `@define_tool` + `skill_directories` + `system_message` pattern). **Read this before writing a new agent or tool.**
-- Accuracy run-book: [docs/poc1-accuracy-runbook.md](../../poc1-accuracy-runbook.md)
 
 **Reuse — what's already in place** (don't re-derive):
 
@@ -35,11 +38,10 @@
 3. `/reviewer-queue` route demoable.
 4. Fleet Manager surfaces an autonomy proposal in `SkillAmplificationPanel` after a simulated decision-cluster.
 5. `audit_query` returns a narrative summary; `report.cost_per_task` returns a weekly cost breakdown.
-6. `simulate-region-failure` simulator command + recorded backup video.
+6. `simulate_region_failure` simulator command + recorded backup video.
 7. Maconomy narration script at `docs/demo-ems-extensibility.md`.
 8. Updated `docs/DEMO.md` covering all 13 ACs.
-9. AC #4 corpus baseline ≥ 95% recorded into `docs/poc1-accuracy-baseline.json`.
-10. Tag `v0.8-poc1-feature-complete` pushed.
+9. Tag `v0.8-poc1-platform-complete` pushed.
 
 ---
 
@@ -106,78 +108,6 @@ These come from the global `ghcp-sdk-python` skill and the Week 2 plan's convent
 - **Validators on graph edges** return `{"ok": bool, ...}`. Off-graph guardrails raise.
 - **Tests use `tmp_path`** when writing to disk. Simulator tests use the `_isolate_app_state_store` autouse fixture pattern.
 - **Commits include** `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` and reference the AC.
-
----
-
-## Task 0: Pre-flight — 300-claim accuracy gate (AC #4 evidence)
-
-**Files:**
-- Create: `docs/poc1-accuracy-baseline.json` (overwritten with the final pass)
-
-The pipeline is shipped; the gate is one model run away. Per the run-book.
-
-- [ ] **Step 1: Smoke first**
-
-```bash
-./.venv/Scripts/pytest.exe tests/api -q
-./.venv/Scripts/pytest.exe tests/api/unit/test_classifier_e2e_smoke.py -m smoke -v
-```
-
-Expect 185 pass on the suite; 5/5 on the smoke. If smoke fails, fix wiring before paying for 300 calls.
-
-- [ ] **Step 2: Run the harness**
-
-Inline (per memory: no need for `func start` for the harness path):
-
-```bash
-PYTHONIOENCODING=utf-8 ./.venv/Scripts/python.exe -X utf8 -c "
-import asyncio, json, time
-from pathlib import Path
-from api.functions.workflows import accuracy_harness_workflow as harness
-from api.functions.graphs.executors.agents.agent_rag_classifier import execute as rag_execute
-
-CLAIMS_DIR = Path('data/synthetic/claims')
-
-async def classifier(claim_id):
-    return (await rag_execute({'claim_id': claim_id}))['classification']
-
-async def main():
-    cids = sorted(p.stem for p in CLAIMS_DIR.glob('CLM-*.json'))
-    t0 = time.time()
-    progress = {'n': 0}
-    def pub(ev):
-        if ev.get('type') == 'accuracy.progress':
-            progress['n'] += 1
-            if progress['n'] % 50 == 0 or progress['n'] == len(cids):
-                print(f'  {progress[\"n\"]}/{len(cids)} ({time.time()-t0:.0f}s)', flush=True)
-    report = await harness.run(claim_ids=cids, classifier=classifier, concurrency=8, run_id='final', publish=pub)
-    Path('docs/poc1-accuracy-baseline.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
-    print(f'GATE: {\"PASS\" if report[\"overall_accuracy\"] >= 0.95 else \"FAIL\"} ({report[\"overall_accuracy\"]*100:.1f}%)', flush=True)
-
-asyncio.run(main())
-"
-```
-
-Expected wall-clock: ~25 min at concurrency 8.
-
-- [ ] **Step 3: If accuracy < 95% — iterate per the run-book mitigation list**
-
-1. Open `AccuracyReport` panel; click off-diagonal cells; pattern-spot the failure mode.
-2. Cheapest fix first: tighten `api/server/skills/rag-classifier/SKILL.md`, then bump `_TOP_K_POLICY_CHUNKS` in `agent_rag_classifier.py`, then re-chunk policy_search at paragraph level.
-3. Re-run with a **smoke** sample (5 representative claims) before paying for another full run.
-4. After two full iterations: stop and escalate.
-
-- [ ] **Step 4: Capture + commit**
-
-```bash
-git add docs/poc1-accuracy-baseline.json
-git commit -m "evidence(poc1): 300-claim accuracy baseline ≥95% with policy-driven reasoning
-
-Captured against the synthetic corpus and unmodified policy.md.
-AC #4 ✅ end-to-end.
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
-```
 
 ---
 
@@ -1337,7 +1267,7 @@ Each beat = ~2 minutes. Total ~30 minutes including transitions.
 
 ---
 
-## Task 14: Tag `v0.8-poc1-feature-complete`
+## Task 14: Tag `v0.8-poc1-platform-complete`
 
 **Files:** none — git operations only.
 
@@ -1352,39 +1282,39 @@ npx tsc --noEmit
 
 All green; clean tree.
 
-- [ ] **Confirm `docs/poc1-accuracy-baseline.json` reports ≥ 95%.**
-
 - [ ] **Tag + push**
 
 ```bash
-git tag -a v0.8-poc1-feature-complete -m "POC1 feature-complete: all 13 acceptance criteria demoable.
+git tag -a v0.8-poc1-platform-complete -m "POC1 platform-complete: 12 of 13 acceptance criteria demoable.
 
 - 7-phase ExpenseClaim orchestrator (all phases wired)
 - 7 SDK skills (rag-classifier, receipt-validator, escalation-advisor,
   notification-composer, arbitration, audit-summariser, fleet-manager)
 - 17 MCP tools
 - /reviewer-queue route
-- 300-claim accuracy baseline ≥95%
+- Region-failover scenario + Maconomy EMS extensibility narration
 
-AC #1, #2, #3, #4, #5, #6, #7, #8, #9, #10, #11, #12, #13 ✅."
+AC #1, #2, #3, #5, #6, #7, #8, #9, #10, #11, #12, #13 ✅.
+AC #4 (≥95% accuracy on the 300-claim corpus) is captured separately
+post-tag — pipeline shipped, run the harness when the budget is green."
 git push origin main
-git push origin v0.8-poc1-feature-complete
+git push origin v0.8-poc1-platform-complete
 ```
 
-- [ ] **Update `docs/poc1-status.md`** — flip the AC status table to all ✅; rewrite section 3 to "Done"; tag history extended.
+- [ ] **Update `docs/poc1-status.md`** — flip the AC status table to ✅ for the 6 ACs this plan landed; AC #4 stays 🟡 until the post-tag accuracy run; tag history extended.
 
 ---
 
 ## Self-review checklist (run after Task 14)
 
 **Acceptance criteria:**
-- [x] AC #4 corpus baseline ≥ 95% — Task 0
 - [x] AC #8 SSC reviewer interface — Tasks 1–5
 - [x] AC #7 autonomous learning — Tasks 6–7
 - [x] AC #12 immutable audit + reporting — Tasks 8–9
 - [x] AC #13 cost-per-task — Task 10
 - [x] AC #11 region failure recovery — Task 11
 - [x] AC #10 EMS extensibility narration — Task 12
+- [ ] AC #4 corpus baseline ≥ 95% — *post-tag, see [accuracy run-book](../../poc1-accuracy-runbook.md)*
 - [x] All 13 ACs covered in DEMO.md — Task 13
 
 **Conventions:**
