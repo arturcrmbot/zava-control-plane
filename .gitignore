@@ -41,3 +41,13 @@ Thumbs.db
 
 # Old workbench dir (deleted, leave rule defensive)
 scratch/
+
+# tsc emits .js next to .tsx/.ts sources — never check them in
+web/client/**/*.js
+web/shared/**/*.js
+mocks/**/*-mcp/server.js
+tests/web/**/*.test.js
+
+# Demo / dev screenshots — local artifacts, not source
+screenshots/
+*.png
