@@ -17,12 +17,12 @@ export default function PolicyAutonomyPanel() {
           const pct = Math.max(0, Math.min(1, v <= 1 ? v : v / 100));
           return (
             <div key={p.id}>
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-700">{p.description}</span>
-                <span className="text-slate-500">{String(p.currentValue)}</span>
-              </div>
-              <div className="h-1.5 bg-slate-200 rounded mt-1">
-                <div className="h-1.5 bg-blue-500 rounded" style={{ width: `${pct * 100}%` }} />
+              <div className="text-xs text-slate-700 leading-snug">{p.description}</div>
+              <div className="flex justify-between items-center mt-1">
+                <div className="h-1.5 bg-slate-200 rounded flex-1 mr-2">
+                  <div className="h-1.5 bg-blue-500 rounded" style={{ width: `${pct * 100}%` }} />
+                </div>
+                <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap">{String(p.currentValue)}</span>
               </div>
             </div>
           );

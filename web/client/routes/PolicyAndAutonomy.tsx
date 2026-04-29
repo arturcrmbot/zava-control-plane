@@ -33,7 +33,7 @@ export default function PolicyAndAutonomy() {
               <div className="text-xs text-slate-500 mt-0.5">{p.description}</div>
               <div className="text-xs mt-2 text-slate-600">current: <span className="text-slate-900 font-medium">{String(p.currentValue)}</span></div>
               <div className="text-[10px] text-slate-400 mt-1">
-                sha:{p.gitSha} · {p.author} · {new Date(p.updatedAt).toISOString().slice(0, 10)}
+                sha:{p.gitSha} · {p.author} · {new Date(p.updatedAt * 1000).toISOString().slice(0, 10)}
               </div>
             </button>
           ))}

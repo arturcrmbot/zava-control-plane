@@ -3,9 +3,8 @@ import time
 from pathlib import Path
 import yaml
 from fastapi import APIRouter
-from pydantic import BaseModel
 from api.server.state import app_state
-from api.shared.types import AutonomyPolicy
+from api.shared.types import AutonomyPolicy, BaseModel  # camelCase-aliased
 
 router = APIRouter(prefix="/api/policy")
 
@@ -14,7 +13,7 @@ _change_requests: list[dict] = []
 
 def _load_policies() -> None:
     path = Path(__file__).resolve().parents[2] / "shared" / "policies.yaml"
-    data = yaml.safe_load(path.read_text())
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
     for p in data["policies"]:
         app_state.store.upsert_policy(AutonomyPolicy(
             id=p["id"], description=p["description"], current_value=p["value"],

@@ -13,15 +13,21 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
-import numpy as np
 from copilot.tools import ToolResult, define_tool
 from opentelemetry import trace
 from pydantic import BaseModel, Field
-from sentence_transformers import SentenceTransformer
 
 from ._otel import traced_tool
+
+# Heavy ML deps (sentence_transformers pulls torch + transformers, ~2GB in memory
+# and ~90s to import). Lazy-load inside _load_model so Azure Functions worker
+# startup stays under the 60s WorkerMetadataRequest timeout — otherwise the host
+# abandons worker init and the Functions host never reaches "Job host started".
+if TYPE_CHECKING:
+    import numpy as np
+    from sentence_transformers import SentenceTransformer
 
 _POLICY_PATH = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "policy.md"
 
@@ -37,9 +43,10 @@ _index_cache: Optional[list[_Chunk]] = None
 _model_cache: Optional[SentenceTransformer] = None
 
 
-def _load_model() -> SentenceTransformer:
+def _load_model() -> "SentenceTransformer":
     global _model_cache
     if _model_cache is None:
+        from sentence_transformers import SentenceTransformer
         _model_cache = SentenceTransformer("all-MiniLM-L6-v2")
     return _model_cache
 
@@ -107,6 +114,7 @@ def reset_cache() -> None:
 @traced_tool("policy.search")
 def search(query: str, k: int = 5) -> list[dict]:
     """Return top-k policy chunks ranked by cosine similarity to query."""
+    import numpy as np
     span = trace.get_current_span()
     span.set_attribute("wpp.mcp.query", query)
     span.set_attribute("wpp.mcp.k", k)

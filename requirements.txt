@@ -35,16 +35,20 @@ annotated-doc==0.0.4
 annotated-types==0.7.0
 anthropic==0.80.0
 anyio==4.13.0
+asgiref==3.11.1
 async-timeout==5.0.1 ; python_full_version < '3.11.3'
 asyncio==4.0.0
 attrs==26.1.0
 azure-ai-inference==1.0.0b9
 azure-ai-projects==2.0.1
 azure-core==1.39.0
+azure-core-tracing-opentelemetry==1.0.0b12
 azure-cosmos==4.15.0
 azure-functions==1.24.0
 azure-functions-durable==1.5.0
 azure-identity==1.25.3
+azure-monitor-opentelemetry==1.8.7
+azure-monitor-opentelemetry-exporter==1.0.0b51
 azure-storage-blob==12.28.0
 backoff==2.2.1
 boto3==1.42.89
@@ -57,13 +61,18 @@ click==8.3.2
 clr-loader==0.2.10 ; python_full_version < '3.14'
 colorama==0.4.6 ; sys_platform == 'win32'
 cryptography==46.0.7
+cuda-bindings==13.2.0 ; sys_platform == 'linux'
+cuda-pathfinder==1.5.3 ; sys_platform == 'linux'
+cuda-toolkit==13.0.2 ; sys_platform == 'linux'
 distro==1.9.0
 docstring-parser==0.17.0
 durabletask==1.4.0
 durabletask-azuremanaged==1.4.0
 fastapi==0.135.3
+filelock==3.29.0
 foundry-local-sdk==0.5.1
 frozenlist==1.8.0
+fsspec==2026.3.0
 furl==2.1.4
 github-copilot-sdk==0.2.1
 google-api-core==2.30.3
@@ -74,11 +83,13 @@ griffelib==2.0.2
 grpcio==1.80.0
 h11==0.16.0
 h2==4.3.0
+hf-xet==1.4.3 ; platform_machine == 'AMD64' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64'
 hpack==4.1.0
 httpcore==1.0.9
 httptools==0.7.1
 httpx==0.28.1
 httpx-sse==0.4.3
+huggingface-hub==1.12.0
 hyperframe==6.1.0
 idna==3.11
 importlib-metadata==8.7.1
@@ -86,42 +97,82 @@ isodate==0.7.2
 jinja2==3.1.6
 jiter==0.14.0
 jmespath==1.1.0
+joblib==1.5.3
 jsonpath-ng==1.8.0
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
+markdown-it-py==4.0.0
 markupsafe==3.0.3
 mcp==1.27.0
+mdurl==0.1.2
 mem0ai==1.0.11
 microsoft-agents-activity==0.3.1
 microsoft-agents-copilotstudio-client==0.3.1
 microsoft-agents-hosting-core==0.3.1
 ml-dtypes==0.5.4
+mpmath==1.3.0
 msal==1.36.0
 msal-extensions==1.3.1
+msrest==0.7.1
 multidict==6.7.1
 nanoid==2.0.0
+networkx==3.6.1
 numpy==2.4.4
+nvidia-cublas==13.1.0.3 ; sys_platform == 'linux'
+nvidia-cuda-cupti==13.0.85 ; sys_platform == 'linux'
+nvidia-cuda-nvrtc==13.0.88 ; sys_platform == 'linux'
+nvidia-cuda-runtime==13.0.96 ; sys_platform == 'linux'
+nvidia-cudnn-cu13==9.19.0.56 ; sys_platform == 'linux'
+nvidia-cufft==12.0.0.61 ; sys_platform == 'linux'
+nvidia-cufile==1.15.1.6 ; sys_platform == 'linux'
+nvidia-curand==10.4.0.35 ; sys_platform == 'linux'
+nvidia-cusolver==12.0.4.66 ; sys_platform == 'linux'
+nvidia-cusparse==12.6.3.3 ; sys_platform == 'linux'
+nvidia-cusparselt-cu13==0.8.0 ; sys_platform == 'linux'
+nvidia-nccl-cu13==2.28.9 ; sys_platform == 'linux'
+nvidia-nvjitlink==13.0.88 ; sys_platform == 'linux'
+nvidia-nvshmem-cu13==3.4.5 ; sys_platform == 'linux'
+nvidia-nvtx==13.0.85 ; sys_platform == 'linux'
+oauthlib==3.3.1
 ollama==0.5.3
 openai==2.31.0
 openai-agents==0.13.6
 openai-chatkit==1.6.3
-opentelemetry-api==1.41.0
-opentelemetry-sdk==1.41.0
-opentelemetry-semantic-conventions==0.62b0
+opentelemetry-api==1.40.0
+opentelemetry-instrumentation==0.61b0
+opentelemetry-instrumentation-asgi==0.61b0
+opentelemetry-instrumentation-dbapi==0.61b0
+opentelemetry-instrumentation-django==0.61b0
+opentelemetry-instrumentation-fastapi==0.61b0
+opentelemetry-instrumentation-flask==0.61b0
+opentelemetry-instrumentation-httpx==0.61b0
+opentelemetry-instrumentation-logging==0.61b0
+opentelemetry-instrumentation-psycopg2==0.61b0
+opentelemetry-instrumentation-requests==0.61b0
+opentelemetry-instrumentation-urllib==0.61b0
+opentelemetry-instrumentation-urllib3==0.61b0
+opentelemetry-instrumentation-wsgi==0.61b0
+opentelemetry-resource-detector-azure==0.1.5
+opentelemetry-sdk==1.40.0
+opentelemetry-semantic-conventions==0.61b0
+opentelemetry-util-http==0.61b0
 orderedmultidict==1.0.2
 packaging==26.0
+pillow==12.2.0
 portalocker==3.2.0
 posthog==7.11.0
 powerfx==0.0.34 ; python_full_version < '3.14'
 propcache==0.4.1
 proto-plus==1.27.2
 protobuf==6.33.6
+psutil==7.2.2
 pyasn1==0.6.3
 pyasn1-modules==0.4.2
 pycparser==3.0 ; (python_full_version < '3.14' and implementation_name != 'PyPy') or (implementation_name != 'PyPy' and platform_python_implementation != 'PyPy')
 pydantic==2.13.0
 pydantic-core==2.46.0
 pydantic-settings==2.13.1
+pygments==2.20.0
 pyjwt==2.12.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
@@ -135,16 +186,32 @@ qdrant-client==1.17.1
 redis==7.1.1
 redisvl==0.15.0
 referencing==0.37.0
+regex==2026.4.4
 requests==2.33.1
+requests-oauthlib==2.0.0
+rich==15.0.0
 rpds-py==0.30.0
 s3transfer==0.16.0
+safetensors==0.7.0
+scikit-learn==1.8.0
+scipy==1.17.1
+sentence-transformers==5.4.1
+setuptools==81.0.0
+shellingham==1.5.4
 six==1.17.0
 sniffio==1.3.1
 sqlalchemy==2.0.49
 sse-starlette==3.3.4
 starlette==1.0.0
+sympy==1.14.0
 tenacity==9.1.4
+threadpoolctl==3.6.0
+tokenizers==0.22.2
+torch==2.11.0
 tqdm==4.67.3
+transformers==5.6.2
+triton==3.6.0 ; sys_platform == 'linux'
+typer==0.25.0
 types-requests==2.33.0.20260408
 typing-extensions==4.15.0
 typing-inspection==0.4.2
@@ -154,5 +221,6 @@ uvloop==0.22.1 ; platform_python_implementation != 'PyPy' and sys_platform != 'c
 watchfiles==1.1.1
 websockets==16.0
 werkzeug==3.1.8
+wrapt==1.17.3
 yarl==1.23.0
 zipp==3.23.0

@@ -6,6 +6,7 @@ import ReviewerQueue from "./routes/ReviewerQueue";
 import PolicyAndAutonomy from "./routes/PolicyAndAutonomy";
 import Analytics from "./routes/Analytics";
 import Evaluations from "./routes/Evaluations";
+import Economics from "./routes/Economics";
 import WorkflowDetail from "./routes/WorkflowDetail";
 import FleetManagerRail from "./components/FleetManagerRail";
 
@@ -35,7 +36,7 @@ export default function App() {
         <div className="ml-auto text-xs text-slate-500">role: Finance Controller</div>
       </header>
 
-      <div className="grid grid-cols-[220px_1fr_360px] h-[calc(100vh-3rem)]">
+      <div className="grid grid-cols-[200px_1fr_300px] h-[calc(100vh-3rem)]">
         <aside className="bg-white border-r border-slate-200 p-3 space-y-1">
           {nav.map(n => (
             <NavLink key={n.to} to={n.to}
@@ -58,7 +59,7 @@ export default function App() {
             <Route path="/evals" element={<Evaluations />} />
             <Route path="/agents" element={<Stub title="Agents" />} />
             <Route path="/library" element={<Stub title="Library" />} />
-            <Route path="/economics" element={<Stub title="Economics" />} />
+            <Route path="/economics" element={<Economics />} />
           </Routes>
         </main>
 

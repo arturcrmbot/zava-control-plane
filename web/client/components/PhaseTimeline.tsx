@@ -1,5 +1,10 @@
 // src/client/components/PhaseTimeline.tsx
-import { PHASE_ORDER, type Phase } from "@shared/types";
+import { PHASE_ORDER, EXPENSE_PHASE_ORDER, type Phase, type PhaseName, type Workflow } from "@shared/types";
+
+function phaseOrderFor(type: Workflow["type"] | undefined): PhaseName[] {
+  if (type === "expense-claim") return EXPENSE_PHASE_ORDER;
+  return PHASE_ORDER;
+}
 
 type DisplayStatus = Phase["status"] | "not_started";
 
@@ -19,11 +24,14 @@ const STATUS_STYLE: Record<DisplayStatus, string> = {
   not_started: "text-slate-400",
 };
 
-export default function PhaseTimeline({ phases }: { phases: Phase[] }) {
+export default function PhaseTimeline({ phases, workflowType }: {
+  phases: Phase[]; workflowType?: Workflow["type"];
+}) {
   const byName = new Map(phases.map(p => [p.name, p]));
+  const order = phaseOrderFor(workflowType);
   return (
     <div className="space-y-1.5">
-      {PHASE_ORDER.map(name => {
+      {order.map(name => {
         const p = byName.get(name);
         const status: DisplayStatus = p?.status ?? "not_started";
         const duration = p?.startedAt && p?.completedAt ? Math.round(p.completedAt - p.startedAt) : null;

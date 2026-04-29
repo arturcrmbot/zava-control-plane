@@ -31,27 +31,53 @@ def _agent_tried(ledger: list[ActionLedgerEntry], limit: int = 5) -> list[str]:
     return bullets
 
 
+def _describe_subject(workflow: Workflow) -> tuple[str, str]:
+    """Return (subject_phrase, amount_str) tailored to the workflow type.
+
+    Expense claims read from `workflow.claim`; invoices from `workflow.invoice`.
+    """
+    if workflow.type == "expense-claim" and workflow.claim:
+        c = workflow.claim
+        amount_str = _fmt_amount(c.amount, c.currency)
+        subject = (
+            f"Expense claim {c.claim_id} from {c.employee_id} "
+            f"({c.category}, {c.vendor})"
+        )
+        return subject, amount_str
+    if workflow.type == "hiring":
+        amount_str = ""
+        subject = f"Hiring workflow {workflow.id}"
+        return subject, amount_str
+    inv = workflow.invoice
+    vendor = workflow.vendor.name if workflow.vendor else "<unknown vendor>"
+    if inv:
+        amount_str = _fmt_amount(inv.amount, inv.currency)
+        subject = f"Invoice {inv.number} for {vendor}"
+    else:
+        amount_str = ""
+        subject = f"Workflow {workflow.id} for {vendor}"
+    return subject, amount_str
+
+
 def compose(workflow: Workflow, exception: Exception,
             ledger: list[ActionLedgerEntry]) -> dict:
-    inv = workflow.invoice
     phase = workflow.current_phase
-    amount_str = _fmt_amount(inv.amount, inv.currency)
-    vendor = workflow.vendor.name
+    subject, amount_str = _describe_subject(workflow)
+    money = f" ({amount_str})" if amount_str else ""
 
     if exception.category == "validator-blocked":
         what_happened = (
-            f"Invoice {inv.number} for {vendor} ({amount_str}) blocked at "
-            f"{phase}: {exception.summary}."
+            f"{subject}{money} blocked at {phase}: {exception.summary}."
         )
     elif exception.category == "threshold-exceeded":
         what_happened = (
-            f"Invoice {inv.number} for {vendor} ({amount_str}) requires "
-            f"human approval at {phase}: {exception.summary}."
+            f"{subject}{money} requires human approval at {phase}: "
+            f"{exception.summary}."
         )
     else:
         what_happened = (
-            f"Invoice {inv.number} for {vendor} ({amount_str}) exception "
-            f"raised at {phase}: {exception.summary}."
+            f"{subject}{money} exception raised at {phase}: "
+            f"{exception.summary}."
         )
 
     return {

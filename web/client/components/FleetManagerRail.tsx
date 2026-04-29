@@ -78,8 +78,18 @@ export default function FleetManagerRail() {
       </div>
       {tab === "fm" && (
         <div className="space-y-1.5">
-          <div className="text-[11px] text-slate-500">GHCP SDK session · {fmEvents.length} recent events</div>
-          {fmEvents.length === 0 && <div className="text-xs text-slate-400 italic">idle</div>}
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+            </span>
+            <span>GHCP SDK session · {fmEvents.length} recent events</span>
+          </div>
+          {fmEvents.length === 0 && (
+            <div className="text-xs text-slate-500 italic px-2 py-3 border border-dashed border-slate-200 rounded">
+              Watching event bus. Fleet Manager will compose summaries when claims need attention.
+            </div>
+          )}
           {fmEvents.map((e, i) => {
             const open = expanded.has(i);
             return (
@@ -112,8 +122,18 @@ export default function FleetManagerRail() {
       )}
       {tab === "orch" && (
         <div className="space-y-1">
-          <div className="text-[11px] text-slate-500">MAF Durable Workflows · {orchEvents.length} recent events</div>
-          {orchEvents.length === 0 && <div className="text-xs text-slate-400 italic">idle</div>}
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500"></span>
+            </span>
+            <span>Durable Functions · {orchEvents.length} recent events</span>
+          </div>
+          {orchEvents.length === 0 && (
+            <div className="text-xs text-slate-500 italic px-2 py-3 border border-dashed border-slate-200 rounded">
+              Watching orchestration bus. Phase activity will appear here as workflows advance.
+            </div>
+          )}
           {orchEvents.map((e, i) => (
             <div key={i} className="flex items-center gap-2 text-[11px] border border-slate-200 rounded px-2 py-1 bg-white">
               {orchTypeIcon(e.payload.type)}

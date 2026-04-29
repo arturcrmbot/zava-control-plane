@@ -1,5 +1,10 @@
-import { PHASE_ORDER, type Phase, type Workflow } from "@shared/types";
+import { PHASE_ORDER, EXPENSE_PHASE_ORDER, type Phase, type PhaseName, type Workflow } from "@shared/types";
 import { Check, Loader2, Ban, CircleDashed } from "lucide-react";
+
+function phaseOrderFor(type: Workflow["type"] | undefined): PhaseName[] {
+  if (type === "expense-claim") return EXPENSE_PHASE_ORDER;
+  return PHASE_ORDER;
+}
 
 type Status = "completed" | "in_progress" | "blocked" | "pending";
 
@@ -32,9 +37,10 @@ export default function PhaseRibbon({ workflow, phases }: {
   workflow: Workflow; phases: Phase[];
 }) {
   const hasException = !!workflow.activeExceptionId;
+  const order = phaseOrderFor(workflow.type);
   return (
     <div className="flex flex-wrap items-center gap-y-2 gap-x-1.5" data-testid="phase-ribbon">
-      {PHASE_ORDER.map((name, i) => {
+      {order.map((name, i) => {
         const s = classify(name, phases, workflow.currentPhase, hasException);
         return (
           <div key={name} className="flex items-center gap-1.5">
@@ -42,7 +48,7 @@ export default function PhaseRibbon({ workflow, phases }: {
               <Icon s={s} />
               <span className="text-xs font-medium whitespace-nowrap">{name}</span>
             </div>
-            {i < PHASE_ORDER.length - 1 &&
+            {i < order.length - 1 &&
               <div className="h-px w-3 bg-slate-300" />}
           </div>
         );

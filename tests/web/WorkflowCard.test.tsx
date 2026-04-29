@@ -69,8 +69,8 @@ describe("WorkflowCard — AC #9 system-agnostic Control Plane", () => {
         <WorkflowCard w={makeWorkflow()} />
       </MemoryRouter>,
     );
-    // Visible: employee id, currency+amount, verdict, phase.
-    expect(screen.getByText("EMP-0001")).toBeTruthy();
+    // Visible: employee id (in subtitle), currency+amount, verdict, phase.
+    expect(screen.getByText(/EMP-0001/)).toBeTruthy();
     expect(screen.getByText(/GBP/)).toBeTruthy();
     expect(screen.getByText("amber")).toBeTruthy();
     expect(screen.getByText("Classify")).toBeTruthy();

@@ -282,24 +282,31 @@ async def simulate_region_failure(stop_seconds: int = 10) -> dict:
 
 
 async def ramp_loop() -> None:
-    """Background coroutine: spawn ExpenseClaim workflows until target, then steady-state.
+    """Background coroutine: spawn ExpenseClaim workflows until target, then optionally steady-state.
 
-    SIMULATOR_TARGET_WORKFLOWS=0 disables both ramp and steady-state.
+    Env vars:
+      SIMULATOR_TARGET_WORKFLOWS — initial ramp size (0 = disabled, manual inject only).
+      SIMULATOR_STEADY_STATE     — after ramp, keep spawning continuously.
+                                   Default false (laptop-friendly). Set "1" to enable.
     """
     target = int(os.getenv("SIMULATOR_TARGET_WORKFLOWS", "0"))
+    steady_state = os.getenv("SIMULATOR_STEADY_STATE", "0") == "1"
     if target <= 0:
         print("[orchestrator] simulator disabled (SIMULATOR_TARGET_WORKFLOWS=0); inject manually via /api/simulator/inject")
         return
     ramp_seconds = 90
     delay_per = ramp_seconds / target
-    print(f"[orchestrator] ramping {target} expense-claim workflows over {ramp_seconds}s")
+    print(f"[orchestrator] ramping {target} expense-claim workflows over {ramp_seconds}s (steady_state={steady_state})")
     for _ in range(target):
         try:
             await spawn_expense_workflow()
         except Exception as ex:
             print(f"[orchestrator] spawn failed: {ex}")
         await asyncio.sleep(delay_per)
-    print("[orchestrator] ramp complete; steady-state")
+    if not steady_state:
+        print("[orchestrator] ramp complete; steady-state disabled (SIMULATOR_STEADY_STATE!=1). Use /api/simulator/inject to add more.")
+        return
+    print("[orchestrator] ramp complete; steady-state ON")
     while True:
         try:
             await spawn_expense_workflow()

@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import type {
   Workflow, Phase, OtelSpan, Exception, SkillAmplification,
-  ActionLedgerEntry, McpCall, Economics, Narrative,
+  ActionLedgerEntry, McpCall, Economics, Narrative, ClaimData,
 } from "@shared/types";
 import OtelSpanTree from "../components/OtelSpanTree";
 import PhaseTimeline from "../components/PhaseTimeline";
@@ -26,7 +26,58 @@ type DetailResp = {
   narrative: Narrative | null;
 };
 
-const TABS = ["Overview", "Phases", "Traces", "Ledger", "Amplification", "Execution Timeline"] as const;
+const TABS = ["Overview", "Phases", "Traces", "Ledger", "Amplification", "Timeline"] as const;
+
+const FLAVOUR_LABEL: Record<string, { text: string; cls: string }> = {
+  "correct": { text: "Receipt matches", cls: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" },
+  "wrong-amount": { text: "Receipt amount mismatch", cls: "bg-red-50 text-red-700 ring-1 ring-red-200" },
+  "wrong-date": { text: "Receipt date mismatch", cls: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
+  "wrong-vendor": { text: "Receipt vendor mismatch", cls: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
+  "missing-line-item": { text: "Line item missing on receipt", cls: "bg-amber-50 text-amber-700 ring-1 ring-amber-200" },
+  "missing-receipt": { text: "Receipt missing", cls: "bg-red-50 text-red-700 ring-1 ring-red-200" },
+};
+
+function ReceiptPanel({ claim }: { claim: ClaimData }) {
+  const [errored, setErrored] = useState(false);
+  const flavour = claim.receiptMismatchFlavour;
+  const annotation = flavour && FLAVOUR_LABEL[flavour];
+  const isMissing = errored || flavour === "missing-receipt";
+  return (
+    <div className="panel">
+      <div className="panel-header flex items-center justify-between">
+        <span>Receipt · {claim.claimId}</span>
+        {annotation && (
+          <span className={`text-[10px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded ${annotation.cls}`}>
+            {annotation.text}
+          </span>
+        )}
+      </div>
+      <div className="panel-body flex gap-4">
+        {isMissing ? (
+          <div className="w-32 h-40 bg-amber-50 border-2 border-dashed border-amber-300 rounded flex items-center justify-center text-xs text-amber-700 text-center px-2">
+            no receipt<br />submitted
+          </div>
+        ) : (
+          <img
+            src={`/api/receipts/${claim.claimId}.png`}
+            alt={`receipt ${claim.claimId}`}
+            onError={() => setErrored(true)}
+            className="w-32 h-40 object-contain bg-white rounded border border-slate-200"
+          />
+        )}
+        <div className="text-xs text-slate-700 space-y-1">
+          <div><span className="text-slate-500">Submitted by</span> <span className="font-medium">{claim.employeeId}</span></div>
+          <div><span className="text-slate-500">Vendor</span> <span className="font-medium">{claim.vendor}</span></div>
+          <div><span className="text-slate-500">Amount</span> <span className="font-semibold text-slate-900">{claim.currency} {claim.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+          <div><span className="text-slate-500">Category</span> <span className="font-medium capitalize">{claim.category}</span></div>
+          {claim.attendees > 1 && <div><span className="text-slate-500">Attendees</span> <span className="font-medium">{claim.attendees}</span></div>}
+          <div><span className="text-slate-500">Submitted</span> <span className="font-mono text-[11px]">{claim.submittedAt.replace("T", " ").slice(0, 16)}</span></div>
+          <div><span className="text-slate-500">Source</span> <span className="font-medium">{claim.emsSource}</span> · <span className="font-medium">{claim.market}</span></div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function WorkflowDetail() {
   const { id } = useParams();
@@ -94,10 +145,10 @@ export default function WorkflowDetail() {
         <WorkflowHeaderTiles workflow={w} />
         <PhaseRibbon workflow={w} phases={d.phases} />
 
-        <div className="flex gap-1 border-b border-slate-200">
+        <div className="flex flex-wrap gap-1 border-b border-slate-200">
           {TABS.map(t => (
             <button key={t} onClick={() => setTab(t)}
-                    className={`text-sm px-4 py-2 ${tab === t ?
+                    className={`text-sm px-3 py-2 whitespace-nowrap ${tab === t ?
                       "text-blue-700 border-b-2 border-blue-600 font-medium" :
                       "text-slate-500 hover:text-slate-800"}`}>{t}</button>
           ))}
@@ -105,6 +156,7 @@ export default function WorkflowDetail() {
 
         {tab === "Overview" && (
           <div className="space-y-4">
+            {w.claim && <ReceiptPanel claim={w.claim} />}
             {d.narrative && d.activeException && (
               <>
                 <ExceptionAnalysisCard narrative={d.narrative} />
@@ -118,7 +170,7 @@ export default function WorkflowDetail() {
             )}
           </div>
         )}
-        {tab === "Phases" && <PhaseTimeline phases={d.phases} />}
+        {tab === "Phases" && <PhaseTimeline phases={d.phases} workflowType={w.type} />}
         {tab === "Traces" && <OtelSpanTree spans={d.spans} />}
         {tab === "Ledger" && (
           <div className="space-y-1 text-xs">
@@ -134,7 +186,7 @@ export default function WorkflowDetail() {
           </div>
         )}
         {tab === "Amplification" && <SkillAmplificationPanel items={d.amplifications} />}
-        {tab === "Execution Timeline" &&
+        {tab === "Timeline" &&
           <ExecutionTimelineTab mcpCalls={d.mcpCalls} workflowId={w.id} onLogAction={logAction} />}
       </div>
 
