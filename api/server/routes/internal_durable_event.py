@@ -101,7 +101,8 @@ async def receive_durable_event(body: DurableEventBody):
         if stage == "start":
             _span_starts[(wid, name)] = now
         elif stage in ("complete", "error"):
-            dur_s = body.payload.get("duration_ms", 0) / 1000.0
+            dur_ms = int(body.payload.get("duration_ms", 0))
+            dur_s = dur_ms / 1000.0
             start = _span_starts.pop((wid, name), now - dur_s)
             app_state.store.append_span(OtelSpan(
                 trace_id=wid,  # group all spans under the workflow id as trace
@@ -115,6 +116,40 @@ async def receive_durable_event(body: DurableEventBody):
                     "executor.type": etype,
                 },
                 status="error" if stage == "error" else "ok",
+            ))
+            # Synthesize an MCP-call entry per executor so the Timeline tab
+            # populates with per-step records. The actual HTTP traffic happens
+            # inside GHCP SDK tool invocations and isn't currently captured —
+            # this gives the operator the same per-step inspection surface
+            # (executor name, type, phase, duration, outcome) for both agents
+            # and validators / deterministic steps.
+            phase = body.payload.get("stage_label") or body.payload.get("phase")
+            request_preview: dict = {"executor": name, "type": etype}
+            if phase:
+                request_preview["phase"] = phase
+            extra = body.payload.get("attributes")
+            if isinstance(extra, dict):
+                request_preview.update(
+                    {k: v for k, v in extra.items() if k not in ("tool",)}
+                )
+            inferred_url = (
+                f"local://tool/{extra.get('tool')}" if isinstance(extra, dict) and extra.get("tool")
+                else f"local://executor/{name}"
+            )
+            response_preview: dict = {
+                "duration_ms": dur_ms,
+                "outcome": "error" if stage == "error" else "ok",
+            }
+            app_state.store.append_mcp_call(McpCall(
+                workflow_id=wid,
+                timestamp=now,
+                tool=name,
+                url=inferred_url,
+                method="EXEC",
+                request=request_preview,
+                response=response_preview,
+                status_code=500 if stage == "error" else 200,
+                duration_ms=dur_ms,
             ))
 
     elif body.kind == "mcp.call":

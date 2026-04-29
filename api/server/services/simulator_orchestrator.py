@@ -285,18 +285,21 @@ async def ramp_loop() -> None:
     """Background coroutine: spawn ExpenseClaim workflows until target, then optionally steady-state.
 
     Env vars:
-      SIMULATOR_TARGET_WORKFLOWS — initial ramp size (0 = disabled, manual inject only).
-      SIMULATOR_STEADY_STATE     — after ramp, keep spawning continuously.
-                                   Default false (laptop-friendly). Set "1" to enable.
+      SIMULATOR_TARGET_WORKFLOWS         — initial ramp size (0 = disabled, manual inject only).
+      SIMULATOR_STEADY_STATE             — after ramp, keep spawning continuously. Default off.
+      SIMULATOR_STEADY_INTERVAL_SECONDS  — average seconds between steady-state spawns
+                                           (default 60 = 1/minute, demo-friendly).
+                                           Real interval is uniform [0.7×, 1.3×] of this.
     """
     target = int(os.getenv("SIMULATOR_TARGET_WORKFLOWS", "0"))
     steady_state = os.getenv("SIMULATOR_STEADY_STATE", "0") == "1"
+    steady_interval = float(os.getenv("SIMULATOR_STEADY_INTERVAL_SECONDS", "60"))
     if target <= 0:
         print("[orchestrator] simulator disabled (SIMULATOR_TARGET_WORKFLOWS=0); inject manually via /api/simulator/inject")
         return
     ramp_seconds = 90
     delay_per = ramp_seconds / target
-    print(f"[orchestrator] ramping {target} expense-claim workflows over {ramp_seconds}s (steady_state={steady_state})")
+    print(f"[orchestrator] ramping {target} expense-claim workflows over {ramp_seconds}s (steady_state={steady_state}, steady_interval={steady_interval}s)")
     for _ in range(target):
         try:
             await spawn_expense_workflow()
@@ -306,10 +309,12 @@ async def ramp_loop() -> None:
     if not steady_state:
         print("[orchestrator] ramp complete; steady-state disabled (SIMULATOR_STEADY_STATE!=1). Use /api/simulator/inject to add more.")
         return
-    print("[orchestrator] ramp complete; steady-state ON")
+    print(f"[orchestrator] ramp complete; steady-state ON ({steady_interval}s ± 30%)")
     while True:
         try:
             await spawn_expense_workflow()
         except Exception as ex:
             print(f"[orchestrator] spawn failed: {ex}")
-        await asyncio.sleep(3 + random.random() * 5)
+        # uniform jitter ±30% so the cadence isn't robotic
+        jittered = steady_interval * (0.7 + random.random() * 0.6)
+        await asyncio.sleep(jittered)

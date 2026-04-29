@@ -13,7 +13,11 @@ export default function Evaluations() {
     const tick = () => void fetch("/api/evals").then(r => r.json()).then(setItems);
     tick(); const i = setInterval(tick, 5000); return () => clearInterval(i);
   }, []);
-  const avg = (k: keyof Eval) => items.length === 0 ? 0 : items.reduce((a, b) => a + (b[k] as number), 0) / items.length;
+  const avg = (k: keyof Eval) => {
+    if (items.length === 0) return 0;
+    const total = items.reduce((a, b) => a + (typeof b[k] === "number" ? (b[k] as number) : 0), 0);
+    return total / items.length;
+  };
 
   return (
     <div className="space-y-4">
@@ -35,9 +39,9 @@ export default function Evaluations() {
           {items.slice(0, 20).map(e => (
             <div key={e.id} className="flex items-center gap-3 px-3 py-2 text-xs">
               <a href={`/workflows/${e.workflowId}`} className="text-blue-700 hover:underline font-mono">{e.workflowId}</a>
-              <span className="text-slate-400">{new Date(e.ranAt).toLocaleTimeString()}</span>
+              <span className="text-slate-400">{e.ranAt ? new Date(e.ranAt * 1000).toLocaleTimeString() : ""}</span>
               <span className="ml-auto text-slate-600 font-mono">
-                adh={e.taskAdherence.toFixed(2)} · safe={e.safety.toFixed(2)} · tool={e.toolAccuracy.toFixed(2)}
+                adh={(e.taskAdherence ?? 0).toFixed(2)} · safe={(e.safety ?? 0).toFixed(2)} · tool={(e.toolAccuracy ?? 0).toFixed(2)}
               </span>
             </div>
           ))}
