@@ -34,10 +34,18 @@ async def lifespan(app: FastAPI):
     ramp_task = asyncio.create_task(simulator_orchestrator.ramp_loop())
     from api.server.eval.online_subscriber import lifespan_register, lifespan_shutdown
     await lifespan_register(app)
+    # Candidate-portal: subscribe the cv_crystalliser → magic-link + email
+    # bridge. Returns an unsubscribe callable that we hold for teardown.
+    from api.server.services.portal_orchestration import attach as _attach_portal_orch
+    _portal_orch_off = _attach_portal_orch(app_state)
     try:
         yield
     finally:
         ramp_task.cancel()
+        try:
+            _portal_orch_off()
+        except Exception:
+            pass
         try:
             await app_state.fm.stop()
         except Exception:
