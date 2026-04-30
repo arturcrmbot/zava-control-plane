@@ -2,6 +2,35 @@
 
 Week 1 (`v0.6-poc1-accuracy-spine`) landed the full accuracy spine: synthetic policy, 300 labelled claims, R/A/G classifier skill, accuracy harness, AccuracyReport panel, and a live policy-edit-and-rerun route. This runbook is what you do once you want to run the full 300-claim ≥95% accuracy gate (Brief AC #4) end-to-end.
 
+## Quick run (Foundry-backed)
+
+The shortest path from "Foundry resources provisioned" to "AC #4 number on disk":
+
+1. **Env vars** — copy from `.env.example` into `.env`, then fill in:
+   - `AZURE_FOUNDRY_PROJECT_ENDPOINT` — Foundry project URI
+   - `AZURE_OPENAI_ENDPOINT` — Azure OpenAI base endpoint for the judge model
+   - `AZURE_OPENAI_DEPLOYMENT` — judge deployment name (e.g. `gpt-4-1-judge`)
+   - `AZURE_OPENAI_API_VERSION` — pinned to `2024-10-21`
+   - `AZURE_FOUNDRY_JUDGE_MODEL_DEPLOYMENT` — same as `AZURE_OPENAI_DEPLOYMENT`
+
+   Verify with `uv run python -c "from api.server.eval import foundry_client; print(foundry_client.is_configured())"` — must print `True`.
+
+2. **Pre-classify the 300-claim corpus** (~25 min at concurrency 5):
+   ```bash
+   uv run python scripts/preclassify_corpus.py --sample-size 300
+   ```
+   Writes `data/.eval/preclassified-300.jsonl`. This step is the slow part — re-run only when the rag-classifier prompt or retrieval changes.
+
+3. **Run the Foundry batch evaluation** (FastAPI must be up — `./.venv/Scripts/uvicorn.exe api.server.main:app --port 3001 --reload`):
+   ```bash
+   curl -X POST http://localhost:3001/api/accuracy/run \
+     -H 'Content-Type: application/json' \
+     -d '{"sample_size": 300}'
+   ```
+   Returns a `run_id`. Watch progress on `/api/stream/fleet`; fetch the report via `GET /api/accuracy/last` once `accuracy.complete` fires. The result also lands in the Foundry portal (`foundry_run_url` in the report).
+
+The detailed mechanics (alternate triggers, mitigation list, live-policy-edit demo) follow below.
+
 ## Pre-flight
 
 ```bash
