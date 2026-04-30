@@ -33,6 +33,10 @@ dependencies = [
   "azure-identity>=1.25.3",
   # Azure AI Foundry evaluation (LLM-judge + custom evaluators + portal upload)
   "azure-ai-evaluation>=1.0.0",
+  # Candidate portal — Blob storage for CV uploads + HeyGen mp4 cache
+  "azure-storage-blob>=12.20",
+  # Candidate portal — multipart parsing for FastAPI UploadFile
+  "python-multipart>=0.0.20",
 ]
 
 [dependency-groups]
@@ -40,7 +44,9 @@ dev = [
   "pytest>=8.3",
   "pytest-asyncio>=0.24",
   "pytest-mock>=3.14",
-  "ruff>=0.7"
+  "ruff>=0.7",
+  # Mock httpx in service tests (email_send, heygen_client)
+  "respx>=0.21"
 ]
 
 [tool.pytest.ini_options]

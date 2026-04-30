@@ -43,6 +43,10 @@ FleetEventType = Literal[
     "arbitration.recommended",
     "audit.summary.composed",
     "region.failure.simulated",
+    # Week 3 — candidate portal events (POC2 demo-ready scope)
+    "candidate.applied",
+    "magic_link.issued",
+    "offer.decided",
 ]
 
 
