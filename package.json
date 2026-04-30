@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev:client": "vite",
+    "dev:portal": "npm --prefix web/portal run dev",
+    "build:portal": "npm --prefix web/portal run build",
     "dev:mcp": "concurrently -k -n wd,concur,mac \"tsx watch mocks/workday-mcp/server.ts\" \"tsx watch mocks/concur-mcp/server.ts\" \"tsx watch mocks/maconomy-mcp/server.ts\"",
     "demo:mcp": "concurrently -k -n wd,concur,mac \"tsx mocks/workday-mcp/server.ts\" \"tsx mocks/concur-mcp/server.ts\" \"tsx mocks/maconomy-mcp/server.ts\"",
     "dev:mcp:poc2": "concurrently -k -n gh,li,wdhr,grph,snow,acs,hg \"tsx watch mocks/greenhouse-mcp/server.ts\" \"tsx watch mocks/linkedin-mcp/server.ts\" \"tsx watch mocks/workday-hr-mcp/server.ts\" \"tsx watch mocks/graph-mcp/server.ts\" \"tsx watch mocks/servicenow-mcp/server.ts\" \"tsx watch mocks/acs-mcp/server.ts\" \"tsx watch mocks/heygen-mcp/server.ts\"",
