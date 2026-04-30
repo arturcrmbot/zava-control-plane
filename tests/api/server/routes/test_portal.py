@@ -194,3 +194,105 @@ def test_status_repeatable_does_not_consume(portal_client):
     for _ in range(3):
         resp = client.get(f"/api/portal/status/{token}")
         assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------- Task 7: /offer
+
+
+def test_offer_accept_consumes_token_and_emits_event(portal_client, monkeypatch):
+    client, app_state = portal_client
+    apply_resp = client.post(
+        "/api/portal/apply",
+        data={"role_id": "REQ-SDE-USA-DEMO", "name": "Cara", "email": "c@x.y"},
+        files={"cv": ("c.pdf", io.BytesIO(b"%PDF-1.4"), "application/pdf")},
+    )
+    cid = apply_resp.json()["candidate_id"]
+    token = app_state.magic_links.issue(
+        candidate_id=cid, scope="offer", ttl_seconds=3600, single_use=True,
+    )
+
+    # Stub raise_orchestration_event so we don't hit the Functions host.
+    raised: list = []
+
+    async def _fake_raise(instance_id, event_name, event_data):
+        raised.append((instance_id, event_name, event_data))
+
+    import api.server.routes.portal as portal_module
+    monkeypatch.setattr(portal_module, "raise_orchestration_event", _fake_raise)
+
+    events: list = []
+    app_state.bus.on("offer.decided", lambda e: events.append(e))
+
+    resp = client.post(
+        f"/api/portal/offer/{token}", params={"decision": "accept"},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["ok"] is True
+    assert body["decision"] == "accept"
+    assert raised and raised[0][1] == "offer_decision"
+    assert events and events[0].type == "offer.decided"
+
+
+def test_offer_decline_works(portal_client, monkeypatch):
+    client, app_state = portal_client
+    apply_resp = client.post(
+        "/api/portal/apply",
+        data={"role_id": "REQ-CD-USA-DEMO", "name": "Dan", "email": "d@x.y"},
+        files={"cv": ("d.pdf", io.BytesIO(b"%PDF-1.4"), "application/pdf")},
+    )
+    cid = apply_resp.json()["candidate_id"]
+    token = app_state.magic_links.issue(
+        candidate_id=cid, scope="offer", ttl_seconds=3600, single_use=True,
+    )
+
+    async def _noop(*a, **k):
+        pass
+
+    import api.server.routes.portal as portal_module
+    monkeypatch.setattr(portal_module, "raise_orchestration_event", _noop)
+
+    resp = client.post(
+        f"/api/portal/offer/{token}", params={"decision": "decline"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["decision"] == "decline"
+
+
+def test_offer_double_consume_is_rejected(portal_client, monkeypatch):
+    client, app_state = portal_client
+    apply_resp = client.post(
+        "/api/portal/apply",
+        data={"role_id": "REQ-SDE-DE-DEMO", "name": "F", "email": "f@x.y"},
+        files={"cv": ("f.pdf", io.BytesIO(b"%PDF-1.4"), "application/pdf")},
+    )
+    cid = apply_resp.json()["candidate_id"]
+    token = app_state.magic_links.issue(
+        candidate_id=cid, scope="offer", ttl_seconds=3600, single_use=True,
+    )
+
+    async def _noop(*a, **k):
+        pass
+
+    import api.server.routes.portal as portal_module
+    monkeypatch.setattr(portal_module, "raise_orchestration_event", _noop)
+
+    first = client.post(f"/api/portal/offer/{token}", params={"decision": "accept"})
+    assert first.status_code == 200
+    second = client.post(f"/api/portal/offer/{token}", params={"decision": "accept"})
+    assert second.status_code == 409
+
+
+def test_offer_invalid_decision_400(portal_client):
+    client, app_state = portal_client
+    apply_resp = client.post(
+        "/api/portal/apply",
+        data={"role_id": "REQ-SDE-USA-DEMO", "name": "G", "email": "g@x.y"},
+        files={"cv": ("g.pdf", io.BytesIO(b"%PDF-1.4"), "application/pdf")},
+    )
+    cid = apply_resp.json()["candidate_id"]
+    token = app_state.magic_links.issue(
+        candidate_id=cid, scope="offer", ttl_seconds=3600, single_use=True,
+    )
+    resp = client.post(f"/api/portal/offer/{token}", params={"decision": "maybe"})
+    assert resp.status_code == 400

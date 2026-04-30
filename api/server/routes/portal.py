@@ -8,7 +8,11 @@ import uuid
 
 from fastapi import APIRouter, Form, HTTPException, UploadFile, File
 
-from api.server.services.magic_link import MagicLinkExpired
+from api.server.services.durable_client import raise_orchestration_event
+from api.server.services.magic_link import (
+    MagicLinkAlreadyConsumed,
+    MagicLinkExpired,
+)
 from api.server.state import app_state
 from api.shared.events import FleetEvent
 
@@ -118,3 +122,47 @@ def _next_action_for_phase(phase) -> str | None:
     if phase == "Offer":
         return "decide_offer"
     return None
+
+
+# ----------------------------------------------------- Task 7: offer accept/decline
+
+
+@router.post("/offer/{token}")
+async def decide_offer(token: str, decision: str):
+    """Single-use accept/decline endpoint for an offer-scope magic link.
+
+    Consumes the token (single_use=True at issuance), raises an
+    `offer_decision` external event on the underlying HiringOrchestrator
+    instance so the workflow resumes Phase 9, and emits an `offer.decided`
+    bus event for the Control Plane.
+    """
+    if decision not in {"accept", "decline"}:
+        raise HTTPException(400, "decision must be accept|decline")
+    try:
+        payload = app_state.magic_links.consume(token, scope="offer")
+    except MagicLinkAlreadyConsumed:
+        raise HTTPException(409, "already decided")
+    except MagicLinkExpired:
+        raise HTTPException(410, "link expired")
+    except ValueError:
+        raise HTTPException(404, "invalid or expired")
+    candidate = app_state.store.get_candidate(payload["candidate_id"])
+    if candidate is None:
+        raise HTTPException(404, "candidate not found")
+    instance_id = candidate.get("instance_id")
+    if instance_id:
+        try:
+            await raise_orchestration_event(
+                instance_id, "offer_decision", {"decision": decision},
+            )
+        except Exception as exc:  # pragma: no cover — surfaces in logs
+            # The orchestration may already be terminal; we still want the
+            # event to flow so the Control Plane records the decision.
+            print(f"[portal] raise_orchestration_event failed: {exc}")
+    app_state.bus.emit(FleetEvent(
+        type="offer.decided",
+        workflow_id=candidate.get("workflow_id"),
+        candidate_id=candidate["id"],
+        offer_decision=decision,
+    ))
+    return {"ok": True, "decision": decision}
