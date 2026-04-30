@@ -8,6 +8,7 @@ import type {
 import OtelSpanTree from "../components/OtelSpanTree";
 import PhaseTimeline from "../components/PhaseTimeline";
 import SkillAmplificationPanel from "../components/SkillAmplificationPanel";
+import AgentDrivenComponent, { type AgentComponentSpec } from "../components/AgentDrivenComponent";
 import PhaseRibbon from "../components/apex/PhaseRibbon";
 import WorkflowHeaderTiles from "../components/apex/WorkflowHeaderTiles";
 import ExceptionAnalysisCard from "../components/apex/ExceptionAnalysisCard";
@@ -110,6 +111,15 @@ export default function WorkflowDetail() {
 
   if (!d) return <div className="text-sm text-slate-500">loading…</div>;
   const w = d.workflow;
+  // POC2 §4.21 AG-UI: pull the cv_crystalliser agent's component_spec off
+  // the workflow ledger. Tolerates both camelCase (from the API serialiser)
+  // and snake_case (raw JSON from a synthetic fixture loader). Empty list
+  // when the agent hasn't run yet.
+  const agentOutputs = (w as unknown as { agentOutputs?: Record<string, unknown>; agent_outputs?: Record<string, unknown> }).agentOutputs
+    ?? (w as unknown as { agent_outputs?: Record<string, unknown> }).agent_outputs
+    ?? {};
+  const triageOutput = (agentOutputs["cv_crystalliser"] ?? {}) as { componentSpec?: unknown[]; component_spec?: unknown[] };
+  const specs = ((triageOutput.componentSpec ?? triageOutput.component_spec) ?? []) as AgentComponentSpec[];
 
   return (
     <div className="grid grid-cols-4 gap-4 min-w-0">
@@ -156,6 +166,19 @@ export default function WorkflowDetail() {
 
         {tab === "Overview" && (
           <div className="space-y-4">
+            {w.type === "hiring" && specs.length > 0 && (
+              <section data-testid="candidate-scorecard" className="space-y-3">
+                <h3 className="text-sm font-semibold text-slate-700">
+                  Candidate scorecard{" "}
+                  <span className="text-xs font-normal text-slate-500">— agent-emitted</span>
+                </h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  {specs.map((spec, i) => (
+                    <AgentDrivenComponent key={i} spec={spec} />
+                  ))}
+                </div>
+              </section>
+            )}
             {w.claim && <ReceiptPanel claim={w.claim} />}
             {d.narrative && d.activeException && (
               <>
