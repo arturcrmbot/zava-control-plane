@@ -108,6 +108,10 @@ export interface Workflow {
   // POC2 hiring stash — keys: candidate_id, candidate_name, role_family,
   // level_target, jurisdiction, right_to_work. Empty for POC1.
   metadata?: Record<string, unknown>;
+  // POC2 §4.21 AG-UI: per-agent structured outputs lifted onto the workflow
+  // ledger. Keyed by agent name (e.g. "cv_crystalliser"); each value carries
+  // the canonical agent payload incl. an optional component_spec array.
+  agentOutputs?: Record<string, { profile?: Record<string, unknown>; componentSpec?: unknown[]; component_spec?: unknown[]; inconsistencies?: unknown[] }>;
 }
 
 export interface Phase {

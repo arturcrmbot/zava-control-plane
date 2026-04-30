@@ -103,3 +103,21 @@ class StateStore:
 
     def get_amplifications(self, workflow_id: str) -> list[SkillAmplification]:
         return self._amplifications.get(workflow_id, [])
+
+    def append_agent_output(self, workflow_id: str, agent: str, output: dict) -> None:
+        """POC2 §4.21 AG-UI: lift a structured agent output onto the
+        workflow's `agent_outputs` map so the Control Plane can render any
+        `component_spec` entries in WorkflowDetail.
+
+        No-op if the workflow is unknown — agent outputs without a workflow
+        record have nowhere to land. The map is keyed by agent name (last
+        write wins per agent; downstream re-runs replace earlier outputs).
+        """
+        w = self._workflows.get(workflow_id)
+        if w is None:
+            return
+        w.agent_outputs[agent] = output
+
+    def get_agent_outputs(self, workflow_id: str) -> dict:
+        w = self._workflows.get(workflow_id)
+        return dict(w.agent_outputs) if w else {}

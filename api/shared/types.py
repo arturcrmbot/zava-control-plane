@@ -121,6 +121,11 @@ class Workflow(BaseModel):
     # POC2 hiring stash — candidate id, role family, jurisdiction. Absent on
     # POC1 workflows so the field is fully additive.
     metadata: dict = Field(default_factory=dict)
+    # POC2 §4.21 AG-UI: per-agent structured outputs lifted onto the workflow
+    # ledger so the Control Plane can render them. Keyed by agent name (e.g.
+    # "cv_crystalliser"); each value carries the canonical agent payload incl.
+    # an optional `component_spec` array of AgentComponentSpec entries.
+    agent_outputs: dict = Field(default_factory=dict)
 
 
 class Phase(BaseModel):

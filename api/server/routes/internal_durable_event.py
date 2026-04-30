@@ -218,6 +218,18 @@ async def receive_durable_event(body: DurableEventBody):
         # for this workflow so the operator queue doesn't leak stale entries.
         _auto_resolve_open(wid, "auto-resolved:resumed")
 
+    elif body.kind == "agent_output":
+        # POC2 §4.21 AG-UI: cross-process bridge for structured agent
+        # outputs. The Functions-host triage executor emits this with
+        # {"agent": "cv_crystalliser", "output": {profile, component_spec, ...}};
+        # we lift it onto the workflow ledger so WorkflowDetail can render
+        # the candidate scorecard.
+        p = body.payload or {}
+        agent = str(p.get("agent") or "")
+        output = p.get("output") or {}
+        if agent and isinstance(output, dict):
+            app_state.store.append_agent_output(wid, agent, output)
+
     elif body.kind == "agent.completed":
         # Cross-process bridge: agent.completed is emitted in the Functions
         # host's _wrapper.run_agent_session and arrives here as a webhook.
