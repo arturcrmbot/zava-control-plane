@@ -1,17 +1,7 @@
 import { Route, Routes, Navigate, Link } from "react-router-dom";
-
-function Placeholder({ label }: { label: string }) {
-  return (
-    <div className="max-w-xl mx-auto p-8">
-      <div className="panel">
-        <div className="panel-header">{label}</div>
-        <div className="panel-body text-sm text-slate-500">
-          Route under construction.
-        </div>
-      </div>
-    </div>
-  );
-}
+import Apply from "./routes/Apply";
+import Portal from "./routes/Portal";
+import Screen from "./routes/Screen";
 
 export default function App() {
   return (
@@ -24,9 +14,9 @@ export default function App() {
       <main className="flex-1 overflow-y-auto">
         <Routes>
           <Route path="/" element={<Navigate to="/apply" replace />} />
-          <Route path="/apply" element={<Placeholder label="/apply" />} />
-          <Route path="/portal" element={<Placeholder label="/portal" />} />
-          <Route path="/screen" element={<Placeholder label="/screen" />} />
+          <Route path="/apply" element={<Apply />} />
+          <Route path="/portal" element={<Portal />} />
+          <Route path="/screen" element={<Screen />} />
         </Routes>
       </main>
     </div>
