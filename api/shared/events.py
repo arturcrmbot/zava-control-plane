@@ -29,6 +29,9 @@ FleetEventType = Literal[
     # Accuracy harness events (one-shot evaluation runs; do NOT wake the fleet manager)
     "accuracy.progress",
     "accuracy.complete",
+    # Per-agent eval signal — emitted by run_agent_session, observed by online_subscriber.
+    # Does NOT wake the fleet manager.
+    "agent.completed",
     # Week 2 — expense-claim domain events
     "claim.routed.green",
     "claim.routed.amber",
