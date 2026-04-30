@@ -218,6 +218,17 @@ async def receive_durable_event(body: DurableEventBody):
         # for this workflow so the operator queue doesn't leak stale entries.
         _auto_resolve_open(wid, "auto-resolved:resumed")
 
+    elif body.kind == "agent.completed":
+        # Cross-process bridge: agent.completed is emitted in the Functions
+        # host's _wrapper.run_agent_session and arrives here as a webhook.
+        # Re-emit onto the FastAPI bus where api.server.eval.online_subscriber
+        # is listening.
+        app_state.bus.emit(FleetEvent(
+            type="agent.completed",
+            workflow_id=wid,
+            **{k: v for k, v in (body.payload or {}).items() if k != "type"},
+        ))
+
     elif body.kind == "workflow.completed":
         _ledger(wid, kind="agent", actor_id="orchestrator",
                 action="workflow.completed", details={})

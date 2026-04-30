@@ -48,10 +48,17 @@ class _FakeClient:
 
 
 @pytest.mark.asyncio
-async def test_run_agent_session_emits_agent_completed(monkeypatch):
-    captured: list[FleetEvent] = []
-    from api.server.state import app_state
-    monkeypatch.setattr(app_state.bus, "emit", lambda e: captured.append(e))
+async def test_run_agent_session_emits_agent_completed_via_webhook(monkeypatch):
+    """run_agent_session must POST agent.completed to the FastAPI webhook
+    so the online_subscriber (in the FastAPI process) sees it."""
+    captured: list[dict] = []
+
+    async def fake_webhook_emit(workflow_id, instance_id, kind, payload):
+        captured.append({"workflow_id": workflow_id, "instance_id": instance_id,
+                         "kind": kind, "payload": payload})
+
+    import api.functions.webhook as webhook_mod
+    monkeypatch.setattr(webhook_mod, "emit", fake_webhook_emit)
 
     from api.functions.graphs.executors.agents import _wrapper
     monkeypatch.setattr(_wrapper, "_gh_token", lambda: "fake-token")
@@ -67,28 +74,28 @@ async def test_run_agent_session_emits_agent_completed(monkeypatch):
 
     assert parsed == {"verdict": "Red"}
     assert len(captured) == 1
-    ev = captured[0]
-    assert ev.type == "agent.completed"
-    assert ev.workflow_id == "wf-abc"
-    assert ev.agent_label == "rag-classifier"
-    assert ev.prompt == "classify CLM-001"
-    assert ev.response_text == '{"verdict": "Red"}'
-    assert ev.extracted_json == {"verdict": "Red"}
-    assert isinstance(ev.tool_calls, list)
-    assert ev.usage["input_tokens"] == 10
-    assert ev.usage["output_tokens"] == 5
-    assert ev.latency_ms >= 0
+    call = captured[0]
+    assert call["kind"] == "agent.completed"
+    assert call["workflow_id"] == "wf-abc"
+    p = call["payload"]
+    assert p["agent_label"] == "rag-classifier"
+    assert p["prompt"] == "classify CLM-001"
+    assert p["response_text"] == '{"verdict": "Red"}'
+    assert p["extracted_json"] == {"verdict": "Red"}
+    assert isinstance(p["tool_calls"], list)
+    assert p["usage"]["input_tokens"] == 10
+    assert p["usage"]["output_tokens"] == 5
+    assert p["latency_ms"] >= 0
 
 
 @pytest.mark.asyncio
-async def test_emit_failure_does_not_propagate(monkeypatch):
-    """If app_state.bus.emit raises, run_agent_session must still return cleanly."""
-    from api.server.state import app_state
+async def test_webhook_emit_failure_does_not_propagate(monkeypatch):
+    """If the webhook raises, run_agent_session must still return cleanly."""
+    async def boom(*a, **kw):
+        raise RuntimeError("webhook is broken")
 
-    def boom(e):
-        raise RuntimeError("bus is broken")
-
-    monkeypatch.setattr(app_state.bus, "emit", boom)
+    import api.functions.webhook as webhook_mod
+    monkeypatch.setattr(webhook_mod, "emit", boom)
 
     from api.functions.graphs.executors.agents import _wrapper
     monkeypatch.setattr(_wrapper, "_gh_token", lambda: "fake-token")

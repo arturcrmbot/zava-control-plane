@@ -238,23 +238,28 @@ async def run_agent_session(
     except Exception:
         context = ""
 
+    # Cross-process emit: agent executors normally run in the Azure Functions
+    # host process, while the online_subscriber lives in the FastAPI process.
+    # Sending via the existing webhook bridge ensures the subscriber sees it.
+    # `webhook.emit` is best-effort and swallows errors.
+    payload = {
+        "agent_label": skill_label or "unknown",
+        "agent_run_id": f"ar-{uuid.uuid4().hex[:8]}",
+        "prompt": prompt,
+        "response_text": text,
+        "extracted_json": parsed,
+        "tool_calls": tool_calls_collected,
+        "context": context,
+        "usage": {
+            "input_tokens": int(in_tok) if in_tok is not None else None,
+            "output_tokens": int(out_tok) if out_tok is not None else None,
+        },
+        "latency_ms": elapsed_ms,
+    }
     try:
-        app_state.bus.emit(FleetEvent(
-            type="agent.completed",
-            workflow_id=workflow_id,
-            agent_label=skill_label or "unknown",
-            agent_run_id=f"ar-{uuid.uuid4().hex[:8]}",
-            prompt=prompt,
-            response_text=text,
-            extracted_json=parsed,
-            tool_calls=tool_calls_collected,
-            context=context,
-            usage={"input_tokens": int(in_tok) if in_tok is not None else None,
-                   "output_tokens": int(out_tok) if out_tok is not None else None},
-            latency_ms=elapsed_ms,
-        ))
+        from api.functions.webhook import emit as _webhook_emit
+        await _webhook_emit(workflow_id or "?", workflow_id, "agent.completed", payload)
     except Exception:
-        # Observability must never crash the caller.
         pass
 
     return parsed
