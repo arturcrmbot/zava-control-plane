@@ -33,6 +33,64 @@ If `ocr_extract` returns `failure`, fall back to attaching the PDF to the sessio
 2. If `linkedin_url` is present, call `linkedin_profile_fetch(url)` for structured profile JSON. Cross-reference against the PDF; flag inconsistencies (date overlaps, title mismatches, unstated employers).
 3. Reconcile to one canonical profile. Where the PDF and LinkedIn disagree, prefer the PDF for tenure/dates and prefer LinkedIn for current title.
 
+## Component spec for AG-UI
+
+In addition to the canonical profile fields, emit a `component_spec` array
+of UI hints for the Control Plane to render. Pick spec kinds based on the
+candidate's role (matched against `current_title.value`):
+
+- **Senior Data Engineer** (or any title containing "engineer" / "developer"
+  / "SDE") →
+
+    ```json
+    [
+      {"kind": "fact_grid", "title": "Profile",
+       "facts": [
+         {"label": "Current role", "value": "<current_title.value>"},
+         {"label": "Total tenure", "value": "<tenure_years_total.value> yrs"},
+         {"label": "Right to work", "value": "<right_to_work.evidence>"}
+       ]},
+      {"kind": "skill_chips", "title": "Top skills",
+       "skills": ["<top 6 skills from skills array>"]}
+    ]
+    ```
+
+- **Creative Director / Designer / Brand** roles (any title containing
+  "director" / "designer" / "brand" / "creative") →
+
+    ```json
+    [
+      {"kind": "fact_grid", "title": "Profile",
+       "facts": [
+         {"label": "Current role", "value": "<current_title.value>"},
+         {"label": "Total tenure", "value": "<tenure_years_total.value> yrs"},
+         {"label": "Right to work", "value": "<right_to_work.evidence>"}
+       ]},
+      {"kind": "portfolio_gallery", "title": "Portfolio",
+       "image_urls": ["<up to 6 image URLs from CV — synthesise placeholder paths under data/synthetic/hiring/portfolios/{candidate_id}/*.jpg if not in CV>"]}
+    ]
+    ```
+
+- **Default** (any other role) →
+
+    ```json
+    [
+      {"kind": "fact_grid", "title": "Profile",
+       "facts": [
+         {"label": "Current role", "value": "<current_title.value>"},
+         {"label": "Total tenure", "value": "<tenure_years_total.value> yrs"},
+         {"label": "Right to work", "value": "<right_to_work.evidence>"}
+       ]}
+    ]
+    ```
+
+If `inconsistencies` is non-empty, additionally append a `callout`:
+
+```json
+{"kind": "callout", "tone": "warn",
+ "text": "<count> CV/LinkedIn inconsistencies — see Inconsistencies tab"}
+```
+
 ## Output
 
 ```json
@@ -46,6 +104,10 @@ If `ocr_extract` returns `failure`, fall back to attaching the PDF to the sessio
   "skills": ["python", "kubernetes"],
   "right_to_work": {"jurisdiction": "USA", "evidence": "us_citizen" | "h1b" | "green_card" | "unknown"},
   "inconsistencies": [{"kind": "date_overlap", "detail": "...", "confidence": 0.0}],
+  "component_spec": [
+    {"kind": "fact_grid", "title": "Profile", "facts": [{"label": "Current role", "value": "Senior Data Engineer"}]},
+    {"kind": "skill_chips", "title": "Top skills", "skills": ["python", "spark"]}
+  ],
   "confidence": 0.0
 }
 ```
