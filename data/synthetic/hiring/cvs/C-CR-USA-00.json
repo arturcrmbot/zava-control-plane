@@ -34,5 +34,34 @@
     }
   ],
   "level_target": "L6",
-  "jurisdiction_target": "USA"
+  "jurisdiction_target": "USA",
+  "component_spec": [
+    {
+      "kind": "fact_grid",
+      "title": "Profile",
+      "facts": [
+        {"label": "Current role", "value": "Creative Director"},
+        {"label": "Total tenure", "value": "1.5 yrs"},
+        {"label": "Right to work", "value": "us_citizen"},
+        {"label": "Level target", "value": "L6"}
+      ]
+    },
+    {
+      "kind": "portfolio_gallery",
+      "title": "Portfolio",
+      "image_urls": [
+        "data/synthetic/hiring/portfolios/C-CR-USA-00/01.jpg",
+        "data/synthetic/hiring/portfolios/C-CR-USA-00/02.jpg",
+        "data/synthetic/hiring/portfolios/C-CR-USA-00/03.jpg",
+        "data/synthetic/hiring/portfolios/C-CR-USA-00/04.jpg",
+        "data/synthetic/hiring/portfolios/C-CR-USA-00/05.jpg",
+        "data/synthetic/hiring/portfolios/C-CR-USA-00/06.jpg"
+      ]
+    },
+    {
+      "kind": "callout",
+      "tone": "warn",
+      "text": "1 CV/LinkedIn inconsistency — see Inconsistencies tab"
+    }
+  ]
 }

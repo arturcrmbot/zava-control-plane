@@ -36,5 +36,27 @@
     }
   ],
   "level_target": "L5",
-  "jurisdiction_target": "USA"
+  "jurisdiction_target": "USA",
+  "component_spec": [
+    {
+      "kind": "fact_grid",
+      "title": "Profile",
+      "facts": [
+        {"label": "Current role", "value": "Senior Data Engineer"},
+        {"label": "Total tenure", "value": "1.5 yrs"},
+        {"label": "Right to work", "value": "us_citizen"},
+        {"label": "Level target", "value": "L5"}
+      ]
+    },
+    {
+      "kind": "skill_chips",
+      "title": "Top skills",
+      "skills": ["python", "spark", "airflow", "dbt", "kubernetes"]
+    },
+    {
+      "kind": "callout",
+      "tone": "warn",
+      "text": "1 CV/LinkedIn inconsistency — see Inconsistencies tab"
+    }
+  ]
 }

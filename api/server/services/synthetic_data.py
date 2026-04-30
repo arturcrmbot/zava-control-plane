@@ -128,6 +128,28 @@ def build_hiring_workflow(workflow_id: str, candidate_id: str | None = None) -> 
     jurisdiction = raw.get("jurisdiction_target") or raw.get("right_to_work", {}).get("jurisdiction") or "USA"
     market = "London" if jurisdiction == "USA" else "Berlin"
     now = time.time()
+
+    # POC2 §4.21 AG-UI: if the fixture carries a hand-authored
+    # component_spec, lift it onto agent_outputs.cv_crystalliser so the
+    # WorkflowDetail scorecard renders the moment a seeded HIRE-* workflow
+    # is opened — no real Triage run required for the demo.
+    agent_outputs: dict = {}
+    component_spec = raw.get("component_spec")
+    if component_spec:
+        agent_outputs["cv_crystalliser"] = {
+            "candidate_id": candidate_id,
+            "profile": {
+                "candidate_id": candidate_id,
+                "name": raw.get("name"),
+                "current_title": raw.get("current_title"),
+                "tenure_years_total": raw.get("tenure_years_total"),
+                "skills": raw.get("skills"),
+                "right_to_work": raw.get("right_to_work"),
+            },
+            "component_spec": component_spec,
+            "inconsistencies": raw.get("inconsistencies", []),
+        }
+
     return Workflow(
         id=workflow_id,
         type="hiring",
@@ -144,4 +166,5 @@ def build_hiring_workflow(workflow_id: str, candidate_id: str | None = None) -> 
             "jurisdiction": jurisdiction,
             "right_to_work": raw.get("right_to_work"),
         },
+        agent_outputs=agent_outputs,
     )

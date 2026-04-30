@@ -89,3 +89,33 @@ def test_get_agent_outputs_returns_copy():
     w = store.get_workflow("HIRE-3")
     assert w is not None
     assert "bogus" not in w.agent_outputs
+
+
+def test_build_hiring_workflow_lifts_fixture_component_spec():
+    """POC2 §4.21 fixture loader: hand-authored component_spec on a CV
+    fixture must land on the workflow's agent_outputs.cv_crystalliser at
+    build time so seeded HIRE-* workflows show the scorecard immediately,
+    without waiting for a real Triage run."""
+    from api.server.services.synthetic_data import build_hiring_workflow
+
+    # C-SE-USA-00 was hand-authored with a 3-entry component_spec
+    # (fact_grid, skill_chips, callout) per Task 4.
+    w = build_hiring_workflow("HIRE-SMOKE-1", candidate_id="C-SE-USA-00")
+    assert w.type == "hiring"
+    assert "cv_crystalliser" in w.agent_outputs
+    spec = w.agent_outputs["cv_crystalliser"]["component_spec"]
+    assert isinstance(spec, list) and len(spec) >= 2
+    kinds = [entry["kind"] for entry in spec]
+    assert "fact_grid" in kinds
+    assert "skill_chips" in kinds
+
+
+def test_build_hiring_workflow_no_component_spec_when_fixture_lacks_it():
+    """A fixture without component_spec must not synthesise an empty entry —
+    the WorkflowDetail render path then leaves the scorecard hidden."""
+    from api.server.services.synthetic_data import build_hiring_workflow
+
+    # C-SE-DE-00 (or any non-hand-authored fixture) has no component_spec.
+    w = build_hiring_workflow("HIRE-SMOKE-2", candidate_id="C-SE-DE-00")
+    assert w.type == "hiring"
+    assert "cv_crystalliser" not in w.agent_outputs

@@ -34,5 +34,22 @@
     }
   ],
   "level_target": "L4",
-  "jurisdiction_target": "USA"
+  "jurisdiction_target": "USA",
+  "component_spec": [
+    {
+      "kind": "fact_grid",
+      "title": "Profile",
+      "facts": [
+        {"label": "Current role", "value": "Media Strategist"},
+        {"label": "Total tenure", "value": "1.5 yrs"},
+        {"label": "Right to work", "value": "us_citizen"},
+        {"label": "Level target", "value": "L4"}
+      ]
+    },
+    {
+      "kind": "callout",
+      "tone": "warn",
+      "text": "1 CV/LinkedIn inconsistency — see Inconsistencies tab"
+    }
+  ]
 }
