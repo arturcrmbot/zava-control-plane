@@ -1,15 +1,17 @@
 # src/functions/graphs/onboarding.py
 """POC2 Phase 10 (Onboarding) graph.
 
-Spine stub. Track C wires this to the `onboarding-buddy` skill calling
-`heygen_render` (avatar) + `servicenow_jml` (provisioning) + `graph_invite`
-(day-1 calendar) per spec §4.5 + §4.13. Hook-gated for the JML send.
+Calls the `onboarding-buddy` skill family: `avatar_render` (Azure AI Speech
+batch avatar) + `servicenow_jml` (provisioning) + `graph_invite` (day-1
+calendar) per spec §4.5 + §4.13. The avatar render result lands on
+`workflow.metadata.onboarding_video_url` so the candidate portal can replay
+it. Hook-gated for the JML send (deferred to subsequent stream).
 """
 from __future__ import annotations
 from agent_framework import Workflow, WorkflowBuilder
 
 from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
-from api.functions.graphs.executors.agents import agent_hiring_stub
+from api.functions.graphs.executors.agents import agent_onboarding
 from api.functions.graphs.executors.validators import validate_hiring_stub
 
 
@@ -18,7 +20,7 @@ def build_hiring_onboarding_workflow() -> Workflow:
         id="hiring_onboarding",
         name="agent_onboarding_buddy",
         executor_type="agent",
-        fn=agent_hiring_stub.execute,
+        fn=agent_onboarding.execute,
     )
     n2 = TrackedExecutor(
         id="val_onboarding",
