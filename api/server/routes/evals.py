@@ -22,7 +22,13 @@ def _unconfigured_envelope() -> dict:
 
 
 def _tile_summary(per_agent: dict) -> dict:
-    """Compute the three honest tiles defined in spec §6.3."""
+    """Compute the three honest tiles defined in spec §6.3.
+
+    Task adherence uses groundedness when available (RAG agents), falling
+    back to coherence then fluency for non-RAG agents that don't get a
+    grounded-context score. Score keys are normalised to 0..1 — the SDK
+    LLM-judge evaluators return 1..5 (we divide by 5).
+    """
 
     def _mean_across_agents(score_name: str) -> tuple[float, int, list[str]]:
         total = 0.0
@@ -36,7 +42,23 @@ def _tile_summary(per_agent: dict) -> dict:
                 contributing.append(label)
         return (total / n if n else 0.0, n, contributing)
 
-    adh, adh_n, adh_agents = _mean_across_agents("groundedness")
+    def _normalise_5_to_1(value: float) -> float:
+        """LLM-judge scores are 1..5; tiles render as 0..1."""
+        return max(0.0, min(1.0, value / 5.0))
+
+    # Quality: prefer groundedness, fall back to coherence then fluency.
+    adh = 0.0
+    adh_n = 0
+    adh_agents: list[str] = []
+    adh_evaluators: list[str] = []
+    for primary in ("groundedness", "coherence", "fluency"):
+        val, n, agents = _mean_across_agents(primary)
+        if n > 0:
+            adh = _normalise_5_to_1(val)
+            adh_n = n
+            adh_agents = agents
+            adh_evaluators.append(primary)
+            break
 
     safety_total = 0.0
     safety_n = 0
@@ -61,7 +83,7 @@ def _tile_summary(per_agent: dict) -> dict:
     return {
         "task_adherence": {
             "value": adh, "n_evals": adh_n, "n_agents": len(adh_agents),
-            "evaluators": ["groundedness"],
+            "evaluators": adh_evaluators or ["groundedness"],
         },
         "safety": {
             "value": safety_total / safety_n if safety_n else 0.0,

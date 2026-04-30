@@ -81,10 +81,23 @@ export default function Evaluations() {
 
   const tiles = summary?.tiles;
   const byAgent = summary?.by_agent ?? [];
+  // Keep only primary score keys; drop SDK metadata noise like
+  // `*_prompt_tokens`, `*_completion_tokens`, `*_threshold`,
+  // `*_total_tokens`, `gpt_*`, and `*_finish_reason`.
+  const _META_SUFFIXES = ["_prompt_tokens", "_completion_tokens", "_total_tokens",
+                          "_threshold", "_finish_reason", "_model", "_sample_input",
+                          "_sample_output", "_pass", "_result"];
+  const _isMetaKey = (k: string) =>
+    k.startsWith("gpt_") || _META_SUFFIXES.some(s => k.endsWith(s));
   const allEvalNames = Array.from(
-    new Set(byAgent.flatMap(a => Object.keys(a.scores)))
+    new Set(byAgent.flatMap(a => Object.keys(a.scores).filter(k => !_isMetaKey(k))))
   ).sort();
   const rows = rowsEnv?.rows ?? [];
+
+  const _primaryScores = (s: Record<string, number | string>) =>
+    Object.entries(s)
+      .filter(([k, v]) => typeof v === "number" && !_isMetaKey(k))
+      .slice(0, 3);
 
   return (
     <div className="space-y-4">
@@ -143,20 +156,22 @@ export default function Evaluations() {
             <div className="p-3 text-xs text-slate-500 italic">No evaluations yet.</div>
           ) : null}
           {rows.slice(0, 20).map(r => (
-            <div key={r.id} className="flex items-center gap-3 px-3 py-2 text-xs">
-              <a href={`/workflows/${r.workflow_id ?? ""}`} className="text-blue-700 hover:underline font-mono">
+            <div key={r.id} className="flex items-center gap-3 px-3 py-2 text-xs min-w-0">
+              <a href={`/workflows/${r.workflow_id ?? ""}`}
+                 className="text-blue-700 hover:underline font-mono shrink-0">
                 {r.agent_label}
               </a>
-              <span className="text-slate-400">{new Date(r.ts * 1000).toLocaleTimeString()}</span>
-              <span className="ml-auto text-slate-600 font-mono">
-                {Object.entries(r.scores)
-                  .filter(([, v]) => typeof v === "number")
-                  .slice(0, 3)
-                  .map(([k, v]) => `${k}=${(v as number).toFixed(2)}`)
-                  .join(" · ")}
+              <span className="text-slate-400 shrink-0">{new Date(r.ts * 1000).toLocaleTimeString()}</span>
+              <StatusBadge status={r.status} />
+              <span className="ml-auto text-slate-600 font-mono truncate min-w-0 max-w-[60%] text-right">
+                {r.status === "completed"
+                  ? _primaryScores(r.scores).map(([k, v]) => `${k}=${(v as number).toFixed(2)}`).join(" · ")
+                  : r.status === "error"
+                    ? <span className="text-rose-600" title={r.error_text || "error"}>{(r.error_text || "error").slice(0, 80)}{((r.error_text || "").length > 80) ? "…" : ""}</span>
+                    : <span className="text-slate-400 italic">scoring…</span>}
               </span>
               {r.foundry_run_url ? (
-                <a className="text-blue-700 hover:underline" href={r.foundry_run_url} target="_blank" rel="noreferrer">
+                <a className="text-blue-700 hover:underline shrink-0" href={r.foundry_run_url} target="_blank" rel="noreferrer">
                   portal →
                 </a>
               ) : null}
@@ -168,6 +183,14 @@ export default function Evaluations() {
       <AccuracyReport />
     </div>
   );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const cls = status === "completed" ? "bg-emerald-100 text-emerald-800"
+            : status === "error"     ? "bg-rose-100 text-rose-800"
+            : status === "pending"   ? "bg-amber-100 text-amber-800"
+            :                          "bg-slate-100 text-slate-700";
+  return <span className={`text-[10px] px-1.5 py-0.5 rounded ${cls}`}>{status}</span>;
 }
 
 function Tile({ label, tile }: { label: string; tile?: TileBody }) {

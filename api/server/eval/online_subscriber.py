@@ -34,12 +34,25 @@ _worker_task: asyncio.Task | None = None
 
 
 _DECLARED_TOOLS: dict[str, list[str]] = {
-    "rag-classifier": ["policy_search", "claim_get_structured"],
-    "arbitration": ["policy_search", "precedents_search"],
-    "escalation": [],
-    "notification": [],
-    "receipt-validator": [],
-    "audit-summariser": [],
+    # Mirror each agent executor's `tools=[...]` registration. ToolCallValidity
+    # scores 1.0 when the tool name was declared; 0.0 if the model hallucinated
+    # a tool the skill never gets. Empty list scores 1.0 trivially (no calls
+    # are technically valid).
+    "rag-classifier":     ["policy_search", "claim_get_structured"],
+    "arbitration":        ["policy_search", "precedents_search"],
+    "escalation":         ["employee_history"],
+    "escalation-advisor": ["employee_history"],
+    "notification":       ["claim_summary", "policy_cite"],
+    "notification-composer": ["claim_summary", "policy_cite"],
+    "receipt-validator":  ["claim_get_structured", "ocr_extract"],
+    "audit-summariser":   ["claim_summary", "audit_query"],
+    # Extractors typically don't get registered tools — empty list ⇒ 1.0.
+    "field_extractor":    [],
+    "line_item_extractor": [],
+    "anomaly_flagger":    [],
+    "exception_classifier": [],
+    "resolution_recommender": [],
+    "root_cause_explainer": [],
 }
 
 
@@ -108,11 +121,18 @@ async def _drain_loop() -> None:
 
 
 async def _score_row(row: EvalRow, *, attempt: int = 0) -> None:
+    """Run all evaluators for the row in parallel and merge scores.
+
+    Per-evaluator failures are isolated: one evaluator throwing no longer
+    fails the whole row. Only when EVERY evaluator throws do we mark the
+    row as errored. This is important because LLM-judge calls are flaky
+    on real Foundry — single transient 429s shouldn't void four other
+    successful scores.
+    """
     from api.server.eval.evaluator_set import evaluators_for
-    try:
-        evaluators = evaluators_for(row.agent_label)
-        merged_scores: dict[str, Any] = {}
-        for name, ev in evaluators.items():
+
+    async def _call_one(name: str, ev) -> tuple[str, dict | None, str | None]:
+        try:
             result = await asyncio.to_thread(
                 ev,
                 query=row.prompt,
@@ -121,14 +141,37 @@ async def _score_row(row: EvalRow, *, attempt: int = 0) -> None:
                 tool_calls=row.tool_calls,
                 declared_tools=_declared_tools_for(row.agent_label),
             )
-            if isinstance(result, dict):
-                merged_scores.update(result)
-        _store.complete(row.id, scores=merged_scores, foundry_run_url=None)
+            return (name, result if isinstance(result, dict) else None, None)
+        except Exception as ex:
+            return (name, None, str(ex)[:200])
+
+    try:
+        evaluators = evaluators_for(row.agent_label)
     except Exception as ex:
+        _store.error(row.id, error_text=f"evaluator_set: {ex}"[:500])
+        return
+
+    results = await asyncio.gather(*(_call_one(n, e) for n, e in evaluators.items()))
+    merged_scores: dict[str, Any] = {}
+    errors: list[str] = []
+    succeeded = 0
+    for name, result, err in results:
+        if err is not None:
+            errors.append(f"{name}: {err}")
+        elif result:
+            merged_scores.update(result)
+            succeeded += 1
+        # `result == {}` (e.g. safety evaluator silently empty) counts as
+        # neither error nor success — just no signal.
+
+    if succeeded == 0 and errors:
         if attempt == 0:
             await asyncio.sleep(_RETRY_BACKOFF_S)
             return await _score_row(row, attempt=1)
-        _store.error(row.id, error_text=str(ex)[:500])
+        _store.error(row.id, error_text=" | ".join(errors)[:500])
+        return
+
+    _store.complete(row.id, scores=merged_scores, foundry_run_url=None)
 
 
 def _reset_queue_for_test(maxsize: int) -> None:
@@ -146,6 +189,23 @@ async def lifespan_register(app) -> None:
     from api.server.state import app_state
     _unsub = app_state.bus.on_any(on_bus_event)
     _worker_task = asyncio.create_task(_drain_loop())
+
+    # Recovery: any rows still marked 'pending' in the store are orphans
+    # from a previous process — the in-memory asyncio.Queue is wiped on
+    # restart but sqlite persists. Re-enqueue them so the new drain worker
+    # picks them up. Bounded by EVAL_QUEUE_MAX so a corrupted store can't
+    # blow us up.
+    try:
+        recent_pending = [r for r in _store.recent(int(_DEFAULT_QUEUE_MAX)) if r.status == "pending"]
+        for row in recent_pending:
+            try:
+                _enqueue_for_drain(row)
+            except asyncio.QueueFull:
+                break
+        if recent_pending:
+            log.info("eval startup: re-enqueued %d orphaned pending rows", len(recent_pending))
+    except Exception as ex:
+        log.warning("eval startup: pending-row recovery failed: %s", ex)
 
 
 async def lifespan_shutdown(app) -> None:

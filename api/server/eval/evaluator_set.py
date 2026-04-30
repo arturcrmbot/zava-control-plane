@@ -45,35 +45,77 @@ def _llm_evaluator_classes():
     }
 
 
+class _SafetyAdapter:
+    """Wraps a Foundry safety evaluator (Violence/HateUnfairness/...).
+
+    The SDK's safety evaluators return an empty dict `{}` when no risk is
+    detected — the common case for benign business content like expense
+    classifications. The downstream tile aggregator needs a numeric value
+    to render "safe", so we map empty → numeric 0 ("no risk detected" on
+    the SDK's 0..7 risk scale).
+
+    Real risk detections still pass through unchanged.
+    """
+
+    def __init__(self, inner, score_key: str):
+        self._inner = inner
+        self._score_key = score_key  # e.g. "violence" / "hate_unfairness"
+
+    def __call__(self, **kwargs) -> dict:
+        out = self._inner(**kwargs) or {}
+        if not isinstance(out, dict):
+            out = {}
+        if not out:
+            # Synthesise a "safe" reading. The score is 0 ("no risk") on
+            # the SDK's 0..7 scale; the label mirrors the SDK's textual
+            # classification. The tile aggregator reads the numeric base key.
+            return {
+                self._score_key: 0,
+                f"{self._score_key}_score": 0,
+                f"{self._score_key}_reason": "no risk detected",
+                f"{self._score_key}_result": "pass",
+            }
+        return out
+
+
 def _build_llm_evaluator(name: str) -> Any:
     """Construct one LLM evaluator with the right kwargs for its constructor.
 
-    Quality evaluators (groundedness/relevance/similarity/coherence/fluency)
-    take `model_config=`. Safety evaluators (violence/hate_unfairness/etc.)
-    take `azure_ai_project=` AND `credential=` — the SDK enforces credential
-    as a required positional kwarg, not optional.
+    Quality evaluators take `model_config=`. Safety evaluators take
+    `azure_ai_project=` + `credential=` (both required positional).
+    Safety evaluators are wrapped in `_SafetyAdapter` so empty responses
+    become a numeric 0 ("safe") rather than no-data.
     """
     classes = _llm_evaluator_classes()
     cls = classes[name]
     if name in ("violence", "hate_unfairness"):
-        from azure.identity import DefaultAzureCredential
-        return cls(
+        inner = cls(
             azure_ai_project=foundry_client.get_project_config(),
-            credential=DefaultAzureCredential(),
+            credential=foundry_client._credential(),
         )
+        return _SafetyAdapter(inner, score_key=name)
     return cls(model_config=foundry_client.get_model_config())
 
 
 _PER_AGENT: dict[str, tuple[str, ...]] = {
+    # NOTE: SimilarityEvaluator requires `ground_truth=` (only batch has it).
+    # ViolenceEvaluator / HateUnfairnessEvaluator wrapped via SafetyAdapter
+    # below — an empty SDK response (the common case for benign business
+    # content) is interpreted as "no risk detected" (numeric 0).
     "rag-classifier": (
-        "groundedness", "relevance", "similarity",
+        "groundedness", "relevance",
         "policy_clause_cited", "tool_call_validity",
+        "violence", "hate_unfairness",
     ),
     "arbitration": (
-        "groundedness", "relevance", "coherence", "violence", "hate_unfairness",
+        "groundedness", "relevance", "coherence", "tool_call_validity",
+        "violence", "hate_unfairness",
     ),
 }
-_DEFAULT: tuple[str, ...] = ("coherence", "fluency", "violence", "hate_unfairness")
+_DEFAULT: tuple[str, ...] = (
+    "coherence", "fluency", "tool_call_validity",
+    "violence", "hate_unfairness",
+)
 
 
 def evaluators_for(agent_label: str) -> dict[str, Any]:

@@ -16,8 +16,8 @@ afterEach(() => {
 });
 
 const fetchMock = (jsonByUrl: Record<string, any>) =>
-  vi.fn(async (url: string) => {
-    const path = typeof url === "string" ? url : url.toString();
+  vi.fn(async (url: string | URL | Request) => {
+    const path = typeof url === "string" ? url : (url as any).toString();
     const keys = Object.keys(jsonByUrl).sort((a, b) => b.length - a.length);
     for (const key of keys) {
       if (path.startsWith(key)) {

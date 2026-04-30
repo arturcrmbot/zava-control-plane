@@ -50,6 +50,18 @@ def _require_configured() -> None:
 
 @lru_cache(maxsize=1)
 def _credential():
+    """Single shared credential, pinned to AZURE_TENANT_ID when set.
+
+    DefaultAzureCredential's tenant-id kwargs don't constrain the CLI
+    sub-credential, so when the user is signed in to multiple tenants the
+    chain can present a cached token from the wrong one — "Tenant provided
+    in token does not match resource token" 400s. When AZURE_TENANT_ID is
+    set we go straight to AzureCliCredential with that tenant pinned.
+    """
+    tenant_id = os.environ.get("AZURE_TENANT_ID")
+    if tenant_id:
+        from azure.identity import AzureCliCredential
+        return AzureCliCredential(tenant_id=tenant_id)
     from azure.identity import DefaultAzureCredential
     return DefaultAzureCredential()
 
