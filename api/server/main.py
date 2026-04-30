@@ -32,12 +32,17 @@ async def lifespan(app: FastAPI):
         print(f"[server] Fleet Manager failed to start: {ex}")
     # Start the simulator ramp loop (spawns workflows via the AF Durable host)
     ramp_task = asyncio.create_task(simulator_orchestrator.ramp_loop())
-    yield
-    ramp_task.cancel()
+    from api.server.eval.online_subscriber import lifespan_register, lifespan_shutdown
+    await lifespan_register(app)
     try:
-        await app_state.fm.stop()
-    except Exception:
-        pass
+        yield
+    finally:
+        ramp_task.cancel()
+        try:
+            await app_state.fm.stop()
+        except Exception:
+            pass
+        await lifespan_shutdown(app)
 
 
 app = FastAPI(title="WPP Control Plane (Python POC1)", lifespan=lifespan)
