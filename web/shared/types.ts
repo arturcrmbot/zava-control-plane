@@ -105,6 +105,9 @@ export interface Workflow {
   actionLedger: ActionLedgerEntry[];
   tokensSpent: number;
   costUSD: number;
+  // POC2 hiring stash — keys: candidate_id, candidate_name, role_family,
+  // level_target, jurisdiction, right_to_work. Empty for POC1.
+  metadata?: Record<string, unknown>;
 }
 
 export interface Phase {

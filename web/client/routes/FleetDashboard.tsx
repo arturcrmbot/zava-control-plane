@@ -20,7 +20,7 @@ export default function FleetDashboard() {
           <div>
             <div className="text-xl font-semibold text-slate-900">Control Plane Overview</div>
             <div className="text-xs text-slate-500">
-              Operational status for Finance Controller's fleet
+              Operational status across all domains
             </div>
           </div>
           <div className="ml-auto"><DevPanel /></div>

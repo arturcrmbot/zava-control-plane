@@ -87,7 +87,7 @@ export default function FleetManagerRail() {
           </div>
           {fmEvents.length === 0 && (
             <div className="text-xs text-slate-500 italic px-2 py-3 border border-dashed border-slate-200 rounded">
-              Watching event bus. Fleet Manager will compose summaries when claims need attention.
+              Watching event bus. Fleet Manager will compose summaries when workflows need attention.
             </div>
           )}
           {fmEvents.map((e, i) => {

@@ -37,7 +37,7 @@ export default function App() {
         <div className="font-semibold text-slate-900">Project Apex</div>
         <span className="text-slate-300">·</span>
         <div className="text-sm text-slate-500">Control Plane</div>
-        <div className="ml-auto text-xs text-slate-500">role: Finance Controller</div>
+        <div className="ml-auto text-xs text-slate-500">role: Agent Administrator</div>
       </header>
 
       <div className="grid grid-cols-[200px_1fr_300px] h-[calc(100vh-3rem)]">

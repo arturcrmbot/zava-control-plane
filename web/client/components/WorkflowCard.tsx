@@ -31,6 +31,26 @@ const PROGRESS_BAR: Record<Workflow["status"], string> = {
   failed: "bg-red-500",
 };
 
+const DOMAIN_LABEL: Record<Workflow["type"], string> = {
+  "expense-claim": "expense",
+  "hiring": "hiring",
+  "invoice-p2p": "invoice",
+};
+
+const DOMAIN_COLOR: Record<Workflow["type"], string> = {
+  "expense-claim": "bg-sky-50 text-sky-700 ring-1 ring-sky-200",
+  "hiring": "bg-violet-50 text-violet-700 ring-1 ring-violet-200",
+  "invoice-p2p": "bg-slate-50 text-slate-600 ring-1 ring-slate-200",
+};
+
+function hiringSubtitle(metadata: Record<string, unknown> | undefined): string {
+  const name = (metadata?.candidate_name as string | undefined) ?? "";
+  const role = (metadata?.role_family as string | undefined) ?? "";
+  const jur = (metadata?.jurisdiction as string | undefined) ?? "";
+  const parts = [name, role, jur].filter(Boolean);
+  return parts.join(" · ") || "—";
+}
+
 function fmtSlaRemaining(slaDueAt: number): { text: string; warn: boolean } | null {
   const remainSec = slaDueAt - Date.now() / 1000;
   if (remainSec < 0) return { text: "SLA breached", warn: true };
@@ -49,6 +69,8 @@ export default function WorkflowCard({ w }: { w: Workflow }) {
   const pct = ((phaseIdx + 1) / phaseOrder.length) * 100;
   const subtitle = w.claim
     ? `${w.claim.employeeId} · ${w.claim.vendor}`
+    : w.type === "hiring"
+    ? hiringSubtitle(w.metadata)
     : w.vendor?.name ?? w.id;
   const amount = w.claim ?? w.invoice;
   const sla = fmtSlaRemaining(w.slaDueAt);
@@ -65,7 +87,14 @@ export default function WorkflowCard({ w }: { w: Workflow }) {
       className={`block bg-white border ${cardBorder} rounded-lg p-3 shadow-sm hover:border-blue-400 hover:shadow transition`}
     >
       <div className="flex items-center justify-between gap-2">
-        <div className="font-semibold text-sm text-slate-900 truncate">{w.id}</div>
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className={`text-[10px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${DOMAIN_COLOR[w.type]}`}
+          >
+            {DOMAIN_LABEL[w.type]}
+          </span>
+          <div className="font-semibold text-sm text-slate-900 truncate">{w.id}</div>
+        </div>
         <span
           className={`text-[10px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${STATUS_COLOR[w.status]}`}
         >
