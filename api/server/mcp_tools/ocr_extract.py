@@ -49,19 +49,20 @@ def _resolve_path(document_id: str) -> Path:
 def _get_di_client():
     """Return a configured DocumentIntelligenceClient or raise RuntimeError.
 
-    Imports the SDK lazily so tests can monkeypatch the entire helper without
-    needing the real package installed at import time."""
+    Auth via Entra ID (DefaultAzureCredential) — the local-auth (key) path is
+    disabled by tenant policy in this subscription. The signed-in identity (or
+    the func host's managed identity in cloud) needs the "Cognitive Services
+    User" role on the DI resource.
+    """
     endpoint = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
-    key = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_KEY")
-    if not endpoint or not key:
-        missing = "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT" if not endpoint else "AZURE_DOCUMENT_INTELLIGENCE_KEY"
+    if not endpoint:
         raise RuntimeError(
-            f"{missing} is not configured. Set both AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT "
-            f"and AZURE_DOCUMENT_INTELLIGENCE_KEY in .env (FastAPI) and local.settings.json (func host)."
+            "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT is not configured. Set it in "
+            ".env (FastAPI) and local.settings.json (func host)."
         )
     from azure.ai.documentintelligence import DocumentIntelligenceClient
-    from azure.core.credentials import AzureKeyCredential
-    return DocumentIntelligenceClient(endpoint, AzureKeyCredential(key))
+    from azure.identity import DefaultAzureCredential
+    return DocumentIntelligenceClient(endpoint, DefaultAzureCredential())
 
 
 def _trim_di_result(payload: dict, model: str) -> dict:
