@@ -1,4 +1,11 @@
-"""Accuracy route tests using FastAPI test client."""
+"""Accuracy route tests using FastAPI test client.
+
+After the Foundry-eval cutover the route is backed by api.server.eval.batch_runner
+and gated by foundry_client.is_configured(). When Foundry is unconfigured:
+- POST /api/accuracy/run returns 503
+- GET /api/accuracy/last returns {configured: false} (HTTP 200)
+- GET /api/accuracy/{run_id} returns {configured: false} (HTTP 200)
+"""
 from __future__ import annotations
 import time
 from unittest.mock import AsyncMock, patch
@@ -7,18 +14,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api.server.main import app
-from api.server.routes import accuracy as accuracy_route
+
 
 client = TestClient(app)
-
-
-@pytest.fixture(autouse=True)
-def _reset_reports():
-    accuracy_route._reports.clear()
-    accuracy_route._last_run_id = None
-    yield
-    accuracy_route._reports.clear()
-    accuracy_route._last_run_id = None
 
 
 def _fake_report(n: int = 3) -> dict:
@@ -33,8 +31,46 @@ def _fake_report(n: int = 3) -> dict:
     }
 
 
-def test_post_run_returns_run_id_and_accepted_status():
-    with patch.object(accuracy_route, "_run_harness", AsyncMock(return_value=_fake_report(3))):
+# --- Unconfigured (default test environment) -------------------------------
+
+def test_post_run_returns_503_when_foundry_not_configured(monkeypatch):
+    monkeypatch.delenv("AZURE_FOUNDRY_PROJECT_ENDPOINT", raising=False)
+    monkeypatch.delenv("AZURE_FOUNDRY_JUDGE_MODEL_DEPLOYMENT", raising=False)
+    resp = client.post("/api/accuracy/run", json={"sample_size": 3})
+    assert resp.status_code == 503
+    detail = resp.json()["detail"]
+    assert detail["configured"] is False
+    assert "Foundry" in detail["reason"]
+
+
+def test_get_last_returns_configured_false_when_unconfigured(monkeypatch):
+    monkeypatch.delenv("AZURE_FOUNDRY_PROJECT_ENDPOINT", raising=False)
+    monkeypatch.delenv("AZURE_FOUNDRY_JUDGE_MODEL_DEPLOYMENT", raising=False)
+    resp = client.get("/api/accuracy/last")
+    assert resp.status_code == 200
+    assert resp.json()["configured"] is False
+
+
+def test_get_by_run_id_returns_configured_false_when_unconfigured(monkeypatch):
+    monkeypatch.delenv("AZURE_FOUNDRY_PROJECT_ENDPOINT", raising=False)
+    monkeypatch.delenv("AZURE_FOUNDRY_JUDGE_MODEL_DEPLOYMENT", raising=False)
+    resp = client.get("/api/accuracy/acc-deadbeef")
+    assert resp.status_code == 200
+    assert resp.json()["configured"] is False
+
+
+# --- Configured (env vars set + batch_runner mocked) -----------------------
+
+@pytest.fixture
+def _configured(monkeypatch):
+    monkeypatch.setenv("AZURE_FOUNDRY_PROJECT_ENDPOINT", "https://example.cognitiveservices.azure.com")
+    monkeypatch.setenv("AZURE_FOUNDRY_JUDGE_MODEL_DEPLOYMENT", "gpt-4o")
+    yield
+
+
+def test_post_run_returns_run_id_and_accepted_status(_configured):
+    from api.server.eval import batch_runner
+    with patch.object(batch_runner, "run", AsyncMock(return_value=_fake_report(3))):
         resp = client.post("/api/accuracy/run", json={"sample_size": 3})
     assert resp.status_code == 202
     body = resp.json()
@@ -42,41 +78,16 @@ def test_post_run_returns_run_id_and_accepted_status():
     assert body["n"] == 3
 
 
-def test_get_last_returns_most_recent_complete_report():
-    fake = _fake_report(3)
-    with patch.object(accuracy_route, "_run_harness", AsyncMock(return_value=fake)):
-        client.post("/api/accuracy/run", json={"sample_size": 3})
-    deadline = time.time() + 5.0
-    while time.time() < deadline and accuracy_route._last_run_id is None:
-        time.sleep(0.05)
-    resp = client.get("/api/accuracy/last")
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["overall_accuracy"] == 1.0
-
-
-def test_get_last_returns_404_when_no_run_yet():
+def test_get_last_returns_404_when_configured_but_no_runs(_configured, tmp_path, monkeypatch):
+    # Point default_store at a fresh sqlite so no prior batch run exists.
+    from api.server.eval.store import EvalStore
+    fresh = EvalStore(db_path=str(tmp_path / "fresh.sqlite"))
+    monkeypatch.setattr("api.server.eval.store._default", fresh)
+    monkeypatch.setattr("api.server.routes.accuracy.default_store", lambda: fresh)
     resp = client.get("/api/accuracy/last")
     assert resp.status_code == 404
 
 
-def test_get_by_run_id_returns_specific_report():
-    fake = _fake_report(3)
-    with patch.object(accuracy_route, "_run_harness", AsyncMock(return_value=fake)):
-        post = client.post("/api/accuracy/run", json={"sample_size": 3})
-    run_id = post.json()["run_id"]
-    deadline = time.time() + 5.0
-    while time.time() < deadline and run_id not in accuracy_route._reports:
-        time.sleep(0.05)
-    resp = client.get(f"/api/accuracy/{run_id}")
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["overall_accuracy"] == 1.0
-
-
-def test_get_by_run_id_returns_404_for_unknown():
-    resp = client.get("/api/accuracy/acc-deadbeef")
-    assert resp.status_code == 404
-
-
-def test_post_run_rejects_sample_size_above_corpus():
+def test_post_run_rejects_sample_size_above_corpus(_configured):
     resp = client.post("/api/accuracy/run", json={"sample_size": 99999})
     assert resp.status_code == 400
