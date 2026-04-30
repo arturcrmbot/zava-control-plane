@@ -14,9 +14,24 @@ class StateStore:
         self._policies: dict[str, AutonomyPolicy] = {}
         self._amplifications: dict[str, list[SkillAmplification]] = {}
         self._mcp_calls: dict[str, list[McpCall]] = {}
+        # Candidate-portal state — keyed by candidate_id ("C-XXXXXXXX"). Each
+        # entry stashes the dict that the /apply route built (id, name, email,
+        # cv_url, role_id), plus a `workflow_id` once attach_candidate_to_role
+        # binds it to a HiringOrchestrator workflow, plus an optional
+        # `voice_transcript` list once the screening voice agent emits turns.
+        self._candidates: dict[str, dict] = {}
+        # Reverse index for attach: role_id -> first matching workflow_id.
+        # Multiple workflows per role_id are allowed; last-seeded wins.
+        self._role_index: dict[str, str] = {}
 
     def upsert_workflow(self, w: Workflow) -> None:
         self._workflows[w.id] = w
+        # Maintain the role_id -> workflow_id reverse index so the candidate
+        # portal's /apply route can attach a candidate to the matching seeded
+        # HiringOrchestrator workflow without scanning every workflow each call.
+        role_id = (w.metadata or {}).get("role_id") if hasattr(w, "metadata") else None
+        if role_id:
+            self._role_index[role_id] = w.id
 
     def get_workflow(self, id: str) -> Workflow | None:
         return self._workflows.get(id)
@@ -121,3 +136,59 @@ class StateStore:
     def get_agent_outputs(self, workflow_id: str) -> dict:
         w = self._workflows.get(workflow_id)
         return dict(w.agent_outputs) if w else {}
+
+    # ----------------------------------------------------------------- candidates
+    # Candidate-portal surface (POC2 §4 demo-ready scope). Candidates submit
+    # an application via the public /api/portal/apply route; we persist their
+    # dict here and bind them to an existing HiringOrchestrator workflow keyed
+    # by role_id. The workflow's `metadata.candidate_id` is updated so the
+    # downstream Triage / Screening phases find the right CV.
+
+    def attach_candidate_to_role(
+        self, role_id: str, candidate: dict
+    ) -> str | None:
+        """Bind a freshly-submitted candidate to the seeded workflow for `role_id`.
+
+        Returns the workflow_id we attached to, or None if no workflow exists
+        for this role yet (the /apply route turns that into a 404).
+        """
+        workflow_id = self._role_index.get(role_id)
+        if workflow_id is None:
+            return None
+        w = self._workflows.get(workflow_id)
+        if w is None:
+            # Stale index pointing at a removed workflow — drop the entry so
+            # subsequent calls don't keep hitting the same dead row.
+            self._role_index.pop(role_id, None)
+            return None
+        # Copy the candidate dict so caller mutations don't leak into our store
+        record = dict(candidate)
+        record["workflow_id"] = workflow_id
+        record.setdefault("role_id", role_id)
+        record["instance_id"] = w.orchestration_instance_id
+        self._candidates[record["id"]] = record
+        # Reflect onto the workflow metadata so the agent layer (cv_crystalliser
+        # et al.) can pick up the candidate id without a separate lookup.
+        w.metadata = dict(w.metadata or {})
+        w.metadata["candidate_id"] = record["id"]
+        w.metadata["candidate_name"] = record.get("name")
+        w.metadata["candidate_email"] = record.get("email")
+        w.metadata["cv_url"] = record.get("cv_url")
+        return workflow_id
+
+    def get_candidate(self, candidate_id: str) -> dict | None:
+        rec = self._candidates.get(candidate_id)
+        return dict(rec) if rec else None
+
+    def list_candidates(self) -> list[dict]:
+        return [dict(r) for r in self._candidates.values()]
+
+    def append_voice_transcript(self, candidate_id: str, turn: dict) -> None:
+        """Append a single voice-screening transcript turn onto the candidate
+        record so the portal /status page can replay the conversation. No-op
+        if the candidate is unknown — voice turns without an applicant record
+        have nowhere to land."""
+        rec = self._candidates.get(candidate_id)
+        if rec is None:
+            return
+        rec.setdefault("voice_transcript", []).append(dict(turn))
