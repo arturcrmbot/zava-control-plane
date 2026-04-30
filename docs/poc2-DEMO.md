@@ -37,6 +37,15 @@ Generate the synthetic corpus once if it doesn't exist:
 python data/synthetic/hiring/generate_hiring.py
 ```
 
+Pre-render the demo onboarding videos so Phase 10 returns instantly from
+the Azure Blob cache rather than re-rendering on the live demo run
+(2-3 min wall-clock per render):
+
+```bash
+# Requires AZURE_SPEECH_REGION + AZURE_STORAGE_CONNECTION_STRING in env.
+uv run python scripts/prewarm_avatar.py
+```
+
 ---
 
 ## 1. The 22-capability walkthrough
