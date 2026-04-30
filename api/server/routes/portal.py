@@ -166,3 +166,25 @@ async def decide_offer(token: str, decision: str):
         offer_decision=decision,
     ))
     return {"ok": True, "decision": decision}
+
+
+# --------------------------------------------------- Task 13: admin /links
+
+
+@router.get("/admin/links")
+async def admin_links():
+    """Control-Plane fallback for delivering magic links when ACS Email is
+    unavailable. Joins the candidate name + email onto each active token row
+    so the admin can click-to-copy without a second lookup."""
+    rows = app_state.magic_links.list_active()
+    out = []
+    for row in rows:
+        cand = app_state.store.get_candidate(row["candidate_id"]) or {}
+        out.append({
+            **row,
+            "name": cand.get("name"),
+            "email": cand.get("email"),
+            "role_id": cand.get("role_id"),
+            "workflow_id": cand.get("workflow_id"),
+        })
+    return {"links": out}

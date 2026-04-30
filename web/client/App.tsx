@@ -10,6 +10,7 @@ import Economics from "./routes/Economics";
 import WorkflowDetail from "./routes/WorkflowDetail";
 import HiringManager from "./routes/HiringManager";
 import FleetManagerRail from "./components/FleetManagerRail";
+import CandidatesPanel from "./components/apex/CandidatesPanel";
 
 const nav = [
   { to: "/fleet",          label: "Dashboard" },
@@ -19,6 +20,7 @@ const nav = [
   { to: "/analytics",      label: "Analytics" },
   { to: "/evals",          label: "Evaluations" },
   { to: "/economics",      label: "Economics" },
+  { to: "/candidates",     label: "Candidates" },
 ];
 
 export default function App() {
@@ -53,6 +55,7 @@ export default function App() {
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/evals" element={<Evaluations />} />
             <Route path="/economics" element={<Economics />} />
+            <Route path="/candidates" element={<CandidatesPanel />} />
             {/* POC2 surfaces */}
             <Route path="/hiring-manager/:workflowId?" element={<HiringManager />} />
           </Routes>

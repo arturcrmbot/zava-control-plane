@@ -296,3 +296,26 @@ def test_offer_invalid_decision_400(portal_client):
     )
     resp = client.post(f"/api/portal/offer/{token}", params={"decision": "maybe"})
     assert resp.status_code == 400
+
+
+# ----------------------------------------------------- Task 13: admin/links
+
+
+def test_admin_links_lists_active_with_candidate_join(portal_client):
+    client, app_state = portal_client
+    apply_resp = client.post(
+        "/api/portal/apply",
+        data={"role_id": "REQ-SDE-USA-DEMO", "name": "Heidi", "email": "h@x.y"},
+        files={"cv": ("h.pdf", io.BytesIO(b"%PDF-1.4"), "application/pdf")},
+    )
+    cid = apply_resp.json()["candidate_id"]
+    app_state.magic_links.issue(
+        candidate_id=cid, scope="status", ttl_seconds=3600, single_use=False,
+    )
+
+    resp = client.get("/api/portal/admin/links")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "links" in body
+    rows = body["links"]
+    assert any(r["candidate_id"] == cid and r.get("name") == "Heidi" for r in rows)
