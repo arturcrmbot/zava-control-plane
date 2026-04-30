@@ -36,6 +36,7 @@ def _emit_notification_event(claim_id: str, payload: dict) -> None:
 
 async def execute(input: dict) -> dict:
     claim_id = input["claim_id"]
+    workflow_id = input.get("workflow_id")
     verdict = input.get("verdict")
     policy_clause = input.get("policy_clause") or input.get("classify", {}).get("policy_clause")
     escalation = input.get("escalation") or {}
@@ -58,6 +59,7 @@ async def execute(input: dict) -> dict:
         tools=[claim_summary_tool, policy_cite_tool],
         skill_dir=_SKILL_DIR,
         skill_label="notification-composer",
+        workflow_id=workflow_id,
     )
     _emit_notification_event(claim_id, notification)
     return {"notification": notification}

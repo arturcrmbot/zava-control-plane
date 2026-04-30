@@ -6,8 +6,9 @@ from ._wrapper import run_agent_skill
 
 async def execute(input: dict) -> dict:
     item = input["unmatched_item"]
+    workflow_id = input.get("workflow_id")
     prompt = (
         f"Unmatched item: {json.dumps(item)}\n\n"
         f"Classify per your role."
     )
-    return {"exception_classification": await run_agent_skill("exception_classifier", prompt)}
+    return {"exception_classification": await run_agent_skill("exception_classifier", prompt, workflow_id=workflow_id)}

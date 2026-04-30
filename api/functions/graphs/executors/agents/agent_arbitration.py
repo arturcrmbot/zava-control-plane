@@ -11,6 +11,7 @@ _SKILL_DIR = SKILLS_DIR / "arbitration"
 
 async def execute(input: dict) -> dict:
     claim_id = input.get("claim_id")
+    workflow_id = input.get("workflow_id")
     policy_clause = input.get("policy_clause") or input.get("classify", {}).get("policy_clause")
     tier = input.get("escalation_tier") or (input.get("escalation") or {}).get("tier") or "warning"
     justification = input.get("justification") or {}
@@ -31,5 +32,6 @@ async def execute(input: dict) -> dict:
         tools=[precedents_search_tool, policy_search_tool],
         skill_dir=_SKILL_DIR,
         skill_label="arbitration",
+        workflow_id=workflow_id,
     )
     return {"arbitration": recommendation}

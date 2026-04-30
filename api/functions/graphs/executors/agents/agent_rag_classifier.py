@@ -17,6 +17,7 @@ _SKILL_DIR = SKILLS_DIR / "rag-classifier"
 
 async def execute(input: dict) -> dict:
     claim_id = input["claim_id"]
+    workflow_id = input.get("workflow_id")
     prompt = (
         f"Classify expense claim `{claim_id}` per your role.\n\n"
         f"Use `claim_get_structured` to load the claim record, then use "
@@ -29,5 +30,6 @@ async def execute(input: dict) -> dict:
         tools=[policy_search_tool, claim_get_structured_tool],
         skill_dir=_SKILL_DIR,
         skill_label="rag-classifier",
+        workflow_id=workflow_id,
     )
     return {"classification": classification}

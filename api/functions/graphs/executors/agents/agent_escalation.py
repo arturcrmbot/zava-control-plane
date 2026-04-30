@@ -15,6 +15,7 @@ _SKILL_DIR = SKILLS_DIR / "escalation-advisor"
 
 async def execute(input: dict) -> dict:
     claim_id = input.get("claim_id")
+    workflow_id = input.get("workflow_id")
     employee_id = input.get("employee_id")
     verdict = input.get("verdict")
     category = input.get("category")
@@ -39,5 +40,6 @@ async def execute(input: dict) -> dict:
         tools=[employee_history_tool],
         skill_dir=_SKILL_DIR,
         skill_label="escalation-advisor",
+        workflow_id=workflow_id,
     )
     return {"escalation": recommendation}
