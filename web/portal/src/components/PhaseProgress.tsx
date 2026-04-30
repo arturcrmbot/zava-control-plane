@@ -26,27 +26,42 @@ const PHASE_ALIAS: Record<string, Phase> = {
 export default function PhaseProgress({ phase }: { phase: string }) {
   const norm = (phase ?? "apply").toLowerCase();
   const resolved = (PHASE_ALIAS[norm] ?? norm) as Phase;
-  const activeIdx = PHASES.findIndex((p) => p.id === resolved);
+  const activeIdx = Math.max(PHASES.findIndex((p) => p.id === resolved), 0);
+
   return (
-    <ol className="flex items-center gap-2 text-xs">
+    <ol className="grid grid-cols-7 gap-1 sm:gap-2 text-[11px] sm:text-xs">
       {PHASES.map((p, i) => {
-        const reached = i <= activeIdx;
+        const done = i < activeIdx;
+        const current = i === activeIdx;
+        const bubbleClass = done
+          ? "phase-bubble phase-bubble-done"
+          : current
+            ? "phase-bubble phase-bubble-current"
+            : "phase-bubble phase-bubble-todo";
+        const labelClass = done
+          ? "phase-label-done"
+          : current
+            ? "phase-label-current"
+            : "phase-label-todo";
+        const railClass = done
+          ? "phase-rail-done"
+          : current
+            ? "phase-rail-current"
+            : "phase-rail-todo";
+
         return (
-          <li key={p.id} className="flex items-center gap-2">
-            <span
-              className={
-                "inline-flex items-center justify-center rounded-full w-6 h-6 border " +
-                (reached
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-slate-400 border-slate-300")
-              }
-            >
-              {i + 1}
-            </span>
-            <span className={reached ? "text-slate-800 font-medium" : "text-slate-400"}>
-              {p.label}
-            </span>
-            {i < PHASES.length - 1 && <span className="text-slate-300">›</span>}
+          <li key={p.id} className="flex flex-col items-center text-center relative">
+            <div className="flex items-center w-full">
+              {i > 0 && <div className={`flex-1 h-0.5 ${railClass}`}/>}
+              <span className={bubbleClass}>
+                {done ? "✓" : i + 1}
+              </span>
+              {i < PHASES.length - 1 && <div className={`flex-1 h-0.5 ${
+                i < activeIdx ? "phase-rail-done" :
+                i === activeIdx ? "phase-rail-current" : "phase-rail-todo"
+              }`}/>}
+            </div>
+            <span className={`mt-2 ${labelClass}`}>{p.label}</span>
           </li>
         );
       })}

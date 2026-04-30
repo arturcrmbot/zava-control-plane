@@ -2,6 +2,7 @@
 
 :root {
   color-scheme: light;
+  --portal-grad: linear-gradient(135deg, #1e3a8a 0%, #6366f1 50%, #4f46e5 100%);
 }
 
 html, body, #root {
@@ -10,34 +11,192 @@ html, body, #root {
 
 body {
   @apply bg-slate-50 text-slate-900 font-sans antialiased;
+  background:
+    radial-gradient(1200px 600px at -10% -20%, #eef2ff 0%, rgba(238,242,255,0) 60%),
+    radial-gradient(900px 500px at 110% 110%, #ecfdf5 0%, rgba(236,253,245,0) 60%),
+    #f8fafc;
 }
 
-/* Reusable surface utility for card-like panels */
+/* ───────────────── header / nav ───────────────── */
+
+.portal-header {
+  @apply sticky top-0 z-30 flex items-center gap-4 px-6 h-16 bg-white/80 backdrop-blur border-b border-slate-200;
+}
+
+.portal-brand {
+  @apply font-semibold text-slate-900 flex items-center gap-2;
+}
+
+.portal-brand-mark {
+  @apply h-7 w-7 rounded-md grid place-items-center text-white text-xs font-bold shadow-sm;
+  background: var(--portal-grad);
+}
+
+.portal-tagline {
+  @apply text-sm text-slate-500 hidden sm:block;
+}
+
+.portal-nav-link {
+  @apply text-sm text-slate-600 px-2.5 py-1.5 rounded-md hover:bg-slate-100 hover:text-slate-900 transition;
+}
+
+.portal-nav-link.active {
+  @apply bg-blue-50 text-blue-700 font-medium;
+}
+
+/* ───────────────── panels / cards ───────────────── */
+
 .panel {
-  @apply bg-white border border-slate-200 rounded-lg shadow-sm;
+  @apply bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden;
 }
 
 .panel-header {
-  @apply px-4 py-3 border-b border-slate-200 text-sm font-semibold text-slate-800;
+  @apply px-5 py-3.5 border-b border-slate-100 text-sm font-semibold text-slate-800 flex items-center justify-between;
 }
 
 .panel-body {
-  @apply p-4;
+  @apply p-5;
 }
 
-/* Buttons */
+.panel-elevated {
+  @apply bg-white rounded-xl shadow-md ring-1 ring-slate-200 overflow-hidden;
+}
+
+/* hero card with gradient — used for greeting / status header */
+.hero {
+  @apply rounded-xl p-7 text-white shadow-md;
+  background: var(--portal-grad);
+}
+
+.hero-eyebrow {
+  @apply text-xs uppercase tracking-wider text-white/70 font-medium;
+}
+
+.hero-title {
+  @apply text-2xl sm:text-3xl font-semibold mt-1;
+}
+
+.hero-subtitle {
+  @apply text-sm text-white/80 mt-2;
+}
+
+/* ───────────────── form controls ───────────────── */
+
+.form-label {
+  @apply block text-sm font-medium text-slate-700;
+}
+
+.form-input,
+.form-select {
+  @apply mt-1.5 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm
+         focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none
+         disabled:bg-slate-50 disabled:text-slate-500 transition;
+}
+
+.form-file {
+  @apply mt-1.5 block w-full text-sm text-slate-700
+         file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm
+         file:font-medium file:text-blue-700 hover:file:bg-blue-100;
+}
+
+.form-help {
+  @apply mt-1 text-xs text-slate-500;
+}
+
+/* ───────────────── buttons ───────────────── */
+
 .btn-primary {
-  @apply inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-40;
+  @apply inline-flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm
+         hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600
+         disabled:opacity-50 disabled:cursor-not-allowed transition;
 }
 .btn-secondary {
-  @apply inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40;
+  @apply inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm
+         hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400
+         disabled:opacity-50 transition;
+}
+.btn-success {
+  @apply inline-flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm
+         hover:bg-emerald-700 disabled:opacity-50 transition;
 }
 .btn-danger {
-  @apply inline-flex items-center gap-2 rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50;
+  @apply inline-flex items-center justify-center gap-2 rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-600 shadow-sm
+         hover:bg-red-50 transition;
+}
+.btn-large {
+  @apply px-5 py-3 text-base;
+}
+.btn-ghost {
+  @apply inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100;
 }
 
-/* Status chips */
-.chip-success { @apply inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200; }
-.chip-warning { @apply inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 border border-amber-200; }
-.chip-danger  { @apply inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 border border-red-200; }
-.chip-info    { @apply inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-200; }
+/* ───────────────── chips / badges ───────────────── */
+
+.chip-success { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200; }
+.chip-warning { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border bg-amber-50 text-amber-700 border-amber-200; }
+.chip-danger  { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border bg-red-50 text-red-700 border-red-200; }
+.chip-info    { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border bg-blue-50 text-blue-700 border-blue-200; }
+.chip-neutral { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium border bg-slate-50 text-slate-700 border-slate-200; }
+
+/* status dot */
+.status-dot {
+  @apply inline-block h-2 w-2 rounded-full mr-1.5;
+}
+.status-dot-active  { @apply bg-emerald-500 animate-pulse; }
+.status-dot-pending { @apply bg-amber-500; }
+.status-dot-idle    { @apply bg-slate-300; }
+.status-dot-error   { @apply bg-red-500; }
+
+/* ───────────────── phase progress ───────────────── */
+
+.phase-bubble {
+  @apply inline-flex items-center justify-center rounded-full w-7 h-7 border text-xs font-semibold transition;
+}
+.phase-bubble-done {
+  @apply bg-blue-600 text-white border-blue-600 shadow-sm;
+}
+.phase-bubble-current {
+  @apply bg-white text-blue-700 border-blue-600 ring-4 ring-blue-100;
+}
+.phase-bubble-todo {
+  @apply bg-white text-slate-400 border-slate-300;
+}
+
+.phase-label-done    { @apply text-slate-800 font-medium; }
+.phase-label-current { @apply text-blue-700 font-semibold; }
+.phase-label-todo    { @apply text-slate-400; }
+
+.phase-rail-done    { @apply bg-blue-600; }
+.phase-rail-current { @apply bg-gradient-to-r from-blue-600 to-slate-200; }
+.phase-rail-todo    { @apply bg-slate-200; }
+
+/* ───────────────── tables (recruiter view) ───────────────── */
+
+.table-base {
+  @apply w-full border-collapse text-sm;
+}
+.table-base thead th {
+  @apply text-left px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-slate-500 bg-slate-50 border-b border-slate-200;
+}
+.table-base tbody td {
+  @apply px-4 py-3 border-b border-slate-100 text-slate-700;
+}
+.table-base tbody tr:hover {
+  @apply bg-slate-50;
+}
+
+/* ───────────────── misc ───────────────── */
+
+.video-frame {
+  @apply rounded-xl overflow-hidden bg-black shadow-md ring-1 ring-slate-200;
+}
+
+.transcript-line {
+  @apply text-sm leading-relaxed py-1.5 border-b border-slate-100 last:border-0;
+}
+.transcript-role-agent     { @apply text-blue-700 font-semibold mr-2; }
+.transcript-role-candidate { @apply text-emerald-700 font-semibold mr-2; }
+
+.spinner {
+  @apply inline-block h-4 w-4 rounded-full border-2 border-slate-300 border-t-blue-600 animate-spin;
+}

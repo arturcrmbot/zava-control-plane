@@ -155,10 +155,12 @@ export default function Screen() {
 
   if (error) {
     return (
-      <div className="max-w-2xl mx-auto p-8">
+      <div className="max-w-2xl mx-auto p-6 sm:p-10">
         <div className="panel">
-          <div className="panel-header">Screening unavailable</div>
-          <div className="panel-body text-sm text-red-600">{error}</div>
+          <div className="panel-header">
+            <span><span className="status-dot status-dot-error"/> Screening unavailable</span>
+          </div>
+          <div className="panel-body text-sm text-red-700">{error}</div>
         </div>
       </div>
     );
@@ -166,67 +168,124 @@ export default function Screen() {
 
   if (!candidateId) {
     return (
-      <div className="max-w-2xl mx-auto p-8 text-sm text-slate-500">
-        Loading screening surface…
+      <div className="max-w-2xl mx-auto p-6 sm:p-10 text-sm text-slate-500 flex items-center gap-2">
+        <span className="spinner"/> Loading screening surface…
       </div>
     );
   }
 
   if (getVoiceTransport() === "canned") {
     return (
-      <div className="min-h-[calc(100vh-3.5rem)] flex items-center justify-center bg-slate-100">
+      <div className="min-h-[calc(100vh-7rem)] flex items-center justify-center p-6">
         <div
           data-testid="screen-canned-mount"
-          className="w-full max-w-xl rounded-lg bg-white border border-slate-200 shadow-sm p-8 space-y-4"
+          className="panel-elevated w-full max-w-xl"
         >
-          <h2 className="text-lg font-semibold text-slate-900">
-            Canned screening (demo mode)
-          </h2>
-          <p className="text-sm text-slate-600">
-            Voice screening is in canned mode. Press the button below to replay
-            the canned transcript and continue the workflow.
-          </p>
-          <button
-            type="button"
-            onClick={runCannedScreen}
-            disabled={cannedRunning}
-            className="btn-primary"
-          >
-            {cannedRunning ? "Running…" : "Run canned screen"}
-          </button>
+          <div className="panel-header">
+            <span><span className="status-dot status-dot-pending"/> Canned screening</span>
+            <span className="chip-warning">demo mode</span>
+          </div>
+          <div className="panel-body space-y-4 text-sm text-slate-700">
+            <p>
+              Voice screening is in canned mode. Press the button below to
+              replay the canned transcript and advance the workflow as if you
+              had completed a real call.
+            </p>
+            <button
+              type="button"
+              onClick={runCannedScreen}
+              disabled={cannedRunning}
+              className="btn-primary btn-large w-full"
+            >
+              {cannedRunning ? <><span className="spinner"/> Running…</> : "Run canned screen"}
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
+  const statusLabels: Record<string, { dot: string; label: string; tone: string }> = {
+    idle:       { dot: "status-dot-idle",    label: "Ready when you are",  tone: "text-slate-600" },
+    connecting: { dot: "status-dot-pending", label: "Connecting…",         tone: "text-amber-700" },
+    connected:  { dot: "status-dot-active",  label: "Live · listening",     tone: "text-emerald-700" },
+    ending:     { dot: "status-dot-pending", label: "Wrapping up…",         tone: "text-amber-700" },
+    ended:      { dot: "status-dot-idle",    label: "Call ended",           tone: "text-slate-600" },
+    error:      { dot: "status-dot-error",   label: "Error",                tone: "text-red-700" },
+  };
+  const sl = statusLabels[callStatus] ?? statusLabels.idle;
+
   return (
     <div
-      className="min-h-[calc(100vh-3.5rem)] flex flex-col bg-slate-100"
+      className="min-h-[calc(100vh-7rem)] flex flex-col"
       data-testid="screen-call-mount"
     >
-      <div className="max-w-2xl mx-auto p-8 w-full space-y-4">
-        <div className="panel">
-          <div className="panel-header">Voice screening</div>
-          <div className="panel-body space-y-3 text-sm">
-            <p>Status: <span className="font-medium">{callStatus}</span></p>
+      <div className="max-w-2xl mx-auto p-6 sm:p-10 w-full space-y-5">
+        <div className="hero">
+          <div className="hero-eyebrow">Voice screening · ~60 seconds</div>
+          <h1 className="hero-title">Quick chat with our screening agent</h1>
+          <p className="hero-subtitle">
+            We'll ask 4 questions — your most impactful project, what you're
+            excited about, work authorisation, and earliest start. The agent
+            will explain each before you speak. You can re-do the call by
+            ending and clicking Start again.
+          </p>
+        </div>
+
+        <div className="panel-elevated">
+          <div className="panel-header">
+            <span>
+              <span className={`status-dot ${sl.dot}`}/>
+              <span className={sl.tone}>{sl.label}</span>
+            </span>
+            {transcript.length > 0 && <span className="chip-info">{transcript.length} turns</span>}
+          </div>
+          <div className="panel-body space-y-4">
             {callStatus === "idle" && (
+              <>
+                <p className="text-sm text-slate-700">
+                  When you press Start, we'll request mic access. Speak
+                  naturally — there's no script to read off.
+                </p>
+                <button
+                  type="button"
+                  onClick={startCall}
+                  className="btn-primary btn-large w-full"
+                  data-testid="btn-start-call"
+                >
+                  🎙️ Start screening call
+                </button>
+              </>
+            )}
+            {(callStatus === "connecting" || callStatus === "connected") && (
+              <>
+                <p className="text-sm text-slate-700">
+                  Speak naturally — the agent listens between turns. Press End
+                  call when you're done with the four questions.
+                </p>
+                <button
+                  type="button"
+                  onClick={endCall}
+                  className="btn-danger btn-large w-full"
+                  data-testid="btn-end-call"
+                >
+                  End call
+                </button>
+              </>
+            )}
+            {callStatus === "ended" && (
+              <p className="text-sm text-slate-700">
+                Thanks — call ended. The orchestration is moving you to the
+                interview phase. Closing this tab is fine.
+              </p>
+            )}
+            {callStatus === "error" && (
               <button
                 type="button"
                 onClick={startCall}
-                className="btn-primary"
-                data-testid="btn-start-call"
+                className="btn-secondary btn-large w-full"
               >
-                Start screening call
-              </button>
-            )}
-            {(callStatus === "connecting" || callStatus === "connected") && (
-              <button
-                type="button"
-                onClick={endCall}
-                className="btn-primary"
-                data-testid="btn-end-call"
-              >
-                End call
+                Try again
               </button>
             )}
           </div>
@@ -235,10 +294,12 @@ export default function Screen() {
         {transcript.length > 0 && (
           <div className="panel" data-testid="transcript-panel">
             <div className="panel-header">Live transcript</div>
-            <div className="panel-body space-y-2 text-sm max-h-96 overflow-y-auto">
+            <div className="panel-body max-h-96 overflow-y-auto">
               {transcript.map((t, i) => (
-                <div key={i}>
-                  <span className="font-medium text-slate-700">{t.role}:</span>{" "}
+                <div key={i} className="transcript-line">
+                  <span className={t.role === "agent" ? "transcript-role-agent" : "transcript-role-candidate"}>
+                    {t.role === "agent" ? "Agent" : "You"}
+                  </span>
                   <span className="text-slate-800">{t.text}</span>
                 </div>
               ))}

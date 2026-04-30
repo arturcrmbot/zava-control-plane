@@ -2,7 +2,22 @@
 
 Sister doc to [poc1-status.md](poc1-status.md) — same shape, applied to POC2 (HR Talent Lifecycle, 12-week sprint, the "Frontier POC"). The thesis is **reuse the POC1 platform; swap the domain.** Per [poc1-inventory.md](poc1-inventory.md) ≈ 75% of POC1 source artifacts are domain-agnostic platform; POC2 keeps that and replaces skills, MCP mocks, UI labels, and the per-phase graph set, then adds four genuinely new capabilities (voice, avatar, A2A, jurisdiction switching).
 
-**Status snapshot (2026-04-30):** the POC2 spine merged into `main` 2026-04-30 — 10-phase `HiringOrchestrator`, all ten phase graphs, ten hiring skills, seven MCP mocks (4201–4207), 50-CV synthetic corpus across 5 roles × 2 jurisdictions, and Tracks B (multi-surface), D (jurisdiction), E (frontier) and F (reuse) at first-runnable. Today also landed: removal of the Threadlight surface stub and `PhaseRibbon` switching for hiring workflows. POC2 demo runbook lives in [poc2-DEMO.md](poc2-DEMO.md). What remains is per-track polish + a 30-min dry run; see §3.
+**Status snapshot (2026-04-30):** the POC2 spine merged into `main` 2026-04-30 — 10-phase `HiringOrchestrator`, all ten phase graphs, ten hiring skills, seven MCP mocks (4201–4207), 50-CV synthetic corpus across 5 roles × 2 jurisdictions, and Tracks B (multi-surface), D (jurisdiction), E (frontier) and F (reuse) at first-runnable.
+
+**Status snapshot (2026-04-30 evening):** ALL demo-ready streams landed (commits `97c1fdb4`, `e18ab2eb`, `b67953a9`, `058c6f45`, plus tonight's portal styling pass). Visible state:
+
+- **`web/portal/`** — fully styled candidate portal (Vite, port 5174). Routes:
+  - `/apply` — public application form, role cards with country flags, polished hero
+  - `/portal?token=xxx` — phase-aware status with hero greeting, animated 7-step ribbon, contextual CTAs (BookCall / Interview RSVP / Offer Accept-Decline / Onboarding video). Auto-refreshes every 8s.
+  - `/screen?token=xxx` — native WebRTC voice call (no iframe, no separate accelerator process); `RealtimeCall.ts` mirrors firstcentral's WebRTC core
+  - `/recruiter` — admin Candidates panel **moved here from web/client** (it's recruiter-facing data, not Agent-Administrator data); KPI cards + filterable magic-link table + auto-refresh
+- **Voice via real Azure GPT-Realtime** — backend mints ephemeral keys + proxies SDP at `/api/portal/voice/{session,rtc}`; reuses the user's existing `arzie-mm4okigm-canadacentral` realtime endpoint
+- **Avatar via real Azure AI Speech** — `avatar_render` MCP tool calls custom-subdomain endpoint with DefaultAzureCredential, per-role (character, style) pairing, blob-cached by sha256(voice|script)
+- **ACS Email send** — provisioned `apex-demo-acs` + `apex-demo-email` + Azure-managed domain (DKIM/DMARC/SPF verified); real UUID-id message sends, plus offline outbox fallback for demo robustness
+- **AG-UI render** — `WorkflowDetail.tsx` shows agent-emitted scorecards for hiring workflows
+- **Foundry-backed AC #4 pipeline** — `preclassify_corpus.py` + `/api/accuracy/run` against Foundry `evaluate()`; full corpus run pending env-var-driven exec
+
+POC2 demo runbook lives in [poc2-DEMO.md](poc2-DEMO.md).
 
 Three sections: capability map against the 22 demos, architecture (with the local-vs-cloud split + what's reused from POC1), and the build plan.
 

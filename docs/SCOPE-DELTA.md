@@ -69,7 +69,21 @@ The engagement POC must hit all 13 live in front of WPP. The lab build is conver
 
 POC2 in the lab landed on `main` 2026-04-30 — the spine merge brought the 10-phase `HiringOrchestrator`, ten hiring skills, seven MCP mocks (4201–4207), a 50-CV synthetic corpus across 5 roles × 2 jurisdictions, and Tracks B (multi-surface) / D (jurisdiction) / E (frontier: A2A inbound + episodic recall + AG-UI primitive) / F (POC1 reuse). See [poc2-status.md](poc2-status.md) §1 for the per-capability matrix — 17/22 ✅, 5/22 🟡, 0/22 ❌.
 
-Outstanding lab-build polish before `v1.0-poc2-frontier` tag: render `AgentDrivenComponent` inside `WorkflowDetail` (§4.21); expand the synthetic CV corpus past 50 if eval variance demands it (§4.9); 30-min end-to-end demo dry run.
+**As of 2026-04-30 evening (demo-ready additions):**
+
+- ✅ Candidate portal `web/portal/` Vite app (styled hero / phase ribbon / per-phase CTAs): `/apply`, `/portal?token`, `/screen?token`, `/recruiter`
+- ✅ Real Azure GPT-Realtime voice (native WebRTC in portal — no iframe)
+- ✅ Real Azure AI Speech batch avatar synthesis (custom-subdomain endpoint, Entra-ID auth, per-role character/style)
+- ✅ Real ACS Email send (Azure-managed domain, DKIM/DMARC/SPF verified)
+- ✅ AG-UI scorecard rendering on `WorkflowDetail`
+- ✅ Recruiter view moved out of admin Control Plane into the portal app (filterable magic-link table)
+
+Outstanding lab-build polish before `v1.0-poc2-frontier` tag:
+
+- POC1 AC #4 full Foundry corpus run (300 claims, ~25 min compute time)
+- One clean end-to-end stack boot to confirm `onboarding_video_url` lands on workflow metadata (the avatar fixes are committed; verification pending stable Functions host startup on this dev machine)
+- 30-min demo dry run with someone playing the WPP evaluator
+- Demo recording / screenshots
 
 Engagement-POC differences vs the lab build are the same shape as POC1:
 

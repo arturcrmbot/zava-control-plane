@@ -150,3 +150,38 @@ Walk through [DEMO.md](DEMO.md) end-to-end with someone playing WPP evaluator. C
 | Demo script | [DEMO.md](DEMO.md) |
 
 **Current tag:** `v0.8-poc1-platform-complete`. Outstanding: AC #4 full Foundry corpus run (needs Foundry project + judge-model env vars) and a demo dry run.
+
+---
+
+## 5. Status as of 2026-04-30 evening
+
+**Demo-ready scope (per master spec) — what landed today:**
+
+| Stream | Status | Notes |
+|---|---|---|
+| Candidate portal (web/portal) | ✅ live | New Vite app: /apply (public form), /portal?token=xxx (status + phase ribbon + per-phase CTAs), /screen?token=xxx (native WebRTC voice screen), /recruiter (admin candidates panel — moved out of Control Plane) |
+| Real Document Intelligence OCR | ✅ live | `ocr_extract` MCP tool wraps Azure DI; `receipt-validator` + `cv-crystalliser` skills both call it first |
+| Real Azure AI Speech avatar | ✅ wired (e2e verification pending stable func host) | `avatar_render` MCP tool uses custom-subdomain endpoint + DefaultAzureCredential; per-role character/style pairing fixed (lisa/graceful-sitting, harry/business, lori/graceful) |
+| Real voice WebRTC | ✅ wired | Native `RealtimeCall.ts` class in portal calls `/api/portal/voice/{session,rtc}` (mirrored from `firstcentral/voice-direct/server.py` — no iframe, no separate accelerator process) |
+| ACS Email send | ✅ live | Real ACS Email REST sends — UUID message IDs in outbox; provisioned `apex-demo-acs` + `apex-demo-email` + Azure-managed domain (DKIM/DMARC/SPF verified) |
+| Foundry-backed AC #4 pipeline | ✅ live | preclassify CLI + `evaluate()` batch + sqlite store + Evaluations UI; full 300-claim corpus run pending |
+| Azure resources provisioned | ✅ | Storage `apexdemo62525`, Speech `apex-demo-speech`, ACS `apex-demo-acs`, Email `apex-demo-email`, Foundry (already in `.env` from prior work) — all in `project-apex-demo` RG |
+
+**Bugs found and fixed during e2e smoke (2026-04-30 evening, commits `b67953a9`, `058c6f45`, plus this evening's portal styling pass):**
+
+1. `load_dotenv()` ran after `app_state` import in `main.py` — Functions worker got empty env; BlobStore was None. Now runs first.
+2. `state.py` now also calls `load_dotenv()` at module load so the Functions worker (which doesn't load .env via FastAPI lifespan) sees portal env vars.
+3. `/api/portal/apply` emitted `candidate.applied` but no listener spawned the orchestration. `portal_orchestration.make_candidate_applied_handler` now spawns the HiringOrchestrator + auto-fires `budget_approval`.
+4. `portal_orchestration.make_offer_hitl_handler` now subscribes to `workflow.hitl.requested` (reason=`awaiting_offer_approval`) and issues an offer-scope magic link + email at Phase 9 suspend.
+5. Status-scope token now issued **immediately on `candidate.applied`** (before orchestration spawn) so the candidate has a live `/portal?token=xxx` URL even if Functions host is down.
+6. `/api/portal/offer/{token}` was firing `offer_decision` but Phase 9 awaits `offer_approval`. Renamed.
+7. PhaseProgress + Portal.tsx normalised case mismatch (backend `Screening`, UI checked `screening`). Plus alias map: Budget/JobDesign→apply, Sourcing→triage, Voice→screening, Compliance→interview.
+8. `/api/portal/status` now returns `screen_token` + `offer_token` so BookCallButton + OfferPanel route correctly.
+9. SpeechAvatarClient was using regional endpoint (key-auth only); switched to custom-subdomain endpoint (token auth via DefaultAzureCredential).
+10. `_avatar_for_role` returned a character only; default style "graceful-sitting" doesn't apply to "harry". Now returns (character, style) tuple matching Azure's avatar matrix.
+11. SpeechAvatarClient passed Bearer token on the result mp4 download — Azure Blob rejects with 403. Removed auth on download.
+
+**Outstanding for the demo:**
+- Functions host startup is slow on this machine (60-90s cold + occasional WorkerMetadataRequest timeouts). Run via `scripts/run-func.bat` for the right env wiring; reboot once if metadata times out.
+- AC #4 corpus run still needs the offline preclassify + `/api/accuracy/run` execution (env is configured).
+- Avatar render e2e validated end-to-end via Playwright + curl is pending one more clean stack boot to confirm `onboarding_video_url` lands on `workflow.metadata`.

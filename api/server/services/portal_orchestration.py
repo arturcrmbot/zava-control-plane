@@ -165,41 +165,19 @@ def make_handler(app_state) -> Callable[[FleetEvent], None]:
 
 
 async def _spawn_hire_orchestration(app_state, *, candidate_id: str, workflow_id: str, role_id: str) -> None:
-    """Start a HiringOrchestrator Durable instance for this candidate, issue
-    a status-scope magic link + email so the candidate has a live URL into
-    the portal, then auto-fire `budget_approval` so the workflow advances
-    past the Finance-BP HITL into Triage. The candidate-portal demo path
-    does not have a real Finance BP in the loop — auto-approving here keeps
-    the through-line candidate-driven."""
+    """Issue the candidate's status-scope magic link + email immediately, then
+    try to start a HiringOrchestrator Durable instance and auto-approve the
+    Finance-BP budget HITL. The status link issuance is on a separate path
+    from the orchestration spawn so the candidate ALWAYS gets a live /portal
+    URL — even if the Functions host is down (devmode), they can still see
+    "Application received, phase=Applied" and resume once the host comes up.
+    """
     candidate = app_state.store.get_candidate(candidate_id)
     if candidate is None:
         return
     workflow = app_state.store.get_workflow(workflow_id)
-    payload = {
-        "workflow_id": workflow_id,
-        "candidate_id": candidate_id,
-        "role_id": role_id,
-        "role_title": (workflow.metadata or {}).get("role_title") if workflow else None,
-        "role_jurisdiction": (workflow.metadata or {}).get("role_jurisdiction") if workflow else None,
-        "candidate": candidate,
-    }
-    try:
-        resp = await schedule_new_orchestration(payload, function_name="HiringOrchestrator")
-    except Exception as exc:  # pragma: no cover — surfaces in logs
-        print(f"[portal] schedule_new_orchestration failed: {exc}")
-        return
-    instance_id = resp.get("id")
-    if not instance_id:
-        return
 
-    # Record the instance_id on the candidate so /transcript and /offer can
-    # raise external events on the right Durable instance.
-    candidate["instance_id"] = instance_id
-    app_state.store.upsert_candidate(candidate)
-
-    # Issue a long-lived status-scope token + email so the candidate can hit
-    # /portal?token=xxx and watch the phases tick by. Status tokens are
-    # repeatable so this is the candidate's persistent home in the portal.
+    # Step 1 (always runs): mint status-scope token + send acknowledgement email.
     try:
         status_token = app_state.magic_links.issue(
             candidate_id=candidate_id,
@@ -230,6 +208,30 @@ async def _spawn_hire_orchestration(app_state, *, candidate_id: str, workflow_id
         ))
     except Exception as exc:  # pragma: no cover
         print(f"[portal] status-link issuance failed: {exc}")
+
+    # Step 2 (best-effort): spawn the Durable orchestration. If func host is
+    # down, the candidate still has the status link and can refresh later.
+    payload = {
+        "workflow_id": workflow_id,
+        "candidate_id": candidate_id,
+        "role_id": role_id,
+        "role_title": (workflow.metadata or {}).get("role_title") if workflow else None,
+        "role_jurisdiction": (workflow.metadata or {}).get("role_jurisdiction") if workflow else None,
+        "candidate": candidate,
+    }
+    try:
+        resp = await schedule_new_orchestration(payload, function_name="HiringOrchestrator")
+    except Exception as exc:  # pragma: no cover — surfaces in logs
+        print(f"[portal] schedule_new_orchestration failed: {exc} (status link still issued; orchestration won't advance)")
+        return
+    instance_id = resp.get("id")
+    if not instance_id:
+        return
+
+    # Record the instance_id on the candidate so /transcript and /offer can
+    # raise external events on the right Durable instance.
+    candidate["instance_id"] = instance_id
+    app_state.store.upsert_candidate(candidate)
 
     # Auto-approve the budget HITL so the orchestration advances. The Finance
     # BP path is exercised separately (see /api/webhooks/finance-bp).
