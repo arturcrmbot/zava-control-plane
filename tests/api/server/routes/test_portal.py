@@ -130,3 +130,67 @@ def test_apply_rejects_non_pdf_cv(portal_client):
         files={"cv": ("x.txt", io.BytesIO(b"hi"), "text/plain")},
     )
     assert resp.status_code == 415
+
+
+# ---------------------------------------------------------------- Task 6: /status
+
+
+def test_status_returns_candidate_phase_for_valid_token(portal_client):
+    client, app_state = portal_client
+    # Apply first so we have a candidate bound to a workflow.
+    apply_resp = client.post(
+        "/api/portal/apply",
+        data={"role_id": "REQ-SDE-USA-DEMO", "name": "Bob", "email": "b@x.y"},
+        files={"cv": ("b.pdf", io.BytesIO(b"%PDF-1.4"), "application/pdf")},
+    )
+    cid = apply_resp.json()["candidate_id"]
+    token = app_state.magic_links.issue(
+        candidate_id=cid, scope="status", ttl_seconds=3600, single_use=False,
+    )
+
+    resp = client.get(f"/api/portal/status/{token}")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["candidate"]["id"] == cid
+    assert body["phase"] == "Triage"
+
+
+def test_status_404_on_invalid_token(portal_client):
+    client, _ = portal_client
+    resp = client.get("/api/portal/status/totally-bogus-token")
+    assert resp.status_code == 404
+
+
+def test_status_410_on_expired_token(portal_client):
+    client, app_state = portal_client
+    apply_resp = client.post(
+        "/api/portal/apply",
+        data={"role_id": "REQ-SDE-USA-DEMO", "name": "Eve", "email": "e@x.y"},
+        files={"cv": ("e.pdf", io.BytesIO(b"%PDF-1.4"), "application/pdf")},
+    )
+    cid = apply_resp.json()["candidate_id"]
+    # ttl_seconds=0 -> immediately expired (peek compares strict >).
+    token = app_state.magic_links.issue(
+        candidate_id=cid, scope="status", ttl_seconds=0, single_use=False,
+    )
+    time.sleep(0.05)
+    resp = client.get(f"/api/portal/status/{token}")
+    assert resp.status_code == 410
+
+
+def test_status_repeatable_does_not_consume(portal_client):
+    """status-scope tokens are repeatable — refreshing the page should not
+    invalidate the link."""
+    client, app_state = portal_client
+    apply_resp = client.post(
+        "/api/portal/apply",
+        data={"role_id": "REQ-SDE-USA-DEMO", "name": "Repeat", "email": "r@x.y"},
+        files={"cv": ("r.pdf", io.BytesIO(b"%PDF-1.4"), "application/pdf")},
+    )
+    cid = apply_resp.json()["candidate_id"]
+    token = app_state.magic_links.issue(
+        candidate_id=cid, scope="status", ttl_seconds=3600, single_use=False,
+    )
+    for _ in range(3):
+        resp = client.get(f"/api/portal/status/{token}")
+        assert resp.status_code == 200

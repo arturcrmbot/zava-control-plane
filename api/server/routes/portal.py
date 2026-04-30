@@ -8,6 +8,7 @@ import uuid
 
 from fastapi import APIRouter, Form, HTTPException, UploadFile, File
 
+from api.server.services.magic_link import MagicLinkExpired
 from api.server.state import app_state
 from api.shared.events import FleetEvent
 
@@ -68,3 +69,52 @@ async def apply(
         "candidate_id": candidate_id,
         "workflow_id": workflow_id,
     }
+
+
+# ----------------------------------------------------- Task 6: token-authed status
+
+
+@router.get("/status/{token}")
+async def status(token: str):
+    """Phase-aware candidate-facing view, gated by a status-scope magic link.
+
+    `peek` not `consume` — a status link is repeatable so the candidate can
+    refresh the page across the multi-day hiring lifecycle.
+    """
+    try:
+        payload = app_state.magic_links.peek(token, scope="status")
+    except MagicLinkExpired:
+        raise HTTPException(410, "link expired")
+    except ValueError:
+        # Wrong scope — surface as 404 so we don't leak that the token exists.
+        raise HTTPException(404, "invalid token")
+    if payload is None:
+        raise HTTPException(404, "invalid token")
+    candidate = app_state.store.get_candidate(payload["candidate_id"])
+    if candidate is None:
+        raise HTTPException(404, "candidate not found")
+    workflow = app_state.store.get_workflow(candidate.get("workflow_id", ""))
+    phase = workflow.current_phase if workflow else None
+    # Phase-driven hints for the portal UI. Optional fields land on the
+    # workflow.metadata dict once the relevant agent emits them; we surface
+    # them straight through.
+    meta = (workflow.metadata if workflow else {}) or {}
+    return {
+        "candidate": candidate,
+        "phase": phase,
+        "next_action": _next_action_for_phase(phase),
+        "offer_letter_url": meta.get("offer_letter_url") if phase == "Offer" else None,
+        "onboarding_video_url": meta.get("onboarding_video_url") if phase == "Onboarding" else None,
+        "voice_transcript": candidate.get("voice_transcript", []),
+    }
+
+
+def _next_action_for_phase(phase) -> str | None:
+    """Map a workflow phase to a candidate-side call-to-action label."""
+    if phase == "Screening":
+        return "rsvp_screening"
+    if phase == "Interview":
+        return "rsvp_interview"
+    if phase == "Offer":
+        return "decide_offer"
+    return None
