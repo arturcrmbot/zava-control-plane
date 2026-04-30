@@ -41,7 +41,10 @@ export type VoiceCallSurfaceProps = {
   onError?: (err: string) => void;
 };
 
-const DEFAULT_ACCELERATOR_URL = "http://localhost:8000";
+// Defaults to :8001 because FastAPI already owns :8000; the demo runbook
+// (docs/poc2-DEMO.md §0) starts the accelerator with `--port 8001`. Override
+// via VITE_VOICE_ACCELERATOR_URL at build time if running elsewhere.
+const DEFAULT_ACCELERATOR_URL = "http://localhost:8001";
 
 export default function VoiceCallSurface({
   candidateId,

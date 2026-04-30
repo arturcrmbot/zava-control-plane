@@ -28,6 +28,13 @@ npm run dev:mcp
 
 # Terminal 5 — UI
 npm run dev:client
+
+# Terminal 6 — firstcentral voice-direct accelerator (Phase 6 voice screen)
+# Iframed by /screen?token=xxx. We pin to 8001 because FastAPI already
+# owns 8000; set VITE_VOICE_ACCELERATOR_URL=http://localhost:8001 in the
+# portal's .env so Screen.tsx points the iframe at the right host.
+# Skip if VITE_VOICE_TRANSPORT=canned (canned-transcript fallback).
+cd C:\dev\firstcentral\voice-direct && uv run uvicorn server:app --port 8001
 ```
 
 Open http://localhost:5173. The Fleet Dashboard should show zero workflows.
@@ -60,7 +67,7 @@ and the SKILL.md / MCP-tool that *would* run the capability live.
 | 4.2 | System integration & auth | live | Inspect the spans on Phase 3 (Sourcing): `linkedin_search` + `greenhouse_post` fire in parallel against `mocks/linkedin-mcp` + `mocks/greenhouse-mcp`. |
 | 4.3 | HITL + bulk action | live | Phase 1 (Budget) suspends; the Adaptive Card payload is in the orchestration history. POST the Finance BP webhook to unblock: `POST /api/webhooks/finance-bp/HIRE-NNNN?decision=approve`. Bulk = the existing BulkHitlModal works on hiring workflows verbatim. |
 | 4.4 | Exception handling & self-healing | live | Inject `scenario="rtw-unknown"` and watch Phase 8 raise `right_to_work_unverified` to the exception queue; resolve it via the queue. |
-| 4.5 | Voice + avatar | live | Phase 6 calls `acs_dial` against `mocks/acs-mcp` (canned transcript); Phase 10 calls `avatar_render` against Azure AI Speech batch synthesis (cached mp4 SAS URL surfaced on the candidate portal). `AVATAR_TRANSPORT=mock` falls back to `mocks/heygen-mcp` for offline runs. Both surfaced in the Execution Timeline. |
+| 4.5 | Voice + avatar | live | Phase 6 issues a `screen`-scope magic link, emails the candidate, and suspends on the `voice_complete` external event raced against a 24h timer. The candidate opens `/screen?token=xxx` which iframes the firstcentral voice-direct accelerator (browser WebRTC + GPT-Realtime); on call-end the transcript posts to `/api/portal/voice/{cid}/transcript` and the orchestration resumes. `VITE_VOICE_TRANSPORT=canned` falls back to the existing `acs-mcp` canned transcript via a one-button surface for demo robustness. Phase 10 calls `avatar_render` against Azure AI Speech batch synthesis (cached mp4 SAS URL surfaced on the candidate portal). `AVATAR_TRANSPORT=mock` falls back to `mocks/heygen-mcp` for offline runs. Both surfaced in the Execution Timeline. |
 | 4.6 | Multi-surface convergence | mixed | Live: Finance BP card webhook (Phase 1), ServiceNow IT-Ops webhook (Phase 10), Hiring Manager surface at `/hiring-manager/HIRE-NNNN`, Candidate at the A2A boundary `/api/a2a/inbound`. Narrated: Teams deep-link, real Outlook Adaptive Card. |
 | 4.7 | Episodic memory | live | Open the workflow detail; the `recall_similar_hires` MCP tool surfaces past hires of the same `(role_family, jurisdiction)`. |
 | 4.8 | Crystallisation pipeline | live | Phase 4 runs `cv-crystalliser` against the synthetic CV (PDF + LinkedIn JSON merge); inconsistencies surfaced in the workflow detail. |
@@ -104,6 +111,7 @@ If time gets cut, lead with these:
 | Avatar render fails / times out | Real Azure Speech API issue (region down, role missing, quota) | Set `AVATAR_TRANSPORT=mock`; the `mocks/heygen-mcp` canned mp4 plays instead. Pre-warmed cache (`scripts/prewarm_avatar.py`) means re-renders shouldn't fire during a live demo anyway. |
 | Functions host won't replay after region-failure simulation | Azurite tablestore write race | Stop everything, `rm -rf azurite-data/`, restart. |
 | BetrVG step doesn't fire on DE hire | Wrong `jurisdiction_target` on the synthetic CV | Pick a `C-*-DE-NN` candidate explicitly: `POST /api/simulator/hire {"candidate_id": "C-SE-DE-00"}`. |
+| `/screen?token=xxx` shows blank iframe / `ERR_CONNECTION_REFUSED` | firstcentral voice-direct accelerator not running on :8001 | Set `VITE_VOICE_TRANSPORT=canned` (rebuild portal or set in .env), reload `/screen?token=xxx` — single button replays the canned transcript via `/api/portal/voice/{cid}/canned` and the orchestration resumes through the same `voice_complete` callback. Long-term: boot the accelerator (`Terminal 6` in §0). |
 
 ---
 
