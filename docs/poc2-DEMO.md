@@ -60,7 +60,7 @@ and the SKILL.md / MCP-tool that *would* run the capability live.
 | 4.2 | System integration & auth | live | Inspect the spans on Phase 3 (Sourcing): `linkedin_search` + `greenhouse_post` fire in parallel against `mocks/linkedin-mcp` + `mocks/greenhouse-mcp`. |
 | 4.3 | HITL + bulk action | live | Phase 1 (Budget) suspends; the Adaptive Card payload is in the orchestration history. POST the Finance BP webhook to unblock: `POST /api/webhooks/finance-bp/HIRE-NNNN?decision=approve`. Bulk = the existing BulkHitlModal works on hiring workflows verbatim. |
 | 4.4 | Exception handling & self-healing | live | Inject `scenario="rtw-unknown"` and watch Phase 8 raise `right_to_work_unverified` to the exception queue; resolve it via the queue. |
-| 4.5 | Voice + avatar | live | Phase 6 calls `acs_dial` against `mocks/acs-mcp` (canned transcript); Phase 10 calls `heygen_render` against `mocks/heygen-mcp` (returns mp4 URL). Both surfaced in the Execution Timeline. |
+| 4.5 | Voice + avatar | live | Phase 6 calls `acs_dial` against `mocks/acs-mcp` (canned transcript); Phase 10 calls `avatar_render` against Azure AI Speech batch synthesis (cached mp4 SAS URL surfaced on the candidate portal). `AVATAR_TRANSPORT=mock` falls back to `mocks/heygen-mcp` for offline runs. Both surfaced in the Execution Timeline. |
 | 4.6 | Multi-surface convergence | mixed | Live: Finance BP card webhook (Phase 1), ServiceNow IT-Ops webhook (Phase 10), Hiring Manager surface at `/hiring-manager/HIRE-NNNN`, Candidate at the A2A boundary `/api/a2a/inbound`. Narrated: Teams deep-link, real Outlook Adaptive Card. |
 | 4.7 | Episodic memory | live | Open the workflow detail; the `recall_similar_hires` MCP tool surfaces past hires of the same `(role_family, jurisdiction)`. |
 | 4.8 | Crystallisation pipeline | live | Phase 4 runs `cv-crystalliser` against the synthetic CV (PDF + LinkedIn JSON merge); inconsistencies surfaced in the workflow detail. |
@@ -101,6 +101,7 @@ If time gets cut, lead with these:
 |---|---|---|
 | `acs-mcp` 500 on dial | Mock not booted | Skip to recorded clip; restart `npm run dev:mcp:poc2`. |
 | HeyGen avatar 404 | Render id collision | Switch to fallback `welcome-default`. |
+| Avatar render fails / times out | Real Azure Speech API issue (region down, role missing, quota) | Set `AVATAR_TRANSPORT=mock`; the `mocks/heygen-mcp` canned mp4 plays instead. Pre-warmed cache (`scripts/prewarm_avatar.py`) means re-renders shouldn't fire during a live demo anyway. |
 | Functions host won't replay after region-failure simulation | Azurite tablestore write race | Stop everything, `rm -rf azurite-data/`, restart. |
 | BetrVG step doesn't fire on DE hire | Wrong `jurisdiction_target` on the synthetic CV | Pick a `C-*-DE-NN` candidate explicitly: `POST /api/simulator/hire {"candidate_id": "C-SE-DE-00"}`. |
 
