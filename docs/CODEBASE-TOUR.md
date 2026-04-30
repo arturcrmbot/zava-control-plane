@@ -151,7 +151,7 @@ platform.
   Manager, OTEL, audit ledger, validators, bulk HITL)
 - **9 🟡** rebind by swapping skill prompt / MCP endpoint / label
 - **6 ❌** genuinely new: voice, multi-surface convergence, jurisdiction
-  switching, crystallisation, Threadlight, A2A, AG-UI
+  switching, crystallisation, A2A, AG-UI
 
 Six work tracks (A–F) and a 12-week shape — see
 [poc2-status.md §3 + §5](poc2-status.md#3-whats-left-to-build-and-how)

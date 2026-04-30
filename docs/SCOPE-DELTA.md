@@ -71,7 +71,7 @@ The engagement POC must hit all 13 live in front of WPP. The lab build is conver
 POC2 in the lab is **not started**. The plan in [poc2-status.md](poc2-status.md)
 calls out that ~75% of POC1 source artefacts are domain-agnostic platform
 and reuse. The 25% that's POC2-specific (10 hiring skills, 7 mocks,
-synthetic 200-CV corpus, voice + avatar tracks, Threadlight, A2A,
+synthetic 200-CV corpus, voice + avatar tracks, A2A,
 multi-jurisdiction compliance) is greenfield.
 
 So for POC2:

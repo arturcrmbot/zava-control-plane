@@ -236,7 +236,6 @@ Source: our §14.2 B.6 known constraints, plus POC-specific risks.
 | EMS sandbox delays from WPP | Medium | High | Build against OpenAPI specs and mock early; swap to sandbox when available. REST-to-MCP gateway reduces sandbox ramp-up |
 | GHCP SDK preview API churn | Low | Low | Core patterns (skills, MCP, hooks) are production-GA inside GitHub Copilot's runtime. SKILL.md files and MCP tools are portable to any MCP-native runtime |
 | Agent 365 not GA by demo date (targeted May 2026) | Medium | Low | Entra Agent ID is usable independently today and is the identity primitive we rely on. Agent 365 adds lifecycle and policy layering when GA |
-| Threadlight delivery dependency | Low | Low | Threadlight is an accelerator demonstrated in POC 2; not a release-blocker for POC 1 |
 | Autonomy-dial governance tension (brief says runtime-adjustable; we recommend PR-gated in production) | Low | Low | Demonstrate both paths. Runtime-adjustable is shown working; PR-gated is presented as the production-hardening recommendation with dual-control approval. WPP chooses per deployment |
 | Copilot Studio misinterpreted as the core agent fleet | Low | Medium | Copilot Studio is positioned as an available low-code surface (60-minute build demo) but explicitly not recommended for the core agent fleet. Core authoring is GHCP SDK |
 

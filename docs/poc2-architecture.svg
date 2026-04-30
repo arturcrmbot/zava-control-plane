@@ -110,10 +110,6 @@
 <text x="444" y="576" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Fleet Manager (GHCP SDK Hosted Agent)</text>
 <text x="444" y="594" text-anchor="middle" font-size="10.5" fill="#3A3F48">Exception composition · Process-evolution proposals (§4.18)</text>
 <text x="444" y="608" text-anchor="middle" font-size="10.5" fill="#3A3F48">Drift detection · 10% spot-check audit (§4.20)</text>
-<rect x="714" y="554" width="327" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
-<text x="877" y="576" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Threadlight accelerator</text>
-<text x="877" y="594" text-anchor="middle" font-size="10.5" fill="#3A3F48">SME interview → SKILL.md (§4.14)</text>
-<text x="877" y="608" text-anchor="middle" font-size="10.5" fill="#3A3F48">Runtime agent assembly</text>
 <rect x="1049" y="554" width="327" height="74" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
 <text x="1212" y="576" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">Foundry Hosted Agents</text>
 <text x="1212" y="594" text-anchor="middle" font-size="10.5" fill="#6A6E78">GHCP SDK runtime (preview)</text>
@@ -201,7 +197,7 @@
 <rect x="14" y="1038" width="6" height="134" rx="3" fill="#1F1F1F"/>
 <text x="36" y="1060" font-size="13" font-weight="700" fill="#1F1F1F">POC scope</text>
 <text x="36" y="1082" font-size="11" font-weight="700" fill="#1F7A45">In:</text>
-<text x="64" y="1082" font-size="11" fill="#1F1F1F">HiringOrchestrator + 10 phase graphs · hiring-agent@wpp + Fleet Manager + Threadlight · Multi-surface convergence (5 humans, 4 timezones)</text>
+<text x="64" y="1082" font-size="11" fill="#1F1F1F">HiringOrchestrator + 10 phase graphs · hiring-agent@wpp + Fleet Manager · Multi-surface convergence (5 humans, 4 timezones)</text>
 <text x="64" y="1098" font-size="11" fill="#1F1F1F">Multi-jurisdiction (USA vs Germany) compliance + A2A at candidate boundary · Greenhouse/LinkedIn/Workday-HR/Graph/ServiceNow/ACS/HeyGen MCP servers</text>
 <text x="64" y="1114" font-size="11" fill="#1F1F1F">Voice screening (GPT-Realtime) + HeyGen avatar onboarding</text>
 <text x="36" y="1134" font-size="11" font-weight="700" fill="#A02C2C">Out:</text>

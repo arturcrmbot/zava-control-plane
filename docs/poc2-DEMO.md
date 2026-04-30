@@ -60,7 +60,6 @@ and the SKILL.md / MCP-tool that *would* run the capability live.
 | 4.11 | Tiered model usage | narrated | Phase 5 (auto-shortlister) uses gpt-4.1-mini (cheap screen); Phase 4 (cv-crystalliser, multimodal) uses gpt-4.1 frontier. Skill `model:` frontmatter drives the choice. |
 | 4.12 | Skill library + APIOps gate | narrated | All 11 hiring SKILL.md files under `api/server/skills/`; cloud target publishes via API Center governance with a CI gate. |
 | 4.13 | Hooks for non-revocable sends | live | Phase 9 (Offer) drafts the offer letter; the `graph_mail` send is gated by `onPreToolUse` hook. Phase 10 ServiceNow JML same pattern. Logged in the action ledger. |
-| 4.14 | Threadlight | live | Open `/threadlight`. Start a session for `recruiter-creative-direction`. Answer 3-4 questions; right rail shows the SKILL.md being assembled live. Click Finalise — the SKILL.md hits disk and the next ephemeral session loads it. |
 | 4.15 | Entra Agent ID | narrated | `hiring-agent@wpp` is the workload identity in the cloud target. Local demo uses the gh CLI token. |
 | 4.16 | Audit + reporting | live | Workflow detail → Audit tab. Same ledger as POC1, partition key extends to `(jurisdiction, hire_id)`. |
 | 4.17 | Cost-per-hire | live | Fleet Manager rail: `report.cost_per_task` returns the per-hire average; `query_economics` aggregates over the hiring fleet. POC1's economics service is domain-neutral — the label rebinds to "per hire" automatically based on workflow type. |
@@ -81,10 +80,7 @@ If time gets cut, lead with these:
 2. **Jurisdiction switching live** (§4.10) — flip the country flag USA → DE
    on the next spawn; watch the workflow grow a Compliance step *without
    any code change*.
-3. **Threadlight** (§4.14) — open `/threadlight`, capture an SME's tacit
-   knowledge in 3 minutes, watch the SKILL.md emit, run the next hire and
-   see the new skill influence the JD draft.
-4. **A2A boundary** (§4.19) — POST to `/api/a2a/inbound` from a stand-in
+3. **A2A boundary** (§4.19) — POST to `/api/a2a/inbound` from a stand-in
    "candidate's PA"; the inbound message threads into the same
    orchestration without breaking identity.
 

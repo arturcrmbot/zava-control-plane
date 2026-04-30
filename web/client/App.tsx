@@ -9,7 +9,6 @@ import Evaluations from "./routes/Evaluations";
 import Economics from "./routes/Economics";
 import WorkflowDetail from "./routes/WorkflowDetail";
 import HiringManager from "./routes/HiringManager";
-import Threadlight from "./routes/Threadlight";
 import FleetManagerRail from "./components/FleetManagerRail";
 
 const nav = [
@@ -19,16 +18,8 @@ const nav = [
   { to: "/policy",         label: "Policy" },
   { to: "/analytics",      label: "Analytics" },
   { to: "/evals",          label: "Evaluations" },
-  { to: "/agents",         label: "Agents" },
-  { to: "/library",        label: "Library" },
   { to: "/economics",      label: "Economics" },
-  // POC2 surfaces
-  { to: "/threadlight",    label: "Threadlight" },
 ];
-
-function Stub({ title }: { title: string }) {
-  return <div className="panel panel-body text-sm text-slate-600">{title} — coming soon.</div>;
-}
 
 export default function App() {
   return (
@@ -61,12 +52,9 @@ export default function App() {
             <Route path="/policy" element={<PolicyAndAutonomy />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/evals" element={<Evaluations />} />
-            <Route path="/agents" element={<Stub title="Agents" />} />
-            <Route path="/library" element={<Stub title="Library" />} />
             <Route path="/economics" element={<Economics />} />
             {/* POC2 surfaces */}
             <Route path="/hiring-manager/:workflowId?" element={<HiringManager />} />
-            <Route path="/threadlight" element={<Threadlight />} />
           </Routes>
         </main>
 
