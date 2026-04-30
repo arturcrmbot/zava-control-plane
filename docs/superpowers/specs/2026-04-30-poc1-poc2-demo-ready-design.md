@@ -12,7 +12,7 @@ Constraints:
 
 - **No full Azure deployment of the app itself** — Functions / FastAPI / mocks / UI keep running on a laptop. Saves the 2-3 days that "lift everything to ACA" would cost.
 - **Azure *services* are fair game** — ACS, ACS Email, Storage, Foundry, Document Intelligence (already wired). The user has authorised standing up new resources where needed; Microsoft tenant.
-- **HeyGen API key** — user provides.
+- **Avatar render: Azure AI Speech batch avatar synthesis** (was HeyGen, swapped 2026-04-30 for the all-Microsoft narrative). Auth via DefaultAzureCredential; no third-party API key.
 - **Voice s2s accelerator** — exists already on the user's laptop, will be reused as a black box in the candidate portal's `/screen` route. Path/contract TBD when the per-feature spec is drafted.
 - **Demo timing:** ~60+ minutes live, open format, no WPP-named must-haves.
 
@@ -24,7 +24,7 @@ Constraints:
 |---|---|---|---|
 | 1 | **AC #4 corpus run** | POC1 — close the last yellow on the 13 ACs | Existing runbook ([poc1-accuracy-runbook.md](../../poc1-accuracy-runbook.md)); no new spec |
 | 2 | **AG-UI render** | POC2 §4.21 — wire `AgentDrivenComponent` into `WorkflowDetail` | Short spec — `2026-04-30-ag-ui-render-design.md` |
-| 3 | **Real HeyGen avatar** | Replace `heygen-mcp` canned mp4 with real API behind same MCP-tool surface | `2026-04-30-heygen-real-design.md` |
+| 3 | **Real avatar (Azure AI Speech)** | Replace `heygen-mcp` canned mp4 with real Azure Speech batch avatar synthesis behind a new `avatar_render` MCP tool | [`2026-04-30-avatar-real-plan.md`](../plans/2026-04-30-avatar-real-plan.md) |
 | 4 | **Real voice via accelerator** | Replace canned ACS transcript with the user's s2s accelerator running browser-side WebRTC, transcript callback into Phase 6 | `2026-04-30-voice-real-design.md` |
 | 5 | **Candidate portal** | New `web/portal/` Vite app — three routes: `/apply`, `/portal?token=xxx`, `/screen?token=xxx` | `2026-04-30-candidate-portal-design.md` |
 
@@ -154,34 +154,40 @@ The existing `acs-mcp` mock stays as a non-portal fallback (e.g., dev-loop scena
 - Transcript schema — what fields do we get back; do they map cleanly to `transcript_score` rubric?
 - Failure modes — accelerator unreachable, mid-call drop, no audio captured.
 
-## 6. HeyGen integration (real)
+## 6. Avatar integration (Azure AI Speech batch synthesis)
 
-`mcp_tools/heygen_render.py` swaps from canned mp4 to real HeyGen API behind the **same MCP tool contract**. The `onboarding-buddy` skill is unchanged.
+A new `avatar_render` MCP tool calls Azure AI Speech batch avatar synthesis. The existing `onboarding-buddy` skill swaps from `heygen_render` to `avatar_render` — same contract shape (script in, video URL out). Auth uses `DefaultAzureCredential` (Entra ID) consistent with `ocr_extract`; tenant policy disables key-auth on Cognitive Services.
 
 ### Render lifecycle
 
 ```
 Phase 10 Onboarding entry
-  → skill calls heygen_render(script, avatar_id)
-  → tool: cache lookup by sha256(script) + avatar_id (Blob-backed)
+  → skill calls avatar_render(script, avatar_character="lisa", voice="en-US-JennyNeural")
+  → tool: cache lookup by sha256(voice + script) keyed against avatar_character
        hit  → return cached blob URL
        miss →
-         POST HeyGen render API { script, avatar_id }
-         poll render-job status until done (or callback if HeyGen supports it)
-         download mp4
-         upload to Azure Blob (container: heygen-renders, name: {sha}.mp4)
+         PUT Azure Speech batchsyntheses/{job_id} { synthesisConfig, inputs, avatarConfig }
+         poll GET batchsyntheses/{job_id} until status=Succeeded
+         download mp4 from outputs.result SAS URL
+         upload to Azure Blob (container: avatar-renders, name: {sha}-{character}.mp4)
          persist cache entry
          return blob SAS URL
-  → orchestration stores URL on workflow.onboarding.video_url
+  → orchestration stores URL on workflow.metadata.onboarding_video_url
   → portal /portal?token=xxx loads the URL when phase=Onboarding
 ```
 
+### Why Azure Speech (vs HeyGen)
+
+- All-Microsoft narrative for the WPP demo
+- Single Azure subscription, single auth model (DefaultAzureCredential), no third-party API key
+- Same Azure Storage account hosts the mp4 cache as the candidate-portal CV uploads
+- Tradeoff: ~14 prebuilt avatars (lisa, harry, lori, max, jeff, meg with style variants) instead of HeyGen's 200+; absolute polish slightly behind. More than enough for a 30-second onboarding welcome.
+
 ### Open questions for the per-feature spec
 
-- HeyGen render time — sync poll vs async webhook?
-- Pre-render at workflow start (warm cache) vs on-demand at Phase 10 (cold)? Cold is simpler; warm is faster on demo day.
-- Avatar id — one default for demo (`welcome-default`) or per-jurisdiction/role?
-- SAS URL expiry — blob lifetime + revocation story.
+- Render time — typical 1-3 minutes for 30-second segments. Pre-warm the cache for the demo's expected scripts (`scripts/prewarm_avatar.py`) so demo-day plays from cache.
+- Avatar character per role — one default for demo (`lisa` / `graceful-sitting`) or per-jurisdiction/role variant.
+- SAS URL expiry — 24h is plenty for a demo-day video.
 
 ## 7. POC1 close-out (AC #4 corpus run)
 
@@ -214,7 +220,8 @@ The `AgentDrivenComponent` primitive is built but not rendered anywhere. Half-da
 |---|---|---|
 | Azure Communication Services | Voice transport for the accelerator (if needed beyond what the accelerator already uses) | TBD per voice spec |
 | ACS Email | Magic-link emails | Cheap; one Email Communication Service + a verified domain |
-| Azure Storage account | CV uploads + HeyGen rendered mp4s + magic-link sqlite (optional) | Single account, multiple containers |
+| Azure AI Speech | Avatar batch synthesis (Phase 10 onboarding video) | Cognitive Services Speech User role on the signed-in identity |
+| Azure Storage account | CV uploads + avatar rendered mp4s + magic-link sqlite (optional) | Single account, multiple containers |
 | Azure AI Foundry project + judge-model deployment | AC #4 corpus run + per-agent online evals | One project; Azure OpenAI gpt-4.1 deployment behind it |
 | Azure Document Intelligence | OCR (already wired via `ocr_extract`) | Existing — `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` |
 
@@ -227,7 +234,7 @@ Cost: low. One-shot bicep under `infra/main.bicep` provisions all of the above; 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
 | Voice accelerator integration takes longer than 2-3 days | HIGH | Examine accelerator early; spec subagent calls out concrete contract; fall back to canned transcript if hard-blocked |
-| HeyGen render time too long for demo | MED | Pre-render the demo's expected videos at workflow start; cache aggressively |
+| Azure Speech avatar render time too long for demo | MED | Pre-render the demo's expected videos at workflow start; cache aggressively |
 | Candidate portal scope creep | MED | Stick to three routes; defer chat surface entirely |
 | Foundry corpus run needs >1 prompt iteration | MED | Buffer ~1 day, iterate as runbook prescribes |
 | AG-UI render reveals data-shape problems in cv-crystalliser output | LOW | Half-day wire-up; trivially restorable |
@@ -236,7 +243,7 @@ Cost: low. One-shot bicep under `infra/main.bicep` provisions all of the above; 
 
 1. **AG-UI render** — narrate §4.21 against the existing `AgentDrivenComponent.tsx` primitive file in code review
 2. **POC1 corpus iterations beyond first pass** — accept first-pass accuracy if it lands ≥90%; iterate post-demo
-3. **HeyGen real** — fall back to canned mp4 (existing mock)
+3. **Avatar real** — fall back to canned mp4 (existing `mocks/heygen-mcp` stays in repo as the fallback)
 4. **Portal `/screen` route** — drop in-browser voice; voice falls back to canned `acs-mcp` mock
 5. **Voice real** (last cut — biggest demo loss) — keep canned transcript mock; narrate the s2s accelerator against the architecture diagram
 
@@ -246,7 +253,7 @@ After this master spec is approved, the following per-feature specs are drafted 
 
 - **`2026-04-30-candidate-portal-design.md`** — drafted by me. Drills routes, magic-link state machine, apply backend route, status-page phase morphology, ACS Email integration.
 - **`2026-04-30-voice-real-design.md`** — drafted by subagent, briefed with the accelerator path/contract once the user shares it. Drills the accelerator's API surface, WebRTC mounting in portal, transcript callback schema.
-- **`2026-04-30-heygen-real-design.md`** — drafted by subagent. Drills HeyGen render API, polling vs webhook, Blob upload, cache schema.
+- **[`2026-04-30-avatar-real-plan.md`](../plans/2026-04-30-avatar-real-plan.md)** — drafted as a plan directly (no separate design doc). Drills the Azure AI Speech batch synthesis REST contract, DefaultAzureCredential auth, polling, Blob upload, cache schema.
 - **`2026-04-30-ag-ui-render-design.md`** — drafted by me, short. Spec-kind selection in cv-crystalliser, wire-up in `WorkflowDetail.tsx`.
 - **POC1 corpus run** — uses existing [poc1-accuracy-runbook.md](../../poc1-accuracy-runbook.md); no new spec.
 
@@ -258,7 +265,7 @@ After the per-feature specs are approved, the implementation plans drive five pa
 Mon-Wed (3 streams running in parallel)
   Stream 1: candidate portal (routes, apply backend, magic link, email)
   Stream 2: voice real (accelerator integration, /screen route, transcript callback)
-  Stream 3: heygen real (MCP tool swap, blob upload, cache)
+  Stream 3: avatar real (Azure AI Speech batch synthesis, blob upload, cache)
   Stream 4: ag-ui render (cv-crystalliser output + WorkflowDetail wire-up)
   Stream 5: POC1 corpus run (Foundry provisioning, run, iterate)
 
