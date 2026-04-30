@@ -61,6 +61,10 @@ WAKE_TYPES: frozenset[FleetEventType] = frozenset({
     "workflow.policy.violation",
     "fleet.anomaly.detected",
     "fleet.tick",
+    # Red routes warrant FM attention before the HITL gate trips, so the
+    # demo rail pulses on the agent's hot path instead of waiting 60s+ for
+    # a suspend. Green/amber are routine signal and stay out.
+    "claim.routed.red",
 })
 
 

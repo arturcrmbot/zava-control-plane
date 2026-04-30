@@ -78,8 +78,24 @@ def receipt_activity(payload: dict) -> dict:
 
 
 def route_activity(payload: dict) -> dict:
-    """Phase 4 — escalation advisor + verdict routing."""
-    return asyncio.run(_run_workflow(build_route_workflow, payload, "Route"))
+    """Phase 4 — escalation advisor + verdict routing.
+
+    After the graph resolves, surface the verdict to the FastAPI tier so the
+    fleet bus can fire `claim.routed.{green,amber,red}` — the Fleet Manager
+    rail uses this signal to wake on red routes before any HITL gate trips.
+    """
+    result = asyncio.run(_run_workflow(build_route_workflow, payload, "Route"))
+    asyncio.run(emit(
+        payload.get("workflow_id", "?"),
+        payload.get("instance_id"),
+        "claim_routed",
+        {
+            "verdict": result.get("verdict"),
+            "routed_to": result.get("routed_to"),
+            "escalation_tier": result.get("escalation_tier"),
+        },
+    ))
+    return result
 
 
 def notify_activity(payload: dict) -> dict:

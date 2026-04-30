@@ -12,4 +12,4 @@ def test_does_not_wake_on_phase_started():
 
 
 def test_wake_set_size():
-    assert len(WAKE_TYPES) == 6
+    assert len(WAKE_TYPES) == 7

@@ -78,8 +78,15 @@ async def test_claim_routed_red_event_broadcasts_to_fleet_topic():
         app_state.hub.unsubscribe("fleet", q)
 
 
-def test_week2_types_not_in_wake_types():
-    """Week 2 events are routine workflow signal — must not wake the Fleet Manager."""
+def test_only_claim_routed_red_wakes_fleet_manager():
+    """Of the Week 2 event types, only `claim.routed.red` should wake the FM —
+    the others are routine signal. Red wakes so the demo rail responds on the
+    hot path instead of waiting for the HITL suspend that fires 60s+ in.
+    """
     from api.shared.events import WAKE_TYPES
-    overlap = set(WEEK2_TYPES) & WAKE_TYPES
-    assert not overlap, f"Week 2 types must not wake fleet manager: {overlap}"
+    waking = set(WEEK2_TYPES) & WAKE_TYPES
+    assert waking == {"claim.routed.red"}, (
+        f"expected only claim.routed.red to wake; waking={waking}"
+    )
+    assert "claim.routed.green" not in WAKE_TYPES
+    assert "claim.routed.amber" not in WAKE_TYPES

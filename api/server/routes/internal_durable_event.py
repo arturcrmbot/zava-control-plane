@@ -166,6 +166,16 @@ async def receive_durable_event(body: DurableEventBody):
             duration_ms=int(p.get("duration_ms", 0)),
         ))
 
+    elif body.kind == "claim_routed":
+        verdict = (body.payload.get("verdict") or "").lower()
+        if verdict in {"green", "amber", "red"}:
+            app_state.bus.emit(FleetEvent(
+                type=f"claim.routed.{verdict}",  # type: ignore[arg-type]
+                workflow_id=wid,
+                routed_to=body.payload.get("routed_to"),
+                escalation_tier=body.payload.get("escalation_tier"),
+            ))
+
     elif body.kind == "validator.blocked":
         compose_validator_exception(
             app_state.store, wid,

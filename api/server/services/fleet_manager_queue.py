@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 
 class QueueEntry(BaseModel):
-    workflow_id: str
+    workflow_id: str | None = None
     reason: str
 
 
@@ -19,7 +19,13 @@ class FleetManagerQueue:
         self._flushing = False
 
     def enqueue(self, entry: QueueEntry) -> None:
-        self._pending[entry.workflow_id] = entry
+        # Workflow-bound events de-dupe by workflow_id so the same workflow's
+        # rapid-fire events collapse into one wake. Workflow-less events
+        # (fleet.tick, fleet.anomaly.detected) get a per-reason sentinel key so
+        # tick + anomaly arriving in the same debounce window don't clobber
+        # each other.
+        key = entry.workflow_id or f"__fleet__:{entry.reason}"
+        self._pending[key] = entry
         if not self._task or self._task.done():
             self._task = asyncio.get_event_loop().create_task(self._wait_and_flush())
 

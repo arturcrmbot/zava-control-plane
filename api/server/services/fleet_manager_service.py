@@ -159,8 +159,10 @@ class FleetManagerService:
                 pattern=anomaly["pattern"],
                 workflow_ids=anomaly["workflow_ids"],
             ))
-        # If wake-worthy and has workflow_id, enqueue
-        if self._triage.should_wake(event) and event.workflow_id:
+        # If wake-worthy, enqueue. Workflow-less wakes (fleet.tick,
+        # fleet.anomaly.detected) are first-class — the queue handles them
+        # via per-reason sentinel keys so the rail still pulses on idle demos.
+        if self._triage.should_wake(event):
             self._queue.enqueue(QueueEntry(workflow_id=event.workflow_id, reason=event.type))
             self._on_live({
                 "kind": "wakeup",
@@ -189,7 +191,11 @@ class FleetManagerService:
             }
         })
 
-        prompt_lines = [f"- workflow={b.workflow_id} reason={b.reason}" for b in batch]
+        prompt_lines = [
+            (f"- workflow={b.workflow_id} reason={b.reason}"
+             if b.workflow_id else f"- reason={b.reason}")
+            for b in batch
+        ]
         prompt = (
             "Triggering events:\n"
             + "\n".join(prompt_lines)
@@ -201,7 +207,7 @@ class FleetManagerService:
             span.set_attribute("wpp.fleet_manager.batch_size", len(batch))
             span.set_attribute(
                 "wpp.fleet_manager.workflow_ids",
-                [b.workflow_id for b in batch],
+                [b.workflow_id for b in batch if b.workflow_id],
             )
             # Capture context so session-event tool spans attach as children.
             self._reasoning_parent_ctx = trace.set_span_in_context(span)
