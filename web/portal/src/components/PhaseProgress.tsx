@@ -10,8 +10,23 @@ const PHASES: { id: Phase; label: string }[] = [
   { id: "complete", label: "Done" },
 ];
 
-export default function PhaseProgress({ phase }: { phase: Phase }) {
-  const activeIdx = PHASES.findIndex((p) => p.id === phase);
+// Backend phase strings (from api/functions/workflows/activities.py
+// _with_phase): Budget, JobDesign, Sourcing, Triage, Screening, Voice,
+// Interview, Compliance, Offer, Onboarding. The candidate-side ribbon
+// collapses the orchestration internals into the 7 visible buckets.
+const PHASE_ALIAS: Record<string, Phase> = {
+  budget: "apply",
+  jobdesign: "apply",
+  "job design": "apply",
+  sourcing: "triage",
+  voice: "screening",
+  compliance: "interview",
+};
+
+export default function PhaseProgress({ phase }: { phase: string }) {
+  const norm = (phase ?? "apply").toLowerCase();
+  const resolved = (PHASE_ALIAS[norm] ?? norm) as Phase;
+  const activeIdx = PHASES.findIndex((p) => p.id === resolved);
   return (
     <ol className="flex items-center gap-2 text-xs">
       {PHASES.map((p, i) => {

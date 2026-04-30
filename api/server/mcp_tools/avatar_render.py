@@ -58,9 +58,10 @@ def is_configured() -> bool:
     """
     if os.environ.get("AVATAR_TRANSPORT", "").lower() == "mock":
         return False
-    return bool(os.environ.get("AZURE_SPEECH_REGION")) and bool(
-        os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+    has_speech = bool(os.environ.get("AZURE_SPEECH_ENDPOINT")) or bool(
+        os.environ.get("AZURE_SPEECH_REGION")
     )
+    return has_speech and bool(os.environ.get("AZURE_STORAGE_CONNECTION_STRING"))
 
 
 def _compute_hash(script: str, voice: str = _DEFAULT_VOICE) -> str:
@@ -69,7 +70,14 @@ def _compute_hash(script: str, voice: str = _DEFAULT_VOICE) -> str:
 
 # Lazy singletons — keep import-time clean so unconfigured envs don't crash.
 def _speech_client() -> SpeechAvatarClient:
-    return SpeechAvatarClient(region=os.environ["AZURE_SPEECH_REGION"])
+    # Token auth (DefaultAzureCredential) requires the custom-subdomain
+    # endpoint; the regional /api.cognitive.microsoft.com endpoint only
+    # accepts API keys. Prefer endpoint when set.
+    endpoint = os.environ.get("AZURE_SPEECH_ENDPOINT") or None
+    return SpeechAvatarClient(
+        region=os.environ.get("AZURE_SPEECH_REGION"),
+        endpoint=endpoint,
+    )
 
 
 def _blob_store() -> BlobStore:

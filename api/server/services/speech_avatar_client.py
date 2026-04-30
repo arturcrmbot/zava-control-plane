@@ -39,12 +39,23 @@ class SpeechAvatarClient:
     def __init__(
         self,
         *,
-        region: str,
+        region: str | None = None,
+        endpoint: str | None = None,
         poll_interval_s: float = 10.0,
         max_polls: int = 60,
     ):
-        self._region = region
-        self._base = f"https://{region}.api.cognitive.microsoft.com"
+        # Token auth (DefaultAzureCredential) requires the Speech resource's
+        # custom-subdomain endpoint, NOT the regional /api.cognitive.microsoft.com
+        # form — Azure rejects bearer tokens on the regional endpoint with
+        # "Please provide a custom subdomain for token authentication".
+        # Prefer AZURE_SPEECH_ENDPOINT (https://<resource>.cognitiveservices.azure.com)
+        # over the region; fall back to regional only if endpoint is unset.
+        if endpoint:
+            self._base = endpoint.rstrip("/")
+        elif region:
+            self._base = f"https://{region}.api.cognitive.microsoft.com"
+        else:
+            raise ValueError("SpeechAvatarClient needs endpoint or region")
         self._poll = poll_interval_s
         self._max_polls = max_polls
         self._cred = DefaultAzureCredential()
@@ -107,15 +118,12 @@ class SpeechAvatarClient:
                         raise AvatarRenderError(
                             "no result url in succeeded response"
                         )
-                    mp4 = http.get(
-                        result_url,
-                        headers={
-                            "Authorization": f"Bearer {self._token()}"
-                        },
-                    )
+                    # Result URL is a pre-signed Blob SAS — DO NOT pass our
+                    # Bearer token (Blob rejects it as 403 InvalidAuthentication).
+                    mp4 = http.get(result_url, headers={})
                     if mp4.status_code >= 400:
                         raise AvatarRenderError(
-                            f"mp4 download failed: {mp4.status_code}"
+                            f"mp4 download failed: {mp4.status_code} {mp4.text[:200]}"
                         )
                     return mp4.content
                 if status == "Failed":

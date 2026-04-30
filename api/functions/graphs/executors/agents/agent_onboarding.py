@@ -38,16 +38,23 @@ def _welcome_script(
     )
 
 
-def _avatar_for_role(role_title: str | None) -> str:
-    """Pick a prebuilt Azure Speech avatar based on role flavour. Default lisa."""
+def _avatar_for_role(role_title: str | None) -> tuple[str, str]:
+    """Pick a (character, style) pair compatible with Azure Speech's prebuilt
+    avatar matrix. Each character only supports specific styles — passing
+    an unsupported pair returns 400 from the batch synthesis endpoint.
+
+    Reference: https://learn.microsoft.com/en-us/azure/ai-services/speech-service/text-to-speech-avatar/avatar-gestures-with-ssml
+    """
     if not role_title:
-        return "lisa"
+        return ("lisa", "graceful-sitting")
     rt = role_title.lower()
     if any(k in rt for k in ("data", "engineer", "analyst")):
-        return "harry"
+        # harry only supports "business"
+        return ("harry", "business")
     if "creative" in rt or "design" in rt:
-        return "lori"
-    return "lisa"
+        # lori supports graceful / formal / casual
+        return ("lori", "graceful")
+    return ("lisa", "graceful-sitting")
 
 
 async def execute(input: dict) -> dict:
@@ -73,11 +80,12 @@ async def execute(input: dict) -> dict:
         role_title=role_title,
         manager_name=manager_name,
     )
-    avatar_character = _avatar_for_role(role_title)
+    avatar_character, avatar_style = _avatar_for_role(role_title)
 
     result = avatar_render(
         script=script,
         avatar_character=avatar_character,
+        avatar_style=avatar_style,
     )
 
     out: dict = {
@@ -86,6 +94,7 @@ async def execute(input: dict) -> dict:
         "candidate_name": candidate_name,
         "role_title": role_title,
         "avatar_character": avatar_character,
+        "avatar_style": avatar_style,
     }
 
     if result.result_type == "success" and result.video_url:

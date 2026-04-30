@@ -3,6 +3,17 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+# Both FastAPI and the Azure Functions worker import this module and read env
+# vars at AppState construction. FastAPI's main.py already loads .env before
+# this import, but the Functions worker only sees `local.settings.json` + the
+# system env — without an explicit load here it would miss .env-only vars
+# (ACS_EMAIL_CONNECTION_STRING, AZURE_STORAGE_CONNECTION_STRING, etc.) and
+# the Phase 6 send_screen_email_activity would silently fall through to the
+# offline outbox even when ACS Email is configured.
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from api.server.services.event_bus import EventBus
 from api.server.services.state_store import StateStore
 from api.server.services.audit_logger import AuditLogger

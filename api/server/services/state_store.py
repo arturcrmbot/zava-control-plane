@@ -180,6 +180,15 @@ class StateStore:
         rec = self._candidates.get(candidate_id)
         return dict(rec) if rec else None
 
+    def upsert_candidate(self, candidate: dict) -> None:
+        """Replace the stored candidate record with a copy of `candidate`.
+        Used by portal_orchestration to write back the durable instance_id
+        once the HiringOrchestrator is spawned."""
+        cid = candidate.get("id")
+        if not cid:
+            return
+        self._candidates[cid] = dict(candidate)
+
     def list_candidates(self) -> list[dict]:
         return [dict(r) for r in self._candidates.values()]
 

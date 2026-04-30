@@ -103,6 +103,15 @@ async def status(token: str):
     # workflow.metadata dict once the relevant agent emits them; we surface
     # them straight through.
     meta = (workflow.metadata if workflow else {}) or {}
+    # Look up the candidate's active screen + offer scope tokens (if any)
+    # so the portal UI can mint the right call-to-action URL without an
+    # extra round-trip. Tokens are filtered to active (unconsumed,
+    # unexpired) — list_active() already enforces both conditions.
+    active = app_state.magic_links.list_active()
+    screen_token = next((r["token"] for r in active
+                         if r["candidate_id"] == candidate["id"] and r["scope"] == "screen"), None)
+    offer_token = next((r["token"] for r in active
+                        if r["candidate_id"] == candidate["id"] and r["scope"] == "offer"), None)
     return {
         "candidate": candidate,
         "phase": phase,
@@ -110,6 +119,8 @@ async def status(token: str):
         "offer_letter_url": meta.get("offer_letter_url") if phase == "Offer" else None,
         "onboarding_video_url": meta.get("onboarding_video_url") if phase == "Onboarding" else None,
         "voice_transcript": candidate.get("voice_transcript", []),
+        "screen_token": screen_token,
+        "offer_token": offer_token,
     }
 
 
@@ -132,7 +143,7 @@ async def decide_offer(token: str, decision: str):
     """Single-use accept/decline endpoint for an offer-scope magic link.
 
     Consumes the token (single_use=True at issuance), raises an
-    `offer_decision` external event on the underlying HiringOrchestrator
+    `offer_approval` external event on the underlying HiringOrchestrator
     instance so the workflow resumes Phase 9, and emits an `offer.decided`
     bus event for the Control Plane.
     """
@@ -152,8 +163,12 @@ async def decide_offer(token: str, decision: str):
     instance_id = candidate.get("instance_id")
     if instance_id:
         try:
+            # Event name MUST match the orchestrator's wait_for_external_event
+            # in api/functions/workflows/hiring.py — Phase 9 awaits
+            # `offer_approval`, not `offer_decision`.
             await raise_orchestration_event(
-                instance_id, "offer_decision", {"decision": decision},
+                instance_id, "offer_approval",
+                {"decision": decision, "resolved_by": "candidate_portal"},
             )
         except Exception as exc:  # pragma: no cover — surfaces in logs
             # The orchestration may already be terminal; we still want the
