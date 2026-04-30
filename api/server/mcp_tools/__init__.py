@@ -7,6 +7,7 @@ from .dry_run_policy import make_dry_run_policy_tool, dry_run_policy_impl
 from .query_reviewer_decisions import query_reviewer_decisions_tool
 from .query_economics import query_economics_tool
 from . import claim_lookup  # noqa: F401  (Phase 1 Intake — Workday/Concur dispatcher)
+from . import avatar_render  # noqa: F401  (Phase 10 Onboarding — Azure Speech avatar)
 
 
 def build_fleet_manager_tools(store, audit):
