@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from api.server.mcp_tools.claim_get_receipt import get_receipt
 from api.server.mcp_tools.claim_get_structured import claim_get_structured_tool
+from api.server.mcp_tools.ocr_extract import ocr_extract_tool
 
 from ._wrapper import SKILLS_DIR, run_agent_session
 
@@ -22,6 +23,7 @@ _SKILL_DIR = SKILLS_DIR / "receipt-validator"
 
 async def execute(input: dict) -> dict:
     claim_id = input["claim_id"]
+    workflow_id = input.get("workflow_id")
     receipt = get_receipt(claim_id)
 
     if receipt["absent"]:
@@ -54,9 +56,10 @@ async def execute(input: dict) -> dict:
 
     validation = await run_agent_session(
         prompt=prompt,
-        tools=[claim_get_structured_tool],
+        tools=[claim_get_structured_tool, ocr_extract_tool],
         skill_dir=_SKILL_DIR,
         skill_label="receipt-validator",
         attachments=attachments,
+        workflow_id=workflow_id,
     )
     return {"receipt_validation": validation}

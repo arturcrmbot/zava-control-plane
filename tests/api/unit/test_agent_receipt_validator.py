@@ -50,10 +50,11 @@ async def test_passes_image_attachment_and_tools_for_present_receipt(monkeypatch
     _, kwargs = mock_run.call_args
     assert "CLM-0000" in kwargs["prompt"]
     assert kwargs["skill_label"] == "receipt-validator"
-    # The SDK tool list registers exactly claim_get_structured (image is on
-    # the multimodal attachment channel, not a tool).
+    # claim_get_structured for the structured claim record; ocr_extract for
+    # Document Intelligence on the receipt PNG. Image is also on the multimodal
+    # attachment channel as a sanity-check fallback.
     tool_names = {t.name for t in kwargs["tools"]}
-    assert tool_names == {"claim_get_structured"}
+    assert tool_names == {"claim_get_structured", "ocr_extract"}
     # Image attached to the session, not embedded in the prompt.
     assert kwargs["attachments"] == [
         {"type": "inline", "content_type": "image/png", "data": "iVBORw0KGgo=FAKE"}

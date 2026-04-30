@@ -1,7 +1,7 @@
 ---
 name: receipt-validator
 description: Cross-validate an expense claim's receipt image against the claim's structured fields (vendor, amount, date, line item). Detect six mismatch flavours: correct, wrong-amount, wrong-date, wrong-vendor, missing-line-item, missing-receipt.
-allowed-tools: claim_get_structured
+allowed-tools: claim_get_structured, ocr_extract
 ---
 
 You validate receipt images against expense-claim records.
@@ -9,6 +9,18 @@ You validate receipt images against expense-claim records.
 ## Inputs
 
 The user prompt names a claim id. The session may also include the receipt image as a multimodal attachment.
+
+## Step 0: Extract via Document Intelligence
+
+Before inspecting the image, call:
+
+```
+ocr_extract(document_id=claim_id, model="prebuilt-receipt")
+```
+
+The structured fields it returns (`merchantName`, `total`, `transactionDate`, `items[]`) are your **authoritative read** of the receipt. Use them as primary evidence, with the attached image as a sanity check. Cite the per-field confidence scores in your evidence sentence per the use-document-intelligence skill.
+
+If `ocr_extract` returns a `failure` result, follow the error-handling guidance in use-document-intelligence: fall back to vision-only validation if the failure is transient (timeout, 5xx); short-circuit to `missing-receipt` if the document is genuinely absent.
 
 Procedure:
 
@@ -33,13 +45,19 @@ Return exactly one JSON object, no prose:
   "verdict": "match" | "mismatch",
   "flavour": "correct" | "wrong-amount" | "wrong-date" | "wrong-vendor" | "missing-line-item" | "missing-receipt",
   "evidence": "1-3 sentences. State what the receipt shows and what the claim asserts; identify the mismatch (or confirm match).",
-  "confidence": 0.0
+  "confidence": 0.0,
+  "field_confidences": {
+    "merchantName": 0.0,
+    "total": 0.0,
+    "transactionDate": 0.0
+  }
 }
 ```
 
 Rules:
 - `verdict` is `"match"` iff `flavour == "correct"`.
-- `evidence` quotes specific values from the receipt (`"receipt total reads USD 234.50"`) and the claim (`"claim asserts USD 156.33"`). Never guess fields you can't see.
+- `evidence` quotes specific values from Document Intelligence with their confidences (`"Document Intelligence reads total=USD 234.50 (conf 0.97)"`) and the claim (`"claim asserts USD 156.33"`). Never guess fields you can't see.
+- `field_confidences` carries the DI confidences through to the audit trail. Copy them verbatim from the `documents[].fields.*.confidence` values you read.
 - If the image is unreadable or absent, return `flavour: "missing-receipt"` (or `flavour: "missing-line-item"` if the header is visible but the body is illegible).
 - The skill is non-destructive — never propose corrections to the claim record. Just classify the mismatch.
 
