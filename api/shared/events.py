@@ -47,6 +47,7 @@ FleetEventType = Literal[
     "candidate.applied",
     "magic_link.issued",
     "offer.decided",
+    "voice_transcript.received",
 ]
 
 
