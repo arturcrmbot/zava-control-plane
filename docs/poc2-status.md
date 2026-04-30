@@ -2,17 +2,19 @@
 
 Sister doc to [poc1-status.md](poc1-status.md) — same shape, applied to POC2 (HR Talent Lifecycle, 12-week sprint, the "Frontier POC"). The thesis is **reuse the POC1 platform; swap the domain.** Per [poc1-inventory.md](poc1-inventory.md) ≈ 75% of POC1 source artifacts are domain-agnostic platform; POC2 keeps that and replaces skills, MCP mocks, UI labels, and the per-phase graph set, then adds four genuinely new capabilities (voice, avatar, A2A, jurisdiction switching).
 
+**Status snapshot (2026-04-30):** the POC2 spine merged into `main` 2026-04-30 — 10-phase `HiringOrchestrator`, all ten phase graphs, ten hiring skills, seven MCP mocks (4201–4207), 50-CV synthetic corpus across 5 roles × 2 jurisdictions, and Tracks B (multi-surface), D (jurisdiction), E (frontier) and F (reuse) at first-runnable. Today also landed: removal of the Threadlight surface stub and `PhaseRibbon` switching for hiring workflows. POC2 demo runbook lives in [poc2-DEMO.md](poc2-DEMO.md). What remains is per-track polish + a 30-min dry run; see §3.
+
 Three sections: capability map against the 22 demos, architecture (with the local-vs-cloud split + what's reused from POC1), and the build plan.
 
 ---
 
 ## 1. Capability matrix — starting state
 
-22 demos required from [spec.md](../spec.md) §4.1–4.22. Status legend:
+22 demos required from [spec.md](../spec.md) §4.1–4.22. Updated 2026-04-30 to reflect what's actually wired in `main` after the spine merge. Status legend:
 
-- ✅ — POC1 plumbing applies as-is (Control Plane shell, Durable runtime, Fleet Manager, OTEL, audit ledger, validator-as-guardrail edges, bulk HITL modal).
-- 🟡 — POC1 has the shape; rebind by swapping skill prompt, MCP endpoint, or label.
-- ❌ — net-new for POC2; no analogue in POC1.
+- ✅ — wired in `main` and demoable against the local stack (per [poc2-DEMO.md](poc2-DEMO.md)).
+- 🟡 — code path exists; needs polish, fixtures, or end-to-end verification before it lights up cleanly.
+- ❌ — net-new and not yet implemented.
 
 | § | Capability | Status | What backs it |
 |---|---|---|---|

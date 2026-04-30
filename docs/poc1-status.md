@@ -13,8 +13,8 @@ Handover doc for the technical team. Three sections: where we are against the br
 | 1 | Single Finance Controller view across 30+ workflows | ✅ | [expense_claim.py](../api/functions/workflows/expense_claim.py); [simulator_orchestrator.py](../api/server/services/simulator_orchestrator.py) |
 | 2 | Exception-only surfacing | ✅ | [WorkflowCard.tsx](../web/client/components/WorkflowCard.tsx) |
 | 3 | Bulk approval 10+ | ✅ | [BulkHitlModal.tsx](../web/client/components/BulkHitlModal.tsx) |
-| 4 | ≥95% R/A/G accuracy | 🟡 | Pipeline live; first 300-claim run 64.3%; smoke 5/6 after one prompt iteration; full re-run is post-tag work per [accuracy run-book](poc1-accuracy-runbook.md). [rag-classifier/SKILL.md](../api/server/skills/rag-classifier/SKILL.md), [accuracy_harness_workflow.py](../api/functions/workflows/accuracy_harness_workflow.py) |
-| 5 | Receipt cross-validation | ✅ | Live smoke 3/3. [receipt-validator/SKILL.md](../api/server/skills/receipt-validator/SKILL.md), [receipt.py](../api/functions/graphs/receipt.py) |
+| 4 | ≥95% R/A/G accuracy | 🟡 | Pipeline rebuilt 2026-04-30 over Foundry: batch corpus run via `evaluate()` ([batch_runner.py](../api/server/eval/batch_runner.py)) + online per-agent eval on `agent.completed` events ([online_subscriber.py](../api/server/eval/online_subscriber.py)) + 3 deterministic custom evaluators (`PolicyClauseCited`, `ToolCallValidity`, `GoldLabelMatch`) plus per-agent LLM-judge set. Results in sqlite [`EvalStore`](../api/server/eval/store.py); UI [Evaluations](../web/client/routes/Evaluations.tsx) reads `/api/evals/summary`. `/api/accuracy/run` returns 503 if Foundry isn't configured (no fake numbers). Old `accuracy_harness_workflow` deleted. Full 300-claim corpus run still pending. |
+| 5 | Receipt cross-validation | ✅ | Live smoke 3/3. Receipt OCR upgraded 2026-04-30 from in-repo stub to real Azure Document Intelligence via [`ocr_extract`](../api/server/mcp_tools/ocr_extract.py) MCP tool (Entra-ID auth, sha256+model cache); [receipt-validator/SKILL.md](../api/server/skills/receipt-validator/SKILL.md) calls `ocr_extract` first then cross-validates against the claim record. [receipt.py](../api/functions/graphs/receipt.py) |
 | 6 | Progressive enforcement | ✅ | [escalation-advisor/SKILL.md](../api/server/skills/escalation-advisor/SKILL.md), [employee_history.py](../api/server/mcp_tools/employee_history.py) |
 | 7 | Autonomous learning | ✅ | Phase 5 HITL justification round-trip + FM `fleet.tick` behaviour-change loop. [fleet-manager/SKILL.md](../api/server/skills/fleet-manager/SKILL.md), [query_reviewer_decisions.py](../api/server/mcp_tools/query_reviewer_decisions.py) |
 | 8 | SSC Reviewer interface | ✅ | [arbitration/SKILL.md](../api/server/skills/arbitration/SKILL.md), [arbitrate.py](../api/functions/graphs/arbitrate.py), [ReviewerQueue.tsx](../web/client/routes/ReviewerQueue.tsx) |
@@ -24,7 +24,7 @@ Handover doc for the technical team. Three sections: where we are against the br
 | 12 | Immutable audit + reporting | ✅ | [audit-summariser/SKILL.md](../api/server/skills/audit-summariser/SKILL.md), [audit.py](../api/functions/graphs/audit.py), [audit_query.py](../api/server/mcp_tools/audit_query.py) |
 | 13 | Cost-per-task report | ✅ | [query_economics.py](../api/server/mcp_tools/query_economics.py) + FM `report.cost_per_task` skill section |
 
-**12 demoable, 1 partial.** AC #4 (corpus-wide ≥95%) is one ~25-minute model run away; the pipeline is shipped (smoke 5/6 after iteration). Run via [poc1-accuracy-runbook.md](poc1-accuracy-runbook.md) post-tag.
+**12 demoable, 1 partial.** AC #4 (corpus-wide ≥95%) — Foundry-backed pipeline shipped 2026-04-30; full corpus run still pending and now requires `AZURE_FOUNDRY_PROJECT_ENDPOINT` + judge-model deployment in env. Run via [poc1-accuracy-runbook.md](poc1-accuracy-runbook.md).
 
 ---
 
@@ -119,9 +119,17 @@ flowchart LR
 
 ## 3. What's left
 
-### AC #4 — Corpus-wide accuracy gate
+### AC #4 — Corpus-wide accuracy gate (Foundry)
 
-The pipeline is live; one ~25-minute model run captures the number into `docs/poc1-accuracy-baseline.json`. Per the [run-book](poc1-accuracy-runbook.md), iterate prompt + retrieval if < 95% (we're already at smoke 5/6 after one tweak). Run post-tag, not pre-demo.
+Pipeline now Foundry-gated. Configure `AZURE_FOUNDRY_PROJECT_ENDPOINT`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_FOUNDRY_JUDGE_MODEL_DEPLOYMENT`; pre-classify the 300-claim corpus, hit `POST /api/accuracy/run`, results land in the sqlite store + Foundry portal. Iterate prompt + retrieval if <95% per the [run-book](poc1-accuracy-runbook.md).
+
+### What landed 2026-04-29 → 2026-04-30 (post tag `v0.8`)
+
+- Demo polish: receipt thumbnails + 4-button reviewer actions ([ReviewerQueue.tsx](../web/client/routes/ReviewerQueue.tsx)), Policy What-If with real impact numbers, Analytics page (6 KPI + 4 stacked-bar breakdowns), Economics page (cost composition + savings vs $18/claim baseline).
+- Foundry eval integration (replaces the old in-repo accuracy harness): `evaluate()` batch + online subscriber + sqlite EvalStore + 3 custom evaluators + per-agent evaluator set + UI rewritten over `/api/evals/summary`. `agent.completed` event plumbed through all 13 agent executors and bridged across the Functions-host → FastAPI process boundary.
+- Receipt OCR upgraded from stub to real Azure Document Intelligence (`ocr_extract` MCP tool, [use-document-intelligence](../api/server/skills/use-document-intelligence/SKILL.md) skill, Entra-ID auth — tenant policy disables key auth on Cognitive Services).
+- Fleet Manager rail now responds on red routes + idle ticks (no more dead rail during demo).
+- Unified Agent Administrator view — POC1 + POC2 fleets in one shell.
 
 ### Demo dry run
 
@@ -141,4 +149,4 @@ Walk through [DEMO.md](DEMO.md) end-to-end with someone playing WPP evaluator. C
 | Local dev | [DEVELOPMENT.md](DEVELOPMENT.md) |
 | Demo script | [DEMO.md](DEMO.md) |
 
-**Current tag:** `v0.8-poc1-platform-complete`. AC #4 corpus-wide accuracy run is the only remaining work.
+**Current tag:** `v0.8-poc1-platform-complete`. Outstanding: AC #4 full Foundry corpus run (needs Foundry project + judge-model env vars) and a demo dry run.

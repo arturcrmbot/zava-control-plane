@@ -46,11 +46,21 @@ def _llm_evaluator_classes():
 
 
 def _build_llm_evaluator(name: str) -> Any:
-    """Construct one LLM evaluator with the right kwargs for its constructor."""
+    """Construct one LLM evaluator with the right kwargs for its constructor.
+
+    Quality evaluators (groundedness/relevance/similarity/coherence/fluency)
+    take `model_config=`. Safety evaluators (violence/hate_unfairness/etc.)
+    take `azure_ai_project=` AND `credential=` — the SDK enforces credential
+    as a required positional kwarg, not optional.
+    """
     classes = _llm_evaluator_classes()
     cls = classes[name]
     if name in ("violence", "hate_unfairness"):
-        return cls(azure_ai_project=foundry_client.get_project_config())
+        from azure.identity import DefaultAzureCredential
+        return cls(
+            azure_ai_project=foundry_client.get_project_config(),
+            credential=DefaultAzureCredential(),
+        )
     return cls(model_config=foundry_client.get_model_config())
 
 

@@ -20,8 +20,8 @@ def mock_sdk_evaluators():
             SimilarityEvaluator=lambda model_config: ("similarity", model_config),
             CoherenceEvaluator=lambda model_config: ("coherence", model_config),
             FluencyEvaluator=lambda model_config: ("fluency", model_config),
-            ViolenceEvaluator=lambda azure_ai_project, credential=None: ("violence", azure_ai_project),
-            HateUnfairnessEvaluator=lambda azure_ai_project, credential=None: ("hate_unfairness", azure_ai_project),
+            ViolenceEvaluator=lambda azure_ai_project, credential: ("violence", azure_ai_project),
+            HateUnfairnessEvaluator=lambda azure_ai_project, credential: ("hate_unfairness", azure_ai_project),
         ),
     }):
         import sys
@@ -30,8 +30,9 @@ def mock_sdk_evaluators():
 
 
 def test_rag_classifier_evaluator_set_includes_groundedness_and_custom(monkeypatch, mock_sdk_evaluators):
-    monkeypatch.setenv("AZURE_FOUNDRY_PROJECT_ENDPOINT", "https://e")
-    monkeypatch.setenv("AZURE_FOUNDRY_JUDGE_MODEL_DEPLOYMENT", "gpt-4o")
+    monkeypatch.setenv("AZURE_FOUNDRY_PROJECT_ENDPOINT", "https://e/api/projects/p")
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://aoai.example.com")
+    monkeypatch.setenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
     from api.server.eval.evaluator_set import evaluators_for
     evals = evaluators_for("rag-classifier")
     assert set(evals.keys()) == {
@@ -41,8 +42,9 @@ def test_rag_classifier_evaluator_set_includes_groundedness_and_custom(monkeypat
 
 
 def test_arbitration_evaluator_set(monkeypatch, mock_sdk_evaluators):
-    monkeypatch.setenv("AZURE_FOUNDRY_PROJECT_ENDPOINT", "https://e")
-    monkeypatch.setenv("AZURE_FOUNDRY_JUDGE_MODEL_DEPLOYMENT", "gpt-4o")
+    monkeypatch.setenv("AZURE_FOUNDRY_PROJECT_ENDPOINT", "https://e/api/projects/p")
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://aoai.example.com")
+    monkeypatch.setenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
     from api.server.eval.evaluator_set import evaluators_for
     evals = evaluators_for("arbitration")
     assert set(evals.keys()) == {
@@ -51,8 +53,9 @@ def test_arbitration_evaluator_set(monkeypatch, mock_sdk_evaluators):
 
 
 def test_unknown_agent_label_falls_back_to_default(monkeypatch, mock_sdk_evaluators):
-    monkeypatch.setenv("AZURE_FOUNDRY_PROJECT_ENDPOINT", "https://e")
-    monkeypatch.setenv("AZURE_FOUNDRY_JUDGE_MODEL_DEPLOYMENT", "gpt-4o")
+    monkeypatch.setenv("AZURE_FOUNDRY_PROJECT_ENDPOINT", "https://e/api/projects/p")
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://aoai.example.com")
+    monkeypatch.setenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
     from api.server.eval.evaluator_set import evaluators_for
     evals = evaluators_for("some-future-poc2-agent")
     assert set(evals.keys()) == {"coherence", "fluency", "violence", "hate_unfairness"}
