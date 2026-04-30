@@ -1,9 +1,23 @@
 # src/functions/graphs/voice.py
 """POC2 Phase 6 (Voice screening) graph.
 
-Spine stub. Track C wires this to the `voice-screener` skill calling
-`acs_dial` + `transcript_score` per spec §4.5. ACS / GPT-Realtime stubbed
-locally via `acs-mcp`.
+The orchestration generator in `api/functions/workflows/hiring.py` now
+gates Phase 6 on a `voice_complete` external event raced against a 24h
+timer (see `VOICE_SCREEN_TIMEOUT`). Before suspending, the orchestrator
+issues a `screen`-scope magic link via `issue_screen_link_activity` and
+emails the candidate the /screen call URL via
+`send_screen_email_activity`. The FastAPI route
+`/api/portal/voice/{candidate_id}/transcript` raises the
+`voice_complete` event with the final score after the firstcentral s2s
+accelerator's frontend POSTs the transcript on call-end.
+
+This graph runs AFTER the suspend resolves: its job is to log a span,
+validate the transcript schema against the existing rubric, and emit
+the structured verdict downstream phases consume. The score from the
+external-event payload is folded into the result by the orchestration
+generator. ACS / GPT-Realtime live behind the accelerator black box —
+the legacy `acs-mcp` mock is retained only for `VOICE_TRANSPORT=canned`
+demo robustness.
 """
 from __future__ import annotations
 from agent_framework import Workflow, WorkflowBuilder

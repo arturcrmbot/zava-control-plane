@@ -171,6 +171,21 @@ def hiring_voice_activity(payload: dict) -> dict:
     ))
 
 
+# Phase 6 voice-screen activities live in their own module so they can be
+# imported (e.g. from tests) without dragging in the agent-framework graph
+# stack via `api.functions.graphs.*`. We re-export here so function_app.py's
+# registration block stays unchanged.
+from api.functions.workflows.voice_screen_activities import (  # noqa: E402
+    issue_screen_link_activity,
+    send_screen_email_activity,
+)
+
+__all__ = list(globals().get("__all__", [])) + [
+    "issue_screen_link_activity",
+    "send_screen_email_activity",
+]
+
+
 def hiring_interview_activity(payload: dict) -> dict:
     """POC2 Phase 7 — Interview (graph_calendar + graph_mail panel scheduling)."""
     return asyncio.run(_run_workflow(

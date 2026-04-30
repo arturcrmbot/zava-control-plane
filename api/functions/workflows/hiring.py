@@ -30,6 +30,7 @@ from api.shared.constants import (
     DECISION_REJECTED,
     BUDGET_APPROVAL_TIMEOUT,
     OFFER_APPROVAL_TIMEOUT,
+    VOICE_SCREEN_TIMEOUT,
 )
 
 
@@ -101,7 +102,79 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
         })
         return {"status": "auto_dropped", "phase": "Screening", "screening": screening_result}
 
-    voice_result = yield context.call_activity("hiring_voice_activity_trigger", enriched)
+    # Phase 6: Voice screen — issue a one-shot screen-scope magic link, email
+    # the candidate the /screen call URL, then suspend on `voice_complete`
+    # raced against a 24h timer. The FastAPI /api/portal/voice/{id}/transcript
+    # callback (raised by the firstcentral s2s accelerator's frontend on
+    # call-end) fires the event with the final score.
+    candidate_id = (input_dict.get("candidate_id")
+                    or (enriched.get("metadata") or {}).get("candidate_id"))
+    if candidate_id:
+        link_result = yield context.call_activity(
+            "issue_screen_link_activity_trigger",
+            {"candidate_id": candidate_id},
+        )
+        yield context.call_activity(
+            "send_screen_email_activity_trigger",
+            {
+                "candidate_id": candidate_id,
+                "token": link_result.get("token"),
+                "portal_url": link_result.get("portal_url"),
+            },
+        )
+
+        yield context.call_activity("checkpoint_activity_trigger", {
+            "workflow_id": workflow_id, "instance_id": context.instance_id,
+            "kind": "suspended",
+            "payload": {"reason": "awaiting_voice_complete", "phase": "Voice"},
+        })
+
+        voice_event = context.wait_for_external_event("voice_complete")
+        timeout_event = context.create_timer(
+            context.current_utc_datetime + VOICE_SCREEN_TIMEOUT,
+        )
+        winner = yield context.task_any([voice_event, timeout_event])
+
+        if winner == timeout_event:
+            yield context.call_activity("checkpoint_activity_trigger", {
+                "workflow_id": workflow_id, "instance_id": context.instance_id,
+                "kind": "workflow.completed",
+                "payload": {"status": "timeout", "phase": "Voice"},
+            })
+            return {"status": "timeout", "phase": "Voice"}
+        timeout_event.cancel()
+
+        # On callback, hand the score-bearing event payload into the voice
+        # graph so the agent step still runs (gives us spans + the rubric
+        # validator) but with the real transcript score in scope.
+        voice_payload = voice_event.result if hasattr(voice_event, "result") else {}
+        enriched_voice_input = {
+            **enriched,
+            "voice_event": voice_payload,
+            "screen_link": link_result,
+        }
+        voice_result = yield context.call_activity(
+            "hiring_voice_activity_trigger", enriched_voice_input,
+        )
+        # Surface the score the FastAPI callback raised so downstream phases
+        # can read it without re-parsing the event payload.
+        if isinstance(voice_payload, dict) and voice_payload.get("score") is not None:
+            voice_result = {**(voice_result or {}),
+                            "score": voice_payload.get("score"),
+                            "duration_s": voice_payload.get("duration_s")}
+
+        yield context.call_activity("checkpoint_activity_trigger", {
+            "workflow_id": workflow_id, "instance_id": context.instance_id,
+            "kind": "resumed",
+            "payload": {"phase": "Voice", "score": voice_payload.get("score")
+                        if isinstance(voice_payload, dict) else None},
+        })
+    else:
+        # No candidate_id bound (legacy / spine-only test path): fall back to
+        # the synchronous voice activity so existing tests keep passing.
+        voice_result = yield context.call_activity(
+            "hiring_voice_activity_trigger", enriched,
+        )
     enriched = {**enriched, "voice": voice_result}
 
     # Phase 7: Interview

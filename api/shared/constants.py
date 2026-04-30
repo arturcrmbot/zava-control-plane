@@ -18,3 +18,9 @@ REVIEWER_DECISION_TIMEOUT: timedelta = timedelta(hours=72)
 # both reasonably sit for several days before timing out.
 BUDGET_APPROVAL_TIMEOUT: timedelta = timedelta(days=7)
 OFFER_APPROVAL_TIMEOUT: timedelta = timedelta(days=7)
+
+# Phase 6 voice screen — candidate has 24h to walk through the screening
+# call link. After the timer wins, the orchestration emits a verdict of
+# `timeout` and the candidate must reapply. Mirrors the existing
+# wait_for_external_event race-against-timer pattern used elsewhere.
+VOICE_SCREEN_TIMEOUT: timedelta = timedelta(hours=24)

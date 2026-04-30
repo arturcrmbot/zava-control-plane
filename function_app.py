@@ -23,6 +23,8 @@ from api.functions.workflows.activities import (
     hiring_triage_activity,
     hiring_screening_activity,
     hiring_voice_activity,
+    issue_screen_link_activity,
+    send_screen_email_activity,
     hiring_interview_activity,
     hiring_compliance_activity,
     hiring_offer_activity,
@@ -119,6 +121,20 @@ def hiring_screening_activity_trigger(payload: dict) -> dict:
 @app.activity_trigger(input_name="payload")
 def hiring_voice_activity_trigger(payload: dict) -> dict:
     return hiring_voice_activity(payload)
+
+
+# Phase 6 voice screen — magic-link issuance + email delivery happen as
+# their own activities so they show up as discrete spans on the workflow
+# timeline. The orchestration generator suspends on `voice_complete`
+# between these and the FastAPI /transcript callback.
+@app.activity_trigger(input_name="payload")
+def issue_screen_link_activity_trigger(payload: dict) -> dict:
+    return issue_screen_link_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def send_screen_email_activity_trigger(payload: dict) -> dict:
+    return send_screen_email_activity(payload)
 
 
 @app.activity_trigger(input_name="payload")
