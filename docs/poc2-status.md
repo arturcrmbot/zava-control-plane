@@ -18,29 +18,29 @@ Three sections: capability map against the 22 demos, architecture (with the loca
 
 | § | Capability | Status | What backs it |
 |---|---|---|---|
-| 4.1 | Multi-agent orchestration (parallel + sequential) | 🟡 | `ExpenseClaimOrchestrator` (7 phases) → `HiringOrchestrator` (10 phases). Same Durable+MAF pattern. |
-| 4.2 | System integration & auth (Greenhouse, LinkedIn, Workday-HR, Graph, ServiceNow) | 🟡 | Replace the three POC1 EMS mocks (Workday, Concur, Maconomy) with the seven POC2 MCP mocks. Same `@define_tool` + Pydantic shape. |
-| 4.3 | HITL gates + bulk action across surfaces | ✅ | `BulkHitlModal` + `wait_for_external_event` reusable. New: Adaptive Card path for Finance BP, ServiceNow webhook path for IT Ops. |
-| 4.4 | Exception handling & self-healing | ✅ | `exception_factory` + `triage` services unchanged. Action labels rebind. |
-| 4.5 | Voice screening + avatar onboarding | ❌ | Net-new: ACS + GPT-Realtime for inbound voice screen; HeyGen avatar for day-1 onboarding. |
-| 4.6 | Multi-surface convergence (5 humans, 4 timezones) | ❌ | New surfaces: Hiring Manager via Teams/Copilot, Finance BP via email Adaptive Card, IT Ops via ServiceNow webhook, Candidate via web+voice. POC1 only has Control Plane + reviewer queue. |
-| 4.7 | Episodic memory | 🟡 | POC1 has `state_store` + `audit_logger` ledger; POC2 adds Cosmos-style episodic recall ("similar candidate last quarter rejected for X"). |
-| 4.8 | Crystallisation pipeline (CV → structured profile) | ❌ | Net-new Triage agent step; multi-modal (PDF + LinkedIn JSON + free-text). |
-| 4.9 | Synthetic CV gym for evals | 🟡 | POC1's `data/synthetic/generate.py` pattern reusable. New corpus: ~200 CVs across 10 roles + ground-truth shortlist labels. |
-| 4.10 | Compliance & jurisdiction switching (USA vs Germany / BetrVG) | ❌ | Net-new Compliance agent + per-jurisdiction policy corpus. POC1 has one policy doc; POC2 has two with divergent rules. |
-| 4.11 | Tiered model usage (cheap screen / frontier reasoning) | ✅ | Already in POC1 via skill `model:` frontmatter. |
-| 4.12 | Skill library + APIOps gate | 🟡 | POC1 ships skills locally. POC2 publishes via API Center governance; CI gate is new. |
-| 4.13 | Hooks (`onPreToolUse` / `onPostToolUse`) for non-revocable sends | ✅ | POC1 receipt + notification path uses hooks. Same pattern for offer-letter send + ServiceNow JML provisioning. |
-| 4.15 | Entra Agent ID for `hiring-agent@wpp` | 🟡 | POC1 narrates this; POC2 demonstrates it (preview API). |
-| 4.16 | Audit trail + jurisdiction-partitioned reporting | 🟡 | POC1 ledger reusable; partition by `jurisdiction` is new. |
-| 4.17 | Cost-per-hire report | 🟡 | POC1 `economics.py` service maps directly; relabel "per-claim" → "per-hire". |
-| 4.18 | Process evolution proposals | 🟡 | POC1 `propose_skill_amp` MCP tool reusable. New proposal types (e.g. "auto-reject candidates failing right-to-work check"). |
-| 4.19 | A2A at candidate boundary | ❌ | Net-new. External candidate Personal Agent talks to internal hiring-agent over A2A; APIM polices the boundary. |
-| 4.20 | Drift detection + 10% spot-check audit | 🟡 | Fleet Manager skill extension; reuses `query_traces` + `query_fleet`. |
-| 4.21 | AG-UI dynamic components | ❌ | Net-new. Agent emits component spec; UI renders it inline. POC1 UI is static. |
-| 4.22 | Region failure + jurisdiction-aware model routing | 🟡 | Region failover reuses POC1's Durable replay (AC #11 plan). Jurisdiction-aware APIM routing is new policy. |
+| 4.1 | Multi-agent orchestration (parallel + sequential) | ✅ | [`hiring.py`](../api/functions/workflows/hiring.py) — 10-phase `HiringOrchestrator` Durable generator with HITL waits at Phases 1 (Budget) + 9 (Offer). |
+| 4.2 | System integration & auth | ✅ | Seven Node MCP mocks live: [greenhouse](../mocks/greenhouse-mcp/) :4201, [linkedin](../mocks/linkedin-mcp/) :4202, [workday-hr](../mocks/workday-hr-mcp/) :4203, [graph](../mocks/graph-mcp/) :4204, [servicenow](../mocks/servicenow-mcp/) :4205, [acs](../mocks/acs-mcp/) :4206, [heygen](../mocks/heygen-mcp/) :4207. |
+| 4.3 | HITL gates + bulk action across surfaces | ✅ | `BulkHitlModal` reusable. New: [`adaptive_card.py`](../api/server/services/adaptive_card.py) Finance BP card composer + [`webhooks_finance_bp.py`](../api/server/routes/webhooks_finance_bp.py) callback raising `budget_approval` event; [`webhooks_servicenow.py`](../api/server/routes/webhooks_servicenow.py) IT Ops webhook. |
+| 4.4 | Exception handling & self-healing | ✅ | POC1 `exception_factory` + `triage` reused; hiring-flavour categories (e.g. `right_to_work_unverified`) added. |
+| 4.5 | Voice screening + avatar onboarding | ✅ | Phase 6 [voice.py](../api/functions/graphs/voice.py) + [voice-screener](../api/server/skills/voice-screener/SKILL.md) skill calls `acs-mcp`; Phase 10 [onboarding.py](../api/functions/graphs/onboarding.py) + [onboarding-buddy](../api/server/skills/onboarding-buddy/SKILL.md) calls `heygen-mcp`. Mocks return canned transcript + mp4 URL. |
+| 4.6 | Multi-surface convergence (5 humans, 4 timezones) | ✅ | Five surfaces wired: Control Plane (HR BP) + ReviewerQueue + [HiringManager.tsx](../web/client/routes/HiringManager.tsx) (Hiring Manager) + Finance BP webhook + ServiceNow webhook + A2A inbound (Candidate). |
+| 4.7 | Episodic memory | ✅ | [`recall_similar_hires.py`](../api/server/mcp_tools/recall_similar_hires.py) MCP tool — local state-store query keyed on `(role_family, jurisdiction)`. Cosmos backing is the cloud-target swap. |
+| 4.8 | Crystallisation pipeline (CV → structured profile) | ✅ | Phase 4 [triage.py](../api/functions/graphs/triage.py) + [cv-crystalliser](../api/server/skills/cv-crystalliser/SKILL.md). Calls `ocr_extract` (Document Intelligence, `prebuilt-layout`) first, then merges with LinkedIn JSON + free-text. |
+| 4.9 | Synthetic CV gym for evals | 🟡 | [`generate_hiring.py`](../data/synthetic/hiring/generate_hiring.py) produces 50 CVs across 5 roles × 2 jurisdictions with `labels.csv` ground truth. Spec target was 200 across 10 roles; expand if eval needs more variance. |
+| 4.10 | Compliance & jurisdiction switching (USA vs Germany / BetrVG) | ✅ | Phase 8 [compliance.py](../api/functions/graphs/compliance.py) + [jurisdiction-router](../api/server/skills/jurisdiction-router/SKILL.md) + [betrvg-checker](../api/server/skills/betrvg-checker/SKILL.md). Two policy bundles under `data/synthetic/hiring/policies/{usa,de}/`. |
+| 4.11 | Tiered model usage (cheap screen / frontier reasoning) | ✅ | Skill `model:` frontmatter drives gpt-4.1-mini for `auto-shortlister`, gpt-4.1 for `cv-crystalliser`. |
+| 4.12 | Skill library + APIOps gate | 🟡 | All hiring skills under `api/server/skills/`; APIM/API-Center governance + CI gate is engagement-POC, narrated only. |
+| 4.13 | Hooks (`onPreToolUse` / `onPostToolUse`) for non-revocable sends | ✅ | POC1 hook pattern reused for offer-letter send (Phase 9) + ServiceNow JML provisioning (Phase 10). |
+| 4.15 | Entra Agent ID for `hiring-agent@wpp` | 🟡 | Local demo uses `gh` CLI token; cloud-target Entra Agent ID narrated. `ocr_extract` does demonstrate Entra-ID auth in the lab today. |
+| 4.16 | Audit trail + jurisdiction-partitioned reporting | ✅ | POC1 ledger + `audit_query` reused; partition extends to `(jurisdiction, hire_id)`. |
+| 4.17 | Cost-per-hire report | ✅ | `economics.py` is workflow-type-aware; FM rail reads "per hire" automatically for hiring workflows. |
+| 4.18 | Process evolution proposals | ✅ | POC1 `propose_skill_amp` MCP tool reused; surfaces in policy panel. |
+| 4.19 | A2A at candidate boundary | ✅ | [`a2a.py`](../api/server/routes/a2a.py) inbound route — signed JWT verification stubbed locally (APIM mTLS in cloud target); messages thread into the workflow ledger + Execution Timeline. |
+| 4.20 | Drift detection + 10% spot-check audit | 🟡 | Fleet Manager skill paragraph + reuse of `query_traces` / `query_fleet`. End-to-end demo beat to verify. |
+| 4.21 | AG-UI dynamic components | 🟡 | [AgentDrivenComponent.tsx](../web/client/components/AgentDrivenComponent.tsx) primitive defined (5 spec kinds). Not yet rendered in `WorkflowDetail` — wire-up still TODO before this lights up in the demo. |
+| 4.22 | Region failure + jurisdiction-aware model routing | 🟡 | Region failover reuses POC1's `simulate-region-failure`. APIM jurisdiction-aware routing remains narrated (cloud-target). |
 
-**By count:** 7 ✅, 9 🟡, 5 ❌. The net-news (voice, multi-surface convergence, crystallisation, jurisdiction switching, A2A, AG-UI) are the "Frontier" content that distinguishes POC2 from POC1.
+**By count (21 rows; spec §4.14 not enumerated):** 15 ✅, 6 🟡, 0 ❌. The remaining yellow rows are: synthetic-CV expansion (4.9), APIOps governance gate (4.12), Entra Agent ID demonstration (4.15), drift-detection beat (4.20), AG-UI render wiring (4.21), and APIM jurisdiction routing narrative (4.22). No net-new capability is unimplemented; the gap is verification + polish + cloud-target narrative.
 
 ---
 
@@ -144,7 +144,20 @@ flowchart LR
 
 ## 3. What's left to build, and how
 
-The work clusters into six tracks. Each row is a focused day. Files marked `(NEW)` don't exist yet; `(MOD)` adapts a POC1 file.
+**Status as of 2026-04-30:** Tracks A, B, C, D, E, F all have first-runnable code in `main`. The build plan below is preserved as a reference for what each track *was*, with status flags showing where each track now stands.
+
+| Track | What it is | Status |
+|---|---|---|
+| A — Domain rebind | 10-phase orchestrator + 10 hiring skills + 7 MCP mocks + UI relabel + CV corpus | ✅ landed (50 CVs vs 200 target) |
+| B — Multi-surface convergence | Adaptive Card composer, ServiceNow webhook, HiringManager surface | ✅ landed (signed-payload verification stubbed) |
+| C — Voice + Avatar | `voice-screener` + `acs-mcp`, `onboarding-buddy` + `heygen-mcp` | ✅ landed (mocks return canned transcript + mp4 URL) |
+| D — Compliance + Jurisdiction | `jurisdiction-router` + `betrvg-checker` + USA/DE policy bundles | ✅ landed |
+| E — Frontier (A2A, AG-UI, Episodic) | `/api/a2a/inbound` + `AgentDrivenComponent.tsx` + `recall_similar_hires` | 🟡 A2A + episodic ✅; AG-UI primitive built but not yet rendered in `WorkflowDetail` |
+| F — POC1 reuse demos | Region failover, cost-per-hire, drift detection, audit, bulk HITL, hooks | ✅ reuses POC1 platform; demo beats need a 30-min dry-run |
+
+**Outstanding before `v1.0-poc2-frontier` tag:** wire `AgentDrivenComponent` into `WorkflowDetail`; expand the synthetic CV corpus past 50 (only if eval variance demands it); 30-minute end-to-end demo dry run; capture demo screenshots / recording.
+
+The original work plan (track tables below) is kept for cross-referencing implementations against intent. Files marked `(NEW)` were planned new; `(MOD)` adapts a POC1 file.
 
 ### Track A — Domain rebind (the 🟡 column)
 

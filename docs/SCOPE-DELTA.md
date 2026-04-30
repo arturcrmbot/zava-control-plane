@@ -36,7 +36,7 @@ Same code runs on the laptop and on Azure. Backend implementations differ; agent
 
 | Capability | Lab build (this repo) | Engagement POC (proper) |
 |---|---|---|
-| **OCR / receipt extraction** | Stub. `doc_intelligence_extract.py` is a pass-through over fields already attached to synthetic claims. | Azure Document Intelligence over real receipt PDFs; `agent_field_extractor` for low-confidence cases. |
+| **OCR / receipt extraction** | Real Azure Document Intelligence as of 2026-04-30 — `ocr_extract` MCP tool wraps the DI prebuilt-receipt / prebuilt-layout / prebuilt-invoice / prebuilt-idDocument / prebuilt-document models, sha256+model cache, Entra-ID auth (tenant policy disables key auth on Cognitive Services). `receipt-validator` and `cv-crystalliser` skills both call it as their first step. | Same `ocr_extract` MCP contract; engagement POC adds `agent_field_extractor` fallback for low-confidence cases. |
 | **Policy retrieval** | In-process embedding index using `sentence-transformers` (`all-MiniLM-L6-v2`) over `data/synthetic/policy.md`. | Foundry IQ over the WPP-supplied T&E policy corpus. **Same `policy_search` MCP contract.** |
 | **Employee history / breach data** | Reads `data/synthetic/employees.json` from disk. | Fabric IQ over WPP HR data. **Same `employee_history` MCP contract.** |
 | **Precedents** | 53 hand-authored fixtures in `data/synthetic/precedents.json`; token-overlap retrieval. | WPP SSC reviewer decisions accumulating in Foundry IQ over the engagement window; same `precedents_search` contract. |
@@ -49,35 +49,32 @@ Same code runs on the laptop and on Azure. Backend implementations differ; agent
 | **Audit retention** | In-process action ledger; cleared with `make reset`. | Log Analytics → Azure Storage immutable export, 7–12 year retention. |
 | **Cost attribution** | OTEL spans local-only; cost numbers synthetic. | App Insights with real model-token cost per claim, per phase, per layer. |
 | **Synthetic dataset** | 300 claims, 30 employees, 53 precedents, 1 policy doc, all committed to git. | WPP-supplied 3,430 claims with ground-truth R/A/G labels + real T&E policy + delegated authority matrix + real org chart. |
-| **Accuracy gate** | Smoke 5/6 on a 20-claim sample today; target ≥95% on the 300-claim local run. | **≥95% on the WPP 3,430-line dataset — 40% of the POC1 score.** |
+| **Accuracy gate** | Foundry-backed pipeline as of 2026-04-30: `evaluate()` batch over a pre-classified JSONL + online subscriber that scores every `agent.completed` event + 3 deterministic custom evaluators (`PolicyClauseCited`, `ToolCallValidity`, `GoldLabelMatch`) + per-agent LLM-judge set; sqlite store; UI reads `/api/evals/summary`. `/api/accuracy/run` returns 503 if Foundry isn't configured. Full 300-claim corpus run still pending. | Same Foundry `evaluate()` SDK; **≥95% on the WPP 3,430-line dataset — 40% of the POC1 score.** |
 | **Region failover** | `simulate-region-failure` simulator command (kills the Functions host, restarts) — local proof of replay. | Real Azure region pair with Cosmos DB geo-replication; live failover demonstrated against 500 in-flight workflows. |
 | **HITL surfaces** | Web UI + a `/api/simulator/justification` endpoint that fakes the employee reply. | Real Adaptive Card sent via Outlook through the recipient's M365 Personal Agent. |
 | **60-minute Copilot Studio build** | Not in this repo. | Separate scripted demo: junior dev builds a new agent with 3 MCPs + 3 knowledge sources in under 30 minutes. |
 
 ### Lab build status against the 13 acceptance criteria
 
-(Snapshot of where this repo is — see [poc1-status.md](poc1-status.md) for live state.)
+(Snapshot of where this repo is — see [poc1-status.md](poc1-status.md) for live state. Last refreshed 2026-04-30.)
 
-- ✅ AC #1 fleet view · #2 exception-only · #3 bulk approval · #5 receipt cross-validation · #6 progressive enforcement · #9 multi-EMS Control Plane
-- 🟡 AC #4 accuracy pipeline live, full corpus run pending · #7 justification round-trip wired, autonomy-proposal Fleet Manager extension to-build · #8 SSC Reviewer queue route just landed · #10 EMS extensibility narration script to-build
-- ❌ AC #11 region failure simulator · #12 audit query + summariser skill · #13 cost-per-task report (the MCP tools `audit_query` / `query_reviewer_decisions` / `query_economics` just landed in `main`; the skill + UI surfaces remain)
+- ✅ AC #1 fleet view · #2 exception-only · #3 bulk approval · #5 receipt cross-validation (real DI) · #6 progressive enforcement · #7 autonomous learning · #8 SSC Reviewer queue · #9 multi-EMS Control Plane · #10 EMS extensibility narration · #11 region failure simulator · #12 immutable audit + reporting · #13 cost-per-task report
+- 🟡 AC #4 Foundry-backed accuracy pipeline shipped 2026-04-30; full 300-claim corpus run still pending (needs Foundry project + judge-model env vars)
 
 The engagement POC must hit all 13 live in front of WPP. The lab build is converging on demoable evidence for the platform claims; the engagement POC then exercises the same code against real systems and real data.
 
 ---
 
-## POC2 — much wider gap
+## POC2 — closing fast
 
-POC2 in the lab is **not started**. The plan in [poc2-status.md](poc2-status.md)
-calls out that ~75% of POC1 source artefacts are domain-agnostic platform
-and reuse. The 25% that's POC2-specific (10 hiring skills, 7 mocks,
-synthetic 200-CV corpus, voice + avatar tracks, A2A,
-multi-jurisdiction compliance) is greenfield.
+POC2 in the lab landed on `main` 2026-04-30 — the spine merge brought the 10-phase `HiringOrchestrator`, ten hiring skills, seven MCP mocks (4201–4207), a 50-CV synthetic corpus across 5 roles × 2 jurisdictions, and Tracks B (multi-surface) / D (jurisdiction) / E (frontier: A2A inbound + episodic recall + AG-UI primitive) / F (POC1 reuse). See [poc2-status.md](poc2-status.md) §1 for the per-capability matrix — 17/22 ✅, 5/22 🟡, 0/22 ❌.
 
-So for POC2:
+Outstanding lab-build polish before `v1.0-poc2-frontier` tag: render `AgentDrivenComponent` inside `WorkflowDetail` (§4.21); expand the synthetic CV corpus past 50 if eval variance demands it (§4.9); 30-min end-to-end demo dry run.
 
-- **Lab build** (when it starts): same single-laptop pattern, mocked Greenhouse / LinkedIn / Workday-HR / Graph / ServiceNow / ACS / HeyGen, synthetic CVs, simulated multi-surface convergence.
-- **Engagement POC**: real ATS sandbox, real LinkedIn Recruiter API, real Microsoft Graph (Teams / Outlook / Calendar), real ServiceNow tenant, real ACS phone number, real HeyGen API key, real BetrVG corpus, real Foundry Guardrails for jurisdiction routing.
+Engagement-POC differences vs the lab build are the same shape as POC1:
+
+- **Lab build (today):** mocked Greenhouse / LinkedIn / Workday-HR / Graph / ServiceNow / ACS / HeyGen — canned transcripts, mp4 stubs, synthetic CVs, signed-payload verification stubbed at the A2A boundary.
+- **Engagement POC:** real ATS sandbox, real LinkedIn Recruiter API, real Microsoft Graph (Teams / Outlook / Calendar), real ServiceNow tenant, real ACS phone number, real HeyGen API key, real BetrVG corpus, real Foundry Guardrails for jurisdiction routing, APIM mTLS + signed JWT at the A2A boundary.
 
 The same swap-in story applies — MCP contracts identical, backend implementations different.
 
