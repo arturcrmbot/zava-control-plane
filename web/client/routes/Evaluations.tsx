@@ -2,61 +2,185 @@
 import { useEffect, useState } from "react";
 import { AccuracyReport } from "../components/AccuracyReport";
 
-interface Eval {
-  id: string; workflowId: string; ranAt: number;
-  taskAdherence: number; safety: number; toolAccuracy: number;
+interface TileBody {
+  value: number;
+  n_evals: number;
+  n_agents: number;
+  evaluators: string[];
+}
+
+interface Summary {
+  configured: boolean;
+  reason?: string;
+  window_minutes?: number;
+  tiles?: { task_adherence: TileBody; safety: TileBody; tool_accuracy: TileBody };
+  by_agent?: { agent_label: string; n: number; scores: Record<string, number> }[];
+  n_completed?: number;
+  n_errored?: number;
+  queue?: { pending: number; completed: number; errored: number };
+}
+
+interface Row {
+  id: string;
+  kind: string;
+  agent_label: string;
+  workflow_id: string | null;
+  ts: number;
+  status: string;
+  scores: Record<string, number | string>;
+  foundry_run_url: string | null;
+  error_text?: string | null;
+}
+
+interface RowsEnvelope {
+  configured: boolean;
+  reason?: string;
+  rows?: Row[];
 }
 
 export default function Evaluations() {
-  const [items, setItems] = useState<Eval[]>([]);
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [rowsEnv, setRowsEnv] = useState<RowsEnvelope | null>(null);
+
   useEffect(() => {
-    const tick = () => void fetch("/api/evals").then(r => r.json()).then(setItems);
-    tick(); const i = setInterval(tick, 5000); return () => clearInterval(i);
+    const tick = async () => {
+      try {
+        const [s, r] = await Promise.all([
+          fetch("/api/evals/summary").then(x => x.json()),
+          fetch("/api/evals/").then(x => x.json()),
+        ]);
+        setSummary(s);
+        setRowsEnv(r);
+      } catch {
+        // network blip — leave previous state.
+      }
+    };
+    void tick();
+    const i = setInterval(tick, 5000);
+    return () => clearInterval(i);
   }, []);
-  const avg = (k: keyof Eval) => {
-    if (items.length === 0) return 0;
-    const total = items.reduce((a, b) => a + (typeof b[k] === "number" ? (b[k] as number) : 0), 0);
-    return total / items.length;
-  };
+
+  if (summary && summary.configured === false) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <div className="text-lg font-semibold text-slate-900">Continuous Evaluation</div>
+        </div>
+        <div className="panel panel-body">
+          <div className="text-sm font-semibold text-slate-900 mb-1">Foundry evaluation is not configured.</div>
+          <div className="text-xs text-slate-600">
+            Set <code className="text-xs">AZURE_FOUNDRY_PROJECT_ENDPOINT</code> and{" "}
+            <code className="text-xs">AZURE_FOUNDRY_JUDGE_MODEL_DEPLOYMENT</code> to enable.
+          </div>
+          {summary.reason ? <div className="text-xs text-slate-500 mt-2">{summary.reason}</div> : null}
+        </div>
+        <AccuracyReport />
+      </div>
+    );
+  }
+
+  const tiles = summary?.tiles;
+  const byAgent = summary?.by_agent ?? [];
+  const allEvalNames = Array.from(
+    new Set(byAgent.flatMap(a => Object.keys(a.scores)))
+  ).sort();
+  const rows = rowsEnv?.rows ?? [];
 
   return (
     <div className="space-y-4">
       <div>
         <div className="text-lg font-semibold text-slate-900">Continuous Evaluation</div>
-        <div className="text-xs text-slate-500 mt-0.5">{items.length} evals on sampled traces</div>
+        <div className="text-xs text-slate-500 mt-0.5">
+          {summary
+            ? `${summary.n_completed ?? 0} evals scored · ${summary.n_errored ?? 0} errored · last ${summary.window_minutes ?? 60}min`
+            : "loading…"}
+        </div>
       </div>
+
       <div className="grid grid-cols-3 gap-3">
-        <Metric label="Task adherence" v={avg("taskAdherence")} />
-        <Metric label="Safety" v={avg("safety")} />
-        <Metric label="Tool accuracy" v={avg("toolAccuracy")} />
+        <Tile label="Task adherence" tile={tiles?.task_adherence} />
+        <Tile label="Safety" tile={tiles?.safety} />
+        <Tile label="Tool accuracy" tile={tiles?.tool_accuracy} />
       </div>
+
+      {byAgent.length > 0 ? (
+        <div className="panel">
+          <div className="panel-header">By agent</div>
+          <table className="text-xs w-full">
+            <thead>
+              <tr className="text-slate-500">
+                <th className="text-left px-3 py-2">agent</th>
+                <th className="text-right px-3 py-2">n</th>
+                {allEvalNames.map(n => (
+                  <th key={n} className="text-right px-3 py-2">{n}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {byAgent.map(a => (
+                <tr key={a.agent_label}>
+                  <td className="px-3 py-2 font-mono">{a.agent_label}</td>
+                  <td className="px-3 py-2 text-right">{a.n}</td>
+                  {allEvalNames.map(n => {
+                    const v = a.scores[n];
+                    return (
+                      <td key={n} className="px-3 py-2 text-right">
+                        {typeof v === "number" ? v.toFixed(2) : "—"}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
       <div className="panel">
         <div className="panel-header">Recent runs</div>
         <div className="divide-y divide-slate-200">
-          {items.length === 0 && (
-            <div className="p-3 text-xs text-slate-500 italic">No evaluation runs yet.</div>
-          )}
-          {items.slice(0, 20).map(e => (
-            <div key={e.id} className="flex items-center gap-3 px-3 py-2 text-xs">
-              <a href={`/workflows/${e.workflowId}`} className="text-blue-700 hover:underline font-mono">{e.workflowId}</a>
-              <span className="text-slate-400">{e.ranAt ? new Date(e.ranAt * 1000).toLocaleTimeString() : ""}</span>
+          {rows.length === 0 ? (
+            <div className="p-3 text-xs text-slate-500 italic">No evaluations yet.</div>
+          ) : null}
+          {rows.slice(0, 20).map(r => (
+            <div key={r.id} className="flex items-center gap-3 px-3 py-2 text-xs">
+              <a href={`/workflows/${r.workflow_id ?? ""}`} className="text-blue-700 hover:underline font-mono">
+                {r.agent_label}
+              </a>
+              <span className="text-slate-400">{new Date(r.ts * 1000).toLocaleTimeString()}</span>
               <span className="ml-auto text-slate-600 font-mono">
-                adh={(e.taskAdherence ?? 0).toFixed(2)} · safe={(e.safety ?? 0).toFixed(2)} · tool={(e.toolAccuracy ?? 0).toFixed(2)}
+                {Object.entries(r.scores)
+                  .filter(([, v]) => typeof v === "number")
+                  .slice(0, 3)
+                  .map(([k, v]) => `${k}=${(v as number).toFixed(2)}`)
+                  .join(" · ")}
               </span>
+              {r.foundry_run_url ? (
+                <a className="text-blue-700 hover:underline" href={r.foundry_run_url} target="_blank" rel="noreferrer">
+                  portal →
+                </a>
+              ) : null}
             </div>
           ))}
         </div>
       </div>
+
       <AccuracyReport />
     </div>
   );
 }
 
-function Metric({ label, v }: { label: string; v: number }) {
+function Tile({ label, tile }: { label: string; tile?: TileBody }) {
+  const value = tile?.value ?? 0;
   return (
     <div className="panel panel-body">
       <div className="text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="text-2xl font-semibold text-slate-900 mt-1">{(v * 100).toFixed(1)}%</div>
+      <div className="text-2xl font-semibold text-slate-900 mt-1">
+        {tile?.n_evals === 0 ? "—" : `${(value * 100).toFixed(1)}%`}
+      </div>
+      <div className="text-[10px] text-slate-500 mt-1">
+        {tile ? `${tile.n_evals} evals · ${tile.n_agents} agents` : ""}
+      </div>
     </div>
   );
 }
