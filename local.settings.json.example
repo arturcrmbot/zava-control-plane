@@ -6,6 +6,7 @@
     "PYTHON_ISOLATE_WORKER_DEPENDENCIES": "0",
     "PYTHONPATH": "<absolute-path-to-repo>",
     "FASTAPI_WEBHOOK_URL": "http://localhost:3001/internal/durable-event",
-    "APPLICATIONINSIGHTS_CONNECTION_STRING": ""
+    "APPLICATIONINSIGHTS_CONNECTION_STRING": "",
+    "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT": ""
   }
 }
