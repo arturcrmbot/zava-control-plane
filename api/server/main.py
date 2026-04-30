@@ -38,6 +38,16 @@ async def lifespan(app: FastAPI):
     # bridge. Returns an unsubscribe callable that we hold for teardown.
     from api.server.services.portal_orchestration import attach as _attach_portal_orch
     _portal_orch_off = _attach_portal_orch(app_state)
+    # Seed three demo HiringOrchestrator workflows so the candidate portal's
+    # /apply form always has a workflow to attach to (one per req in
+    # data/synthetic/hiring/reqs.json). Idempotent — safe to re-run.
+    from api.server.services.portal_seed import seed_demo_reqs
+    try:
+        seeded = seed_demo_reqs(app_state)
+        if seeded:
+            print(f"[server] seeded {len(seeded)} demo hiring reqs: {seeded}")
+    except Exception as ex:
+        print(f"[server] portal demo-req seeding failed: {ex}")
     try:
         yield
     finally:

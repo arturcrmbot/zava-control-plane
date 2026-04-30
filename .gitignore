@@ -54,3 +54,6 @@ screenshots/
 
 # Local eval store
 data/.eval/
+
+# Candidate portal local artefacts (magic-link sqlite, email outbox)
+data/portal/
