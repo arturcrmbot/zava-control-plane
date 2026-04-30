@@ -10,6 +10,9 @@ Pattern (post-2026-04-28 retrofit):
 2. Subscribe `session.on(...)` -> OTEL bridge so tool calls appear as child spans.
 3. Send the user prompt via `send_and_wait` (with optional `attachments` for
    multimodal). Return the parsed JSON object from the response text.
+4. Emit a FleetEvent("agent.completed", ...) so the eval subscriber can score
+   the invocation. Wrapped in try/except — eval pipeline failures must never
+   propagate up into the caller.
 
 The agent identity is "finance-agent" universally; specialisation comes from
 the loaded skill, matching the spec's "specialisation via skills, not via
@@ -18,6 +21,8 @@ separate agents" pattern.
 from __future__ import annotations
 import json
 import subprocess
+import time
+import uuid
 from pathlib import Path
 
 from copilot import CopilotClient
@@ -28,21 +33,13 @@ from copilot.tools import Tool
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 
+from api.server.state import app_state
+from api.shared.events import FleetEvent
+
 
 _SKILLS_DIR = Path(__file__).resolve().parents[4] / "server" / "skills"
-
-# Public alias — agents reference this rather than recomputing parents[4]
-# magic with their own path arithmetic.
 SKILLS_DIR = _SKILLS_DIR
 _tracer = trace.get_tracer("wpp.agents.finance")
-
-
-def _load_skill(skill_dir: Path) -> str:
-    """Read the SKILL.md body for a skill (skill_dir is the skill's own
-    directory, e.g. .../skills/rag-classifier/)."""
-    return (skill_dir / "SKILL.md").read_text(encoding="utf-8")
-
-# 4KB cap on response-text span-event payload (OTEL event attr size safety).
 _MAX_RESPONSE_EVENT_BYTES = 4096
 
 
@@ -50,12 +47,7 @@ _gh_token_cache: str | None = None
 
 
 def _gh_token() -> str:
-    """Return the gh CLI auth token, cached for the lifetime of the process.
-
-    Spawning `gh auth token` per session was the dominant per-call overhead
-    in the 300-claim accuracy harness — 300 subprocess spawns + tear-downs
-    on top of the actual model calls. The token is process-stable; cache it.
-    """
+    """Return the gh CLI auth token, cached for the lifetime of the process."""
     global _gh_token_cache
     if _gh_token_cache is None:
         _gh_token_cache = subprocess.check_output(
@@ -64,13 +56,19 @@ def _gh_token() -> str:
     return _gh_token_cache
 
 
-def _install_session_otel_bridge(session) -> callable:
-    """Bridge GHCP session events -> OTEL child spans. Returns unsubscribe callable.
+def _load_skill(skill_dir: Path) -> str:
+    return (skill_dir / "SKILL.md").read_text(encoding="utf-8")
 
-    TOOL_EXECUTION_START opens a span `tool.{name}` keyed by tool_call_id; the matching
-    TOOL_EXECUTION_COMPLETE closes it with status derived from `.success`.
+
+def _install_session_otel_bridge(session, tool_calls_out: list[dict]) -> callable:
+    """Bridge GHCP session events -> OTEL child spans AND collect a flat list of
+    completed tool calls into `tool_calls_out` for the eval payload.
+
+    TOOL_EXECUTION_START opens a span keyed by tool_call_id; TOOL_EXECUTION_COMPLETE
+    closes it AND appends `{name, args, result, success, latency_ms}` to the list.
     """
     open_spans: dict[str, object] = {}
+    open_meta: dict[str, dict] = {}
     parent_ctx = trace.set_span_in_context(trace.get_current_span())
 
     def on_event(event) -> None:
@@ -79,29 +77,51 @@ def _install_session_otel_bridge(session) -> callable:
                 data = event.data
                 name = getattr(data, "tool_name", "unknown")
                 call_id = getattr(data, "tool_call_id", None)
+                args = getattr(data, "tool_args", None) or getattr(data, "arguments", None) or ""
+                if not isinstance(args, str):
+                    try:
+                        args = json.dumps(args)
+                    except Exception:
+                        args = str(args)
                 span = _tracer.start_span(f"tool.{name}", context=parent_ctx)
                 span.set_attribute("wpp.tool.name", str(name))
                 if call_id:
                     span.set_attribute("wpp.tool.call_id", str(call_id))
                     open_spans[call_id] = span
+                    open_meta[call_id] = {
+                        "name": str(name), "args": args, "started_at": time.monotonic(),
+                    }
             elif event.type == SessionEventType.TOOL_EXECUTION_COMPLETE:
                 data = event.data
                 call_id = getattr(data, "tool_call_id", None)
                 span = open_spans.pop(call_id, None) if call_id else None
+                meta = open_meta.pop(call_id, None) if call_id else None
                 if span is not None:
                     success = getattr(data, "success", None)
                     if success is False:
                         span.set_status(Status(StatusCode.ERROR, "tool reported failure"))
                     span.end()
+                if meta is not None:
+                    result_text = getattr(data, "result", None) or getattr(data, "output", None) or ""
+                    if not isinstance(result_text, str):
+                        try:
+                            result_text = json.dumps(result_text)
+                        except Exception:
+                            result_text = str(result_text)
+                    tool_calls_out.append({
+                        "name": meta["name"],
+                        "args": meta["args"],
+                        "result": result_text,
+                        "success": getattr(data, "success", True) is not False,
+                        "latency_ms": int((time.monotonic() - meta["started_at"]) * 1000),
+                    })
         except Exception:
-            # Observability must never crash the caller.
             pass
 
     return session.on(on_event)
 
 
 def _extract_json(text: str) -> dict:
-    """Extract the first JSON object/array from the response text."""
     obj_start = text.find("{")
     obj_end = text.rfind("}")
     arr_start = text.find("[")
@@ -129,24 +149,27 @@ async def run_agent_session(
     skill_label: str | None = None,
     model: str = "gpt-4.1",
     attachments: list[dict] | None = None,
+    workflow_id: str | None = None,
 ) -> dict:
     """Run a finance-agent ephemeral session and return the parsed JSON response.
 
     Args:
         prompt: The user prompt — per-call context.
-        tools: SDK-native tools (each created via `@define_tool`) registered on
-            the session via `tools=[...]`. The model invokes them autonomously.
-        skill_dir: Path to the skill's directory (containing SKILL.md). The
-            SKILL.md body is read and appended to the session's system message
-            so the model strongly follows the role + output schema. The
-            directory is also passed to the SDK's `skill_directories` so the
-            skill is discoverable.
-        skill_label: Optional OTEL span tag.
+        tools: SDK-native tools registered on the session via `tools=[...]`.
+        skill_dir: Path to the skill's directory (containing SKILL.md).
+        skill_label: Optional OTEL span tag. Also drives evaluator selection
+            in the online subscriber.
         model: Model id (default `gpt-4.1`).
         attachments: Optional multimodal attachments for `send_and_wait`.
+        workflow_id: Durable Functions instance_id, plumbed through from the
+            executor's input dict, so eval rows can be joined to the workflow
+            on the control plane.
     """
     tools = tools or []
     skill_text = _load_skill(skill_dir) if skill_dir else None
+    tool_calls_collected: list[dict] = []
+    started_at = time.monotonic()
+    in_tok = out_tok = None
 
     with _tracer.start_as_current_span("gen_ai.generate_content") as span:
         span.set_attribute("gen_ai.system", "github_copilot")
@@ -171,7 +194,7 @@ async def run_agent_session(
             if skill_dir:
                 session_kwargs["skill_directories"] = [str(skill_dir)]
             session = await client.create_session(**session_kwargs)
-            unsub = _install_session_otel_bridge(session)
+            unsub = _install_session_otel_bridge(session, tool_calls_collected)
             try:
                 if attachments:
                     response_event = await session.send_and_wait(
@@ -206,25 +229,46 @@ async def run_agent_session(
             if out_tok is not None:
                 span.set_attribute("gen_ai.usage.output_tokens", int(out_tok))
 
-    return _extract_json(text)
+    parsed = _extract_json(text)
+    elapsed_ms = int((time.monotonic() - started_at) * 1000)
+
+    try:
+        from api.server.eval.evaluator_set import extract_context
+        context = extract_context(skill_label or "", tool_calls_collected)
+    except Exception:
+        context = ""
+
+    try:
+        app_state.bus.emit(FleetEvent(
+            type="agent.completed",
+            workflow_id=workflow_id,
+            agent_label=skill_label or "unknown",
+            agent_run_id=f"ar-{uuid.uuid4().hex[:8]}",
+            prompt=prompt,
+            response_text=text,
+            extracted_json=parsed,
+            tool_calls=tool_calls_collected,
+            context=context,
+            usage={"input_tokens": int(in_tok) if in_tok is not None else None,
+                   "output_tokens": int(out_tok) if out_tok is not None else None},
+            latency_ms=elapsed_ms,
+        ))
+    except Exception:
+        # Observability must never crash the caller.
+        pass
+
+    return parsed
 
 
 # Backwards-compatible alias for legacy agents that pass a skill_name string.
-# Resolves the name (e.g. "rag_classifier" or "rag-classifier") to the
-# corresponding skill directory under api/server/skills/. New code should call
-# run_agent_session(skill_dir=..., tools=[...]) directly.
 async def run_agent_skill(
     skill_name: str,
     prompt: str,
     model: str = "gpt-4.1",
     attachments: list[dict] | None = None,
+    workflow_id: str | None = None,
 ) -> dict:
-    """Deprecated alias — prefer `run_agent_session(skill_dir=..., tools=[...])`.
-
-    Resolves a skill name to a directory under api/server/skills/, allowing
-    underscore→hyphen normalisation (so legacy callers using
-    "anomaly_flagger" still find the "anomaly-flagger/" directory).
-    """
+    """Deprecated alias — prefer `run_agent_session(skill_dir=..., tools=[...])`."""
     candidate = _SKILLS_DIR / skill_name
     if not candidate.is_dir():
         candidate = _SKILLS_DIR / skill_name.replace("_", "-")
@@ -234,4 +278,5 @@ async def run_agent_skill(
         skill_label=skill_name,
         model=model,
         attachments=attachments,
+        workflow_id=workflow_id,
     )
