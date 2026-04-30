@@ -8,6 +8,8 @@ import Analytics from "./routes/Analytics";
 import Evaluations from "./routes/Evaluations";
 import Economics from "./routes/Economics";
 import WorkflowDetail from "./routes/WorkflowDetail";
+import HiringManager from "./routes/HiringManager";
+import Threadlight from "./routes/Threadlight";
 import FleetManagerRail from "./components/FleetManagerRail";
 
 const nav = [
@@ -20,6 +22,8 @@ const nav = [
   { to: "/agents",         label: "Agents" },
   { to: "/library",        label: "Library" },
   { to: "/economics",      label: "Economics" },
+  // POC2 surfaces
+  { to: "/threadlight",    label: "Threadlight" },
 ];
 
 function Stub({ title }: { title: string }) {
@@ -60,6 +64,9 @@ export default function App() {
             <Route path="/agents" element={<Stub title="Agents" />} />
             <Route path="/library" element={<Stub title="Library" />} />
             <Route path="/economics" element={<Economics />} />
+            {/* POC2 surfaces */}
+            <Route path="/hiring-manager/:workflowId?" element={<HiringManager />} />
+            <Route path="/threadlight" element={<Threadlight />} />
           </Routes>
         </main>
 

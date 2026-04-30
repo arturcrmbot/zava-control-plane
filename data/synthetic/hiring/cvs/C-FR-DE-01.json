@@ -1,0 +1,35 @@
+{
+  "candidate_id": "C-FR-DE-01",
+  "name": "Felix Becker",
+  "current_title": "Frontend Engineer",
+  "tenure_years_total": 2.6,
+  "education": [
+    {
+      "institution": "Synthetic University",
+      "degree": "BSc CS",
+      "year": 2017
+    }
+  ],
+  "work_history": [
+    {
+      "employer": "Synth Corp 1",
+      "title": "Frontend Engineer",
+      "start": "2020-01",
+      "end": "2024-06"
+    }
+  ],
+  "skills": [
+    "typescript",
+    "react",
+    "vite",
+    "tailwind",
+    "playwright"
+  ],
+  "right_to_work": {
+    "jurisdiction": "DE",
+    "evidence": "blue_card"
+  },
+  "inconsistencies": [],
+  "level_target": "L3",
+  "jurisdiction_target": "DE"
+}

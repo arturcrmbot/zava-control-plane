@@ -1,0 +1,35 @@
+{
+  "candidate_id": "C-FR-DE-02",
+  "name": "Anya Hoffmann",
+  "current_title": "Frontend Engineer",
+  "tenure_years_total": 3.7,
+  "education": [
+    {
+      "institution": "Synthetic University",
+      "degree": "BSc CS",
+      "year": 2016
+    }
+  ],
+  "work_history": [
+    {
+      "employer": "Synth Corp 2",
+      "title": "Frontend Engineer",
+      "start": "2020-01",
+      "end": "2024-06"
+    }
+  ],
+  "skills": [
+    "typescript",
+    "react",
+    "vite",
+    "tailwind",
+    "playwright"
+  ],
+  "right_to_work": {
+    "jurisdiction": "DE",
+    "evidence": "eu_citizen"
+  },
+  "inconsistencies": [],
+  "level_target": "L3",
+  "jurisdiction_target": "DE"
+}

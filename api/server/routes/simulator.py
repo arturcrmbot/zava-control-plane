@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from api.server.services.simulator_orchestrator import (
     spawn_expense_workflow, spawn_repeat_offender_ramp, simulate_region_failure,
+    spawn_hiring_workflow,
 )
 from api.server.state import app_state
 from api.shared.events import FleetEvent
@@ -102,6 +103,23 @@ async def seed_decisions(body: SeedDecisionsBody):
             },
         ))
     return {"ok": True, "workflow_id": workflow_id, "added": body.count}
+
+
+class HireBody(BaseModel):
+    candidate_id: str | None = None
+    scenario: str | None = None
+
+
+@router.post("/hire")
+async def inject_hire(body: HireBody):
+    """POC2 simulator: spawn a hiring workflow. Optional `candidate_id` picks
+    a specific synthetic CV (deterministic). Optional `scenario` tags the
+    payload so per-track activities can override behaviour (e.g.
+    "rtw-unknown", "betrvg-objection-received")."""
+    workflow_id = await spawn_hiring_workflow(
+        candidate_id=body.candidate_id, scenario=body.scenario,
+    )
+    return {"workflow_id": workflow_id}
 
 
 @router.post("/fleet-tick")

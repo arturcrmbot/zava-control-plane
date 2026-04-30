@@ -17,8 +17,11 @@ class BaseModel(_PydBaseModel):
 PhaseName = Literal[
     # Invoice P2P (legacy — orchestrator deleted, kept for any in-flight workflow records)
     "Intake", "Validation", "Routing", "Approval", "Payment", "Reconciliation",
-    # Expense compliance (current — see api/functions/workflows/expense_claim.py)
+    # Expense compliance (POC1 — see api/functions/workflows/expense_claim.py)
     "Classify", "Validate Receipt", "Route", "Notify", "Arbitrate", "Audit",
+    # Hiring (POC2 — see api/functions/workflows/hiring.py)
+    "Budget", "Job Design", "Sourcing", "Triage", "Screening",
+    "Voice", "Interview", "Compliance", "Offer", "Onboarding",
 ]
 
 PHASE_ORDER: list[PhaseName] = [
@@ -27,6 +30,11 @@ PHASE_ORDER: list[PhaseName] = [
 
 EXPENSE_PHASE_ORDER: list[PhaseName] = [
     "Intake", "Classify", "Validate Receipt", "Route", "Notify", "Arbitrate", "Audit",
+]
+
+HIRING_PHASE_ORDER: list[PhaseName] = [
+    "Budget", "Job Design", "Sourcing", "Triage", "Screening",
+    "Voice", "Interview", "Compliance", "Offer", "Onboarding",
 ]
 
 WorkflowStatus = Literal["in_progress", "awaiting_hitl", "completed", "failed"]
@@ -92,7 +100,7 @@ class ActionLedgerEntry(BaseModel):
 
 class Workflow(BaseModel):
     id: str
-    type: Literal["invoice-p2p", "expense-claim"] = "expense-claim"
+    type: Literal["invoice-p2p", "expense-claim", "hiring"] = "expense-claim"
     status: WorkflowStatus = "in_progress"
     current_phase: PhaseName = "Intake"
     created_at: float
@@ -110,6 +118,9 @@ class Workflow(BaseModel):
     tokens_spent: int = 0
     cost_usd: float = 0.0
     orchestration_instance_id: str | None = None
+    # POC2 hiring stash — candidate id, role family, jurisdiction. Absent on
+    # POC1 workflows so the field is fully additive.
+    metadata: dict = Field(default_factory=dict)
 
 
 class Phase(BaseModel):

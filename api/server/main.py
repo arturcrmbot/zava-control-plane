@@ -70,9 +70,16 @@ from api.server.routes.fleet import router as fleet_router
 from api.server.routes.accuracy import router as accuracy_router
 from api.server.routes.policy_md import router as policy_md_router
 from api.server.routes.receipts import router as receipts_router
+# POC2 multi-surface + frontier endpoints (§4.6, §4.14, §4.19)
+from api.server.routes.webhooks_servicenow import router as webhooks_servicenow_router
+from api.server.routes.webhooks_finance_bp import router as webhooks_finance_bp_router
+from api.server.routes.threadlight import router as threadlight_router
+from api.server.routes.a2a import router as a2a_router
 
 for r in (stream_router, workflows_router, exceptions_router, policy_router,
           simulator_router, audit_router, evals_router, orchestration_router,
           durable_event_router, fleet_router, accuracy_router, policy_md_router,
-          receipts_router):
+          receipts_router,
+          webhooks_servicenow_router, webhooks_finance_bp_router,
+          threadlight_router, a2a_router):
     app.include_router(r)

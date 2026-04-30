@@ -1,0 +1,7 @@
+{
+  "avatars": [
+    {"id": "welcome-default", "name": "Friendly HR Avatar (English)", "language": "en"},
+    {"id": "welcome-de", "name": "Welcome-Avatar (Deutsch)", "language": "de"}
+  ],
+  "renders": []
+}

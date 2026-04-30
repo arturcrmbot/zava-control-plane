@@ -1,0 +1,34 @@
+{
+  "profiles": [
+    {
+      "linkedin_url": "https://linkedin.com/in/priya-mehta",
+      "name": "Priya Mehta",
+      "current_title": "Senior Data Engineer",
+      "current_employer": "FinTech Co",
+      "tenure_years_total": 7.5,
+      "skills": ["python", "spark", "kubernetes", "airflow", "dbt"],
+      "education": [{"institution": "IIT Bombay", "degree": "B.Tech CS", "year": 2017}],
+      "headline": "Senior Data Engineer | Spark/Airflow/dbt"
+    },
+    {
+      "linkedin_url": "https://linkedin.com/in/danielchen",
+      "name": "Daniel Chen",
+      "current_title": "Staff Engineer",
+      "current_employer": "AdTech Co",
+      "tenure_years_total": 11.2,
+      "skills": ["go", "kubernetes", "kafka", "postgres", "grpc"],
+      "education": [{"institution": "Stanford", "degree": "MS CS", "year": 2014}],
+      "headline": "Staff Engineer | Distributed systems @ AdTech"
+    },
+    {
+      "linkedin_url": "https://linkedin.com/in/laraschmidt",
+      "name": "Lara Schmidt",
+      "current_title": "Frontend Engineer (Werkstudent)",
+      "current_employer": "Berliner StartUp",
+      "tenure_years_total": 1.5,
+      "skills": ["typescript", "react", "vite", "tailwind"],
+      "education": [{"institution": "TU Berlin", "degree": "BSc Informatik (in progress)", "year": 2027}],
+      "headline": "Werkstudent Frontend | React/TS"
+    }
+  ]
+}

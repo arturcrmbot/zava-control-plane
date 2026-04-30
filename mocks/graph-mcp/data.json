@@ -1,0 +1,15 @@
+{
+  "free_busy": {
+    "pm@wpp.com": [
+      {"start": "2026-05-12T10:00:00Z", "end": "2026-05-12T11:00:00Z", "status": "busy"},
+      {"start": "2026-05-12T14:00:00Z", "end": "2026-05-12T15:00:00Z", "status": "free"}
+    ],
+    "eng-lead@wpp.com": [
+      {"start": "2026-05-12T14:00:00Z", "end": "2026-05-12T15:00:00Z", "status": "free"}
+    ],
+    "ic1@wpp.com": [
+      {"start": "2026-05-12T14:00:00Z", "end": "2026-05-12T15:00:00Z", "status": "free"}
+    ]
+  },
+  "messages_sent": []
+}

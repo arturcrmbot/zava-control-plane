@@ -1,7 +1,7 @@
 // src/client/components/WorkflowCard.tsx
 import type { Workflow } from "@shared/types";
 import { Link } from "react-router-dom";
-import { PHASE_ORDER, EXPENSE_PHASE_ORDER } from "@shared/types";
+import { PHASE_ORDER, EXPENSE_PHASE_ORDER, HIRING_PHASE_ORDER } from "@shared/types";
 import { AlertTriangle, Clock } from "lucide-react";
 
 const STATUS_COLOR: Record<Workflow["status"], string> = {
@@ -41,7 +41,10 @@ function fmtSlaRemaining(slaDueAt: number): { text: string; warn: boolean } | nu
 }
 
 export default function WorkflowCard({ w }: { w: Workflow }) {
-  const phaseOrder = w.type === "expense-claim" ? EXPENSE_PHASE_ORDER : PHASE_ORDER;
+  const phaseOrder =
+    w.type === "expense-claim" ? EXPENSE_PHASE_ORDER :
+    w.type === "hiring" ? HIRING_PHASE_ORDER :
+    PHASE_ORDER;
   const phaseIdx = phaseOrder.indexOf(w.currentPhase);
   const pct = ((phaseIdx + 1) / phaseOrder.length) * 100;
   const subtitle = w.claim

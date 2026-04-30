@@ -1,8 +1,9 @@
 // src/client/components/PhaseTimeline.tsx
-import { PHASE_ORDER, EXPENSE_PHASE_ORDER, type Phase, type PhaseName, type Workflow } from "@shared/types";
+import { PHASE_ORDER, EXPENSE_PHASE_ORDER, HIRING_PHASE_ORDER, type Phase, type PhaseName, type Workflow } from "@shared/types";
 
 function phaseOrderFor(type: Workflow["type"] | undefined): PhaseName[] {
   if (type === "expense-claim") return EXPENSE_PHASE_ORDER;
+  if (type === "hiring") return HIRING_PHASE_ORDER;
   return PHASE_ORDER;
 }
 

@@ -2,8 +2,12 @@
 """Per-phase MAF Workflow graph builders. Each returns a Workflow instance ready to
 be invoked from the durable orchestration via `await workflow.run(input)`.
 
-ExpenseClaim 7-phase flow: Intake -> Classify -> Validate Receipt -> Route ->
-Notify -> Arbitrate -> Audit. Phase 7 (Audit) is still a stub.
+POC1 ExpenseClaim 7-phase flow: Intake -> Classify -> Validate Receipt -> Route ->
+Notify -> Arbitrate -> Audit.
+
+POC2 Hiring 10-phase flow (spine, stubs to be filled in per-track): Budget ->
+Job Design -> Sourcing -> Triage -> Screening -> Voice -> Interview ->
+Compliance -> Offer -> Onboarding.
 """
 from .intake import build_intake_workflow
 from .intake_expense import build_intake_expense_workflow
@@ -15,8 +19,21 @@ from .arbitrate import build_arbitrate_workflow
 from .audit import build_audit_workflow
 from .approval import build_approval_workflow
 
+# POC2 hiring spine
+from .budget import build_hiring_budget_workflow
+from .job_design import build_hiring_job_design_workflow
+from .sourcing import build_hiring_sourcing_workflow
+from .triage import build_hiring_triage_workflow
+from .screening import build_hiring_screening_workflow
+from .voice import build_hiring_voice_workflow
+from .interview import build_hiring_interview_workflow
+from .compliance import build_hiring_compliance_workflow
+from .offer import build_hiring_offer_workflow
+from .onboarding import build_hiring_onboarding_workflow
+
 
 __all__ = [
+    # POC1
     "build_intake_workflow",
     "build_intake_expense_workflow",
     "build_classify_workflow",
@@ -26,4 +43,15 @@ __all__ = [
     "build_notify_workflow",
     "build_arbitrate_workflow",
     "build_audit_workflow",
+    # POC2 hiring spine
+    "build_hiring_budget_workflow",
+    "build_hiring_job_design_workflow",
+    "build_hiring_sourcing_workflow",
+    "build_hiring_triage_workflow",
+    "build_hiring_screening_workflow",
+    "build_hiring_voice_workflow",
+    "build_hiring_interview_workflow",
+    "build_hiring_compliance_workflow",
+    "build_hiring_offer_workflow",
+    "build_hiring_onboarding_workflow",
 ]
