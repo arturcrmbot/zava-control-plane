@@ -1,37 +1,45 @@
-"""Accelerator -> FastAPI callback after a voice screen call ends.
+"""Candidate-portal voice screen — native WebRTC bridge to Azure GPT-Realtime.
 
-Two routes:
+Five routes:
 
   GET  /api/portal/voice/screen-resolve?token=...
        Peeks a `screen`-scope magic-link token without consuming it. The
        portal's /screen page calls this on mount so it can hand the
-       candidate id to the embedded accelerator iframe. Returns
-         200 {candidate_id}
-         404 if the token is unknown or scope-mismatched
-         410 if the token is past its expiry
+       candidate id to the WebRTC client.
+
+  POST /api/portal/voice/session
+       Mints an ephemeral key for an Azure GPT-Realtime session. Browser
+       calls this once before opening the WebRTC peer connection. We hold
+       the long-lived Azure credential server-side; the browser only ever
+       sees a short-lived ephemeral key.
+
+  POST /api/portal/voice/rtc
+       Proxies the browser's SDP offer to Azure's WebRTC endpoint and
+       returns Azure's SDP answer. Two reasons we do not let the browser
+       call Azure directly: (1) avoids a CORS preflight against the Azure
+       endpoint; (2) keeps the ephemeral-key short-lived header off the
+       browser-side fetch.
 
   POST /api/portal/voice/{candidate_id}/transcript
-       Final webhook from the accelerator (or its iframe parent) once the
-       call ends. Validates the screen token, persists the transcript on
-       the candidate record, and raises the `voice_complete` external
-       event on the Durable orchestration so Phase 6 of the
-       HiringOrchestrator resumes with the score.
+       Browser-side callback after the call ends. Validates the screen
+       token, persists the transcript turns on the candidate record, and
+       raises the `voice_complete` external event on the Durable
+       orchestration so Phase 6 resumes with the score.
 
-       Body:
-         { token, transcript: [{role, text, ts}, ...], score, duration_s }
-       Returns:
-         200 {ok: true}
-         403 on invalid / scope-mismatched / candidate-mismatched token
-         404 on unknown candidate
-         409 if the candidate has no orchestration instance yet
+  POST /api/portal/voice/{candidate_id}/canned
+       Demo-mode fallback when VOICE_TRANSPORT=canned — replays a static
+       transcript through the same `voice_complete` resume path.
 
-See `docs/superpowers/plans/2026-04-30-voice-real-plan.md` Phase 1 Tasks 1-2.
+See `docs/superpowers/plans/2026-04-30-voice-real-plan.md` for the design
+and `C:\\dev\\firstcentral\\voice-direct\\server.py` for the original
+WebRTC bridge this module mirrors.
 """
 from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter, HTTPException
+import httpx
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from api.server.services.durable_client import raise_orchestration_event
@@ -43,6 +51,89 @@ from api.server.state import app_state
 from api.shared.events import FleetEvent
 
 router = APIRouter(prefix="/api/portal/voice", tags=["portal", "voice"])
+
+
+# ---------------------------------------------------------------- WebRTC config
+
+
+_REALTIME_SESSION_URL = (os.environ.get("AZURE_GPT_REALTIME_URL") or "").strip('"')
+_WEBRTC_URL = (os.environ.get("WEBRTC_URL") or "").strip('"')
+_REALTIME_DEPLOYMENT = (
+    os.environ.get("AZURE_GPT_REALTIME_DEPLOYMENT") or "gpt-realtime-1.5"
+).strip('"')
+_REALTIME_KEY = (os.environ.get("AZURE_GPT_REALTIME_KEY") or "").strip('"')
+_REALTIME_VOICE = (os.environ.get("AZURE_REALTIME_VOICE") or "alloy").strip('"')
+
+
+async def _realtime_auth_headers() -> dict[str, str]:
+    """Auth header for the Azure GPT-Realtime control plane.
+
+    Prefer the API key (cheaper, no token-cache eviction surprises). Fall back
+    to DefaultAzureCredential when key isn't set — matches the firstcentral
+    accelerator's pattern.
+    """
+    if _REALTIME_KEY:
+        return {"api-key": _REALTIME_KEY, "Content-Type": "application/json"}
+    from azure.identity.aio import DefaultAzureCredential
+    cred = DefaultAzureCredential()
+    try:
+        token = await cred.get_token("https://cognitiveservices.azure.com/.default")
+        return {
+            "Authorization": f"Bearer {token.token}",
+            "Content-Type": "application/json",
+        }
+    finally:
+        await cred.close()
+
+
+class SessionResponse(BaseModel):
+    ephemeral_key: str
+    webrtc_url: str
+    deployment: str
+    voice: str
+
+
+@router.post("/session", response_model=SessionResponse)
+async def create_session():
+    """Mint an ephemeral GPT-Realtime session key for the browser."""
+    if not _REALTIME_SESSION_URL or not _WEBRTC_URL:
+        raise HTTPException(
+            500, "AZURE_GPT_REALTIME_URL and WEBRTC_URL must be set",
+        )
+    headers = await _realtime_auth_headers()
+    payload = {"model": _REALTIME_DEPLOYMENT, "voice": _REALTIME_VOICE}
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.post(_REALTIME_SESSION_URL, headers=headers, json=payload)
+    if resp.status_code != 200:
+        raise HTTPException(resp.status_code, f"Realtime session error: {resp.text}")
+    return SessionResponse(
+        ephemeral_key=resp.json()["client_secret"]["value"],
+        webrtc_url=_WEBRTC_URL,
+        deployment=_REALTIME_DEPLOYMENT,
+        voice=_REALTIME_VOICE,
+    )
+
+
+@router.post("/rtc")
+async def proxy_rtc(request: Request):
+    """Proxy the browser's SDP offer to Azure WebRTC; return Azure's answer."""
+    body = await request.body()
+    eph_key = request.headers.get("authorization", "").replace("Bearer ", "").strip()
+    if not eph_key:
+        raise HTTPException(401, "missing Bearer ephemeral key")
+    url = f"{_WEBRTC_URL}?model={_REALTIME_DEPLOYMENT}"
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(url, content=body, headers={
+            "Authorization": f"Bearer {eph_key}",
+            "Content-Type": "application/sdp",
+        })
+    if resp.status_code >= 400:
+        raise HTTPException(resp.status_code, resp.text)
+    return Response(
+        content=resp.content,
+        media_type="application/sdp",
+        status_code=resp.status_code,
+    )
 
 
 # ---------------------------------------------------------------- screen-resolve

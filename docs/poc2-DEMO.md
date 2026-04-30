@@ -26,16 +26,19 @@ npm run dev:mcp:poc2
 # Terminal 4 — POC1 mocks (ports 4101–4103, optional but keeps POC1 alive)
 npm run dev:mcp
 
-# Terminal 5 — UI
+# Terminal 5 — admin UI (Control Plane)
 npm run dev:client
 
-# Terminal 6 — firstcentral voice-direct accelerator (Phase 6 voice screen)
-# Iframed by /screen?token=xxx. We pin to 8001 because FastAPI already
-# owns 8000; set VITE_VOICE_ACCELERATOR_URL=http://localhost:8001 in the
-# portal's .env so Screen.tsx points the iframe at the right host.
-# Skip if VITE_VOICE_TRANSPORT=canned (canned-transcript fallback).
-cd C:\dev\firstcentral\voice-direct && uv run uvicorn server:app --port 8001
+# Terminal 6 — candidate portal Vite app
+npm run dev:portal
 ```
+
+The voice screen runs natively inside the portal — no separate accelerator
+process. `/screen?token=xxx` opens a real WebRTC peer connection to Azure
+GPT-Realtime through `/api/portal/voice/{session,rtc}` (the FastAPI
+control plane proxies the SDP exchange). Set `VOICE_TRANSPORT=canned`
+(or `VITE_VOICE_TRANSPORT=canned` for the portal-side branch) to short-circuit
+to a one-button canned-transcript path if mic / Azure access isn't available.
 
 Open http://localhost:5173. The Fleet Dashboard should show zero workflows.
 Generate the synthetic corpus once if it doesn't exist:
@@ -111,7 +114,7 @@ If time gets cut, lead with these:
 | Avatar render fails / times out | Real Azure Speech API issue (region down, role missing, quota) | Set `AVATAR_TRANSPORT=mock`; the `mocks/heygen-mcp` canned mp4 plays instead. Pre-warmed cache (`scripts/prewarm_avatar.py`) means re-renders shouldn't fire during a live demo anyway. |
 | Functions host won't replay after region-failure simulation | Azurite tablestore write race | Stop everything, `rm -rf azurite-data/`, restart. |
 | BetrVG step doesn't fire on DE hire | Wrong `jurisdiction_target` on the synthetic CV | Pick a `C-*-DE-NN` candidate explicitly: `POST /api/simulator/hire {"candidate_id": "C-SE-DE-00"}`. |
-| `/screen?token=xxx` shows blank iframe / `ERR_CONNECTION_REFUSED` | firstcentral voice-direct accelerator not running on :8001 | Set `VITE_VOICE_TRANSPORT=canned` (rebuild portal or set in .env), reload `/screen?token=xxx` — single button replays the canned transcript via `/api/portal/voice/{cid}/canned` and the orchestration resumes through the same `voice_complete` callback. Long-term: boot the accelerator (`Terminal 6` in §0). |
+| `/screen?token=xxx` fails to start the call | `AZURE_GPT_REALTIME_URL` / `WEBRTC_URL` not set, or `az login` token expired | Set `VITE_VOICE_TRANSPORT=canned` (rebuild portal or set in `.env`), reload `/screen?token=xxx` — single button replays the canned transcript via `/api/portal/voice/{cid}/canned` and the orchestration resumes through the same `voice_complete` callback. Long-term: confirm the realtime env vars are set + `az login` is fresh. |
 
 ---
 

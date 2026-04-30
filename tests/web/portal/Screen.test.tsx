@@ -5,88 +5,177 @@ import { setupServer } from "msw/node";
 import Screen from "@portal/routes/Screen";
 
 let resolveStatus = 200;
-let resolveBody: { candidate_id: string } = { candidate_id: "C-IFRAME1" };
+let resolveBody: { candidate_id: string } = { candidate_id: "C-NATIVE1" };
 let lastTranscriptPost: { url: string; body: any } | null = null;
 let lastCannedPost: { url: string; query: string } | null = null;
+let lastSessionPost: { url: string } | null = null;
+let lastRtcPost: { url: string; body: string; auth: string } | null = null;
 
 const server = setupServer(
-  http.get("*/api/portal/voice/screen-resolve", ({ request }) => {
+  http.get("*/api/portal/voice/screen-resolve", () => {
     if (resolveStatus !== 200) {
       return HttpResponse.json({ detail: "err" }, { status: resolveStatus });
     }
     return HttpResponse.json(resolveBody);
   }),
-  http.post("*/api/portal/voice/:cid/transcript", async ({ request, params }) => {
+  http.post("*/api/portal/voice/session", async ({ request }) => {
+    lastSessionPost = { url: request.url };
+    return HttpResponse.json({
+      ephemeral_key: "EPH-FAKE",
+      webrtc_url: "https://fake.webrtc",
+      deployment: "gpt-realtime-1.5",
+      voice: "alloy",
+    });
+  }),
+  http.post("*/api/portal/voice/rtc", async ({ request }) => {
+    lastRtcPost = {
+      url: request.url,
+      body: await request.text(),
+      auth: request.headers.get("authorization") ?? "",
+    };
+    return new HttpResponse("v=0\nmocked-answer\n", {
+      status: 200,
+      headers: { "Content-Type": "application/sdp" },
+    });
+  }),
+  http.post("*/api/portal/voice/:cid/transcript", async ({ request }) => {
     const body = await request.json();
     lastTranscriptPost = { url: request.url, body };
     return HttpResponse.json({ ok: true });
   }),
-  http.post("*/api/portal/voice/:cid/canned", async ({ request, params }) => {
+  http.post("*/api/portal/voice/:cid/canned", async ({ request }) => {
     const url = new URL(request.url);
     lastCannedPost = { url: request.url, query: url.search };
     return HttpResponse.json({ ok: true, source: "canned" });
   }),
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+// ── WebRTC mocks ─────────────────────────────────────────────────────
+//
+// jsdom doesn't ship RTCPeerConnection / MediaDevices; stub them at
+// module level so the RealtimeCall class can drive its lifecycle.
+
+class FakeRTCDataChannel {
+  readyState = "connecting";
+  onopen: (() => void) | null = null;
+  onmessage: ((ev: MessageEvent) => void) | null = null;
+  sent: string[] = [];
+  close() { this.readyState = "closed"; }
+  send(s: string) { this.sent.push(s); }
+}
+
+class FakeRTCPeerConnection {
+  static instances: FakeRTCPeerConnection[] = [];
+  ontrack: ((e: any) => void) | null = null;
+  dc: FakeRTCDataChannel | null = null;
+  closed = false;
+  constructor() { FakeRTCPeerConnection.instances.push(this); }
+  createDataChannel(_name: string) {
+    this.dc = new FakeRTCDataChannel();
+    return this.dc as unknown as RTCDataChannel;
+  }
+  addTrack(_t: any) {}
+  async createOffer() { return { type: "offer", sdp: "v=0\nfake-offer\n" }; }
+  async setLocalDescription(_o: any) {}
+  async setRemoteDescription(_a: any) {}
+  close() { this.closed = true; }
+}
+
+const fakeMediaStream = {
+  getTracks: () => [{ stop: () => {} }],
+  getAudioTracks: () => [{}],
+};
+
+beforeAll(() => {
+  server.listen({ onUnhandledRequest: "error" });
+  // @ts-expect-error — install fakes for jsdom
+  globalThis.RTCPeerConnection = FakeRTCPeerConnection;
+  Object.defineProperty(globalThis.navigator, "mediaDevices", {
+    value: { getUserMedia: async () => fakeMediaStream },
+    configurable: true,
+  });
+});
+
 beforeEach(() => {
   resolveStatus = 200;
-  resolveBody = { candidate_id: "C-IFRAME1" };
+  resolveBody = { candidate_id: "C-NATIVE1" };
   lastTranscriptPost = null;
   lastCannedPost = null;
+  lastSessionPost = null;
+  lastRtcPost = null;
+  FakeRTCPeerConnection.instances = [];
   window.history.replaceState({}, "", "/screen?token=SCRTOK");
-  // Default: accelerator transport. Tests for canned override.
   vi.stubEnv("VITE_VOICE_TRANSPORT", "accelerator");
-  // Stub location.assign so the redirect after call-end doesn't crash jsdom.
   Object.defineProperty(window, "location", {
     value: { ...window.location, assign: vi.fn(), search: "?token=SCRTOK" },
     writable: true,
   });
 });
+
 afterEach(() => {
   server.resetHandlers();
   vi.unstubAllEnvs();
 });
+
 afterAll(() => server.close());
 
 
-describe("Screen", () => {
-  test("resolves token, renders the accelerator iframe with candidate_id + token", async () => {
+describe("Screen (native WebRTC)", () => {
+  test("resolves token, then renders the Start call button", async () => {
     render(<Screen />);
-    const iframe = (await screen.findByTestId("voice-iframe")) as HTMLIFrameElement;
-    expect(iframe).toBeTruthy();
-    expect(iframe.getAttribute("src")).toContain("candidate_id=C-IFRAME1");
-    expect(iframe.getAttribute("src")).toContain("token=SCRTOK");
-    // Microphone delegated to the iframe so getUserMedia inside works.
-    expect(iframe.getAttribute("allow")).toContain("microphone");
+    expect(await screen.findByTestId("btn-start-call")).toBeTruthy();
   });
 
-  test("on voice-call-ended message, POSTs transcript and redirects to /portal", async () => {
+  test("clicking Start call opens a peer connection via /api/portal/voice/session + /rtc", async () => {
     render(<Screen />);
-    await screen.findByTestId("voice-iframe");
-    // Simulate the accelerator's iframe posting the call-end signal.
+    const btn = await screen.findByTestId("btn-start-call");
     await act(async () => {
-      window.dispatchEvent(new MessageEvent("message", {
-        data: {
-          type: "voice-call-ended",
-          transcript: [
-            { role: "agent", text: "Hi", ts: 0 },
-            { role: "candidate", text: "Hello", ts: 1.2 },
-          ],
-          score: 8.4,
-          duration_s: 95.2,
-        },
+      fireEvent.click(btn);
+    });
+    await waitFor(() => expect(lastSessionPost).not.toBeNull());
+    await waitFor(() => expect(lastRtcPost).not.toBeNull());
+    expect(lastRtcPost!.auth).toBe("Bearer EPH-FAKE");
+    expect(lastRtcPost!.body).toContain("fake-offer");
+    expect(FakeRTCPeerConnection.instances).toHaveLength(1);
+  });
+
+  test("on End call, captured transcript is POSTed and we redirect to /portal", async () => {
+    render(<Screen />);
+    const start = await screen.findByTestId("btn-start-call");
+    await act(async () => { fireEvent.click(start); });
+    await waitFor(() => expect(lastRtcPost).not.toBeNull());
+
+    // Simulate two transcript events arriving over the data channel.
+    const pc = FakeRTCPeerConnection.instances[0];
+    await act(async () => {
+      pc.dc!.onmessage?.(new MessageEvent("message", {
+        data: JSON.stringify({
+          type: "conversation.item.input_audio_transcription.completed",
+          transcript: "Hello there",
+        }),
+      }));
+      pc.dc!.onmessage?.(new MessageEvent("message", {
+        data: JSON.stringify({
+          type: "response.audio_transcript.done",
+          transcript: "Welcome to the call.",
+        }),
       }));
     });
+
+    const end = await screen.findByTestId("btn-end-call");
+    await act(async () => { fireEvent.click(end); });
     await waitFor(() => expect(lastTranscriptPost).not.toBeNull());
-    expect(lastTranscriptPost!.url).toContain("/api/portal/voice/C-IFRAME1/transcript");
-    expect(lastTranscriptPost!.body).toMatchObject({
-      token: "SCRTOK",
-      score: 8.4,
-      duration_s: 95.2,
-    });
+    expect(lastTranscriptPost!.url).toContain("/api/portal/voice/C-NATIVE1/transcript");
+    expect(lastTranscriptPost!.body).toMatchObject({ token: "SCRTOK" });
     expect(lastTranscriptPost!.body.transcript).toHaveLength(2);
-    // Returns to /portal once the upload succeeds.
+    expect(lastTranscriptPost!.body.transcript[0]).toMatchObject({
+      role: "candidate",
+      text: "Hello there",
+    });
+    expect(lastTranscriptPost!.body.transcript[1]).toMatchObject({
+      role: "agent",
+      text: "Welcome to the call.",
+    });
     await waitFor(() => {
       expect((window.location.assign as any)).toHaveBeenCalledWith(
         "/portal?token=SCRTOK",
@@ -98,8 +187,7 @@ describe("Screen", () => {
     resolveStatus = 410;
     render(<Screen />);
     expect(await screen.findByText(/expired/i)).toBeTruthy();
-    // Iframe must NOT mount when resolve fails.
-    expect(screen.queryByTestId("voice-iframe")).toBeNull();
+    expect(screen.queryByTestId("btn-start-call")).toBeNull();
   });
 
   test("missing token in URL shows error without hitting screen-resolve", async () => {
@@ -113,16 +201,12 @@ describe("Screen", () => {
   });
 
   test("VITE_VOICE_TRANSPORT=canned renders Run canned screen button that POSTs the canned route", async () => {
-    // getVoiceTransport() reads import.meta.env at render time so flipping
-    // the env BEFORE render flips the branch. vi.stubEnv works on
-    // import.meta.env for vite/vitest.
     vi.stubEnv("VITE_VOICE_TRANSPORT", "canned");
     render(<Screen />);
     const btn = (await screen.findByRole("button", { name: /run canned screen/i })) as HTMLButtonElement;
-    expect(btn).toBeTruthy();
     fireEvent.click(btn);
     await waitFor(() => expect(lastCannedPost).not.toBeNull());
-    expect(lastCannedPost!.url).toContain("/api/portal/voice/C-IFRAME1/canned");
+    expect(lastCannedPost!.url).toContain("/api/portal/voice/C-NATIVE1/canned");
     expect(lastCannedPost!.query).toContain("token=SCRTOK");
   });
 });
