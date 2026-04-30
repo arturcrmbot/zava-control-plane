@@ -58,7 +58,29 @@ async def post_run(req: RunRequest, background: BackgroundTasks):
 
     async def _execute_and_cache():
         try:
-            await batch_runner.run(claim_ids, run_id=run_id, publish=_bus_publish)
+            # Pre-classify each claim (sequentially — avoids GHCP fork-bomb
+            # under Foundry's batch worker), then hand the rows to batch_runner
+            # which only does the eval scoring step.
+            from api.functions.graphs.executors.agents.agent_rag_classifier import execute as rag_execute
+            pre_classified: list[dict] = []
+            for i, cid in enumerate(claim_ids):
+                _bus_publish({"type": "accuracy.progress", "run_id": run_id,
+                              "index": i, "total": len(claim_ids), "claim_id": cid,
+                              "correct": False})
+                try:
+                    cls = (await rag_execute({"claim_id": cid, "workflow_id": run_id}))["classification"]
+                except Exception as ex:
+                    log.warning("pre-classify failed for %s: %s", cid, ex)
+                    cls = {}
+                pre_classified.append({
+                    "claim_id": cid,
+                    "predicted_label": cls.get("verdict", "<error>"),
+                    "predicted_reasoning": cls.get("reasoning", ""),
+                    "policy_clause": cls.get("policy_clause", ""),
+                    "context": "",
+                })
+
+            await batch_runner.run(pre_classified, run_id=run_id, publish=_bus_publish)
         except Exception as ex:
             log.exception("batch run %s failed", run_id)
             _bus_publish({"type": "accuracy.complete", "run_id": run_id,

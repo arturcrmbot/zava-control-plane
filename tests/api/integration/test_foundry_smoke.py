@@ -14,26 +14,37 @@ pytestmark = pytest.mark.foundry
 
 def _has_creds() -> bool:
     return all(os.environ.get(k) for k in (
-        "AZURE_FOUNDRY_PROJECT_ENDPOINT", "AZURE_FOUNDRY_JUDGE_MODEL_DEPLOYMENT",
+        "AZURE_FOUNDRY_PROJECT_ENDPOINT", "AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_DEPLOYMENT",
     ))
 
 
 @pytest.mark.skipif(not _has_creds(), reason="Foundry creds not set")
 @pytest.mark.asyncio
-async def test_foundry_smoke_5_claims():
+async def test_foundry_smoke_eval_only_no_target():
+    """Eval-only smoke: pre-built rows → real Foundry → real scores.
+
+    Uses fabricated `predicted_*` so the test doesn't depend on running the
+    rag classifier. Confirms wiring: model_config endpoint + api_version,
+    project URI shape, JSONL building, dict-shaped result handling.
+    """
     from api.server.eval.batch_runner import run
 
-    from pathlib import Path
-    claims_dir = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "claims"
-    available = sorted(p.stem for p in claims_dir.glob("CLM-*.json"))[:5]
-    assert len(available) == 5, "need at least 5 synthetic claims for the smoke run"
+    pre_classified = [
+        {"claim_id": "CLM-0000", "predicted_label": "green",
+         "predicted_reasoning": "Meal claim is below the per-diem cap.",
+         "policy_clause": "Section 3.2",
+         "context": "Section 3.2 Meal claims must not exceed the per-diem cap."},
+        {"claim_id": "CLM-0001", "predicted_label": "green",
+         "predicted_reasoning": "Travel within policy.",
+         "policy_clause": "Section 5.1",
+         "context": "Section 5.1 Travel must use approved booking."},
+    ]
 
     captured: list[dict] = []
-    report = await run(claim_ids=available, run_id="smoke-test",
+    report = await run(pre_classified, run_id="smoke-test",
                        publish=lambda e: captured.append(e))
 
-    assert report["n"] == 5
-    assert "overall_accuracy" in report
+    assert report["n"] == 2
     assert isinstance(report["overall_accuracy"], float)
     assert 0.0 <= report["overall_accuracy"] <= 1.0
     assert "confusion_matrix" in report

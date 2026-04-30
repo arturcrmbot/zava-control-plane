@@ -1,11 +1,18 @@
 """Foundry-backed batch corpus evaluator.
 
-Replaces the old in-process accuracy_harness_workflow. Calls the SDK's
-high-level `evaluate()` helper with `azure_ai_project=` so the run shows
-up as a comparable named run in the Foundry portal.
+Pattern (per Azure AI Evaluation SDK docs): pre-build a JSONL where each row
+already contains both the inputs and the model's outputs (predicted_label,
+predicted_reasoning, context). `evaluate()` is called with **no target** —
+it just runs the evaluators against the pre-computed rows.
 
-Result reshape preserves the existing /api/accuracy/last response so the
-AccuracyReport panel keeps rendering without structural changes.
+We do NOT use `target=` to re-run the rag classifier per row through Foundry's
+batch worker. That pattern is for "queries without responses"; we have
+responses already (online classifications, or a one-shot pre-classify
+done outside this function).
+
+The caller is responsible for producing classifications and passing them
+in via `pre_classified` (a list of dicts, one per claim). For demos, this
+is a tiny set; for the 300-claim corpus, it's pre-computed offline.
 """
 from __future__ import annotations
 import asyncio
@@ -29,20 +36,8 @@ PublishFn = Callable[[dict], None]
 _CLAIMS_DIR = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "claims"
 
 
-# Indirection so tests can swap with a stub.
-async def _rag_execute(input_dict: dict) -> dict:
-    from api.functions.graphs.executors.agents.agent_rag_classifier import execute as e
-    return await e(input_dict)
-
-
-def _to_eval_row(claim_id: str) -> dict:
-    raw = json.loads((_CLAIMS_DIR / f"{claim_id}.json").read_text(encoding="utf-8"))
-    return {
-        "claim_id": claim_id,
-        "gold_label": raw["gold_label"],
-        "gold_reasoning": raw.get("gold_reasoning", ""),
-        "gold_category": raw.get("gold_category") or raw.get("category", ""),
-    }
+def _load_claim(claim_id: str) -> dict:
+    return json.loads((_CLAIMS_DIR / f"{claim_id}.json").read_text(encoding="utf-8"))
 
 
 def _write_temp_jsonl(rows: list[dict]) -> str:
@@ -57,17 +52,22 @@ def _empty_confusion_matrix() -> dict[str, dict[str, int]]:
     return {gold: {pred: 0 for pred in VERDICTS} for gold in VERDICTS}
 
 
-def _shape_existing_report(result, claim_ids: list[str]) -> dict:
-    """Convert the SDK result into the shape the AccuracyReport panel expects."""
-    rows = list(getattr(result, "rows", []) or [])
+def _shape_existing_report(result, rows_in: list[dict]) -> dict:
+    """Convert the SDK result dict into the AccuracyReport shape.
+
+    `result["rows"]` carries `inputs.*` (from the JSONL) and `outputs.<eval_name>.*`
+    (from each evaluator). The SDK returns a plain dict with keys `rows`, `metrics`,
+    `studio_url` — NOT an object with attributes.
+    """
+    out_rows = list(result.get("rows", []) or [])
     cm = _empty_confusion_matrix()
     per_claim: list[dict] = []
     correct = 0
     per_category: dict[str, dict] = {}
 
-    for r in rows:
+    for r in out_rows:
         gold = r.get("inputs.gold_label", "")
-        pred = r.get("outputs.predicted_label", "<error>")
+        pred = r.get("inputs.predicted_label", "<error>")
         match = r.get("outputs.label_match.label_match", 0)
         if match:
             correct += 1
@@ -78,8 +78,8 @@ def _shape_existing_report(result, claim_ids: list[str]) -> dict:
             "gold_label": gold,
             "predicted_label": pred,
             "gold_reasoning": r.get("inputs.gold_reasoning", ""),
-            "predicted_reasoning": r.get("outputs.predicted_reasoning", ""),
-            "policy_clause": r.get("outputs.policy_clause", ""),
+            "predicted_reasoning": r.get("inputs.predicted_reasoning", ""),
+            "policy_clause": r.get("inputs.policy_clause", ""),
             "correct": bool(match),
         })
         cat = r.get("inputs.gold_category", "")
@@ -93,7 +93,7 @@ def _shape_existing_report(result, claim_ids: list[str]) -> dict:
         bucket["accuracy"] = bucket["correct"] / bucket["n"] if bucket["n"] else 0.0
         del bucket["correct"]
 
-    n = len(rows)
+    n = len(out_rows)
     return {
         "n": n,
         "overall_accuracy": correct / n if n else 0.0,
@@ -103,18 +103,44 @@ def _shape_existing_report(result, claim_ids: list[str]) -> dict:
     }
 
 
+def _build_jsonl_rows(pre_classified: list[dict]) -> list[dict]:
+    """Merge gold labels (from synthetic corpus) with the caller's classifications."""
+    out: list[dict] = []
+    for c in pre_classified:
+        claim_id = c["claim_id"]
+        raw = _load_claim(claim_id)
+        out.append({
+            "claim_id": claim_id,
+            "gold_label": raw["gold_label"],
+            "gold_reasoning": raw.get("gold_reasoning", ""),
+            "gold_category": raw.get("gold_category") or raw.get("category", ""),
+            "predicted_label": c.get("predicted_label", "<error>"),
+            "predicted_reasoning": c.get("predicted_reasoning", ""),
+            "policy_clause": c.get("policy_clause", ""),
+            "context": c.get("context", ""),
+        })
+    return out
+
+
 async def run(
-    claim_ids: list[str],
+    pre_classified: list[dict],
     *,
     run_id: str,
     publish: PublishFn,
 ) -> dict:
-    """Run the batch corpus eval through Foundry's `evaluate()`.
+    """Run evaluators against pre-classified rows via Foundry `evaluate()`.
 
-    Returns the existing-shape accuracy report (`overall_accuracy`,
-    `per_category`, `confusion_matrix`, `per_claim`) plus a
-    `foundry_run_url` field for the portal entry. Also writes the
-    report into the EvalStore as kind="batch".
+    Args:
+        pre_classified: List of dicts, one per claim, each with at minimum
+            `claim_id`, `predicted_label`, `predicted_reasoning`, `policy_clause`,
+            `context`. Gold labels are loaded from data/synthetic/claims.
+        run_id: Stable identifier for this batch run (used in evaluation_name
+            and as the EvalStore key).
+        publish: Callback for accuracy.progress / accuracy.complete events.
+
+    Returns the accuracy report (n, overall_accuracy, per_category,
+    confusion_matrix, per_claim) plus `foundry_run_url` and `run_id`.
+    Raises RuntimeError if Foundry is not configured.
     """
     if not foundry_client.is_configured():
         raise RuntimeError("Foundry is not configured; refusing to run batch.")
@@ -123,28 +149,23 @@ async def run(
         evaluate, GroundednessEvaluator, SimilarityEvaluator,
     )
 
-    rows = [_to_eval_row(cid) for cid in claim_ids]
+    rows = _build_jsonl_rows(pre_classified)
     jsonl_path = _write_temp_jsonl(rows)
-
-    def _target(*, claim_id, **_):
-        cls = asyncio.run(_rag_execute({"claim_id": claim_id}))["classification"]
-        return {
-            "predicted_label": cls.get("verdict", "<error>"),
-            "predicted_reasoning": cls.get("reasoning", ""),
-            "policy_clause": cls.get("policy_clause", ""),
-            "context": "policy",
-        }
 
     model_config = foundry_client.get_model_config()
     project_config = foundry_client.get_project_config()
 
     publish({"type": "accuracy.progress", "run_id": run_id, "index": 0,
-             "total": len(claim_ids), "claim_id": claim_ids[0] if claim_ids else "",
+             "total": len(rows),
+             "claim_id": rows[0]["claim_id"] if rows else "",
              "correct": False})
 
-    result = evaluate(
+    # `evaluate()` is synchronous + blocks while it streams batch progress.
+    # Run it on a worker thread so the event loop stays free.
+    result = await asyncio.to_thread(
+        evaluate,
         data=jsonl_path,
-        target=_target,
+        # No `target=` — the JSONL already has predicted_label/reasoning/context.
         evaluators={
             "groundedness": GroundednessEvaluator(model_config=model_config),
             "similarity": SimilarityEvaluator(model_config=model_config),
@@ -154,31 +175,31 @@ async def run(
         evaluator_config={
             "groundedness": {"column_mapping": {
                 "query": "${data.claim_id}",
-                "response": "${target.predicted_reasoning}",
-                "context": "${target.context}",
+                "response": "${data.predicted_reasoning}",
+                "context": "${data.context}",
             }},
             "similarity": {"column_mapping": {
                 "query": "${data.claim_id}",
-                "response": "${target.predicted_reasoning}",
+                "response": "${data.predicted_reasoning}",
                 "ground_truth": "${data.gold_reasoning}",
             }},
             "label_match": {"column_mapping": {
-                "predicted": "${target.predicted_label}",
+                "predicted": "${data.predicted_label}",
                 "gold": "${data.gold_label}",
             }},
             "policy_cited": {"column_mapping": {
                 "query": "${data.claim_id}",
-                "response": "${target.predicted_reasoning}",
-                "context": "${target.context}",
+                "response": "${data.predicted_reasoning}",
+                "context": "${data.context}",
             }},
         },
         azure_ai_project=project_config,
         evaluation_name=f"poc1-accuracy-{run_id}-{int(time.time())}",
     )
 
-    report = _shape_existing_report(result, claim_ids)
+    report = _shape_existing_report(result, rows)
     report["run_id"] = run_id
-    report["foundry_run_url"] = getattr(result, "studio_url", None)
+    report["foundry_run_url"] = result.get("studio_url")
 
     default_store().put_batch(run_id, report)
 

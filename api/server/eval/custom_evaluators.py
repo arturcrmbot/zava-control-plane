@@ -25,7 +25,7 @@ class PolicyClauseCited:
     cites a clause number ('per §3.2') without quoting the literal text.
     """
 
-    def __call__(self, *, query: str, response: str, context: str, **_: Any) -> dict:
+    def __call__(self, *, query: str, response: str, context: str, **kwargs: Any) -> dict:
         if not context or not response:
             return {"policy_clause_cited": 0, "policy_clause_excerpt": None}
 
@@ -56,7 +56,7 @@ class ToolCallValidity:
         response: str,
         tool_calls: list[dict] | None = None,
         declared_tools: list[str] | None = None,
-        **_: Any,
+        **kwargs: Any,
     ) -> dict:
         tool_calls = tool_calls or []
         declared = set(declared_tools or [])
@@ -92,7 +92,7 @@ class GoldLabelMatch:
     """
 
     def __call__(
-        self, *, predicted: str = "", gold: str = "", **_: Any
+        self, *, predicted: str = "", gold: str = "", **kwargs: Any
     ) -> dict:
         return {
             "label_match": 1 if predicted == gold else 0,
