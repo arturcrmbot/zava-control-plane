@@ -28,6 +28,8 @@ dependencies = [
   "opentelemetry-instrumentation-fastapi>=0.48b0",
   "pillow>=10.0",
   "sentence-transformers>=3.0",
+  "azure-ai-documentintelligence>=1.0.2",
+  "weasyprint>=68.1",
 ]
 
 [dependency-groups]
