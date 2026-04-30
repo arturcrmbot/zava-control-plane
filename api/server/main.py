@@ -2,6 +2,13 @@ from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+
+# load_dotenv MUST run before any module that reads os.environ at import time.
+# api.server.state constructs MagicLinkStore + EmailSender + BlobStore eagerly
+# using env vars; if .env hasn't been parsed yet, BlobStore comes back as None
+# and /api/portal/apply 503s with "AZURE_STORAGE_CONNECTION_STRING not set".
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -9,8 +16,6 @@ from api.server.state import app_state
 from api.server.services.fleet_manager_service import FleetManagerService
 from api.server.services import simulator_orchestrator
 from api.shared.otel import init_otel
-
-load_dotenv()
 
 
 def _on_live(ev: dict):
