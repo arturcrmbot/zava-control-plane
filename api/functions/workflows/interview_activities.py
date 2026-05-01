@@ -60,16 +60,27 @@ def send_book_interview_email_activity(payload: dict) -> dict:
 
     Best-effort — a send failure must not abort the orchestration since
     the recruiter can copy/paste the link from the recruiter view.
+
+    Reads candidate name/email from the payload first (orchestrator passes
+    them through `enriched["candidate"]`); falls back to the local store
+    for backwards compatibility, but the worker process's StateStore is
+    independent of FastAPI's, so the payload path is the load-bearing one.
     """
     from api.server.state import app_state
     candidate_id = payload["candidate_id"]
     token = payload["token"]
     role_title = payload.get("role_title") or "the role"
     portal_url = payload.get("portal_url") or f"{_portal_base()}/book?token={token}"
-    candidate = app_state.store.get_candidate(candidate_id)
-    if candidate is None:
-        return {"sent": False, "reason": "unknown_candidate"}
-    name = candidate.get("name") or "there"
+    name = payload.get("name")
+    email = payload.get("email")
+    if not name or not email:
+        candidate = app_state.store.get_candidate(candidate_id)
+        if candidate is None and (not name or not email):
+            return {"sent": False, "reason": "unknown_candidate"}
+        if candidate:
+            name = name or candidate.get("name")
+            email = email or candidate.get("email")
+    name = name or "there"
     subject = f"Schedule your {role_title} interview"
     html = (
         f"<p>Hi {name},</p>"
@@ -81,7 +92,7 @@ def send_book_interview_email_activity(payload: dict) -> dict:
     )
     try:
         msg_id = app_state.email_sender.send(
-            to=candidate.get("email") or "unknown@example.com",
+            to=email or "unknown@example.com",
             subject=subject,
             html_body=html,
         )
@@ -101,10 +112,16 @@ def send_rejection_email_activity(payload: dict) -> dict:
     candidate_id = payload["candidate_id"]
     gate = (payload.get("gate") or "interview").lower()
     role_title = payload.get("role_title") or "the role"
-    candidate = app_state.store.get_candidate(candidate_id)
-    if candidate is None:
-        return {"sent": False, "reason": "unknown_candidate"}
-    name = candidate.get("name") or "there"
+    name = payload.get("name")
+    email = payload.get("email")
+    if not name or not email:
+        candidate = app_state.store.get_candidate(candidate_id)
+        if candidate is None and (not name or not email):
+            return {"sent": False, "reason": "unknown_candidate"}
+        if candidate:
+            name = name or candidate.get("name")
+            email = email or candidate.get("email")
+    name = name or "there"
     if gate == "offer":
         bridge = (
             f"After the interview stage we've decided not to move forward "
@@ -126,7 +143,7 @@ def send_rejection_email_activity(payload: dict) -> dict:
     )
     try:
         msg_id = app_state.email_sender.send(
-            to=candidate.get("email") or "unknown@example.com",
+            to=email or "unknown@example.com",
             subject=subject,
             html_body=html,
         )

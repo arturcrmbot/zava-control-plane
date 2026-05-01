@@ -238,10 +238,15 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
 
     if invite_decision != "invite":
         # Recruiter rejected at gate 1 — auto-reject email + close workflow.
+        # Pass name/email through the payload because the worker process's
+        # in-memory candidate store is independent of FastAPI's.
+        _cand_dict = enriched.get("candidate") or {}
         yield context.call_activity("send_rejection_email_activity_trigger", {
             "candidate_id": candidate_id,
             "gate": "interview",
             "role_title": (enriched.get("metadata") or {}).get("role_title"),
+            "name": _cand_dict.get("name"),
+            "email": _cand_dict.get("email"),
         })
         yield context.call_activity("checkpoint_activity_trigger", {
             "workflow_id": workflow_id, "instance_id": context.instance_id,
@@ -267,6 +272,7 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
         "issue_book_interview_link_activity_trigger",
         {"candidate_id": candidate_id},
     )
+    _cand_dict = enriched.get("candidate") or {}
     yield context.call_activity(
         "send_book_interview_email_activity_trigger",
         {
@@ -274,6 +280,8 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
             "token": book_link.get("token"),
             "portal_url": book_link.get("portal_url"),
             "role_title": (enriched.get("metadata") or {}).get("role_title"),
+            "name": _cand_dict.get("name"),
+            "email": _cand_dict.get("email"),
         },
     )
 
@@ -345,10 +353,13 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
 
     if post_decision != "offer":
         # Recruiter rejected at gate 3 — auto-reject email + close workflow.
+        _cand_dict = enriched.get("candidate") or {}
         yield context.call_activity("send_rejection_email_activity_trigger", {
             "candidate_id": candidate_id,
             "gate": "offer",
             "role_title": (enriched.get("metadata") or {}).get("role_title"),
+            "name": _cand_dict.get("name"),
+            "email": _cand_dict.get("email"),
         })
         yield context.call_activity("checkpoint_activity_trigger", {
             "workflow_id": workflow_id, "instance_id": context.instance_id,
