@@ -63,7 +63,11 @@ def expense_claim_orchestration(context: df.DurableOrchestrationContext) -> Gene
         yield context.call_activity("checkpoint_activity_trigger", {
             "workflow_id": workflow_id, "instance_id": context.instance_id,
             "kind": "suspended",
-            "payload": {"reason": "awaiting_justification"},
+            # wait_kind: external_party — the claim submitter (employee) has
+            # to justify. The SSC operator queue shouldn't care; they only
+            # see this if it ages past SLA.
+            "payload": {"reason": "awaiting_justification",
+                        "wait_kind": "external_party"},
         })
 
         justification_event = context.wait_for_external_event("justification")
@@ -91,7 +95,11 @@ def expense_claim_orchestration(context: df.DurableOrchestrationContext) -> Gene
 
         yield context.call_activity("checkpoint_activity_trigger", {
             "workflow_id": workflow_id, "instance_id": context.instance_id,
-            "kind": "suspended", "payload": {"reason": "awaiting_reviewer"},
+            "kind": "suspended",
+            # wait_kind: operator_review — SSC reviewer must accept/reject.
+            # This goes on the operator queue and ages against our SLA.
+            "payload": {"reason": "awaiting_reviewer",
+                        "wait_kind": "operator_review"},
         })
 
         decision_event = context.wait_for_external_event("reviewer_decision")

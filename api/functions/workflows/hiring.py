@@ -52,7 +52,13 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
         "kind": "suspended",
-        "payload": {"reason": "awaiting_budget_approval", "phase": "Budget"},
+        # wait_kind: external_party — Finance BP is technically internal, but
+        # in the candidate-portal demo path the candidate-applied subscriber
+        # auto-fires budget_approval. Treating this as a candidate-driven
+        # wait keeps the operator queue clean during the demo. Engagement-POC
+        # path (real Finance BP delegation) would reclassify as operator_review.
+        "payload": {"reason": "awaiting_budget_approval", "phase": "Budget",
+                    "wait_kind": "external_party"},
     })
 
     approval_event = context.wait_for_external_event("budget_approval")
@@ -126,7 +132,10 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
         yield context.call_activity("checkpoint_activity_trigger", {
             "workflow_id": workflow_id, "instance_id": context.instance_id,
             "kind": "suspended",
-            "payload": {"reason": "awaiting_voice_complete", "phase": "Voice"},
+            # wait_kind: external_party — candidate's screening call. Not an
+            # operator HITL; nothing for the Agent Administrator to action.
+            "payload": {"reason": "awaiting_voice_complete", "phase": "Voice",
+                        "wait_kind": "external_party"},
         })
 
         voice_event = context.wait_for_external_event("voice_complete")
@@ -192,7 +201,11 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
         "kind": "suspended",
-        "payload": {"reason": "awaiting_offer_approval", "phase": "Offer"},
+        # wait_kind: external_party — candidate's accept/decline. Engagement
+        # POC may reclassify as operator_review when HR BP also gates the
+        # non-revocable send.
+        "payload": {"reason": "awaiting_offer_approval", "phase": "Offer",
+                    "wait_kind": "external_party"},
     })
 
     offer_event = context.wait_for_external_event("offer_approval")

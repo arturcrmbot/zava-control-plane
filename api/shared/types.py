@@ -126,6 +126,12 @@ class Workflow(BaseModel):
     # "cv_crystalliser"); each value carries the canonical agent payload incl.
     # an optional `component_spec` array of AgentComponentSpec entries.
     agent_outputs: dict = Field(default_factory=dict)
+    # Per-agent reasoning trace — one entry per agent.completed event from the
+    # agent-tracked-executor wrapper. Each entry has: agent_label, phase,
+    # started_at, completed_at, messages (full chat stream), tool_calls,
+    # extracted_json, latency_ms, tokens. Append-only; re-runs are kept.
+    # Generic platform field — every domain that uses the wrapper benefits.
+    agent_reasoning: list = Field(default_factory=list)
 
 
 class Phase(BaseModel):

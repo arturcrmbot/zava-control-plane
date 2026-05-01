@@ -137,6 +137,41 @@ class StateStore:
         w = self._workflows.get(workflow_id)
         return dict(w.agent_outputs) if w else {}
 
+    def append_agent_reasoning(self, workflow_id: str, entry: dict) -> None:
+        """Persist one agent.completed reasoning entry on the workflow.
+
+        Each entry should carry the canonical wrapper shape — `agent_label`,
+        `phase` (when known), `started_at`, `completed_at`, `messages` (full
+        chat-completion message stream), `tool_calls` (input/output of each
+        tool the agent invoked), `extracted_json` (the structured output the
+        agent produced), `latency_ms`, `tokens_in`/`tokens_out`. Surfaces in
+        the admin Traces tab and any domain view (recruiter candidate page,
+        reviewer queue, …) so we always know what the AI thought, not just
+        that it ran.
+
+        Append-only: re-runs of the same agent on the same workflow each get
+        their own entry. Last entry per agent_label is the authoritative
+        verdict for downstream UI. No-op if the workflow is unknown.
+        """
+        w = self._workflows.get(workflow_id)
+        if w is None:
+            return
+        if not hasattr(w, "agent_reasoning") or w.agent_reasoning is None:
+            try:
+                w.agent_reasoning = []
+            except Exception:
+                # Pydantic immutable field — fall back to dict-style mutation
+                # via the model's __dict__. Workflow uses arbitrary types
+                # in tests so this is the conservative path.
+                w.__dict__["agent_reasoning"] = []
+        w.agent_reasoning.append(entry)
+
+    def get_agent_reasoning(self, workflow_id: str) -> list[dict]:
+        w = self._workflows.get(workflow_id)
+        if w is None:
+            return []
+        return list(getattr(w, "agent_reasoning", None) or [])
+
     # ----------------------------------------------------------------- candidates
     # Candidate-portal surface (POC2 §4 demo-ready scope). Candidates submit
     # an application via the public /api/portal/apply route; we persist their

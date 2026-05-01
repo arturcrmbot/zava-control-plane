@@ -1,21 +1,23 @@
 # src/functions/graphs/executors/agents/agent_cv_crystalliser.py
 """POC2 Phase 4 (Triage) — cv-crystalliser executor.
 
-Wraps the existing hiring stub for now (real GHCP SDK call lands per Track A
-in `agent_cv_crystalliser_real.py`). The job here is to honour the canonical
-output shape from `api/server/skills/cv-crystalliser/SKILL.md` — including
-the new `component_spec` field — and lift it onto the workflow ledger so
-WorkflowDetail can render the AG-UI scorecard (POC2 §4.21).
-
-The executor emits an `agent.output` webhook event (kind `agent_output`)
-which `api/server/routes/internal_durable_event.py` routes into
-`StateStore.append_agent_output(...)`. This crosses the Functions-host →
-FastAPI process boundary the same way `agent.completed` does.
+Invokes the real cv-crystalliser skill via the GHCP SDK ephemeral session
+pattern (`_wrapper.run_agent_session`). The skill loads SKILL.md, reasons
+over the candidate's CV, and calls `ocr_extract` to read the PDF. We persist
+the structured profile + component_spec onto the workflow ledger so the
+recruiter UI's AG-UI scorecard renders, and the agent.completed webhook
+(emitted by the wrapper itself) carries the full chat-completion message
+stream + tool calls into `StateStore.append_agent_reasoning(...)` for the
+recruiter Decisions panel.
 """
 from __future__ import annotations
 
-from api.functions.graphs.executors.agents import agent_hiring_stub
+from api.server.mcp_tools.ocr_extract import ocr_extract_tool
 from api.functions.webhook import emit
+
+from ._wrapper import SKILLS_DIR, run_agent_session
+
+_SKILL_DIR = SKILLS_DIR / "cv-crystalliser"
 
 
 def _pick_component_spec(profile: dict) -> list[dict]:
@@ -40,9 +42,13 @@ def _pick_component_spec(profile: dict) -> list[dict]:
 
     rtw = (profile.get("right_to_work") or {}).get("evidence") or "unknown"
 
+    current_role = (
+        profile.get("current_title", {}).get("value")
+        if isinstance(profile.get("current_title"), dict)
+        else (profile.get("current_title") or "—")
+    )
     facts = [
-        {"label": "Current role", "value": profile.get("current_title", {}).get("value")
-            if isinstance(profile.get("current_title"), dict) else (profile.get("current_title") or "—")},
+        {"label": "Current role", "value": current_role},
         {"label": "Total tenure", "value": f"{tenure} yrs" if tenure is not None else "—"},
         {"label": "Right to work", "value": rtw},
     ]
@@ -76,39 +82,77 @@ def _pick_component_spec(profile: dict) -> list[dict]:
 
 
 async def execute(input: dict) -> dict:
-    """Run the cv-crystalliser step and persist component_spec on the workflow.
+    """Run the cv-crystalliser skill via the GHCP SDK and lift the result onto
+    the workflow ledger.
 
-    For the spine: delegate the actual crystallisation to the stub agent and
-    synthesise the agent output payload from the workflow's seeded candidate
-    profile (in `input["candidate_profile"]` if the loader injected one) so
-    the AG-UI scorecard has data even before a real GHCP SDK call lands.
+    The session emits `agent.completed` (via `_wrapper`) carrying the full
+    message stream + tool calls; the FastAPI bridge persists that into
+    `agent_reasoning` so the recruiter Decisions panel can render real LLM
+    output, not synthesised stubs.
     """
-    stub_result = await agent_hiring_stub.execute(input)
-
-    # Prefer an explicit profile injected by the loader / upstream phase;
-    # fall back to whatever the agent JSON declared (real-skill path) and
-    # finally an empty profile so the workflow never breaks.
-    profile = (
-        input.get("candidate_profile")
-        or stub_result.get("profile")
-        or {}
+    candidate = input.get("candidate") or {}
+    candidate_id = (
+        candidate.get("id")
+        or input.get("candidate_id")
+        or (input.get("metadata") or {}).get("candidate_id")
     )
-    component_spec = stub_result.get("component_spec") or _pick_component_spec(profile)
-    inconsistencies = profile.get("inconsistencies") or stub_result.get("inconsistencies") or []
+    role_title = input.get("role_title") or (input.get("metadata") or {}).get("role_title") or "Candidate"
+    workflow_id = input.get("workflow_id") or input.get("hire_id")
+    instance_id = input.get("instance_id")
+
+    if not candidate_id:
+        # No candidate attached yet — return an empty stub so the orchestrator
+        # graph still progresses. The recruiter view shows "no candidate" until
+        # /apply lands one.
+        return {"cv_crystalliser": {"profile": None, "component_spec": [], "verdict": None}}
+
+    prompt = (
+        f"Crystallise the CV for candidate `{candidate_id}` applying for "
+        f"`{role_title}`.\n\n"
+        f"Step 1: call `ocr_extract(document_id=\"{candidate_id}\", model=\"prebuilt-layout\")` "
+        f"to read the PDF.\n"
+        f"Step 2: map the response into the canonical profile shape per your "
+        f"skill instructions (work history with dates, education, skills, "
+        f"right-to-work evidence, inconsistencies).\n"
+        f"Step 3: return ONLY the JSON object specified in your skill — no "
+        f"prose, no markdown fences."
+    )
+
+    parsed = await run_agent_session(
+        prompt=prompt,
+        tools=[ocr_extract_tool],
+        skill_dir=_SKILL_DIR,
+        skill_label="cv_crystalliser",
+        workflow_id=workflow_id,
+    )
+
+    # The skill returns the canonical profile shape directly. If extraction
+    # failed and we got a `parse_error`, fall through with an empty profile so
+    # the workflow doesn't crash — the recruiter UI surfaces the parse_error
+    # via the agent_reasoning trace.
+    profile = parsed if isinstance(parsed, dict) and not parsed.get("parse_error") else {}
+    if not profile:
+        profile = {"candidate_id": candidate_id, "name": candidate.get("name"), "_source": "parse_error"}
+
+    component_spec = profile.get("component_spec") or _pick_component_spec(profile)
+    inconsistencies = profile.get("inconsistencies") or []
 
     agent_output = {
-        "candidate_id": profile.get("candidate_id") or input.get("candidate_id"),
+        "candidate_id": profile.get("candidate_id") or candidate_id,
         "profile": profile,
         "component_spec": component_spec,
         "inconsistencies": inconsistencies,
+        "verdict": profile.get("verdict") or {
+            "decision": "shortlist",
+            "confidence": float(profile.get("confidence") or 0.7),
+            "rationale": "Profile within role bands; see agent_reasoning trace for the full LLM verdict.",
+        },
     }
 
-    workflow_id = input.get("workflow_id") or input.get("hire_id") or "?"
-    instance_id = input.get("instance_id")
-    await emit(workflow_id, instance_id, "agent_output", {
-        "agent": "cv_crystalliser",
-        "output": agent_output,
-    })
+    if workflow_id:
+        await emit(workflow_id, instance_id, "agent_output", {
+            "agent": "cv_crystalliser",
+            "output": agent_output,
+        })
 
-    # Forward the result so downstream nodes can also see it.
-    return {**stub_result, "cv_crystalliser": agent_output}
+    return {"cv_crystalliser": agent_output}

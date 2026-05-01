@@ -125,7 +125,36 @@ export default function WorkflowDetail() {
     <div className="grid grid-cols-4 gap-4 min-w-0">
       <div className="col-span-3 space-y-4 min-w-0">
         <div>
-          <div className="text-xs text-slate-500">{w.id}</div>
+          <div className="text-xs text-slate-500 flex items-center gap-2">
+            <span>{w.id}</span>
+            {/*
+              Generic "open in domain view" deep-link. Each domain owns its
+              own surface; admin shell stays domain-clean. Hiring → recruiter
+              candidate page (when we have the candidate id); expense → the
+              SSC reviewer queue filtered to this workflow.
+            */}
+            {(() => {
+              const candidateId = (w.metadata as { candidate_id?: string } | undefined)?.candidate_id;
+              if (w.type === "hiring" && candidateId) {
+                return (
+                  <a href={`http://localhost:5174/recruiter/c/${encodeURIComponent(candidateId)}`}
+                     target="_blank" rel="noreferrer"
+                     className="text-blue-600 hover:underline">
+                    open in recruiter view ↗
+                  </a>
+                );
+              }
+              if (w.type === "expense_claim") {
+                return (
+                  <a href={`/reviewer-queue?workflow=${encodeURIComponent(w.id)}`}
+                     className="text-blue-600 hover:underline">
+                    open in reviewer queue ↗
+                  </a>
+                );
+              }
+              return null;
+            })()}
+          </div>
           {w.claim ? (
             <>
               <div className="text-xl font-semibold text-slate-900">
@@ -186,11 +215,47 @@ export default function WorkflowDetail() {
                 <InterventionProtocols exception={d.activeException} onResolved={refresh} />
               </>
             )}
-            {!d.activeException && (
-              <div className="panel panel-body text-sm text-slate-500">
-                No active exception. Workflow is progressing autonomously.
-              </div>
-            )}
+            {!d.activeException && (() => {
+              // Generic platform framing only — no domain vocabulary here.
+              // For domain-friendly copy ("Awaiting screening call",
+              // "Awaiting reviewer decision") use the per-domain "Open in
+              // domain view" deep-link below.
+              const meta = (w.metadata as { wait_kind?: string; awaiting_reason?: string } | undefined) ?? {};
+              if (meta.wait_kind === "external_party") {
+                return (
+                  <div className="panel">
+                    <div className="panel-header text-blue-700">⏳ Awaiting external party</div>
+                    <div className="panel-body text-sm text-slate-700 space-y-2">
+                      <p>
+                        This workflow is suspended on an event from a party outside our org
+                        ({meta.awaiting_reason ? <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs">{meta.awaiting_reason}</code> : "unspecified"}).
+                        It does not appear on the operator queue and ages against their SLA, not ours.
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Open the per-domain view (link in the workflow header) for the
+                        domain-friendly story — who's waiting, on what, with what tokens issued.
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+              if (meta.wait_kind === "operator_review") {
+                return (
+                  <div className="panel">
+                    <div className="panel-header text-amber-700">⏳ Awaiting operator review</div>
+                    <div className="panel-body text-sm text-slate-700">
+                      Operator action expected — see Exception Queue. Reason:{" "}
+                      <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs">{meta.awaiting_reason ?? "—"}</code>.
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div className="panel panel-body text-sm text-slate-500">
+                  No active exception. Workflow is progressing autonomously.
+                </div>
+              );
+            })()}
           </div>
         )}
         {tab === "Phases" && <PhaseTimeline phases={d.phases} workflowType={w.type} />}

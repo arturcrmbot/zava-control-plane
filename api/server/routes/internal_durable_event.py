@@ -192,19 +192,33 @@ async def receive_durable_event(body: DurableEventBody):
         ))
 
     elif body.kind == "suspended":
-        compose_hitl_exception(
-            app_state.store, wid,
-            body.payload.get("reason", "approval"),
-        )
+        # Platform contract: every suspended event declares a `wait_kind` —
+        # `operator_review` (someone in our org must act; goes on the operator
+        # exception queue, ages against our SLA) or `external_party` (someone
+        # outside our org must act; admin sees it as informational only, no
+        # exception composed). Default to operator_review for safety on any
+        # legacy suspended events that haven't been updated yet.
+        reason = body.payload.get("reason", "approval")
+        wait_kind = body.payload.get("wait_kind", "operator_review")
+        is_external_party = wait_kind == "external_party"
+        if not is_external_party:
+            compose_hitl_exception(app_state.store, wid, reason)
         _ledger(wid, kind="agent", actor_id="orchestrator",
                 action="suspended",
-                details={"reason": body.payload.get("reason", "approval")})
+                details={"reason": reason, "wait_kind": wait_kind})
         w = app_state.store.get_workflow(wid)
         if w:
             w.status = "awaiting_hitl"
+            # Stash neutral metadata for downstream consumers. Domain-specific
+            # surfaces (recruiter portal, reviewer queue) translate these into
+            # domain-friendly copy; the generic admin shell uses the wait_kind
+            # alone ("Awaiting external party" vs "Awaiting operator review").
+            w.metadata = dict(w.metadata or {})
+            w.metadata["awaiting_reason"] = reason
+            w.metadata["wait_kind"] = wait_kind
         app_state.bus.emit(FleetEvent(
             type="workflow.hitl.requested", workflow_id=wid,
-            reason=body.payload.get("reason", "approval"),
+            reason=reason, wait_kind=wait_kind,
         ))
 
     elif body.kind == "resumed":
@@ -213,6 +227,11 @@ async def receive_durable_event(body: DurableEventBody):
         w = app_state.store.get_workflow(wid)
         if w:
             w.status = "in_progress"
+            # Clear the awaiting markers so the UI doesn't keep showing the
+            # wait state after the orchestration has resumed.
+            if w.metadata:
+                w.metadata = {k: v for k, v in w.metadata.items()
+                              if k not in {"awaiting_reason", "wait_kind"}}
         # When the orchestrator resumes via raiseEvent, the HITL exception that
         # gated the suspension is defunct. Resolve any still-open exceptions
         # for this workflow so the operator queue doesn't leak stale entries.
@@ -233,12 +252,20 @@ async def receive_durable_event(body: DurableEventBody):
     elif body.kind == "agent.completed":
         # Cross-process bridge: agent.completed is emitted in the Functions
         # host's _wrapper.run_agent_session and arrives here as a webhook.
-        # Re-emit onto the FastAPI bus where api.server.eval.online_subscriber
-        # is listening.
+        # Three downstream consumers:
+        #   1. The bus — api.server.eval.online_subscriber scores it.
+        #   2. portal_orchestration — issues magic-link + email when
+        #      cv_crystalliser passes the shortlist threshold.
+        #   3. The workflow ledger — store.append_agent_reasoning persists
+        #      the full trace (messages + tool_calls + extracted_json) so
+        #      the admin Traces tab and any domain view can show what the
+        #      AI thought, not just that it ran.
+        payload = {k: v for k, v in (body.payload or {}).items() if k != "type"}
+        app_state.store.append_agent_reasoning(wid, payload)
         app_state.bus.emit(FleetEvent(
             type="agent.completed",
             workflow_id=wid,
-            **{k: v for k, v in (body.payload or {}).items() if k != "type"},
+            **payload,
         ))
 
     elif body.kind == "workflow.completed":

@@ -1,53 +1,55 @@
-// web/portal/src/routes/Recruiter.tsx
+// Recruiter view — /recruiter
 //
-// Recruiter view inside the candidate portal — lists every active magic link
-// from the MagicLinkStore so an HR/recruiter operator can copy the link to
-// any candidate's portal page (status / screen / offer) without digging in
-// the email outbox. Used as the demo-day fallback.
-//
-// Backend contract: GET /api/portal/admin/links → { links: [{
-//   token, candidate_id, scope, issued_at, expires_at,
-//   name?, email?, role_id?, workflow_id?
-// }] }
-import { useCallback, useEffect, useState } from "react";
-import { getAdminLinks, type AdminLink as LinkRow } from "../lib/api";
+// List every candidate the system knows about with their phase + role +
+// quick links to (a) the candidate detail page and (b) any active magic
+// links. Replaces the old magic-link-only view; magic links live below the
+// candidate row inside the per-candidate detail page.
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { getCandidates, type CandidateRow } from "../lib/api";
 
-const PORTAL_ORIGIN =
-  (typeof window !== "undefined" && window.location.origin) ||
-  "http://localhost:5174";
+const ROLE_LABELS: Record<string, string> = {
+  "REQ-SDE-USA-DEMO": "Senior Data Engineer · USA",
+  "REQ-SDE-DE-DEMO":  "Senior Data Engineer · Germany",
+  "REQ-CD-USA-DEMO":  "Creative Director · USA",
+};
 
-function fmtTs(ts: number): string {
-  if (!ts) return "—";
-  return new Date(ts * 1000).toLocaleString();
-}
+const PHASE_HUMAN: Record<string, string> = {
+  Triage: "Review",
+  Screening: "Screening",
+  Voice: "Awaiting screening call",
+  Interview: "Interview",
+  Compliance: "Compliance",
+  Offer: "Offer",
+  Onboarding: "Onboarding",
+};
 
-function magicLinkUrl(row: LinkRow): string {
-  // Same magic-link URL shape Portal.tsx consumes — /portal for status + offer
-  // (offer-scope token is just a different scope routed via the same path),
-  // /screen for screen-scope.
-  const route = row.scope === "screen" ? "screen" : "portal";
-  return `${PORTAL_ORIGIN}/${route}?token=${encodeURIComponent(row.token)}`;
-}
+const AWAITING_LABEL: Record<string, string> = {
+  awaiting_voice_complete:  "Awaiting screening call",
+  awaiting_offer_approval:  "Awaiting offer decision",
+  awaiting_budget_approval: "Awaiting budget approval",
+};
 
-const SCOPE_CHIP: Record<string, string> = {
-  status: "chip-info",
-  screen: "chip-success",
-  offer:  "chip-warning",
+const PHASE_TONE: Record<string, string> = {
+  Triage: "chip-info",
+  Screening: "chip-info",
+  Voice: "chip-warning",
+  Interview: "chip-info",
+  Compliance: "chip-info",
+  Offer: "chip-warning",
+  Onboarding: "chip-success",
 };
 
 export default function Recruiter() {
-  const [rows, setRows] = useState<LinkRow[]>([]);
+  const [rows, setRows] = useState<CandidateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
 
   const refresh = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
-      const links = await getAdminLinks();
-      setRows((prev) => (JSON.stringify(prev) === JSON.stringify(links) ? prev : links));
+      setRows(await getCandidates());
     } catch (e) {
       setError(String(e));
     } finally {
@@ -61,79 +63,60 @@ export default function Recruiter() {
     return () => window.clearInterval(id);
   }, [refresh]);
 
-  const handleCopy = async (row: LinkRow) => {
-    try {
-      await navigator.clipboard.writeText(magicLinkUrl(row));
-      setCopiedToken(row.token);
-      window.setTimeout(
-        () => setCopiedToken((t) => (t === row.token ? null : t)),
-        1500,
-      );
-    } catch {
-      window.prompt("Copy this link:", magicLinkUrl(row));
-    }
-  };
-
-  const visible = rows.filter((r) => {
+  const visible = useMemo(() => rows.filter((r) => {
     if (!filter.trim()) return true;
     const f = filter.toLowerCase();
     return (
       (r.name ?? "").toLowerCase().includes(f) ||
       (r.email ?? "").toLowerCase().includes(f) ||
       (r.role_id ?? "").toLowerCase().includes(f) ||
-      r.candidate_id.toLowerCase().includes(f) ||
-      r.scope.toLowerCase().includes(f)
+      (r.phase ?? "").toLowerCase().includes(f) ||
+      r.candidate_id.toLowerCase().includes(f)
     );
-  });
+  }), [rows, filter]);
 
-  const counts = {
+  const counts = useMemo(() => ({
     total: rows.length,
-    status: rows.filter((r) => r.scope === "status").length,
-    screen: rows.filter((r) => r.scope === "screen").length,
-    offer:  rows.filter((r) => r.scope === "offer").length,
-  };
+    awaiting_voice: rows.filter((r) => r.awaiting_reason === "awaiting_voice_complete").length,
+    awaiting_offer: rows.filter((r) => r.awaiting_reason === "awaiting_offer_approval").length,
+    onboarding: rows.filter((r) => r.phase === "Onboarding").length,
+  }), [rows]);
 
   return (
     <div className="max-w-6xl mx-auto p-6 sm:p-10 space-y-6">
       <div className="hero">
         <div className="hero-eyebrow">Recruiter view</div>
-        <h1 className="hero-title">Candidates &amp; active links</h1>
+        <h1 className="hero-title">Candidates</h1>
         <p className="hero-subtitle">
-          Every active magic link in the system. Copy any link to manually
-          deliver it via Slack, email, or a phone screen — handy when ACS
-          Email is rate-limited or when sandboxing the demo.
+          Click any candidate to see their full story — extracted profile, agent
+          reasoning, voice transcript, audit timeline, and the magic-links
+          fallback for delivering portal URLs by hand.
         </p>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Stat label="Active links" value={counts.total} />
-        <Stat label="Status (long-lived)" value={counts.status} tone="info" />
-        <Stat label="Screen (single-use)" value={counts.screen} tone="success" />
-        <Stat label="Offer (single-use)"  value={counts.offer} tone="warning" />
+        <Stat label="Candidates" value={counts.total} />
+        <Stat label="Awaiting screening call" value={counts.awaiting_voice} tone="warning" />
+        <Stat label="Awaiting offer decision" value={counts.awaiting_offer} tone="warning" />
+        <Stat label="Onboarding" value={counts.onboarding} tone="success" />
       </div>
 
       <div className="panel">
         <div className="panel-header">
-          <span>Magic links</span>
+          <span>All candidates</span>
           <div className="flex items-center gap-2">
             <input
               type="text"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              placeholder="Filter by name / email / role / scope"
+              placeholder="Filter by name / email / role / phase"
               className="form-input !mt-0 text-xs w-72"
             />
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              className="btn-secondary"
-            >
-              Refresh
-            </button>
+            <button type="button" onClick={() => void refresh()} className="btn-secondary">Refresh</button>
           </div>
         </div>
         <div className="panel-body p-0">
-          {loading && (
+          {loading && rows.length === 0 && (
             <div className="p-6 text-sm text-slate-500 flex items-center gap-2">
               <span className="spinner"/> Loading…
             </div>
@@ -144,8 +127,8 @@ export default function Recruiter() {
           {!loading && !error && visible.length === 0 && (
             <div className="p-6 text-sm text-slate-500">
               {rows.length === 0
-                ? "No active magic links yet — submit an application via /apply to spin one up."
-                : "No matches. Clear the filter to see all links."}
+                ? "No candidates yet — submit an application via /apply to spin one up."
+                : "No matches. Clear the filter to see all candidates."}
             </div>
           )}
           {!loading && visible.length > 0 && (
@@ -156,36 +139,43 @@ export default function Recruiter() {
                     <th>Name</th>
                     <th>Email</th>
                     <th>Role</th>
-                    <th>Scope</th>
-                    <th>Issued</th>
-                    <th>Expires</th>
-                    <th className="text-right">Magic link</th>
+                    <th>Phase</th>
+                    <th>Active links</th>
+                    <th className="text-right">Open</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {visible.map((row) => (
-                    <tr key={row.token}>
-                      <td className="font-medium text-slate-900">{row.name ?? "—"}</td>
-                      <td className="text-slate-600 text-xs">{row.email ?? "—"}</td>
-                      <td className="text-xs">{row.role_id ?? "—"}</td>
-                      <td>
-                        <span className={SCOPE_CHIP[row.scope] ?? "chip-neutral"}>
-                          {row.scope}
-                        </span>
-                      </td>
-                      <td className="text-xs text-slate-500">{fmtTs(row.issued_at)}</td>
-                      <td className="text-xs text-slate-500">{fmtTs(row.expires_at)}</td>
-                      <td className="text-right">
-                        <button
-                          type="button"
-                          onClick={() => void handleCopy(row)}
-                          className="btn-secondary"
-                        >
-                          {copiedToken === row.token ? "✓ Copied" : "Copy link"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {visible.map((row) => {
+                    const phaseLabel = row.awaiting_reason
+                      ? AWAITING_LABEL[row.awaiting_reason] ?? row.awaiting_reason
+                      : (row.phase ? PHASE_HUMAN[row.phase] ?? row.phase : "—");
+                    const phaseTone = row.awaiting_reason
+                      ? "chip-warning"
+                      : (row.phase ? PHASE_TONE[row.phase] ?? "chip-neutral" : "chip-neutral");
+                    return (
+                      <tr key={row.candidate_id}>
+                        <td className="font-medium text-slate-900">{row.name ?? "—"}</td>
+                        <td className="text-slate-600 text-xs">{row.email ?? "—"}</td>
+                        <td className="text-xs">{ROLE_LABELS[row.role_id ?? ""] ?? row.role_id ?? "—"}</td>
+                        <td><span className={phaseTone}>{phaseLabel}</span></td>
+                        <td>
+                          <div className="flex flex-wrap gap-1">
+                            {(row.active_tokens ?? []).map((s) => (
+                              <span key={s} className={`text-[10px] ${
+                                s === "offer" ? "chip-warning" : s === "screen" ? "chip-success" : "chip-info"
+                              }`}>{s}</span>
+                            ))}
+                            {(row.active_tokens ?? []).length === 0 && <span className="text-xs text-slate-400">—</span>}
+                          </div>
+                        </td>
+                        <td className="text-right">
+                          <Link to={`/recruiter/c/${row.candidate_id}`} className="btn-secondary">
+                            View →
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -195,7 +185,7 @@ export default function Recruiter() {
 
       <p className="text-xs text-slate-500 text-center">
         Auto-refreshes every 8 seconds. List backed by{" "}
-        <code className="bg-slate-100 px-1.5 py-0.5 rounded">/api/portal/admin/links</code>.
+        <code className="bg-slate-100 px-1.5 py-0.5 rounded">/api/portal/admin/candidates</code>.
       </p>
     </div>
   );

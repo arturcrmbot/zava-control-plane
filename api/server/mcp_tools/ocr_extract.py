@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 from ._otel import traced_tool
 
 _RECEIPTS_DIR = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "receipts"
-_PDFS_DIR = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "hiring" / "cvs" / "pdfs"
+_PDFS_DIR = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "hiring" / "cv-pdfs"
 
 _OcrModel = Literal[
     "prebuilt-receipt",

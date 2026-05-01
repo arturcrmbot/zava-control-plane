@@ -3,6 +3,7 @@ import Apply from "./routes/Apply";
 import Portal from "./routes/Portal";
 import Screen from "./routes/Screen";
 import Recruiter from "./routes/Recruiter";
+import RecruiterCandidate from "./routes/RecruiterCandidate";
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/portal" element={<Portal />} />
           <Route path="/screen" element={<Screen />} />
           <Route path="/recruiter" element={<Recruiter />} />
+          <Route path="/recruiter/c/:id" element={<RecruiterCandidate />} />
         </Routes>
       </main>
       <footer className="text-center text-xs text-slate-400 py-4 border-t border-slate-200 bg-white/60">

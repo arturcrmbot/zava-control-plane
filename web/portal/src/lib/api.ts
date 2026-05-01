@@ -78,3 +78,101 @@ export async function getAdminLinks(): Promise<AdminLink[]> {
   const body = (await resp.json()) as { links?: AdminLink[] };
   return Array.isArray(body.links) ? body.links : [];
 }
+
+// ────────────────────────────────────────────────────────────────────
+// Recruiter candidate detail endpoints
+
+export type CandidateRow = {
+  candidate_id: string;
+  name?: string | null;
+  email?: string | null;
+  role_id?: string | null;
+  role_title?: string | null;
+  role_jurisdiction?: string | null;
+  workflow_id?: string | null;
+  phase?: string | null;
+  status?: string | null;
+  awaiting_reason?: string | null;
+  active_tokens?: string[];
+};
+
+export async function getCandidates(): Promise<CandidateRow[]> {
+  const resp = await fetch("/api/portal/admin/candidates");
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const body = (await resp.json()) as { candidates?: CandidateRow[] };
+  return Array.isArray(body.candidates) ? body.candidates : [];
+}
+
+export type CrystalliserOutput = {
+  candidate_id?: string;
+  profile?: {
+    name?: string;
+    current_title?: string | { value?: string };
+    tenure_years_total?: number | { value?: number };
+    skills?: string[];
+    work_history?: Array<{ employer: string; title: string; start: string; end: string }>;
+    education?: Array<{ institution: string; degree: string; year: number }>;
+    right_to_work?: { jurisdiction?: string; evidence?: string };
+    inconsistencies?: unknown[];
+    _source?: string;
+  };
+  verdict?: { decision: string; confidence: number; rationale: string };
+  inconsistencies?: unknown[];
+  component_spec?: unknown[];
+};
+
+// Agent reasoning trace — one entry per agent.completed event from the
+// agent-tracked-executor wrapper. Carries the real LLM message stream and
+// each tool call's input + output, so the recruiter view can render what the
+// AI actually thought, not a synthesised stub.
+export type AgentReasoning = {
+  agent_label?: string;
+  agent_run_id?: string;
+  prompt?: string;
+  response_text?: string;
+  extracted_json?: Record<string, unknown>;
+  tool_calls?: Array<{
+    name: string;
+    args?: string;
+    result?: string;
+    success?: boolean;
+    latency_ms?: number;
+  }>;
+  context?: string;
+  usage?: { input_tokens?: number | null; output_tokens?: number | null };
+  latency_ms?: number;
+};
+
+export type CandidateDetail = {
+  candidate: {
+    id: string;
+    name?: string;
+    email?: string;
+    cv_url?: string;
+    role_id?: string;
+    workflow_id?: string;
+    instance_id?: string | null;
+    voice_transcript?: Array<{ role: string; text: string; ts: number }>;
+  };
+  workflow: {
+    id: string;
+    type: string;
+    phase?: string | null;
+    status?: string | null;
+    jurisdiction?: string;
+    metadata?: Record<string, unknown>;
+    awaiting_reason?: string | null;
+  };
+  agent_outputs: { cv_crystalliser?: CrystalliserOutput; [k: string]: unknown };
+  agent_reasoning: AgentReasoning[];
+  voice_transcript: Array<{ role: string; text: string; ts: number }>;
+  active_tokens: Array<{ scope: string; token: string; expires_at: number }>;
+  action_ledger: Array<{ action: string; actor_kind: string; actor_id: string; timestamp: number; details: Record<string, unknown> }>;
+  phase_events: Array<{ phase: string; event: string; timestamp: number; summary: string }>;
+};
+
+export async function getCandidateDetail(id: string): Promise<CandidateDetail> {
+  const resp = await fetch(`/api/portal/admin/candidate/${encodeURIComponent(id)}`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return (await resp.json()) as CandidateDetail;
+}

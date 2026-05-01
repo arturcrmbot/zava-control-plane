@@ -5,6 +5,7 @@ See docs/superpowers/plans/2026-04-30-candidate-portal-plan.md Tasks 5-7, 13.
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, UploadFile, File
 
@@ -52,6 +53,14 @@ async def apply(
     cv_url = app_state.blob_store.put(
         cv_blob_name, cv_bytes, content_type="application/pdf",
     )
+    # Also stage a copy under data/synthetic/hiring/cv-pdfs so the
+    # ocr_extract MCP tool (which resolves C-* ids to local paths) can read
+    # uploaded CVs the same way it reads the seeded synthetic ones. Without
+    # this, cv-crystalliser would fail on real uploads because the tool can't
+    # see Azurite blobs.
+    _local_pdfs_dir = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "hiring" / "cv-pdfs"
+    _local_pdfs_dir.mkdir(parents=True, exist_ok=True)
+    (_local_pdfs_dir / f"{candidate_id}.pdf").write_bytes(cv_bytes)
     candidate = {
         "id": candidate_id,
         "name": name,
@@ -203,3 +212,108 @@ async def admin_links():
             "workflow_id": cand.get("workflow_id"),
         })
     return {"links": out}
+
+
+# ---------------------------------------------- Recruiter candidate detail
+# Surfaced inside the candidate-portal app at /recruiter/c/:id — the
+# recruiter-facing view of a single candidate. Joins candidate record +
+# workflow + agent reasoning outputs + voice transcript so the recruiter
+# (or an evaluator stepping through the demo) can see WHO this is, WHAT
+# we learned, and WHAT THE AI DECIDED — not just span names.
+
+
+@router.get("/admin/candidates")
+async def admin_candidates():
+    """List every candidate the system knows about, with their workflow phase,
+    role, and any active magic links. Powers the recruiter list view at
+    /recruiter."""
+    candidates = app_state.store.list_candidates()
+    active_tokens = app_state.magic_links.list_active()
+    by_cid: dict[str, list[dict]] = {}
+    for t in active_tokens:
+        by_cid.setdefault(t["candidate_id"], []).append(t)
+
+    out = []
+    for c in candidates:
+        wf = app_state.store.get_workflow(c.get("workflow_id", ""))
+        meta = (wf.metadata if wf else {}) or {}
+        out.append({
+            "candidate_id": c["id"],
+            "name": c.get("name"),
+            "email": c.get("email"),
+            "role_id": c.get("role_id"),
+            "role_title": meta.get("role_title"),
+            "role_jurisdiction": meta.get("role_jurisdiction"),
+            "workflow_id": c.get("workflow_id"),
+            "phase": wf.current_phase if wf else None,
+            "status": wf.status if wf else None,
+            "awaiting_reason": meta.get("awaiting_reason"),
+            "active_tokens": [t["scope"] for t in by_cid.get(c["id"], [])],
+        })
+    return {"candidates": out}
+
+
+@router.get("/admin/candidate/{candidate_id}")
+async def admin_candidate_detail(candidate_id: str):
+    """Full recruiter view of a single candidate. Returns:
+      - candidate record (name, email, cv_url, role_id, workflow_id, instance_id)
+      - workflow (phase, status, awaiting_reason, type, jurisdiction)
+      - agent_outputs (cv_crystalliser profile + component_spec + inconsistencies,
+        screening verdict, etc.)
+      - voice_transcript turns
+      - active magic-link scopes
+      - audit ledger entries from the workflow
+      - phase event timeline
+    """
+    candidate = app_state.store.get_candidate(candidate_id)
+    if candidate is None:
+        raise HTTPException(404, "candidate not found")
+    wf = app_state.store.get_workflow(candidate.get("workflow_id", ""))
+    if wf is None:
+        raise HTTPException(404, "workflow not found")
+
+    active_tokens = [
+        {"scope": t["scope"], "token": t["token"], "expires_at": t["expires_at"]}
+        for t in app_state.magic_links.list_active()
+        if t["candidate_id"] == candidate_id
+    ]
+
+    return {
+        "candidate": candidate,
+        "workflow": {
+            "id": wf.id,
+            "type": wf.type,
+            "phase": wf.current_phase,
+            "status": wf.status,
+            "jurisdiction": wf.jurisdiction,
+            "metadata": wf.metadata or {},
+            "awaiting_reason": (wf.metadata or {}).get("awaiting_reason"),
+        },
+        "agent_outputs": getattr(wf, "agent_outputs", {}) or {},
+        # Real LLM reasoning trace from the agent-tracked-executor wrapper.
+        # Each entry: agent_label, phase, started_at, completed_at, messages,
+        # tool_calls, extracted_json, latency_ms, tokens_in/out. Empty when
+        # the workflow has only run stub-path agents (no LLM calls).
+        "agent_reasoning": app_state.store.get_agent_reasoning(wf.id),
+        "voice_transcript": candidate.get("voice_transcript", []),
+        "active_tokens": active_tokens,
+        "action_ledger": [
+            {
+                "action": a.action,
+                "actor_kind": getattr(a, "actor_kind", getattr(a, "actorKind", "")),
+                "actor_id": getattr(a, "actor_id", getattr(a, "actorId", "")),
+                "timestamp": a.timestamp,
+                "details": getattr(a, "details", {}),
+            }
+            for a in (getattr(wf, "action_ledger", None) or [])
+        ],
+        "phase_events": [
+            {
+                "phase": getattr(p, "phase", "") or p.get("phase", "") if isinstance(p, dict) else getattr(p, "phase", ""),
+                "event": getattr(p, "event", "") or p.get("event", "") if isinstance(p, dict) else getattr(p, "event", ""),
+                "timestamp": getattr(p, "timestamp", 0) or p.get("timestamp", 0) if isinstance(p, dict) else getattr(p, "timestamp", 0),
+                "summary": getattr(p, "summary", "") or p.get("summary", "") if isinstance(p, dict) else getattr(p, "summary", ""),
+            }
+            for p in (getattr(wf, "phase_events", None) or [])
+        ],
+    }
