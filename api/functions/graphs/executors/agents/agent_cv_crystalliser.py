@@ -126,28 +126,43 @@ async def execute(input: dict) -> dict:
         workflow_id=workflow_id,
     )
 
-    # The skill returns the canonical profile shape directly. If extraction
-    # failed and we got a `parse_error`, fall through with an empty profile so
-    # the workflow doesn't crash — the recruiter UI surfaces the parse_error
-    # via the agent_reasoning trace.
-    profile = parsed if isinstance(parsed, dict) and not parsed.get("parse_error") else {}
-    if not profile:
-        profile = {"candidate_id": candidate_id, "name": candidate.get("name"), "_source": "parse_error"}
+    # Extraction can fail honestly: parse_error from the JSON extractor, or a
+    # parsed object that lacks any real profile fields (e.g. when ocr_extract
+    # auth failed and the model bailed). Surface that as failure rather than
+    # fabricating a "Shortlist 70%" verdict.
+    parse_failed = (
+        not isinstance(parsed, dict)
+        or parsed.get("parse_error")
+        or not any(k in parsed for k in ("name", "current_title", "skills", "work_history"))
+    )
 
-    component_spec = profile.get("component_spec") or _pick_component_spec(profile)
-    inconsistencies = profile.get("inconsistencies") or []
-
-    agent_output = {
-        "candidate_id": profile.get("candidate_id") or candidate_id,
-        "profile": profile,
-        "component_spec": component_spec,
-        "inconsistencies": inconsistencies,
-        "verdict": profile.get("verdict") or {
-            "decision": "shortlist",
-            "confidence": float(profile.get("confidence") or 0.7),
-            "rationale": "Profile within role bands; see agent_reasoning trace for the full LLM verdict.",
-        },
-    }
+    if parse_failed:
+        agent_output = {
+            "candidate_id": candidate_id,
+            "profile": {"candidate_id": candidate_id, "name": candidate.get("name"),
+                        "_source": "extraction_failed"},
+            "component_spec": [],
+            "inconsistencies": [],
+            "verdict": None,
+            "extraction_status": "failed",
+            "extraction_error": (
+                "cv-crystalliser could not extract a profile — see agent_reasoning "
+                "trace for the failing tool call (most likely ocr_extract auth)."
+            ),
+        }
+    else:
+        profile = parsed
+        component_spec = profile.get("component_spec") or _pick_component_spec(profile)
+        inconsistencies = profile.get("inconsistencies") or []
+        # Only emit a verdict the model actually produced. No fabricated default.
+        agent_output = {
+            "candidate_id": profile.get("candidate_id") or candidate_id,
+            "profile": profile,
+            "component_spec": component_spec,
+            "inconsistencies": inconsistencies,
+            "verdict": profile.get("verdict"),
+            "extraction_status": "ok",
+        }
 
     if workflow_id:
         await emit(workflow_id, instance_id, "agent_output", {

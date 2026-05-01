@@ -49,10 +49,13 @@ def _resolve_path(document_id: str) -> Path:
 def _get_di_client():
     """Return a configured DocumentIntelligenceClient or raise RuntimeError.
 
-    Auth via Entra ID (DefaultAzureCredential) — the local-auth (key) path is
-    disabled by tenant policy in this subscription. The signed-in identity (or
-    the func host's managed identity in cloud) needs the "Cognitive Services
-    User" role on the DI resource.
+    Auth via Entra ID. Locally we use `AzureCliCredential` directly because the
+    `DefaultAzureCredential` chain has earlier credentials (azd token, env
+    vars with only `AZURE_TENANT_ID` set) that fail or hang. In the cloud we
+    fall back to `DefaultAzureCredential` so managed identity works.
+
+    The signed-in identity (or the func host's managed identity in cloud)
+    needs the "Cognitive Services User" role on the DI resource.
     """
     endpoint = os.getenv("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
     if not endpoint:
@@ -61,8 +64,20 @@ def _get_di_client():
             ".env (FastAPI) and local.settings.json (func host)."
         )
     from azure.ai.documentintelligence import DocumentIntelligenceClient
-    from azure.identity import DefaultAzureCredential
-    return DocumentIntelligenceClient(endpoint, DefaultAzureCredential())
+    from azure.identity import AzureCliCredential, DefaultAzureCredential
+    # Prefer AzureCliCredential locally — the user is already logged in via
+    # `az login`, and skipping the chain avoids the broken azd-token + empty
+    # EnvironmentCredential paths that DefaultAzureCredential exposes first.
+    # WEBSITE_INSTANCE_ID is set when running inside an Azure Functions host
+    # in the cloud (App Service / Functions), where MI is the right path.
+    if os.getenv("WEBSITE_INSTANCE_ID"):
+        cred = DefaultAzureCredential()
+    else:
+        try:
+            cred = AzureCliCredential()
+        except Exception:
+            cred = DefaultAzureCredential()
+    return DocumentIntelligenceClient(endpoint, cred)
 
 
 def _trim_di_result(payload: dict, model: str) -> dict:

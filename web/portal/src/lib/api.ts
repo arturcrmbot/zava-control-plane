@@ -116,9 +116,11 @@ export type CrystalliserOutput = {
     inconsistencies?: unknown[];
     _source?: string;
   };
-  verdict?: { decision: string; confidence: number; rationale: string };
+  verdict?: { decision: string; confidence: number; rationale: string } | null;
   inconsistencies?: unknown[];
   component_spec?: unknown[];
+  extraction_status?: "ok" | "failed";
+  extraction_error?: string;
 };
 
 // Agent reasoning trace — one entry per agent.completed event from the

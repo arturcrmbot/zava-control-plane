@@ -137,8 +137,8 @@ export default function RecruiterCandidate() {
       <div className="panel-elevated">
         <div className="panel-header">
           <span>What we learned · cv_crystalliser</span>
-          {profile._source === "parse_error" && (
-            <span className="chip-warning">parse error — see reasoning trace</span>
+          {cv?.extraction_status === "failed" && (
+            <span className="chip-danger">extraction failed</span>
           )}
           {!latestRun && !profile._source && (
             <span className="chip-info">awaiting LLM run</span>
@@ -241,7 +241,19 @@ export default function RecruiterCandidate() {
               </div>
             )}
 
-            {verdict && (
+            {cv?.extraction_status === "failed" && (
+              <>
+                <h3 className="text-xs uppercase tracking-wider text-slate-500 mt-4 mb-2">Verdict</h3>
+                <div className="rounded-lg border p-3 bg-red-50 border-red-200">
+                  <div className="text-sm"><strong>Extraction failed — no verdict</strong></div>
+                  <p className="text-xs text-slate-700 mt-1">
+                    {(cv as { extraction_error?: string }).extraction_error
+                      ?? "The agent did not return a profile. Inspect the tool-call result above."}
+                  </p>
+                </div>
+              </>
+            )}
+            {verdict?.decision && (
               <>
                 <h3 className="text-xs uppercase tracking-wider text-slate-500 mt-4 mb-2">Verdict</h3>
                 <div className={`rounded-lg border p-3 ${
@@ -251,9 +263,11 @@ export default function RecruiterCandidate() {
                 }`}>
                   <div className="text-sm">
                     <strong className="capitalize">{verdict.decision}</strong>
-                    <span className="text-slate-500 ml-2 text-xs">confidence {(verdict.confidence * 100).toFixed(0)}%</span>
+                    {typeof verdict.confidence === "number" && (
+                      <span className="text-slate-500 ml-2 text-xs">confidence {(verdict.confidence * 100).toFixed(0)}%</span>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-700 mt-1">{verdict.rationale}</p>
+                  {verdict.rationale && <p className="text-xs text-slate-700 mt-1">{verdict.rationale}</p>}
                 </div>
               </>
             )}
