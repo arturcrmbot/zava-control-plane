@@ -37,6 +37,7 @@ dependencies = [
   "azure-storage-blob>=12.20",
   # Candidate portal — multipart parsing for FastAPI UploadFile
   "python-multipart>=0.0.20",
+  "reportlab>=4.5.0",
 ]
 
 [dependency-groups]
