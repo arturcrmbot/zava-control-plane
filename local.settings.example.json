@@ -1,0 +1,14 @@
+{
+  "IsEncrypted": false,
+  "_comment": "Copy this to local.settings.json (gitignored) and adjust the absolute paths. PYTHONPATH MUST include both the repo root AND .funcvenv/Lib/site-packages — the Functions worker needs the latter to import azure.durable_functions / azure.identity / agent_framework etc. Without it, cold start hits ModuleNotFoundError. local.settings.json Values WIN over env vars set in the parent shell, so this is the only reliable place to pin PYTHONPATH.",
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "PYTHON_ISOLATE_WORKER_DEPENDENCIES": "0",
+    "PYTHONPATH": "c:/dev/ghcp sdk stuff;c:/dev/ghcp sdk stuff/.funcvenv/Lib/site-packages",
+    "FASTAPI_WEBHOOK_URL": "http://localhost:3001/internal/durable-event",
+    "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT": "",
+    "languageWorkers__python__defaultExecutablePath": "c:/dev/ghcp sdk stuff/.funcvenv/Scripts/python.exe",
+    "LANGUAGE_WORKERS__PYTHON__DEFAULTEXECUTABLEPATH": "c:/dev/ghcp sdk stuff/.funcvenv/Scripts/python.exe"
+  }
+}
