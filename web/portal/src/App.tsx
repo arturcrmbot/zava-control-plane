@@ -2,6 +2,7 @@ import { Route, Routes, Navigate, NavLink, Link } from "react-router-dom";
 import Apply from "./routes/Apply";
 import Portal from "./routes/Portal";
 import Screen from "./routes/Screen";
+import Book from "./routes/Book";
 import Recruiter from "./routes/Recruiter";
 import RecruiterCandidate from "./routes/RecruiterCandidate";
 
@@ -28,6 +29,7 @@ export default function App() {
           <Route path="/apply" element={<Apply />} />
           <Route path="/portal" element={<Portal />} />
           <Route path="/screen" element={<Screen />} />
+          <Route path="/book" element={<Book />} />
           <Route path="/recruiter" element={<Recruiter />} />
           <Route path="/recruiter/c/:id" element={<RecruiterCandidate />} />
         </Routes>

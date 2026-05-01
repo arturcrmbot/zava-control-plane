@@ -186,3 +186,79 @@ export async function getCandidateDetail(id: string): Promise<CandidateDetail> {
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   return (await resp.json()) as CandidateDetail;
 }
+
+// ────────────────────────────────────────────────────────────────────
+// Interview booking + recruiter decisions
+
+export type InterviewSlot = {
+  slot_id: string;
+  label: string;
+  starts_at: string;
+  available: boolean;
+};
+
+export type BookingResolveResponse = {
+  candidate_id: string;
+  role_title: string;
+  slots: InterviewSlot[];
+};
+
+export async function getBookingResolve(token: string): Promise<BookingResolveResponse> {
+  const resp = await fetch(
+    `/api/portal/interview/resolve?token=${encodeURIComponent(token)}`,
+  );
+  if (resp.status === 410) throw new Error("expired");
+  if (!resp.ok) throw new Error(`booking-resolve failed (${resp.status})`);
+  return (await resp.json()) as BookingResolveResponse;
+}
+
+export async function postBooking(token: string, slotId: string): Promise<void> {
+  const resp = await fetch("/api/portal/interview/book", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, slot_id: slotId }),
+  });
+  if (resp.status === 409) throw new Error("already-booked");
+  if (resp.status === 410) throw new Error("expired");
+  if (!resp.ok) throw new Error(`booking failed (${resp.status})`);
+}
+
+export async function postInterviewInvite(
+  candidateId: string,
+  body: { decision: "invite" | "reject"; reason?: string; resolved_by?: string },
+): Promise<void> {
+  const resp = await fetch(
+    `/api/portal/admin/candidate/${encodeURIComponent(candidateId)}/interview-invite`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!resp.ok) throw new Error(`invite-decision failed (${resp.status})`);
+}
+
+export async function postPostInterviewDecision(
+  candidateId: string,
+  body: {
+    decision: "offer" | "reject";
+    notes: string;
+    rating: number;
+    level?: string;
+    resolved_by?: string;
+  },
+): Promise<void> {
+  const resp = await fetch(
+    `/api/portal/admin/candidate/${encodeURIComponent(candidateId)}/post-interview-decision`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  if (resp.status === 400) {
+    const detail = (await resp.json()).detail ?? "validation error";
+    throw new Error(detail);
+  }
+  if (!resp.ok) throw new Error(`post-interview-decision failed (${resp.status})`);
+}
