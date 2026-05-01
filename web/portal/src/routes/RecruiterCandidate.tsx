@@ -15,6 +15,11 @@ import {
   type CandidateDetail,
   type CrystalliserOutput,
 } from "../lib/api";
+import {
+  InterviewInvitePanel,
+  AwaitingBookingPanel,
+  PostInterviewPanel,
+} from "../components/InterviewPanels";
 
 const ROLE_LABELS: Record<string, string> = {
   "REQ-SDE-USA-DEMO": "Senior Data Engineer · USA",
@@ -44,6 +49,20 @@ function asString(v: unknown): string {
   if (typeof v === "number") return String(v);
   if (typeof v === "object" && v !== null && "value" in v) return String((v as { value: unknown }).value);
   return String(v);
+}
+
+const LEVELS_BY_ROLE_TITLE: Record<string, string[]> = {
+  "Senior Data Engineer": ["Mid-Level", "Senior", "Staff", "Principal"],
+  "Creative Director": ["Director", "Senior Director", "VP Creative"],
+};
+const DEFAULT_LEVELS = ["Junior", "Mid", "Senior", "Lead"];
+
+function levelsFor(roleTitle: string | undefined | null): string[] {
+  if (!roleTitle) return DEFAULT_LEVELS;
+  for (const [k, v] of Object.entries(LEVELS_BY_ROLE_TITLE)) {
+    if (roleTitle.toLowerCase().includes(k.toLowerCase())) return v;
+  }
+  return DEFAULT_LEVELS;
 }
 
 export default function RecruiterCandidate() {
@@ -132,6 +151,37 @@ export default function RecruiterCandidate() {
           </span>
         </div>
       </div>
+
+      {/* Phase 7 sub-wait action panels */}
+      {w.awaiting_reason === "awaiting_interview_invite" && (
+        <InterviewInvitePanel
+          candidateId={c.id}
+          agent_reasoning={data.agent_reasoning ?? []}
+          onSubmitted={() => void refresh()}
+        />
+      )}
+
+      {w.awaiting_reason === "awaiting_interview_booking" && (
+        <AwaitingBookingPanel
+          bookingTokenUrl={
+            (() => {
+              const tok = data.active_tokens.find((t) => t.scope === "book_interview");
+              return tok ? `${window.location.origin}/book?token=${tok.token}` : null;
+            })()
+          }
+        />
+      )}
+
+      {w.awaiting_reason === "awaiting_interview_complete" && (
+        <PostInterviewPanel
+          candidateId={c.id}
+          agent_reasoning={data.agent_reasoning ?? []}
+          levelOptions={levelsFor(
+            (w.metadata?.role_title as string | undefined) ?? null,
+          )}
+          onSubmitted={() => void refresh()}
+        />
+      )}
 
       {/* What the AI learned */}
       <div className="panel-elevated">
