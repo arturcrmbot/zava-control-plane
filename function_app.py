@@ -29,6 +29,10 @@ from api.functions.workflows.activities import (
     hiring_compliance_activity,
     hiring_offer_activity,
     hiring_onboarding_activity,
+    hiring_interview_recommender_activity,
+    issue_book_interview_link_activity,
+    send_book_interview_email_activity,
+    send_rejection_email_activity,
 )
 
 # Wire OTEL at worker module-load; DF orchestrator + activity spans export to Foundry.
@@ -135,6 +139,26 @@ def issue_screen_link_activity_trigger(payload: dict) -> dict:
 @app.activity_trigger(input_name="payload")
 def send_screen_email_activity_trigger(payload: dict) -> dict:
     return send_screen_email_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def hiring_interview_recommender_activity_trigger(payload: dict) -> dict:
+    return hiring_interview_recommender_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def issue_book_interview_link_activity_trigger(payload: dict) -> dict:
+    return issue_book_interview_link_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def send_book_interview_email_activity_trigger(payload: dict) -> dict:
+    return send_book_interview_email_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def send_rejection_email_activity_trigger(payload: dict) -> dict:
+    return send_rejection_email_activity(payload)
 
 
 @app.activity_trigger(input_name="payload")

@@ -179,10 +179,20 @@ from api.functions.workflows.voice_screen_activities import (  # noqa: E402
     issue_screen_link_activity,
     send_screen_email_activity,
 )
+from api.functions.workflows.interview_activities import (  # noqa: E402
+    hiring_interview_recommender_activity,
+    issue_book_interview_link_activity,
+    send_book_interview_email_activity,
+    send_rejection_email_activity,
+)
 
 __all__ = list(globals().get("__all__", [])) + [
     "issue_screen_link_activity",
     "send_screen_email_activity",
+    "hiring_interview_recommender_activity",
+    "issue_book_interview_link_activity",
+    "send_book_interview_email_activity",
+    "send_rejection_email_activity",
 ]
 
 
