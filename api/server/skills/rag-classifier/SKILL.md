@@ -43,6 +43,26 @@ The policy structure has two kinds of sections:
 - ❌ Ignoring the per-attendee dimension. A claim of GBP 320 for 4 attendees = GBP 80/head — compare against the per-attendee cap, not the solo cap.
 - ❌ Returning Green when the ratio falls above 1.0 just because no hard rule trips.
 
+## Verdict integrity rules — read carefully
+
+These two failure modes have caused real misclassifications. Apply both as hard guards on your final verdict.
+
+### Rule V1 — your verdict must match your final reasoning
+
+After your final paragraph of reasoning, look at the conclusion you reached. If your reasoning concludes the ratio is ≤ 1.00 under the correct cap and no hard rule (§ "Override the ratio result …") tripped, then the verdict is **Green** — not Red, not Amber. If you found yourself picking the wrong cap mid-reasoning and then corrected it, your verdict is determined by the corrected math, not by a holdover impression from the wrong path.
+
+Concretely: if your reasoning ends with sentences like "the correct cap to apply is X, making this claim Green" or "the ratio is 0.9 under cap X" — your verdict field MUST be `green`. Do not output `red` after writing reasoning that exonerates the claim.
+
+### Rule V2 — only apply hard-rule overrides on evidence in the data, never on speculation
+
+The hard-rule overrides (alcohol prohibited, missing receipt above threshold, group meal without attendee names, etc.) trigger ONLY when the claim's structured data — what `claim_get_structured` returned — explicitly shows the trigger condition. Do NOT trigger them on hypotheticals.
+
+- ❌ Wrong: "If alcohol was present, this is Red — verdict: Red." (Speculation. The data didn't say alcohol was present.)
+- ✅ Right: "The structured claim shows `alcohol_present: false`. The IN entertainment alcohol prohibition does NOT trigger. Continuing with the cap-ratio test."
+- ✅ Also right: "The structured claim shows `alcohol_present: true` and the market is IN. §3.4 prohibits alcohol on IN entertainment → Red."
+
+If the data is silent about a trigger field (the field is absent or null), treat the trigger as NOT met. Do not assume worst-case from absence of evidence — the gold-label policy treats silence as "fact not present."
+
 ## Output
 
 Return exactly one JSON object, no prose:
@@ -72,11 +92,21 @@ Rules:
 - Ratio: 16,217 / 16,000 = 1.013 (101%). Above base, below 110% → **Amber**.
 - `policy_clause`: `§3.3 Accommodation — IN Tier 1 base cap INR 16,000 (110% INR 17,600)`.
 
-**Example B — Green (within cap):** UK client lunch, GBP 320 for 4 attendees, alcohol, all named.
+**Example B — Amber (107% of per-attendee cap):** UK client lunch, GBP 320 for 4 attendees, alcohol present, all named.
 - §3.1 UK per-attendee base cap = GBP 75; 110% = GBP 82.50.
-- Per-head: 320/4 = 80. Ratio: 80/75 = 1.067 (107%). Above base, below 110% → wait, this is Amber.
-- Re-check: actually base cap is GBP 75, GBP 80/head is above, ratio 1.067 → **Amber**, not Green.
+- Per-head: 320/4 = 80. Ratio: 80/75 = 1.067 (107%). Above base, below 110% → **Amber**.
+- Hard-rule check: alcohol at a UK *client* meal is allowed. UK alcohol prohibition is non-client only. Override does not trip.
 - `policy_clause`: `§3.1 Meals — UK per-attendee base cap GBP 75 (110% GBP 82.50)`.
+
+**Example D — Green (city-tier override):** Hamburg hotel, EUR 182.09/night, alcohol n/a (accommodation).
+- First-pass mistake to avoid: applying the DE *standard* per-night cap of EUR 170. Hamburg is a Tier 2 city → EUR 190.
+- Tier 2 (EUR 190) is the correct cap. Ratio: 182.09 / 190 = 0.958 (96%). Below cap → **Green**.
+- Per Rule V1: the corrected math says Green. Verdict is `green`, regardless of the first-pass impression.
+
+**Example E — Green (no alcohol evidence):** Mumbai client entertainment, INR 17,096 for 4 attendees, all named, business purpose annotated. Structured claim does NOT report alcohol.
+- §3.4 IN per-head cap = INR 5,500. Per-head: 17,096 / 4 = 4,274. Ratio: 4,274 / 5,500 = 0.777 (78%). Within cap.
+- Hard-rule check (Rule V2): the IN alcohol prohibition triggers ONLY if `alcohol_present: true`. The data is silent → treat as not present → override does NOT trigger.
+- Verdict: **Green**. Do not output Red on a hypothetical "if alcohol was present" — that's Rule V2.
 
 **Example C — Red (above 110%):** US economy domestic flight, USD 850 each way, gold §3.2.
 - §3.2 US economy domestic base cap = USD 600; 110% = USD 660.
