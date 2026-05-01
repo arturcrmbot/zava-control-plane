@@ -184,11 +184,203 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
         voice_result = yield context.call_activity(
             "hiring_voice_activity_trigger", enriched,
         )
+        # Phase 7 references voice_payload unconditionally; keep it defined
+        # on the legacy path so the gate-1 recommender input is well-formed.
+        voice_payload = {}
     enriched = {**enriched, "voice": voice_result}
 
-    # Phase 7: Interview
-    interview_result = yield context.call_activity("hiring_interview_activity_trigger", enriched)
+    # Phase 7: Interview — three sequential HITL waits under current_phase=Interview
+    # 1) recruiter decides invite-vs-reject (gate "post_voice")
+    # 2) candidate books a slot (gate "candidate_booking")
+    # 3) recruiter records post-interview decision (gate "post_interview")
+    # Each wait races against a timer; timeouts close the workflow as completed(timeout).
+    from api.shared.constants import (
+        INTERVIEW_INVITE_TIMEOUT,
+        INTERVIEW_BOOKING_TIMEOUT,
+        INTERVIEW_DECISION_TIMEOUT,
+    )
+
+    # Pre-wait: run the recommender so the recruiter sees an AI rec.
+    rec_input_gate1 = {
+        **enriched,
+        "gate": "post_voice",
+        "cv_crystalliser": (enriched.get("triage") or {}).get("cv_crystalliser") or {},
+        "screening": enriched.get("screening") or {},
+        "voice_transcript": (voice_payload or {}).get("transcript") or [],
+        "voice_score": (voice_payload or {}).get("score"),
+    }
+    yield context.call_activity(
+        "hiring_interview_recommender_activity_trigger", rec_input_gate1,
+    )
+
+    yield context.call_activity("checkpoint_activity_trigger", {
+        "workflow_id": workflow_id, "instance_id": context.instance_id,
+        "kind": "suspended",
+        "payload": {"reason": "awaiting_interview_invite", "phase": "Interview",
+                    "wait_kind": "operator_review"},
+    })
+
+    invite_event = context.wait_for_external_event("interview_invite")
+    timeout_event = context.create_timer(
+        context.current_utc_datetime + INTERVIEW_INVITE_TIMEOUT,
+    )
+    winner = yield context.task_any([invite_event, timeout_event])
+    if winner == timeout_event:
+        yield context.call_activity("checkpoint_activity_trigger", {
+            "workflow_id": workflow_id, "instance_id": context.instance_id,
+            "kind": "workflow.completed",
+            "payload": {"status": "timeout", "phase": "Interview",
+                        "gate": "interview_invite"},
+        })
+        return {"status": "timeout", "phase": "Interview"}
+    timeout_event.cancel()
+
+    invite_payload = invite_event.result if hasattr(invite_event, "result") else {}
+    invite_decision = (invite_payload.get("decision") or "").lower() if isinstance(invite_payload, dict) else ""
+
+    if invite_decision != "invite":
+        # Recruiter rejected at gate 1 — auto-reject email + close workflow.
+        yield context.call_activity("send_rejection_email_activity_trigger", {
+            "candidate_id": candidate_id,
+            "gate": "interview",
+            "role_title": (enriched.get("metadata") or {}).get("role_title"),
+        })
+        yield context.call_activity("checkpoint_activity_trigger", {
+            "workflow_id": workflow_id, "instance_id": context.instance_id,
+            "kind": "workflow.rejected",
+            "payload": {
+                "by": invite_payload.get("resolved_by") if isinstance(invite_payload, dict) else None,
+                "reason": invite_payload.get("reason") if isinstance(invite_payload, dict) else "recruiter rejected at interview-invite",
+                "phase": "Interview",
+                "gate": "interview_invite",
+            },
+        })
+        return {"status": "rejected", "phase": "Interview", "gate": "interview_invite"}
+
+    yield context.call_activity("checkpoint_activity_trigger", {
+        "workflow_id": workflow_id, "instance_id": context.instance_id,
+        "kind": "resumed",
+        "payload": {"phase": "Interview", "gate": "interview_invite",
+                    "decision": "invite"},
+    })
+
+    # Gate 2: candidate books a slot.
+    book_link = yield context.call_activity(
+        "issue_book_interview_link_activity_trigger",
+        {"candidate_id": candidate_id},
+    )
+    yield context.call_activity(
+        "send_book_interview_email_activity_trigger",
+        {
+            "candidate_id": candidate_id,
+            "token": book_link.get("token"),
+            "portal_url": book_link.get("portal_url"),
+            "role_title": (enriched.get("metadata") or {}).get("role_title"),
+        },
+    )
+
+    yield context.call_activity("checkpoint_activity_trigger", {
+        "workflow_id": workflow_id, "instance_id": context.instance_id,
+        "kind": "suspended",
+        "payload": {"reason": "awaiting_interview_booking", "phase": "Interview",
+                    "wait_kind": "external_party"},
+    })
+
+    booked_event = context.wait_for_external_event("interview_booked")
+    timeout_event = context.create_timer(
+        context.current_utc_datetime + INTERVIEW_BOOKING_TIMEOUT,
+    )
+    winner = yield context.task_any([booked_event, timeout_event])
+    if winner == timeout_event:
+        yield context.call_activity("checkpoint_activity_trigger", {
+            "workflow_id": workflow_id, "instance_id": context.instance_id,
+            "kind": "workflow.completed",
+            "payload": {"status": "timeout", "phase": "Interview",
+                        "gate": "interview_booking"},
+        })
+        return {"status": "timeout", "phase": "Interview"}
+    timeout_event.cancel()
+
+    booked_payload = booked_event.result if hasattr(booked_event, "result") else {}
+
+    yield context.call_activity("checkpoint_activity_trigger", {
+        "workflow_id": workflow_id, "instance_id": context.instance_id,
+        "kind": "resumed",
+        "payload": {"phase": "Interview", "gate": "interview_booking",
+                    "slot": booked_payload.get("slot")
+                    if isinstance(booked_payload, dict) else None},
+    })
+
+    # Gate 3: pre-decision recommender, then recruiter records.
+    rec_input_gate3 = {
+        **rec_input_gate1,
+        "gate": "post_interview",
+    }
+    yield context.call_activity(
+        "hiring_interview_recommender_activity_trigger", rec_input_gate3,
+    )
+
+    yield context.call_activity("checkpoint_activity_trigger", {
+        "workflow_id": workflow_id, "instance_id": context.instance_id,
+        "kind": "suspended",
+        "payload": {"reason": "awaiting_interview_complete", "phase": "Interview",
+                    "wait_kind": "operator_review"},
+    })
+
+    decision_event = context.wait_for_external_event("offer_decision")
+    timeout_event = context.create_timer(
+        context.current_utc_datetime + INTERVIEW_DECISION_TIMEOUT,
+    )
+    winner = yield context.task_any([decision_event, timeout_event])
+    if winner == timeout_event:
+        yield context.call_activity("checkpoint_activity_trigger", {
+            "workflow_id": workflow_id, "instance_id": context.instance_id,
+            "kind": "workflow.completed",
+            "payload": {"status": "timeout", "phase": "Interview",
+                        "gate": "interview_decision"},
+        })
+        return {"status": "timeout", "phase": "Interview"}
+    timeout_event.cancel()
+
+    post_payload = decision_event.result if hasattr(decision_event, "result") else {}
+    post_decision = (post_payload.get("decision") or "").lower() if isinstance(post_payload, dict) else ""
+
+    if post_decision != "offer":
+        # Recruiter rejected at gate 3 — auto-reject email + close workflow.
+        yield context.call_activity("send_rejection_email_activity_trigger", {
+            "candidate_id": candidate_id,
+            "gate": "offer",
+            "role_title": (enriched.get("metadata") or {}).get("role_title"),
+        })
+        yield context.call_activity("checkpoint_activity_trigger", {
+            "workflow_id": workflow_id, "instance_id": context.instance_id,
+            "kind": "workflow.rejected",
+            "payload": {
+                "by": post_payload.get("resolved_by") if isinstance(post_payload, dict) else None,
+                "reason": "recruiter declined post-interview",
+                "phase": "Interview",
+                "gate": "interview_decision",
+                "notes": post_payload.get("notes") if isinstance(post_payload, dict) else None,
+                "rating": post_payload.get("rating") if isinstance(post_payload, dict) else None,
+            },
+        })
+        return {"status": "rejected", "phase": "Interview", "gate": "interview_decision"}
+
+    interview_result = {
+        "decision": "offer",
+        "level": post_payload.get("level") if isinstance(post_payload, dict) else None,
+        "rating": post_payload.get("rating") if isinstance(post_payload, dict) else None,
+        "notes": post_payload.get("notes") if isinstance(post_payload, dict) else None,
+        "slot": booked_payload.get("slot") if isinstance(booked_payload, dict) else None,
+    }
     enriched = {**enriched, "interview": interview_result}
+
+    yield context.call_activity("checkpoint_activity_trigger", {
+        "workflow_id": workflow_id, "instance_id": context.instance_id,
+        "kind": "resumed",
+        "payload": {"phase": "Interview", "gate": "interview_decision",
+                    "decision": "offer", "level": interview_result["level"]},
+    })
 
     # Phase 8: Compliance (jurisdiction-aware — USA / DE BetrVG)
     compliance_result = yield context.call_activity("hiring_compliance_activity_trigger", enriched)

@@ -24,3 +24,8 @@ OFFER_APPROVAL_TIMEOUT: timedelta = timedelta(days=7)
 # `timeout` and the candidate must reapply. Mirrors the existing
 # wait_for_external_event race-against-timer pattern used elsewhere.
 VOICE_SCREEN_TIMEOUT: timedelta = timedelta(hours=24)
+
+# Phase 7 (Interview) sub-wait timeouts.
+INTERVIEW_INVITE_TIMEOUT  = timedelta(days=3)   # recruiter to invite/reject
+INTERVIEW_BOOKING_TIMEOUT = timedelta(days=7)   # candidate to pick a slot
+INTERVIEW_DECISION_TIMEOUT = timedelta(days=5)  # recruiter to record post-int decision
