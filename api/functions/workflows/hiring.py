@@ -31,6 +31,9 @@ from api.shared.constants import (
     BUDGET_APPROVAL_TIMEOUT,
     OFFER_APPROVAL_TIMEOUT,
     VOICE_SCREEN_TIMEOUT,
+    INTERVIEW_INVITE_TIMEOUT,
+    INTERVIEW_BOOKING_TIMEOUT,
+    INTERVIEW_DECISION_TIMEOUT,
 )
 
 
@@ -194,11 +197,6 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
     # 2) candidate books a slot (gate "candidate_booking")
     # 3) recruiter records post-interview decision (gate "post_interview")
     # Each wait races against a timer; timeouts close the workflow as completed(timeout).
-    from api.shared.constants import (
-        INTERVIEW_INVITE_TIMEOUT,
-        INTERVIEW_BOOKING_TIMEOUT,
-        INTERVIEW_DECISION_TIMEOUT,
-    )
 
     # Pre-wait: run the recommender so the recruiter sees an AI rec.
     rec_input_gate1 = {
