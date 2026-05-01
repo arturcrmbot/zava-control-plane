@@ -94,6 +94,8 @@ class BookRequest(BaseModel):
 @router.post("/book")
 async def book(body: BookRequest):
     """Consume token + raise interview_booked on the Durable instance."""
+    # Validate slot_id BEFORE consuming the token: a typo'd slot must not
+    # burn the candidate's single-use link.
     grid_ids = {f"{d}-{t}" for d in _DAY_KEYS for t in _TIME_KEYS}
     if body.slot_id not in grid_ids:
         raise HTTPException(400, "unknown slot_id")
