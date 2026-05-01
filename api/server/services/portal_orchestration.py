@@ -279,9 +279,22 @@ def make_offer_hitl_handler(app_state) -> Callable[[FleetEvent], None]:
             ttl_seconds=_STATUS_LINK_TTL_SECONDS,
             single_use=True,
         )
-        offer_url = f"{_portal_base_url()}/portal?token={token}"
+        # Email URL points at /portal with the candidate's existing STATUS
+        # token (not the offer token). /portal expects status-scope; it loads
+        # the status payload and the candidate's active offer-scope token
+        # gets attached as `offer_token`, which the OfferPanel uses for the
+        # accept/decline POST. Linking to /portal with the offer token
+        # directly would 404 — wrong scope on the status endpoint.
+        active = app_state.magic_links.list_active()
+        status_rows = [
+            r for r in active
+            if r.get("candidate_id") == candidate_id and r.get("scope") == "status"
+        ]
+        status_rows.sort(key=lambda r: r.get("issued_at") or 0, reverse=True)
+        status_token = status_rows[0]["token"] if status_rows else token  # fallback unlikely
+        portal_link_url = f"{_portal_base_url()}/portal?token={status_token}"
         safe_name = escape(candidate.get("name") or "there")
-        safe_url = escape(offer_url, quote=True)
+        safe_url = escape(portal_link_url, quote=True)
         html = (
             "<!doctype html><html><body style=\"font-family: system-ui, sans-serif;\">"
             f"<p>Hi {safe_name},</p>"
@@ -304,7 +317,10 @@ def make_offer_hitl_handler(app_state) -> Callable[[FleetEvent], None]:
             workflow_id=workflow_id,
             candidate_id=candidate_id,
             magic_token=token,
-            portal_url=offer_url,
+            # `portal_url` is the working candidate-facing URL (status-scope
+            # token); `magic_token` is the offer-scope token that the POST
+            # /api/portal/offer/{token} endpoint consumes.
+            portal_url=portal_link_url,
             scope="offer",
         ))
 
