@@ -105,6 +105,7 @@ from api.server.routes.a2a import router as a2a_router
 # Candidate portal (demo-ready scope) — public /apply + token-authed surfaces
 from api.server.routes.portal import router as portal_router
 from api.server.routes.portal_voice import router as portal_voice_router
+from api.server.routes.portal_interview import router as portal_interview_router
 
 for r in (stream_router, workflows_router, exceptions_router, policy_router,
           simulator_router, audit_router, evals_router, orchestration_router,
@@ -112,5 +113,5 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           receipts_router,
           webhooks_servicenow_router, webhooks_finance_bp_router,
           a2a_router,
-          portal_router, portal_voice_router):
+          portal_router, portal_voice_router, portal_interview_router):
     app.include_router(r)
