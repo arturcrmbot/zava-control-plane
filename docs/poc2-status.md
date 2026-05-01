@@ -262,11 +262,30 @@ These need no new code; just demo scripts and rebound labels.
 | GHCP SDK skill conventions (global) | `~/.claude/skills/ghcp-sdk-python/SKILL.md` |
 | Local dev | [DEVELOPMENT.md](DEVELOPMENT.md) |
 
-**Starting tag:** `v0.8-poc1-feature-complete` (target end-state of POC1). **POC2 target:** `v1.0-poc2-frontier` after Tracks A–F land.
+**Starting tag:** `v0.8-poc1-feature-complete` (target end-state of POC1). **POC2 target:** `v1.0-poc2-frontier` after the dry-run + recording lands.
 
 ---
 
-## 5. Sequencing
+## 5. What's left (2026-05-01 snapshot)
+
+Tracks A through F all landed. Lab-build is feature complete on every demo-ready stream. Remaining work is **operational** — three concrete items:
+
+1. **One clean end-to-end stack boot through to onboarding-video render.** All avatar fixes are committed (V1/V2 prompt rules, custom-subdomain Azure Speech endpoint, per-role character/style tuple, mp4-download-without-bearer-token). Just needs a stable Functions-host startup to confirm `onboarding_video_url` lands on workflow metadata. Use [`scripts/run-func.bat`](../scripts/run-func.bat) for the env-pinned boot.
+2. **30-min demo dry run** against [poc2-DEMO.md](poc2-DEMO.md) — walk all 22 capability beats with someone playing the WPP evaluator. Capture and fix anything that flakes.
+3. **Final recording + screenshots** + tag `v1.0-poc2-frontier`.
+
+### Reserved for the engagement POC (intentionally not lab work)
+
+Per [SCOPE-DELTA.md](SCOPE-DELTA.md) §POC2:
+
+- §4.9 — 200-CV corpus expansion (50 is enough for the demo)
+- §4.12 — APIOps governance gate (narrated against architecture)
+- §4.15 — Entra Agent ID for `hiring-agent@wpp` (lab uses `gh` CLI; Entra-ID auth IS already demonstrated by `ocr_extract` + `avatar_render`)
+- §4.20 — drift-detection live beat (narrated)
+- §4.22 — APIM jurisdiction-aware routing (narrated)
+- Real Greenhouse / LinkedIn Recruiter / Microsoft Graph / ServiceNow / ACS phone number — MCP contracts identical, backends swap-in at engagement kickoff
+
+### Original 12-week sequencing (kept for reference)
 
 Tracks A and F can start day 1 (rebind work and platform-reuse demos are independent). Track B (multi-surface) waits on A's mocks. Tracks C, D, E build in parallel once A is partially landed (need the basic 10-phase skeleton). Suggested 12-week shape:
 
@@ -275,3 +294,5 @@ Tracks A and F can start day 1 (rebind work and platform-reuse demos are indepen
 - **Weeks 7–9:** Track C (voice + avatar)
 - **Weeks 10–11:** Track E (A2A, AG-UI, episodic) + accuracy gym + region-failover dry run
 - **Week 12:** Demo dry run, bug fixes, recording.
+
+(In practice we landed all six tracks on a compressed timeline 2026-04-28→05-01 because the platform reuse from POC1 was higher than ~75% — closer to 90% — once the candidate portal and Azure-services wiring shipped.)

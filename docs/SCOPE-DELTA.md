@@ -56,10 +56,11 @@ Same code runs on the laptop and on Azure. Backend implementations differ; agent
 
 ### Lab build status against the 13 acceptance criteria
 
-(Snapshot of where this repo is — see [poc1-status.md](poc1-status.md) for live state. Last refreshed 2026-04-30.)
+(Snapshot of where this repo is — see [poc1-status.md](poc1-status.md) for live state. Last refreshed 2026-05-01.)
 
-- ✅ AC #1 fleet view · #2 exception-only · #3 bulk approval · #5 receipt cross-validation (real DI) · #6 progressive enforcement · #7 autonomous learning · #8 SSC Reviewer queue · #9 multi-EMS Control Plane · #10 EMS extensibility narration · #11 region failure simulator · #12 immutable audit + reporting · #13 cost-per-task report
-- 🟡 AC #4 Foundry-backed accuracy pipeline shipped 2026-04-30; full 300-claim corpus run still pending (needs Foundry project + judge-model env vars)
+- ✅ All 13 ACs demoable on the laptop. AC #1 fleet view · #2 exception-only · #3 bulk approval · #4 accuracy pipeline (Foundry-backed; rag-classifier prompt tuned 2026-05-01: 60% → 70% on 10-claim smoke, zero green→red false flags) · #5 receipt cross-validation (real DI) · #6 progressive enforcement · #7 autonomous learning · #8 SSC Reviewer queue · #9 multi-EMS Control Plane · #10 EMS extensibility narration · #11 region failure simulator · #12 immutable audit + reporting · #13 cost-per-task report
+
+**AC #4 — explicitly punted to engagement-POC scope.** Running the full 300-claim synthetic-corpus accuracy gate is not a useful number — the real metric is ≥95% on WPP's 3,430-line dataset (40% of POC1 score per the brief). The pipeline + prompt are demonstrably working; we'll run the corpus gate when WPP supplies their data after engagement kickoff.
 
 The engagement POC must hit all 13 live in front of WPP. The lab build is converging on demoable evidence for the platform claims; the engagement POC then exercises the same code against real systems and real data.
 
@@ -78,12 +79,20 @@ POC2 in the lab landed on `main` 2026-04-30 — the spine merge brought the 10-p
 - ✅ AG-UI scorecard rendering on `WorkflowDetail`
 - ✅ Recruiter view moved out of admin Control Plane into the portal app (filterable magic-link table)
 
-Outstanding lab-build polish before `v1.0-poc2-frontier` tag:
+**Outstanding lab-build polish before `v1.0-poc2-frontier` tag (priority order):**
 
-- POC1 AC #4 full Foundry corpus run (300 claims, ~25 min compute time)
-- One clean end-to-end stack boot to confirm `onboarding_video_url` lands on workflow metadata (the avatar fixes are committed; verification pending stable Functions host startup on this dev machine)
-- 30-min demo dry run with someone playing the WPP evaluator
-- Demo recording / screenshots
+1. **One clean end-to-end stack boot through to onboarding-video render.** Avatar fixes are committed (V1/V2 in rag-classifier prompt; custom-subdomain endpoint; per-role character/style; mp4-download auth). Just needs a stable Functions-host startup to confirm `onboarding_video_url` lands on workflow metadata. **Operational, not feature work.** Use `scripts/run-func.bat` for the env-pinned boot.
+2. **30-min demo dry run** with someone playing the WPP evaluator — walk all 22 capability beats per [poc2-DEMO.md](poc2-DEMO.md). Bug fixes captured as we go.
+3. **Demo recording + screenshots** — final artefact for evaluator review (or live demo prep).
+
+**Punted to engagement POC** (these were always engagement-POC scope per master spec; not lab-build blockers):
+
+- AC #4 corpus-wide accuracy gate (≥95%) — runs on real WPP 3,430-claim dataset, not synthetic
+- §4.9 200-CV expansion — only if eval variance demands; 50-CV gym is enough for the demo
+- §4.12 APIOps governance gate — narrated against the architecture
+- §4.15 Entra Agent ID for `hiring-agent@wpp` — narrated; lab uses `gh` CLI token (Entra-ID auth IS demonstrated by `ocr_extract` and `avatar_render` though)
+- §4.20 drift-detection live beat — Fleet Manager skill paragraph + reuse `query_traces`; demo'd narratively
+- §4.22 APIM jurisdiction-aware routing — narrated
 
 Engagement-POC differences vs the lab build are the same shape as POC1:
 

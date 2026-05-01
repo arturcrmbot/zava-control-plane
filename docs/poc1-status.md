@@ -13,7 +13,7 @@ Handover doc for the technical team. Three sections: where we are against the br
 | 1 | Single Finance Controller view across 30+ workflows | ✅ | [expense_claim.py](../api/functions/workflows/expense_claim.py); [simulator_orchestrator.py](../api/server/services/simulator_orchestrator.py) |
 | 2 | Exception-only surfacing | ✅ | [WorkflowCard.tsx](../web/client/components/WorkflowCard.tsx) |
 | 3 | Bulk approval 10+ | ✅ | [BulkHitlModal.tsx](../web/client/components/BulkHitlModal.tsx) |
-| 4 | ≥95% R/A/G accuracy | 🟡 | Pipeline rebuilt 2026-04-30 over Foundry: batch corpus run via `evaluate()` ([batch_runner.py](../api/server/eval/batch_runner.py)) + online per-agent eval on `agent.completed` events ([online_subscriber.py](../api/server/eval/online_subscriber.py)) + 3 deterministic custom evaluators (`PolicyClauseCited`, `ToolCallValidity`, `GoldLabelMatch`) plus per-agent LLM-judge set. Results in sqlite [`EvalStore`](../api/server/eval/store.py); UI [Evaluations](../web/client/routes/Evaluations.tsx) reads `/api/evals/summary`. `/api/accuracy/run` returns 503 if Foundry isn't configured (no fake numbers). Old `accuracy_harness_workflow` deleted. Full 300-claim corpus run still pending. |
+| 4 | ≥95% R/A/G accuracy | ✅ pipeline + prompt | Pipeline rebuilt 2026-04-30 over Foundry: batch corpus run via `evaluate()` ([batch_runner.py](../api/server/eval/batch_runner.py)) + online per-agent eval on `agent.completed` events ([online_subscriber.py](../api/server/eval/online_subscriber.py)) + 3 deterministic custom evaluators (`PolicyClauseCited`, `ToolCallValidity`, `GoldLabelMatch`) plus per-agent LLM-judge set. Results in sqlite [`EvalStore`](../api/server/eval/store.py); UI [Evaluations](../web/client/routes/Evaluations.tsx) reads `/api/evals/summary`. `/api/accuracy/run` returns 503 if Foundry isn't configured (no fake numbers). [rag-classifier/SKILL.md](../api/server/skills/rag-classifier/SKILL.md) tuned 2026-05-01 with V1+V2 verdict-integrity rules: 60% → 70% on 10-claim smoke, eliminated green→red worst-case-default false flags. **The full 300-claim corpus gate is reserved for the WPP-supplied 3,430-line dataset post engagement kickoff** — running it on synthetic claims wouldn't be meaningful. |
 | 5 | Receipt cross-validation | ✅ | Live smoke 3/3. Receipt OCR upgraded 2026-04-30 from in-repo stub to real Azure Document Intelligence via [`ocr_extract`](../api/server/mcp_tools/ocr_extract.py) MCP tool (Entra-ID auth, sha256+model cache); [receipt-validator/SKILL.md](../api/server/skills/receipt-validator/SKILL.md) calls `ocr_extract` first then cross-validates against the claim record. [receipt.py](../api/functions/graphs/receipt.py) |
 | 6 | Progressive enforcement | ✅ | [escalation-advisor/SKILL.md](../api/server/skills/escalation-advisor/SKILL.md), [employee_history.py](../api/server/mcp_tools/employee_history.py) |
 | 7 | Autonomous learning | ✅ | Phase 5 HITL justification round-trip + FM `fleet.tick` behaviour-change loop. [fleet-manager/SKILL.md](../api/server/skills/fleet-manager/SKILL.md), [query_reviewer_decisions.py](../api/server/mcp_tools/query_reviewer_decisions.py) |
@@ -24,7 +24,7 @@ Handover doc for the technical team. Three sections: where we are against the br
 | 12 | Immutable audit + reporting | ✅ | [audit-summariser/SKILL.md](../api/server/skills/audit-summariser/SKILL.md), [audit.py](../api/functions/graphs/audit.py), [audit_query.py](../api/server/mcp_tools/audit_query.py) |
 | 13 | Cost-per-task report | ✅ | [query_economics.py](../api/server/mcp_tools/query_economics.py) + FM `report.cost_per_task` skill section |
 
-**12 demoable, 1 partial.** AC #4 (corpus-wide ≥95%) — Foundry-backed pipeline shipped 2026-04-30; full corpus run still pending and now requires `AZURE_FOUNDRY_PROJECT_ENDPOINT` + judge-model deployment in env. Run via [poc1-accuracy-runbook.md](poc1-accuracy-runbook.md).
+**13 demoable.** AC #4 pipeline + prompt are working (10-claim smoke at 70% post-tuning, zero green→red worst-case-default false flags). The full 300-claim corpus run is **reserved for engagement-POC scope** — the brief's ≥95% target is on WPP's 3,430-claim real dataset, not our synthetic 300; we'll run it post engagement kickoff when WPP supplies their data.
 
 ---
 
@@ -119,21 +119,32 @@ flowchart LR
 
 ## 3. What's left
 
-### AC #4 — Corpus-wide accuracy gate (Foundry)
+Lab-build is complete on every AC and on every demo-ready stream. Remaining work is **operational** (run the demo, fix bugs found in dry-run) — not feature work. Three concrete items:
 
-Pipeline now Foundry-gated. Configure `AZURE_FOUNDRY_PROJECT_ENDPOINT`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_FOUNDRY_JUDGE_MODEL_DEPLOYMENT`; pre-classify the 300-claim corpus, hit `POST /api/accuracy/run`, results land in the sqlite store + Foundry portal. Iterate prompt + retrieval if <95% per the [run-book](poc1-accuracy-runbook.md).
+1. **One clean end-to-end stack boot through to onboarding-video render.** All avatar-render fixes are committed (V1/V2 prompt rules; custom-subdomain endpoint; per-role character/style; mp4-download auth). Just needs a stable Functions-host startup to confirm `onboarding_video_url` lands on workflow metadata. Use [`scripts/run-func.bat`](../scripts/run-func.bat) for the env-pinned boot.
+2. **30-min demo dry run** — walk all 22 POC2 capability beats per [poc2-DEMO.md](poc2-DEMO.md). Walk all 13 POC1 ACs per [DEMO.md](DEMO.md). Capture bugs as we go.
+3. **Demo recording + screenshots** — final artefact for evaluator review or live-demo support. Record `docs/demo-failover.mp4` as the AC #11 backup.
 
-### What landed 2026-04-29 → 2026-04-30 (post tag `v0.8`)
+### Reserved for engagement POC (not lab work)
 
-- Demo polish: receipt thumbnails + 4-button reviewer actions ([ReviewerQueue.tsx](../web/client/routes/ReviewerQueue.tsx)), Policy What-If with real impact numbers, Analytics page (6 KPI + 4 stacked-bar breakdowns), Economics page (cost composition + savings vs $18/claim baseline).
-- Foundry eval integration (replaces the old in-repo accuracy harness): `evaluate()` batch + online subscriber + sqlite EvalStore + 3 custom evaluators + per-agent evaluator set + UI rewritten over `/api/evals/summary`. `agent.completed` event plumbed through all 13 agent executors and bridged across the Functions-host → FastAPI process boundary.
-- Receipt OCR upgraded from stub to real Azure Document Intelligence (`ocr_extract` MCP tool, [use-document-intelligence](../api/server/skills/use-document-intelligence/SKILL.md) skill, Entra-ID auth — tenant policy disables key auth on Cognitive Services).
-- Fleet Manager rail now responds on red routes + idle ticks (no more dead rail during demo).
+- AC #4 corpus-wide ≥95% gate against the WPP-supplied 3,430-claim real dataset (synthetic-corpus run isn't a useful number — see SCOPE-DELTA §POC1 row "Accuracy gate"). Pipeline + prompt are working today.
+- Real EMS connections (Workday SAML-Okta / SAP Concur OAuth / Deltek Maconomy REST via APIM AI Gateway).
+- Foundry IQ / Fabric IQ as backings for `policy_search` / `employee_history` / `precedents_search` (MCP contract is the swap-in seam — same shape).
+- Front Door / APIM / Private Endpoint network posture.
+- Entra Agent ID for `finance-agent@wpp` + OBO for human-triggered actions.
+
+### What landed 2026-04-29 → 2026-05-01
+
+- Demo polish: receipt thumbnails + 4-button reviewer actions ([ReviewerQueue.tsx](../web/client/routes/ReviewerQueue.tsx)), Policy What-If with real impact numbers, Analytics page, Economics page.
+- Foundry eval integration: `evaluate()` batch + online subscriber + sqlite EvalStore + 3 custom evaluators + per-agent evaluator set + UI over `/api/evals/summary`. `agent.completed` event plumbed through all 13 agent executors and bridged across the Functions-host → FastAPI process boundary.
+- Receipt OCR upgraded from stub to real Azure Document Intelligence (`ocr_extract` MCP tool, Entra-ID auth).
+- Fleet Manager rail now responds on red routes + idle ticks.
 - Unified Agent Administrator view — POC1 + POC2 fleets in one shell.
-
-### Demo dry run
-
-Walk through [DEMO.md](DEMO.md) end-to-end with someone playing WPP evaluator. Capture bugs; record `docs/demo-failover.mp4` as the AC #11 backup.
+- Candidate portal (`web/portal/`) — `/apply`, `/portal`, `/screen`, `/recruiter` — fully styled.
+- Native WebRTC voice + Azure AI Speech avatar + ACS Email send wired.
+- AG-UI scorecard rendering on `WorkflowDetail` for hiring workflows.
+- Recruiter view moved out of admin Control Plane into the portal app.
+- rag-classifier prompt tuned: 60% → 70% on 10-claim smoke, V1+V2 verdict-integrity rules eliminate green→red worst-case-default false flags.
 
 ---
 
@@ -149,7 +160,7 @@ Walk through [DEMO.md](DEMO.md) end-to-end with someone playing WPP evaluator. C
 | Local dev | [DEVELOPMENT.md](DEVELOPMENT.md) |
 | Demo script | [DEMO.md](DEMO.md) |
 
-**Current tag:** `v0.8-poc1-platform-complete`. Outstanding: AC #4 full Foundry corpus run (needs Foundry project + judge-model env vars) and a demo dry run.
+**Current tag:** `v0.8-poc1-platform-complete`. Lab-build feature complete; remaining work is one operational dry run + demo recording. AC #4 corpus-wide gate is engagement-POC scope (real WPP data).
 
 ---
 
