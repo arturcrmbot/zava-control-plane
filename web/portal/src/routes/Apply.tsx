@@ -1,4 +1,5 @@
 import { useState, FormEvent } from "react";
+import { postApply } from "../lib/api";
 
 const ROLE_OPTIONS = [
   { id: "REQ-SDE-USA-DEMO", label: "Senior Data Engineer", market: "USA", flag: "🇺🇸" },
@@ -19,18 +20,11 @@ export default function Apply() {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
-    const fd = new FormData(e.currentTarget);
     try {
-      const resp = await fetch("/api/portal/apply", { method: "POST", body: fd });
-      if (resp.status !== 202) {
-        const text = await resp.text();
-        setError(`Apply failed (${resp.status}): ${text}`);
-        return;
-      }
-      const body = (await resp.json()) as Confirmation;
-      setConfirmation(body);
+      const body = await postApply(new FormData(e.currentTarget));
+      setConfirmation({ candidate_id: body.candidate_id, workflow_id: body.workflow_id ?? "" });
     } catch (err) {
-      setError(`Network error: ${(err as Error).message}`);
+      setError((err as Error).message);
     } finally {
       setSubmitting(false);
     }

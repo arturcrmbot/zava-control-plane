@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { postOfferDecision } from "../lib/api";
 
 type Props = {
   token: string;
@@ -14,17 +15,10 @@ export default function OfferPanel({ token, url, onDecided }: Props) {
     setSubmitting(decision);
     setError(null);
     try {
-      const resp = await fetch(
-        `/api/portal/offer/${encodeURIComponent(token)}?decision=${decision}`,
-        { method: "POST" },
-      );
-      if (!resp.ok) {
-        setError(`Decision failed (${resp.status})`);
-        return;
-      }
+      await postOfferDecision(token, decision);
       onDecided();
     } catch (err) {
-      setError(`Network error: ${(err as Error).message}`);
+      setError((err as Error).message);
     } finally {
       setSubmitting(null);
     }

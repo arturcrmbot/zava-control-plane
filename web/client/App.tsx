@@ -11,11 +11,6 @@ import WorkflowDetail from "./routes/WorkflowDetail";
 import HiringManager from "./routes/HiringManager";
 import FleetManagerRail from "./components/FleetManagerRail";
 
-// Recruiter / Candidates view moved out of the admin Control Plane and into
-// the candidate portal app at http://localhost:5174/recruiter — the magic-link
-// list is recruiter-facing data, not Agent-Administrator data, and the wrong
-// shell was confusing.
-
 const nav = [
   { to: "/fleet",          label: "Dashboard" },
   { to: "/exceptions",     label: "Exceptions" },

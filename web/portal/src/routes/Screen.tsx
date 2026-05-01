@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { RealtimeCall, type Turn } from "../voice/RealtimeCall";
+import TranscriptList from "../components/TranscriptList";
+import { getScreenResolve, postCannedScreen, postTranscript } from "../lib/api";
 
 /**
  * /screen?token=xxx — voice screening surface, native WebRTC.
@@ -60,22 +62,19 @@ export default function Screen() {
     let cancelled = false;
     (async () => {
       try {
-        const resp = await fetch(
-          `/api/portal/voice/screen-resolve?token=${encodeURIComponent(token)}`,
-        );
+        const body = await getScreenResolve(token);
         if (cancelled) return;
-        if (resp.status === 410) {
-          setError("This screening link has expired.");
-          return;
-        }
-        if (!resp.ok) {
-          setError(`Could not resolve screening link (${resp.status}).`);
-          return;
-        }
-        const body = (await resp.json()) as { candidate_id: string };
         setCandidateId(body.candidate_id);
       } catch (err) {
-        if (!cancelled) setError(`Network error: ${(err as Error).message}`);
+        if (cancelled) return;
+        const msg = (err as Error).message;
+        setError(
+          msg === "expired"
+            ? "This screening link has expired."
+            : msg.startsWith("screen-resolve failed")
+              ? `Could not resolve screening link (${msg.replace("screen-resolve failed ", "")}).`
+              : `Network error: ${msg}`,
+        );
       }
     })();
     return () => {
@@ -110,23 +109,12 @@ export default function Screen() {
     const summary = callRef.current.stop();
     callRef.current = null;
     try {
-      const resp = await fetch(
-        `/api/portal/voice/${encodeURIComponent(candidateId)}/transcript`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            token,
-            transcript: summary.transcript,
-            score: 0,
-            duration_s: summary.duration_s,
-          }),
-        },
-      );
-      if (!resp.ok) {
-        setError(`Transcript callback failed (${resp.status}).`);
-        return;
-      }
+      await postTranscript(candidateId, {
+        token,
+        transcript: summary.transcript,
+        score: 0,
+        duration_s: summary.duration_s,
+      });
       returnToPortal();
     } catch (err) {
       setError(`Transcript post failed: ${(err as Error).message}`);
@@ -137,18 +125,10 @@ export default function Screen() {
     if (!candidateId) return;
     setCannedRunning(true);
     try {
-      const resp = await fetch(
-        `/api/portal/voice/${encodeURIComponent(candidateId)}/canned?token=${encodeURIComponent(token)}`,
-        { method: "POST" },
-      );
-      if (!resp.ok) {
-        setError(`Canned screen failed (${resp.status}).`);
-        setCannedRunning(false);
-        return;
-      }
+      await postCannedScreen(candidateId, token);
       returnToPortal();
     } catch (err) {
-      setError(`Network error: ${(err as Error).message}`);
+      setError((err as Error).message);
       setCannedRunning(false);
     }
   }
@@ -295,14 +275,7 @@ export default function Screen() {
           <div className="panel" data-testid="transcript-panel">
             <div className="panel-header">Live transcript</div>
             <div className="panel-body max-h-96 overflow-y-auto">
-              {transcript.map((t, i) => (
-                <div key={i} className="transcript-line">
-                  <span className={t.role === "agent" ? "transcript-role-agent" : "transcript-role-candidate"}>
-                    {t.role === "agent" ? "Agent" : "You"}
-                  </span>
-                  <span className="text-slate-800">{t.text}</span>
-                </div>
-              ))}
+              <TranscriptList turns={transcript} />
             </div>
           </div>
         )}

@@ -9,19 +9,8 @@
 //   token, candidate_id, scope, issued_at, expires_at,
 //   name?, email?, role_id?, workflow_id?
 // }] }
-import { useEffect, useMemo, useState } from "react";
-
-type LinkRow = {
-  token: string;
-  candidate_id: string;
-  scope: string;
-  issued_at: number;
-  expires_at: number;
-  name?: string | null;
-  email?: string | null;
-  role_id?: string | null;
-  workflow_id?: string | null;
-};
+import { useCallback, useEffect, useState } from "react";
+import { getAdminLinks, type AdminLink as LinkRow } from "../lib/api";
 
 const PORTAL_ORIGIN =
   (typeof window !== "undefined" && window.location.origin) ||
@@ -53,23 +42,18 @@ export default function Recruiter() {
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
 
-  const refresh = useMemo(
-    () => async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const r = await fetch("/api/portal/admin/links");
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const body = await r.json();
-        setRows(Array.isArray(body.links) ? body.links : []);
-      } catch (e) {
-        setError(String(e));
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
-  );
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const links = await getAdminLinks();
+      setRows((prev) => (JSON.stringify(prev) === JSON.stringify(links) ? prev : links));
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     void refresh();

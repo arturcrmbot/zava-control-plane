@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import PhaseProgress from "../components/PhaseProgress";
 import OfferPanel from "../components/OfferPanel";
 import OnboardingPanel from "../components/OnboardingPanel";
+import TranscriptList from "../components/TranscriptList";
+import { resolvePhase, type Phase } from "../lib/phases";
 
 export type StatusResponse = {
   candidate: { id: string; name: string; email: string; role_id?: string };
-  // Backend phase strings are capitalised (Triage, Screening, Voice, etc.).
-  // PhaseProgress + the CTA gates normalise via toLowerCase first.
   phase: string;
   next_action: string | null;
   offer_letter_url: string | null;
@@ -22,12 +22,10 @@ const ROLE_LABELS: Record<string, string> = {
   "REQ-CD-USA-DEMO":  "Creative Director · USA",
 };
 
-const PHASE_HEADLINES: Record<string, { eyebrow: string; title: string; sub: string }> = {
+const PHASE_HEADLINES: Partial<Record<Phase, { eyebrow: string; title: string; sub: string }>> = {
   triage:     { eyebrow: "Step 2 of 6", title: "Reviewing your CV", sub: "Our triage agent is matching your profile to the role's success criteria." },
   screening:  { eyebrow: "Step 3 of 6", title: "Time for a quick chat", sub: "Open the screening call when you're ready — it's about 60 seconds." },
-  voice:      { eyebrow: "Step 3 of 6", title: "Time for a quick chat", sub: "Open the screening call when you're ready — it's about 60 seconds." },
   interview:  { eyebrow: "Step 4 of 6", title: "Interview being scheduled", sub: "We're coordinating with your hiring panel. Watch your inbox." },
-  compliance: { eyebrow: "Step 4 of 6", title: "Interview being scheduled", sub: "We're confirming compliance details (work authorisation, jurisdiction)." },
   offer:      { eyebrow: "Step 5 of 6", title: "Your offer is ready", sub: "Review and respond below. Single-use link — please decide before it expires." },
   onboarding: { eyebrow: "Step 6 of 6", title: "Welcome to the team!", sub: "Day 1 essentials are below. We've already provisioned your tooling." },
   complete:   { eyebrow: "All set", title: "You're onboarded.", sub: "Reach out to your manager — see you on day 1." },
@@ -111,7 +109,8 @@ export default function Portal() {
         );
         return;
       }
-      setData((await resp.json()) as StatusResponse);
+      const body = (await resp.json()) as StatusResponse;
+      setData((prev) => (prev && JSON.stringify(prev) === JSON.stringify(body) ? prev : body));
       setError(null);
     } catch (err) {
       setError(`Network error: ${(err as Error).message}`);
@@ -151,9 +150,10 @@ export default function Portal() {
     );
   }
 
-  const phaseLower = (data.phase ?? "apply").toLowerCase();
-  const headline = PHASE_HEADLINES[phaseLower] ?? PHASE_HEADLINES.triage;
+  const resolved = resolvePhase(data.phase);
+  const headline = PHASE_HEADLINES[resolved] ?? PHASE_HEADLINES.triage!;
   const roleLabel = ROLE_LABELS[data.candidate.role_id ?? ""] ?? "Your role";
+  const turns = data.voice_transcript ?? [];
 
   return (
     <div className="max-w-3xl mx-auto p-6 sm:p-10 space-y-6">
@@ -177,20 +177,16 @@ export default function Portal() {
         </div>
       </div>
 
-      {(phaseLower === "screening" || phaseLower === "voice") && (
-        <BookCallButton screenToken={data.screen_token} />
-      )}
-      {(phaseLower === "interview" || phaseLower === "compliance") && (
-        <InterviewRsvp nextAction={data.next_action} />
-      )}
-      {phaseLower === "offer" && (
+      {resolved === "screening" && <BookCallButton screenToken={data.screen_token} />}
+      {resolved === "interview" && <InterviewRsvp nextAction={data.next_action} />}
+      {resolved === "offer" && (
         <OfferPanel
           token={data.offer_token ?? token}
           url={data.offer_letter_url}
           onDecided={refetch}
         />
       )}
-      {phaseLower === "onboarding" && (
+      {resolved === "onboarding" && (
         <OnboardingPanel
           videoUrl={data.onboarding_video_url}
           candidateName={data.candidate.name}
@@ -198,21 +194,14 @@ export default function Portal() {
         />
       )}
 
-      {(data.voice_transcript ?? []).length > 0 && (
+      {turns.length > 0 && (
         <div className="panel">
           <div className="panel-header">
             <span>Your screening transcript</span>
-            <span className="chip-success">{(data.voice_transcript ?? []).length} turns</span>
+            <span className="chip-success">{turns.length} turns</span>
           </div>
           <div className="panel-body">
-            {(data.voice_transcript ?? []).map((t, i) => (
-              <div key={i} className="transcript-line">
-                <span className={t.role === "agent" ? "transcript-role-agent" : "transcript-role-candidate"}>
-                  {t.role === "agent" ? "Agent" : "You"}
-                </span>
-                <span className="text-slate-800">{t.text}</span>
-              </div>
-            ))}
+            <TranscriptList turns={turns} />
           </div>
         </div>
       )}
