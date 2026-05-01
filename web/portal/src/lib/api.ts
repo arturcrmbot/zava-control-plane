@@ -37,10 +37,16 @@ export async function getScreenResolve(
   return (await resp.json()) as { candidate_id: string };
 }
 
+export type ScreenCompleteResponse = {
+  ok: boolean;
+  portal_url?: string | null;
+  source?: string;
+};
+
 export async function postTranscript(
   candidateId: string,
   body: { token: string; transcript: unknown; score: number; duration_s: number },
-): Promise<void> {
+): Promise<ScreenCompleteResponse> {
   const resp = await fetch(
     `/api/portal/voice/${encodeURIComponent(candidateId)}/transcript`,
     {
@@ -50,14 +56,16 @@ export async function postTranscript(
     },
   );
   if (!resp.ok) throw new Error(`transcript failed (${resp.status})`);
+  return (await resp.json()) as ScreenCompleteResponse;
 }
 
-export async function postCannedScreen(candidateId: string, token: string): Promise<void> {
+export async function postCannedScreen(candidateId: string, token: string): Promise<ScreenCompleteResponse> {
   const resp = await fetch(
     `/api/portal/voice/${encodeURIComponent(candidateId)}/canned?token=${encodeURIComponent(token)}`,
     { method: "POST" },
   );
   if (!resp.ok) throw new Error(`canned screen failed (${resp.status})`);
+  return (await resp.json()) as ScreenCompleteResponse;
 }
 
 export type AdminLink = {

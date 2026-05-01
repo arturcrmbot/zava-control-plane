@@ -51,6 +51,7 @@ export default function Screen() {
   >("idle");
   const [transcript, setTranscript] = useState<Turn[]>([]);
   const [cannedRunning, setCannedRunning] = useState(false);
+  const [portalUrl, setPortalUrl] = useState<string | null>(null);
 
   const callRef = useRef<RealtimeCall | null>(null);
 
@@ -82,10 +83,6 @@ export default function Screen() {
     };
   }, [token]);
 
-  function returnToPortal() {
-    window.location.assign(`/portal?token=${encodeURIComponent(token)}`);
-  }
-
   async function startCall() {
     if (!candidateId || callRef.current) return;
     setError(null);
@@ -109,13 +106,14 @@ export default function Screen() {
     const summary = callRef.current.stop();
     callRef.current = null;
     try {
-      await postTranscript(candidateId, {
+      const resp = await postTranscript(candidateId, {
         token,
         transcript: summary.transcript,
         score: 0,
         duration_s: summary.duration_s,
       });
-      returnToPortal();
+      setPortalUrl(resp.portal_url ?? null);
+      setCallStatus("ended");
     } catch (err) {
       setError(`Transcript post failed: ${(err as Error).message}`);
     }
@@ -125,8 +123,9 @@ export default function Screen() {
     if (!candidateId) return;
     setCannedRunning(true);
     try {
-      await postCannedScreen(candidateId, token);
-      returnToPortal();
+      const resp = await postCannedScreen(candidateId, token);
+      setPortalUrl(resp.portal_url ?? null);
+      setCallStatus("ended");
     } catch (err) {
       setError((err as Error).message);
       setCannedRunning(false);
@@ -171,14 +170,28 @@ export default function Screen() {
               replay the canned transcript and advance the workflow as if you
               had completed a real call.
             </p>
-            <button
-              type="button"
-              onClick={runCannedScreen}
-              disabled={cannedRunning}
-              className="btn-primary btn-large w-full"
-            >
-              {cannedRunning ? <><span className="spinner"/> Running…</> : "Run canned screen"}
-            </button>
+            {callStatus === "ended" ? (
+              <div className="space-y-3">
+                <p className="text-sm text-slate-700">
+                  Thanks — canned transcript replayed. The orchestration is
+                  advancing.
+                </p>
+                {portalUrl && (
+                  <a href={portalUrl} className="btn-primary btn-large w-full inline-block text-center">
+                    View my application status →
+                  </a>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={runCannedScreen}
+                disabled={cannedRunning}
+                className="btn-primary btn-large w-full"
+              >
+                {cannedRunning ? <><span className="spinner"/> Running…</> : "Run canned screen"}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -254,10 +267,22 @@ export default function Screen() {
               </>
             )}
             {callStatus === "ended" && (
-              <p className="text-sm text-slate-700">
-                Thanks — call ended. The orchestration is moving you to the
-                interview phase. Closing this tab is fine.
-              </p>
+              <div className="space-y-3">
+                <p className="text-sm text-slate-700">
+                  Thanks — call ended. We've sent your transcript through and
+                  the orchestration is advancing.
+                </p>
+                {portalUrl ? (
+                  <a href={portalUrl} className="btn-primary btn-large w-full inline-block text-center">
+                    View my application status →
+                  </a>
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    Closing this tab is fine — your application status link was
+                    emailed at apply time.
+                  </p>
+                )}
+              </div>
             )}
             {callStatus === "error" && (
               <button

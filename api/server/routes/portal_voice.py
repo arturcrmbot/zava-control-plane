@@ -53,6 +53,21 @@ from api.shared.events import FleetEvent
 router = APIRouter(prefix="/api/portal/voice", tags=["portal", "voice"])
 
 
+def _portal_status_url_for(candidate_id: str) -> str | None:
+    """Look up the candidate's most recent active status-scope token and
+    return the full /portal?token=... URL, or None if no active status link
+    exists. Used by the post-call endpoints so the candidate can be returned
+    to a working portal page (their original screen token has just been
+    consumed and is wrong-scope for /portal anyway)."""
+    base = os.getenv("PORTAL_BASE_URL", "http://localhost:5174")
+    rows = app_state.magic_links.list_active()
+    matches = [r for r in rows if r.get("candidate_id") == candidate_id and r.get("scope") == "status"]
+    if not matches:
+        return None
+    matches.sort(key=lambda r: r.get("issued_at") or 0, reverse=True)
+    return f"{base}/portal?token={matches[0]['token']}"
+
+
 # ---------------------------------------------------------------- WebRTC config
 
 
@@ -220,7 +235,7 @@ async def receive_transcript(candidate_id: str, body: TranscriptPayload):
         "duration_s": body.duration_s,
         "turn_count": len(body.transcript),
     })
-    return {"ok": True}
+    return {"ok": True, "portal_url": _portal_status_url_for(candidate_id)}
 
 
 # ---------------------------------------------------------------- /canned-screen
@@ -269,4 +284,4 @@ async def canned_screen(candidate_id: str, token: str):
         "turn_count": len(canned),
         "source": "canned",
     })
-    return {"ok": True, "source": "canned"}
+    return {"ok": True, "source": "canned", "portal_url": _portal_status_url_for(candidate_id)}
