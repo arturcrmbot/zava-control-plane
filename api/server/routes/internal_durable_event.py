@@ -249,6 +249,21 @@ async def receive_durable_event(body: DurableEventBody):
         if agent and isinstance(output, dict):
             app_state.store.append_agent_output(wid, agent, output)
 
+    elif body.kind == "onboarding_video_ready":
+        # Cross-process bridge: agent_onboarding renders the avatar video
+        # in the Functions worker, then sends this webhook so FastAPI's
+        # app_state gets workflow.metadata.onboarding_video_url updated.
+        # Without this the candidate portal sits forever showing
+        # "Welcome video being prepared" because the worker's app_state
+        # write was process-local.
+        p = body.payload or {}
+        video_url = p.get("video_url")
+        wf = app_state.store.get_workflow(wid)
+        if wf and video_url:
+            wf.metadata = dict(wf.metadata or {})
+            wf.metadata["onboarding_video_url"] = video_url
+            app_state.store.upsert_workflow(wf)
+
     elif body.kind == "agent.completed":
         # Cross-process bridge: agent.completed is emitted in the Functions
         # host's _wrapper.run_agent_session and arrives here as a webhook.

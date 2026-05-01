@@ -12,8 +12,10 @@ persisting — the portal then renders the no-video Onboarding panel.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 
+from api.functions.webhook import emit as _webhook_emit
 from api.server.mcp_tools.avatar_render import avatar_render
 
 log = logging.getLogger(__name__)
@@ -113,11 +115,29 @@ async def execute(input: dict) -> dict:
 
 
 def _persist_video_url(workflow_id: str | None, video_url: str) -> None:
-    """Best-effort: write the URL to workflow.metadata.onboarding_video_url
-    via app_state.store. Wrapped in try/except so unit tests that don't
-    bootstrap app_state still work."""
+    """Persist the video URL to workflow.metadata.onboarding_video_url.
+
+    The activity runs in the func worker process; FastAPI maintains its
+    own app_state.store. Writing locally only updates the worker's copy
+    and the candidate-portal /status route would never see the URL.
+    Send via the webhook bridge so FastAPI's app_state gets updated.
+
+    Falls back to a direct store write so that unit tests without a live
+    FastAPI continue to pass.
+    """
     if not workflow_id:
         return
+    # Webhook path (production): tells FastAPI's bridge to update metadata.
+    try:
+        asyncio.run(_webhook_emit(
+            workflow_id, workflow_id, "onboarding_video_ready",
+            {"video_url": video_url},
+        ))
+    except Exception as exc:  # pragma: no cover — best-effort
+        log.warning("webhook emit onboarding_video_ready failed: %s", exc)
+    # Local fallback (tests / spine-only paths): write to whichever app_state
+    # the current process has. Harmless when FastAPI's process already wrote
+    # via the webhook above.
     try:
         from api.server.state import app_state
 
@@ -128,4 +148,4 @@ def _persist_video_url(workflow_id: str | None, video_url: str) -> None:
         wf.metadata["onboarding_video_url"] = video_url
         app_state.store.upsert_workflow(wf)
     except Exception as exc:  # pragma: no cover — best-effort
-        log.warning("persist video_url failed: %s", exc)
+        log.warning("persist video_url local fallback failed: %s", exc)
