@@ -229,11 +229,17 @@ async def receive_transcript(candidate_id: str, body: TranscriptPayload):
     # Resume the suspended Phase 6 orchestration. The voice_graph in
     # api/functions/workflows/hiring.py awaits "voice_complete" on a
     # 24h timer race — see plan §Phase 1 Task 2.
+    # Pass the full transcript through the event payload — the Phase 7
+    # interview-recommender reads it via voice_payload.transcript. The
+    # worker process can't see FastAPI's in-memory candidate store so the
+    # transcript MUST travel via the event (not the candidate dict).
+    transcript_dicts = [t.model_dump() for t in body.transcript]
     await raise_orchestration_event(instance_id, "voice_complete", {
         "candidate_id": candidate_id,
         "score": body.score,
         "duration_s": body.duration_s,
         "turn_count": len(body.transcript),
+        "transcript": transcript_dicts,
     })
     return {"ok": True, "portal_url": _portal_status_url_for(candidate_id)}
 
@@ -283,5 +289,6 @@ async def canned_screen(candidate_id: str, token: str):
         "duration_s": 60.0,
         "turn_count": len(canned),
         "source": "canned",
+        "transcript": canned,
     })
     return {"ok": True, "source": "canned", "portal_url": _portal_status_url_for(candidate_id)}
