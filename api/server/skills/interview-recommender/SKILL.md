@@ -25,7 +25,7 @@ You will be told which gate this is. You **recommend** — a human recruiter mak
 ```json
 {
   "decision": "advance" | "decline",
-  "level_suggestion": "Senior" | null,
+  "level_suggestion": "<one of levels_for_role>" | null,
   "rationale": "2-3 sentences citing specific evidence from the inputs",
   "talking_points": ["probe X", "verify Y"]
 }
