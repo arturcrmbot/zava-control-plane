@@ -26,7 +26,6 @@ from .sourcing import build_hiring_sourcing_workflow
 from .triage import build_hiring_triage_workflow
 from .screening import build_hiring_screening_workflow
 from .voice import build_hiring_voice_workflow
-from .interview import build_hiring_interview_workflow
 from .compliance import build_hiring_compliance_workflow
 from .offer import build_hiring_offer_workflow
 from .onboarding import build_hiring_onboarding_workflow
@@ -50,7 +49,6 @@ __all__ = [
     "build_hiring_triage_workflow",
     "build_hiring_screening_workflow",
     "build_hiring_voice_workflow",
-    "build_hiring_interview_workflow",
     "build_hiring_compliance_workflow",
     "build_hiring_offer_workflow",
     "build_hiring_onboarding_workflow",

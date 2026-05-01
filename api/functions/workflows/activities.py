@@ -31,7 +31,6 @@ from api.functions.graphs import (
     build_hiring_triage_workflow,
     build_hiring_screening_workflow,
     build_hiring_voice_workflow,
-    build_hiring_interview_workflow,
     build_hiring_compliance_workflow,
     build_hiring_offer_workflow,
     build_hiring_onboarding_workflow,
@@ -194,13 +193,6 @@ __all__ = list(globals().get("__all__", [])) + [
     "send_book_interview_email_activity",
     "send_rejection_email_activity",
 ]
-
-
-def hiring_interview_activity(payload: dict) -> dict:
-    """POC2 Phase 7 — Interview (graph_calendar + graph_mail panel scheduling)."""
-    return asyncio.run(_run_workflow(
-        build_hiring_interview_workflow, _with_phase(payload, "Interview"), "Interview",
-    ))
 
 
 def hiring_compliance_activity(payload: dict) -> dict:

@@ -1,14 +1,26 @@
 # POC2 — Quick Demo Script
 
-End-to-end walkthrough you can record in ~5 minutes. Covers candidate apply → triage → recruiter view → screening call → offer decision, with the right places to look at logs along the way.
+End-to-end walkthrough of the **recruiter HITL hiring flow**. Apply → triage → screening call → recruiter invite → candidate books → recruiter post-interview decision → candidate accepts offer. ~5–8 minutes once you know it.
 
 > Full 30-min runbook lives in [poc2-DEMO.md](poc2-DEMO.md). This file is the **short version** — what to click, in what order, to prove the stack works.
+
+The hiring orchestrator runs 10 phases. **Phase 7 (Interview)** is the new bit — three sequential HITL waits:
+
+```
+… Voice (candidate HITL)
+  → Phase 7 ① awaiting_interview_invite     (operator_review)  ← recruiter
+  → Phase 7 ② awaiting_interview_booking    (external_party)   ← candidate picks slot
+  → Phase 7 ③ awaiting_interview_complete   (operator_review)  ← recruiter
+  → Compliance → Offer (candidate accept/decline) → Onboarding
+```
+
+Recruiter view at `:5174/recruiter` paints a different action panel for each `awaiting_reason`.
 
 ---
 
 ## 0 · Pre-flight (30 seconds)
 
-All five services must respond. From any shell:
+All five services must respond:
 
 ```bash
 curl -s -o /dev/null -w "azurite:%{http_code}\n" http://localhost:10000/devstoreaccount1
@@ -18,121 +30,217 @@ curl -s -o /dev/null -w "admin:%{http_code}\n"   http://localhost:5173/
 curl -s -o /dev/null -w "portal:%{http_code}\n"  http://localhost:5174/
 ```
 
-Expected: `400 / 200 / 200 / 200 / 200`. If anything is missing, see the [logs section](#logs) at the bottom.
+Expected: `400 / 200 / 200 / 200 / 200`. If anything is missing, see [logs](#logs).
 
-Open three browser tabs, side-by-side:
+Open three browser tabs:
 
 | Tab | URL | What it is |
 |-----|-----|-----------|
 | **Portal**    | http://localhost:5174           | Public candidate-facing app |
-| **Recruiter** | http://localhost:5174/recruiter | List of candidates + per-candidate decisions |
-| **Admin**     | http://localhost:5173           | Domain-neutral Control Plane |
+| **Recruiter** | http://localhost:5174/recruiter | Candidate list + per-candidate decision panels |
+| **Admin**     | http://localhost:5173           | Domain-neutral Control Plane (workflow detail) |
 
 ---
 
-## 1 · Apply (the candidate side) · 30 sec
+## 1 · Apply as the candidate · 30 sec
 
 1. On the **Portal** tab, you land on the apply form.
-2. Pick role **Senior Data Engineer · USA** (`REQ-SDE-USA-DEMO`).
-3. Fill name + email — anything works; suggested:
-   - Name: `John Sample`
-   - Email: `john.sample@example.com`
-4. Drop in a CV PDF. Easiest: `data/synthetic/hiring/cv-pdfs/C-SE-USA-00.pdf` (any of the synthetic ones works; they're real PDFs the agent will OCR).
-5. Submit. You'll see `submitted, candidate_id=C-XXXXXXXX`. **Copy that ID** — you'll use it.
+2. Pick **Senior Data Engineer · USA** (`REQ-SDE-USA-DEMO`).
+3. Fill name + email — anything works. Suggested: `John Sample` / `john.sample@example.com`.
+4. Drop in a CV PDF — easiest: `data/synthetic/hiring/cv-pdfs/C-SE-USA-00.pdf` (any of the synthetic ones works; they're real PDFs the agent will OCR).
+5. Submit. The response shows `submitted, candidate_id=C-XXXXXXXX`. **Copy that ID** — you'll use it.
 
-> What just happened: `/api/portal/apply` wrote the bytes to Azurite blob + staged a copy under `data/synthetic/hiring/cv-pdfs/<candidate_id>.pdf`, attached the candidate to seeded workflow `HIRE-DEMO-01`, and emitted `candidate.applied`. The portal subscriber then issued a status-link email and started a `HiringOrchestrator` Durable instance that auto-approves Phase 1 (Budget) and runs through to Triage.
+> What just happened: the bytes were written to Azurite blob, a copy was staged at `data/synthetic/hiring/cv-pdfs/<candidate_id>.pdf`, the candidate was attached to seeded workflow `HIRE-DEMO-01`, a `candidate.applied` event fired, the portal subscriber issued a status-link email and started a `HiringOrchestrator` Durable instance that auto-approves Phase 1 (Budget) and runs through to Triage.
 
 ---
 
-## 2 · Watch Triage run · 30–90 sec
+## 2 · Watch the AI do triage · 30–90 sec
 
-On the **Recruiter** tab, click into your new candidate.
+On the **Recruiter** tab, click into your candidate. Phase will be `Review (Triage)` for ~10–60 seconds.
 
-You should see **phase: Review (Triage)** for ~10–60 seconds, then move to **Screening** or **Awaiting screening call** depending on the verdict.
+Panel **"What we learned · cv_crystalliser"** populates with a real LLM trace:
+- A clickable `tool · ocr_extract` row showing args + the trimmed Document Intelligence response.
+- Final LLM response — the structured profile the model returned, plus token usage.
+- A latency chip in the panel header, e.g. `12.3s · 1 tool call(s)`.
 
-While it's running, the panel **"How the agent reasoned · cv_crystalliser"** populates with the **real LLM trace**:
-
-- A clickable `tool · ocr_extract` row showing the args (the candidate ID + `prebuilt-layout` model) and the trimmed Document Intelligence response.
-- `final LLM response` — the structured profile the model returned, plus token usage.
-- A latency chip (e.g. `12.3s · 1 tool call(s)`) in the panel header.
-
-> If you only see "awaiting LLM run" for more than a minute, check `logs/func.log` for the agent run — see [logs](#logs).
+If `extraction_status === "failed"` you'll see a red chip and a "no verdict" panel — no fabricated shortlist.
 
 ---
 
-## 3 · The voice screening call · 90 sec
+## 3 · Voice screening call · 60–90 sec
 
-If the candidate's verdict is borderline / strong, the orchestrator suspends at Phase 6 (Voice) and emails a single-use screening link.
+Once Triage clears, the workflow suspends at `awaiting_voice_complete`. The candidate gets emailed a screen-scope token.
 
-1. On the **Recruiter** candidate page, look at **Active magic links** at the bottom. Find the row with scope `screen`.
-2. Copy the token.
-3. Open `http://localhost:5174/screen?token=<paste-here>` in a new tab.
-4. Click the green **Start call** button. Allow mic. Have a 30-second chat.
-5. Click **End call**. You're redirected back to the portal.
+**Real call (mic + speakers required):**
+1. Recruiter view → **Active magic links** → copy the `screen` token.
+2. Open `http://localhost:5174/screen?token=<token>` in a new tab.
+3. Click **Start screening call**, allow mic. Have ~30 seconds of conversation.
+4. Click **End call**. Page flips to "Thanks — call ended" with a "View my application status" button.
 
-Back on the **Recruiter** tab, refresh — the candidate should now show **Voice screening transcript** with the conversation turns, and the workflow should advance past Voice.
+**Fast path (no mic / scripted demo):** post a fake transcript directly:
+```bash
+SCREEN_TOK=$(curl -s "http://localhost:3001/api/portal/admin/candidate/<CID>" \
+  | python -c "import sys,json; print([t['token'] for t in json.load(sys.stdin)['active_tokens'] if t['scope']=='screen'][0])")
+curl -s -X POST "http://localhost:3001/api/portal/voice/<CID>/transcript" \
+  -H "Content-Type: application/json" \
+  -d "{\"token\":\"$SCREEN_TOK\",\"transcript\":[{\"role\":\"agent\",\"text\":\"hi\",\"ts\":0}],\"score\":7.5,\"duration_s\":60}"
+```
 
-> Mic not available? Set `VITE_VOICE_TRANSPORT=canned` and rebuild the portal — the screen page exposes a single "Submit canned transcript" button instead.
+Either way, the recruiter view picks up the transcript turns under "Voice screening transcript".
 
 ---
 
-## 4 · The recruiter view (the money shot) · 60 sec
+## 4 · Gate ① · Recruiter "invite to interview?" · 60 sec  ⭐ NEW
 
-Still on the **Recruiter** candidate page. This is the page to linger on:
+After the call completes, the workflow suspends at `awaiting_interview_invite` (`wait_kind: operator_review`). Behind the scenes the `interview-recommender` agent has already run with the CV + screening verdict + voice transcript as context.
+
+On the **Recruiter** candidate page (refresh if needed — auto-polls every 8s), a new panel appears:
+
+> **Decision · invite to interview?** — *awaiting recruiter*
+>
+> AI rec card: "AI recommends: advance · Strong on Spark, vague on stakeholder management — would push on EM experience in interview" plus 2-4 talking points.
+>
+> Optional reason textarea. **Invite to interview** / **Reject** buttons.
+
+Click **Invite to interview**.
+
+> What happens: `interview_invite` Durable event raises with `decision=invite`. Orchestrator advances to gate ②.
+
+(Try the reject path with another candidate later — see [Reject paths](#reject-paths).)
+
+---
+
+## 5 · Gate ② · Candidate picks an interview slot · 60 sec  ⭐ NEW
+
+Workflow suspends at `awaiting_interview_booking` (`wait_kind: external_party`). The candidate gets emailed a `book_interview`-scope link, single-use, 7-day TTL.
+
+On the **Recruiter** candidate page, the panel switches to:
+
+> **Awaiting candidate to book interview**
+>
+> "The candidate has been emailed an interview-booking link." Plus the operator copy/paste fallback URL.
+
+Open that URL (or grab the token from active magic links and visit `/book?token=<token>`):
+
+- 5 weekdays × 3 slots/day = 15 slot buttons grouped by day, ~80% available.
+- Pick any available slot. Page flips to **"Interview booked"** with the chosen time.
+
+> What happens: token consumed, slot persisted on the candidate dict, `interview_booked` event raises with the slot. Orchestrator runs the recommender again (gate ③ context) and advances.
+
+---
+
+## 6 · Gate ③ · Recruiter post-interview decision · 90 sec  ⭐ NEW
+
+Workflow suspends at `awaiting_interview_complete` (`wait_kind: operator_review`). The recommender just ran a second time.
+
+(Skip the "actual interview" — pretend it happened in Teams.)
+
+On the **Recruiter** candidate page, new panel:
+
+> **Post-interview decision** — *awaiting recruiter*
+>
+> AI rec card: "AI recommends: advance · suggested level: Senior · …rationale…"
+>
+> - **Interview notes** textarea.
+> - **Overall rating**: 1-5 buttons.
+> - **Decision**: Offer / Reject dropdown.
+> - **Level**: dropdown sourced per-role-family. For SDE: Mid-Level / Senior / Staff / Principal.
+> - **Submit decision** button.
+
+Fill: rating=4, decision=Offer, level=Senior, notes=`"Strong on Spark, communicates clearly."`. Submit.
+
+> What happens: `offer_decision` event raises with `{decision: "offer", level, notes, rating}`. Orchestrator advances Phase 7 → Compliance → Phase 9 (Offer letter, candidate accept/decline).
+
+---
+
+## 7 · Candidate accepts the offer · 30 sec
+
+Workflow suspends at `awaiting_offer_approval` (`wait_kind: external_party`). The candidate gets an `offer`-scope token.
+
+```bash
+OFFER_TOK=$(curl -s "http://localhost:3001/api/portal/admin/candidate/<CID>" \
+  | python -c "import sys,json; print([t['token'] for t in json.load(sys.stdin)['active_tokens'] if t['scope']=='offer'][0])")
+curl -s -X POST "http://localhost:3001/api/portal/offer/$OFFER_TOK?decision=accept"
+```
+
+Refresh the recruiter page — workflow advances to **Onboarding**, action ledger gains `workflow.completed`, no active tokens left.
+
+---
+
+## 8 · Recruiter view · the money shot
+
+Linger on the **Recruiter** candidate page after the workflow completes. It's the single page that proves the value:
 
 - **Header** — name, role, jurisdiction, current phase, **Download CV** link.
-- **What we learned** — the canonical profile (current role, total tenure, right to work, top skills, recent work history).
-- **How the agent reasoned** — every `ocr_extract` call expanded shows the args + trimmed result; the final LLM response is collapsible.
-- **Verdict** — green/amber/red callout with the model's confidence + rationale.
-- **Voice screening transcript** — turn-by-turn replay of the conversation.
-- **Audit timeline** — every orchestration step with timestamps and actor (`agent:orchestrator`, `human:operator`, etc.).
-- **Active magic links** — copy/paste fallback when ACS Email is offline.
-
-This is the "who is this person, what did we learn, what did the AI decide" view we built today.
+- **What we learned · cv_crystalliser** — canonical profile from the LLM extraction.
+- **How the agent reasoned** — every `ocr_extract` call expanded with args + trimmed result, plus the final response.
+- **Voice screening transcript** — turn-by-turn replay.
+- **Audit timeline** — every orchestration step with timestamps. Look for `interview_invite`, `interview_booked`, `offer_decision`, `workflow.completed`.
+- **Active magic links** — empty after onboarding (all tokens consumed or expired).
 
 ---
 
-## 5 · The admin / Control-Plane view · 30 sec
+## 9 · Admin / Control-Plane view · 30 sec
 
 On the **Admin** tab (`:5173`):
 
-1. Find your hiring workflow in the list. Click in.
-2. The header shows **type: hiring** with a **"Open recruiter view"** deep-link → jumps back to the recruiter page for this workflow.
-3. If it's parked at Voice/Offer, you should see:
-   > **Awaiting external party** _(no domain copy, no red-alert dashboard)_
+1. Find the hiring workflow in the list. Click in.
+2. Header shows **type: hiring** with an **"Open recruiter view"** deep-link.
+3. While at any of the three Phase 7 sub-waits, the page shows:
+   > **Awaiting external party** *(gate ②)*
+   > **Awaiting operator review** *(gates ① and ③)*
 
-4. **Compare** by opening any expense workflow — the wait label says *"Awaiting operator review"* and the deep-link reads *"Open reviewer queue"*. **Zero hiring vocabulary** appears on the expense page. That's the platform-vs-domain split working.
-
----
-
-## 6 · Offer accept / decline · 30 sec
-
-Once the workflow reaches Phase 9 (Offer) it suspends and an offer-scope magic link is issued.
-
-1. **Recruiter** page → **Active magic links** → copy the `offer` token.
-2. POST the decision:
-   ```bash
-   curl -X POST "http://localhost:3001/api/portal/offer/<token>?decision=accept"
-   ```
-3. Refresh the recruiter page — the workflow advances to **Onboarding**, the action ledger gains `workflow.completed`, the offer token disappears from the active list.
-
-(For the recorded demo, `decline` also works — it short-circuits to status=rejected.)
+4. **Compare** by opening any expense workflow — wait label says *"Awaiting operator review"* and deep-link reads *"Open reviewer queue"*. **Zero hiring vocabulary** appears on the expense page. Platform-vs-domain split working.
 
 ---
 
-## 7 · Where to look if something goes sideways
+## Reject paths
+
+Re-run from step 1 with two more candidates to exercise the auto-rejection email:
+
+- **Candidate B** (reject at gate ①): drive to `awaiting_interview_invite`, click **Reject** with optional reason. Workflow → `failed`. Email lands in `data/portal/email_outbox/` with subject `"Update on your <role> application"` and body `"After reviewing your screening for the <role> role, we've decided not to move forward at this stage."`
+
+- **Candidate C** (reject at gate ③): drive all the way to `awaiting_interview_complete`, fill the form with **decision=Reject** + notes/rating, submit. Workflow → `failed`. Same email template, copy says `"After the interview stage we've decided not to move forward …"` instead.
+
+The recruiter's free-text reason is **never** included in the candidate-facing email — it's logged only on the workflow ledger.
+
+---
+
+## TL;DR — record this in one take
+
+```
+Portal :5174        → apply (any synthetic PDF)              → ~5s
+Recruiter           → click candidate, narrate LLM trace     → ~30s
+                      (cv_crystalliser real OCR + reasoning)
+Recruiter or curl   → fire voice transcript (real or fake)   → ~60s
+Recruiter           → Gate ① panel: Invite to interview      → ~30s
+Open /book          → Gate ②: pick a slot                    → ~30s
+Recruiter           → Gate ③ panel: notes+rating+offer+level → ~60s
+Admin :5173         → same workflow, point at neutral wait   → ~30s
+                      labels + recruiter deep-link
+curl /offer/accept  → workflow → Onboarding                  → ~10s
+```
+
+Total: **~5 minutes** smooth, **~8 minutes** with narration.
+
+---
+
+## Logs
 
 <a id="logs"></a>
 
 | Symptom | Where to look |
 |---------|---------------|
 | Apply returns 503 "blob storage unavailable" | Azurite isn't running. `tail logs/azurite.log` |
-| Apply returns 404 "no workflow for role_id" | FastAPI didn't seed reqs. `tail logs/fastapi.log` for `seed_demo_reqs` line |
-| Triage panel stuck at "awaiting LLM run" | `tail -f logs/func.log` — look for `agent.completed` or a `gh auth token` failure |
-| Recruiter view 404 / loading forever | `curl http://localhost:3001/api/portal/admin/candidate/C-XXXXXXXX` — the FastAPI side |
-| Admin view shows hiring strings on an expense workflow | Vite didn't HMR. Hard-refresh `:5173` (Ctrl-Shift-R) |
+| Apply returns 404 "no workflow for role_id" | FastAPI didn't seed reqs. `tail logs/fastapi.log` for `seed_demo_reqs` |
+| Triage panel stuck at "awaiting LLM run" | `tail -f logs/func.log` — look for `agent.completed` or `gh auth token` failure |
+| Recruiter view 404 / loading forever | `curl http://localhost:3001/api/portal/admin/candidate/C-XXXXXXXX` — FastAPI side |
+| Phase 7 gate panels not appearing | Check `awaiting_reason` matches one of `awaiting_interview_invite` / `awaiting_interview_booking` / `awaiting_interview_complete`. Hard-refresh portal Vite (Ctrl-Shift-R). |
+| `/book?token=…` shows "Booking unavailable" 404 | Token was the wrong scope (e.g. you grabbed the `screen` token by mistake). Get the `book_interview` token from `/api/portal/admin/candidate/<CID>`. |
+| Rejection email missing from outbox | Func host worker didn't pick up the orchestrator change. Restart func host: kill PID on 7071 then `cmd //c "scripts\\run-func.bat"`. |
+| Admin view shows hiring strings on an expense workflow | Vite didn't HMR. Hard-refresh `:5173`. |
 
-To restart just the Python services (keep Azurite + Vite warm):
+Restart Python services (keep Azurite + Vite warm):
 
 ```bash
 # kill PIDs from `netstat -ano | findstr LISTENING | findstr ":3001 :7071"`
@@ -140,22 +248,3 @@ To restart just the Python services (keep Azurite + Vite warm):
 uv run uvicorn api.server.main:app --port 3001 > logs/fastapi.log 2>&1 &
 cmd //c "scripts\\run-func.bat" > logs/func.log 2>&1 &
 ```
-
----
-
-## TL;DR — record this in one take
-
-```
-Portal :5174       → apply (any synthetic PDF)            → ~5s
-Recruiter :5174/r  → click candidate, narrate LLM trace   → ~30s
-Recruiter         → copy screen token, do voice call     → ~60s
-Recruiter         → narrate transcript + verdict + audit → ~30s
-Admin :5173        → open same workflow, point at        → ~30s
-                     "Awaiting external party" + deep-link
-Admin             → open an expense workflow, prove no   → ~15s
-                     hiring strings appear
-Recruiter         → copy offer token, accept via curl    → ~15s
-Recruiter         → workflow → Onboarding, done          → ~5s
-```
-
-Total: under 4 minutes if you don't pause to talk.
