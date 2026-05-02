@@ -10,7 +10,7 @@ from __future__ import annotations
 from agent_framework import Workflow, WorkflowBuilder
 
 from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
-from api.functions.graphs.executors.agents import agent_hiring_stub
+from api.functions.graphs.executors.agents import agent_offer_personaliser
 from api.functions.graphs.executors.validators import validate_hiring_stub
 
 
@@ -19,7 +19,7 @@ def build_hiring_offer_workflow() -> Workflow:
         id="hiring_offer",
         name="agent_offer_personaliser",
         executor_type="agent",
-        fn=agent_hiring_stub.execute,
+        fn=agent_offer_personaliser.execute,
     )
     n2 = TrackedExecutor(
         id="val_offer",

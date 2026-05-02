@@ -249,6 +249,22 @@ async def receive_durable_event(body: DurableEventBody):
         if agent and isinstance(output, dict):
             app_state.store.append_agent_output(wid, agent, output)
 
+    elif body.kind == "offer_letter_ready":
+        # Cross-process bridge: agent_offer_personaliser renders the offer
+        # letter PDF in the Functions worker, then sends this webhook so
+        # FastAPI's app_state gets workflow.metadata.offer_letter_url set
+        # before the orchestrator suspends at awaiting_offer_approval.
+        # Without this the candidate portal sits forever showing
+        # "Offer letter is being generated…" because the worker's app_state
+        # write was process-local.
+        p = body.payload or {}
+        offer_letter_url = p.get("offer_letter_url")
+        wf = app_state.store.get_workflow(wid)
+        if wf and offer_letter_url:
+            wf.metadata = dict(wf.metadata or {})
+            wf.metadata["offer_letter_url"] = offer_letter_url
+            app_state.store.upsert_workflow(wf)
+
     elif body.kind == "onboarding_video_ready":
         # Cross-process bridge: agent_onboarding renders the avatar video
         # in the Functions worker, then sends this webhook so FastAPI's
