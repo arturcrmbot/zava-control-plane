@@ -22,3 +22,15 @@ async def emit(workflow_id: str, instance_id: str | None, kind: str, payload: di
             await c.post(WEBHOOK_URL, json=body, timeout=5)
     except Exception:
         pass
+
+
+def emit_sync(workflow_id: str, instance_id: str | None, kind: str, payload: dict) -> None:
+    """Synchronous variant — safe to call from activity functions that run inside
+    the Functions host's already-running event loop (asyncio.run() raises
+    'cannot be called from a running event loop' in that context)."""
+    body = {"workflow_id": workflow_id, "instance_id": instance_id, "kind": kind, "payload": payload}
+    try:
+        with httpx.Client() as c:
+            c.post(WEBHOOK_URL, json=body, timeout=5)
+    except Exception:
+        pass

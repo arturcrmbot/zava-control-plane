@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from api.functions.webhook import emit as _webhook_emit
+from api.functions.webhook import emit_sync as _webhook_emit_sync
 from api.server.mcp_tools.avatar_render import avatar_render
 
 log = logging.getLogger(__name__)
@@ -128,11 +128,13 @@ def _persist_video_url(workflow_id: str | None, video_url: str) -> None:
     if not workflow_id:
         return
     # Webhook path (production): tells FastAPI's bridge to update metadata.
+    # Uses the sync httpx client — asyncio.run() fails here because the
+    # Functions host activity runner already has a running event loop.
     try:
-        asyncio.run(_webhook_emit(
+        _webhook_emit_sync(
             workflow_id, workflow_id, "onboarding_video_ready",
             {"video_url": video_url},
-        ))
+        )
     except Exception as exc:  # pragma: no cover — best-effort
         log.warning("webhook emit onboarding_video_ready failed: %s", exc)
     # Local fallback (tests / spine-only paths): write to whichever app_state
