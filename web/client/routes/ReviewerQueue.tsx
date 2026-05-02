@@ -186,7 +186,7 @@ export default function ReviewerQueue() {
                       onClick={() => void act(e.id, a)}
                       className={`text-xs px-3 py-1.5 rounded font-medium transition disabled:opacity-50 disabled:cursor-not-allowed ${ACTION_BUTTON_CLASS[a]}`}
                     >
-                      {ACTION_LABEL[a]}
+                      {isResolving ? <><span className="spinner"/> Processing…</> : ACTION_LABEL[a]}
                     </button>
                   ))}
                 </div>

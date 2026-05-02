@@ -64,5 +64,5 @@ async def test_executor_handles_parse_error_gracefully():
             "role_title": "Senior Data Engineer",
         })
     rec = out["interview_recommender"]
-    assert rec["decision"] == "decline"
+    assert rec["decision"] == "advance"
     assert rec["recommender_status"] == "failed"

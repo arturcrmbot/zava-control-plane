@@ -65,10 +65,10 @@ async def execute(input: dict) -> dict:
     if parse_failed:
         return {
             "interview_recommender": {
-                "decision": "decline",
+                "decision": "advance",
                 "level_suggestion": None,
-                "rationale": "Recommender output unparseable — see agent_reasoning trace.",
-                "talking_points": [],
+                "rationale": "Recommender output unparseable — defaulting to advance so candidates are not penalised by system errors. See agent_reasoning trace.",
+                "talking_points": ["verify CV details manually", "confirm screening outcome in interview"],
                 "recommender_status": "failed",
             }
         }

@@ -67,7 +67,7 @@ export default function ExceptionItem({ e, selected, onToggle, onResolved }: {
                 data-testid={`resolve-${o.action}`}
                 className="btn-secondary text-xs py-1 disabled:opacity-40"
               >
-                {o.label}{o.nonRevocable ? " ⚠" : ""}
+                {busy ? <><span className="spinner"/> Resolving…</> : <>{o.label}{o.nonRevocable ? " ⚠" : ""}</>}
               </button>
             ))}
           </div>

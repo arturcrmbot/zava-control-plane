@@ -115,13 +115,13 @@ export function InterviewInvitePanel({
             disabled={busy}
             onClick={() => submit("invite")}
             className="btn-primary flex-1"
-          >Invite to interview</button>
+          >{busy ? <><span className="spinner"/> Processing…</> : "Invite to interview"}</button>
           <button
             type="button"
             disabled={busy}
             onClick={() => submit("reject")}
             className="btn-danger flex-1"
-          >Reject</button>
+          >{busy ? <><span className="spinner"/> Processing…</> : "Reject"}</button>
         </div>
         {error && <p className="text-xs text-red-600">{error}</p>}
       </div>
@@ -242,7 +242,7 @@ export function PostInterviewPanel({
           disabled={busy}
           onClick={submit}
           className="btn-primary w-full"
-        >Submit decision</button>
+        >{busy ? <><span className="spinner"/> Submitting…</> : "Submit decision"}</button>
         {error && <p className="text-xs text-red-600">{error}</p>}
       </div>
     </div>
