@@ -50,8 +50,13 @@ web/shared/**/*.js
 web/portal/src/**/*.js
 web/portal/vite.config.js
 web/portal/vitest.config.js
+web/portal/tsconfig.tsbuildinfo
 mocks/**/*-mcp/server.js
 tests/web/**/*.test.js
+
+# Azure Functions Core Tools auto-generates host.json on first start when
+# the file is absent — it's not the canonical config for this project.
+api/functions/host.json
 
 # Demo / dev screenshots — local artifacts, not source
 screenshots/
