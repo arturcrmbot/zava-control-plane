@@ -12,6 +12,7 @@
     "dev:mcp:poc2": "concurrently -k -n gh,li,wdhr,grph,snow,acs,hg \"tsx watch mocks/greenhouse-mcp/server.ts\" \"tsx watch mocks/linkedin-mcp/server.ts\" \"tsx watch mocks/workday-hr-mcp/server.ts\" \"tsx watch mocks/graph-mcp/server.ts\" \"tsx watch mocks/servicenow-mcp/server.ts\" \"tsx watch mocks/acs-mcp/server.ts\" \"tsx watch mocks/heygen-mcp/server.ts\"",
     "demo:mcp:poc2": "concurrently -k -n gh,li,wdhr,grph,snow,acs,hg \"tsx mocks/greenhouse-mcp/server.ts\" \"tsx mocks/linkedin-mcp/server.ts\" \"tsx mocks/workday-hr-mcp/server.ts\" \"tsx mocks/graph-mcp/server.ts\" \"tsx mocks/servicenow-mcp/server.ts\" \"tsx mocks/acs-mcp/server.ts\" \"tsx mocks/heygen-mcp/server.ts\"",
     "demo:ui": "vite preview --host 0.0.0.0 --port 5173",
+    "demo:portal": "npm --prefix web/portal run preview -- --host 0.0.0.0 --port 5174",
     "build": "tsc && vite build",
     "test": "vitest run",
     "test:watch": "vitest",

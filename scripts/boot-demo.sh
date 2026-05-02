@@ -56,6 +56,14 @@ echo "==> vite preview (static)"
 npm run demo:ui &
 pids+=($!)
 
+echo "==> portal preview (candidate UI)"
+if [[ ! -d web/portal/dist ]]; then
+  echo "    portal/dist missing — building..."
+  npm run build:portal
+fi
+npm run demo:portal &
+pids+=($!)
+
 launch_func() {
   case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*)
@@ -92,6 +100,7 @@ cat <<EOF
 
 All services should be up. Ports:
   UI:         http://localhost:5173
+  Portal:     http://localhost:5174
   FastAPI:    http://localhost:3001
   Functions:  http://localhost:7071
   Azurite:    10000-10002
