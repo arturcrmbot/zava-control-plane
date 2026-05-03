@@ -395,15 +395,39 @@ export function MindMap({ events, status, composition }: Props) {
           );
           if (!trav) return null;
           const progress = Math.min(1, (now - trav.startMs) / TRAVERSAL_DURATION_MS);
-          const dotX = sp.x + (tp.x - sp.x) * progress;
-          const dotY = sp.y + (tp.y - sp.y) * progress;
+
+          // Quadratic Bezier control point: midpoint pushed OUTWARD from
+          // centre so the curve bows around the centre badge instead of
+          // crossing through it.
+          const midX = (sp.x + tp.x) / 2;
+          const midY = (sp.y + tp.y) / 2;
+          const dx = midX - cx;
+          const dy = midY - cy;
+          const distFromCentre = Math.sqrt(dx * dx + dy * dy) || 1;
+          // Push 70% of phaseRadius further outward from the centre
+          // through the midpoint. This is enough to keep a top-skill->
+          // bottom-tool line clear of the 56px-radius badge even on
+          // perfectly opposite layouts.
+          const push = phaseRadius * 0.7;
+          const cpX = midX + (dx / distFromCentre) * push;
+          const cpY = midY + (dy / distFromCentre) * push;
+
+          // Quadratic Bezier point at parameter t along the curve.
+          const oneMinus = 1 - progress;
+          const dotX =
+            oneMinus * oneMinus * sp.x +
+            2 * oneMinus * progress * cpX +
+            progress * progress * tp.x;
+          const dotY =
+            oneMinus * oneMinus * sp.y +
+            2 * oneMinus * progress * cpY +
+            progress * progress * tp.y;
+
           return (
             <g key={`${s.name}-${t.name}-${trav.startMs}`}>
-              <line
-                x1={sp.x}
-                y1={sp.y}
-                x2={tp.x}
-                y2={tp.y}
+              <path
+                d={`M ${sp.x} ${sp.y} Q ${cpX} ${cpY} ${tp.x} ${tp.y}`}
+                fill="none"
                 className={`mindmap__edge ${trav.blocked ? "mindmap__edge--blocked" : ""}`}
               />
               <circle

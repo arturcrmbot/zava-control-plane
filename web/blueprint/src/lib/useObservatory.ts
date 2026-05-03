@@ -61,15 +61,18 @@ export function useObservatory(opts: UseObservatoryOptions = {}) {
         setCounters((c) => {
           const next = { ...c };
           const wid = data.workflow_id ?? "?";
+
+          // Workflow lifecycle: count a workflow as 'started' the first
+          // time we see ANY event referencing its workflow_id. The page
+          // mounts mid-trickle and missing the actual workflow.started
+          // emit shouldn't make 'workflows started' read 0 while skills
+          // and tool calls are clearly firing.
+          if (wid !== "?" && !seenStartedRef.current.has(wid)) {
+            seenStartedRef.current.add(wid);
+            next.workflowsStarted += 1;
+          }
+
           switch (data.type) {
-            case "workflow.started":
-            case "durable.workflow.started": {
-              if (!seenStartedRef.current.has(wid)) {
-                seenStartedRef.current.add(wid);
-                next.workflowsStarted += 1;
-              }
-              break;
-            }
             case "durable.executor.invoked": {
               // Only count on `start` so we don't double-count start+complete.
               if (data.stage && data.stage !== "start") break;

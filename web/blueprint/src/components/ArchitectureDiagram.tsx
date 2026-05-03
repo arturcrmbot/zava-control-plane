@@ -24,9 +24,9 @@ import type { Domain, Skill, Mcp } from "../lib/types";
  * arrays — no static link maps.
  */
 
-const VISIBLE_DOMAINS = 30;  // hard cap; we have 9 today
-const VISIBLE_SKILLS = 40;   // hard cap; we have ~37 today
-const VISIBLE_MCPS = 40;     // hard cap; we have ~22 wired today
+const VISIBLE_DOMAINS = 9;
+const VISIBLE_SKILLS = 12;
+const VISIBLE_MCPS = 14;
 
 interface Guarantee {
   id: string;
@@ -183,59 +183,54 @@ export function ArchitectureDiagram() {
 
   const hl = useMemo(() => highlightFor(hover, ix), [hover, ix]);
 
-  // Dimensions. The diagram renders at its NATURAL width — chip widths are
-  // fixed (so labels don't truncate) and the diagram extends as wide as it
-  // needs to. The .arch__scroll wrapper handles horizontal overflow on
-  // narrower viewports.
+  // Fixed canvas width — fits within typical viewport with no horizontal
+  // scroll. Chip widths derived from canvas width and visible counts; long
+  // names wrap to two lines via foreignObject.
+  const W = 1240;
   const stackX = 30;
+  const stackW = W - stackX - 30;
+  const innerX = stackX + 18;
+  const innerW = stackW - 36;
 
-  // Per-row chip widths chosen so the longest realistic name fits without
-  // ellipsis. Domain tiles need room for two-line metadata.
-  const DOMAIN_CHIP_W = 168;
-  const DOMAIN_GAP = 12;
-  const SKILL_CHIP_W = 220;
-  const SKILL_GAP = 10;
-  const MCP_CHIP_W = 220;
-  const MCP_GAP = 10;
+  const DOMAIN_GAP = 8;
+  const SKILL_GAP = 6;
+  const MCP_GAP = 6;
 
-  // Compute the column-widths the rows need, then take the widest as the
-  // diagram's overall content width. Each row centres its chips inside it.
-  const domainsContentW = visibleDomains.length * (DOMAIN_CHIP_W + DOMAIN_GAP) - DOMAIN_GAP;
-  const skillsContentW = visibleSkills.length * (SKILL_CHIP_W + SKILL_GAP) - SKILL_GAP;
   const mcpOverflow = (visibleMcps.length < rankedMcps.length || orphanMcpCount > 0) ? 1 : 0;
-  const mcpsContentW =
-    (visibleMcps.length + mcpOverflow) * (MCP_CHIP_W + MCP_GAP) - MCP_GAP;
-  const innerW = Math.max(domainsContentW, skillsContentW, mcpsContentW, 800);
-  const stackW = innerW + 36;
-  const W = stackW + 60;
+  const skillOverflow =
+    composition && composition.skills.length > VISIBLE_SKILLS ? 1 : 0;
+
+  const DOMAIN_CHIP_W = visibleDomains.length > 0
+    ? (innerW - DOMAIN_GAP * (visibleDomains.length - 1)) / visibleDomains.length
+    : innerW;
+  const SKILL_CHIP_W = (visibleSkills.length + skillOverflow) > 0
+    ? (innerW - SKILL_GAP * ((visibleSkills.length + skillOverflow) - 1)) /
+      (visibleSkills.length + skillOverflow)
+    : innerW;
+  const MCP_CHIP_W = (visibleMcps.length + mcpOverflow) > 0
+    ? (innerW - MCP_GAP * ((visibleMcps.length + mcpOverflow) - 1)) /
+      (visibleMcps.length + mcpOverflow)
+    : innerW;
 
   const domainsY = 30;
-  const domainsH = 140;
-  const skillsY = domainsY + domainsH + 32;
-  const skillsH = 110;
-  const mcpsY = skillsY + skillsH + 22;
-  const mcpsH = 110;
-  const guaranteesY = mcpsY + mcpsH + 28;
+  const domainsH = 132;
+  const skillsY = domainsY + domainsH + 28;
+  const skillsH = 96;
+  const mcpsY = skillsY + skillsH + 18;
+  const mcpsH = 96;
+  const guaranteesY = mcpsY + mcpsH + 24;
   const guaranteesH = 100;
   const H = guaranteesY + guaranteesH + 30;
 
-  const innerX = stackX + 18;
+  const innerXLocal = stackX + 18;
 
-  // Per-row content layout. Each row gets its own helper that returns the
-  // centre x for the i-th chip, accounting for chip width + gap. The row
-  // is centred horizontally within innerW.
-  const rowOffsetX = (rowContentW: number) =>
-    innerX + Math.max(0, (innerW - rowContentW) / 2);
-  const domainsRowX = rowOffsetX(domainsContentW);
-  const skillsRowX = rowOffsetX(skillsContentW);
-  const mcpsRowX = rowOffsetX(mcpsContentW);
-
+  // Each row's chip i centre x.
   const domainXCentre = (i: number) =>
-    domainsRowX + i * (DOMAIN_CHIP_W + DOMAIN_GAP) + DOMAIN_CHIP_W / 2;
+    innerXLocal + i * (DOMAIN_CHIP_W + DOMAIN_GAP) + DOMAIN_CHIP_W / 2;
   const skillXCentre = (i: number) =>
-    skillsRowX + i * (SKILL_CHIP_W + SKILL_GAP) + SKILL_CHIP_W / 2;
+    innerXLocal + i * (SKILL_CHIP_W + SKILL_GAP) + SKILL_CHIP_W / 2;
   const mcpXCentre = (i: number) =>
-    mcpsRowX + i * (MCP_CHIP_W + MCP_GAP) + MCP_CHIP_W / 2;
+    innerXLocal + i * (MCP_CHIP_W + MCP_GAP) + MCP_CHIP_W / 2;
 
   const isActiveDomain = (id: string) => !hl.active || hl.glowAll || hl.domains.has(id);
   const isActiveSkill = (id: string) => !hl.active || hl.glowAll || hl.skills.has(id);
@@ -322,8 +317,7 @@ export function ArchitectureDiagram() {
           viewBox={`0 0 ${W} ${H}`}
           width={W}
           height={H}
-          style={{ width: `${W}px`, height: `${H}px`, minWidth: `${W}px`, display: "block" }}
-          preserveAspectRatio="xMinYMin meet"
+          preserveAspectRatio="xMidYMid meet"
           role="img"
           aria-label="Functional architecture: live domains on top, then their skills, then the MCP tools those skills allow-list. A row of always-on guarantees runs along the bottom and applies to every domain. Hover any chip to see relationships."
         >
