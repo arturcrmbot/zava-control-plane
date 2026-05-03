@@ -1,9 +1,9 @@
 # Blueprint pitch — single prompt for the unified one-pager
 
-**Date:** 2026-05-01
+**Date:** 2026-05-02
 **What this is:** a single ChatGPT prompt that produces the entire one-pager — title, body copy, visual, layout, all of it — as one rendered artefact.
 **Audience:** CDO/CIO who has sponsored 3–5 AI POCs that didn't scale.
-**Job:** frame-breaker. Make them ask a different question next time.
+**Job:** frame-breaker. Survive being forwarded with no covering note. Make the reader put it down asking a different question than the one they walked in with.
 
 ---
 
@@ -20,40 +20,38 @@ The page is one composed thesis read top to bottom — copy and visual integrate
 CONTENT IN ORDER, FROM TOP OF PAGE TO BOTTOM:
 
 1. HEADLINE (very large, top of page, modern serif):
-*Literacy at the speed of software.*
+*Why your AI hasn't compounded.*
 
 2. SUBTITLE (immediately beneath, smaller, sans-serif):
-Why your AI work hasn't compounded yet.
+And the only thing we've found that does.
 
 3. OPENING PARAGRAPH (body copy, left-aligned column, comfortable reading width):
 "If you've sponsored AI work in the last three years, you know the pattern. The demo goes fine. The contract gets signed. Some version of the thing ships. Then the next initiative arrives and effectively starts over: new prompts, new evaluation, new integrations, a fresh six-week timeline, often a different vendor. The deliverables stop accumulating about a week after each contract ends."
 
 4. PULLQUOTE (set apart, larger type, accent colour):
-*The thing being sold to you doesn't, by its nature, compose.*
+*What you've been buying is a manuscript. What you need is a press.*
 
 5. CENTRAL VISUAL (the dominant element on the page — a two-panel split illustration with strong tonal contrast: cool/dim left, warm/lit right):
 
-LEFT panel — the mood is exhausting, oppressive, defeated. NOT a tidy kanban board. NOT a Trello wall. This is years of accumulated failure made physical.
+LEFT panel — a medieval scriptorium. The mood is skilled, painstaking, isolated, slow. Cool light through a high lancet window.
 
-A dimly lit office wall buried under drifts of Post-It notes, sticky labels, hand-scribbled index cards, printouts, curling tape. Notes layered three or four deep so bottom layers are barely visible. Many cards illegible, faded, crossed out, hand-rewritten over previous handwriting. Coffee stains. Some notes fallen on the floor. A small trash bin in the foreground overflowing with crumpled cards. Among the dense mess, the viewer can just make out these labels (the rest implied by density): "Expense Classifier", "Invoice Sorter", "Lead Scorer", "CV Screener", "Chatbot v3", "Receipt OCR", "Forecast Bot", "Email Summariser", "Compliance Checker". Three figures, NOT posed in a tableau, in real bodily reactions to the wall: one standing very close, scanning for a specific card; one walking away with shoulders slumped; one standing further back with arms crossed, looking spent. Cool, washed-out palette — muted greys, faded yellows, thin natural light through a window. This panel should make the viewer feel: this is exhausting and it isn't working.
+A single monk hunched over a tilted writing desk, mid-illumination of a page — gold leaf catching the thin light, fine brush in hand, half a capital letter complete. Months of work for one book, and the viewer can feel it. A second monk at a second desk in the background, doing the same painstaking work on an entirely different volume — none of his effort transferable to the first. To one side, a low shelf with three or four finished volumes; each one visibly an object that took a year. On the floor near the foreground, a half-finished manuscript abandoned, its parchment curling. Subtly, on the spines of the finished books, fine lettering: "Expense Compliance", "Receipt Audit", "CV Screen", "Lead Score" — domain names rendered as the titles of single, hand-made volumes. Cool, washed-out palette — muted greys, faded ochre, dim candlelight.
 
-RIGHT panel — the mood is calm, alert, capable. This is what mastery looks like.
+RIGHT panel — a Gutenberg-era print shop. The mood is alert, capable, quietly mechanical. Warm amber side-light from a high window.
 
-A serene reading room. A single figure (gender-neutral, simple modern linework) sits in a leather armchair, leaning slightly forward, actively engaged with the open book on their lap — reading, not posed. The book is open to a page of dense continuous prose. NO numbered table of contents, NO chapter list — just real-looking text. Behind the figure, a tidy bookshelf of substantial bound volumes; their spines carry domain names in elegant gilt lettering ("Finance", "HR", "Procurement", "Legal", "Sales", "IT"), but rendered as part of the books, not as loud labels. On a side table: a notebook, a pen, a cup of tea. Warm amber side-lighting from a desk lamp. Generous space around the figure — a sense of openness, options, command.
+The dominant element is the **type case** itself: a wooden tray, foreground, divided into compartments, each holding a stack of identical metal letter-sorts ready to be picked. A compositor's hand is mid-air just above the case, having just lifted a single piece of type. On the bench in front of the compositor, a composing stick already holding a set line of type, the individual letters visibly arrayed into words. Beyond the bench, a forme — a full page locked up in its frame, set and ready, the discrete letters now composed into continuous text. Behind the forme, the press itself, mid-pull, with a freshly printed sheet just lifted clear. The composition must make clear that **the letters are the reusable thing**, not the books. A second forme on a side bench is being broken back out into letters and returned to the case — the same A that was just on one page, going home to be re-set on the next. The bookshelf in the background carries domain titles in clean printed lettering — "Finance", "Hiring", "Onboarding", "Procurement", "Legal", "IT" — slim, recently-set pamphlets, more of them, none of them painstakingly unique.
 
 6. VISUAL CAPTION (small italic type beneath the illustration):
-POC by POC, vs. an organisation that has learned to read.
+Hand-illuminated, one volume at a time. Or set from a case of type that can be reset for the next page.
 
-7. REFRAME COPY (two short paragraphs, body type):
-"It's the equivalent of teaching someone a word at a time and never giving them the alphabet. They never learn to read.
-
-Literacy works differently. A literate society doesn't re-acquire reading for each subject; it reads once, and everything after is a textbook. There's a question we keep coming back to: whether you can install something analogous in an organisation. A kind of operational literacy where agents have learned how your organisation actually works. Once that exists, teaching them a new domain is closer to writing a chapter than starting a new book."
+7. REFRAME COPY (one paragraph, body type):
+"The pieces that make an agent — its skills, its connections to your real systems, its identity, its governance — are cast once and composed on demand. Standing up the next agent is composition, not construction. The compositor, here, is an agent itself."
 
 8. PROOF CALLOUT (set apart in a small box or accent-rule sidebar, body prose — not a bullet list):
-"We've been doing exactly this with one of the largest companies in the world. The first domain (finance compliance) took about fifteen calendar days from a cold start. The second (hiring) took two days, with most of the underlying code carrying across. We don't yet know what the third will take, though the trajectory points to single-digit hours. Most of the leverage comes from refusing to throw any of it away between projects."
+"We have already built it. Dozens of agents — finance compliance, hiring, onboarding, procurement, more — composed from a shared case of type, increasingly by agents themselves. The first took fifteen days. The most recent took hours. We don't hand you a repository and a statement of work. We hand you the environment, running. A week with you, and your real ambition — one use case or fifty — is operating inside it."
 
 9. CLOSING (full-width, set apart at the bottom of the page, body prose with a final line in larger serif):
-"The most useful thing this changes is the question you ask. Instead of *'what's the next POC we should run'*, it becomes *'what does it look like when this organisation can read.'* That's a longer and weirder conversation. But it's the one that leads somewhere."
+"The question stops being *'which AI project do we fund next.'* It becomes *'what does it look like when this organisation composes its own.'* That's a longer and stranger conversation. It's the one that leads somewhere."
 
 Render every word above legibly and accurately on the page. The illustration is the centerpiece, but the typography and copy hierarchy are equally important — this is an editorial thesis page, not a poster.
 
@@ -61,8 +59,12 @@ Render every word above legibly and accurately on the page. The illustration is 
 
 ## Notes
 
-- **Why this visual.** The wall vs the reader does both jobs in one frame. The reader sees themselves in the Post-It wall (frame-break by recognition) and sees the alternative immediately next to it. The proof-curve and organism options were stronger for more analytical or more imaginative readers respectively — but for a burnt-out CDO/CIO, this is what lands first.
+- **Why this visual.** The press analogy isn't about producing more books. It's about *the letterforms being composable*. That is the real shape of what we're proposing — skills, MCPs, identity and governance cast once, composed into any domain, broken out, recomposed. A reader who knows the technology recognises the analogy as substantive rather than cute. A reader who doesn't, sees the same point in physical form: the unit of reuse is below the page, not at it.
 
-- **If the render is muddy.** Two-panel compositions packed with small labelled cards are at the edge of what current image models do well. If the output is unreadable, I have a stripped-down alternative ready (the substrate + compounding-cost curve). Say the word and I'll swap it in.
+- **The right panel must lead with the type case, not the press.** The press is a recognisable object, which makes it the easy thing for the image model to fixate on. Resist that. The compositor's hand above the type case is the centre of the composition. The forme being broken back out into letters on the side bench is the second-most-important element, because it shows the *re-* in *reusable*. The press itself is the third element — present, mid-pull, but not dominant.
+
+- **If the render is muddy.** Two-panel compositions with this much specific detail are at the edge of what current image models do well. If the output is unreadable, fall back to a single-panel right-hand-only image — the type case and compositor's hand alone, rendered larger and cleaner — and let the headline and pullquote carry the contrast with the manuscript era. The scriptorium side is already vivid in the reader's head.
 
 - **Text rendering caveat.** Headlines and short blocks render reliably; full body paragraphs are hit-or-miss. Expect to take the output into Figma / Canva / a design tool and re-set the body copy cleanly. Use the rendered image as a layout draft, not the final.
+
+- **What changed in this revision (2026-05-02, second pass).** Cut the academic headline ("the wrong unit of work" meant nothing to a normal reader). Cut the confrontational line about the industry blaming execution; let the pattern do the work. Cut the explained analogy (nobody assumed presses were faster because they reused books — saying so insulted the reader). Cut the "we don't know what the third will take" hedge; we have dozens, the trajectory isn't a question. Tightened the reframe to a single paragraph. Aligned the right-panel bookshelf to the actual domains we name in the proof. Headline now diagnoses the reader's problem directly; subtitle promises the answer; the rest of the page delivers it without explaining itself.
