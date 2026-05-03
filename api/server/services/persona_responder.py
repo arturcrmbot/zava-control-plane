@@ -1,117 +1,245 @@
 """Persona responder service.
 
-Subscribes to `workflow.hitl.requested` FleetEvents and closes generated-
-domain HITL gates by applying the matching persona's decision policy
-deterministically against the parked workflow context, then raising the
+Closes generated-domain HITL gates by applying the matching persona's
+decision policy against the parked workflow context, then raising the
 external event back to the Durable orchestrator.
 
-A persona is considered handleable iff the suspended-event payload included
-`persona`, `external_event`, and `context` fields (the persona-responder
-contract — see `compose-domain` SKILL). Hand-built domains (expense /
-hiring) omit these fields and route through their own UI flows
-(reviewer queue, recruiter portal, candidate portal); their HITL events
-are silently ignored here.
+Architecture
+------------
+Each persona is one ``api/server/personae/<role>/SKILL.md`` file with
+YAML frontmatter declaring:
 
-The decision policies in this module mirror the prose in each persona's
-SKILL.md verbatim. When a persona's prose changes, the matching handler
-here changes too. Long-term we want either:
-  - codegen from the SKILL.md decision_policy paragraph, or
-  - a real GHCP session per persona that evaluates the SKILL.md
-    against the parked context.
-v1 keeps it deterministic for predictable demos.
+    name: <role>
+    description: <one sentence>
+    allowed-tools:
+    workflow_label: <human label for the domain>
+    external_event: <durable event name to raise>
+    decision_policy: |
+        <Python source that reads `context` and assigns `decision`+`reason`>
+
+The persona responder discovers all SKILL.md files under
+``api/server/personae/`` at attach() time, parses the YAML frontmatter,
+and compiles the ``decision_policy`` block into a callable. The body of
+each SKILL.md is human-readable prose describing the same rule. The
+prose and the executable code are both committed; the *executable* is
+the source of truth, the prose tracks it for design-time reading and
+for the eventual GHCP-session-driven persona variant (v2).
+
+Auto-close allow-list
+---------------------
+Default behaviour: **every gate stays open**. A persona only closes a
+gate if its role is in the ``PERSONA_AUTO_CLOSE`` env var (CSV).
+Production-honest default: nothing closes itself. Demo profiles set
+the allow-list explicitly. See ``scripts/profile-friday.sh`` and
+``scripts/profile-autonomous.sh``.
+
+Hand-built domains (expense / hiring) stamp ``persona`` /
+``external_event`` / ``context`` on their suspended payloads (per the
+substrate-fix v2). The responder still honours the allow-list, so
+production / demo days with real humans keep human-in-the-loop unless
+specifically opted in.
 """
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Callable, Awaitable
+import os
+import textwrap
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable
+
+import yaml
 
 from api.server.services.durable_client import raise_orchestration_event
 from api.shared.events import FleetEvent
 
+
+PERSONAE_DIR = Path(__file__).resolve().parents[2] / "server" / "personae"
 
 # A persona handler takes the parked context dict and returns the resolving
 # event payload (e.g. {"decision": "approve", "reason": "in-policy + low band"}).
 PersonaHandler = Callable[[dict[str, Any]], dict[str, Any]]
 
 
-def _line_manager_decide(context: dict[str, Any]) -> dict[str, Any]:
-    """Mirror of api/server/personae/line_manager/SKILL.md decision_policy.
-
-    Approve when policy_fit_check shows policy_fit == "in-policy" AND
-    band in {"low", "mid"}. Otherwise reject. State which condition failed
-    in one sentence in the rejection reason.
-    """
-    pfc = (context or {}).get("policy_fit_check") or {}
-    fit = pfc.get("policy_fit")
-    band = pfc.get("band")
-
-    if not fit or not band:
-        return {
-            "decision": "reject",
-            "reason": "missing policy_fit_check verdict",
-        }
-
-    if fit == "in-policy" and band in {"low", "mid"}:
-        return {
-            "decision": "approve",
-            "reason": f"in-policy + {band} band",
-        }
-
-    if fit != "in-policy":
-        return {
-            "decision": "reject",
-            "reason": f"out of policy: {pfc.get('violated_clauses') or '?'}",
-        }
-
-    return {
-        "decision": "reject",
-        "reason": f"in-policy but {band} band exceeds line-manager delegation",
-    }
+@dataclass
+class PersonaDefinition:
+    role: str
+    description: str
+    workflow_label: str
+    external_event: str
+    decide: PersonaHandler
+    skill_path: Path
 
 
-# Persona handler registry. Add an entry per persona role as new HITL
-# personae get composed. Each key matches the persona's `name:` frontmatter
-# in api/server/personae/<role>/SKILL.md.
-PERSONA_HANDLERS: dict[str, PersonaHandler] = {
-    "line_manager": _line_manager_decide,
+# Populated at attach() time.
+PERSONA_DEFINITIONS: dict[str, PersonaDefinition] = {}
+
+
+def _auto_close_set() -> set[str]:
+    """Read PERSONA_AUTO_CLOSE env var as a set of persona roles. Default empty
+    — every gate stays open unless explicitly opted in."""
+    raw = os.environ.get("PERSONA_AUTO_CLOSE", "").strip()
+    if not raw:
+        return set()
+    return {part.strip() for part in raw.split(",") if part.strip()}
+
+
+# --------------------------------------------------------------------------
+# Persona loading from SKILL.md frontmatter
+# --------------------------------------------------------------------------
+
+
+def _split_frontmatter(text: str) -> tuple[dict[str, Any], str]:
+    """Split a SKILL.md into (frontmatter dict, body text). Returns ({}, text)
+    when there is no recognisable frontmatter block."""
+    if not text.startswith("---"):
+        return {}, text
+    lines = text.splitlines()
+    end = None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            end = i
+            break
+    if end is None:
+        return {}, text
+    fm_text = "\n".join(lines[1:end])
+    body_text = "\n".join(lines[end + 1:])
+    try:
+        data = yaml.safe_load(fm_text) or {}
+    except yaml.YAMLError as ex:
+        raise ValueError(f"persona SKILL.md frontmatter is not valid YAML: {ex}") from ex
+    if not isinstance(data, dict):
+        raise ValueError("persona SKILL.md frontmatter must be a YAML mapping")
+    return data, body_text
+
+
+# Builtins the decision_policy code is allowed to use. Tightly scoped so a
+# typo in a SKILL.md can't reach into the FastAPI process beyond computing a
+# decision against the context dict.
+_DECISION_BUILTINS: dict[str, Any] = {
+    "isinstance": isinstance, "len": len,
+    "str": str, "int": int, "float": float, "bool": bool,
+    "list": list, "dict": dict, "set": set, "tuple": tuple,
+    "min": min, "max": max, "abs": abs, "round": round,
+    "any": any, "all": all, "sum": sum,
+    "True": True, "False": False, "None": None,
 }
 
 
+def _compile_decision_policy(role: str, source: str) -> PersonaHandler:
+    """Compile a ``decision_policy`` source block into a callable that takes
+    a context dict and returns ``{"decision", "reason"}``.
+
+    The source runs in an isolated namespace where only ``context`` is in
+    scope plus a small whitelist of safe builtins. The source MUST assign
+    ``decision`` (str: "approve" | "reject") and ``reason`` (str). Any
+    exception falls back to a reject with the exception text as the reason
+    — the orchestrator never sits forever on a broken persona policy.
+    """
+    cleaned = textwrap.dedent(source)
+    try:
+        code = compile(cleaned, f"<persona:{role}:decision_policy>", "exec")
+    except SyntaxError as ex:
+        raise ValueError(f"persona '{role}' decision_policy fails to compile: {ex}") from ex
+
+    def decide(context: dict[str, Any]) -> dict[str, Any]:
+        ns: dict[str, Any] = {"context": context, "decision": None, "reason": None}
+        try:
+            exec(code, {"__builtins__": _DECISION_BUILTINS}, ns)
+        except Exception as ex:
+            return {"decision": "reject", "reason": f"persona handler error: {ex}"}
+        decision = ns.get("decision")
+        reason = ns.get("reason")
+        if decision not in {"approve", "reject"}:
+            return {"decision": "reject",
+                    "reason": f"persona '{role}' produced invalid decision={decision!r}"}
+        return {"decision": str(decision), "reason": str(reason or "")}
+
+    return decide
+
+
+def _load_personae() -> dict[str, PersonaDefinition]:
+    """Walk PERSONAE_DIR for SKILL.md files; load + compile each."""
+    out: dict[str, PersonaDefinition] = {}
+    if not PERSONAE_DIR.exists():
+        return out
+    for skill_path in sorted(PERSONAE_DIR.glob("*/SKILL.md")):
+        try:
+            text = skill_path.read_text(encoding="utf-8")
+            fm, _body = _split_frontmatter(text)
+            role = fm.get("name") or skill_path.parent.name
+            description = fm.get("description") or ""
+            workflow_label = fm.get("workflow_label") or "?"
+            external_event = fm.get("external_event")
+            decision_src = fm.get("decision_policy")
+            if not external_event or not isinstance(decision_src, str):
+                print(f"[persona_responder] {skill_path}: missing external_event or "
+                      f"decision_policy in frontmatter; skipping")
+                continue
+            decide = _compile_decision_policy(str(role), decision_src)
+            out[str(role)] = PersonaDefinition(
+                role=str(role),
+                description=str(description),
+                workflow_label=str(workflow_label),
+                external_event=str(external_event),
+                decide=decide,
+                skill_path=skill_path,
+            )
+        except Exception as ex:
+            print(f"[persona_responder] failed to load {skill_path}: {ex}")
+    return out
+
+
+# --------------------------------------------------------------------------
+# Bus subscription
+# --------------------------------------------------------------------------
+
+
 async def _handle_hitl(event: FleetEvent) -> None:
-    """Apply the matching persona's decision policy and raise the resolving event."""
+    """Apply the matching persona's decision policy and raise the resolving event.
+
+    Skipped silently for any persona NOT in PERSONA_AUTO_CLOSE, so real
+    humans can drive the gate via the existing portal/UI flows.
+    """
     data = event.model_dump()
-    persona = data.get("persona")
-    external_event = data.get("external_event")
+    persona_role = data.get("persona")
+    external_event_override = data.get("external_event")
     instance_id = data.get("instance_id")
     context = data.get("context") or {}
 
-    # Hand-built domains (expense / hiring) omit these fields. Their HITL
-    # events are routed through dedicated UI surfaces, not this responder.
-    if not (persona and external_event and instance_id):
+    # No persona contract on this gate (UI-driven legacy path) → nothing to do.
+    if not (persona_role and instance_id):
         return
 
-    handler = PERSONA_HANDLERS.get(persona)
-    if handler is None:
-        print(f"[persona_responder] no handler for persona={persona!r}; skipping")
+    auto_close = _auto_close_set()
+    if persona_role not in auto_close:
+        # Real human is supposed to drive this gate. Stay out of their way.
+        return
+
+    persona = PERSONA_DEFINITIONS.get(persona_role)
+    if persona is None:
+        print(f"[persona_responder] AUTO_CLOSE includes {persona_role!r} but no "
+              f"SKILL.md defines that persona; gate stays open")
         return
 
     try:
-        decision_payload = handler(context)
+        decision_payload = persona.decide(context)
     except Exception as ex:
-        print(f"[persona_responder] handler {persona!r} failed: {ex}")
+        print(f"[persona_responder] persona {persona_role!r} crashed: {ex}")
         return
 
+    event_name = external_event_override or persona.external_event
     print(
-        f"[persona_responder] {persona} decided "
+        f"[persona_responder] {persona_role} decided "
         f"{decision_payload.get('decision')!r} for {data.get('workflow_id')} "
-        f"({data.get('reason')}); raising {external_event!r}"
+        f"({data.get('reason')}); raising {event_name!r}"
     )
 
     try:
-        await raise_orchestration_event(instance_id, external_event, decision_payload)
+        await raise_orchestration_event(instance_id, event_name, decision_payload)
     except Exception as ex:
         print(
-            f"[persona_responder] failed to raise {external_event!r} on "
+            f"[persona_responder] failed to raise {event_name!r} on "
             f"instance {instance_id}: {ex}"
         )
 
@@ -119,21 +247,27 @@ async def _handle_hitl(event: FleetEvent) -> None:
 def attach(bus) -> Callable[[], None]:
     """Subscribe the persona responder to the EventBus.
 
-    Returns an unsubscribe callable for teardown. Wired from
-    api/server/main.py lifespan.
+    Loads (or reloads) PERSONA_DEFINITIONS from disk so SKILL.md edits
+    take effect on the next FastAPI restart. Returns an unsubscribe
+    callable for teardown. Wired from api/server/main.py lifespan.
     """
+    global PERSONA_DEFINITIONS
+    PERSONA_DEFINITIONS = _load_personae()
+    auto = _auto_close_set()
+    print(
+        f"[persona_responder] loaded {len(PERSONA_DEFINITIONS)} personae "
+        f"({sorted(PERSONA_DEFINITIONS.keys())}); "
+        f"AUTO_CLOSE={sorted(auto) if auto else '(empty — every gate stays open)'}"
+    )
+
     loop = asyncio.get_event_loop()
 
     def _on_event(event: FleetEvent) -> None:
         if event.type != "workflow.hitl.requested":
             return
-        # Schedule the async handler. The bus subscriber is sync; we hop
-        # into the running event loop so the durable HTTP call doesn't
-        # block the bus.
         try:
             loop.create_task(_handle_hitl(event))
         except RuntimeError:
-            # No running loop \u2014 happens during process shutdown. Drop.
             pass
 
     return bus.on_any(_on_event)
