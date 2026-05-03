@@ -63,9 +63,13 @@ type DomainState = {
   status: "live" | "completed" | "blocked";
 };
 
-const SKILL_FADE_MS = 2400;
-const TOOL_FADE_MS = 2400;
-const TRAVERSAL_DURATION_MS = 1600;
+// Visible-state durations. The mind-map is a *wall of recent activity*,
+// not a strict per-workflow display — events from different workflows are
+// allowed to overlap and fade naturally. Tuning these up gives the page
+// the "living system" feel rather than a flicker-and-gone effect.
+const SKILL_FADE_MS = 6000;
+const TOOL_FADE_MS = 6000;
+const TRAVERSAL_DURATION_MS = 3000;
 
 function _emptyDomain(name: string): DomainState {
   return {
@@ -104,21 +108,33 @@ export function MindMap({ events, status, composition }: Props) {
     setActiveDomain((current) => {
       let next = current;
       const eventDomain = _domainFromEvent(head);
-      // Switch active domain on workflow.started, OR on first sight of any
-      // event that names a domain when there is no current domain yet, OR
-      // when an event's domain differs from the active one (prevents skills
-      // from a different walk piling onto the wrong centre).
-      if (head.type === "workflow.started" || head.type === "durable.workflow.started") {
-        if (eventDomain) {
-          next = _emptyDomain(eventDomain);
-          next.workflowId = head.workflow_id;
+      // Switching rules:
+      //   - First event ever → seed an empty domain so we have something
+      //     to fold into.
+      //   - workflow.started → update the centre label / workflow id but
+      //     KEEP prior skills/tools/traversals fading naturally. The page
+      //     should always look alive even right at the moment a new run
+      //     begins.
+      //   - Cross-domain events → retarget the centre label, but again do
+      //     not wipe prior activity. Trickle interleaves four domains and
+      //     wiping on every cross-domain event was producing a flicker.
+      if (!next && eventDomain) {
+        next = _emptyDomain(eventDomain);
+        next.workflowId = head.workflow_id;
+      } else if (next && eventDomain) {
+        const isStarted =
+          head.type === "workflow.started" ||
+          head.type === "durable.workflow.started";
+        if (isStarted || eventDomain !== next.name) {
+          next = {
+            ...next,
+            name: eventDomain,
+            workflowId: head.workflow_id ?? next.workflowId,
+            // status resets to live for the new run; prior status fades
+            // along with the prior skills/tools.
+            status: "live",
+          };
         }
-      } else if (!next && eventDomain) {
-        next = _emptyDomain(eventDomain);
-        next.workflowId = head.workflow_id;
-      } else if (next && eventDomain && eventDomain !== next.name) {
-        next = _emptyDomain(eventDomain);
-        next.workflowId = head.workflow_id;
       }
       if (!next) return current;
 
@@ -182,10 +198,23 @@ export function MindMap({ events, status, composition }: Props) {
         (t) => now - t.startMs < TRAVERSAL_DURATION_MS * 2
       );
 
+      // Prune skills/tools that have fully faded so the layout stays
+      // breathable. Keep anything still inside the fade window.
+      const skillCutoff = now - SKILL_FADE_MS;
+      const toolCutoff = now - TOOL_FADE_MS;
+      const livingSkills = new Map<string, ActiveSkill>();
+      next.activeSkills.forEach((s, name) => {
+        if (s.lastFiredMs >= skillCutoff) livingSkills.set(name, s);
+      });
+      const livingTools = new Map<string, ActiveTool>();
+      next.activeTools.forEach((t, name) => {
+        if (t.lastFiredMs >= toolCutoff) livingTools.set(name, t);
+      });
+
       return {
         ...next,
-        activeSkills: new Map(next.activeSkills),
-        activeTools: new Map(next.activeTools),
+        activeSkills: livingSkills,
+        activeTools: livingTools,
       };
     });
     // We deliberately depend on `events` only — phaseAliases is read at
