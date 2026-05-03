@@ -21,13 +21,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import random
 import time
 from typing import Any
 
 from fastapi import APIRouter, Request
 from sse_starlette.sse import EventSourceResponse
 
-from api.server.services.blueprint_inventory import composition_tree
+from api.server.services.blueprint_inventory import DOMAINS, composition_tree
 from api.server.state import app_state
 from api.shared.events import FleetEvent
 
@@ -70,15 +71,20 @@ _OBSERVATORY_TYPES: set[str] = {
 
 
 def _domain_from_workflow_type(workflow_type: str | None) -> str | None:
+    """Map a runtime ``workflow_type`` string to the domain name shown on
+    the page. Sourced from the DOMAINS manifest in blueprint_inventory so
+    new domains do not need a separate edit here.
+
+    Returns ``None`` when the workflow_type is unknown; the page handles
+    that gracefully (no centre badge label).
+    """
     if not workflow_type:
         return None
-    mapping = {
-        "expense-claim": "Finance Compliance",
-        "expense_claim": "Finance Compliance",
-        "hiring": "Hiring",
-        "onboarding": "Onboarding",
-    }
-    return mapping.get(workflow_type)
+    for domain in DOMAINS:
+        wt = domain.get("workflow_type")
+        if wt and wt == workflow_type:
+            return domain["name"]
+    return None
 
 
 def _normalise_event(event: FleetEvent) -> dict[str, Any] | None:
@@ -213,8 +219,6 @@ async def demo_emit(script: str = "hire-walk", interval_ms: int = 350) -> dict[s
 # Designed so the page reads as a continuously breathing operating
 # environment, not a periodic demo with quiet gaps.
 # --------------------------------------------------------------------------
-
-import random
 
 # Pool of plausible per-domain workflow walks. Each entry is the ordered
 # sequence of events one workflow goes through. The stream picks a workflow

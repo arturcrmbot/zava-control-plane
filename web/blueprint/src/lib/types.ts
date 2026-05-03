@@ -18,6 +18,8 @@ export interface Mcp {
 export interface Domain {
   name: string;
   status: Status;
+  /** Runtime workflow_type the orchestrator emits, or null for aspirational. */
+  workflow_type: string | null;
   skills: string[];
   tools: string[];
 }
@@ -34,6 +36,10 @@ export interface CompositionTree {
   mcps: Mcp[];
   domains: Domain[];
   meta_skills: MetaSkill[];
+  /** Reverse lookup: runtime workflow_type string → domain name. */
+  workflow_types: Record<string, string>;
+  /** Reverse lookup: skill name → phase label for the mind-map orbit. */
+  phase_aliases: Record<string, string>;
   counts: {
     skills: number;
     mcps: number;

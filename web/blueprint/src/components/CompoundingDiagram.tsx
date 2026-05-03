@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useComposition } from "../lib/useComposition";
 import { useInView } from "../lib/useInView";
-import type { CompositionTree, Domain } from "../lib/types";
+import type { CompositionTree } from "../lib/types";
 
 /**
  * Section 6 — compounding visualisation.
@@ -24,12 +24,11 @@ interface DomainProjection {
 }
 
 function project(tree: CompositionTree): DomainProjection[] {
-  const order = ["Finance Compliance", "Hiring", "Onboarding", "Procurement", "Legal", "IT"];
+  // Walk domains in the order the manifest declares them. Cumulative
+  // "case of type" size grows as we encounter new skills.
   const seen = new Set<string>();
   const out: DomainProjection[] = [];
-  for (const name of order) {
-    const d: Domain | undefined = tree.domains.find((x) => x.name === name);
-    if (!d) continue;
+  for (const d of tree.domains) {
     const newOnes: string[] = [];
     const reused: string[] = [];
     for (const skillName of d.skills) {
@@ -63,7 +62,7 @@ export function CompoundingDiagram() {
     if (!inView || !data) return;
     // Reset on each re-entry so the animation replays.
     setRevealed(0);
-    const total = 6;
+    const total = data.domains.length;
     intervalRef.current = window.setInterval(() => {
       setRevealed((n) => {
         if (n >= total) {
@@ -101,7 +100,10 @@ export function CompoundingDiagram() {
   return (
     <div ref={ref} className={`compounding${inView ? " compounding--ready" : ""}`}>
       {/* Cumulative-size strip across the top. */}
-      <div className="compounding__curve">
+      <div
+        className="compounding__curve"
+        style={{ gridTemplateColumns: `repeat(${data.domains.length}, 1fr)` }}
+      >
         {projectionsWithCum.map((p, i) => {
           const isRevealed = i < revealed;
           const targetHeight = (p.cumulative / maxCum) * 100;
@@ -130,7 +132,10 @@ export function CompoundingDiagram() {
       </div>
 
       {/* Per-domain headlines. */}
-      <div className="compounding__headlines">
+      <div
+        className="compounding__headlines"
+        style={{ gridTemplateColumns: `repeat(${data.domains.length}, 1fr)` }}
+      >
         {projectionsWithCum.map((p, i) => {
           const isRevealed = i < revealed;
           const total = p.newSkills.length + p.reusedSkills.length;
@@ -168,7 +173,10 @@ export function CompoundingDiagram() {
       </div>
 
       {/* Tile detail per domain. */}
-      <div className="compounding__detail">
+      <div
+        className="compounding__detail"
+        style={{ gridTemplateColumns: `repeat(${data.domains.length}, 1fr)` }}
+      >
         {projectionsWithCum.map((p, i) => {
           const isRevealed = i < revealed;
           return (

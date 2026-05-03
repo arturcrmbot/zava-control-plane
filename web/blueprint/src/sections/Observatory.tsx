@@ -1,5 +1,6 @@
 import { useObservatory } from "../lib/useObservatory";
 import { useDemoStream } from "../lib/useDemoStream";
+import { useComposition } from "../lib/useComposition";
 import { MindMap } from "../components/MindMap";
 import type { ObservatoryEvent } from "../lib/types";
 
@@ -23,6 +24,7 @@ function isValidatorEvent(t: string): boolean {
 
 export function Observatory() {
   const { events, counters, status } = useObservatory({ bufferSize: 60 });
+  const { data: composition } = useComposition();
   const { running, pending, start, stop } = useDemoStream();
 
   const statusLabel =
@@ -97,7 +99,7 @@ export function Observatory() {
         </div>
 
         <div className="mindmap__frame">
-          <MindMap events={events} status={status} />
+          <MindMap events={events} status={status} composition={composition} />
         </div>
 
         <div className="feed">

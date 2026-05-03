@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ObservatoryEvent } from "../lib/types";
+import type { CompositionTree, ObservatoryEvent } from "../lib/types";
 
 /**
  * Live mind-map for the observatory section. Single active domain at centre.
  * Drawn as concentric rings: domain → phases → skills → MCP tools.
  *
- * The component owns its own visual state derived from the event stream so it
- * can fade nodes on a timer independent of React re-renders.
+ * Two reverse mappings come in from the composition tree, not from
+ * in-component constants:
+ *
+ *   - `composition.workflow_types["hiring"] === "Hiring"`
+ *     The mind-map can label any new domain the manifest declares without
+ *     a code change here.
+ *
+ *   - `composition.phase_aliases["cv-crystalliser"] === "Triage"`
+ *     New skills get a phase label by appearing in DOMAINS in the
+ *     inventory; nothing else changes.
  */
 
 interface Props {
@@ -14,6 +22,12 @@ interface Props {
   events: ObservatoryEvent[];
   /** Live status of the SSE connection. Used for the resting visual. */
   status: "watching" | "connecting" | "offline";
+  /**
+   * Composition tree from /api/blueprint/composition. Optional — when
+   * absent the mind-map still renders, it just can't label phases or
+   * derive a domain name from the workflow_id prefix fallback.
+   */
+  composition?: CompositionTree | null;
 }
 
 type ActiveSkill = {
@@ -43,11 +57,8 @@ type DomainState = {
   currentPhase: string | null;
   /** Order of phases as they have been observed; we do not pre-declare them. */
   phasesSeen: string[];
-  /** Skill name -> ActiveSkill. */
   activeSkills: Map<string, ActiveSkill>;
-  /** Tool name -> ActiveTool. */
   activeTools: Map<string, ActiveTool>;
-  /** Recent skill->tool traversals; rendered as travelling dots. */
   traversals: Traversal[];
   status: "live" | "completed" | "blocked";
 };
@@ -55,45 +66,6 @@ type DomainState = {
 const SKILL_FADE_MS = 2400;
 const TOOL_FADE_MS = 2400;
 const TRAVERSAL_DURATION_MS = 1600;
-
-function _domainFromEvent(e: ObservatoryEvent): string | null {
-  if (e.domain) return e.domain;
-  // Fallback: derive from workflow_id prefix used in the demo scripts.
-  const wid = e.workflow_id ?? "";
-  if (wid.startsWith("HIRE")) return "Hiring";
-  if (wid.startsWith("CLM")) return "Finance Compliance";
-  if (wid.startsWith("ONB")) return "Onboarding";
-  return null;
-}
-
-function _phaseFromSkill(skill: string | null): string | null {
-  if (!skill) return null;
-  // Lightweight heuristic: a few skill names map to a recognisable phase
-  // label. The mind-map uses these as orbital labels around the centre.
-  const map: Record<string, string> = {
-    "field-extractor": "Intake",
-    "line-item-extractor": "Intake",
-    "rag-classifier": "Classify",
-    "receipt-validator": "Receipt",
-    "escalation-advisor": "Route",
-    "notification-composer": "Notify",
-    "arbitration": "Arbitrate",
-    "audit-summariser": "Audit",
-    "budget-checker": "Budget",
-    "jd-drafter": "Job Design",
-    "sourcing-orchestrator": "Sourcing",
-    "cv-crystalliser": "Triage",
-    "auto-shortlister": "Screening",
-    "voice-screener": "Voice",
-    "interview-recommender": "Interview",
-    "interview-coordinator": "Interview",
-    "jurisdiction-router": "Compliance",
-    "betrvg-checker": "Compliance",
-    "offer-personaliser": "Offer",
-    "onboarding-buddy": "Onboarding",
-  };
-  return map[skill] ?? null;
-}
 
 function _emptyDomain(name: string): DomainState {
   return {
@@ -108,17 +80,23 @@ function _emptyDomain(name: string): DomainState {
   };
 }
 
-export function MindMap({ events, status }: Props) {
+export function MindMap({ events, status, composition }: Props) {
   const [activeDomain, setActiveDomain] = useState<DomainState | null>(null);
   const seenEventsRef = useRef<Set<number>>(new Set());
   const [, force] = useState(0);
+
+  // Reverse lookups derived from the composition tree.
+  const phaseAliases = composition?.phase_aliases ?? {};
+  const _domainFromEvent = (e: ObservatoryEvent): string | null => {
+    if (e.domain) return e.domain;
+    return null;
+  };
 
   // Watch the head of the events list for new events; fold them into the
   // active domain state. Events older than what we've seen are ignored.
   useEffect(() => {
     if (events.length === 0) return;
     const head = events[0];
-    const key = head.ts * 1000 + Math.random(); // ts may collide; jitter
     if (seenEventsRef.current.has(head.ts)) return;
     seenEventsRef.current.add(head.ts);
 
@@ -126,7 +104,8 @@ export function MindMap({ events, status }: Props) {
     setActiveDomain((current) => {
       let next = current;
       const eventDomain = _domainFromEvent(head);
-      // Switch active domain on workflow.started or first sight of a new one.
+      // Switch active domain on workflow.started, OR on first sight of any
+      // event that names a domain when there is no current domain yet.
       if (head.type === "workflow.started" || head.type === "durable.workflow.started") {
         if (eventDomain) {
           next = _emptyDomain(eventDomain);
@@ -138,8 +117,8 @@ export function MindMap({ events, status }: Props) {
       }
       if (!next) return current;
 
-      // Phase derivation from skill name.
-      const phase = _phaseFromSkill(head.skill);
+      // Phase derivation from skill name, sourced from the manifest.
+      const phase = head.skill ? (phaseAliases[head.skill] ?? null) : null;
       if (phase) {
         if (!next.phasesSeen.includes(phase)) next.phasesSeen.push(phase);
         next.currentPhase = phase;
@@ -161,7 +140,7 @@ export function MindMap({ events, status }: Props) {
         });
       }
 
-      // Update tool activity.
+      // Update tool activity + traversal animation.
       if (head.tool) {
         next.activeTools.set(head.tool, {
           name: head.tool,
@@ -178,8 +157,7 @@ export function MindMap({ events, status }: Props) {
         }
       }
 
-      // Validator block: mark the most recent traversal as blocked, or add a
-      // self-traversal that the renderer will show as a red bolt.
+      // Validator block: mark the most recent traversal as blocked.
       if (head.type === "durable.validator.blocked") {
         const last = next.traversals[next.traversals.length - 1];
         if (last) last.blocked = true;
@@ -199,8 +177,15 @@ export function MindMap({ events, status }: Props) {
         (t) => now - t.startMs < TRAVERSAL_DURATION_MS * 2
       );
 
-      return { ...next, activeSkills: new Map(next.activeSkills), activeTools: new Map(next.activeTools) };
+      return {
+        ...next,
+        activeSkills: new Map(next.activeSkills),
+        activeTools: new Map(next.activeTools),
+      };
     });
+    // We deliberately depend on `events` only — phaseAliases is read at
+    // event-fold time but its identity changes are fine to ignore.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events]);
 
   // Drive a periodic re-render so node opacity decays smoothly between events.
@@ -219,7 +204,8 @@ export function MindMap({ events, status }: Props) {
   const toolRadius = 320;
   const now = Date.now();
 
-  const calm = !activeDomain || (activeDomain && activeDomain.activeSkills.size === 0 && activeDomain.activeTools.size === 0);
+  const calm = !activeDomain
+    || (activeDomain.activeSkills.size === 0 && activeDomain.activeTools.size === 0);
 
   // Compute positions.
   const phases = activeDomain?.phasesSeen ?? [];
@@ -234,13 +220,12 @@ export function MindMap({ events, status }: Props) {
       });
     });
     return positions;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phases.join("|"), cx, cy]);
 
   const skillPositions = useMemo(() => {
     const positions = new Map<string, { x: number; y: number }>();
     const skills = Array.from(activeDomain?.activeSkills.values() ?? []);
-    // Distribute skills around the centre on the skill ring, biased toward
-    // the current-phase angle so they cluster where the action is.
     const phaseAngle = activeDomain?.currentPhase
       ? (() => {
           const idx = phases.indexOf(activeDomain.currentPhase);
@@ -249,7 +234,6 @@ export function MindMap({ events, status }: Props) {
         })()
       : -Math.PI / 2;
     skills.forEach((s, i) => {
-      // Spread skills in an arc of ±70° around the current-phase angle.
       const spread = (Math.PI * 140) / 180;
       const t = skills.length === 1 ? 0 : (i / (skills.length - 1)) - 0.5;
       const angle = phaseAngle + t * spread;
@@ -259,6 +243,7 @@ export function MindMap({ events, status }: Props) {
       });
     });
     return positions;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDomain, phases.join("|"), cx, cy, skillRadius]);
 
   const toolPositions = useMemo(() => {
@@ -275,7 +260,6 @@ export function MindMap({ events, status }: Props) {
     return positions;
   }, [activeDomain, cx, cy, toolRadius]);
 
-  // Opacity for a node based on how recently it fired.
   function nodeOpacity(lastFiredMs: number, fadeMs: number): number {
     const age = now - lastFiredMs;
     if (age < 200) return 1;
@@ -283,13 +267,8 @@ export function MindMap({ events, status }: Props) {
     return 1 - 0.82 * ((age - 200) / (fadeMs - 200));
   }
 
-  // Domain badge colour by status.
   const domainColour =
-    activeDomain?.status === "blocked"
-      ? "var(--error)"
-      : activeDomain?.status === "completed"
-      ? "var(--accent)"
-      : "var(--accent)";
+    activeDomain?.status === "blocked" ? "var(--error)" : "var(--accent)";
 
   return (
     <svg
@@ -328,14 +307,13 @@ export function MindMap({ events, status }: Props) {
         );
       })}
 
-      {/* Lines from skills to tools (current traversals + static). */}
+      {/* Lines from skills to tools (only the recent traversals between them). */}
       {Array.from(activeDomain?.activeSkills.values() ?? []).map((s) => {
         const sp = skillPositions.get(s.name);
         if (!sp) return null;
         return Array.from(activeDomain?.activeTools.values() ?? []).map((t) => {
           const tp = toolPositions.get(t.name);
           if (!tp) return null;
-          // Only draw a line when there's a recent traversal between them.
           const trav = activeDomain?.traversals.find(
             (tr) => tr.fromSkill === s.name && tr.toTool === t.name && now - tr.startMs < TRAVERSAL_DURATION_MS
           );
