@@ -236,54 +236,38 @@ export function CompoundingDiagram() {
         {(() => {
           const liveProjections = projections.filter((p) => p.status === "live");
           const first = liveProjections[0];
-          const second = liveProjections[1];
-          const last = liveProjections[liveProjections.length - 1];
-          const totalSkillsCast = projections.reduce(
-            (acc, p) => acc + p.newSkills.length,
-            0,
-          );
           if (!first) {
-            return (
-              <>
-                The case of type holds <strong>{totalSkillsCast} skills</strong> so far.
-              </>
-            );
+            return <>The case of type is empty.</>;
           }
-          const lastTotal = last.newSkills.length + last.reusedSkills.length;
-          const lastReusePct =
-            lastTotal === 0 ? null : Math.round((last.reusedSkills.length / lastTotal) * 100);
+          // Headline reuse stat = the most-reused live domain after the first.
+          const others = liveProjections.slice(1);
+          const ranked = others
+            .map((p) => {
+              const total = p.newSkills.length + p.reusedSkills.length;
+              const pct = total === 0 ? 0 : (p.reusedSkills.length / total) * 100;
+              return { p, total, pct };
+            })
+            .sort((a, b) => b.pct - a.pct);
+          const top = ranked[0];
           return (
             <>
-              The first domain cast{" "}
-              <strong>{first.newSkills.length} new skills</strong>.
-              {second && (
+              The first domain (<strong>{first.name}</strong>) cast{" "}
+              <strong>{first.newSkills.length} new skills</strong> — the case
+              of type bootstrapping itself.
+              {top && top.p.reusedSkills.length > 0 && (
                 <>
-                  {" "}The second reused{" "}
+                  {" "}By <strong>{top.p.name}</strong>,{" "}
                   <strong>
-                    {second.reusedSkills.length} of{" "}
-                    {second.newSkills.length + second.reusedSkills.length}
-                  </strong>
-                  .
-                </>
-              )}
-              {last !== first && last !== second && lastReusePct !== null && (
-                <>
-                  {" "}By the time we got to <strong>{last.name}</strong>,{" "}
-                  {last.newSkills.length === 0 ? (
-                    <>
-                      every skill was already in the case of type —{" "}
-                      <strong>{last.reusedSkills.length} of {lastTotal}</strong> reused.
-                    </>
-                  ) : (
-                    <>
-                      <strong>{lastReusePct}%</strong> of the work was reuse.
-                    </>
-                  )}
+                    {top.p.reusedSkills.length} of {top.total}
+                  </strong>{" "}
+                  skills were already in the case — the surface compounding
+                  starts paying out.
                 </>
               )}
               {" "}And the skills are only the visible part. The harness, the
-              MCPs, the identity, audit and governance — all of that was cast on
-              day one and carries unchanged into every domain after.
+              MCPs, the identity, audit and governance — all of that was cast
+              on day one and carries unchanged into every domain after. That
+              is the compounding the bar chart can’t show.
             </>
           );
         })()}
