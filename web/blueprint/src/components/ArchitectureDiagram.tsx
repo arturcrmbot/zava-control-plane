@@ -58,15 +58,44 @@ const SYSTEMS: ChipNode[] = [
   { id: "sys-di", label: "Document Intelligence", links: [] },
 ];
 
-const SPINE = [
-  { id: "sp-entra", label: "Entra Agent ID", governs: "harness" },
-  { id: "sp-365", label: "Agent 365", governs: "harness" },
-  { id: "sp-audit", label: "Audit ledger", governs: "all" },
-  { id: "sp-hooks", label: "Hooks on sends", governs: "skills" },
-  { id: "sp-validators", label: "Validators", governs: "skills" },
-  { id: "sp-policy", label: "Policy-driven", governs: "skills" },
-  { id: "sp-otel", label: "OTEL spans", governs: "all" },
-  { id: "sp-cost", label: "Cost attribution", governs: "all" },
+const SPINE: never[] = [];
+
+/**
+ * Always-on guarantees — wraps the entire stack. Captions are written
+ * for a business reader, not an engineer; each one names the concrete
+ * thing the harness gives you that you don't have to build per-domain.
+ */
+interface Guarantee {
+  id: string;
+  label: string;
+  caption: string;
+}
+
+const GUARANTEES: Guarantee[] = [
+  {
+    id: "g-identity",
+    label: "Identity on every action",
+    caption:
+      "Each agent runs under its own Entra Agent ID. Every call into Workday, Concur, ServiceNow, or any other system is signed by that identity — so the audit trail names the agent, not a shared service account.",
+  },
+  {
+    id: "g-validator",
+    label: "Validator before every send",
+    caption:
+      "Outputs are checked against policy before they leave the harness. A bad message, a non‑compliant offer, an unapproved expense — blocked at the boundary, never sent. No after‑the‑fact patching.",
+  },
+  {
+    id: "g-audit",
+    label: "Audit ledger on every step",
+    caption:
+      "Who did what, why, when, on whose behalf, and what it cost — written to an immutable ledger automatically. Reviewers don't reconstruct it from logs; it's already there.",
+  },
+  {
+    id: "g-policy",
+    label: "Policy as data, not code",
+    caption:
+      "Approval thresholds, jurisdiction routing, allow‑listed tools — defined in YAML. Compliance edits the rules; no engineer needed, no redeploy. Validators re‑read the policy on every request.",
+  },
 ];
 
 type HoverState =
@@ -74,7 +103,7 @@ type HoverState =
   | { kind: "skill"; id: string }
   | { kind: "mcp"; id: string }
   | { kind: "system"; id: string }
-  | { kind: "spine"; id: string }
+  | { kind: "guarantee"; id: string }
   | null;
 
 interface Highlight {
@@ -82,7 +111,8 @@ interface Highlight {
   skills: Set<string>;
   mcps: Set<string>;
   systems: Set<string>;
-  spineGroup: "harness" | "skills" | "mcps" | "systems" | "all" | null;
+  /** A guarantee is hovered — light up the whole stack to say "this applies everywhere". */
+  glowAll: boolean;
   active: boolean;
 }
 
@@ -92,7 +122,7 @@ function emptyHighlight(): Highlight {
     skills: new Set(),
     mcps: new Set(),
     systems: new Set(),
-    spineGroup: null,
+    glowAll: false,
     active: false,
   };
 }
@@ -151,16 +181,15 @@ function highlightFor(hover: HoverState): Highlight {
         });
       }
     });
-  } else if (hover.kind === "spine") {
-    const item = SPINE.find((x) => x.id === hover.id);
-    if (item) h.spineGroup = item.governs as Highlight["spineGroup"];
+  } else if (hover.kind === "guarantee") {
+    h.glowAll = true;
   }
   return h;
 }
 
 export function ArchitectureDiagram() {
   const W = 1100;
-  const H = 540;
+  const H = 660;
 
   // Live counts power the overflow chips so the diagram doesn’t drift
   // every time a new skill or MCP gets cast. The drawn agents/skills/MCPs
@@ -178,38 +207,34 @@ export function ArchitectureDiagram() {
     return extra > 0 ? `+ ${extra} more` : MCP_OVERFLOW_DEFAULT;
   }, [composition]);
 
-  const spineX = 30;
-  const spineW = 110;
+  // No more side spine — the stack uses the full width, with the
+  // always-on guarantees as a single band along the bottom.
+  const stackX = 30;
+  const stackW = W - stackX - 30;
   const harnessY = 30;
   const harnessH = 100;
-  const stackX = spineX + spineW + 28;
-  const stackW = W - stackX - 30;
   const skillsY = harnessY + harnessH + 28;
   const skillsH = 110;
   const mcpsY = skillsY + skillsH + 18;
   const mcpsH = 110;
   const systemsY = mcpsY + mcpsH + 18;
   const systemsH = 110;
+  const guaranteesY = systemsY + systemsH + 24;
+  const guaranteesH = 84;
 
   const [hover, setHover] = useState<HoverState>(null);
   const hl = useMemo(() => highlightFor(hover), [hover]);
 
-  const skillX = (i: number) => stackX + 18 + i * 116 + 55;
-  const mcpX = (i: number) => stackX + 18 + i * 128 + 60;
-  const systemX = (i: number) => stackX + 18 + i * 130 + 40;
-  const agentX = (i: number) => stackX + 18 + i * 134 + 60;
+  const skillX = (i: number) => stackX + 18 + i * 134 + 60;
+  const mcpX = (i: number) => stackX + 18 + i * 148 + 65;
+  const systemX = (i: number) => stackX + 18 + i * 152 + 40;
+  const agentX = (i: number) => stackX + 18 + i * 154 + 65;
 
   const isActive = {
-    agent: (id: string) => !hl.active || hl.agents.has(id),
-    skill: (id: string) => !hl.active || hl.skills.has(id),
-    mcp: (id: string) => !hl.active || hl.mcps.has(id),
-    system: (id: string) => !hl.active || hl.systems.has(id),
-    spineRow: (group: string) => {
-      if (!hl.active) return true;
-      if (hl.spineGroup === "all") return true;
-      if (hl.spineGroup === group) return true;
-      return false;
-    },
+    agent: (id: string) => !hl.active || hl.glowAll || hl.agents.has(id),
+    skill: (id: string) => !hl.active || hl.glowAll || hl.skills.has(id),
+    mcp: (id: string) => !hl.active || hl.glowAll || hl.mcps.has(id),
+    system: (id: string) => !hl.active || hl.glowAll || hl.systems.has(id),
   };
 
   const dimClass = (active: boolean) => (active ? "" : " arch__dim");
@@ -292,16 +317,9 @@ export function ArchitectureDiagram() {
         ? `${s?.label} reached through ${fronting.join(", ")}`
         : `${s?.label} (not currently fronted by an MCP in this sample)`;
     }
-    if (state.kind === "spine") {
-      const item = SPINE.find((x) => x.id === state.id);
-      const map: Record<string, string> = {
-        harness: "the agentic harness",
-        skills: "every skill",
-        mcps: "every MCP",
-        systems: "every system call",
-        all: "every layer",
-      };
-      return `${item?.label} governs ${map[item?.governs ?? "all"]}`;
+    if (state.kind === "guarantee") {
+      const g = GUARANTEES.find((x) => x.id === state.id);
+      return g ? g.caption : "";
     }
     return "";
   };
@@ -316,48 +334,9 @@ export function ArchitectureDiagram() {
           height={H}
           preserveAspectRatio="xMidYMid meet"
           role="img"
-          aria-label="Functional architecture: agentic harness on top, governance spine on the left, skills and MCPs and real systems stacked beneath. Hover any element to see relationships."
+          aria-label="Functional architecture: agentic harness on top, then skills, then MCPs, then your real systems. A row of always-on guarantees runs along the bottom and applies to every layer above. Hover any element to see relationships."
         >
-          {/* Spine */}
-          <g>
-            <rect
-              x={spineX}
-              y={harnessY}
-              width={spineW}
-              height={H - harnessY - 30}
-              className="arch__spine"
-              rx={3}
-            />
-            <text x={spineX + 16} y={harnessY + 26} className="arch__zone-label">
-              GOVERNANCE
-            </text>
-            <text x={spineX + 16} y={harnessY + 50} className="arch__zone-sub">
-              identity · audit
-            </text>
-            {SPINE.map((item, i) => {
-              const yPos = 110 + i * 44;
-              const isHovered = hover?.kind === "spine" && hover.id === item.id;
-              return (
-                <g
-                  key={item.id}
-                  onMouseEnter={() => setHover({ kind: "spine", id: item.id })}
-                  style={{ cursor: "pointer" }}
-                >
-                  <rect
-                    x={spineX + 6}
-                    y={yPos - 14}
-                    width={spineW - 12}
-                    height={20}
-                    rx={2}
-                    className={`arch__spine-chip${isHovered ? " arch__spine-chip--hover" : ""}`}
-                  />
-                  <text x={spineX + 16} y={yPos} className="arch__spine-item">
-                    {item.label}
-                  </text>
-                </g>
-              );
-            })}
-          </g>
+          {/* (Governance moved to a single band along the bottom — see GUARANTEES). */}
 
           {/* Harness band */}
           <g>
@@ -366,7 +345,7 @@ export function ArchitectureDiagram() {
               y={harnessY}
               width={stackW}
               height={harnessH}
-              className={`arch__harness-band${litClass(isActive.spineRow("harness"))}${dimClass(isActive.spineRow("harness"))}`}
+              className="arch__harness-band"
               rx={3}
             />
             <text x={stackX + 18} y={harnessY + 26} className="arch__zone-label">
@@ -377,7 +356,7 @@ export function ArchitectureDiagram() {
             </text>
 
             {AGENTS.map((a, i) => {
-              const x = stackX + 18 + i * 134;
+              const x = stackX + 18 + i * 154;
               const y = harnessY + 64;
               const active = isActive.agent(a.id);
               const lit = hl.active && hl.agents.has(a.id);
@@ -389,13 +368,13 @@ export function ArchitectureDiagram() {
                   style={{ cursor: "pointer" }}
                 >
                   <rect
-                    width={120}
+                    width={140}
                     height={26}
                     rx={3}
                     className={`arch__agent arch__agent--${a.status}${lit ? " arch__agent--lit" : ""}${dimClass(active)}`}
                   />
                   <text
-                    x={60}
+                    x={70}
                     y={17}
                     textAnchor="middle"
                     className={`arch__agent-label${dimClass(active)}`}
@@ -403,7 +382,7 @@ export function ArchitectureDiagram() {
                     {a.label}
                   </text>
                   <text
-                    x={60}
+                    x={70}
                     y={42}
                     textAnchor="middle"
                     className={`arch__agent-status arch__agent-status--${a.status}${dimClass(active)}`}
@@ -434,7 +413,7 @@ export function ArchitectureDiagram() {
               y={skillsY}
               width={stackW}
               height={skillsH}
-              className={`arch__row arch__row--skills${dimClass(isActive.spineRow("skills"))}`}
+              className="arch__row arch__row--skills"
               rx={3}
             />
             <text x={stackX + 18} y={skillsY + 26} className="arch__zone-label">
@@ -449,18 +428,18 @@ export function ArchitectureDiagram() {
               return (
                 <g
                   key={s.id}
-                  transform={`translate(${stackX + 18 + i * 116}, ${skillsY + 64})`}
+                  transform={`translate(${stackX + 18 + i * 134}, ${skillsY + 64})`}
                   onMouseEnter={() => setHover({ kind: "skill", id: s.id })}
                   style={{ cursor: "pointer" }}
                 >
                   <rect
-                    width={110}
+                    width={128}
                     height={28}
                     rx={3}
                     className={`arch__chip arch__chip--skill${lit ? " arch__chip--lit" : ""}${dimClass(active)}`}
                   />
                   <text
-                    x={55}
+                    x={64}
                     y={18}
                     textAnchor="middle"
                     className={`arch__chip-label${dimClass(active)}`}
@@ -470,9 +449,9 @@ export function ArchitectureDiagram() {
                 </g>
               );
             })}
-            <g transform={`translate(${stackX + 18 + SKILLS.length * 116}, ${skillsY + 64})`}>
-              <rect width={84} height={28} rx={3} className="arch__chip arch__chip--overflow" />
-              <text x={42} y={18} textAnchor="middle" className="arch__chip-label arch__chip-label--mute">
+            <g transform={`translate(${stackX + 18 + SKILLS.length * 134}, ${skillsY + 64})`}>
+              <rect width={96} height={28} rx={3} className="arch__chip arch__chip--overflow" />
+              <text x={48} y={18} textAnchor="middle" className="arch__chip-label arch__chip-label--mute">
                 {skillOverflowLabel}
               </text>
             </g>
@@ -485,7 +464,7 @@ export function ArchitectureDiagram() {
               y={mcpsY}
               width={stackW}
               height={mcpsH}
-              className={`arch__row arch__row--mcps${dimClass(isActive.spineRow("mcps"))}`}
+              className="arch__row arch__row--mcps"
               rx={3}
             />
             <text x={stackX + 18} y={mcpsY + 26} className="arch__zone-label">
@@ -500,18 +479,18 @@ export function ArchitectureDiagram() {
               return (
                 <g
                   key={m.id}
-                  transform={`translate(${stackX + 18 + i * 128}, ${mcpsY + 64})`}
+                  transform={`translate(${stackX + 18 + i * 148}, ${mcpsY + 64})`}
                   onMouseEnter={() => setHover({ kind: "mcp", id: m.id })}
                   style={{ cursor: "pointer" }}
                 >
                   <rect
-                    width={120}
+                    width={138}
                     height={28}
                     rx={3}
                     className={`arch__chip arch__chip--mcp${lit ? " arch__chip--lit" : ""}${dimClass(active)}`}
                   />
                   <text
-                    x={60}
+                    x={69}
                     y={18}
                     textAnchor="middle"
                     className={`arch__chip-label${dimClass(active)}`}
@@ -521,9 +500,9 @@ export function ArchitectureDiagram() {
                 </g>
               );
             })}
-            <g transform={`translate(${stackX + 18 + MCPS.length * 128}, ${mcpsY + 64})`}>
-              <rect width={84} height={28} rx={3} className="arch__chip arch__chip--overflow" />
-              <text x={42} y={18} textAnchor="middle" className="arch__chip-label arch__chip-label--mute">
+            <g transform={`translate(${stackX + 18 + MCPS.length * 148}, ${mcpsY + 64})`}>
+              <rect width={96} height={28} rx={3} className="arch__chip arch__chip--overflow" />
+              <text x={48} y={18} textAnchor="middle" className="arch__chip-label arch__chip-label--mute">
                 {mcpOverflowLabel}
               </text>
             </g>
@@ -536,7 +515,7 @@ export function ArchitectureDiagram() {
               y={systemsY}
               width={stackW}
               height={systemsH}
-              className={`arch__row arch__row--systems${dimClass(isActive.spineRow("systems"))}`}
+              className="arch__row arch__row--systems"
               rx={3}
             />
             <text x={stackX + 18} y={systemsY + 26} className="arch__zone-label">
@@ -551,23 +530,71 @@ export function ArchitectureDiagram() {
               return (
                 <g
                   key={s.id}
-                  transform={`translate(${stackX + 18 + i * 130}, ${systemsY + 64})`}
+                  transform={`translate(${stackX + 18 + i * 152}, ${systemsY + 64})`}
                   onMouseEnter={() => setHover({ kind: "system", id: s.id })}
                   style={{ cursor: "pointer" }}
                 >
                   <rect
-                    width={120}
+                    width={140}
                     height={28}
                     rx={3}
                     className={`arch__chip arch__chip--system${lit ? " arch__chip--lit" : ""}${dimClass(active)}`}
                   />
                   <text
-                    x={60}
+                    x={70}
                     y={18}
                     textAnchor="middle"
                     className={`arch__chip-label${dimClass(active)}`}
                   >
                     {s.label}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+
+          {/* Always-on guarantees band — wraps the whole stack. */}
+          <g>
+            <rect
+              x={stackX}
+              y={guaranteesY}
+              width={stackW}
+              height={guaranteesH}
+              className={`arch__guarantees-band${hl.glowAll ? " arch__guarantees-band--glow" : ""}`}
+              rx={3}
+            />
+            <text x={stackX + 18} y={guaranteesY + 26} className="arch__zone-label">
+              ALWAYS‑ON GUARANTEES
+            </text>
+            <text x={stackX + 18} y={guaranteesY + 46} className="arch__zone-sub">
+              built once into the harness — carried into every domain after
+            </text>
+            {GUARANTEES.map((g, i) => {
+              const colW = (stackW - 36) / GUARANTEES.length;
+              const x = stackX + 18 + i * colW;
+              const y = guaranteesY + 56;
+              const isHovered = hover?.kind === "guarantee" && hover.id === g.id;
+              return (
+                <g
+                  key={g.id}
+                  onMouseEnter={() => setHover({ kind: "guarantee", id: g.id })}
+                  style={{ cursor: "pointer" }}
+                >
+                  <rect
+                    x={x}
+                    y={y - 14}
+                    width={colW - 12}
+                    height={20}
+                    rx={2}
+                    className={`arch__guarantee-chip${isHovered ? " arch__guarantee-chip--hover" : ""}`}
+                  />
+                  <text
+                    x={x + (colW - 12) / 2}
+                    y={y}
+                    textAnchor="middle"
+                    className="arch__guarantee-label"
+                  >
+                    {g.label}
                   </text>
                 </g>
               );

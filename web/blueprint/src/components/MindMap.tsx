@@ -67,18 +67,6 @@ const SKILL_FADE_MS = 2400;
 const TOOL_FADE_MS = 2400;
 const TRAVERSAL_DURATION_MS = 1600;
 
-/** Visual ceiling on skill labels; longer names get a mid-ellipsis. */
-const SKILL_LABEL_MAX = 22;
-
-function shortenSkill(name: string): string {
-  if (name.length <= SKILL_LABEL_MAX) return name;
-  // Mid-ellipsis preserves both the leading qualifier and the meaningful tail
-  // (e.g. "fleet-travel-preapproval-policy-fit-checker" → "fleet-trave…fit-checker").
-  const head = Math.ceil((SKILL_LABEL_MAX - 1) / 2);
-  const tail = Math.floor((SKILL_LABEL_MAX - 1) / 2);
-  return `${name.slice(0, head)}…${name.slice(-tail)}`;
-}
-
 function _emptyDomain(name: string): DomainState {
   return {
     name,
@@ -364,27 +352,28 @@ export function MindMap({ events, status, composition }: Props) {
         });
       })}
 
-      {/* Skill nodes. */}
+      {/* Skill nodes. Rendered as <foreignObject> so HTML/CSS can
+          handle text overflow with a true ellipsis — SVG <text> can't. */}
       {Array.from(activeDomain?.activeSkills.values() ?? []).map((s) => {
         const pos = skillPositions.get(s.name);
         if (!pos) return null;
         const op = nodeOpacity(s.lastFiredMs, SKILL_FADE_MS);
-        const label = shortenSkill(s.name);
+        const W_TILE = 160;
+        const H_TILE = 24;
         return (
-          <g key={`skill-${s.name}`} opacity={op}>
-            <title>{s.name}</title>
-            <rect
-              x={pos.x - 70}
-              y={pos.y - 11}
-              width={140}
-              height={22}
-              rx={3}
-              className="mindmap__skill-tile"
-            />
-            <text x={pos.x} y={pos.y + 4} className="mindmap__label mindmap__label--skill" textAnchor="middle">
-              {label}
-            </text>
-          </g>
+          <foreignObject
+            key={`skill-${s.name}`}
+            x={pos.x - W_TILE / 2}
+            y={pos.y - H_TILE / 2}
+            width={W_TILE}
+            height={H_TILE}
+            opacity={op}
+            style={{ overflow: "visible" }}
+          >
+            <div className="mindmap__skill-pill" title={s.name}>
+              {s.name}
+            </div>
+          </foreignObject>
         );
       })}
 

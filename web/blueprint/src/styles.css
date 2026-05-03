@@ -835,6 +835,28 @@ body {
   stroke-width: 1;
 }
 
+.mindmap__skill-pill {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.5rem;
+  font-family: var(--mono-family);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: rgba(244, 163, 0, 0.12);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: all;
+  cursor: default;
+}
+
 .mindmap__tool-dot {
   fill: var(--accent);
   opacity: 0.85;
@@ -937,23 +959,38 @@ body {
   /* Keep the SVG at its declared width; the scroll container handles overflow. */
 }
 
-.arch__spine {
-  fill: rgba(244, 163, 0, 0.04);
-  stroke: rgba(244, 163, 0, 0.5);
+.arch__guarantees-band {
+  fill: rgba(233, 231, 227, 0.04);
+  stroke: rgba(233, 231, 227, 0.22);
   stroke-width: 1;
+  transition: fill 200ms ease, stroke 200ms ease;
 }
 
-.arch__spine-chip {
+.arch__guarantees-band--glow {
+  fill: rgba(244, 163, 0, 0.06);
+  stroke: var(--accent);
+}
+
+.arch__guarantee-chip {
   fill: transparent;
-  stroke: transparent;
+  stroke: rgba(233, 231, 227, 0.22);
+  stroke-width: 1;
   pointer-events: all;
   cursor: pointer;
   transition: fill 200ms ease, stroke 200ms ease;
 }
 
-.arch__spine-chip--hover {
-  fill: rgba(244, 163, 0, 0.12);
+.arch__guarantee-chip--hover {
+  fill: rgba(244, 163, 0, 0.16);
   stroke: var(--accent);
+}
+
+.arch__guarantee-label {
+  fill: var(--ink);
+  font-family: var(--mono-family);
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
+  pointer-events: none;
 }
 
 .arch__harness-band {
@@ -1105,14 +1142,6 @@ body {
   letter-spacing: -0.005em;
 }
 
-.arch__spine-item {
-  fill: var(--ink-dim);
-  font-family: var(--mono-family);
-  font-size: 0.66rem;
-  letter-spacing: 0.04em;
-  pointer-events: none;
-}
-
 .arch__line {
   fill: none;
   stroke: rgba(233, 231, 227, 0.06);
@@ -1158,7 +1187,184 @@ body {
   padding-bottom: var(--space-7);
 }
 
-/* ---------- Compounding visualisation (section 6 centerpiece) ---------- */
+/* ---------- Compounding v2: per-domain stacked build-surface bars ---------- */
+.compounding-v2 {
+  background: var(--bg-elev);
+  border: 1px solid var(--rule);
+  padding: var(--space-4);
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.compounding-v2__bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.compounding-v2__row {
+  display: grid;
+  grid-template-columns: 14rem 1fr;
+  gap: var(--space-3);
+  align-items: center;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 500ms ease, transform 500ms ease;
+}
+
+.compounding-v2__row--revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.compounding-v2__row--aspirational {
+  opacity: 0.55;
+}
+
+.compounding-v2__row--aspirational.compounding-v2__row--revealed {
+  opacity: 0.55;
+}
+
+.compounding-v2__row-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.compounding-v2__row-name {
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+
+.compounding-v2__row-stat {
+  font-family: var(--mono-family);
+  font-size: 0.7rem;
+  color: var(--ink-mute);
+  letter-spacing: 0.04em;
+}
+
+.compounding-v2__row-stat strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.compounding-v2__bar {
+  display: flex;
+  height: 24px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(233, 231, 227, 0.04);
+  border: 1px solid rgba(233, 231, 227, 0.08);
+}
+
+.compounding-v2__seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  font-family: var(--mono-family);
+  font-size: 0.62rem;
+  color: rgba(15, 15, 15, 0.85);
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  white-space: nowrap;
+  border-right: 1px solid rgba(15, 15, 15, 0.18);
+}
+
+.compounding-v2__seg:last-child {
+  border-right: none;
+}
+
+.compounding-v2__seg-count {
+  padding: 0 0.3rem;
+}
+
+.compounding-v2__seg--harness {
+  background: rgba(233, 231, 227, 0.5);
+}
+
+.compounding-v2__seg--guarantees {
+  background: rgba(233, 231, 227, 0.35);
+}
+
+.compounding-v2__seg--mcps {
+  background: rgba(233, 231, 227, 0.22);
+  color: rgba(233, 231, 227, 0.9);
+}
+
+.compounding-v2__seg--reused-skills {
+  background: rgba(244, 163, 0, 0.32);
+}
+
+.compounding-v2__seg--new-skills {
+  background: var(--accent);
+  color: rgba(15, 15, 15, 0.95);
+  font-weight: 500;
+}
+
+.compounding-v2__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-family: var(--mono-family);
+  font-size: 0.72rem;
+  color: var(--ink-mute);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--rule);
+}
+
+.compounding-v2__swatch {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-right: 0.35rem;
+  vertical-align: -1px;
+  border-radius: 1px;
+}
+
+.compounding-v2__swatch--harness {
+  background: rgba(233, 231, 227, 0.5);
+}
+.compounding-v2__swatch--guarantees {
+  background: rgba(233, 231, 227, 0.35);
+}
+.compounding-v2__swatch--mcps {
+  background: rgba(233, 231, 227, 0.22);
+}
+.compounding-v2__swatch--reused-skills {
+  background: rgba(244, 163, 0, 0.32);
+}
+.compounding-v2__swatch--new-skills {
+  background: var(--accent);
+}
+
+.compounding-v2__summary {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--rule);
+}
+
+.compounding-v2__observation {
+  margin: 0;
+  color: var(--ink-dim);
+}
+
+.compounding-v2__observation strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+@media (max-width: 720px) {
+  .compounding-v2__row {
+    grid-template-columns: 1fr;
+    gap: 0.3rem;
+  }
+}
+
+/* ---------- Compounding v1 (legacy, kept for back-compat) ---------- */
 .compounding {
   background: var(--bg-elev);
   border: 1px solid var(--rule);

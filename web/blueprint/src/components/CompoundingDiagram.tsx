@@ -6,28 +6,37 @@ import type { CompositionTree } from "../lib/types";
 /**
  * Section 6 — compounding visualisation.
  *
- * Renders, in order:
- *   1. Cumulative size curve along the top — bars grow when the section
- *      enters the viewport, one after the other (the curve "draws itself").
- *   2. Per-domain headlines with new/reused counts.
- *   3. Tile detail per domain.
+ * Premise: surface "skill reuse" massively undersells the story. The thing
+ * that actually compounds is the *platform* — the harness, the MCPs, the
+ * validators, the identity, the audit. Each new domain ships a tiny bit of
+ * new code on top of an enormous reused base. This visualisation makes
+ * that proportion legible.
  *
- * The animation is one-shot — it only plays the first time the user
- * scrolls into the section.
+ * Per-domain stacked horizontal bar: each bar represents the total "build
+ * surface" you'd otherwise have written from scratch. The vast majority is
+ * always reused. The new sliver shrinks domain by domain.
  */
 
-interface DomainProjection {
+interface DomainBreakdown {
   name: string;
   status: "live" | "aspirational";
   newSkills: string[];
   reusedSkills: string[];
+  /** MCP tools wired into this domain — all reused after the first cast. */
+  reusedMcps: number;
+  /** Always-on guarantees inherited by every domain (entra/validator/audit/policy). */
+  reusedGuarantees: number;
+  /** Harness primitives inherited by every domain (lifecycle, queue, retry, observability, cost). */
+  reusedHarness: number;
 }
 
-function project(tree: CompositionTree): DomainProjection[] {
-  // Walk domains in the order the manifest declares them. Cumulative
-  // "case of type" size grows as we encounter new skills.
+/** Constant platform surface inherited by every domain regardless of size. */
+const HARNESS_PRIMITIVES = 8; // workflow lifecycle, retry, queue, OTEL spans, cost attribution, dispatch, persistence, hooks
+const GUARANTEE_PRIMITIVES = 4; // identity-on-action, validator-before-send, audit-ledger, policy-as-data
+
+function buildBreakdowns(tree: CompositionTree): DomainBreakdown[] {
   const seen = new Set<string>();
-  const out: DomainProjection[] = [];
+  const out: DomainBreakdown[] = [];
   for (const d of tree.domains) {
     const newOnes: string[] = [];
     const reused: string[] = [];
@@ -41,26 +50,43 @@ function project(tree: CompositionTree): DomainProjection[] {
       status: d.status === "live" ? "live" : "aspirational",
       newSkills: newOnes,
       reusedSkills: reused,
+      reusedMcps: d.tools.length,
+      reusedGuarantees: GUARANTEE_PRIMITIVES,
+      reusedHarness: HARNESS_PRIMITIVES,
     });
   }
   return out;
 }
 
-const STAGGER_MS = 280;
+function totalSurface(b: DomainBreakdown): number {
+  return (
+    b.newSkills.length +
+    b.reusedSkills.length +
+    b.reusedMcps +
+    b.reusedGuarantees +
+    b.reusedHarness
+  );
+}
+
+function pct(part: number, whole: number): number {
+  if (whole === 0) return 0;
+  return Math.round((part / whole) * 100);
+}
+
+const STAGGER_MS = 240;
 
 export function CompoundingDiagram() {
   const { data } = useComposition();
-  const { ref, inView, enterCount } = useInView<HTMLDivElement>({ threshold: 0.25, debounceMs: 600 });
+  const { ref, inView, enterCount } = useInView<HTMLDivElement>({
+    threshold: 0.25,
+    debounceMs: 600,
+  });
 
-  // Reveal counter — increments per stagger interval once in view, capped
-  // at the number of domains so we don't burn timers forever. Resets each
-  // time the user re-enters the section.
   const [revealed, setRevealed] = useState(0);
   const intervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!inView || !data) return;
-    // Reset on each re-entry so the animation replays.
     setRevealed(0);
     const total = data.domains.length;
     intervalRef.current = window.setInterval(() => {
@@ -82,196 +108,172 @@ export function CompoundingDiagram() {
       <div ref={ref} className="map__placeholder map__placeholder--offline">
         Compounding visualisation needs the composition tree.
         <br />
-        <span className="mono">
-          Start the FastAPI control plane on :3001.
-        </span>
+        <span className="mono">Start the FastAPI control plane on :3001.</span>
       </div>
     );
   }
 
-  const projections = project(data);
-  let cumulative = 0;
-  const projectionsWithCum = projections.map((p) => {
-    cumulative += p.newSkills.length;
-    return { ...p, cumulative };
-  });
-  const maxCum = Math.max(cumulative, 1);
+  const breakdowns = buildBreakdowns(data);
+
+  // Use the largest domain surface as the bar scale so every bar reads on
+  // the same axis. (All bars will be close to full because the harness
+  // dominates; that's the point.)
+  const maxSurface = Math.max(...breakdowns.map(totalSurface), 1);
 
   return (
-    <div ref={ref} className={`compounding${inView ? " compounding--ready" : ""}`}>
-      {/* Cumulative-size strip across the top. */}
-      <div
-        className="compounding__curve"
-        style={{ gridTemplateColumns: `repeat(${data.domains.length}, 1fr)` }}
-      >
-        {projectionsWithCum.map((p, i) => {
+    <div ref={ref} className={`compounding-v2${inView ? " compounding-v2--ready" : ""}`}>
+      {/* Per-domain stacked bars. */}
+      <div className="compounding-v2__bars" role="img" aria-label="Per-domain build surface broken down by what's reused vs newly cast">
+        {breakdowns.map((b, i) => {
           const isRevealed = i < revealed;
-          const targetHeight = (p.cumulative / maxCum) * 100;
-          return (
-            <div className="compounding__curve-cell" key={p.name}>
-              <div
-                className={`compounding__curve-bar compounding__curve-bar--${p.status}`}
-                style={{
-                  height: isRevealed ? `${targetHeight}%` : "0%",
-                }}
-              >
-                <div
-                  className="compounding__curve-value"
-                  style={{ opacity: isRevealed ? 1 : 0 }}
-                >
-                  {p.cumulative}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="compounding__curve-axis">
-        <span>cumulative size of the case of type</span>
-        <span className="compounding__curve-cap">{maxCum} skills cast in total</span>
-      </div>
-
-      {/* Per-domain headlines. */}
-      <div
-        className="compounding__headlines"
-        style={{ gridTemplateColumns: `repeat(${data.domains.length}, 1fr)` }}
-      >
-        {projectionsWithCum.map((p, i) => {
-          const isRevealed = i < revealed;
-          const total = p.newSkills.length + p.reusedSkills.length;
-          const pctReused = total === 0 ? null : Math.round((p.reusedSkills.length / total) * 100);
+          const total = totalSurface(b);
+          const widthPct = (total / maxSurface) * 100;
+          const segments = [
+            {
+              kind: "harness" as const,
+              label: "harness",
+              count: b.reusedHarness,
+              cls: "compounding-v2__seg--harness",
+            },
+            {
+              kind: "guarantees" as const,
+              label: "guarantees",
+              count: b.reusedGuarantees,
+              cls: "compounding-v2__seg--guarantees",
+            },
+            {
+              kind: "mcps" as const,
+              label: "MCPs",
+              count: b.reusedMcps,
+              cls: "compounding-v2__seg--mcps",
+            },
+            {
+              kind: "reused-skills" as const,
+              label: "reused skills",
+              count: b.reusedSkills.length,
+              cls: "compounding-v2__seg--reused-skills",
+            },
+            {
+              kind: "new-skills" as const,
+              label: "new skills",
+              count: b.newSkills.length,
+              cls: "compounding-v2__seg--new-skills",
+            },
+          ];
+          const newPct = pct(b.newSkills.length, total);
+          const reusePct = 100 - newPct;
           return (
             <div
-              className="compounding__head"
-              key={p.name}
-              style={{
-                opacity: isRevealed ? 1 : 0,
-                transform: isRevealed ? "translateY(0)" : "translateY(8px)",
-              }}
+              key={b.name}
+              className={`compounding-v2__row compounding-v2__row--${b.status}${
+                isRevealed ? " compounding-v2__row--revealed" : ""
+              }`}
             >
-              <div className={`compounding__head-domain compounding__head-domain--${p.status}`}>
-                {p.name}
-              </div>
-              {p.status === "aspirational" && p.newSkills.length === 0 ? (
-                <div className="compounding__head-aspirational">next domain</div>
-              ) : (
-                <>
-                  <div className="compounding__head-new">
-                    {p.newSkills.length}
-                    <span className="compounding__head-unit"> new</span>
-                  </div>
-                  {pctReused !== null && (
-                    <div className="compounding__head-reused">
-                      {p.reusedSkills.length} reused · {pctReused}%
-                    </div>
+              <div className="compounding-v2__row-label">
+                <span className="compounding-v2__row-name">{b.name}</span>
+                <span className="compounding-v2__row-stat">
+                  {b.status === "aspirational" && total === HARNESS_PRIMITIVES + GUARANTEE_PRIMITIVES ? (
+                    <>{HARNESS_PRIMITIVES + GUARANTEE_PRIMITIVES} primitives ready · 0 new yet</>
+                  ) : (
+                    <>
+                      <strong>{reusePct}%</strong> reuse
+                      {b.newSkills.length > 0 && (
+                        <>
+                          {" "}· <strong>{b.newSkills.length}</strong> new skill
+                          {b.newSkills.length === 1 ? "" : "s"}
+                        </>
+                      )}
+                    </>
                   )}
-                </>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Tile detail per domain. */}
-      <div
-        className="compounding__detail"
-        style={{ gridTemplateColumns: `repeat(${data.domains.length}, 1fr)` }}
-      >
-        {projectionsWithCum.map((p, i) => {
-          const isRevealed = i < revealed;
-          return (
-            <div
-              className="compounding__detail-col"
-              key={p.name}
-              style={{
-                opacity: isRevealed ? 1 : 0,
-                transform: isRevealed ? "translateY(0)" : "translateY(12px)",
-                transition: `opacity 600ms ease ${i * 80}ms, transform 600ms ease ${i * 80}ms`,
-              }}
-            >
-              <div className="compounding__detail-tiles">
-                {p.newSkills.map((s) => (
-                  <span className="compounding__tile compounding__tile--new" key={`new-${s}`}>
-                    {s}
-                  </span>
-                ))}
-                {p.reusedSkills.length > 0 && (
-                  <div className="compounding__detail-divider">{p.reusedSkills.length} reused</div>
-                )}
-                {p.reusedSkills.slice(0, 4).map((s) => (
-                  <span className="compounding__tile compounding__tile--reused" key={`reused-${s}`}>
-                    {s}
-                  </span>
-                ))}
-                {p.reusedSkills.length > 4 && (
-                  <span className="compounding__tile compounding__tile--reused">
-                    + {p.reusedSkills.length - 4} more
-                  </span>
-                )}
-                {p.status === "aspirational" && p.newSkills.length === 0 && (
-                  <span className="compounding__tile compounding__tile--aspirational">to be cast</span>
-                )}
+                </span>
+              </div>
+              <div className="compounding-v2__bar" style={{ width: `${widthPct}%` }}>
+                {segments.map((seg) => {
+                  if (seg.count === 0) return null;
+                  const segPct = (seg.count / total) * 100;
+                  return (
+                    <div
+                      key={seg.kind}
+                      className={`compounding-v2__seg ${seg.cls}`}
+                      style={{ flex: `0 0 ${segPct}%` }}
+                      title={`${seg.count} ${seg.label}`}
+                    >
+                      <span className="compounding-v2__seg-count">{seg.count}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
         })}
       </div>
 
-      <div className="compounding__legend">
+      {/* Legend keyed to the segment colours above. */}
+      <div className="compounding-v2__legend">
         <span>
-          <span className="compounding__swatch compounding__swatch--new" /> new — cast
-          for this domain
+          <span className="compounding-v2__swatch compounding-v2__swatch--harness" /> Harness
+          primitives
         </span>
         <span>
-          <span className="compounding__swatch compounding__swatch--reused" /> reused
-          — already in the case of type
+          <span className="compounding-v2__swatch compounding-v2__swatch--guarantees" /> Always‑on
+          guarantees
         </span>
         <span>
-          <span className="compounding__swatch compounding__swatch--aspirational" /> aspirational
-          — next domains
+          <span className="compounding-v2__swatch compounding-v2__swatch--mcps" /> MCPs wired in
+        </span>
+        <span>
+          <span className="compounding-v2__swatch compounding-v2__swatch--reused-skills" /> Skills
+          already in the case
+        </span>
+        <span>
+          <span className="compounding-v2__swatch compounding-v2__swatch--new-skills" /> New skills
+          cast for this domain
         </span>
       </div>
 
-      <p className="compounding__observation body">
+      {/* Headline numbers + narrative. */}
+      <div className="compounding-v2__summary">
         {(() => {
-          const liveProjections = projections.filter((p) => p.status === "live");
-          const first = liveProjections[0];
-          if (!first) {
-            return <>The case of type is empty.</>;
-          }
-          // Headline reuse stat = the most-reused live domain after the first.
-          const others = liveProjections.slice(1);
-          const ranked = others
-            .map((p) => {
-              const total = p.newSkills.length + p.reusedSkills.length;
-              const pct = total === 0 ? 0 : (p.reusedSkills.length / total) * 100;
-              return { p, total, pct };
-            })
-            .sort((a, b) => b.pct - a.pct);
-          const top = ranked[0];
+          const live = breakdowns.filter((b) => b.status === "live");
+          if (live.length === 0) return null;
+          const totalsByDomain = live.map((b) => ({
+            b,
+            total: totalSurface(b),
+            newCount: b.newSkills.length,
+          }));
+          const newCounts = totalsByDomain.map((x) => x.newCount);
+          const minNew = Math.min(...newCounts);
+          const maxNew = Math.max(...newCounts);
+          const reusedTotals = totalsByDomain.map(
+            (x) => x.total - x.newCount,
+          );
+          const avgReusePct = Math.round(
+            (totalsByDomain.reduce((acc, x) => acc + (x.total - x.newCount) / x.total, 0) /
+              totalsByDomain.length) *
+              100,
+          );
           return (
-            <>
-              The first domain (<strong>{first.name}</strong>) cast{" "}
-              <strong>{first.newSkills.length} new skills</strong> — the case
-              of type bootstrapping itself.
-              {top && top.p.reusedSkills.length > 0 && (
-                <>
-                  {" "}By <strong>{top.p.name}</strong>,{" "}
-                  <strong>
-                    {top.p.reusedSkills.length} of {top.total}
-                  </strong>{" "}
-                  skills were already in the case — the surface compounding
-                  starts paying out.
-                </>
-              )}
-              {" "}And the skills are only the visible part. The harness, the
-              MCPs, the identity, audit and governance — all of that was cast
-              on day one and carries unchanged into every domain after. That
-              is the compounding the bar chart can’t show.
-            </>
+            <p className="compounding-v2__observation body">
+              The first domain (<strong>{totalsByDomain[0].b.name}</strong>) rode on{" "}
+              <strong>{totalsByDomain[0].total - totalsByDomain[0].newCount}</strong>{" "}
+              already‑cast primitives — harness, guarantees, MCPs, infrastructure.
+              By the time we got to{" "}
+              <strong>{totalsByDomain[totalsByDomain.length - 1].b.name}</strong>,
+              the new code added was{" "}
+              <strong>{minNew} skill</strong>
+              {minNew === 1 ? "" : "s"} against a base of{" "}
+              <strong>{reusedTotals[reusedTotals.length - 1]}</strong> already‑there
+              parts. <strong>That</strong> is reuse. Across the live domains, an
+              average of <strong>{avgReusePct}%</strong> of every shipment came from
+              the case of type — not because we keep rebuilding the same skill, but
+              because the platform itself is the thing we cast on day one. New skills
+              ranged from <strong>{minNew}</strong> to <strong>{maxNew}</strong> per
+              domain; the harness, the validators, the audit ledger, the identity
+              primitives — all carried.
+            </p>
           );
         })()}
-      </p>
+      </div>
     </div>
   );
 }
