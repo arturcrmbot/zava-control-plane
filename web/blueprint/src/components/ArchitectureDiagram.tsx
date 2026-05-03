@@ -383,7 +383,7 @@ export function ArchitectureDiagram() {
                   </text>
                   <text
                     x={70}
-                    y={36}
+                    y={33}
                     textAnchor="middle"
                     className={`arch__agent-status arch__agent-status--${a.status}${dimClass(active)}`}
                   >

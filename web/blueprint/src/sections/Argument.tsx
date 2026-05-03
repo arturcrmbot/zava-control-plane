@@ -20,10 +20,10 @@ const captions: { label: string; title: string; body: string }[] = [
       "Workday, Concur, ServiceNow, Greenhouse, Graph — and your third-party APIs — surfaced as MCP tools with negotiated auth, schemas and contracts. The MCP servers are not agentic themselves. They are pure capability. Agents borrow them.",
   },
   {
-    label: "04 · Governance",
+    label: "04 · Always-on guarantees",
     title: "Blessed once. Not per project.",
     body:
-      "Identity, audit, hooks on non-revocable sends, validators, policy-driven behaviour, cost attribution. The bit legal and risk have to bless once. The same spine carries every domain that follows.",
+      "Every agent runs under its own identity. Every output is checked by a validator before it leaves. Every step writes itself to an immutable audit ledger. Policy lives in YAML, not code — compliance edits the rules, no engineer needed. The four guarantees are built into the harness once and carry into every domain after.",
   },
 ];
 
@@ -34,13 +34,15 @@ export function Argument() {
         <header className="argument__intro stack">
           <p className="subtitle">The architecture</p>
           <h2 className="section-title">
-            What ought to exist instead — <em>the four pieces, and the spine they share.</em>
+            What ought to exist instead — <em>the four pieces, and the guarantees they share.</em>
           </h2>
           <p className="body">
             None of the four pieces are interesting on their own. Together they
             make a working environment that runs in your cloud. The harness
             sits on top. Skills and MCPs and the systems they reach are stacked
-            beneath it. Identity and governance run down the side.
+            beneath it. A row of always‑on guarantees — identity, validation,
+            audit, policy — runs along the bottom and applies to every layer
+            above.
           </p>
         </header>
 
