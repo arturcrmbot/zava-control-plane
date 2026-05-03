@@ -1,0 +1,68 @@
+# Send only what the blueprint deploy needs to the Docker build context.
+# This stays at the repo root because docker build always starts from the
+# repo root (the Dockerfile lives at web/blueprint/Dockerfile but pulls
+# files from across the tree).
+
+# --- Heavy dev artefacts -------------------------------------------------
+**/.venv/
+**/node_modules/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/dist/
+**/build/
+**/*.egg-info/
+**/.tsbuildinfo
+**/.vite/
+
+# --- Local state ---------------------------------------------------------
+azurite-data/
+data/portal/
+data/.eval/
+data/.avatar/
+.env
+.env.local
+local.settings.json
+**/local.settings.json
+*.log
+logs/
+
+# --- Per-user dev tooling ------------------------------------------------
+.playwright/
+.playwright-cli/
+.playwright-mcp/
+.claude/
+.vscode/
+.devcontainer/
+.ipynb_checkpoints/
+
+# --- Other Vite apps we don't deploy here --------------------------------
+web/client/
+web/portal/
+
+# --- Tests / docs / fixtures we don't need in the image ------------------
+tests/
+mocks/
+data/synthetic/
+docs/
+screenshots/
+*.pptx
+*.pdf
+
+# --- Git + CI ------------------------------------------------------------
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# --- Editor noise --------------------------------------------------------
+.DS_Store
+*.swp
+*.swo
+
+# --- Misc images we don't need in the image ------------------------------
+# Keep the blueprint Gutenberg PNG (under web/blueprint/public/) — it's
+# served by the page. Other PNGs are local artefacts.
+**/*.png
+!web/blueprint/public/gutenberg.png

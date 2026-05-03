@@ -50,6 +50,20 @@ async def lifespan(app: FastAPI):
     # their suspended payloads, so this subscriber ignores them.
     from api.server.services.persona_responder import attach as _attach_persona_responder
     _persona_responder_off = _attach_persona_responder(app_state.bus)
+
+    # Blueprint deployment: when BLUEPRINT_AUTOSTART_STREAM=1 is set
+    # (production container), kick the demo trickle so the page is alive
+    # without anyone clicking "Wake the observatory". Local dev leaves
+    # this off so real workflow events on the bus aren't drowned by the
+    # synthetic playback.
+    import os as _os
+    if _os.environ.get("BLUEPRINT_AUTOSTART_STREAM") == "1":
+        try:
+            from api.server.routes.blueprint import demo_stream_start as _bp_start
+            await _bp_start()
+            print("[server] blueprint demo trickle auto-started")
+        except Exception as ex:
+            print(f"[server] blueprint demo trickle autostart failed: {ex}")
     # Seed three demo HiringOrchestrator workflows so the candidate portal's
     # /apply form always has a workflow to attach to (one per req in
     # data/synthetic/hiring/reqs.json). Idempotent — safe to re-run.
@@ -131,3 +145,11 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           portal_admin_decisions_router,
           blueprint_router):
     app.include_router(r)
+
+# Mount the built blueprint Vite bundle if present (production deploy).
+# No-op in dev when web/blueprint/dist/ doesn't exist (Vite serves the
+# page directly on :5175 and proxies /api back here).
+from api.server.static_blueprint import mount_blueprint_static
+_blueprint_mounted = mount_blueprint_static(app)
+if _blueprint_mounted:
+    print("[server] mounted blueprint bundle from web/blueprint/dist/")
