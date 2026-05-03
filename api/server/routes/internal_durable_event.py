@@ -86,7 +86,13 @@ async def receive_durable_event(body: DurableEventBody):
     })
 
     if body.kind == "workflow.started":
+        # Emit BOTH the legacy workflow.started (consumers haven't migrated
+        # yet) and the rich durable.workflow.started the observatory +
+        # recorder expect. The substrate-fix design names durable.* as
+        # canonical; workflow.started stays as a deprecated alias for
+        # one release so existing subscribers keep working.
         _emit("workflow.started", wid)
+        _emit("durable.workflow.started", wid)
         _ledger(wid, kind="agent", actor_id="orchestrator",
                 action="workflow.started", details={})
 
@@ -105,7 +111,11 @@ async def receive_durable_event(body: DurableEventBody):
             w = app_state.store.get_workflow(wid)
             if w:
                 w.current_phase = step  # type: ignore[assignment]
+            # Emit both legacy + canonical names. Observatory consumes the
+            # canonical durable.step.started; legacy alias kept until
+            # consumers migrate.
             _emit("workflow.phase.started", wid, phase=step)
+            _emit("durable.step.started", wid, phase=step, step=step)
 
     elif body.kind == "step.completed":
         step = body.payload.get("step")
@@ -115,11 +125,26 @@ async def receive_durable_event(body: DurableEventBody):
             _ledger(wid, kind="agent", actor_id=f"phase:{step}",
                     action=f"phase.completed:{step}", details={"duration_ms": dur})
             _emit("workflow.phase.completed", wid, phase=step, durationMs=dur)
+            _emit("durable.step.completed", wid, phase=step, step=step, duration_ms=dur)
 
     elif body.kind == "executor.invoked":
         name = str(body.payload.get("name", "?"))
         stage = body.payload.get("stage")
         etype = str(body.payload.get("type", "?"))
+        # Emit on the bus before the bookkeeping so the observatory can
+        # render the executor pulse in near-real-time. Skill / tool labels
+        # come from the payload's `attributes` (set by the agent wrapper).
+        attrs = body.payload.get("attributes") or {}
+        _emit(
+            "durable.executor.invoked", wid,
+            name=name,
+            executor_type=etype,
+            stage=stage,
+            phase=body.payload.get("stage_label") or body.payload.get("phase"),
+            skill=attrs.get("skill") or attrs.get("skill_label"),
+            tool=attrs.get("tool"),
+            duration_ms=int(body.payload.get("duration_ms", 0)),
+        )
         if stage == "start":
             _span_starts[(wid, name)] = now
         elif stage in ("complete", "error"):
@@ -208,9 +233,16 @@ async def receive_durable_event(body: DurableEventBody):
                 actor_id=f"validator:{body.payload.get('name', 'unknown')}",
                 action="validator.blocked",
                 details={"reason": body.payload.get("reason", "validation failed")})
+        # Emit both legacy + canonical. The validator-blocked event is
+        # what the page uses to flash the red line on the orbit.
         _emit(
             "workflow.exception.detected", wid,
             category="validator-blocked", severity="high",
+        )
+        _emit(
+            "durable.validator.blocked", wid,
+            name=body.payload.get("name", "unknown"),
+            reason=body.payload.get("reason", "validation failed"),
         )
 
     elif body.kind == "suspended":
@@ -251,6 +283,15 @@ async def receive_durable_event(body: DurableEventBody):
             external_event=body.payload.get("external_event"),
             context=body.payload.get("context"),
         )
+        # Canonical durable.suspended carries the same payload so the
+        # observatory can render the pause + the recorder can capture it.
+        _emit(
+            "durable.suspended", wid,
+            reason=reason, wait_kind=wait_kind,
+            phase=body.payload.get("phase"),
+            persona=body.payload.get("persona"),
+            external_event=body.payload.get("external_event"),
+        )
 
     elif body.kind == "resumed":
         _ledger(wid, kind="agent", actor_id="orchestrator",
@@ -267,6 +308,9 @@ async def receive_durable_event(body: DurableEventBody):
         # gated the suspension is defunct. Resolve any still-open exceptions
         # for this workflow so the operator queue doesn't leak stale entries.
         _auto_resolve_open(wid, "auto-resolved:resumed")
+        # Canonical durable.resumed lights the orbit ring back up after the
+        # persona responder closes the gate.
+        _emit("durable.resumed", wid, phase=body.payload.get("phase"))
 
     elif body.kind == "agent_output":
         # POC2 §4.21 AG-UI: cross-process bridge for structured agent
@@ -333,6 +377,9 @@ async def receive_durable_event(body: DurableEventBody):
         if w:
             w.status = "completed"
         _auto_resolve_open(wid, "auto-resolved:completed")
+        # Canonical durable.workflow.completed marks the orbit terminal.
+        # Legacy workflow.resolved kept for the existing UI consumer.
+        _emit("durable.workflow.completed", wid, status="completed")
         _emit("workflow.resolved", wid, resolution="completed")
         # Drop the workflow_type cache entry; the workflow is done.
         _workflow_types.pop(wid, None)
