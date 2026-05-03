@@ -2,7 +2,6 @@ export function Opening() {
   return (
     <section className="section opening">
       <div className="column--wide">
-        <p className="eyebrow">A blueprint</p>
         <div className="opening__headline-block">
           <h1 className="headline">
             <em>Why your AI</em>

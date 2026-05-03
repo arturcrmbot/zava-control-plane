@@ -24,9 +24,9 @@ import type { Domain, Skill, Mcp } from "../lib/types";
  * arrays — no static link maps.
  */
 
-const VISIBLE_DOMAINS = 9;
-const VISIBLE_SKILLS = 8;
-const VISIBLE_MCPS = 10;
+const VISIBLE_DOMAINS = 30;  // hard cap; we have 9 today
+const VISIBLE_SKILLS = 40;   // hard cap; we have ~37 today
+const VISIBLE_MCPS = 40;     // hard cap; we have ~22 wired today
 
 interface Guarantee {
   id: string;
@@ -183,32 +183,59 @@ export function ArchitectureDiagram() {
 
   const hl = useMemo(() => highlightFor(hover, ix), [hover, ix]);
 
-  // Dimensions. Domains row is taller (3 lines per chip). Other rows are
-  // single-line chips. Edges are drawn from chip centres.
-  const W = 1180;
+  // Dimensions. The diagram renders at its NATURAL width — chip widths are
+  // fixed (so labels don't truncate) and the diagram extends as wide as it
+  // needs to. The .arch__scroll wrapper handles horizontal overflow on
+  // narrower viewports.
   const stackX = 30;
-  const stackW = W - stackX - 30;
+
+  // Per-row chip widths chosen so the longest realistic name fits without
+  // ellipsis. Domain tiles need room for two-line metadata.
+  const DOMAIN_CHIP_W = 168;
+  const DOMAIN_GAP = 12;
+  const SKILL_CHIP_W = 220;
+  const SKILL_GAP = 10;
+  const MCP_CHIP_W = 220;
+  const MCP_GAP = 10;
+
+  // Compute the column-widths the rows need, then take the widest as the
+  // diagram's overall content width. Each row centres its chips inside it.
+  const domainsContentW = visibleDomains.length * (DOMAIN_CHIP_W + DOMAIN_GAP) - DOMAIN_GAP;
+  const skillsContentW = visibleSkills.length * (SKILL_CHIP_W + SKILL_GAP) - SKILL_GAP;
+  const mcpOverflow = (visibleMcps.length < rankedMcps.length || orphanMcpCount > 0) ? 1 : 0;
+  const mcpsContentW =
+    (visibleMcps.length + mcpOverflow) * (MCP_CHIP_W + MCP_GAP) - MCP_GAP;
+  const innerW = Math.max(domainsContentW, skillsContentW, mcpsContentW, 800);
+  const stackW = innerW + 36;
+  const W = stackW + 60;
 
   const domainsY = 30;
-  const domainsH = 130;
-  const skillsY = domainsY + domainsH + 28;
-  const skillsH = 100;
-  const mcpsY = skillsY + skillsH + 18;
-  const mcpsH = 100;
-  const guaranteesY = mcpsY + mcpsH + 24;
+  const domainsH = 140;
+  const skillsY = domainsY + domainsH + 32;
+  const skillsH = 110;
+  const mcpsY = skillsY + skillsH + 22;
+  const mcpsH = 110;
+  const guaranteesY = mcpsY + mcpsH + 28;
   const guaranteesH = 100;
   const H = guaranteesY + guaranteesH + 30;
 
   const innerX = stackX + 18;
-  const innerW = stackW - 36;
 
-  const domainColW = visibleDomains.length > 0 ? innerW / visibleDomains.length : innerW;
-  const skillColW = visibleSkills.length > 0 ? innerW / (visibleSkills.length + 1) : innerW;
-  const mcpColW = visibleMcps.length > 0 ? innerW / (visibleMcps.length + 1) : innerW;
+  // Per-row content layout. Each row gets its own helper that returns the
+  // centre x for the i-th chip, accounting for chip width + gap. The row
+  // is centred horizontally within innerW.
+  const rowOffsetX = (rowContentW: number) =>
+    innerX + Math.max(0, (innerW - rowContentW) / 2);
+  const domainsRowX = rowOffsetX(domainsContentW);
+  const skillsRowX = rowOffsetX(skillsContentW);
+  const mcpsRowX = rowOffsetX(mcpsContentW);
 
-  const domainXCentre = (i: number) => innerX + (i + 0.5) * domainColW;
-  const skillXCentre = (i: number) => innerX + (i + 0.5) * skillColW;
-  const mcpXCentre = (i: number) => innerX + (i + 0.5) * mcpColW;
+  const domainXCentre = (i: number) =>
+    domainsRowX + i * (DOMAIN_CHIP_W + DOMAIN_GAP) + DOMAIN_CHIP_W / 2;
+  const skillXCentre = (i: number) =>
+    skillsRowX + i * (SKILL_CHIP_W + SKILL_GAP) + SKILL_CHIP_W / 2;
+  const mcpXCentre = (i: number) =>
+    mcpsRowX + i * (MCP_CHIP_W + MCP_GAP) + MCP_CHIP_W / 2;
 
   const isActiveDomain = (id: string) => !hl.active || hl.glowAll || hl.domains.has(id);
   const isActiveSkill = (id: string) => !hl.active || hl.glowAll || hl.skills.has(id);
@@ -295,7 +322,7 @@ export function ArchitectureDiagram() {
           viewBox={`0 0 ${W} ${H}`}
           width={W}
           height={H}
-          preserveAspectRatio="xMidYMid meet"
+          preserveAspectRatio="xMinYMin meet"
           role="img"
           aria-label="Functional architecture: live domains on top, then their skills, then the MCP tools those skills allow-list. A row of always-on guarantees runs along the bottom and applies to every domain. Hover any chip to see relationships."
         >
@@ -307,11 +334,12 @@ export function ArchitectureDiagram() {
               every domain is its own ephemeral agent harness — same substrate, different brief
             </text>
             {visibleDomains.map((d, i) => {
-              const x = innerX + i * domainColW + 4;
+              const cx = domainXCentre(i);
+              const tileW = DOMAIN_CHIP_W;
+              const x = cx - tileW / 2;
               const y = domainsY + 64;
               const active = isActiveDomain(d.name);
               const lit = hl.active && hl.domains.has(d.name);
-              const tileW = domainColW - 8;
               return (
                 <g
                   key={d.name}
@@ -364,7 +392,7 @@ export function ArchitectureDiagram() {
             </text>
             {visibleSkills.map((s, i) => {
               const cx = skillXCentre(i);
-              const w = Math.max(80, skillColW - 12);
+              const w = SKILL_CHIP_W;
               const x = cx - w / 2;
               const y = skillsY + 64;
               const active = isActiveSkill(s.name);
@@ -394,9 +422,9 @@ export function ArchitectureDiagram() {
               );
             })}
             {composition && composition.skills.length > VISIBLE_SKILLS && (
-              <g transform={`translate(${skillXCentre(visibleSkills.length) - 40}, ${skillsY + 64})`}>
-                <rect width={80} height={28} rx={3} className="arch__chip arch__chip--overflow" />
-                <text x={40} y={18} textAnchor="middle" className="arch__chip-label arch__chip-label--mute">
+              <g transform={`translate(${skillXCentre(visibleSkills.length) - SKILL_CHIP_W / 2}, ${skillsY + 64})`}>
+                <rect width={SKILL_CHIP_W} height={28} rx={3} className="arch__chip arch__chip--overflow" />
+                <text x={SKILL_CHIP_W / 2} y={18} textAnchor="middle" className="arch__chip-label arch__chip-label--mute">
                   + {composition.skills.length - VISIBLE_SKILLS} more
                 </text>
               </g>
@@ -412,7 +440,7 @@ export function ArchitectureDiagram() {
             </text>
             {visibleMcps.map((m, i) => {
               const cx = mcpXCentre(i);
-              const w = Math.max(80, mcpColW - 12);
+              const w = MCP_CHIP_W;
               const x = cx - w / 2;
               const y = mcpsY + 64;
               const active = isActiveMcp(m.name);
@@ -442,9 +470,9 @@ export function ArchitectureDiagram() {
               );
             })}
             {(visibleMcps.length < rankedMcps.length || orphanMcpCount > 0) && (
-              <g transform={`translate(${mcpXCentre(visibleMcps.length) - 40}, ${mcpsY + 64})`}>
-                <rect width={80} height={28} rx={3} className="arch__chip arch__chip--overflow" />
-                <text x={40} y={18} textAnchor="middle" className="arch__chip-label arch__chip-label--mute">
+              <g transform={`translate(${mcpXCentre(visibleMcps.length) - MCP_CHIP_W / 2}, ${mcpsY + 64})`}>
+                <rect width={MCP_CHIP_W} height={28} rx={3} className="arch__chip arch__chip--overflow" />
+                <text x={MCP_CHIP_W / 2} y={18} textAnchor="middle" className="arch__chip-label arch__chip-label--mute">
                   + {(rankedMcps.length - visibleMcps.length) + orphanMcpCount} more
                 </text>
               </g>

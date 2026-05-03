@@ -282,13 +282,10 @@ export function MindMap({ events, status, composition }: Props) {
       (Math.PI * 100) / 180 + (Math.PI * 30) / 180 * Math.max(0, skills.length - 2),
     );
     skills.forEach((s, i) => {
-      // 1 skill alone is offset slightly off the phase angle so the
-      // skill->tool line never lies on the vertical axis through the
-      // centre badge.
-      const t =
-        skills.length === 1
-          ? 0.18
-          : (i / (skills.length - 1)) - 0.5;
+      // 1 skill: sits straight up at the phase angle. Tools are now in the
+      // bottom hemisphere, so a vertical skill->tool line is impossible.
+      // 2+ skills fan out gently around the phase angle.
+      const t = skills.length === 1 ? 0 : (i / (skills.length - 1)) - 0.5;
       const angle = phaseAngle + t * spread;
       positions.set(s.name, {
         x: cx + Math.cos(angle) * skillRadius,
@@ -305,31 +302,32 @@ export function MindMap({ events, status, composition }: Props) {
     const total = tools.length;
     if (total === 0) return positions;
 
-    // Lay tools across the BOTTOM 270° arc only (from 7 o'clock around the
-    // bottom up to 5 o'clock), leaving the top of the orbit clear for the
-    // phase ring + label and ensuring no skill->tool line passes through
-    // the centre badge.
+    // Lay tools across the BOTTOM 270° arc only, leaving the TOP 90°
+    // clear for the phase ring + label and ensuring no skill->tool line
+    // crosses the centre badge.
     //
-    // Arc spans 3π/2 (270°), centred on +π/2 (straight down).
-    // Endpoints: -π/4 (top-right outer) and +5π/4 (top-left outer).
-    const arcSpan = (3 * Math.PI) / 2; // 270°
-    const arcStart = Math.PI / 4;       // start at 45° below horizontal-right
-    const arcEnd = arcStart + arcSpan;  // end at 315° (top-left)
+    // SVG angle convention: 0 = right (3 o'clock), +π/2 = down (6 o'clock),
+    // ±π = left (9), -π/2 = up (12). Avoid the wedge centred on -π/2.
+    //
+    // Arc spans 3π/2 (270°), running clockwise from -π/4 ("1-2 o'clock")
+    // through 0 (3 o'clock), π/2 (6 o'clock), π (9 o'clock), to 5π/4
+    // ("7-8 o'clock").
+    const arcSpan = (3 * Math.PI) / 2;
+    const arcStart = -Math.PI / 4;
 
-    // Use elliptical layout (wider than tall) so tools sit comfortably
-    // around the lower half of the canvas without colliding with the
-    // counter band at the top.
+    // Elliptical layout (wider than tall) so tools sit comfortably in
+    // the lower half without colliding with the counter band on top.
     const rx = toolRadius * 0.96;
     const ry = toolRadius * 0.55;
 
     tools.forEach((t, i) => {
-      // (i + 0.5) places tools BETWEEN evenly-spaced anchors, so a
-      // single-tool layout sits straight down (+π/2) and a two-tool
-      // layout splits ±67.5° from straight down — never on the vertical
-      // axis through the centre.
+      // (i + 0.5) anchors place tools BETWEEN evenly spaced positions:
+      //   1 tool  -> sits at 6 o'clock (π/2)
+      //   2 tools -> split ±45° from 6 o'clock
+      //   3 tools -> 4 o'clock, 6, 8
+      // Never on the vertical axis through the centre badge.
       const t01 = (i + 0.5) / total;
       const angle = arcStart + t01 * arcSpan;
-      void arcEnd; // explicit reference to keep linter calm in build
       positions.set(t.name, {
         x: cx + Math.cos(angle) * rx,
         y: cy + Math.sin(angle) * ry,
