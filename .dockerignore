@@ -18,6 +18,9 @@
 
 # --- Local state ---------------------------------------------------------
 azurite-data/
+azurite-data/__azurite_db_blob_extent__.json
+azurite-data/__blobstorage__/
+azurite-data/__queuestorage__/
 data/portal/
 data/.eval/
 data/.avatar/
@@ -27,6 +30,16 @@ local.settings.json
 **/local.settings.json
 *.log
 logs/
+
+# Bulky source not needed by the runtime image
+api/functions/
+.azure/
+.azurite/
+*.pptx
+*.pdf
+.playwright-cli/
+.playwright-mcp/
+.playwright/
 
 # --- Per-user dev tooling ------------------------------------------------
 .playwright/
