@@ -6,6 +6,15 @@ status table (live / partial / to-build) lives in
 [poc1-status.md](poc1-status.md); this doc tells the operator how to
 drive each beat.
 
+> **Other demos.** This file covers POC1 only. For POC2 (HR talent
+> lifecycle hiring flow) see [poc2-DEMO.md](poc2-DEMO.md) (full
+> 30-min) or [poc2-quick-demo.md](poc2-quick-demo.md) (5–8-min apply
+> → triage → screen → interview → offer). For the editorial /
+> compounding-pitch surface, see [blueprint.md](blueprint.md) (the
+> argument the substrate carries) and
+> [blueprint-microsite-contributor-guide.md](blueprint-microsite-contributor-guide.md)
+> (how to run + deploy the live page).
+
 ---
 
 ## Pre-flight (5 min before guests)

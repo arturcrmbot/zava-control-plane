@@ -1,27 +1,42 @@
-# WPP Control Plane — POC1 (Finance Expense Compliance)
+# WPP Control Plane — Apex Substrate
 
-Production-shaped demo of a 7-phase expense compliance pipeline driven by
-[Microsoft Agent Framework](https://learn.microsoft.com/agent-framework)
-durable workflows, with a GHCP-SDK-powered Fleet Manager supervising
-every exception in real time.
+A composable agentic substrate (skills + MCP tools + harness + governance)
+running on a single laptop, with multiple business domains composed on
+top of it. Production-shaped — [Microsoft Agent Framework](https://learn.microsoft.com/agent-framework)
+durable workflows for orchestration, GHCP SDK Python for agent identities,
+a long-lived Fleet Manager session supervising exceptions in real time.
 
-Brief: [docs/poc1-brief.md](docs/poc1-brief.md). Status + canonical
-architecture: [docs/poc1-status.md](docs/poc1-status.md).
+Two domains are live in `main` and one is graduated from the
+[`compose-domain`](docs/superpowers/skills/compose-domain/SKILL.md) meta-skill:
+
+| Domain | Where it lives | Status |
+|---|---|---|
+| **POC1** — Finance expense compliance | [`api/functions/workflows/expense_claim.py`](api/functions/workflows/expense_claim.py) — 7 phases | Live · 13 ACs, brief in [docs/poc1-brief.md](docs/poc1-brief.md), status in [docs/poc1-status.md](docs/poc1-status.md) |
+| **POC2** — HR talent lifecycle | [`api/functions/workflows/hiring.py`](api/functions/workflows/hiring.py) — 10 phases | Live · 22 capabilities, status in [docs/poc2-status.md](docs/poc2-status.md), demo in [docs/poc2-DEMO.md](docs/poc2-DEMO.md) |
+| **Fleet travel pre-approval** | [`api/functions/workflows/fleet_travel_preapproval.py`](api/functions/workflows/fleet_travel_preapproval.py) | Graduated by `compose-domain` v1; first proof that adding a domain is composition, not construction |
+
+The pitch behind this is captured in [docs/blueprint.md](docs/blueprint.md);
+the live editorial microsite that visualises the substrate is
+[`web/blueprint/`](web/blueprint/) (deployed to Azure Container Apps —
+see the [contributor guide](docs/blueprint-microsite-contributor-guide.md)).
 
 **Stack**
-- Python 3.11 · FastAPI · Azure Durable Functions · MAF · GHCP SDK Python
-- React 19 · Vite 6 · TailwindCSS 4
-- Node mock MCP servers (Workday, SAP Concur, Maconomy)
+- Python 3.11 (Functions worker) + 3.13 (FastAPI) · FastAPI · Azure Durable Functions · MAF · GHCP SDK Python
+- React 19 · Vite 6 · TailwindCSS 4 — three frontends: control plane, candidate portal, blueprint microsite
+- 10 Node mock MCP servers (3 finance + 7 HR/comms — see `mocks/`)
 
 ## Ports
 
-| Service         | Port        |
-|-----------------|-------------|
-| Vite (UI)       | 5173        |
-| FastAPI         | 3001        |
-| Functions host  | 7071        |
-| Azurite         | 10000-10002 |
-| Mock MCPs       | 4101-4103   |
+| Service                       | Port        | What |
+|-------------------------------|-------------|------|
+| Vite — Control Plane UI       | 5173        | Domain-neutral operator surface |
+| Vite — Candidate Portal       | 5174        | POC2 candidate-facing app + recruiter view |
+| Vite — Blueprint microsite    | 5175        | Editorial page + live observatory (local dev) |
+| FastAPI                       | 3001        | Fleet Manager, simulator, REST, SSE, blueprint stream |
+| Functions host                | 7071        | Durable orchestrators + activities |
+| Azurite                       | 10000-10002 | Durable state |
+| Mock MCPs (POC1 finance)      | 4101-4103   | Workday, Concur, Maconomy |
+| Mock MCPs (POC2 HR + comms)   | 4201-4207   | Greenhouse, LinkedIn, Workday-HR, Graph, ServiceNow, ACS, HeyGen |
 
 ## Quickstart
 
@@ -30,26 +45,36 @@ Azure Functions Core Tools v4.9+, Docker (for Azurite — or `npm i -g azurite`)
 GitHub Copilot license (`gh auth login`).
 
 ```bash
-make install                                   # uv sync + npm install
+make install                                   # uv sync + npm install (root, web/portal, web/blueprint)
 make funcvenv                                  # Windows: one-time Py 3.11 venv for func
 cp local.settings.json.example local.settings.json
 cp .env.example .env
 gh auth login
-make up                                        # boots the full stack in one terminal
+make up                                        # boots azurite + POC1 mocks + FastAPI + control-plane UI + portal + functions
 ```
 
-UI at http://localhost:5173. The simulator ramps expense-claim workflows
-into the dashboard automatically when `SIMULATOR_TARGET_WORKFLOWS` is set.
+UI at http://localhost:5173, candidate portal at http://localhost:5174.
+The simulator's domain-aware ramp loop trickles real expense, hiring,
+and travel-preapproval workflows into the dashboard automatically when
+the substrate is up. The blueprint microsite runs separately
+(`npm run dev:blueprint` → http://localhost:5175); see the
+[contributor guide](docs/blueprint-microsite-contributor-guide.md).
+
+For POC2 mocks (hiring demo): `npm run dev:mcp:poc2` in another
+terminal.
 
 ## Layout
 
 ```
-api/     — Python: FastAPI + Durable Functions + MAF graphs + skills
-web/     — React 19 + Vite 6 UI
-mocks/   — Node MCP servers (Workday, Concur, Maconomy)
+api/     — Python: FastAPI + Durable Functions + MAF graphs + skills + personae + MCP tools
+web/
+  client/    — Control Plane UI (operator surface, domain-neutral)
+  portal/    — Candidate portal + recruiter view (POC2)
+  blueprint/ — Editorial microsite + live observatory of the substrate
+mocks/   — 10 Node MCP servers (3 finance + 7 HR/comms)
 tests/   — pytest (api/), vitest (web/), Playwright (e2e/)
-docs/    — poc1-brief, poc1-status, ARCHITECTURE, DEVELOPMENT, DEMO
-scripts/ — boot-demo.sh
+docs/    — see docs/README.md for the full index
+scripts/ — boot-demo.sh, build-blueprint-image.sh, deploy-blueprint.sh, profile-*.sh, blueprint-ticker.sh
 ```
 
 Root-level configs (`pyproject.toml`, `package.json`, `host.json`,
@@ -60,10 +85,12 @@ serve the whole repo.
 
 - [docs/README.md](docs/README.md) — index of every doc in this repo + what each is for
 - [docs/CODEBASE-TOUR.md](docs/CODEBASE-TOUR.md) — narrative walkthrough for first-time visitors
-- [docs/poc1-status.md](docs/poc1-status.md) — canonical state, acceptance criteria, what's left
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — three tiers + how events flow
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — three tiers + how events flow + the multi-domain pattern
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — local dev, terminals, debugging
-- [docs/DEMO.md](docs/DEMO.md) — demo scenarios + expected UI flow
+- [docs/DEMO.md](docs/DEMO.md) — POC1 demo (also points at POC2 + blueprint runbooks)
+- [docs/blueprint.md](docs/blueprint.md) — the pitch this whole substrate carries
+- [docs/blueprint-microsite-contributor-guide.md](docs/blueprint-microsite-contributor-guide.md) — making new domains light up on the page + the Azure Container Apps deploy
+- [docs/superpowers/skills/compose-domain/SKILL.md](docs/superpowers/skills/compose-domain/SKILL.md) — meta-skill that graduates new domains
 
 ## Stop
 

@@ -30,30 +30,42 @@ npm-installed one. Either:
 
 Re-run `func --version`; it should report 4.9.0 or newer.
 
-## Running the stack — 5 terminals
+## Running the stack — terminals
 
-The full stack runs as five processes. Use `make up` in one terminal
-for the convenience launcher, or run each explicitly for easier
-debugging.
+The POC1 + portal stack runs as six processes; POC2 hiring needs a
+seventh (POC2 mocks); the blueprint microsite is a separate eighth.
+Use `make up` in one terminal for the convenience launcher (it boots
+the first six), or run each explicitly for easier debugging.
 
-| # | Terminal | Port |
-|---|---|---|
-| 1 | `docker compose up -d azurite` (or `azurite --silent --location azurite-data`) | 10000-10002 |
-| 2 | `make mcp` — 3 mock MCPs (tsx watch) | 4101-4103 |
-| 3 | `make functions` — Azure Functions host | 7071 |
-| 4 | `make server` — FastAPI + Fleet Manager (uvicorn --reload) | 3001 |
-| 5 | `npm run dev:client` — Vite HMR | 5173 |
+| # | Terminal | Port | Notes |
+|---|---|---|---|
+| 1 | `docker compose up -d azurite` (or `azurite --silent --location azurite-data`) | 10000-10002 | |
+| 2 | `make mcp` — 3 POC1 mock MCPs (tsx watch) | 4101-4103 | |
+| 3 | `make functions` — Azure Functions host | 7071 | Hosts ALL durable orchestrators (expense, hiring, fleet-travel-preapproval) |
+| 4 | `make server` — FastAPI + Fleet Manager (uvicorn --reload) | 3001 | |
+| 5 | `npm run dev:client` — Control Plane UI (Vite HMR) | 5173 | |
+| 6 | `npm run dev:portal` — Candidate Portal (Vite HMR) | 5174 | Required for POC2 candidate flows |
+| 7 | `npm run dev:mcp:poc2` — 7 POC2 mock MCPs (tsx watch) | 4201-4207 | greenhouse, linkedin, workday-hr, graph, servicenow, acs, heygen |
+| 8 | `npm run dev:blueprint` — Blueprint microsite (Vite HMR) | 5175 | Optional — only if iterating on the editorial page or the live observatory |
 
-`make up` chains these without watchers (Azurite via npm, no Docker,
-UI served from built bundle) — the fastest boot for demo takes.
+`make up` chains terminals 1–6 without watchers (Azurite via npm, no
+Docker, UI + portal served from built bundles) — the fastest boot for
+demo takes. POC2 mocks and the blueprint microsite are not in `make up`;
+boot them separately when needed.
+
+For the blueprint microsite, an alternative to `make server` is
+`scripts/run-fastapi-blueprint.sh`, which starts uvicorn on `:3001`
+backgrounded with no access log (handy when iterating on `:5175` and
+you don't want noise in the terminal).
 
 ### Hot reload
 
 - **FastAPI**: `--reload` flag in `make server`; edits under `api/server/`
   restart uvicorn on save.
-- **Vite HMR**: any `web/` edit reloads the UI without page refresh.
+- **Vite HMR**: any `web/client/`, `web/portal/`, or `web/blueprint/`
+  edit reloads the relevant UI without page refresh.
 - **MCP mocks**: `tsx watch` restarts each mock when `mocks/*/server.ts`
-  changes.
+  changes (both `dev:mcp` and `dev:mcp:poc2` variants).
 - **Functions host**: does *not* reload on Python changes — you must
   Ctrl-C and restart `func start` after editing `api/functions/*.py`.
 
@@ -115,3 +127,20 @@ Manager + simulator state (not persisted).
 | `failed to schedule` on inject | Functions host not running | `make functions` |
 | `azurite` refuses connections on 10000 | Docker/npm azurite not up | `make azurite-up` or `npm i -g azurite && azurite --silent --location azurite-data` |
 | UI shows empty workflows | No stack / API proxy misrouted | Check `VITE_API_BASE_URL` in `.env`; default is `http://localhost:3001` |
+
+## Helper scripts
+
+In `scripts/`:
+
+| Script | Purpose |
+|---|---|
+| `boot-demo.sh` | What `make up` runs — boots azurite + POC1 mocks + FastAPI + control-plane UI + portal + functions in one terminal |
+| `run-fastapi-blueprint.sh` | Backgrounded uvicorn on `:3001` with no access log; pairs with `npm run dev:blueprint` when iterating on the microsite |
+| `blueprint-ticker.sh` | Drives synthetic blueprint events for visual smoke-testing |
+| `build-blueprint-image.sh` | `az acr build` of the blueprint container into `blueprintacrapexdemo` |
+| `deploy-blueprint.sh` | Single-command deploy of the microsite to Azure Container Apps (resource group `project-apex-demo`, container `blueprint`). See [blueprint-microsite-contributor-guide.md §Deploying to Azure](blueprint-microsite-contributor-guide.md#deploying-to-azure) |
+| `profile-autonomous.sh`, `profile-friday.sh` | Profiling helpers for the autonomous demo loop |
+| `preclassify_corpus.py` | One-shot preclassification of the 300-claim accuracy corpus |
+| `generate_blueprint_image.py` | Renders the social/preview image for the blueprint page |
+| `generate_cv_pdfs.py` | Generates the synthetic CV corpus for POC2 |
+| `prewarm_avatar.py` | Warms the avatar render cache before a POC2 demo |
