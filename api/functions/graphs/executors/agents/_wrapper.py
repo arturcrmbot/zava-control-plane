@@ -19,6 +19,7 @@ the loaded skill, matching the spec's "specialisation via skills, not via
 separate agents" pattern.
 """
 from __future__ import annotations
+import asyncio
 import json
 import subprocess
 import time
@@ -60,16 +61,55 @@ def _load_skill(skill_dir: Path) -> str:
     return (skill_dir / "SKILL.md").read_text(encoding="utf-8")
 
 
-def _install_session_otel_bridge(session, tool_calls_out: list[dict]) -> callable:
-    """Bridge GHCP session events -> OTEL child spans AND collect a flat list of
-    completed tool calls into `tool_calls_out` for the eval payload.
+def _install_session_otel_bridge(
+    session,
+    tool_calls_out: list[dict],
+    *,
+    workflow_id: str | None = None,
+    skill_label: str | None = None,
+) -> callable:
+    """Bridge GHCP session events -> OTEL child spans + collect a flat list of
+    completed tool calls into `tool_calls_out` for the eval payload + emit
+    per-tool `tool.invoked` webhooks so the observatory orbit lights up the
+    MCP nodes in near-real time.
 
-    TOOL_EXECUTION_START opens a span keyed by tool_call_id; TOOL_EXECUTION_COMPLETE
-    closes it AND appends `{name, args, result, success, latency_ms}` to the list.
+    TOOL_EXECUTION_START opens a span keyed by tool_call_id, and fires a
+    `tool.invoked` (stage=start) webhook so the page can flare the
+    skill->tool edge immediately.
+    TOOL_EXECUTION_COMPLETE closes the span, appends to `tool_calls_out`,
+    and fires a `tool.invoked` (stage=complete) webhook.
     """
     open_spans: dict[str, object] = {}
     open_meta: dict[str, dict] = {}
     parent_ctx = trace.set_span_in_context(trace.get_current_span())
+    # Capture the running loop so the synchronous SDK callback can schedule
+    # async emits without blocking.
+    try:
+        _loop = asyncio.get_running_loop()
+    except RuntimeError:
+        _loop = None
+
+    def _fire_tool_webhook(stage: str, tool_name: str, *, latency_ms: int = 0) -> None:
+        if _loop is None or workflow_id is None:
+            return
+        from api.functions.webhook import emit as _webhook_emit
+
+        async def _send():
+            await _webhook_emit(
+                workflow_id, workflow_id, "tool.invoked",
+                {
+                    "tool": tool_name,
+                    "skill": skill_label,
+                    "stage": stage,
+                    "duration_ms": latency_ms,
+                },
+            )
+        try:
+            _loop.call_soon_threadsafe(
+                lambda: _loop.create_task(_send()),
+            )
+        except Exception:
+            pass
 
     def on_event(event) -> None:
         try:
@@ -91,6 +131,9 @@ def _install_session_otel_bridge(session, tool_calls_out: list[dict]) -> callabl
                     open_meta[call_id] = {
                         "name": str(name), "args": args, "started_at": time.monotonic(),
                     }
+                # Fire an observatory webhook so the page lights up the
+                # skill -> tool edge in near-real-time.
+                _fire_tool_webhook("start", str(name))
             elif event.type == SessionEventType.TOOL_EXECUTION_COMPLETE:
                 data = event.data
                 call_id = getattr(data, "tool_call_id", None)
@@ -108,13 +151,15 @@ def _install_session_otel_bridge(session, tool_calls_out: list[dict]) -> callabl
                             result_text = json.dumps(result_text)
                         except Exception:
                             result_text = str(result_text)
+                    latency_ms = int((time.monotonic() - meta["started_at"]) * 1000)
                     tool_calls_out.append({
                         "name": meta["name"],
                         "args": meta["args"],
                         "result": result_text,
                         "success": getattr(data, "success", True) is not False,
-                        "latency_ms": int((time.monotonic() - meta["started_at"]) * 1000),
+                        "latency_ms": latency_ms,
                     })
+                    _fire_tool_webhook("complete", meta["name"], latency_ms=latency_ms)
         except Exception:
             pass
 
@@ -194,7 +239,12 @@ async def run_agent_session(
             if skill_dir:
                 session_kwargs["skill_directories"] = [str(skill_dir)]
             session = await client.create_session(**session_kwargs)
-            unsub = _install_session_otel_bridge(session, tool_calls_collected)
+            unsub = _install_session_otel_bridge(
+                session,
+                tool_calls_collected,
+                workflow_id=workflow_id,
+                skill_label=skill_label,
+            )
             try:
                 if attachments:
                     response_event = await session.send_and_wait(

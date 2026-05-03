@@ -93,6 +93,12 @@ class BlueprintRecorder:
     def __init__(self) -> None:
         self._unsubscribe = None  # callable returned by bus.on_any
         self._workflows: dict[str, _Recording] = {}  # workflow_id -> Recording
+        # Workflows that have already been written. Subsequent terminal
+        # events (e.g. workflow.resolved arriving after
+        # durable.workflow.completed) are silently ignored, so we don't
+        # reopen the file with a -1 suffix and a single-event payload.
+        # Cleared on stop().
+        self._closed: set[str] = set()
         self._started_at_ms: float | None = None
         self._lock = asyncio.Lock()
 
@@ -130,6 +136,7 @@ class BlueprintRecorder:
             flushed.append(str(path.name))
         completed = len(flushed)
         self._workflows = {}
+        self._closed = set()
         self._started_at_ms = None
         return {"status": "stopped", "files_written": completed, "files": flushed}
 
@@ -155,6 +162,12 @@ class BlueprintRecorder:
             # benefits less from such events.
             return
 
+        # Already-closed workflow: a duplicate terminal event arrived
+        # (e.g. workflow.resolved after durable.workflow.completed). Drop
+        # silently — don't reopen the file.
+        if wid in self._closed:
+            return
+
         now_ms = time.time() * 1000.0
         rec = self._workflows.get(wid)
         if rec is None:
@@ -165,10 +178,12 @@ class BlueprintRecorder:
         ts_offset_ms = int(now_ms - rec.started_at_ms)
         rec.events.append({"ts_offset_ms": ts_offset_ms, "event": data})
 
-        # Workflow-end events: write out and forget.
+        # Workflow-end events: write out and forget. Mark closed so a second
+        # terminal event for the same wid doesn't open a fresh file.
         if event.type in ("durable.workflow.completed", "workflow.resolved"):
             self._write_recording(rec)
             self._workflows.pop(wid, None)
+            self._closed.add(wid)
 
     def _write_recording(self, rec: "_Recording") -> Path:
         rdir = _recordings_dir()

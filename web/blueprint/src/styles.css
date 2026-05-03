@@ -807,17 +807,41 @@ body {
 .mindmap__centre-title {
   font-family: var(--serif);
   font-weight: 400;
-  font-size: 1.05rem;
-  fill: var(--ink);
+  font-size: 0.95rem;
+  color: var(--ink);
   letter-spacing: -0.01em;
   font-variation-settings: "opsz" 144;
+  line-height: 1.05;
+  text-align: center;
+  /* Allow up to 2 lines, then ellipsis. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.mindmap__centre-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  pointer-events: none;
 }
 
 .mindmap__centre-meta {
   font-family: var(--mono-family);
-  font-size: 0.7rem;
-  fill: var(--ink-mute);
+  font-size: 0.6rem;
+  color: var(--ink-mute);
   letter-spacing: 0.08em;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .mindmap__phase {

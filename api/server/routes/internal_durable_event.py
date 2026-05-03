@@ -132,8 +132,20 @@ async def receive_durable_event(body: DurableEventBody):
         stage = body.payload.get("stage")
         etype = str(body.payload.get("type", "?"))
         # Emit on the bus before the bookkeeping so the observatory can
-        # render the executor pulse in near-real-time. Skill / tool labels
-        # come from the payload's `attributes` (set by the agent wrapper).
+        # render the executor pulse in near-real-time.
+        # Skill label: for agent executors the `name` IS the skill identity
+        # (e.g. "agent_rag_classifier"); strip the conventional "agent_"
+        # prefix so the page renders the bare skill folder name. Validators
+        # also surface as `skill` so the orbit lights up the validator
+        # node distinctly. Deterministic executors leave skill null.
+        skill_label = None
+        if etype == "agent":
+            skill_label = name[len("agent_"):] if name.startswith("agent_") else name
+        elif etype == "validator":
+            skill_label = name
+        # Per-call tool labels come via a separate `tool.invoked` webhook
+        # the agent wrapper fires per TOOL_EXECUTION_*; this branch is for
+        # the executor pulse itself, not the tool fan-out.
         attrs = body.payload.get("attributes") or {}
         _emit(
             "durable.executor.invoked", wid,
@@ -141,7 +153,7 @@ async def receive_durable_event(body: DurableEventBody):
             executor_type=etype,
             stage=stage,
             phase=body.payload.get("stage_label") or body.payload.get("phase"),
-            skill=attrs.get("skill") or attrs.get("skill_label"),
+            skill=attrs.get("skill") or attrs.get("skill_label") or skill_label,
             tool=attrs.get("tool"),
             duration_ms=int(body.payload.get("duration_ms", 0)),
         )
@@ -212,6 +224,23 @@ async def receive_durable_event(body: DurableEventBody):
             status_code=int(p.get("status_code", 0)),
             duration_ms=int(p.get("duration_ms", 0)),
         ))
+
+    elif body.kind == "tool.invoked":
+        # Per-tool fan-out from the agent wrapper's TOOL_EXECUTION_*
+        # session callback. Translates to durable.executor.invoked with
+        # tool name populated, so the observatory orbit can flare the
+        # skill -> tool edge in near-real time. Replays losslessly via
+        # the recorder.
+        p = body.payload or {}
+        _emit(
+            "durable.executor.invoked", wid,
+            name=f"tool:{p.get('tool', '?')}",
+            executor_type="tool",
+            stage=p.get("stage"),
+            skill=p.get("skill"),
+            tool=p.get("tool"),
+            duration_ms=int(p.get("duration_ms", 0)),
+        )
 
     elif body.kind == "claim_routed":
         verdict = (body.payload.get("verdict") or "").lower()

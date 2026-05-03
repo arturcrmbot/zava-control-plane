@@ -392,15 +392,21 @@ export function MindMap({ events, status, composition }: Props) {
         );
       })}
 
-      {/* Centre badge — domain + workflow id. */}
+      {/* Centre badge — domain + workflow id. Uses foreignObject so HTML
+          layout can wrap long domain names ("Travel pre-approval") to a
+          second line cleanly inside the ring. */}
       <g className={`mindmap__centre mindmap__centre--${activeDomain?.status ?? "idle"}`}>
-        <circle cx={cx} cy={cy} r={50} className="mindmap__centre-ring" stroke={domainColour} />
-        <text x={cx} y={cy - 4} textAnchor="middle" className="mindmap__centre-title">
-          {activeDomain?.name ?? "—"}
-        </text>
-        <text x={cx} y={cy + 14} textAnchor="middle" className="mindmap__centre-meta">
-          {activeDomain?.workflowId ?? (status === "watching" ? "watching" : status)}
-        </text>
+        <circle cx={cx} cy={cy} r={56} className="mindmap__centre-ring" stroke={domainColour} />
+        <foreignObject x={cx - 54} y={cy - 28} width={108} height={56}>
+          <div className="mindmap__centre-inner">
+            <div className="mindmap__centre-title" title={activeDomain?.name ?? "—"}>
+              {activeDomain?.name ?? "—"}
+            </div>
+            <div className="mindmap__centre-meta">
+              {activeDomain?.workflowId ?? (status === "watching" ? "watching" : status)}
+            </div>
+          </div>
+        </foreignObject>
       </g>
 
       {/* Calm overlay */}

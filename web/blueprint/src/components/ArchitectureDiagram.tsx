@@ -220,7 +220,7 @@ export function ArchitectureDiagram() {
   const systemsY = mcpsY + mcpsH + 18;
   const systemsH = 110;
   const guaranteesY = systemsY + systemsH + 24;
-  const guaranteesH = 84;
+  const guaranteesH = 100;
 
   const [hover, setHover] = useState<HoverState>(null);
   const hl = useMemo(() => highlightFor(hover), [hover]);
@@ -383,7 +383,7 @@ export function ArchitectureDiagram() {
                   </text>
                   <text
                     x={70}
-                    y={42}
+                    y={36}
                     textAnchor="middle"
                     className={`arch__agent-status arch__agent-status--${a.status}${dimClass(active)}`}
                   >
@@ -572,7 +572,7 @@ export function ArchitectureDiagram() {
             {GUARANTEES.map((g, i) => {
               const colW = (stackW - 36) / GUARANTEES.length;
               const x = stackX + 18 + i * colW;
-              const y = guaranteesY + 56;
+              const y = guaranteesY + 76;
               const isHovered = hover?.kind === "guarantee" && hover.id === g.id;
               return (
                 <g
