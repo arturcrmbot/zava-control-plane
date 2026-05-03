@@ -1,0 +1,22 @@
+"""Phase {{PHASE_NUMBER}} ({{PHASE_NAME}}) graph for {{DOMAIN_DISPLAY_NAME}}.
+
+  {{GRAPH_FLOW}}
+
+Per brief: {{PHASE_INTENT}}.
+"""
+from __future__ import annotations
+from agent_framework import Workflow, WorkflowBuilder
+
+from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+{{EXECUTOR_IMPORTS}}
+
+
+def build_{{DOMAIN_NAME_SNAKE}}_{{PHASE_NAME}}_workflow() -> Workflow:
+{{NODE_DEFS}}
+    term = TerminalExecutor(id="terminal")
+    return (
+        WorkflowBuilder(start_executor={{START_NODE_VAR}})
+{{ADD_EDGE_LINES}}
+        .add_edge({{LAST_NODE_VAR}}, term)
+        .build()
+    )

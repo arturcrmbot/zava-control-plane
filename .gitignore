@@ -44,6 +44,14 @@ Thumbs.db
 # Old workbench dir (deleted, leave rule defensive)
 scratch/
 
+# compose-domain sandbox runs (design-time meta-skill output; never committed).
+# The README.md inside is the only tracked file. Negations re-include the
+# parent path so git can descend past the `scratch/` rule above.
+!tools/scratch/
+!tools/scratch/compose-domain/
+tools/scratch/compose-domain/*
+!tools/scratch/compose-domain/README.md
+
 # tsc emits .js next to .tsx/.ts sources — never check them in
 web/client/**/*.js
 web/shared/**/*.js

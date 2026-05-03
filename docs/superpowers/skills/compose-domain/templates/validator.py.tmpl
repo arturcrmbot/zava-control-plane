@@ -1,0 +1,16 @@
+"""Graph-shape adapter for the {{DOMAIN_NAME}}-{{PHASE_NAME}} validator.
+
+In-graph validators return `{"ok": bool, ...}` so TrackedExecutor can emit
+`validator.blocked` cleanly. Mirrors validate_classification_schema_node.py.
+"""
+from __future__ import annotations
+
+
+async def execute(input: dict) -> dict:
+    payload = input.get("{{PHASE_NAME}}") or {}
+    {{VALIDATION_BODY}}
+    return {
+        "ok": True,
+        "{{PHASE_NAME}}": payload,
+        {{PASSTHROUGH_FIELDS}}
+    }

@@ -1,0 +1,47 @@
+"""
+The single {{DOMAIN_DISPLAY_NAME}} generator orchestration — one workflow end-to-end.
+
+{{N_PHASES}} phases per docs/superpowers/specs/{{DOMAIN_NAME}}-brief.yaml:
+  {{PHASE_LIST_ARROWED}}
+
+HITL gates:
+{{HITL_GATE_LIST}}
+
+Sync generator per the Azure Durable Functions Python convention. Phase
+activities are registered in `function_app.py` (see GRADUATION.md for the
+diff).
+"""
+from __future__ import annotations
+from collections.abc import Generator
+from datetime import timedelta
+from typing import Any
+
+import azure.durable_functions as df
+
+# Per-phase HITL timeouts. Defined locally for v1; lift into
+# api/shared/constants.py at graduation so the simulator can override per-demo.
+{{TIMEOUT_CONSTANTS}}
+
+
+def {{DOMAIN_NAME_SNAKE}}_orchestration(context: df.DurableOrchestrationContext) -> Generator[Any, Any, dict]:
+    """Orchestrate the {{N_PHASES}} {{DOMAIN_DISPLAY_NAME}} phases for one workflow."""
+    input_dict = context.get_input() or {}
+    workflow_id = input_dict.get("workflow_id", "?")
+    enriched = {**input_dict, "instance_id": context.instance_id}
+
+    yield context.call_activity("checkpoint_activity_trigger", {
+        "workflow_id": workflow_id, "instance_id": context.instance_id,
+        "kind": "workflow.started", "payload": {"domain": "{{DOMAIN_NAME}}"}
+    })
+
+{{PHASE_BLOCKS}}
+
+    yield context.call_activity("checkpoint_activity_trigger", {
+        "workflow_id": workflow_id, "instance_id": context.instance_id,
+        "kind": "workflow.completed", "payload": {}
+    })
+
+    return {
+        "status": "completed",
+        {{PHASE_RESULT_KEYS}}
+    }

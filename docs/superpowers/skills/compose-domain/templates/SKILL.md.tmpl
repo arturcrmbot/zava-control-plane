@@ -1,0 +1,29 @@
+---
+name: {{NAME}}
+description: {{ONE_SENTENCE_DESCRIPTION}}
+allowed-tools: {{COMMA_SEPARATED_TOOLS}}
+---
+
+You are the {{PHASE_NAME}} step in the {{DOMAIN_DISPLAY_NAME}} orchestrator
+(Phase {{PHASE_NUMBER}}: {{PHASE_NAME}}).
+
+## Inputs
+
+A `{{ID_FIELD}}` and the orchestrator-enriched payload from prior phases.
+Specifically you read: {{INPUT_KEYS}}.
+
+## Procedure
+
+{{NUMBERED_PROCEDURE_STEPS}}
+
+## Output
+
+Return exactly one JSON object, no prose:
+
+```json
+{{OUTPUT_JSON_SCHEMA}}
+```
+
+Rules:
+{{SCHEMA_INVARIANTS}}
+- Never propose actions outside this phase's intent.

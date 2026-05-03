@@ -1,0 +1,16 @@
+"""
+{{DOMAIN_DISPLAY_NAME}} activity functions — registered as Azure Durable
+Functions activity triggers (see GRADUATION.md for the function_app.py
+diff). Each runs synchronously and wraps an async MAF Workflow run inside
+asyncio.run.
+"""
+from __future__ import annotations
+import asyncio
+
+from api.functions.workflows.activities import _run_workflow
+from api.functions.graphs import (
+{{GRAPH_BUILDER_IMPORTS}}
+)
+
+
+{{ACTIVITY_FUNCTIONS}}
