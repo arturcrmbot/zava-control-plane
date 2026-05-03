@@ -7,6 +7,7 @@ Travel search API call when wiring to a production tenant.
 """
 from __future__ import annotations
 import hashlib
+import json
 
 from copilot.tools import ToolResult, define_tool
 from opentelemetry import trace
@@ -118,6 +119,6 @@ def concur_travel_search_search_options_tool(params: _SearchOptionsParams) -> To
             params.depart_date,
             params.return_date,
         )
-        return ToolResult(success=True, content=result)
+        return ToolResult(text_result_for_llm=json.dumps(result, ensure_ascii=False))
     except Exception as ex:
-        return ToolResult(success=False, error=str(ex))
+        return ToolResult(text_result_for_llm="", result_type="failure", error=str(ex))

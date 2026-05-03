@@ -6,6 +6,7 @@ HCM call when wiring to a production tenant.
 """
 from __future__ import annotations
 import hashlib
+import json
 
 from copilot.tools import ToolResult, define_tool
 from opentelemetry import trace
@@ -57,6 +58,6 @@ class _GetEmployeeParams(BaseModel):
 def workday_hr_employee_get_employee_tool(params: _GetEmployeeParams) -> ToolResult:
     try:
         result = get_employee(params.employee_id)
-        return ToolResult(success=True, content=result)
+        return ToolResult(text_result_for_llm=json.dumps(result, ensure_ascii=False))
     except Exception as ex:
-        return ToolResult(success=False, error=str(ex))
+        return ToolResult(text_result_for_llm="", result_type="failure", error=str(ex))

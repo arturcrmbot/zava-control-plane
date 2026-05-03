@@ -106,6 +106,7 @@ when wiring to a production system.
 """
 from __future__ import annotations
 import hashlib
+import json
 
 from copilot.tools import ToolResult, define_tool
 from opentelemetry import trace
@@ -143,10 +144,18 @@ class _<Operation>Params(BaseModel):
 def <tool>_<operation>_tool(params: _<Operation>Params) -> ToolResult:
     try:
         result = <operation>(params.<arg>)
-        return ToolResult(success=True, content=result)
+        return ToolResult(text_result_for_llm=json.dumps(result, ensure_ascii=False))
     except Exception as ex:
-        return ToolResult(success=False, error=str(ex))
+        return ToolResult(text_result_for_llm="", result_type="failure", error=str(ex))
 ```
+
+> **SDK contract.** `ToolResult.__init__` takes
+> `text_result_for_llm: str` and `result_type: "success" | "failure"`.
+> It does NOT accept `success=` / `content=` (an older draft API).
+> Always JSON-serialise the dict result into `text_result_for_llm`; the
+> SDK feeds that string back to the model as the tool output. Returning
+> the wrong shape silently breaks every tool call — the model sees a
+> `TypeError` string and falls back to invented prose.
 
 One Python module = one `mcp_tool` from the brief = one or more
 `operations`. If the brief lists multiple `operations` for the same

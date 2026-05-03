@@ -6,6 +6,7 @@ call when wiring to a production system.
 """
 from __future__ import annotations
 import hashlib
+import json
 
 from copilot.tools import ToolResult, define_tool
 from opentelemetry import trace
@@ -43,6 +44,6 @@ class _{{OPERATION_CAMEL}}Params(BaseModel):
 def {{TOOL_NAME}}_{{OPERATION_NAME}}_tool(params: _{{OPERATION_CAMEL}}Params) -> ToolResult:
     try:
         result = {{OPERATION_NAME}}({{PARAMS_PASSTHROUGH}})
-        return ToolResult(success=True, content=result)
+        return ToolResult(text_result_for_llm=json.dumps(result, ensure_ascii=False))
     except Exception as ex:
-        return ToolResult(success=False, error=str(ex))
+        return ToolResult(text_result_for_llm="", result_type="failure", error=str(ex))

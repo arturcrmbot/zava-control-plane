@@ -7,6 +7,7 @@ Policy API call when wiring to a production tenant.
 """
 from __future__ import annotations
 import hashlib
+import json
 
 from copilot.tools import ToolResult, define_tool
 from opentelemetry import trace
@@ -89,6 +90,6 @@ class _GetPolicyParams(BaseModel):
 def concur_travel_policy_get_policy_tool(params: _GetPolicyParams) -> ToolResult:
     try:
         result = get_policy(params.grade, params.market)
-        return ToolResult(success=True, content=result)
+        return ToolResult(text_result_for_llm=json.dumps(result, ensure_ascii=False))
     except Exception as ex:
-        return ToolResult(success=False, error=str(ex))
+        return ToolResult(text_result_for_llm="", result_type="failure", error=str(ex))
