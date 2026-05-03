@@ -41,11 +41,17 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
     """Orchestrate the 10 hiring phases for one req-to-hire."""
     input_dict = context.get_input() or {}
     workflow_id = input_dict.get("workflow_id", "?")
+    # Stamped on every checkpoint payload so internal_durable_event populates
+    # the _workflow_types cache and forwards `workflow_type` onto every
+    # downstream FleetEvent. Lets the recorder/observatory resolve domain
+    # for hiring runs the same way they do for travel.
+    workflow_type = input_dict.get("type", "hiring")
     enriched = {**input_dict, "instance_id": context.instance_id}
 
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
-        "kind": "workflow.started", "payload": {"poc": "poc2-hiring"}
+        "kind": "workflow.started",
+        "payload": {"poc": "poc2-hiring", "workflow_type": workflow_type},
     })
 
     # Phase 1: Budget — Finance BP HITL on £10k+ delegation
@@ -60,8 +66,19 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
         # auto-fires budget_approval. Treating this as a candidate-driven
         # wait keeps the operator queue clean during the demo. Engagement-POC
         # path (real Finance BP delegation) would reclassify as operator_review.
-        "payload": {"reason": "awaiting_budget_approval", "phase": "Budget",
-                    "wait_kind": "external_party"},
+        "payload": {
+            "reason": "awaiting_budget_approval", "phase": "Budget",
+            "wait_kind": "external_party",
+            "workflow_type": workflow_type,
+            # Persona-responder contract: finance_bp applies the delegation
+            # rule against the budget activity output.
+            "persona": "finance_bp",
+            "external_event": "budget_approval",
+            "context": {
+                "budget": enriched.get("budget"),
+                "metadata": enriched.get("metadata"),
+            },
+        },
     })
 
     approval_event = context.wait_for_external_event("budget_approval")
@@ -137,8 +154,20 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
             "kind": "suspended",
             # wait_kind: external_party — candidate's screening call. Not an
             # operator HITL; nothing for the Agent Administrator to action.
-            "payload": {"reason": "awaiting_voice_complete", "phase": "Voice",
-                        "wait_kind": "external_party"},
+            "payload": {
+                "reason": "awaiting_voice_complete", "phase": "Voice",
+                "wait_kind": "external_party",
+                "workflow_type": workflow_type,
+                # Persona-responder contract: candidate persona synthesises
+                # a plausible voice score (~0.7–0.8) when the real candidate
+                # portal isn't driving the call.
+                "persona": "candidate",
+                "external_event": "voice_complete",
+                "context": {
+                    "candidate_id": candidate_id,
+                    "screen_link": link_result,
+                },
+            },
         })
 
         voice_event = context.wait_for_external_event("voice_complete")
@@ -214,8 +243,21 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
         "kind": "suspended",
-        "payload": {"reason": "awaiting_interview_invite", "phase": "Interview",
-                    "wait_kind": "operator_review"},
+        "payload": {
+            "reason": "awaiting_interview_invite", "phase": "Interview",
+            "wait_kind": "operator_review",
+            "workflow_type": workflow_type,
+            # Persona-responder contract: recruiter applies the deterministic
+            # green-path rule (always invite when AI rec >= shortlist).
+            "persona": "recruiter",
+            "external_event": "interview_invite",
+            "context": {
+                "gate": "post_voice",
+                "triage": enriched.get("triage"),
+                "screening": enriched.get("screening"),
+                "voice": enriched.get("voice"),
+            },
+        },
     })
 
     invite_event = context.wait_for_external_event("interview_invite")
@@ -288,8 +330,19 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
         "kind": "suspended",
-        "payload": {"reason": "awaiting_interview_booking", "phase": "Interview",
-                    "wait_kind": "external_party"},
+        "payload": {
+            "reason": "awaiting_interview_booking", "phase": "Interview",
+            "wait_kind": "external_party",
+            "workflow_type": workflow_type,
+            # Persona-responder contract: candidate persona picks the first
+            # available slot deterministically.
+            "persona": "candidate",
+            "external_event": "interview_booked",
+            "context": {
+                "book_link": book_link,
+                "candidate": _cand_dict,
+            },
+        },
     })
 
     booked_event = context.wait_for_external_event("interview_booked")
@@ -329,8 +382,22 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
         "kind": "suspended",
-        "payload": {"reason": "awaiting_interview_complete", "phase": "Interview",
-                    "wait_kind": "operator_review"},
+        "payload": {
+            "reason": "awaiting_interview_complete", "phase": "Interview",
+            "wait_kind": "operator_review",
+            "workflow_type": workflow_type,
+            # Persona-responder contract: recruiter records post-interview
+            # decision (deterministic green path — always offer in v1).
+            "persona": "recruiter",
+            "external_event": "offer_decision",
+            "context": {
+                "gate": "post_interview",
+                "triage": enriched.get("triage"),
+                "screening": enriched.get("screening"),
+                "voice": enriched.get("voice"),
+                "slot": booked_payload.get("slot") if isinstance(booked_payload, dict) else None,
+            },
+        },
     })
 
     decision_event = context.wait_for_external_event("offer_decision")
@@ -405,8 +472,20 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
         # wait_kind: external_party — candidate's accept/decline. Engagement
         # POC may reclassify as operator_review when HR BP also gates the
         # non-revocable send.
-        "payload": {"reason": "awaiting_offer_approval", "phase": "Offer",
-                    "wait_kind": "external_party"},
+        "payload": {
+            "reason": "awaiting_offer_approval", "phase": "Offer",
+            "wait_kind": "external_party",
+            "workflow_type": workflow_type,
+            # Persona-responder contract: hr_bp applies the offer-fit rule
+            # against the offer activity output.
+            "persona": "hr_bp",
+            "external_event": "offer_approval",
+            "context": {
+                "offer": enriched.get("offer"),
+                "compliance": enriched.get("compliance"),
+                "interview": enriched.get("interview"),
+            },
+        },
     })
 
     offer_event = context.wait_for_external_event("offer_approval")

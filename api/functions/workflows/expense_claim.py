@@ -30,11 +30,17 @@ def expense_claim_orchestration(context: df.DurableOrchestrationContext) -> Gene
     """Orchestrate the 7 expense-compliance phases for one claim."""
     input_dict = context.get_input() or {}
     workflow_id = input_dict.get("workflow_id", "?")
+    # Stamped on every checkpoint payload so internal_durable_event can
+    # populate its _workflow_types cache and forward `workflow_type` onto
+    # every downstream FleetEvent. Without this, recordings come out
+    # tagged "unknown-..." and the page can't resolve the domain on
+    # replay. Mirrors the pattern the generated travel domain uses.
+    workflow_type = input_dict.get("type", "expense-claim")
     enriched = {**input_dict, "instance_id": context.instance_id}
 
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
-        "kind": "workflow.started", "payload": {}
+        "kind": "workflow.started", "payload": {"workflow_type": workflow_type},
     })
 
     # Phase 1: Intake & Normalise
@@ -66,8 +72,25 @@ def expense_claim_orchestration(context: df.DurableOrchestrationContext) -> Gene
             # wait_kind: external_party — the claim submitter (employee) has
             # to justify. The SSC operator queue shouldn't care; they only
             # see this if it ages past SLA.
-            "payload": {"reason": "awaiting_justification",
-                        "wait_kind": "external_party"},
+            "payload": {
+                "reason": "awaiting_justification",
+                "wait_kind": "external_party",
+                "phase": "Notify",
+                "workflow_type": workflow_type,
+                # Persona-responder contract: who closes this gate, on what
+                # event, with what context. The claim_submitter persona
+                # synthesises a plausible justification from the parked
+                # claim record (mirrors what simulate_justification did
+                # manually).
+                "persona": "claim_submitter",
+                "external_event": "justification",
+                "context": {
+                    "claim": enriched.get("claim"),
+                    "classify": enriched.get("classify"),
+                    "receipt": enriched.get("receipt"),
+                    "route": enriched.get("route"),
+                },
+            },
         })
 
         justification_event = context.wait_for_external_event("justification")
@@ -98,8 +121,22 @@ def expense_claim_orchestration(context: df.DurableOrchestrationContext) -> Gene
             "kind": "suspended",
             # wait_kind: operator_review — SSC reviewer must accept/reject.
             # This goes on the operator queue and ages against our SLA.
-            "payload": {"reason": "awaiting_reviewer",
-                        "wait_kind": "operator_review"},
+            "payload": {
+                "reason": "awaiting_reviewer",
+                "wait_kind": "operator_review",
+                "phase": "Arbitrate",
+                "workflow_type": workflow_type,
+                # Persona-responder contract: ssc_reviewer applies the
+                # accept/reject rule against the parked arbitrate output.
+                "persona": "ssc_reviewer",
+                "external_event": "reviewer_decision",
+                "context": {
+                    "claim": enriched.get("claim"),
+                    "classify": enriched.get("classify"),
+                    "justification": enriched.get("justification"),
+                    "arbitrate": enriched.get("arbitrate"),
+                },
+            },
         })
 
         decision_event = context.wait_for_external_event("reviewer_decision")
