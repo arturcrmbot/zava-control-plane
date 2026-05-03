@@ -81,12 +81,12 @@ export function Observatory() {
             <div className="counter__label">Workflows started</div>
           </div>
           <div className="counter">
-            <div className="counter__value">{counters.agentInvocations}</div>
-            <div className="counter__label">Agent invocations</div>
+            <div className="counter__value">{counters.skillsInvoked}</div>
+            <div className="counter__label">Skills run</div>
           </div>
           <div className="counter">
             <div className="counter__value">{counters.toolCalls}</div>
-            <div className="counter__label">Tool calls</div>
+            <div className="counter__label">MCP tool calls</div>
           </div>
           <div className="counter">
             <div className="counter__value">{counters.validatorsBlocked}</div>

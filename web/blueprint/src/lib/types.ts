@@ -57,5 +57,9 @@ export interface ObservatoryEvent {
   tool: string | null;
   domain: string | null;
   workflow_id: string | null;
+  /** "agent" | "validator" | "deterministic" | "tool" | null */
+  executor_type?: string | null;
+  /** "start" | "complete" | "error" | null */
+  stage?: string | null;
   ts: number;
 }

@@ -124,6 +124,8 @@ def _normalise_event(event: FleetEvent) -> dict[str, Any] | None:
         "tool": tool,
         "domain": domain,
         "workflow_id": workflow_id,
+        "executor_type": data.get("executor_type"),
+        "stage": data.get("stage"),
         "ts": data.get("ts") or time.time(),
     }
 

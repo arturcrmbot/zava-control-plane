@@ -25,11 +25,16 @@ export function useObservatory(opts: UseObservatoryOptions = {}) {
   const [status, setStatus] = useState<ObservatoryStatus>("connecting");
   const [counters, setCounters] = useState({
     workflowsStarted: 0,
-    agentInvocations: 0,
+    skillsInvoked: 0,
     toolCalls: 0,
     validatorsBlocked: 0,
     workflowsCompleted: 0,
   });
+  // Track which workflow_ids we've seen start/complete events for so we can
+  // count each at most once even if the orchestrator emits both the legacy
+  // and the canonical event names for the same workflow.
+  const seenStartedRef = useRef<Set<string>>(new Set());
+  const seenCompletedRef = useRef<Set<string>>(new Set());
   const onEventRef = useRef(opts.onEvent);
   onEventRef.current = opts.onEvent;
 
@@ -55,24 +60,41 @@ export function useObservatory(opts: UseObservatoryOptions = {}) {
         });
         setCounters((c) => {
           const next = { ...c };
+          const wid = data.workflow_id ?? "?";
           switch (data.type) {
             case "workflow.started":
-            case "durable.workflow.started":
-              next.workflowsStarted += 1;
+            case "durable.workflow.started": {
+              if (!seenStartedRef.current.has(wid)) {
+                seenStartedRef.current.add(wid);
+                next.workflowsStarted += 1;
+              }
               break;
-            case "durable.step.started":
-            case "agent.completed":
-            case "durable.executor.invoked":
-              next.agentInvocations += 1;
-              if (data.tool) next.toolCalls += 1;
+            }
+            case "durable.executor.invoked": {
+              // Only count on `start` so we don't double-count start+complete.
+              if (data.stage && data.stage !== "start") break;
+              const et = data.executor_type ?? "";
+              if (et === "agent") {
+                // A skill run is an agent-executor invocation.
+                next.skillsInvoked += 1;
+              } else if (et === "tool" || data.tool) {
+                next.toolCalls += 1;
+              }
+              // Deterministic + validator executors are infrastructure noise
+              // for these counters; don't roll them up.
               break;
+            }
             case "durable.validator.blocked":
               next.validatorsBlocked += 1;
               break;
             case "durable.workflow.completed":
-            case "workflow.resolved":
-              next.workflowsCompleted += 1;
+            case "workflow.resolved": {
+              if (!seenCompletedRef.current.has(wid)) {
+                seenCompletedRef.current.add(wid);
+                next.workflowsCompleted += 1;
+              }
               break;
+            }
           }
           return next;
         });
