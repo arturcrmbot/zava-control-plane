@@ -19,7 +19,7 @@ in the sandbox — that hides the procedure bug.
 - [ ] §1.4  `<run-id>/api/server/mcp_tools/<tool>.py` exists for every `external_systems[].mcp_tool` not already present in the real `api/server/mcp_tools/`.
 - [ ] §1.5  `<run-id>/api/functions/workflows/<domain>.py` exists.
 - [ ] §1.6  `<run-id>/api/functions/workflows/<domain>_activities.py` exists.
-- [ ] §1.7  `<run-id>/api/functions/graphs/<domain>_<phase>.py` exists for every phase.
+- [ ] §1.7  `<run-id>/api/functions/graphs/<domain>_<phase>.py` exists for every **non-HITL** phase. (HITL phases have no graph — the orchestrator does the wait directly, mirroring `expense_claim.py`.)
 - [ ] §1.8  `<run-id>/api/functions/graphs/executors/agents/agent_<domain>_<phase>.py` exists for every agent phase.
 - [ ] §1.9  `<run-id>/api/functions/graphs/executors/validators/validate_<domain>_<phase>.py` exists for every agent phase.
 - [ ] §1.10 `<run-id>/GRADUATION.md` exists.
@@ -60,7 +60,23 @@ in the sandbox — that hides the procedure bug.
 
 ## §6 — Determinism
 
-- [ ] §6.1  Re-running `compose-domain` against the same brief produces a sandbox whose tree differs only in the `<run-id>` timestamp. (This check is performed across two consecutive runs — the operator confirms by `diff -r` of the two `<run-id>/` directories minus the timestamp directory name.)
+- [ ] §6.1  Re-running `compose-domain` against the same brief produces a sandbox whose tree differs only in the `<run-id>` timestamp directory name and the `REPORT.md` timestamp line. Verified by:
+
+      diff -r --brief \
+        tools/scratch/compose-domain/<run-id-1>/ \
+        tools/scratch/compose-domain/<run-id-2>/
+
+  Differences allowed: the top-level `<run-id>` folder name, the
+  `Generated <ts>` line in `REPORT.md` and `GRADUATION.md`. Anything else
+  is a determinism failure — the divergence points are exactly the parts
+  of the SKILLs that gave the author freedom. Codify those parts.
+
+- [ ] §6.2  HITL convention: every HITL phase's `wait_for_external_event`
+  name in the orchestrator equals `<phase_name>_decision`, and every
+  persona SKILL.md's documented "the orchestrator is waiting on the `…`
+  event" string matches. Verified by `grep -E 'wait_for_external_event'
+  <run-id>/api/functions/workflows/*.py` and `grep -E 'waiting on the'
+  <run-id>/api/server/personae/*/SKILL.md`.
 
 ## §7 — GRADUATION.md completeness
 

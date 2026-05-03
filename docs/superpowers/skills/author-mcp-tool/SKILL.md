@@ -30,17 +30,37 @@ without anyone having to plug in a real backend.
    mcp_tool: <snake_case Python module name>
    operations: [<snake_case function name>, ...]
    ```
-3. **`canonical_example_paths`** — exactly two:
-   `api/server/mcp_tools/claim_lookup.py` (HTTP-backed pattern) and
-   `api/server/mcp_tools/policy_search.py` (in-memory pattern).
+3. **`canonical_example_path`** — one absolute path. v1 canonical is
+   `api/server/mcp_tools/claim_lookup.py` (HTTP-backed pattern with the
+   in-memory escape hatch). The three v1 graduated stubs
+   (`workday_hr_employee.py`, `concur_travel_policy.py`,
+   `concur_travel_search.py`) are working examples of the in-memory
+   shape this skill produces.
 
 If any input is missing, **stop and ask**.
+
+## Note on standalone smoke testing
+
+Importing any module under `api/server/mcp_tools/` triggers
+`api/server/mcp_tools/__init__.py`, which transitively imports
+`api/server/state.py` → `BlobStore`, which connects to Azurite at
+`localhost:10000` on construction. Standalone import-smoke of a generated
+tool therefore requires Azurite running:
+
+```bash
+azurite --silent --location azurite-data \
+  --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 &
+```
+
+Without Azurite, `python -c 'import api.server.mcp_tools.<tool>'` hangs
+in retry loops until SIGINT. This is a property of the existing harness,
+not of the generated stub.
 
 ## Procedure
 
 ### Step 1 — Read both canonical examples
 
-Read both files end-to-end. Note:
+Read `canonical_example_path` end-to-end. Note:
 - the module docstring style (purpose + how it's exposed + a one-line
   caveat about what's a stub vs production-grade).
 - the `from copilot.tools import ToolResult, define_tool` import.
@@ -49,7 +69,11 @@ Read both files end-to-end. Note:
 - the `@define_tool(name=..., description=...)` registration pattern.
 - the `@traced_tool("<dotted.name>")` wrapper on the underlying function.
 
-You will mirror this shape.
+You will mirror this shape. The three v1 graduated stubs
+(`workday_hr_employee.py`, `concur_travel_policy.py`,
+`concur_travel_search.py`) are good targets to compare against once
+you've drafted yours — they are deterministic, self-contained, and
+passed CHECKLIST §4.6–4.7.
 
 ### Step 2 — Decide: HTTP-backed or in-memory?
 

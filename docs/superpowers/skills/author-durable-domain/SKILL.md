@@ -157,7 +157,11 @@ function in the same file) → terminal.
 
 ### Step 6 — Write agent executors
 
-Use `templates/agent_executor.py.tmpl`. Mirror `agent_rag_classifier.py`:
+Use `templates/agent_executor.py.tmpl`. Mirror `agent_rag_classifier.py`
+and the v1 graduated example at
+`api/functions/graphs/executors/agents/agent_fleet_travel_preapproval_policy_fit_check.py`.
+
+The pattern:
 
 ```python
 from api.server.mcp_tools.<tool_a> import <tool_a>_tool
@@ -167,12 +171,12 @@ from ._wrapper import SKILLS_DIR, run_agent_session
 
 _SKILL_DIR = SKILLS_DIR / "<domain>-<phase>"
 
+
 async def execute(input: dict) -> dict:
     workflow_id = input.get("workflow_id")
+    <input_extractions>
     prompt = (
-        f"<one-paragraph instruction that names the inputs the skill should "
-        f"call its tools with, and tells it to return JSON conforming to "
-        f"its skill spec — no prose, no markdown.>"
+        <prompt_lines>
     )
     result = await run_agent_session(
         prompt=prompt,
@@ -184,9 +188,66 @@ async def execute(input: dict) -> dict:
     return {"<phase>": result}
 ```
 
-The `prompt` must explicitly name (a) the input fields the skill will
-need, drawn from the brief's prior phases' outputs, and (b) the
-`allowed-tools` it should use. Mirror `agent_rag_classifier.py`.
+#### `<input_extractions>` — deterministic rules
+
+For each prior-phase output the agent reads (per the brief's
+`phase.intent`), emit one line in this exact form:
+
+- If the upstream phase is `kind: deterministic` or `kind: agent`: the
+  upstream produces a dict under its phase name. Extract with default:
+  ```python
+  <upstream_phase> = input.get("<upstream_phase>") or {}
+  ```
+- If the source is the original orchestrator payload (e.g. a `trip` /
+  `claim` / `candidate` block passed in at orchestration start), extract
+  the same way:
+  ```python
+  trip = input.get("trip") or {}
+  ```
+
+Do not extract scalars individually — leave that for the prompt template.
+
+#### `<prompt_lines>` — deterministic rules
+
+The prompt is constructed in **exactly four sections**, in this order:
+
+1. **One sentence stating the action** — mirrors the phase's
+   `agent_skill_name`. Example:
+   `"Determine policy fit and cost band for the proposed trip below."`
+
+2. **Input lines** — one f-string per upstream variable extracted in
+   `<input_extractions>`, naming every field the agent will reason over.
+   Use `!r` formatter to show types and quote strings. Example:
+   ```python
+   f"Trip: origin={trip.get('origin')!r}, destination={trip.get('destination')!r}, "
+   f"depart={trip.get('depart_date')!r}, return={trip.get('return_date')!r}.\n"
+   f"Employee context: grade={employee_lookup.get('grade')!r}, "
+   f"home_market={employee_lookup.get('home_market')!r}.\n\n"
+   ```
+
+3. **Tool guidance** — one sentence per `allowed-tools` entry telling the
+   agent which tool to call with which inputs. Example:
+   ```python
+   f"Use `concur_travel_policy_get_policy(grade, market)` to load the "
+   f"applicable policy slice. Use `concur_travel_search_search_options"
+   f"(origin, destination, depart_date, return_date)` to load booking "
+   f"options.\n"
+   ```
+
+4. **Closing instruction** — verbatim, every time:
+   ```python
+   f"Reason about <phase intent in 5–10 words> per your skill spec. "
+   f"Return exactly the JSON object specified in your skill instructions "
+   f"— no prose, no markdown."
+   ```
+
+   The closing instruction is what makes the SDK extraction work
+   consistently in the existing two domains. Do not paraphrase. Do not
+   add a sixth section.
+
+The v1 graduated
+`agent_fleet_travel_preapproval_policy_fit_check.py` is a complete
+worked example.
 
 ### Step 7 — Write validators
 
@@ -203,37 +264,107 @@ Use `templates/GRADUATION.md.tmpl`. The file lists every hand-edit the
 engineer must apply at graduation, with copy-pasteable diffs. Sections:
 
 1. **Copy these files** — table of `<sandbox-path> → <real-tree-path>`.
+   Generated domains create `api/server/personae/` if it does not
+   already exist.
 2. **Edit `function_app.py`** — show the literal block of new
    `@app.orchestration_trigger` and `@app.activity_trigger` decorators to
    add. Show the `from api.functions.workflows.<domain> import …` import
    to add at the top.
-3. **Edit `api/functions/workflows/activities.py`** — show the new imports
-   and the new `def <domain>_<phase>_activity(...)` functions.
+3. **`api/functions/workflows/activities.py`** — NO edit required. The
+   activities module reuses `_run_workflow` by importing it from this
+   file in `<domain>_activities.py`. State this explicitly so the
+   engineer doesn't go looking for an edit.
 4. **Edit `api/functions/graphs/__init__.py`** — show the new
    `build_<domain>_<phase>_workflow` exports.
-5. **Edit `api/server/services/simulator_orchestrator.py`** — show the
-   new `spawn_<domain>_workflow` helper, mirroring `spawn_hiring_workflow`.
-6. **Edit `api/server/services/blueprint_inventory.py`** — show the new
+5. **`api/functions/graphs/executors/agents/__init__.py`** and
+   **`api/functions/graphs/executors/validators/__init__.py`** —
+   NO edit required. These files are empty in the live tree;
+   per-phase graphs import the new modules directly
+   (`from api.functions.graphs.executors.agents import
+   agent_<domain>_<phase>`) without registration. Do NOT prescribe
+   any edit here.
+6. **Edit `api/server/services/simulator_orchestrator.py`** — show the
+   new `spawn_<domain>_workflow` helper. Mirror `spawn_hiring_workflow`
+   shape but **omit** the `app_state.store.upsert_workflow(w)` calls —
+   v1 generated domains do not upsert into the existing store (the
+   `Workflow` / `ClaimData` / `HiringData` types are domain-specific).
+   Add a comment in the helper noting this.
+7. **Edit `api/server/routes/simulator.py`** — show the new
+   `class <Domain>Body(BaseModel)` and `@router.post("/<domain>")` handler.
+8. **Edit `api/server/services/blueprint_inventory.py`** — show the new
    entry to add to the `DOMAINS` list (`name`, `status: "live"`, `skills`).
-7. **Edit `api/shared/constants.py`** — show the `<PHASE>_TIMEOUT`
+9. **Edit `api/shared/constants.py`** — show the `<PHASE>_TIMEOUT`
    constants to lift out of the orchestrator.
-8. **Smoke test commands** — `make test`, `curl
-   /api/simulator/<domain>` body, expected FleetEvent sequence on
-   `/api/blueprint/stream`.
+10. **Smoke test commands** — use this exact pattern (do NOT use
+    `/api/workflows`; generated domains don't appear there per §6 above):
+
+    ```bash
+    # 1. boot stack (azurite + functions host + fastapi)
+    bash scripts/boot-demo.sh &
+    sleep 30
+
+    # 2. fire one workflow; capture the returned id
+    RESPONSE=$(curl -s -X POST http://localhost:3001/api/simulator/<domain> \
+         -H 'Content-Type: application/json' -d '{}')
+    WORKFLOW_ID=$(echo "$RESPONSE" | python3 -c "import json,sys;print(json.load(sys.stdin)['workflow_id'])")
+    echo "spawned $WORKFLOW_ID"
+
+    # 3. (HITL only) close the gate by raising the external event directly
+    #    via Azure Durable Functions HTTP API — this needs the instance_id,
+    #    not the workflow_id. The Functions host exposes /runtime/webhooks/
+    #    durabletask/instances/<instance_id>/raiseEvent/<event_name>.
+    #    For v1 this step is operator-driven — the persona-responder
+    #    service that closes gates automatically does not yet exist.
+    ```
+
+    Watch `/api/blueprint/stream` for the expected FleetEvent sequence.
+11. **Rollback (if smoke fails)** — always include this exact block. The
+    bug is in a SKILL.md, not the graduated code. Reverting graduation,
+    fixing the SKILL.md, re-running, and re-graduating is the only
+    correct response.
+
+    ```bash
+    # Rollback the graduation in one shot. This reverts every diff
+    # GRADUATION.md prescribed and removes every copied file.
+    git restore --source=HEAD~1 \
+        function_app.py \
+        api/functions/graphs/__init__.py \
+        api/server/services/simulator_orchestrator.py \
+        api/server/routes/simulator.py \
+        api/server/services/blueprint_inventory.py \
+        api/shared/constants.py
+    rm -rf \
+        api/server/skills/<domain>-* \
+        api/server/mcp_tools/<new_tools>.py \
+        api/functions/workflows/<domain>.py \
+        api/functions/workflows/<domain>_activities.py \
+        api/functions/graphs/<domain>_*.py \
+        api/functions/graphs/executors/agents/agent_<domain>_*.py \
+        api/functions/graphs/executors/validators/validate_<domain>_*.py
+    # If this is the first generated domain (no prior personae):
+    rm -rf api/server/personae/<role>/
+    # Then: fix the SKILL.md, delete the sandbox, re-invoke compose-domain.
+    ```
 
 The GRADUATION.md does NOT execute anything. It is a checklist for a
 human.
 
 ### Step 9 — Self-check
 
-- Every phase from the brief has exactly one graph file and one activity.
+- Every **non-HITL** phase from the brief has exactly one graph file and
+  one activity. HITL phases have neither (the orchestrator does the
+  wait directly).
 - Every agent phase has exactly one agent executor and one validator.
-- Every HITL phase emits a `wait_for_external_event` and a paired
-  `create_timer`.
+- Every HITL phase emits a `wait_for_external_event("<phase_name>_decision")`
+  paired with a `create_timer`. Convention: external event name is
+  `<phase_name>_decision`, byte-identical to the persona SKILL.md's
+  documented event name.
 - The orchestrator's emit sequence at entry/exit matches `expense_claim.py`.
 - The activity functions all use `_run_workflow` from
   `api.functions.workflows.activities`.
-- GRADUATION.md mentions every file in the file set.
+- GRADUATION.md mentions every file in the file set, includes the
+  rollback block, and uses the smoke pattern from step 8 §10 (NOT
+  `/api/workflows`).
 - No `TODO` placeholder remains.
 
 If any check fails, fix in place; if you can't, stop.

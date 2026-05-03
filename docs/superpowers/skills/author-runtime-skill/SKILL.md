@@ -17,7 +17,8 @@ Your job is the file.
 
 ## Inputs you require from the caller
 
-The caller passes you, in their prompt:
+The caller passes you, in their prompt, the structured arguments
+documented in `compose-domain/SKILL.md` step 4. Specifically:
 
 1. **`mode`** — `"phase_agent"` or `"persona"`.
 2. **`output_path`** — the absolute path inside the sandbox to write to.
@@ -28,11 +29,19 @@ The caller passes you, in their prompt:
 3. **`brief`** — the relevant fragment of the YAML brief (the phase entry
    for `phase_agent`, the persona entry for `persona`).
 4. **`canonical_example_path`** — one absolute path to a real existing
-   SKILL.md you should mirror in shape.
+   SKILL.md you should mirror in shape. For `phase_agent`, the canonical
+   is `api/server/skills/receipt-validator/SKILL.md`. For `persona`, the
+   canonical is `api/server/personae/line_manager/SKILL.md` (the
+   one shipped with the v1 graduated `fleet-travel-preapproval` domain).
 5. **`available_mcp_tools`** — a list of `{name, description}` for every MCP
    tool that the agent may legitimately reference in `allowed-tools`. The
    caller assembles this from the brief's `external_systems[]` and from
    `api/server/mcp_tools/`. You may NOT invent a tool name not on this list.
+6. **`external_event_name`** (persona mode only) — the exact string the
+   orchestrator's `wait_for_external_event(...)` will use. Convention is
+   `<hitl_phase_name>_decision`. The caller passes this verbatim; you
+   write it verbatim into the persona's `## Procedure` step 3 and Rules
+   block. Do not invent.
 
 If any of these are missing, **stop and ask**. Do not guess.
 
@@ -151,6 +160,13 @@ Rules:
 - If you cannot decide because a required field is missing from the payload,
   return `{"decision": "reject", "reason": "missing <field>"}`. Do not stall.
 ```
+
+The `<external_event_name>` placeholder in the body MUST be replaced with
+the exact `external_event_name` argument the caller passed. By
+convention this is `<hitl_phase_name>_decision` (e.g.
+`manager_approval_decision`). The same string appears in the
+orchestrator's `wait_for_external_event(...)` call — they MUST match
+byte-for-byte.
 
 ### Step 6 — Write the file
 
