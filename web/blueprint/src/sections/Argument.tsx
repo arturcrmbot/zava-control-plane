@@ -1,4 +1,3 @@
-import { HarnessDiagram } from "../components/HarnessDiagram";
 
 const captions: { label: string; title: string; body: string }[] = [
   {
@@ -45,10 +44,6 @@ export function Argument() {
             above.
           </p>
         </header>
-
-        <div className="arch__frame">
-          <HarnessDiagram />
-        </div>
 
         <ol className="argument__list">
           {captions.map((item) => (
