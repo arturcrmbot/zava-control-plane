@@ -351,6 +351,17 @@ body {
   text-align: center;
 }
 
+.footer__link {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--rule);
+}
+
+.footer__link:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
 /* ---------- Section: Composition map ---------- */
 .composition {
   padding-top: var(--space-7);

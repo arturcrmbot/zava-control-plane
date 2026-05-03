@@ -23,7 +23,16 @@ export default function App() {
       <hr className="rule" />
       <Closing />
       <footer className="footer">
-        Blueprint · Powered by Microsoft · 2026
+        Written by{" "}
+        <a
+          href="https://uk.linkedin.com/in/arturzielinski"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="footer__link"
+        >
+          Artur Zielinski
+        </a>
+        {" · 2026"}
       </footer>
     </div>
   );

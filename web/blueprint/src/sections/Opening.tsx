@@ -9,7 +9,7 @@ export function Opening() {
             <br />
             hasn&apos;t compounded.
           </h1>
-          <p className="subhead">And the only thing we&apos;ve found that does.</p>
+          <p className="subhead">And the approach we think actually does.</p>
         </div>
 
         <div className="column">
