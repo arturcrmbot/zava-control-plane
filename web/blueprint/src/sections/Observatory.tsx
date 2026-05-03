@@ -75,6 +75,14 @@ export function Observatory() {
           firing, the map falls quiet.
         </p>
 
+        <p className="body observatory__note">
+          What you&apos;re watching is a replay of real workflow walks
+          captured from the running system &mdash; the same orchestrator,
+          skills and MCP tools described above, running locally on the
+          laptop these recordings came from. Same events, same cadence,
+          just played back so the page reads continuously.
+        </p>
+
         <div className="observatory__counters">
           <div className="counter">
             <div className="counter__value">{counters.workflowsStarted}</div>

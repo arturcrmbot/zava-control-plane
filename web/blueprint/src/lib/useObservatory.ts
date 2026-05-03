@@ -48,7 +48,21 @@ export function useObservatory(opts: UseObservatoryOptions = {}) {
       setStatus("connecting");
       es = new EventSource("/api/blueprint/stream");
       es.addEventListener("hello", () => {
-        if (!cancelled) setStatus("watching");
+        if (cancelled) return;
+        setStatus("watching");
+        // Reset on every connect so a page reload starts at 0 and the
+        // visitor sees the trickle from the first event they receive
+        // rather than landing in the middle of pre-existing counts.
+        seenStartedRef.current = new Set();
+        seenCompletedRef.current = new Set();
+        setEvents([]);
+        setCounters({
+          workflowsStarted: 0,
+          skillsInvoked: 0,
+          toolCalls: 0,
+          validatorsBlocked: 0,
+          workflowsCompleted: 0,
+        });
       });
       es.addEventListener("event", (raw) => {
         const data = JSON.parse((raw as MessageEvent).data) as ObservatoryEvent;

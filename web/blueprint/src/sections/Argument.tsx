@@ -1,4 +1,4 @@
-import { ArchitectureDiagram } from "../components/ArchitectureDiagram";
+import { HarnessDiagram } from "../components/HarnessDiagram";
 
 const captions: { label: string; title: string; body: string }[] = [
   {
@@ -47,7 +47,7 @@ export function Argument() {
         </header>
 
         <div className="arch__frame">
-          <ArchitectureDiagram />
+          <HarnessDiagram />
         </div>
 
         <ol className="argument__list">

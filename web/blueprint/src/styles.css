@@ -1828,3 +1828,99 @@ body {
   left: 0;
   color: var(--ink-mute);
 }
+
+/* ---------- Harness diagram (section 3, conceptual) ---------- */
+.harness {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.harness__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.harness__piece {
+  display: grid;
+  grid-template-columns: 4rem 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--bg-elev);
+  cursor: pointer;
+  transition: opacity 220ms ease, border-color 220ms ease, background 220ms ease, transform 220ms ease;
+}
+
+.harness__piece:focus { outline: none; }
+
+.harness__piece--harness    { border-left: 3px solid #d8a25e; }
+.harness__piece--skills     { border-left: 3px solid #7fb3a3; }
+.harness__piece--mcps       { border-left: 3px solid #8aa6c8; }
+.harness__piece--guarantees { border-left: 3px solid var(--accent); }
+
+.harness__piece--lit {
+  border-color: var(--accent);
+  background: rgba(244, 163, 0, 0.06);
+  transform: translateX(4px);
+}
+
+.harness__piece--dim {
+  opacity: 0.45;
+}
+
+.harness__piece-num {
+  font-family: var(--mono-family);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-mute);
+}
+
+.harness__piece-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.harness__piece-label {
+  font-family: var(--sans);
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+
+.harness__piece-sub {
+  font-family: var(--mono-family);
+  font-size: 0.78rem;
+  color: var(--ink-mute);
+  letter-spacing: 0.02em;
+}
+
+.harness__caption {
+  min-height: 4rem;
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--rule);
+  border-radius: 3px;
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  color: var(--ink-dim);
+  line-height: 1.5;
+  transition: color 220ms ease, border-color 220ms ease;
+}
+
+.harness__caption--active {
+  color: var(--ink);
+  border-color: rgba(244, 163, 0, 0.4);
+  border-style: solid;
+}
+
+.observatory__note {
+  color: var(--ink-mute);
+  font-style: italic;
+  border-left: 2px solid rgba(244, 163, 0, 0.35);
+  padding-left: var(--space-3);
+}

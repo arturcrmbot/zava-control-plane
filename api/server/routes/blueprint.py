@@ -132,10 +132,24 @@ def _normalise_event(event: FleetEvent) -> dict[str, Any] | None:
 
 @router.get("/api/blueprint/stream")
 async def blueprint_stream(request: Request) -> EventSourceResponse:
-    queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=200)
+    """Per-connection event stream.
+
+    Each browser connection runs its own replay loop so a fresh page load
+    starts at the beginning of a workflow rather than landing in the
+    middle of one. Two parallel sources are merged:
+
+      1. Per-connection replay of recorded templates (the bulk of what
+         the page sees). Picked fresh on connect.
+      2. Live FleetEvents from the in-process bus (used when there's a
+         real backend driving workflows in dev). Always streamed too so
+         the page reflects activity if the operator triggers something.
+
+    No global trickle. _stream_loop is gone.
+    """
+    queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=400)
     loop = asyncio.get_running_loop()
 
-    def _push(event: FleetEvent) -> None:
+    def _push_bus_event(event: FleetEvent) -> None:
         normalised = _normalise_event(event)
         if normalised is None:
             return
@@ -144,7 +158,78 @@ async def blueprint_stream(request: Request) -> EventSourceResponse:
         except (RuntimeError, asyncio.QueueFull):
             pass
 
-    unsubscribe = app_state.bus.on_any(_push)
+    unsubscribe = app_state.bus.on_any(_push_bus_event)
+
+    # Per-connection replay task — owns its own in-flight queue, picks
+    # fresh templates, paces itself, and pushes normalised events onto
+    # the same queue. Cancelled on disconnect.
+    async def _per_connection_replay() -> None:
+        in_flight: list[dict[str, Any]] = []
+        try:
+            while True:
+                # Maintain exactly 1 workflow in flight so the visitor
+                # nearly always catches the start of a workflow within a
+                # few seconds of landing on the page.
+                if not in_flight:
+                    recorded = load_recorded_templates()
+                    if recorded:
+                        template = random.choice(recorded)
+                        wf_type = template["workflow_type"]
+                        prefix = _PREFIX_BY_TYPE.get(wf_type, "WF")
+                        wid = f"{prefix}-{random.randint(1000, 9999)}"
+                        events_with_deltas = [
+                            {"event": dict(e, workflow_id=wid), "delta_ms": d}
+                            for e, d in zip(template["events"], template["deltas_ms"])
+                        ]
+                        in_flight.append({
+                            "events": events_with_deltas,
+                            "wid": wid,
+                            "source": template.get("source", "recorded"),
+                        })
+                    elif _STREAM_TEMPLATES:
+                        template = random.choice(_STREAM_TEMPLATES)
+                        wf_type = template[0].get("workflow_type", "hiring")
+                        prefix = _PREFIX_BY_TYPE.get(wf_type, "WF")
+                        wid = f"{prefix}-{random.randint(1000, 9999)}"
+                        events_with_deltas = [
+                            {"event": dict(e, workflow_id=wid), "delta_ms": 0}
+                            for e in template
+                        ]
+                        in_flight.append({
+                            "events": events_with_deltas,
+                            "wid": wid,
+                            "source": "synthetic",
+                        })
+                    else:
+                        # Nothing to replay; idle.
+                        await asyncio.sleep(2.0)
+                        continue
+
+                slot = in_flight[0]
+                entry = slot["events"].pop(0)
+                try:
+                    fe = FleetEvent(**entry["event"])
+                    normalised = _normalise_event(fe)
+                    if normalised is not None:
+                        try:
+                            queue.put_nowait(normalised)
+                        except asyncio.QueueFull:
+                            pass
+                except Exception:
+                    pass
+                if not slot["events"]:
+                    in_flight.pop(0)
+
+                delta = entry.get("delta_ms", 0)
+                if delta >= 200:
+                    pause = min(delta, 4000) / 1000.0
+                else:
+                    pause = random.uniform(0.9, 2.4)
+                await asyncio.sleep(pause)
+        except asyncio.CancelledError:
+            return
+
+    replay_task = asyncio.create_task(_per_connection_replay())
 
     async def _gen():
         yield {"event": "hello", "data": json.dumps({"ts": time.time()})}
@@ -162,6 +247,7 @@ async def blueprint_stream(request: Request) -> EventSourceResponse:
                 unsubscribe()
             except Exception:
                 pass
+            replay_task.cancel()
 
     return EventSourceResponse(_gen())
 
