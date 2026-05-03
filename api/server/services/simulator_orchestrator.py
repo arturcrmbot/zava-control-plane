@@ -419,6 +419,11 @@ async def ramp_loop() -> None:
         "expense-claim": spawn_expense_workflow,
         "hiring": spawn_hiring_workflow,
         "travel-preapproval": spawn_travel_preapproval_workflow,
+        "employee-onboarding": spawn_fleet_employee_onboarding_workflow,
+        "vendor-kyc": spawn_fleet_vendor_kyc_workflow,
+        "it-access-request": spawn_fleet_it_access_request_workflow,
+        "contract-renewal": spawn_fleet_contract_renewal_workflow,
+        "perf-review": spawn_fleet_perf_review_workflow,
     }
 
     domains_csv = os.getenv("SIMULATOR_RAMP_DOMAINS", "").strip()
@@ -487,3 +492,235 @@ async def _per_domain_ramp(
         jittered = avg_interval * (0.7 + random.random() * 0.6)
         await asyncio.sleep(jittered)
 
+
+
+# === BEGIN compose-domain fleet-employee-onboarding ===
+_onb_seq = 0
+
+
+async def spawn_fleet_employee_onboarding_workflow(
+    employee_id: str | None = None,
+    department: str | None = None,
+    scenario: str | None = None,
+) -> str:
+    """Generated-domain simulator entry: spawn an Employee onboarding
+    workflow. Optional `employee_id` picks a specific synthetic joiner
+    (deterministic). Optional `department` overrides the default. Optional
+    `scenario` tags the payload.
+
+    Note: generated domains do not currently upsert into app_state.store
+    (the existing Workflow / ClaimData / HiringData types are domain-
+    specific). State lives only in Durable + the FleetEvent stream.
+    """
+    global _onb_seq
+    _onb_seq += 1
+    wid = f"ONB-{_onb_seq:04d}"
+    eid = employee_id or f"EMP-{(_onb_seq * 23) % 9000 + 1000:04d}"
+    bid = f"EMP-{(_onb_seq * 41) % 9000 + 1000:04d}"
+    dep = department or "Engineering"
+    payload: dict = {
+        "workflow_id": wid,
+        "type": "employee-onboarding",
+        "joiner": {
+            "employee_id": eid,
+            "department": dep,
+            "buddy_id": bid,
+            "start_date": "2026-06-15",
+        },
+    }
+    if scenario:
+        payload["scenario"] = scenario
+    try:
+        await schedule_new_orchestration(
+            payload, function_name="FleetEmployeeOnboardingOrchestrator",
+        )
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    return wid
+# === END compose-domain fleet-employee-onboarding ===
+
+
+# === BEGIN compose-domain fleet-vendor-kyc ===
+_fvk_seq = 0
+
+
+async def spawn_fleet_vendor_kyc_workflow(
+    vendor_name: str | None = None,
+    country: str | None = None,
+    proposing_agency: str | None = None,
+    scenario: str | None = None,
+) -> str:
+    """Spawn a Vendor onboarding & KYC workflow. Optional fields fall back
+    to deterministic synthetic vendor records.
+
+    Note: generated domains do not currently upsert into app_state.store
+    (the existing Workflow / ClaimData / HiringData types are domain-
+    specific). State lives only in Durable + the FleetEvent stream.
+    """
+    global _fvk_seq
+    _fvk_seq += 1
+    wid = f"VKY-{_fvk_seq:04d}"
+    _names = ["Acme Holdings", "Northwind Trading", "Initech Systems",
+              "Globex Industries", "Umbrella Logistics", "Hooli Capital",
+              "Pied Piper Services", "Stark Materials"]
+    _countries = ["GB", "US", "DE", "FR", "JP", "AE", "SG", "CH"]
+    _agencies = ["Mindshare", "Wavemaker", "Mediacom", "EssenceMediacom",
+                 "Ogilvy", "Grey", "VMLY&R"]
+    payload: dict = {
+        "workflow_id": wid,
+        "type": "vendor-kyc",
+        "vendor": {
+            "name": vendor_name or _names[(_fvk_seq * 7) % len(_names)],
+            "country_of_incorporation": country or _countries[(_fvk_seq * 5) % len(_countries)],
+            "proposing_agency": proposing_agency or _agencies[(_fvk_seq * 3) % len(_agencies)],
+        },
+    }
+    if scenario:
+        payload["scenario"] = scenario
+    try:
+        await schedule_new_orchestration(
+            payload, function_name="FleetVendorKycOrchestrator",
+        )
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    return wid
+# === END compose-domain fleet-vendor-kyc ===
+
+
+# === BEGIN compose-domain fleet-it-access-request ===
+_itar_seq = 0
+
+
+async def spawn_fleet_it_access_request_workflow(
+    employee_id: str | None = None,
+    department: str | None = None,
+    requested_role_templates: list[str] | None = None,
+    business_justification: str | None = None,
+    scenario: str | None = None,
+) -> str:
+    """Generated-domain simulator entry: spawn an IT access request
+    workflow. Optional `employee_id` picks a specific synthetic employee
+    (deterministic). Optional `department` overrides the default. Optional
+    `requested_role_templates` overrides the default 2-template request.
+    Optional `business_justification` overrides the default rationale.
+    Optional `scenario` tags the payload.
+
+    Note: generated domains do not currently upsert into app_state.store
+    (the existing Workflow / ClaimData / HiringData types are domain-
+    specific). State lives only in Durable + the FleetEvent stream.
+    """
+    global _itar_seq
+    _itar_seq += 1
+    wid = f"ITAR-{_itar_seq:04d}"
+    eid = employee_id or f"EMP-{(_itar_seq * 19) % 9000 + 1000:04d}"
+    dep = department or "Finance"
+    templates = requested_role_templates or [
+        f"tmpl-{dep.lower()[:3]}-g3-{(_itar_seq * 7) % 100:02d}",
+        f"tmpl-{dep.lower()[:3]}-g3-{(_itar_seq * 11) % 100:02d}",
+    ]
+    bj = business_justification or (
+        "Project rotation onto Q3 finance-analytics workstream; "
+        "needs read-access to dashboards and write-access to scenario folder."
+    )
+    payload: dict = {
+        "workflow_id": wid,
+        "type": "it-access-request",
+        "request": {
+            "employee_id": eid,
+            "department": dep,
+            "requested_role_templates": templates,
+            "business_justification": bj,
+        },
+    }
+    if scenario:
+        payload["scenario"] = scenario
+    try:
+        await schedule_new_orchestration(
+            payload, function_name="FleetItAccessRequestOrchestrator",
+        )
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    return wid
+# === END compose-domain fleet-it-access-request ===
+
+
+# === BEGIN compose-domain fleet-contract-renewal ===
+_crn_seq = 0
+
+
+async def spawn_fleet_contract_renewal_workflow(
+    contract_id: str | None = None,
+    scenario: str | None = None,
+) -> str:
+    """Generated-domain simulator entry: spawn a Contract renewal workflow.
+    Optional `contract_id` picks a specific synthetic contract
+    (deterministic). Optional `scenario` tags the payload.
+
+    Note: generated domains do not currently upsert into app_state.store
+    (the existing Workflow / ClaimData / HiringData types are domain-
+    specific). State lives only in Durable + the FleetEvent stream.
+    """
+    global _crn_seq
+    _crn_seq += 1
+    wid = f"CRN-{_crn_seq:04d}"
+    cid = contract_id or f"CRN-{(_crn_seq * 23) % 9000 + 1000:04d}"
+    payload: dict = {
+        "workflow_id": wid,
+        "type": "contract-renewal",
+        "contract": {
+            "contract_id": cid,
+        },
+    }
+    if scenario:
+        payload["scenario"] = scenario
+    try:
+        await schedule_new_orchestration(
+            payload, function_name="FleetContractRenewalOrchestrator",
+        )
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    return wid
+# === END compose-domain fleet-contract-renewal ===
+
+
+# === BEGIN compose-domain fleet-perf-review ===
+_prr_seq = 0
+
+
+async def spawn_fleet_perf_review_workflow(
+    employee_id: str | None = None,
+    cycle: str | None = None,
+    scenario: str | None = None,
+) -> str:
+    """Generated-domain simulator entry: spawn a Performance review workflow.
+    Optional `employee_id` picks a specific synthetic reviewee
+    (deterministic). Optional `cycle` overrides the default cycle label.
+    Optional `scenario` tags the payload.
+
+    Note: generated domains do not currently upsert into app_state.store
+    (the existing Workflow / ClaimData / HiringData types are domain-
+    specific). State lives only in Durable + the FleetEvent stream.
+    """
+    global _prr_seq
+    _prr_seq += 1
+    wid = f"PRR-{_prr_seq:04d}"
+    eid = employee_id or f"EMP-{(_prr_seq * 31) % 9000 + 1000:04d}"
+    cyc = cycle or "2026-H1"
+    payload: dict = {
+        "workflow_id": wid,
+        "type": "perf-review",
+        "review": {
+            "employee_id": eid,
+            "cycle": cyc,
+        },
+    }
+    if scenario:
+        payload["scenario"] = scenario
+    try:
+        await schedule_new_orchestration(
+            payload, function_name="FleetPerfReviewOrchestrator",
+        )
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    return wid
+# === END compose-domain fleet-perf-review ===

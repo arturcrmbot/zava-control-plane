@@ -144,3 +144,127 @@ async def inject_travel(body: TravelBody):
         employee_id=body.employee_id, scenario=body.scenario,
     )
     return {"workflow_id": workflow_id}
+
+
+# === BEGIN compose-domain fleet-employee-onboarding ===
+from api.server.services.simulator_orchestrator import (  # noqa: E402
+    spawn_fleet_employee_onboarding_workflow,
+)
+
+
+class FleetEmployeeOnboardingBody(BaseModel):
+    employee_id: str | None = None
+    department: str | None = None
+    scenario: str | None = None
+
+
+@router.post("/fleet-employee-onboarding")
+async def inject_fleet_employee_onboarding(body: FleetEmployeeOnboardingBody):
+    """Generated-domain simulator: spawn an Employee onboarding workflow."""
+    workflow_id = await spawn_fleet_employee_onboarding_workflow(
+        employee_id=body.employee_id,
+        department=body.department,
+        scenario=body.scenario,
+    )
+    return {"workflow_id": workflow_id}
+# === END compose-domain fleet-employee-onboarding ===
+
+
+# === BEGIN compose-domain fleet-vendor-kyc ===
+from api.server.services.simulator_orchestrator import (  # noqa: E402
+    spawn_fleet_vendor_kyc_workflow,
+)
+
+
+class VendorKycBody(BaseModel):
+    vendor_name: str | None = None
+    country: str | None = None
+    proposing_agency: str | None = None
+    scenario: str | None = None
+
+
+@router.post("/fleet-vendor-kyc")
+async def inject_fleet_vendor_kyc(body: VendorKycBody):
+    """Generated-domain simulator: spawn a Vendor onboarding & KYC workflow."""
+    workflow_id = await spawn_fleet_vendor_kyc_workflow(
+        vendor_name=body.vendor_name,
+        country=body.country,
+        proposing_agency=body.proposing_agency,
+        scenario=body.scenario,
+    )
+    return {"workflow_id": workflow_id}
+# === END compose-domain fleet-vendor-kyc ===
+
+
+# === BEGIN compose-domain fleet-it-access-request ===
+from api.server.services.simulator_orchestrator import (  # noqa: E402
+    spawn_fleet_it_access_request_workflow,
+)
+
+
+class FleetItAccessRequestBody(BaseModel):
+    employee_id: str | None = None
+    department: str | None = None
+    requested_role_templates: list[str] | None = None
+    business_justification: str | None = None
+    scenario: str | None = None
+
+
+@router.post("/fleet-it-access-request")
+async def inject_fleet_it_access_request(body: FleetItAccessRequestBody):
+    """Generated-domain simulator: spawn an IT access request workflow."""
+    workflow_id = await spawn_fleet_it_access_request_workflow(
+        employee_id=body.employee_id,
+        department=body.department,
+        requested_role_templates=body.requested_role_templates,
+        business_justification=body.business_justification,
+        scenario=body.scenario,
+    )
+    return {"workflow_id": workflow_id}
+# === END compose-domain fleet-it-access-request ===
+
+
+# === BEGIN compose-domain fleet-contract-renewal ===
+from api.server.services.simulator_orchestrator import (  # noqa: E402
+    spawn_fleet_contract_renewal_workflow,
+)
+
+
+class FleetContractRenewalBody(BaseModel):
+    contract_id: str | None = None
+    scenario: str | None = None
+
+
+@router.post("/fleet-contract-renewal")
+async def inject_fleet_contract_renewal(body: FleetContractRenewalBody):
+    """Generated-domain simulator: spawn a Contract renewal workflow."""
+    workflow_id = await spawn_fleet_contract_renewal_workflow(
+        contract_id=body.contract_id,
+        scenario=body.scenario,
+    )
+    return {"workflow_id": workflow_id}
+# === END compose-domain fleet-contract-renewal ===
+
+
+# === BEGIN compose-domain fleet-perf-review ===
+from api.server.services.simulator_orchestrator import (  # noqa: E402
+    spawn_fleet_perf_review_workflow,
+)
+
+
+class FleetPerfReviewBody(BaseModel):
+    employee_id: str | None = None
+    cycle: str | None = None
+    scenario: str | None = None
+
+
+@router.post("/fleet-perf-review")
+async def inject_fleet_perf_review(body: FleetPerfReviewBody):
+    """Generated-domain simulator: spawn a Performance review workflow."""
+    workflow_id = await spawn_fleet_perf_review_workflow(
+        employee_id=body.employee_id,
+        cycle=body.cycle,
+        scenario=body.scenario,
+    )
+    return {"workflow_id": workflow_id}
+# === END compose-domain fleet-perf-review ===

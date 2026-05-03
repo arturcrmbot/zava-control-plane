@@ -175,6 +175,12 @@ improvisation from the procedure.
   each `operations[].name`: `<mcp_tool>_<operation>`. E.g.
   `concur_travel_policy_get_policy`. The agent skill's `allowed-tools`
   CSV uses these names verbatim.
+- **Validator file name.** `validate_<domain.name with - replaced by _>_<phase_name>_schema.py`.
+  E.g. `validate_fleet_employee_onboarding_access_drafter_schema.py`.
+  The full domain prefix is **required** — without it, two domains with
+  same-named agent phases (e.g. multiple "drafter" phases) will collide
+  in `api/functions/graphs/executors/validators/`.
+- **Validator class / executor name.** `validate_<domain.name with - replaced by _>_<phase_name>` (the file's name minus `_schema.py`). Same prefix-required reason.
 - **Run id.** `<YYYYMMDD-HHMMSS>-<domain.name>` from current UTC time.
   Compute once at the top of step 4; use the literal value everywhere
   downstream.

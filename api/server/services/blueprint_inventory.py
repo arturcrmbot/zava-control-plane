@@ -133,6 +133,73 @@ DOMAINS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "Employee onboarding",
+        "status": "live",
+        "workflow_type": "employee-onboarding",
+        "skills": [
+            "fleet-employee-onboarding-access-drafter",
+            "fleet-employee-onboarding-induction-planner",
+        ],
+        "phase_aliases": {
+            "fleet-employee-onboarding-access-drafter": "Access drafter",
+            "fleet-employee-onboarding-induction-planner": "Induction planner",
+        },
+    },
+    {
+        "name": "Vendor onboarding & KYC",
+        "status": "live",
+        "workflow_type": "vendor-kyc",
+        "skills": [
+            "fleet-vendor-kyc-kyc-diligence-checker",
+            "fleet-vendor-kyc-ubo-resolver",
+        ],
+        "phase_aliases": {
+            "vendor_intake": "Vendor Intake",
+            "kyc_diligence": "KYC Diligence",
+            "ubo_resolver": "UBO Resolver",
+            "finance_signoff": "Finance Signoff",
+        },
+    },
+    {
+        "name": "IT access request",
+        "status": "live",
+        "workflow_type": "it-access-request",
+        "skills": [
+            "fleet-it-access-request-rbac-resolver",
+            "fleet-it-access-request-access-risk-assessor",
+        ],
+        "phase_aliases": {
+            "fleet-it-access-request-rbac-resolver": "RBAC resolver",
+            "fleet-it-access-request-access-risk-assessor": "Access risk assessor",
+        },
+    },
+    {
+        "name": "Contract renewal",
+        "status": "live",
+        "workflow_type": "contract-renewal",
+        "skills": [
+            "fleet-contract-renewal-market-benchmarker",
+            "fleet-contract-renewal-renewal-terms-drafter",
+        ],
+        "phase_aliases": {
+            "fleet-contract-renewal-market-benchmarker": "Market benchmarker",
+            "fleet-contract-renewal-renewal-terms-drafter": "Renewal terms drafter",
+        },
+    },
+    {
+        "name": "Performance review",
+        "status": "live",
+        "workflow_type": "perf-review",
+        "skills": [
+            "fleet-perf-review-peer-feedback-aggregator",
+            "fleet-perf-review-calibration-drafter",
+        ],
+        "phase_aliases": {
+            "fleet-perf-review-peer-feedback-aggregator": "Peer feedback aggregator",
+            "fleet-perf-review-calibration-drafter": "Calibration drafter",
+        },
+    },
+    {
         "name": "Procurement",
         "status": "aspirational",
         "workflow_type": None,

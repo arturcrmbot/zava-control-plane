@@ -209,3 +209,158 @@ async def http_start(req: func.HttpRequest, client: df.DurableOrchestrationClien
     payload = req.get_json() if req.get_body() else {}
     instance_id = await client.start_new(function_name, None, payload)
     return client.create_check_status_response(req, instance_id)
+
+# === BEGIN compose-domain fleet-employee-onboarding ===
+from api.functions.workflows.fleet_employee_onboarding import (
+    fleet_employee_onboarding_orchestration,
+)
+from api.functions.workflows.fleet_employee_onboarding_activities import (
+    fleet_employee_onboarding_employee_lookup_activity,
+    fleet_employee_onboarding_access_drafter_activity,
+    fleet_employee_onboarding_induction_planner_activity,
+)
+
+
+@app.orchestration_trigger(context_name="context")
+def FleetEmployeeOnboardingOrchestrator(context: df.DurableOrchestrationContext):
+    return fleet_employee_onboarding_orchestration(context)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_employee_onboarding_employee_lookup_activity_trigger(payload: dict) -> dict:
+    return fleet_employee_onboarding_employee_lookup_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_employee_onboarding_access_drafter_activity_trigger(payload: dict) -> dict:
+    return fleet_employee_onboarding_access_drafter_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_employee_onboarding_induction_planner_activity_trigger(payload: dict) -> dict:
+    return fleet_employee_onboarding_induction_planner_activity(payload)
+# === END compose-domain fleet-employee-onboarding ===
+
+# === BEGIN compose-domain fleet-vendor-kyc ===
+from api.functions.workflows.fleet_vendor_kyc import (
+    fleet_vendor_kyc_orchestration,
+)
+from api.functions.workflows.fleet_vendor_kyc_activities import (
+    fleet_vendor_kyc_vendor_intake_activity,
+    fleet_vendor_kyc_kyc_diligence_activity,
+    fleet_vendor_kyc_ubo_resolver_activity,
+)
+
+
+@app.orchestration_trigger(context_name="context")
+def FleetVendorKycOrchestrator(context: df.DurableOrchestrationContext):
+    return fleet_vendor_kyc_orchestration(context)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_vendor_kyc_vendor_intake_activity_trigger(payload: dict) -> dict:
+    return fleet_vendor_kyc_vendor_intake_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_vendor_kyc_kyc_diligence_activity_trigger(payload: dict) -> dict:
+    return fleet_vendor_kyc_kyc_diligence_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_vendor_kyc_ubo_resolver_activity_trigger(payload: dict) -> dict:
+    return fleet_vendor_kyc_ubo_resolver_activity(payload)
+# === END compose-domain fleet-vendor-kyc ===
+
+# === BEGIN compose-domain fleet-it-access-request ===
+from api.functions.workflows.fleet_it_access_request import (
+    fleet_it_access_request_orchestration,
+)
+from api.functions.workflows.fleet_it_access_request_activities import (
+    fleet_it_access_request_employee_lookup_activity,
+    fleet_it_access_request_rbac_resolver_activity,
+    fleet_it_access_request_risk_assessor_activity,
+)
+
+
+@app.orchestration_trigger(context_name="context")
+def FleetItAccessRequestOrchestrator(context: df.DurableOrchestrationContext):
+    return fleet_it_access_request_orchestration(context)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_it_access_request_employee_lookup_activity_trigger(payload: dict) -> dict:
+    return fleet_it_access_request_employee_lookup_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_it_access_request_rbac_resolver_activity_trigger(payload: dict) -> dict:
+    return fleet_it_access_request_rbac_resolver_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_it_access_request_risk_assessor_activity_trigger(payload: dict) -> dict:
+    return fleet_it_access_request_risk_assessor_activity(payload)
+# === END compose-domain fleet-it-access-request ===
+
+# === BEGIN compose-domain fleet-contract-renewal ===
+from api.functions.workflows.fleet_contract_renewal import (
+    fleet_contract_renewal_orchestration,
+)
+from api.functions.workflows.fleet_contract_renewal_activities import (
+    fleet_contract_renewal_contract_lookup_activity,
+    fleet_contract_renewal_market_benchmarker_activity,
+    fleet_contract_renewal_renewal_terms_drafter_activity,
+)
+
+
+@app.orchestration_trigger(context_name="context")
+def FleetContractRenewalOrchestrator(context: df.DurableOrchestrationContext):
+    return fleet_contract_renewal_orchestration(context)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_contract_renewal_contract_lookup_activity_trigger(payload: dict) -> dict:
+    return fleet_contract_renewal_contract_lookup_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_contract_renewal_market_benchmarker_activity_trigger(payload: dict) -> dict:
+    return fleet_contract_renewal_market_benchmarker_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_contract_renewal_renewal_terms_drafter_activity_trigger(payload: dict) -> dict:
+    return fleet_contract_renewal_renewal_terms_drafter_activity(payload)
+# === END compose-domain fleet-contract-renewal ===
+
+# === BEGIN compose-domain fleet-perf-review ===
+from api.functions.workflows.fleet_perf_review import (
+    fleet_perf_review_orchestration,
+)
+from api.functions.workflows.fleet_perf_review_activities import (
+    fleet_perf_review_employee_lookup_activity,
+    fleet_perf_review_peer_feedback_aggregator_activity,
+    fleet_perf_review_calibration_drafter_activity,
+)
+
+
+@app.orchestration_trigger(context_name="context")
+def FleetPerfReviewOrchestrator(context: df.DurableOrchestrationContext):
+    return fleet_perf_review_orchestration(context)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_perf_review_employee_lookup_activity_trigger(payload: dict) -> dict:
+    return fleet_perf_review_employee_lookup_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_perf_review_peer_feedback_aggregator_activity_trigger(payload: dict) -> dict:
+    return fleet_perf_review_peer_feedback_aggregator_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_perf_review_calibration_drafter_activity_trigger(payload: dict) -> dict:
+    return fleet_perf_review_calibration_drafter_activity(payload)
+# === END compose-domain fleet-perf-review ===

@@ -16,7 +16,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-export PERSONA_AUTO_CLOSE="line_manager,claim_submitter,ssc_reviewer,finance_bp,hr_bp,recruiter,candidate"
+export PERSONA_AUTO_CLOSE="line_manager,claim_submitter,ssc_reviewer,finance_bp,hr_bp,recruiter,candidate,onboarding_it_admin,vendor_kyc_finance_bp,it_access_line_manager,it_access_it_admin,contract_finance_bp,contract_line_manager,perf_review_hr_bp,perf_review_line_manager"
 echo "[profile-autonomous] PERSONA_AUTO_CLOSE=$PERSONA_AUTO_CLOSE"
 echo "[profile-autonomous] every persona is AUTO. real humans bypassed."
 

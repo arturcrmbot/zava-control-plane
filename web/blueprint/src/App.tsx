@@ -23,7 +23,7 @@ export default function App() {
       <hr className="rule" />
       <Closing />
       <footer className="footer">
-        Blueprint · WPP Control Plane · 2026
+        Blueprint · Powered by Microsoft · 2026
       </footer>
     </div>
   );
