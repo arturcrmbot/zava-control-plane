@@ -47,7 +47,9 @@ dev = [
   "pytest-mock>=3.14",
   "ruff>=0.7",
   # Mock httpx in service tests (email_send, heygen_client)
-  "respx>=0.21"
+  "respx>=0.21",
+  # Used only by scripts/generate_blueprint_image.py (Gemini image generation)
+  "google-genai>=1.0",
 ]
 
 [tool.pytest.ini_options]

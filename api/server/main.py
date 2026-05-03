@@ -107,6 +107,8 @@ from api.server.routes.portal import router as portal_router
 from api.server.routes.portal_voice import router as portal_voice_router
 from api.server.routes.portal_interview import router as portal_interview_router
 from api.server.routes.portal_admin_decisions import router as portal_admin_decisions_router
+# Blueprint microsite — composition tree + live observatory SSE
+from api.server.routes.blueprint import router as blueprint_router
 
 for r in (stream_router, workflows_router, exceptions_router, policy_router,
           simulator_router, audit_router, evals_router, orchestration_router,
@@ -115,5 +117,6 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           webhooks_servicenow_router, webhooks_finance_bp_router,
           a2a_router,
           portal_router, portal_voice_router, portal_interview_router,
-          portal_admin_decisions_router):
+          portal_admin_decisions_router,
+          blueprint_router):
     app.include_router(r)

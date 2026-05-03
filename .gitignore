@@ -36,6 +36,7 @@ local.settings.json
 
 # Playwright CLI per-user state (distinct from .playwright-mcp/)
 .playwright/
+.playwright-cli/
 
 # OS
 Thumbs.db
@@ -69,6 +70,9 @@ api/functions/host.json
 # Demo / dev screenshots — local artifacts, not source
 screenshots/
 *.png
+# But keep the blueprint editorial illustration — it's a real artefact,
+# expensive to regenerate (Nano Banana Pro), and the page depends on it.
+!web/blueprint/public/gutenberg.png
 
 # Local eval store
 data/.eval/
