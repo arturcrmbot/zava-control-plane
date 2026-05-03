@@ -36,7 +36,12 @@ GET /api/blueprint/stream
 
 That feed forwards a curated subset of `FleetEvent`s (defined in
 `api/shared/events.py`) and translates them into the visual vocabulary the
-mind-map understands.
+mind-map understands. The events come from one of three sources, in
+order of preference: real workflow events on the in-process bus,
+recordings of past real walks replayed from
+`data/blueprint-recordings/*.jsonl`, or hand-coded synthetic templates
+as a last-resort fallback. See the "make the new domain light up" section
+below.
 
 ---
 
@@ -156,26 +161,93 @@ Order of entries in `DOMAINS` matters for two views:
 
 ## To make the new domain light up on the live mind-map
 
-There are two paths.
+Three paths, in order of preference.
 
-### Path A: real workflow events
+### Path A: real workflow events on the bus (preferred for local dev)
 
-If the new domain's orchestrator already emits `FleetEvent`s with
-`workflow_type` set to the manifest's value, you don't need to do
-anything. The blueprint observatory will see them on the bus and
-forward them to the page.
+If the new domain's orchestrator emits `FleetEvent`s with `workflow_type`
+set to the manifest's value, you don't need to do anything else. The
+blueprint observatory subscribes to the in-process bus and forwards
+matching events to the page.
 
-### Path B: dev demo trickle (for desk demos before the orchestrator is built)
+This is what runs when you're sitting at your desk with the full stack up
+(`make up` or equivalent — FastAPI + Functions host + your real workflows
+firing).
 
-To make the always-on stream include your new domain, append a workflow
-template to `_STREAM_TEMPLATES` in
+### Path B: capture real events to JSONL, replay them in deployment (preferred for deploys)
+
+For an external demo URL, the page can't connect to your live laptop.
+Capture real walks once, commit the JSONL files, deploy with them baked
+into the image. Playback uses the same SSE plumbing as Path A — the page
+can't tell the difference.
+
+```bash
+# 1. Boot the full stack with the real backend firing events.
+make up
+
+# 2. Start the recorder.
+curl -X POST http://localhost:3001/api/blueprint/_recorder/start
+
+# 3. Run your real workflows however you trigger them
+#    (simulator inject, portal /apply, persona responder, real API).
+
+# 4. Watch them complete. The recorder auto-flushes each workflow on
+#    durable.workflow.completed; partial walks are flushed on stop.
+
+# 5. Stop and check what landed.
+curl -X POST http://localhost:3001/api/blueprint/_recorder/stop
+ls -la data/blueprint-recordings/
+```
+
+Files land at `data/blueprint-recordings/<workflow_type>-<UTC>-<id>.jsonl`,
+one workflow per file. Inspect them — hand-delete short or weird runs.
+Multiple recordings of the same `workflow_type` are fine; the playback
+loop picks one at random per spawn, which gives the page variety.
+
+```bash
+# 6. Commit them.
+git add data/blueprint-recordings/*.jsonl
+git commit -m "record: <domain> walks for blueprint trickle"
+```
+
+The next time anyone hits `/api/blueprint/_demo_stream/start` (or clicks
+**Wake the observatory** on the page), the trickle replays the recordings
+at their original cadence (clamped to 200ms–4s per gap to keep it
+readable), substituting a fresh `workflow_id` per spawn so multiple
+in-flight copies don't collide.
+
+What gets captured: only the events the observatory cares about (the
+`RECORDED_TYPES` set in
+[`api/server/services/blueprint_recorder.py`](../../api/server/services/blueprint_recorder.py)),
+and only events that carry a `workflow_id`. Everything else is dropped at
+capture time so you don't accumulate noise.
+
+What gets recorded with the event:
+
+- The full event payload as the bus carries it.
+- A millisecond offset from the workflow's first event (`ts_offset_ms`),
+  used to pace the playback.
+
+There is no `_recorder/status` UI on the page — it's a developer endpoint
+only. Hit `GET /api/blueprint/_recorder/status` from curl if you want to
+check whether a session is currently running.
+
+### Path C: hand-coded synthetic template (fallback when no recordings exist)
+
+If there are no recordings for a domain yet, the trickle falls back to
+hand-coded templates in `_STREAM_TEMPLATES` in
 [`api/server/routes/blueprint.py`](../../api/server/routes/blueprint.py).
+These are the events the page emitted before the recorder existed; they
+cover hiring, expense-claim, and onboarding.
 
-Each template is an ordered list of dicts. Every dict needs `type` and
-`workflow_type`; `skill` and `tool` are optional but recommended:
+Adding a new synthetic template is fine for early-days domains where the
+real orchestrator isn't shipped yet but you want the page to show
+*something*. Each template is an ordered list of dicts. Every dict needs
+`type` and `workflow_type`; `skill` and `tool` are optional but
+recommended:
 
 ```python
-# Travel pre-approval — short walk
+# Travel pre-approval — short synthetic walk
 [
     {"type": "workflow.started", "workflow_type": "fleet-travel-preapproval"},
     {"type": "durable.step.started",
@@ -198,9 +270,11 @@ Each template is an ordered list of dicts. Every dict needs `type` and
 Optional: extend `_PREFIX_BY_TYPE` so the demo workflow IDs read like
 `TRVL-1234` instead of the default `WF-1234`. Pure cosmetics.
 
-After adding the template, restart FastAPI (the stream loop reads it on
-boot). The next time someone clicks **Wake the observatory**, your
-domain becomes one of the workflows in flight.
+**Important:** the trickle only falls back to `_STREAM_TEMPLATES` when
+the recordings directory is empty. If you have **any** recordings
+committed, synthetic templates are ignored entirely. So once you've
+recorded for a domain, treat that as the canonical source — don't
+maintain both.
 
 ---
 
@@ -256,9 +330,13 @@ the renderer will pick it up.
 |---|---|
 | A new skill | `api/server/skills/<name>/SKILL.md` (and the parent domain's `skills` + `phase_aliases` in `blueprint_inventory.py`) |
 | A new MCP tool | `api/server/mcp_tools/<name>.py` (optional: add to `MCPS` sample in `ArchitectureDiagram.tsx`) |
-| A new domain | `DOMAINS` list in `blueprint_inventory.py` (optional: stream template in `blueprint.py`) |
+| A new domain | `DOMAINS` list in `blueprint_inventory.py` |
+| Live activity for a new domain (deploy) | Record real walks via `/api/blueprint/_recorder/{start,stop}`, commit the JSONL files |
+| Live activity for a new domain (no orchestrator yet) | Add a synthetic template to `_STREAM_TEMPLATES` in `blueprint.py` |
 
-Three files at most. No frontend edits needed for new content.
+For static content (skills, MCPs, domains) at most three files. No
+frontend edits needed for new content. For live activity you have one
+command and a `git add` once the workflow runs locally.
 
 ---
 
@@ -276,6 +354,12 @@ If the page doesn't pick up your change:
 - Check the SKILL.md frontmatter parses: `curl -s http://localhost:3001/api/blueprint/composition | python -m json.tool | grep your-skill-name`
 - Check `workflow_types` includes your new domain's runtime string:
   `curl -s http://localhost:3001/api/blueprint/composition | python -c "import sys, json; print(json.load(sys.stdin)['workflow_types'])"`
+- Check the recorder isn't holding stale state from a prior session:
+  `curl -s http://localhost:3001/api/blueprint/_recorder/status`
+- Check whether playback is using recordings or synthetic templates:
+  `ls -la data/blueprint-recordings/*.jsonl` — if any JSONL is present,
+  the trickle uses recordings exclusively. To force synthetic, move the
+  JSONL files out of the directory.
 
 ---
 
@@ -283,5 +367,7 @@ If the page doesn't pick up your change:
 
 - **Spec**: [`docs/superpowers/specs/2026-05-03-blueprint-microsite-design.md`](../superpowers/specs/2026-05-03-blueprint-microsite-design.md)
 - **Inventory module**: [`api/server/services/blueprint_inventory.py`](../../api/server/services/blueprint_inventory.py)
+- **Recorder module**: [`api/server/services/blueprint_recorder.py`](../../api/server/services/blueprint_recorder.py)
 - **Routes**: [`api/server/routes/blueprint.py`](../../api/server/routes/blueprint.py)
+- **Recordings**: [`data/blueprint-recordings/README.md`](../../data/blueprint-recordings/README.md)
 - **Frontend types**: [`web/blueprint/src/lib/types.ts`](../../web/blueprint/src/lib/types.ts)
