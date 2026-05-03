@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from api.server.services.simulator_orchestrator import (
     spawn_expense_workflow, spawn_repeat_offender_ramp, simulate_region_failure,
-    spawn_hiring_workflow,
+    spawn_hiring_workflow, spawn_travel_preapproval_workflow,
 )
 from api.server.state import app_state
 from api.shared.events import FleetEvent
@@ -128,3 +128,19 @@ async def fleet_tick():
     after seed-decisions to force the behaviour-change loop to run."""
     app_state.bus.emit(FleetEvent(type="fleet.tick", workflow_id=None))
     return {"ok": True}
+
+
+# --- Generated-domain entries (compose-domain v1) -------------------------
+
+class TravelBody(BaseModel):
+    employee_id: str | None = None
+    scenario: str | None = None
+
+
+@router.post("/travel")
+async def inject_travel(body: TravelBody):
+    """First generated-domain simulator: spawn a travel pre-approval workflow."""
+    workflow_id = await spawn_travel_preapproval_workflow(
+        employee_id=body.employee_id, scenario=body.scenario,
+    )
+    return {"workflow_id": workflow_id}

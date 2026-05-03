@@ -1,17 +1,30 @@
 """Blueprint inventory — read the case of type from disk.
 
 Reads ``api/server/skills/*/SKILL.md`` and ``api/server/mcp_tools/*.py`` and
-returns a structured composition tree consumed by ``web/blueprint`` section 4
-("What we have already cast.").
+returns a structured composition tree consumed by ``web/blueprint``.
 
-A small hand-declared manifest maps skills → domains. We chose this over
-parsing orchestrator code because the orchestrators are large and parsing is
-brittle; the manifest is ~50 lines, lives next to this module, and only
-changes when a new domain is added.
+Single source of truth for adding a domain to the page is the ``DOMAINS``
+list below. Each domain declares:
 
-Also surfaces two skills that the page renders as *designed-but-not-yet-
-shipped* (faint dashed border in section 6): ``skill-author`` and
-``mcp-author``. They are absent from disk; the UI marks them aspirational.
+  - name           — human-readable label rendered in the UI
+  - status         — "live" (drawn solid) | "aspirational" (drawn dashed)
+  - workflow_type  — the value the runtime emits as `workflow_type` on
+                     FleetEvents. The mind-map uses this to map an event
+                     stream back to a domain.
+  - skills         — list of skill names (matching SKILL.md `name:` field
+                     or directory name) this domain composes.
+  - phase_aliases  — { skill_name: phase_label } pairs for the mind-map's
+                     phase orbit. A skill not present here will appear in
+                     the orbit without a phase label.
+
+To add a new domain to the visualisation:
+
+  1. Append an entry to DOMAINS.
+  2. (Optional) Add a stream template to the dev demo trickle in
+     api/server/routes/blueprint.py so the page lights up for it.
+
+Nothing else changes. The frontend reads everything from the composition
+tree response.
 """
 
 from __future__ import annotations
@@ -27,14 +40,13 @@ MCP_TOOLS_DIR = REPO_ROOT / "api" / "server" / "mcp_tools"
 
 
 # --------------------------------------------------------------------------
-# Domain manifest. Maps skills used by each business domain. Order matters:
-# the live domains come first; aspirational ones are flagged ``status:
-# "aspirational"`` so the UI can render them as ghosts.
+# Domain manifest. Single source of truth.
 # --------------------------------------------------------------------------
 DOMAINS: list[dict[str, Any]] = [
     {
         "name": "Finance Compliance",
         "status": "live",
+        "workflow_type": "expense-claim",
         "skills": [
             "field-extractor",
             "line-item-extractor",
@@ -50,10 +62,21 @@ DOMAINS: list[dict[str, Any]] = [
             "audit-summariser",
             "use-document-intelligence",
         ],
+        "phase_aliases": {
+            "field-extractor": "Intake",
+            "line-item-extractor": "Intake",
+            "rag-classifier": "Classify",
+            "receipt-validator": "Receipt",
+            "escalation-advisor": "Route",
+            "notification-composer": "Notify",
+            "arbitration": "Arbitrate",
+            "audit-summariser": "Audit",
+        },
     },
     {
         "name": "Hiring",
         "status": "live",
+        "workflow_type": "hiring",
         "skills": [
             "budget-checker",
             "jd-drafter",
@@ -69,28 +92,51 @@ DOMAINS: list[dict[str, Any]] = [
             "exception-classifier",
             "use-document-intelligence",
         ],
+        "phase_aliases": {
+            "budget-checker": "Budget",
+            "jd-drafter": "Job Design",
+            "sourcing-orchestrator": "Sourcing",
+            "cv-crystalliser": "Triage",
+            "auto-shortlister": "Screening",
+            "voice-screener": "Voice",
+            "interview-recommender": "Interview",
+            "interview-coordinator": "Interview",
+            "jurisdiction-router": "Compliance",
+            "betrvg-checker": "Compliance",
+            "offer-personaliser": "Offer",
+        },
     },
     {
         "name": "Onboarding",
         "status": "live",
+        "workflow_type": "onboarding",
         "skills": [
             "onboarding-buddy",
         ],
+        "phase_aliases": {
+            "onboarding-buddy": "Onboarding",
+        },
     },
     {
         "name": "Procurement",
         "status": "aspirational",
+        "workflow_type": None,
         "skills": [],
+        "phase_aliases": {},
     },
     {
         "name": "Legal",
         "status": "aspirational",
+        "workflow_type": None,
         "skills": [],
+        "phase_aliases": {},
     },
     {
         "name": "IT",
         "status": "aspirational",
+        "workflow_type": None,
         "skills": [],
+        "phase_aliases": {},
     },
 ]
 
@@ -277,11 +323,13 @@ def composition_tree() -> dict[str, Any]:
     Returns a tree the page can render directly:
 
       {
-        "skills":       [{ name, description, allowed_tools, model, domains[], status }],
-        "mcps":         [{ name, used_by_skills[] }],
-        "domains":      [{ name, status, skills[], tools[] }],
-        "meta_skills":  [...],
-        "counts":       { skills, mcps, domains_live, domains_aspirational }
+        "skills":           [{ name, description, allowed_tools, model, domains[], status }],
+        "mcps":             [{ name, used_by_skills[] }],
+        "domains":          [{ name, status, workflow_type, skills[], tools[] }],
+        "meta_skills":      [...],
+        "workflow_types":   { workflow_type_str: domain_name }   # for the mindmap
+        "phase_aliases":    { skill_name: phase_label }          # for the mindmap
+        "counts":           { skills, mcps, domains_live, domains_aspirational }
       }
     """
     skills = _load_skills()
@@ -320,6 +368,7 @@ def composition_tree() -> dict[str, Any]:
             {
                 "name": domain["name"],
                 "status": domain["status"],
+                "workflow_type": domain.get("workflow_type"),
                 "skills": [s for s in domain["skills"] if s in skill_names],
                 "tools": sorted(domain_tools_raw),
             }
@@ -347,6 +396,19 @@ def composition_tree() -> dict[str, Any]:
         for t in mcps
     ]
 
+    # Reverse lookups the frontend needs but should not hard-code:
+    #   workflow_type "hiring" -> domain "Hiring"
+    #   skill "cv-crystalliser" -> phase "Triage"
+    workflow_types: dict[str, str] = {}
+    phase_aliases: dict[str, str] = {}
+    for domain in DOMAINS:
+        wt = domain.get("workflow_type")
+        if wt:
+            workflow_types[wt] = domain["name"]
+        for skill_name, phase_label in (domain.get("phase_aliases") or {}).items():
+            # Per-domain overrides are merged; later domains win on collision.
+            phase_aliases[skill_name] = phase_label
+
     counts = {
         "skills": len(skills),
         "mcps": len(mcps),
@@ -359,5 +421,7 @@ def composition_tree() -> dict[str, Any]:
         "mcps": mcps_payload,
         "domains": domain_payload,
         "meta_skills": META_SKILLS,
+        "workflow_types": workflow_types,
+        "phase_aliases": phase_aliases,
         "counts": counts,
     }

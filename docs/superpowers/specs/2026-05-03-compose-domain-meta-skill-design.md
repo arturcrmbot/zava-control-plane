@@ -257,3 +257,47 @@ manual surface first.
 This spec stops here. The graduated holiday domain, the constellation
 visual, and the multi-domain simulator are all separate plans, scoped after
 this one closes.
+
+## 11. What v1 cannot scale to, and why we're OK with that
+
+The brief schema in §7 scales to roughly the fidelity of `expense-claim` and
+`hiring` — both of which were hand-built against synthetic policy files and
+mock MCP servers. It does NOT scale to a real Concur tenancy, a real
+40-page travel policy PDF, or a real line-manager's situated judgement.
+Specifically:
+
+- **MCP tools.** The brief names `mcp_tool: <name>` and `operations: [...]`.
+  `author-mcp-tool` writes a deterministic in-memory stub. Real upstream
+  systems are OAuth, pagination, sandbox vs prod, hundreds of endpoints,
+  webhook callbacks. The skill stops you and tells you to write the real
+  Node mock by hand if you want HTTP-backed.
+- **Policy reasoning.** The agent skill's `intent` is one paragraph. There
+  is no field for "consume this 40-page PDF as the source of truth", no
+  citation requirement, no jurisdiction-override schema. The existing
+  `expense-claim` agent reasons via a `policy_search` RAG tool over a
+  synthetic markdown file — the same tier of fidelity v1 produces.
+- **Persona judgement.** `decision_policy: |` is one paragraph, ultimately
+  collapsed to a boolean rule. A real line manager weighs history, team
+  load, prior approvals, strategic context.
+- **Source ingestion.** There is no path from an existing design doc /
+  process map / OpenAPI spec / Confluence page to a brief. Brainstorming
+  elicits the brief from a person.
+
+These limits are deliberate. The point of v1 is to prove the procedure
+end-to-end against the same fidelity tier the existing two domains live
+at. If the procedure holds, three v2 directions become obvious — in
+increasing order of how much they change the meta-skill:
+
+1. **Reference fields on the brief** — `policy_source: …`,
+   `api_spec_source: …`, `process_map_source: …`. Brief stays small;
+   sub-skills consume the references (`author-mcp-tool` reads the
+   OpenAPI; `author-runtime-skill` reads the policy doc).
+2. **Two-tier brief** — small "shape" brief (what we have) plus a "depth
+   pack" of reference material consumed agentically per artifact.
+3. **`ingest-source-material` skill upstream** — reads existing engagement
+   inputs and produces the brief. Brief schema unchanged; the work moves
+   up one tier.
+
+None of these is in v1. Adding any of them now risks getting both spine
+and depth wrong because we haven't yet seen the spine produce a complete
+domain end-to-end.

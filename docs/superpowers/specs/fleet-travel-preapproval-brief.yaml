@@ -1,0 +1,74 @@
+# Travel pre-approval — first test-rig brief for `compose-domain`.
+#
+# This is the FIRST brief the meta-skill is invoked against. The journey is
+# deliberately small (3 phases, 1 HITL, 3 MCPs, 1 persona) so the meta-skill
+# touches every artefact category exactly once. The journey is plausible
+# but synthetic — all three MCP tools are deterministic in-memory stubs.
+# Domain prefix `fleet-` distinguishes generated domains from the two
+# hand-written ones (`expense-claim`, `hiring`).
+
+domain:
+  name: fleet-travel-preapproval
+  display_name: Travel pre-approval
+  owner_role: line_manager
+  description: |
+    An employee submits a trip (origin, destination, dates, business
+    reason). The orchestrator looks up the employee's grade and
+    cost-centre from Workday HR, then asks an agent to determine whether
+    the trip is in-policy and which cost band it lands in (low / mid /
+    high) given the available booking options. The line manager approves
+    or rejects: in-policy + low/mid is approved; anything else rejected
+    with a one-sentence reason. No real Concur/Workday integration in
+    v1 — all three MCP tools are deterministic stubs.
+
+phases:
+  - name: employee_lookup
+    intent: |
+      Read the employee's grade and cost-centre from Workday HR. Pass
+      forward.
+    kind: deterministic
+    external_systems: [workday_hr]
+    hitl: false
+
+  - name: policy_fit_check
+    intent: |
+      Retrieve travel policy clauses for the employee's grade and the
+      destination market. Search for available booking options. Reason
+      about whether the trip is in-policy and which cost band it lands
+      in (low / mid / high) given the cheapest reasonable option.
+    kind: agent
+    agent_skill_name: policy-fit-checker
+    external_systems: [concur_travel_policy, concur_travel_search]
+    hitl: false
+
+  - name: manager_approval
+    intent: |
+      Line manager approves or rejects. Approve if policy_fit ==
+      "in-policy" AND band in {"low", "mid"}; otherwise reject with a
+      one-sentence reason naming which condition failed.
+    kind: hitl
+    persona: line_manager
+    external_systems: []
+    hitl: true
+
+personae:
+  - role: line_manager
+    decision_policy: |
+      Approve when the policy_fit_check verdict shows
+      policy_fit == "in-policy" AND band in {"low", "mid"}. Otherwise
+      reject. State which condition failed in one sentence in the
+      rejection reason.
+
+external_systems:
+  - id: workday_hr
+    mcp_tool: workday_hr_employee
+    operations:
+      - get_employee
+  - id: concur_travel_policy
+    mcp_tool: concur_travel_policy
+    operations:
+      - get_policy
+  - id: concur_travel_search
+    mcp_tool: concur_travel_search
+    operations:
+      - search_options

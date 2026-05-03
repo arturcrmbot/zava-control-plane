@@ -25,6 +25,7 @@ from api.shared.expense_taxonomy import ReceiptFlavour
 _seq = 0
 _exp_seq = 0
 _hire_seq = 0
+_travel_seq = 0
 
 _CLAIMS_DIR = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "claims"
 
@@ -216,6 +217,45 @@ async def spawn_hiring_workflow(
         )
         w.orchestration_instance_id = result.get("id")
         app_state.store.upsert_workflow(w)
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    return wid
+
+
+async def spawn_travel_preapproval_workflow(
+    employee_id: str | None = None,
+    scenario: str | None = None,
+) -> str:
+    """First generated-domain simulator entry: spawn a travel pre-approval
+    workflow. Optional `employee_id` picks a specific synthetic employee
+    (deterministic). Optional `scenario` tags the payload.
+
+    Note: generated domains do not currently upsert into app_state.store
+    (the existing Workflow / ClaimData / HiringData types are domain-
+    specific). State lives only in Durable + the FleetEvent stream.
+    """
+    global _travel_seq
+    _travel_seq += 1
+    wid = f"TRV-{_travel_seq:04d}"
+    eid = employee_id or f"EMP-{(_travel_seq * 17) % 9000 + 1000:04d}"
+    payload: dict = {
+        "workflow_id": wid,
+        "type": "travel-preapproval",
+        "trip": {
+            "employee_id": eid,
+            "origin": "LHR",
+            "destination": "JFK",
+            "depart_date": "2026-06-15",
+            "return_date": "2026-06-18",
+            "business_reason": "Q3 client review",
+        },
+    }
+    if scenario:
+        payload["scenario"] = scenario
+    try:
+        await schedule_new_orchestration(
+            payload, function_name="FleetTravelPreapprovalOrchestrator",
+        )
     except Exception as ex:
         print(f"[orchestrator] failed to schedule {wid}: {ex}")
     return wid

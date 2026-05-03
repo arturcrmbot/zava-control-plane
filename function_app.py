@@ -7,6 +7,13 @@ import azure.durable_functions as df
 from api.shared.otel import init_otel
 from api.functions.workflows.expense_claim import expense_claim_orchestration
 from api.functions.workflows.hiring import hiring_orchestration
+from api.functions.workflows.fleet_travel_preapproval import (
+    fleet_travel_preapproval_orchestration,
+)
+from api.functions.workflows.fleet_travel_preapproval_activities import (
+    fleet_travel_preapproval_employee_lookup_activity,
+    fleet_travel_preapproval_policy_fit_check_activity,
+)
 from api.functions.workflows.activities import (
     intake_activity,
     classify_activity,
@@ -51,6 +58,12 @@ def ExpenseClaimOrchestrator(context: df.DurableOrchestrationContext):
 @app.orchestration_trigger(context_name="context")
 def HiringOrchestrator(context: df.DurableOrchestrationContext):
     return hiring_orchestration(context)
+
+
+# Orchestrator — 3-phase travel pre-approval (first generated domain via compose-domain)
+@app.orchestration_trigger(context_name="context")
+def FleetTravelPreapprovalOrchestrator(context: df.DurableOrchestrationContext):
+    return fleet_travel_preapproval_orchestration(context)
 
 
 # Activity registrations — Azure DF requires each as a decorated function in function_app.py
@@ -173,6 +186,18 @@ def hiring_offer_activity_trigger(payload: dict) -> dict:
 @app.activity_trigger(input_name="payload")
 def hiring_onboarding_activity_trigger(payload: dict) -> dict:
     return hiring_onboarding_activity(payload)
+
+
+# --- Generated-domain activity triggers (compose-domain v1) ----------------
+
+@app.activity_trigger(input_name="payload")
+def fleet_travel_preapproval_employee_lookup_activity_trigger(payload: dict) -> dict:
+    return fleet_travel_preapproval_employee_lookup_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_travel_preapproval_policy_fit_check_activity_trigger(payload: dict) -> dict:
+    return fleet_travel_preapproval_policy_fit_check_activity(payload)
 
 
 # HTTP trigger to start a new orchestration. Used by FastAPI's simulator route.

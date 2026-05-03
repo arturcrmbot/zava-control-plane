@@ -29,3 +29,7 @@ VOICE_SCREEN_TIMEOUT: timedelta = timedelta(hours=24)
 INTERVIEW_INVITE_TIMEOUT  = timedelta(days=3)   # recruiter to invite/reject
 INTERVIEW_BOOKING_TIMEOUT = timedelta(days=7)   # candidate to pick a slot
 INTERVIEW_DECISION_TIMEOUT = timedelta(days=5)  # recruiter to record post-int decision
+
+# --- Generated-domain HITL timeouts (compose-domain v1) --------------------
+# fleet-travel-preapproval — Phase 3 (Manager Approval) HITL gate.
+MANAGER_APPROVAL_TIMEOUT: timedelta = timedelta(hours=24)

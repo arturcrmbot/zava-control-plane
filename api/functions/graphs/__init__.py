@@ -30,6 +30,14 @@ from .compliance import build_hiring_compliance_workflow
 from .offer import build_hiring_offer_workflow
 from .onboarding import build_hiring_onboarding_workflow
 
+# Generated domains (compose-domain v1)
+from .fleet_travel_preapproval_employee_lookup import (
+    build_fleet_travel_preapproval_employee_lookup_workflow,
+)
+from .fleet_travel_preapproval_policy_fit_check import (
+    build_fleet_travel_preapproval_policy_fit_check_workflow,
+)
+
 
 __all__ = [
     # POC1
