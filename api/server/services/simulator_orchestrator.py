@@ -365,39 +365,125 @@ async def simulate_region_failure(stop_seconds: int = 10) -> dict:
 
 
 async def ramp_loop() -> None:
-    """Background coroutine: spawn ExpenseClaim workflows until target, then optionally steady-state.
+    """Domain-aware steady-state ramp loop.
 
-    Env vars:
-      SIMULATOR_TARGET_WORKFLOWS         — initial ramp size (0 = disabled, manual inject only).
-      SIMULATOR_STEADY_STATE             — after ramp, keep spawning continuously. Default off.
-      SIMULATOR_STEADY_INTERVAL_SECONDS  — average seconds between steady-state spawns
-                                           (default 60 = 1/minute, demo-friendly).
-                                           Real interval is uniform [0.7×, 1.3×] of this.
+    Default: enabled, spawning each live domain at ~90s intervals jittered
+    \u00b130%. With 4 domains that's roughly one new workflow every 22s
+    org-wide \u2014 enough to keep the observatory full, light enough to not
+    fork-bomb the GHCP SDK on a laptop.
+
+    Each domain runs in its own coroutine so a failure in one (e.g.
+    Functions host down for hiring) does not stall the others.
+
+    Env vars
+    --------
+    SIMULATOR_RAMP_ENABLED              "1" (default) | "0" to disable.
+    SIMULATOR_RAMP_AVG_INTERVAL_SECONDS Seconds between spawns per domain
+                                        (default 90). Real interval is
+                                        uniform [0.7\u00d7, 1.3\u00d7] of this.
+    SIMULATOR_RAMP_DOMAINS              CSV of domain names to spawn.
+                                        Default = all known domains
+                                        (expense-claim, hiring,
+                                        travel-preapproval). Set to a
+                                        subset to focus a demo, e.g.
+                                        "travel-preapproval" for a demo
+                                        that only needs travel.
+
+    Deprecated
+    ----------
+    SIMULATOR_TARGET_WORKFLOWS, SIMULATOR_STEADY_STATE,
+    SIMULATOR_STEADY_INTERVAL_SECONDS \u2014 the old expense-only ramp.
+    Logged as deprecated if set; values are ignored.
     """
-    target = int(os.getenv("SIMULATOR_TARGET_WORKFLOWS", "0"))
-    steady_state = os.getenv("SIMULATOR_STEADY_STATE", "0") == "1"
-    steady_interval = float(os.getenv("SIMULATOR_STEADY_INTERVAL_SECONDS", "60"))
-    if target <= 0:
-        print("[orchestrator] simulator disabled (SIMULATOR_TARGET_WORKFLOWS=0); inject manually via /api/simulator/inject")
+    enabled = os.getenv("SIMULATOR_RAMP_ENABLED", "1") == "1"
+    if not enabled:
+        print("[ramp] disabled (SIMULATOR_RAMP_ENABLED=0); use POST /api/simulator/{inject,hire,travel} to fire workflows by hand")
         return
-    ramp_seconds = 90
-    delay_per = ramp_seconds / target
-    print(f"[orchestrator] ramping {target} expense-claim workflows over {ramp_seconds}s (steady_state={steady_state}, steady_interval={steady_interval}s)")
-    for _ in range(target):
-        try:
-            await spawn_expense_workflow()
-        except Exception as ex:
-            print(f"[orchestrator] spawn failed: {ex}")
-        await asyncio.sleep(delay_per)
-    if not steady_state:
-        print("[orchestrator] ramp complete; steady-state disabled (SIMULATOR_STEADY_STATE!=1). Use /api/simulator/inject to add more.")
+
+    # Deprecation warning for any operator still on the old vars.
+    deprecated_set = [
+        v for v in (
+            "SIMULATOR_TARGET_WORKFLOWS",
+            "SIMULATOR_STEADY_STATE",
+            "SIMULATOR_STEADY_INTERVAL_SECONDS",
+        ) if os.getenv(v) not in (None, "", "0")
+    ]
+    if deprecated_set:
+        print(
+            f"[ramp] WARNING: {deprecated_set} are deprecated and ignored. "
+            "Use SIMULATOR_RAMP_ENABLED / SIMULATOR_RAMP_AVG_INTERVAL_SECONDS "
+            "/ SIMULATOR_RAMP_DOMAINS instead."
+        )
+
+    spawners = {
+        "expense-claim": spawn_expense_workflow,
+        "hiring": spawn_hiring_workflow,
+        "travel-preapproval": spawn_travel_preapproval_workflow,
+    }
+
+    domains_csv = os.getenv("SIMULATOR_RAMP_DOMAINS", "").strip()
+    if domains_csv:
+        wanted = [d.strip() for d in domains_csv.split(",") if d.strip()]
+    else:
+        wanted = list(spawners.keys())
+
+    avg_interval = float(os.getenv("SIMULATOR_RAMP_AVG_INTERVAL_SECONDS", "90"))
+
+    # Initial-stagger the per-domain coroutines so we don't spawn every
+    # domain at t=0 (which would queue 3+ GHCP SDK subprocesses
+    # simultaneously on cold cache).
+    valid_domains = []
+    for d in wanted:
+        if d not in spawners:
+            print(f"[ramp] WARNING: unknown domain {d!r}; skipping")
+            continue
+        valid_domains.append(d)
+
+    if not valid_domains:
+        print("[ramp] no valid domains in SIMULATOR_RAMP_DOMAINS; nothing to spawn")
         return
-    print(f"[orchestrator] ramp complete; steady-state ON ({steady_interval}s ± 30%)")
+
+    initial_stagger = avg_interval / max(len(valid_domains), 1)
+
+    print(
+        f"[ramp] starting steady-state for domains={valid_domains}, "
+        f"avg_interval={avg_interval}s \u00b130%, initial_stagger={initial_stagger:.1f}s/domain"
+    )
+
+    tasks = []
+    for i, domain in enumerate(valid_domains):
+        spawn_fn = spawners[domain]
+        tasks.append(asyncio.create_task(
+            _per_domain_ramp(domain, spawn_fn, avg_interval, initial_delay=i * initial_stagger)
+        ))
+
+    # Block forever; the loop is supervised by the FastAPI lifespan which
+    # cancels the parent task on shutdown.
+    try:
+        await asyncio.gather(*tasks, return_exceptions=True)
+    except asyncio.CancelledError:
+        for t in tasks:
+            t.cancel()
+        raise
+
+
+async def _per_domain_ramp(
+    domain: str,
+    spawn_fn,
+    avg_interval: float,
+    initial_delay: float = 0.0,
+) -> None:
+    """One domain's spawn loop. Survives individual spawn failures so a
+    single domain outage doesn't stall the rest."""
+    if initial_delay > 0:
+        await asyncio.sleep(initial_delay)
     while True:
         try:
-            await spawn_expense_workflow()
+            wid = await spawn_fn()
+            print(f"[ramp][{domain}] spawned {wid}")
         except Exception as ex:
-            print(f"[orchestrator] spawn failed: {ex}")
-        # uniform jitter ±30% so the cadence isn't robotic
-        jittered = steady_interval * (0.7 + random.random() * 0.6)
+            print(f"[ramp][{domain}] spawn failed: {ex}")
+        # \u00b130% jitter so the cadence isn't robotic.
+        jittered = avg_interval * (0.7 + random.random() * 0.6)
         await asyncio.sleep(jittered)
+
