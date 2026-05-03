@@ -1,0 +1,124 @@
+# Contract renewal — fifth compose-domain brief.
+#
+# A managed-services contract is approaching renewal. Two agent phases
+# (market benchmark + renewal-terms drafter) followed by sequential
+# finance + line-manager sign-off. Reuses policy_cite from the substrate
+# (legal-clauses lookup); introduces two new MCPs (contract_repository,
+# market_pricing). Domain-scoped personae auto-close.
+
+domain:
+  name: fleet-contract-renewal
+  display_name: Contract renewal
+  owner_role: contract_finance_bp
+  description: |
+    A managed-services contract is within 90 days of expiry. The
+    orchestrator pulls the contract record. A market-benchmark agent
+    finds three comparable contracts in our portfolio, gets fresh market
+    quotes for the same category + region, and reviews the contract's
+    amendment history (to detect creeping scope). A renewal-terms
+    drafter agent then drafts proposed renewal terms by combining the
+    benchmarked price band, citing the relevant policy clauses, and
+    proposing the amendment delta against the current contract. The
+    finance business partner signs off (auto-approves when the proposed
+    cost increase is at or below 10%). The contract owner (line
+    manager) signs off (auto-approves when finance has signed off).
+
+phases:
+  - name: contract_lookup
+    intent: |
+      Read the contract record (parties, value, term, category,
+      region) from the contract repository. Pass forward.
+    kind: deterministic
+    external_systems: [contract_repository]
+
+  - name: market_benchmarker
+    intent: |
+      Benchmark the contract against the market. Find three comparable
+      contracts in our portfolio (same category, similar value band).
+      Pull fresh market quotes for the category + region. Pull this
+      contract's amendment history to surface scope creep.
+    kind: agent
+    agent_skill_name: market-benchmarker
+    external_systems: [contract_repository, market_pricing]
+
+  - name: renewal_terms_drafter
+    intent: |
+      Draft proposed renewal terms. Combine the benchmarked price band
+      with the relevant legal-clause precedents. Propose a per-line
+      delta vs the current contract. Output proposed_terms +
+      cost_change_pct (signed) + cited_clauses.
+    kind: agent
+    agent_skill_name: renewal-terms-drafter
+    external_systems: [contract_repository, market_pricing, policy_cite]
+
+  - name: finance_signoff
+    intent: |
+      Finance business partner signs off on the proposed cost change.
+      Approve when cost_change_pct is at or below 10%. Otherwise reject
+      with the proposed cost change.
+    kind: hitl
+    persona: contract_finance_bp
+    external_systems: []
+
+  - name: contract_owner_signoff
+    intent: |
+      Contract owner (line manager) signs off. Approve when finance
+      has already approved (the financial gate is the binding one).
+    kind: hitl
+    persona: contract_line_manager
+    external_systems: []
+
+personae:
+  - role: contract_finance_bp
+    workflow_label: Contract renewal
+    decision_policy: |
+      Approve when renewal_terms_drafter.cost_change_pct is at or
+      below 10. Otherwise reject naming the proposed change.
+    decision_code: |
+      rt = (context or {}).get("renewal_terms_drafter") or {}
+      pct = rt.get("cost_change_pct")
+      try:
+          pct_f = float(pct) if pct is not None else None
+      except (TypeError, ValueError):
+          pct_f = None
+      if pct_f is None:
+          decision = "reject"
+          reason = "missing cost_change_pct"
+      elif pct_f > 10.0:
+          decision = "reject"
+          reason = "cost change " + str(pct_f) + "% exceeds 10% threshold"
+      else:
+          decision = "approve"
+          reason = "cost change " + str(pct_f) + "% within 10% threshold"
+
+  - role: contract_line_manager
+    workflow_label: Contract renewal
+    decision_policy: |
+      Approve when finance has already signed off. The financial gate
+      is the binding one for renewals; the contract owner's role here
+      is acknowledgement.
+    decision_code: |
+      fin = (context or {}).get("finance_signoff") or {}
+      fin_dec = (fin.get("decision") or "").lower()
+      if fin_dec != "approve":
+          decision = "reject"
+          reason = "finance has not signed off"
+      else:
+          decision = "approve"
+          reason = "finance signed off; contract owner acknowledges"
+
+external_systems:
+  - id: contract_repository
+    mcp_tool: contract_repository
+    operations:
+      - get_contract
+      - find_similar
+      - list_amendments
+  - id: market_pricing
+    mcp_tool: market_pricing
+    operations:
+      - get_quotes
+  - id: policy_cite
+    mcp_tool: policy_cite
+    operations:
+      - policy_cite

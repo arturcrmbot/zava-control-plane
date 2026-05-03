@@ -1,0 +1,135 @@
+# IT access request — fourth compose-domain brief.
+#
+# An employee requests new IT access (typically for a project rotation or
+# a new responsibility). Reuses Workday HR + identity_provider from the
+# first two domains. Two agent phases (RBAC resolver + risk assessor)
+# followed by sequential HITL gates (line manager, then IT admin). All
+# four MCPs already exist after the previous two domains have been
+# graduated; this domain is a pure compounding showcase.
+
+domain:
+  name: fleet-it-access-request
+  display_name: IT access request
+  owner_role: it_access_it_admin
+  description: |
+    An employee requests one or more IT roles (e.g. read-access to a new
+    finance system, write-access to a campaign analytics dashboard). The
+    orchestrator reads the employee's Workday HR record. An RBAC-resolver
+    agent enumerates the requested role templates, fetches each, and
+    runs a separation-of-duties check against the union with the
+    employee's existing entitlements. A risk-assessor agent then queries
+    the employee's recent breach history, the audit trail for the
+    requested entitlements, and re-fetches the templates to score each
+    request as low / medium / high risk. The line manager signs off
+    (auto-approves when business justification is non-empty and risk
+    is low or medium). The IT admin signs off (auto-approves when the
+    line manager has already approved AND there are no SoD conflicts).
+
+phases:
+  - name: employee_lookup
+    intent: |
+      Read the requester's grade, cost-centre, agency, and home market
+      from Workday HR. Pass forward.
+    kind: deterministic
+    external_systems: [workday_hr]
+
+  - name: rbac_resolver
+    intent: |
+      Enumerate the role templates referenced in the request. Fetch
+      each template (permissions, owners, default size). Run a
+      separation-of-duties check on the union of the requested roles
+      against the employee's grade-band default entitlements.
+    kind: agent
+    agent_skill_name: rbac-resolver
+    external_systems: [identity_provider]
+
+  - name: risk_assessor
+    intent: |
+      Score the request as low / medium / high risk. Pull the
+      employee's last 90-day compliance history. Query the audit trail
+      for the requested entitlements (recent grant volume, recent
+      revocations). Re-fetch each template to compute permission depth.
+      Output a per-role risk score + an overall verdict.
+    kind: agent
+    agent_skill_name: access-risk-assessor
+    external_systems: [employee_history, audit_query, identity_provider]
+
+  - name: line_manager_approval
+    intent: |
+      Line manager signs off on the business justification and risk
+      level. Approve when business_justification is non-empty AND
+      risk_assessor.overall_risk is "low" or "medium".
+    kind: hitl
+    persona: it_access_line_manager
+    external_systems: []
+
+  - name: it_admin_approval
+    intent: |
+      IT admin signs off on the technical request. Approve when the
+      line manager has already approved AND rbac_resolver.sod_conflicts
+      is empty.
+    kind: hitl
+    persona: it_access_it_admin
+    external_systems: []
+
+personae:
+  - role: it_access_line_manager
+    workflow_label: IT access request
+    decision_policy: |
+      Approve when business_justification is non-empty AND
+      risk_assessor.overall_risk is "low" or "medium". Otherwise reject
+      naming which check failed.
+    decision_code: |
+      req = (context or {}).get("employee_lookup") or {}
+      ra = (context or {}).get("risk_assessor") or {}
+      bj = (req.get("business_justification") or "").strip()
+      risk = (ra.get("overall_risk") or "").lower()
+      if not bj:
+          decision = "reject"
+          reason = "missing business justification"
+      elif risk not in {"low", "medium"}:
+          decision = "reject"
+          reason = "risk " + (risk or "unknown") + " requires CISO escalation"
+      else:
+          decision = "approve"
+          reason = "justification provided; risk " + risk
+
+  - role: it_access_it_admin
+    workflow_label: IT access request
+    decision_policy: |
+      Approve when the line manager has already approved AND
+      rbac_resolver.sod_conflicts is empty.
+    decision_code: |
+      lm = (context or {}).get("line_manager_approval") or {}
+      rbac = (context or {}).get("rbac_resolver") or {}
+      lm_dec = (lm.get("decision") or "").lower()
+      conflicts = rbac.get("sod_conflicts") or []
+      if lm_dec != "approve":
+          decision = "reject"
+          reason = "line manager has not approved"
+      elif conflicts:
+          decision = "reject"
+          reason = "SoD conflicts: " + ", ".join(conflicts[:3])
+      else:
+          decision = "approve"
+          reason = "line manager approved; no SoD conflicts"
+
+external_systems:
+  - id: workday_hr
+    mcp_tool: workday_hr_employee
+    operations:
+      - get_employee
+  - id: identity_provider
+    mcp_tool: identity_provider
+    operations:
+      - list_role_templates
+      - get_role_template
+      - check_separation_of_duties
+  - id: employee_history
+    mcp_tool: employee_history
+    operations:
+      - employee_history
+  - id: audit_query
+    mcp_tool: audit_query
+    operations:
+      - audit_query
