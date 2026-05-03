@@ -29,10 +29,17 @@ from fastapi import APIRouter, Request
 from sse_starlette.sse import EventSourceResponse
 
 from api.server.services.blueprint_inventory import DOMAINS, composition_tree
+from api.server.services.blueprint_recorder import (
+    BlueprintRecorder,
+    load_recorded_templates,
+)
 from api.server.state import app_state
 from api.shared.events import FleetEvent
 
 router = APIRouter()
+
+# Module-level recorder handle. One per uvicorn process.
+_recorder = BlueprintRecorder()
 
 
 # --------------------------------------------------------------------------
@@ -283,6 +290,10 @@ _STREAM_TEMPLATES: list[list[dict[str, Any]]] = [
         {"type": "agent.completed", "skill": "onboarding-buddy", "workflow_type": "onboarding"},
         {"type": "durable.workflow.completed", "workflow_type": "onboarding"},
     ],
+    # NOTE: travel-preapproval is intentionally NOT in the trickle pool.
+    # The generated domain fires for real via the Functions host + persona
+    # responder loop. Adding a ghost template would conflate puppetry with
+    # real runs.
 ]
 
 
@@ -290,6 +301,7 @@ _PREFIX_BY_TYPE = {
     "hiring": "HIRE",
     "expense-claim": "CLM",
     "onboarding": "ONB",
+    "travel-preapproval": "TRVL",
 }
 
 
@@ -299,34 +311,81 @@ _stream_task: asyncio.Task | None = None
 
 async def _stream_loop() -> None:
     """Indefinite trickle: keep up to 3 workflows in flight, drip events
-    from each at randomised intervals so the page reads as continuous."""
-    in_flight: list[dict[str, Any]] = []  # each entry: {events: [...], wid: str}
+    from each so the page reads as continuous.
+
+    Source preference (computed once on each top-up, so adding new
+    recordings while the stream is running gets picked up on the next
+    workflow that lands a slot):
+
+      1. data/blueprint-recordings/*.jsonl   — real captured walks,
+         replayed at original cadence.
+      2. _STREAM_TEMPLATES                    — hand-coded fallback for
+         when no recordings exist.
+    """
+    in_flight: list[dict[str, Any]] = []
     try:
         while True:
             # Top up to 3 in-flight workflows.
             while len(in_flight) < 3:
-                template = random.choice(_STREAM_TEMPLATES)
-                wf_type = template[0].get("workflow_type", "hiring")
-                prefix = _PREFIX_BY_TYPE.get(wf_type, "WF")
-                wid = f"{prefix}-{random.randint(1000, 9999)}"
-                in_flight.append({
-                    "events": [dict(e, workflow_id=wid) for e in template],
-                    "wid": wid,
-                })
+                recorded = load_recorded_templates()
+                if recorded:
+                    template = random.choice(recorded)
+                    wf_type = template["workflow_type"]
+                    prefix = _PREFIX_BY_TYPE.get(wf_type, "WF")
+                    wid = f"{prefix}-{random.randint(1000, 9999)}"
+                    # Replay with original deltas.
+                    events_with_deltas = [
+                        {"event": dict(e, workflow_id=wid), "delta_ms": d}
+                        for e, d in zip(template["events"], template["deltas_ms"])
+                    ]
+                    in_flight.append({
+                        "events": events_with_deltas,
+                        "wid": wid,
+                        "source": template.get("source", "recorded"),
+                    })
+                else:
+                    template = random.choice(_STREAM_TEMPLATES)
+                    wf_type = template[0].get("workflow_type", "hiring")
+                    prefix = _PREFIX_BY_TYPE.get(wf_type, "WF")
+                    wid = f"{prefix}-{random.randint(1000, 9999)}"
+                    # Synthetic templates have no deltas; use 0 (the
+                    # outer randomised sleep below paces them).
+                    events_with_deltas = [
+                        {"event": dict(e, workflow_id=wid), "delta_ms": 0}
+                        for e in template
+                    ]
+                    in_flight.append({
+                        "events": events_with_deltas,
+                        "wid": wid,
+                        "source": "synthetic",
+                    })
 
-            # Pick one of the in-flight workflows at random and pop its next event.
+            # Pick one of the in-flight workflows at random and pop its
+            # next event. Emitting from a randomly selected workflow keeps
+            # multiple workflows interleaved on the page.
             slot_idx = random.randrange(len(in_flight))
             slot = in_flight[slot_idx]
-            event_data = slot["events"].pop(0)
+            entry = slot["events"].pop(0)
             try:
-                app_state.bus.emit(FleetEvent(**event_data))
+                app_state.bus.emit(FleetEvent(**entry["event"]))
             except Exception:
                 pass
             if not slot["events"]:
                 in_flight.pop(slot_idx)
 
-            # Randomised cadence — fast enough to feel alive, slow enough to read.
-            await asyncio.sleep(random.uniform(0.9, 2.4))
+            # Cadence policy:
+            #   - Recorded entries replay at their original delta when
+            #     it's between 200ms and 4000ms (clamps to keep the page
+            #     readable; some real entries are bunched within ms of
+            #     each other and would strobe).
+            #   - Synthetic entries (delta_ms == 0) get the original
+            #     randomised pacing so they still feel alive.
+            delta = entry.get("delta_ms", 0)
+            if delta >= 200:
+                pause = min(delta, 4000) / 1000.0
+            else:
+                pause = random.uniform(0.9, 2.4)
+            await asyncio.sleep(pause)
     except asyncio.CancelledError:
         return
 
@@ -361,3 +420,37 @@ async def demo_stream_status() -> dict[str, Any]:
     """Return whether the always-on stream is currently running."""
     running = _stream_task is not None and not _stream_task.done()
     return {"running": running}
+
+
+# --------------------------------------------------------------------------
+# Recorder — capture real bus events to JSONL files for later replay.
+#
+# Workflow:
+#   1. Start the FastAPI server with whatever real backend is firing
+#      events (Functions host, mock MCPs, simulator).
+#   2. POST /api/blueprint/_recorder/start
+#   3. Run your real workflows.
+#   4. POST /api/blueprint/_recorder/stop
+#   5. JSONL files land under data/blueprint-recordings/. Inspect, curate
+#      (delete short/bad runs), commit.
+#   6. Restart the server. The next /_demo_stream/start will replay the
+#      recordings instead of synthetic templates.
+# --------------------------------------------------------------------------
+
+
+@router.post("/api/blueprint/_recorder/start")
+async def recorder_start() -> dict[str, Any]:
+    """Subscribe to the bus and record observatory events. Idempotent."""
+    return _recorder.start(app_state.bus)
+
+
+@router.post("/api/blueprint/_recorder/stop")
+async def recorder_stop() -> dict[str, Any]:
+    """Stop recording. Flushes any in-flight workflows to disk."""
+    return _recorder.stop()
+
+
+@router.get("/api/blueprint/_recorder/status")
+async def recorder_status() -> dict[str, Any]:
+    """Return current recorder state: running flag, in-flight workflows."""
+    return _recorder.status()
