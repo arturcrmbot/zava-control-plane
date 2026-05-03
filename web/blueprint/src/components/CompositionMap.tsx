@@ -141,27 +141,40 @@ export function CompositionMap({
       <div className="map__row">
         <div className="map__row-label">MCPs</div>
         <div className="map__row-cards">
-          {data.mcps.map((m) => {
-            const active = isMcpActive(m.name);
-            const className = [
-              "tile",
-              "tile--mcp",
-              active ? "tile--active" : "tile--dim",
-            ]
-              .filter(Boolean)
-              .join(" ");
-            return (
-              <button
-                key={m.name}
-                className={className}
-                onMouseEnter={() => setHover({ kind: "mcp", name: m.name })}
-                onFocus={() => setHover({ kind: "mcp", name: m.name })}
-                title={`${m.used_by_skills.length} skills allow-listed`}
-              >
-                {m.name}
-              </button>
-            );
-          })}
+          {[...data.mcps]
+            .sort((a, b) => {
+              // Wired MCPs first, then alphabetically; orphans bubble to the end.
+              const aw = a.used_by_skills.length > 0 ? 0 : 1;
+              const bw = b.used_by_skills.length > 0 ? 0 : 1;
+              if (aw !== bw) return aw - bw;
+              return a.name.localeCompare(b.name);
+            })
+            .map((m) => {
+              const active = isMcpActive(m.name);
+              const orphan = m.used_by_skills.length === 0;
+              const className = [
+                "tile",
+                "tile--mcp",
+                orphan ? "tile--idle" : "",
+                active ? "tile--active" : "tile--dim",
+              ]
+                .filter(Boolean)
+                .join(" ");
+              const tooltip = orphan
+                ? `${m.name} — capability available, no skill calls it yet`
+                : `${m.name} — called by ${m.used_by_skills.length} skill${m.used_by_skills.length === 1 ? "" : "s"}`;
+              return (
+                <button
+                  key={m.name}
+                  className={className}
+                  onMouseEnter={() => setHover({ kind: "mcp", name: m.name })}
+                  onFocus={() => setHover({ kind: "mcp", name: m.name })}
+                  title={tooltip}
+                >
+                  {m.name}
+                </button>
+              );
+            })}
         </div>
       </div>
 
@@ -228,8 +241,12 @@ export function CompositionMap({
             )}
             {hover.kind === "mcp" && (
               <>
-                <strong>{hover.name}</strong> ← called by{" "}
-                {Array.from(highlight.skills).join(", ") || "no skills"}
+                <strong>{hover.name}</strong>
+                {Array.from(highlight.skills).length === 0 ? (
+                  <> · capability available, no skill calls it yet</>
+                ) : (
+                  <> ← called by {Array.from(highlight.skills).join(", ")}</>
+                )}
               </>
             )}
             {hover.kind === "domain" && (

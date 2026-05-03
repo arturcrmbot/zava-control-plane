@@ -494,6 +494,23 @@ body {
   opacity: 0.28;
 }
 
+/* Idle MCP — declared as a capability but no skill calls it yet. Visually
+   distinct so the viewer can see the available headroom (and that the
+   "broken edge" they thought they saw is actually a parking-lot capability). */
+.tile--idle {
+  border-style: dashed;
+  border-color: rgba(233, 231, 227, 0.16);
+  color: var(--ink-mute);
+  background: transparent;
+}
+
+.tile--idle.tile--active {
+  border-color: var(--accent);
+  border-style: dashed;
+  color: var(--ink);
+  background: rgba(244, 163, 0, 0.06);
+}
+
 /* Domain tiles are wider, two-line. */
 .tile--domain {
   display: flex;
@@ -1168,6 +1185,69 @@ body {
 
 .arch__chip-label--mute {
   fill: var(--ink-mute);
+}
+
+/* HTML-rendered chip labels (foreignObject) so we get text-overflow:ellipsis
+   that SVG <text> can't do. The container takes the full chip width minus
+   padding; long names truncate with an ellipsis and the full name is in the
+   `title` attribute for hover. */
+.arch__chip-label-html {
+  color: var(--ink-dim);
+  font-family: var(--mono-family);
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  line-height: 20px;
+  height: 20px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  transition: opacity 200ms ease, color 200ms ease;
+}
+
+.arch__chip-label-html.arch__dim {
+  opacity: 0.32;
+}
+
+.arch__agent-label-html {
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  line-height: 28px;
+  height: 28px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  transition: opacity 200ms ease, color 200ms ease;
+}
+
+.arch__agent-label-html.arch__dim {
+  opacity: 0.32;
+}
+
+.arch__agent-status-html {
+  color: var(--accent);
+  font-family: var(--mono-family);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  line-height: 20px;
+  height: 20px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.78;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+
+.arch__agent-status-html.arch__dim {
+  opacity: 0.28;
 }
 
 .arch__system-label {

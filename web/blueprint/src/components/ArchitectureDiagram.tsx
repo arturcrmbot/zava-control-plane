@@ -24,9 +24,9 @@ import type { Domain, Skill, Mcp } from "../lib/types";
  * arrays — no static link maps.
  */
 
-const VISIBLE_DOMAINS = 12;
-const VISIBLE_SKILLS = 10;
-const VISIBLE_MCPS = 12;
+const VISIBLE_DOMAINS = 9;
+const VISIBLE_SKILLS = 8;
+const VISIBLE_MCPS = 10;
 
 interface Guarantee {
   id: string;
@@ -159,13 +159,23 @@ export function ArchitectureDiagram() {
 
   const rankedMcps = useMemo<Mcp[]>(() => {
     if (!composition) return [];
-    return [...composition.mcps].sort((a, b) => {
-      const da = a.used_by_skills.length;
-      const db = b.used_by_skills.length;
-      if (db !== da) return db - da;
-      return a.name.localeCompare(b.name);
-    });
+    // Only show MCPs that are actually called by at least one skill in the
+    // visible architecture. Orphan MCPs (no caller yet) go in the overflow
+    // chip so they don't read as broken edges in the diagram.
+    return composition.mcps
+      .filter((m) => m.used_by_skills.length > 0)
+      .sort((a, b) => {
+        const da = a.used_by_skills.length;
+        const db = b.used_by_skills.length;
+        if (db !== da) return db - da;
+        return a.name.localeCompare(b.name);
+      });
   }, [composition]);
+
+  const orphanMcpCount = useMemo(
+    () => (composition?.mcps ?? []).filter((m) => m.used_by_skills.length === 0).length,
+    [composition],
+  );
 
   const visibleDomains = rankedDomains.slice(0, VISIBLE_DOMAINS);
   const visibleSkills = rankedSkills.slice(0, VISIBLE_SKILLS);
@@ -301,6 +311,7 @@ export function ArchitectureDiagram() {
               const y = domainsY + 64;
               const active = isActiveDomain(d.name);
               const lit = hl.active && hl.domains.has(d.name);
+              const tileW = domainColW - 8;
               return (
                 <g
                   key={d.name}
@@ -309,27 +320,24 @@ export function ArchitectureDiagram() {
                   style={{ cursor: "pointer" }}
                 >
                   <rect
-                    width={domainColW - 8}
+                    width={tileW}
                     height={56}
                     rx={3}
                     className={`arch__agent arch__agent--alive${lit ? " arch__agent--lit" : ""}${dimClass(active)}`}
                   />
-                  <text
-                    x={(domainColW - 8) / 2}
-                    y={22}
-                    textAnchor="middle"
-                    className={`arch__agent-label${dimClass(active)}`}
-                  >
-                    {d.name}
-                  </text>
-                  <text
-                    x={(domainColW - 8) / 2}
-                    y={42}
-                    textAnchor="middle"
-                    className={`arch__agent-status arch__agent-status--alive${dimClass(active)}`}
-                  >
-                    {d.skills.length} skill{d.skills.length === 1 ? "" : "s"} · {d.tools.length} MCP{d.tools.length === 1 ? "" : "s"}
-                  </text>
+                  <foreignObject x={4} y={4} width={tileW - 8} height={28}>
+                    <div
+                      className={`arch__agent-label-html${dimClass(active)}`}
+                      title={d.name}
+                    >
+                      {d.name}
+                    </div>
+                  </foreignObject>
+                  <foreignObject x={4} y={32} width={tileW - 8} height={20}>
+                    <div className={`arch__agent-status-html${dimClass(active)}`}>
+                      {d.skills.length} skill{d.skills.length === 1 ? "" : "s"} · {d.tools.length} MCP{d.tools.length === 1 ? "" : "s"}
+                    </div>
+                  </foreignObject>
                 </g>
               );
             })}
@@ -374,14 +382,14 @@ export function ArchitectureDiagram() {
                     rx={3}
                     className={`arch__chip arch__chip--skill${lit ? " arch__chip--lit" : ""}${dimClass(active)}`}
                   />
-                  <text
-                    x={w / 2}
-                    y={18}
-                    textAnchor="middle"
-                    className={`arch__chip-label${dimClass(active)}`}
-                  >
-                    {s.name}
-                  </text>
+                  <foreignObject x={4} y={4} width={w - 8} height={20}>
+                    <div
+                      className={`arch__chip-label-html${dimClass(active)}`}
+                      title={s.name}
+                    >
+                      {s.name}
+                    </div>
+                  </foreignObject>
                 </g>
               );
             })}
@@ -422,22 +430,22 @@ export function ArchitectureDiagram() {
                     rx={3}
                     className={`arch__chip arch__chip--mcp${lit ? " arch__chip--lit" : ""}${dimClass(active)}`}
                   />
-                  <text
-                    x={w / 2}
-                    y={18}
-                    textAnchor="middle"
-                    className={`arch__chip-label${dimClass(active)}`}
-                  >
-                    {m.name}
-                  </text>
+                  <foreignObject x={4} y={4} width={w - 8} height={20}>
+                    <div
+                      className={`arch__chip-label-html${dimClass(active)}`}
+                      title={m.name}
+                    >
+                      {m.name}
+                    </div>
+                  </foreignObject>
                 </g>
               );
             })}
-            {composition && composition.mcps.length > VISIBLE_MCPS && (
+            {(visibleMcps.length < rankedMcps.length || orphanMcpCount > 0) && (
               <g transform={`translate(${mcpXCentre(visibleMcps.length) - 40}, ${mcpsY + 64})`}>
                 <rect width={80} height={28} rx={3} className="arch__chip arch__chip--overflow" />
                 <text x={40} y={18} textAnchor="middle" className="arch__chip-label arch__chip-label--mute">
-                  + {composition.mcps.length - VISIBLE_MCPS} more
+                  + {(rankedMcps.length - visibleMcps.length) + orphanMcpCount} more
                 </text>
               </g>
             )}
