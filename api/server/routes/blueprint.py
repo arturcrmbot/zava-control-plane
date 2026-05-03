@@ -290,10 +290,25 @@ _STREAM_TEMPLATES: list[list[dict[str, Any]]] = [
         {"type": "agent.completed", "skill": "onboarding-buddy", "workflow_type": "onboarding"},
         {"type": "durable.workflow.completed", "workflow_type": "onboarding"},
     ],
-    # NOTE: travel-preapproval is intentionally NOT in the trickle pool.
-    # The generated domain fires for real via the Functions host + persona
-    # responder loop. Adding a ghost template would conflate puppetry with
-    # real runs.
+    # Travel pre-approval — first compose-domain generated journey.
+    # Synthetic walk for the trickle. Real workflows fire end-to-end via
+    # POST /api/simulator/travel (Functions host + persona responder); this
+    # template is what plays when nobody's actively triggering a real run.
+    # Same shape and event types as the hiring/expense templates above so
+    # the page renders it identically.
+    [
+        {"type": "workflow.started", "workflow_type": "travel-preapproval"},
+        {"type": "durable.step.started", "skill": "fleet-travel-preapproval-policy-fit-checker",
+         "workflow_type": "travel-preapproval"},
+        {"type": "durable.executor.invoked", "skill": "fleet-travel-preapproval-policy-fit-checker",
+         "tool": "concur_travel_policy", "workflow_type": "travel-preapproval"},
+        {"type": "durable.executor.invoked", "skill": "fleet-travel-preapproval-policy-fit-checker",
+         "tool": "concur_travel_search", "workflow_type": "travel-preapproval"},
+        {"type": "agent.completed", "skill": "fleet-travel-preapproval-policy-fit-checker",
+         "workflow_type": "travel-preapproval"},
+        {"type": "workflow.hitl.requested", "workflow_type": "travel-preapproval"},
+        {"type": "durable.workflow.completed", "workflow_type": "travel-preapproval"},
+    ],
 ]
 
 
