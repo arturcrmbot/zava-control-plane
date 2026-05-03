@@ -14,7 +14,19 @@ class BaseModel(_PydBaseModel):
         populate_by_name=True,
     )
 
-PhaseName = Literal[
+# Phase names. Was a `Literal[...]` whitelist of the two hand-built domains'
+# phases (Invoice P2P, expense, hiring) — but compose-domain v1 generated
+# domains add their own phase names (e.g. "Employee Lookup", "Policy Fit
+# Check"), and there is no value in maintaining the whitelist for them.
+# `Phase.name` is now `str`; the whitelist below stays only as documentation
+# of the hand-built phases and as the PHASE_ORDER source for the legacy
+# invoice flow (which is the only caller of `next_phase()`).
+PhaseName = str
+
+# Hand-built phases — kept as a string list, not a Literal, so it documents
+# what's used by the two original orchestrators without constraining the
+# generated ones.
+HAND_BUILT_PHASES: list[str] = [
     # Invoice P2P (legacy — orchestrator deleted, kept for any in-flight workflow records)
     "Intake", "Validation", "Routing", "Approval", "Payment", "Reconciliation",
     # Expense compliance (POC1 — see api/functions/workflows/expense_claim.py)
