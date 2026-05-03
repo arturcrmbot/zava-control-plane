@@ -125,7 +125,8 @@ export function MindMap({ events, status, composition }: Props) {
         const isStarted =
           head.type === "workflow.started" ||
           head.type === "durable.workflow.started";
-        if (isStarted || eventDomain !== next.name) {
+        const crossDomain = eventDomain !== next.name;
+        if (isStarted || crossDomain) {
           next = {
             ...next,
             name: eventDomain,
@@ -133,6 +134,12 @@ export function MindMap({ events, status, composition }: Props) {
             // status resets to live for the new run; prior status fades
             // along with the prior skills/tools.
             status: "live",
+            // Phases are domain-bound — keeping them across a cross-domain
+            // switch piles labels from 5 different domains around the
+            // centre and they overlap. Reset on switch. Skills/tools keep
+            // fading naturally so the page still looks alive.
+            phasesSeen: crossDomain ? [] : next.phasesSeen,
+            currentPhase: crossDomain ? null : next.currentPhase,
           };
         }
       }

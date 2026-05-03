@@ -12,6 +12,8 @@ export interface Skill {
 
 export interface Mcp {
   name: string;
+  /** Per-MCP registered tool operations (post compose-domain v3). */
+  operations?: string[];
   used_by_skills: string[];
 }
 

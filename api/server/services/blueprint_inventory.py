@@ -353,6 +353,24 @@ class Skill:
 class McpTool:
     name: str
     file: str  # filename without extension
+    operations: list[str]  # registered @define_tool(name=...) strings
+
+
+_DEFINE_TOOL_NAME_RE = re.compile(
+    r"@define_tool\s*\(\s*[^)]*?name\s*=\s*[\"']([A-Za-z0-9_\.-]+)[\"']",
+    re.DOTALL,
+)
+
+
+def _extract_registered_ops(text: str) -> list[str]:
+    """Pull every @define_tool(name="...") registration out of an MCP module.
+
+    Each MCP file may register multiple tool operations. The names declared
+    here are the canonical strings a skill's `allowed-tools` frontmatter
+    must reference for the composition map to draw an edge between the
+    skill and the MCP.
+    """
+    return _DEFINE_TOOL_NAME_RE.findall(text)
 
 
 def _load_skills() -> list[Skill]:
@@ -378,15 +396,31 @@ def _load_skills() -> list[Skill]:
 
 
 def _load_mcp_tools() -> list[McpTool]:
-    """Enumerate MCP tool files. We list the modules; the registered name is
-    derived from the filename (kebab-cased to snake-case in this repo's
-    convention)."""
+    """Enumerate MCP tool files and the operations each registers.
+
+    Historically each file registered a single tool whose name matched the
+    file stem (e.g. ``audit_query.py`` -> tool ``audit_query``). The
+    compose-domain v3 generator adopts a different convention: one file per
+    upstream system, multiple ``@define_tool`` registrations, names of the
+    form ``<file_stem>_<operation>`` (e.g. ``identity_provider.py`` ->
+    ``identity_provider_list_role_templates``,
+    ``identity_provider_get_role_template``, ...). The matcher needs both.
+    """
     tools: list[McpTool] = []
     for path in sorted(MCP_TOOLS_DIR.glob("*.py")):
         stem = path.stem
         if stem.startswith("_") or stem == "__init__":
             continue
-        tools.append(McpTool(name=stem, file=path.name))
+        try:
+            ops = _extract_registered_ops(path.read_text(encoding="utf-8"))
+        except OSError:
+            ops = []
+        # Always include the bare stem as a fallback operation so the
+        # legacy 1-file-1-tool case still resolves when no @define_tool
+        # is found (or the regex misses).
+        if stem not in ops:
+            ops.append(stem)
+        tools.append(McpTool(name=stem, file=path.name, operations=ops))
     return tools
 
 
@@ -419,6 +453,26 @@ def composition_tree() -> dict[str, Any]:
     skill_names = {s.name for s in skills}
     mcp_names = {t.name for t in mcps}
 
+    # Operation-name -> MCP-file-stem index. Each MCP file contributes one
+    # entry per registered @define_tool(name="..."), plus the bare file
+    # stem as a fallback (for the legacy 1-file-1-tool MCPs).
+    op_to_mcp: dict[str, str] = {}
+    for t in mcps:
+        for op in t.operations:
+            op_to_mcp.setdefault(_normalise_tool(op), t.name)
+
+    def _resolve_tool(raw: str) -> str | None:
+        """Resolve a skill's allowed-tools entry to a MCP file stem, or None."""
+        norm = _normalise_tool(raw)
+        if norm in op_to_mcp:
+            return op_to_mcp[norm]
+        # Fallback: longest-prefix match against MCP stems for skills that
+        # use a tool name we couldn't statically resolve.
+        candidates = [m for m in mcp_names if norm == m or norm.startswith(m + "_")]
+        if candidates:
+            return max(candidates, key=len)
+        return None
+
     # Build skill -> domains lookup.
     skill_to_domains: dict[str, list[str]] = {}
     for domain in DOMAINS:
@@ -428,13 +482,13 @@ def composition_tree() -> dict[str, Any]:
             if skill_name in skill_names:
                 skill_to_domains.setdefault(skill_name, []).append(domain["name"])
 
-    # Build mcp -> skills lookup, normalising tool names for matching.
+    # Build mcp -> skills lookup using the operation-aware resolver.
     mcp_to_skills: dict[str, list[str]] = {name: [] for name in mcp_names}
     for skill in skills:
         for tool in skill.allowed_tools:
-            normalised = _normalise_tool(tool)
-            if normalised in mcp_to_skills:
-                mcp_to_skills[normalised].append(skill.name)
+            mcp_stem = _resolve_tool(tool)
+            if mcp_stem is not None:
+                mcp_to_skills[mcp_stem].append(skill.name)
 
     # Resolve each domain's tool set (union of its skills' allowed-tools).
     domain_payload: list[dict[str, Any]] = []
@@ -443,9 +497,9 @@ def composition_tree() -> dict[str, Any]:
         domain_tools_raw: set[str] = set()
         for s in domain_skills:
             for t in s.allowed_tools:
-                norm = _normalise_tool(t)
-                if norm in mcp_names:
-                    domain_tools_raw.add(norm)
+                mcp_stem = _resolve_tool(t)
+                if mcp_stem is not None:
+                    domain_tools_raw.add(mcp_stem)
         domain_payload.append(
             {
                 "name": domain["name"],
@@ -460,9 +514,7 @@ def composition_tree() -> dict[str, Any]:
         {
             "name": s.name,
             "description": s.description,
-            "allowed_tools": [
-                _normalise_tool(t) for t in s.allowed_tools if _normalise_tool(t) in mcp_names
-            ],
+            "allowed_tools": sorted({m for m in (_resolve_tool(t) for t in s.allowed_tools) if m}),
             "model": s.model,
             "domains": skill_to_domains.get(s.name, []),
             "status": s.status,
@@ -473,6 +525,7 @@ def composition_tree() -> dict[str, Any]:
     mcps_payload = [
         {
             "name": t.name,
+            "operations": t.operations,
             "used_by_skills": sorted(set(mcp_to_skills.get(t.name, []))),
         }
         for t in mcps
