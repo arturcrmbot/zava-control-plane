@@ -233,27 +233,60 @@ export function CompoundingDiagram() {
       </div>
 
       <p className="compounding__observation body">
-        The first domain cast{" "}
-        <strong>{projections[0]?.newSkills.length ?? "?"} new skills</strong>.
-        The second reused{" "}
-        <strong>
-          {projections[1]
-            ? `${projections[1].reusedSkills.length} of ${
-                projections[1].newSkills.length + projections[1].reusedSkills.length
-              }`
-            : "?"}
-        </strong>
-        . The third reused{" "}
-        <strong>
-          {projections[2]
-            ? `${projections[2].reusedSkills.length} of ${
-                projections[2].newSkills.length + projections[2].reusedSkills.length
-              }`
-            : "?"}
-        </strong>
-        . And the skills are only the visible part. The harness, the MCPs, the
-        identity, audit and governance — all of that was cast on day one and
-        carries unchanged into every domain after.
+        {(() => {
+          const liveProjections = projections.filter((p) => p.status === "live");
+          const first = liveProjections[0];
+          const second = liveProjections[1];
+          const last = liveProjections[liveProjections.length - 1];
+          const totalSkillsCast = projections.reduce(
+            (acc, p) => acc + p.newSkills.length,
+            0,
+          );
+          if (!first) {
+            return (
+              <>
+                The case of type holds <strong>{totalSkillsCast} skills</strong> so far.
+              </>
+            );
+          }
+          const lastTotal = last.newSkills.length + last.reusedSkills.length;
+          const lastReusePct =
+            lastTotal === 0 ? null : Math.round((last.reusedSkills.length / lastTotal) * 100);
+          return (
+            <>
+              The first domain cast{" "}
+              <strong>{first.newSkills.length} new skills</strong>.
+              {second && (
+                <>
+                  {" "}The second reused{" "}
+                  <strong>
+                    {second.reusedSkills.length} of{" "}
+                    {second.newSkills.length + second.reusedSkills.length}
+                  </strong>
+                  .
+                </>
+              )}
+              {last !== first && last !== second && lastReusePct !== null && (
+                <>
+                  {" "}By the time we got to <strong>{last.name}</strong>,{" "}
+                  {last.newSkills.length === 0 ? (
+                    <>
+                      every skill was already in the case of type —{" "}
+                      <strong>{last.reusedSkills.length} of {lastTotal}</strong> reused.
+                    </>
+                  ) : (
+                    <>
+                      <strong>{lastReusePct}%</strong> of the work was reuse.
+                    </>
+                  )}
+                </>
+              )}
+              {" "}And the skills are only the visible part. The harness, the
+              MCPs, the identity, audit and governance — all of that was cast on
+              day one and carries unchanged into every domain after.
+            </>
+          );
+        })()}
       </p>
     </div>
   );

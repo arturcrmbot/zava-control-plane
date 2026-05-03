@@ -417,6 +417,24 @@ body {
   border-top: 1px dashed var(--rule);
 }
 
+.map__row--aspirational {
+  margin-top: 0;
+  padding-top: var(--space-2);
+  border-top: 1px dotted var(--rule);
+}
+
+.map__row-cards--domains {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+@media (max-width: 900px) {
+  .map__row-cards--domains {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 .map__row-label {
   font-family: var(--mono-family);
   font-size: 0.7rem;
@@ -1014,9 +1032,26 @@ body {
   pointer-events: none;
 }
 
-.apointer-events: all;
+.arch__agent-status {
+  font-family: var(--mono-family);
+  font-size: 0.55rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  pointer-events: none;
+  transition: opacity 200ms ease, fill 200ms ease;
+}
+
+.arch__agent-status--alive {
+  fill: var(--accent);
+}
+
+.arch__agent-status--ghost {
+  fill: var(--ink-mute);
+}
+
+.arch__chip {
+  pointer-events: all;
   cursor: pointer;
-  rch__chip {
   stroke-width: 1;
   transition: fill 200ms ease, stroke 200ms ease, opacity 200ms ease;
 }

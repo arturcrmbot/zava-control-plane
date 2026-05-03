@@ -1,6 +1,10 @@
 import { useMemo, useState } from "react";
 import type { CompositionTree, Skill, Mcp, Domain } from "../lib/types";
 
+function plural(n: number, one: string, many: string = `${one}s`): string {
+  return n === 1 ? `${n} ${one}` : `${n} ${many}`;
+}
+
 type HoverTarget =
   | { kind: "skill"; name: string }
   | { kind: "mcp"; name: string }
@@ -161,39 +165,56 @@ export function CompositionMap({
         </div>
       </div>
 
-      <div className="map__row map__row--domains">
-        <div className="map__row-label">Domains</div>
-        <div className="map__row-cards">
-          {data.domains.map((d) => {
-            const active = isDomainActive(d.name);
-            const pulsing = pulsingDomains?.has(d.name);
-            const className = [
-              "tile",
-              "tile--domain",
-              `tile--${d.status}`,
-              active ? "tile--active" : "tile--dim",
-              pulsing ? "tile--pulse" : "",
-            ]
-              .filter(Boolean)
-              .join(" ");
-            return (
-              <button
-                key={d.name}
-                className={className}
-                onMouseEnter={() => setHover({ kind: "domain", name: d.name })}
-                onFocus={() => setHover({ kind: "domain", name: d.name })}
-              >
-                <span className="tile__title">{d.name}</span>
-                <span className="tile__meta">
-                  {d.status === "live"
-                    ? `${d.skills.length} skills · ${d.tools.length} tools`
-                    : "on the roadmap"}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {(() => {
+        const liveDomains = data.domains.filter((d) => d.status === "live");
+        const aspirationalDomains = data.domains.filter((d) => d.status !== "live");
+        const renderTile = (d: Domain) => {
+          const active = isDomainActive(d.name);
+          const pulsing = pulsingDomains?.has(d.name);
+          const className = [
+            "tile",
+            "tile--domain",
+            `tile--${d.status}`,
+            active ? "tile--active" : "tile--dim",
+            pulsing ? "tile--pulse" : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          return (
+            <button
+              key={d.name}
+              className={className}
+              onMouseEnter={() => setHover({ kind: "domain", name: d.name })}
+              onFocus={() => setHover({ kind: "domain", name: d.name })}
+            >
+              <span className="tile__title">{d.name}</span>
+              <span className="tile__meta">
+                {d.status === "live"
+                  ? `${plural(d.skills.length, "skill")} · ${plural(d.tools.length, "tool")}`
+                  : "on the roadmap"}
+              </span>
+            </button>
+          );
+        };
+        return (
+          <>
+            <div className="map__row map__row--domains">
+              <div className="map__row-label">Domains · live</div>
+              <div className="map__row-cards map__row-cards--domains">
+                {liveDomains.map(renderTile)}
+              </div>
+            </div>
+            {aspirationalDomains.length > 0 && (
+              <div className="map__row map__row--aspirational">
+                <div className="map__row-label">Roadmap</div>
+                <div className="map__row-cards map__row-cards--domains">
+                  {aspirationalDomains.map(renderTile)}
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       <footer className="map__footer">
         {hover ? (
@@ -214,8 +235,8 @@ export function CompositionMap({
             {hover.kind === "domain" && (
               <>
                 <strong>{hover.name}</strong> composes{" "}
-                {Array.from(highlight.skills).length} skills ·{" "}
-                {Array.from(highlight.mcps).length} tools
+                {plural(Array.from(highlight.skills).length, "skill")} ·{" "}
+                {plural(Array.from(highlight.mcps).length, "tool")}
               </>
             )}
           </span>

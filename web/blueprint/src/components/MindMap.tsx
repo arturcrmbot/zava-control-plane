@@ -67,6 +67,18 @@ const SKILL_FADE_MS = 2400;
 const TOOL_FADE_MS = 2400;
 const TRAVERSAL_DURATION_MS = 1600;
 
+/** Visual ceiling on skill labels; longer names get a mid-ellipsis. */
+const SKILL_LABEL_MAX = 22;
+
+function shortenSkill(name: string): string {
+  if (name.length <= SKILL_LABEL_MAX) return name;
+  // Mid-ellipsis preserves both the leading qualifier and the meaningful tail
+  // (e.g. "fleet-travel-preapproval-policy-fit-checker" → "fleet-trave…fit-checker").
+  const head = Math.ceil((SKILL_LABEL_MAX - 1) / 2);
+  const tail = Math.floor((SKILL_LABEL_MAX - 1) / 2);
+  return `${name.slice(0, head)}…${name.slice(-tail)}`;
+}
+
 function _emptyDomain(name: string): DomainState {
   return {
     name,
@@ -105,13 +117,18 @@ export function MindMap({ events, status, composition }: Props) {
       let next = current;
       const eventDomain = _domainFromEvent(head);
       // Switch active domain on workflow.started, OR on first sight of any
-      // event that names a domain when there is no current domain yet.
+      // event that names a domain when there is no current domain yet, OR
+      // when an event's domain differs from the active one (prevents skills
+      // from a different walk piling onto the wrong centre).
       if (head.type === "workflow.started" || head.type === "durable.workflow.started") {
         if (eventDomain) {
           next = _emptyDomain(eventDomain);
           next.workflowId = head.workflow_id;
         }
       } else if (!next && eventDomain) {
+        next = _emptyDomain(eventDomain);
+        next.workflowId = head.workflow_id;
+      } else if (next && eventDomain && eventDomain !== next.name) {
         next = _emptyDomain(eventDomain);
         next.workflowId = head.workflow_id;
       }
@@ -233,8 +250,14 @@ export function MindMap({ events, status, composition }: Props) {
           return (idx * 2 * Math.PI) / Math.max(phases.length, 6) - Math.PI / 2;
         })()
       : -Math.PI / 2;
+    // Adaptive spread: a single skill sits dead centre on the phase angle;
+    // small clusters fan out gently; larger clusters wrap up to 320° so
+    // tiles stop crashing into each other.
+    const spread = Math.min(
+      (Math.PI * 320) / 180,
+      (Math.PI * 100) / 180 + (Math.PI * 30) / 180 * Math.max(0, skills.length - 2),
+    );
     skills.forEach((s, i) => {
-      const spread = (Math.PI * 140) / 180;
       const t = skills.length === 1 ? 0 : (i / (skills.length - 1)) - 0.5;
       const angle = phaseAngle + t * spread;
       positions.set(s.name, {
@@ -346,18 +369,20 @@ export function MindMap({ events, status, composition }: Props) {
         const pos = skillPositions.get(s.name);
         if (!pos) return null;
         const op = nodeOpacity(s.lastFiredMs, SKILL_FADE_MS);
+        const label = shortenSkill(s.name);
         return (
           <g key={`skill-${s.name}`} opacity={op}>
+            <title>{s.name}</title>
             <rect
-              x={pos.x - 56}
+              x={pos.x - 70}
               y={pos.y - 11}
-              width={112}
+              width={140}
               height={22}
               rx={3}
               className="mindmap__skill-tile"
             />
             <text x={pos.x} y={pos.y + 4} className="mindmap__label mindmap__label--skill" textAnchor="middle">
-              {s.name}
+              {label}
             </text>
           </g>
         );
@@ -392,7 +417,7 @@ export function MindMap({ events, status, composition }: Props) {
       {/* Calm overlay */}
       {calm && status === "watching" && (
         <text x={cx} y={H - 18} textAnchor="middle" className="mindmap__hint">
-          watching for signal — fire a workflow to wake the page
+          quiet — the next workflow will draw itself
         </text>
       )}
       {status === "offline" && (

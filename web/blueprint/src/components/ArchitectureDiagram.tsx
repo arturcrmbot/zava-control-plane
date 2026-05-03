@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useComposition } from "../lib/useComposition";
 
 /**
  * Section 3 — functional architecture diagram.
@@ -38,7 +39,7 @@ const SKILLS: ChipNode[] = [
   { id: "sk-jurisdiction", label: "jurisdiction-router", links: ["mcp-policy"] },
 ];
 
-const SKILL_OVERFLOW = "+ 20 more";
+const SKILL_OVERFLOW_DEFAULT = "… and others";
 
 const MCPS: ChipNode[] = [
   { id: "mcp-policy", label: "policy_search", links: ["sys-di"] },
@@ -46,7 +47,7 @@ const MCPS: ChipNode[] = [
   { id: "mcp-claim", label: "claim_lookup", links: ["sys-workday", "sys-concur"] },
   { id: "mcp-audit", label: "audit_query", links: [] },
 ];
-const MCP_OVERFLOW = "+ 15 more";
+const MCP_OVERFLOW_DEFAULT = "… and others";
 
 const SYSTEMS: ChipNode[] = [
   { id: "sys-workday", label: "Workday", links: [] },
@@ -160,6 +161,22 @@ function highlightFor(hover: HoverState): Highlight {
 export function ArchitectureDiagram() {
   const W = 1100;
   const H = 540;
+
+  // Live counts power the overflow chips so the diagram doesn’t drift
+  // every time a new skill or MCP gets cast. The drawn agents/skills/MCPs
+  // themselves are intentionally illustrative — they’re a *shape* of the
+  // architecture, not a manifest of every primitive.
+  const { data: composition } = useComposition();
+  const skillOverflowLabel = useMemo(() => {
+    if (!composition) return SKILL_OVERFLOW_DEFAULT;
+    const extra = composition.counts.skills - SKILLS.length;
+    return extra > 0 ? `+ ${extra} more` : SKILL_OVERFLOW_DEFAULT;
+  }, [composition]);
+  const mcpOverflowLabel = useMemo(() => {
+    if (!composition) return MCP_OVERFLOW_DEFAULT;
+    const extra = composition.counts.mcps - MCPS.length;
+    return extra > 0 ? `+ ${extra} more` : MCP_OVERFLOW_DEFAULT;
+  }, [composition]);
 
   const spineX = 30;
   const spineW = 110;
@@ -383,7 +400,15 @@ export function ArchitectureDiagram() {
                     textAnchor="middle"
                     className={`arch__agent-label${dimClass(active)}`}
                   >
-                    {a.label} · {a.status}
+                    {a.label}
+                  </text>
+                  <text
+                    x={60}
+                    y={42}
+                    textAnchor="middle"
+                    className={`arch__agent-status arch__agent-status--${a.status}${dimClass(active)}`}
+                  >
+                    {a.status}
                   </text>
                 </g>
               );
@@ -446,9 +471,9 @@ export function ArchitectureDiagram() {
               );
             })}
             <g transform={`translate(${stackX + 18 + SKILLS.length * 116}, ${skillsY + 64})`}>
-              <rect width={64} height={28} rx={3} className="arch__chip arch__chip--overflow" />
-              <text x={32} y={18} textAnchor="middle" className="arch__chip-label arch__chip-label--mute">
-                {SKILL_OVERFLOW}
+              <rect width={84} height={28} rx={3} className="arch__chip arch__chip--overflow" />
+              <text x={42} y={18} textAnchor="middle" className="arch__chip-label arch__chip-label--mute">
+                {skillOverflowLabel}
               </text>
             </g>
           </g>
@@ -497,9 +522,9 @@ export function ArchitectureDiagram() {
               );
             })}
             <g transform={`translate(${stackX + 18 + MCPS.length * 128}, ${mcpsY + 64})`}>
-              <rect width={64} height={28} rx={3} className="arch__chip arch__chip--overflow" />
-              <text x={32} y={18} textAnchor="middle" className="arch__chip-label arch__chip-label--mute">
-                {MCP_OVERFLOW}
+              <rect width={84} height={28} rx={3} className="arch__chip arch__chip--overflow" />
+              <text x={42} y={18} textAnchor="middle" className="arch__chip-label arch__chip-label--mute">
+                {mcpOverflowLabel}
               </text>
             </g>
           </g>
