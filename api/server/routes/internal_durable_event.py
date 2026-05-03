@@ -16,6 +16,25 @@ router = APIRouter(prefix="/internal")
 # compute end_ms when stage=complete/error arrives.
 _span_starts: dict[tuple[str, str], float] = {}
 
+# Per-workflow workflow_type cache. Populated on first checkpoint event that
+# carries `workflow_type` in its payload (orchestrators stamp it onto every
+# emit). Used to enrich every FleetEvent emitted on this workflow's behalf so
+# /api/blueprint/stream consumers can resolve `domain` consistently — not
+# just on the trickle templates.
+_workflow_types: dict[str, str] = {}
+
+
+def _emit(event_type, workflow_id: str, **fields) -> None:
+    """Emit a FleetEvent on the bus, automatically stamping the cached
+    workflow_type for this workflow_id (if known) so downstream consumers
+    can resolve `domain` without the orchestrator stamping it on every
+    field."""
+    if "workflow_type" not in fields:
+        wt = _workflow_types.get(workflow_id)
+        if wt:
+            fields["workflow_type"] = wt
+    app_state.bus.emit(FleetEvent(type=event_type, workflow_id=workflow_id, **fields))
+
 
 class DurableEventBody(BaseModel):
     workflow_id: str
@@ -51,6 +70,14 @@ async def receive_durable_event(body: DurableEventBody):
     wid = body.workflow_id
     now = time.time()
 
+    # First-sight cache: if this event carries workflow_type, remember it for
+    # all subsequent events on this workflow_id. Generated-domain orchestrators
+    # stamp it on every checkpoint payload; the cache means we only need it
+    # once.
+    wt_in = body.payload.get("workflow_type")
+    if wt_in and wid not in _workflow_types:
+        _workflow_types[wid] = wt_in
+
     app_state.orchestration_history.setdefault(wid, []).append({
         "kind": body.kind, "payload": body.payload, "at": now
     })
@@ -59,7 +86,7 @@ async def receive_durable_event(body: DurableEventBody):
     })
 
     if body.kind == "workflow.started":
-        app_state.bus.emit(FleetEvent(type="workflow.started", workflow_id=wid))
+        _emit("workflow.started", wid)
         _ledger(wid, kind="agent", actor_id="orchestrator",
                 action="workflow.started", details={})
 
@@ -78,9 +105,7 @@ async def receive_durable_event(body: DurableEventBody):
             w = app_state.store.get_workflow(wid)
             if w:
                 w.current_phase = step  # type: ignore[assignment]
-            app_state.bus.emit(FleetEvent(
-                type="workflow.phase.started", workflow_id=wid, phase=step
-            ))
+            _emit("workflow.phase.started", wid, phase=step)
 
     elif body.kind == "step.completed":
         step = body.payload.get("step")
@@ -89,10 +114,7 @@ async def receive_durable_event(body: DurableEventBody):
             app_state.store.update_phase(wid, step, status="completed", completed_at=now)
             _ledger(wid, kind="agent", actor_id=f"phase:{step}",
                     action=f"phase.completed:{step}", details={"duration_ms": dur})
-            app_state.bus.emit(FleetEvent(
-                type="workflow.phase.completed", workflow_id=wid,
-                phase=step, durationMs=dur,
-            ))
+            _emit("workflow.phase.completed", wid, phase=step, durationMs=dur)
 
     elif body.kind == "executor.invoked":
         name = str(body.payload.get("name", "?"))
@@ -169,12 +191,12 @@ async def receive_durable_event(body: DurableEventBody):
     elif body.kind == "claim_routed":
         verdict = (body.payload.get("verdict") or "").lower()
         if verdict in {"green", "amber", "red"}:
-            app_state.bus.emit(FleetEvent(
-                type=f"claim.routed.{verdict}",  # type: ignore[arg-type]
-                workflow_id=wid,
+            _emit(
+                f"claim.routed.{verdict}",  # type: ignore[arg-type]
+                wid,
                 routed_to=body.payload.get("routed_to"),
                 escalation_tier=body.payload.get("escalation_tier"),
-            ))
+            )
 
     elif body.kind == "validator.blocked":
         compose_validator_exception(
@@ -186,10 +208,10 @@ async def receive_durable_event(body: DurableEventBody):
                 actor_id=f"validator:{body.payload.get('name', 'unknown')}",
                 action="validator.blocked",
                 details={"reason": body.payload.get("reason", "validation failed")})
-        app_state.bus.emit(FleetEvent(
-            type="workflow.exception.detected", workflow_id=wid,
+        _emit(
+            "workflow.exception.detected", wid,
             category="validator-blocked", severity="high",
-        ))
+        )
 
     elif body.kind == "suspended":
         # Platform contract: every suspended event declares a `wait_kind` —
@@ -216,10 +238,19 @@ async def receive_durable_event(body: DurableEventBody):
             w.metadata = dict(w.metadata or {})
             w.metadata["awaiting_reason"] = reason
             w.metadata["wait_kind"] = wait_kind
-        app_state.bus.emit(FleetEvent(
-            type="workflow.hitl.requested", workflow_id=wid,
+        # Forward persona-responder fields onto the FleetEvent. Generated
+        # domains stash `persona`, `external_event`, and `context` in the
+        # suspended payload so the responder can close the gate without a
+        # human in the loop. Hand-built domains (expense / hiring) omit
+        # these fields, so the responder ignores their HITL events.
+        _emit(
+            "workflow.hitl.requested", wid,
             reason=reason, wait_kind=wait_kind,
-        ))
+            instance_id=body.instance_id,
+            persona=body.payload.get("persona"),
+            external_event=body.payload.get("external_event"),
+            context=body.payload.get("context"),
+        )
 
     elif body.kind == "resumed":
         _ledger(wid, kind="agent", actor_id="orchestrator",
@@ -293,11 +324,7 @@ async def receive_durable_event(body: DurableEventBody):
         #      AI thought, not just that it ran.
         payload = {k: v for k, v in (body.payload or {}).items() if k != "type"}
         app_state.store.append_agent_reasoning(wid, payload)
-        app_state.bus.emit(FleetEvent(
-            type="agent.completed",
-            workflow_id=wid,
-            **payload,
-        ))
+        _emit("agent.completed", wid, **payload)
 
     elif body.kind == "workflow.completed":
         _ledger(wid, kind="agent", actor_id="orchestrator",
@@ -306,9 +333,9 @@ async def receive_durable_event(body: DurableEventBody):
         if w:
             w.status = "completed"
         _auto_resolve_open(wid, "auto-resolved:completed")
-        app_state.bus.emit(FleetEvent(
-            type="workflow.resolved", workflow_id=wid, resolution="completed"
-        ))
+        _emit("workflow.resolved", wid, resolution="completed")
+        # Drop the workflow_type cache entry; the workflow is done.
+        _workflow_types.pop(wid, None)
 
     elif body.kind == "log.action":
         # Ledger-only event from the UI (Fork/Rollback illustrative stubs).

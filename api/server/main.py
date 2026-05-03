@@ -43,6 +43,13 @@ async def lifespan(app: FastAPI):
     # bridge. Returns an unsubscribe callable that we hold for teardown.
     from api.server.services.portal_orchestration import attach as _attach_portal_orch
     _portal_orch_off = _attach_portal_orch(app_state)
+    # Persona responder: closes generated-domain HITL gates by applying the
+    # persona's decision policy deterministically against the parked context
+    # and raising the resolving external event back to Durable. Hand-built
+    # domains (expense / hiring) omit the persona/external_event fields from
+    # their suspended payloads, so this subscriber ignores them.
+    from api.server.services.persona_responder import attach as _attach_persona_responder
+    _persona_responder_off = _attach_persona_responder(app_state.bus)
     # Seed three demo HiringOrchestrator workflows so the candidate portal's
     # /apply form always has a workflow to attach to (one per req in
     # data/synthetic/hiring/reqs.json). Idempotent — safe to re-run.
@@ -59,6 +66,10 @@ async def lifespan(app: FastAPI):
         ramp_task.cancel()
         try:
             _portal_orch_off()
+        except Exception:
+            pass
+        try:
+            _persona_responder_off()
         except Exception:
             pass
         try:

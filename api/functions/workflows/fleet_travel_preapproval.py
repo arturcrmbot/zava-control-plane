@@ -25,11 +25,16 @@ def fleet_travel_preapproval_orchestration(context: df.DurableOrchestrationConte
     """Orchestrate the 3 Travel pre-approval phases for one workflow."""
     input_dict = context.get_input() or {}
     workflow_id = input_dict.get("workflow_id", "?")
+    # Stamped on every checkpoint payload so the FastAPI bus knows which
+    # domain the event belongs to. Without this, /api/blueprint/stream events
+    # arrive with domain=null and the mind-map can't pick a ring to light up.
+    workflow_type = input_dict.get("type", "travel-preapproval")
     enriched = {**input_dict, "instance_id": context.instance_id}
 
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
-        "kind": "workflow.started", "payload": {"domain": "fleet-travel-preapproval"}
+        "kind": "workflow.started",
+        "payload": {"domain": "fleet-travel-preapproval", "workflow_type": workflow_type},
     })
 
     # Phase 1: Employee Lookup (deterministic)
@@ -48,8 +53,22 @@ def fleet_travel_preapproval_orchestration(context: df.DurableOrchestrationConte
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
         "kind": "suspended",
-        "payload": {"reason": "awaiting_manager_approval", "phase": "manager_approval",
-                    "wait_kind": "operator_review"},
+        "payload": {
+            "reason": "awaiting_manager_approval",
+            "phase": "manager_approval",
+            "wait_kind": "operator_review",
+            "workflow_type": workflow_type,
+            # Persona-responder contract: tell the responder which persona
+            # owns this gate, which event resumes it, and the prior-phase
+            # context the persona needs to apply its decision policy.
+            "persona": "line_manager",
+            "external_event": "manager_approval_decision",
+            "context": {
+                "trip": enriched.get("trip"),
+                "employee_lookup": enriched.get("employee_lookup"),
+                "policy_fit_check": enriched.get("policy_fit_check"),
+            },
+        },
     })
 
     decision_event = context.wait_for_external_event("manager_approval_decision")
@@ -60,7 +79,8 @@ def fleet_travel_preapproval_orchestration(context: df.DurableOrchestrationConte
         yield context.call_activity("checkpoint_activity_trigger", {
             "workflow_id": workflow_id, "instance_id": context.instance_id,
             "kind": "workflow.completed",
-            "payload": {"status": "timeout", "phase": "manager_approval"}
+            "payload": {"status": "timeout", "phase": "manager_approval",
+                        "workflow_type": workflow_type},
         })
         return {"status": "timeout", "phase": "manager_approval"}
     timeout_event.cancel()
@@ -69,12 +89,13 @@ def fleet_travel_preapproval_orchestration(context: df.DurableOrchestrationConte
 
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
-        "kind": "resumed", "payload": {"phase": "manager_approval"}
+        "kind": "resumed",
+        "payload": {"phase": "manager_approval", "workflow_type": workflow_type},
     })
 
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
-        "kind": "workflow.completed", "payload": {}
+        "kind": "workflow.completed", "payload": {"workflow_type": workflow_type},
     })
 
     return {

@@ -118,6 +118,21 @@ DOMAINS: list[dict[str, Any]] = [
         },
     },
     {
+        # First domain composed by compose-domain (sandbox 20260503-104041,
+        # graduated commit 7146290d). Lives in api/functions/workflows/
+        # fleet_travel_preapproval.py + per-phase graphs; the runtime emits
+        # workflow_type="travel-preapproval" via the simulator entry.
+        "name": "Travel pre-approval",
+        "status": "live",
+        "workflow_type": "travel-preapproval",
+        "skills": [
+            "fleet-travel-preapproval-policy-fit-checker",
+        ],
+        "phase_aliases": {
+            "fleet-travel-preapproval-policy-fit-checker": "Policy fit",
+        },
+    },
+    {
         "name": "Procurement",
         "status": "aspirational",
         "workflow_type": None,
