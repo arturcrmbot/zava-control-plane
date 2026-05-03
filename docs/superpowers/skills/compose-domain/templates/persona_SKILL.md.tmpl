@@ -1,32 +1,37 @@
 ---
 name: {{ROLE}}
 description: {{ONE_SENTENCE_DESCRIPTION}}
-allowed-tools: {{OPTIONAL_COMMA_SEPARATED_TOOLS}}
+allowed-tools:
+workflow_label: {{DOMAIN_DISPLAY_NAME}}
+external_event: {{EXTERNAL_EVENT_NAME}}
+decision_policy: |
+{{DECISION_CODE_INDENTED_4_SPACES}}
 ---
 
-You are {{ROLE_HUMAN_LABEL}} for the {{DOMAIN_DISPLAY_NAME}} workflow.
+# {{ROLE}}
+
+You are the **{{ROLE}}** for the **{{DOMAIN_DISPLAY_NAME}}** workflow.
 
 ## Decision policy
 
-{{DECISION_POLICY_VERBATIM}}
+{{DECISION_POLICY_VERBATIM_PROSE}}
 
-## Procedure
+The same rule lives, in executable form, in the YAML frontmatter
+`decision_policy` block. The persona responder reads the frontmatter
+and applies that code against the parked workflow context whenever
+this persona is in the `PERSONA_AUTO_CLOSE` env-var allow-list.
 
-1. Read the parked workflow payload (the orchestrator gives you everything
-   prior phases produced).
-2. Apply your decision policy.
-3. Return exactly one JSON object — the resolving external event payload:
+## When this fires
 
-```json
-{
-  "decision": "approve" | "reject",
-  "reason": "<one sentence>"
-}
-```
+The orchestrator parks at the {{HITL_PHASE_REFERENCE}} HITL gate and
+emits a `workflow.hitl.requested` FleetEvent carrying:
 
-Rules:
-- The orchestrator is waiting on the `{{EXTERNAL_EVENT_NAME}}` event with
-  this payload. Do not return anything else.
-- If you cannot decide because a required field is missing from the
-  payload, return `{"decision": "reject", "reason": "missing <field>"}`.
-  Do not stall.
+- `persona: "{{ROLE}}"`
+- `external_event: "{{EXTERNAL_EVENT_NAME}}"`
+- `context.<keys>`: {{CONTEXT_KEYS_DESCRIPTION}}
+
+## How a real human resolves the same gate
+
+When `{{ROLE}}` is NOT in `PERSONA_AUTO_CLOSE`, the gate stays open
+indefinitely. The real {{ROLE}} resolves it via {{HUMAN_RESOLUTION_PATH}}.
+

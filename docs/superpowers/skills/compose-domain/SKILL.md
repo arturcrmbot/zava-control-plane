@@ -1,12 +1,20 @@
 ---
 name: compose-domain
 description: |
-  Design-time meta-skill. Given a domain brief (YAML) or a free-text idea,
-  produce a complete Durable-fidelity domain sandbox: orchestrator, per-phase
-  graphs, validators, agent skills, MCP tool stubs, persona(e), synthetic
-  data and simulator entries — all shape-isomorphic to the existing
-  `expense-claim` and `hiring` domains. Sandbox-only; never touches real
-  trees. Calls `author-runtime-skill`, `author-mcp-tool`, and
+  Design-time meta-skill (v3). Given a domain brief (YAML) or a free-text
+  idea, produce a complete Durable-fidelity domain sandbox: orchestrator,
+  per-phase graphs, validators, agent skills, MCP tool stubs, persona(e),
+  + a graduate.sh script that mechanically wires everything into the live
+  trees.
+
+  v3 encodes the substrate-fix v2 contract: durable.* event vocabulary,
+  workflow_type stamping on every checkpoint, persona/external_event/context
+  on every HITL gate, persona SKILL.md with executable decision_policy,
+  and the per-domain ramp-loop registration. Every generated domain inherits
+  the contract by construction.
+
+  Sandbox-only; never touches real trees directly. Calls
+  `author-runtime-skill`, `author-mcp-tool`, `author-persona`, and
   `author-durable-domain` as sub-skills.
 audience: design-time-only
 forbidden-runtime: true
@@ -48,7 +56,7 @@ operator. Wait for explicit approval. Then continue to step 2.
 
 If the operator gives you a YAML brief path on entry, skip this step.
 
-#### Brief schema (authoritative)
+#### Brief schema (authoritative, v3)
 
 ```yaml
 domain:
@@ -62,17 +70,31 @@ phases:
   - name: <snake_case>
     intent: <one sentence>
     kind: deterministic | agent | hitl
-    external_systems: [<id>, ...]            # ids from the external_systems list below
-    hitl: false | true
+    external_systems: [<id>, ...]            # ids from external_systems list
+    hitl: false | true                       # legacy; redundant with kind == hitl
     # only when kind == agent:
     agent_skill_name: <kebab-case>
+    allowed_tools: [<mcp_tool>_<operation>, ...]   # OPTIONAL v3; defaults
+                                                   # to union of phase's
+                                                   # external_systems' tools
     # only when kind == hitl:
     persona: <role from personae below>
+    wait_kind: operator_review | external_party    # OPTIONAL v3; default operator_review
+    external_event: <snake_case>                   # OPTIONAL v3; default <phase>_decision
+    context_keys: [<phase.name>, ...]              # OPTIONAL v3; default = previous phase
 
 personae:
   - role: <snake_case>
     decision_policy: |
       One paragraph stating the rule the persona uses to decide.
+    decision_code: |                               # NEW v3, REQUIRED.
+      # Python source the persona_responder compiles. Reads `context`,
+      # assigns `decision` ("approve" | "reject") and `reason` (str).
+      # Mirror the decision_policy paragraph above. The responder runs
+      # this in a sandboxed namespace with a small whitelist of
+      # builtins; see api/server/services/persona_responder.py.
+      pass
+    workflow_label: <human label>                  # NEW v3, OPTIONAL; defaults to domain.display_name
 
 external_systems:
   - id: <snake_case>
@@ -85,6 +107,8 @@ Validate the brief before you continue:
 - Every phase referenced in `external_systems` exists in the top-level
   `external_systems` list.
 - Every persona referenced in a HITL phase exists in `personae`.
+- Every persona has a `decision_code` block (Python source that the
+  responder will compile).
 - At least one phase has `kind: agent`.
 - At least one phase has `kind: hitl`.
 
@@ -113,24 +137,35 @@ exist in `api/server/mcp_tools/` (check this against the live filesystem):
 Always:
 - 1 orchestrator at `api/functions/workflows/<domain.name>.py`.
 - 1 activities module at `api/functions/workflows/<domain.name>_activities.py`.
-- 1 `GRADUATION.md` at the sandbox root listing the diffs the engineer must
-  apply to `function_app.py`, `simulator_orchestrator.py`,
-  `routes/simulator.py`, `blueprint_inventory.py`, `constants.py`, and
-  `graphs/__init__.py`. The simulator spawn helper, the inject route, and
-  any synthetic test payload all live in GRADUATION.md — NOT in standalone
-  files. v1 generated domains are small enough that they don't need
-  domain-specific synthetic-data or simulator modules.
+- 1 `GRADUATION.md` at the sandbox root — human-readable description of
+  what the graduation script will do.
+- 1 `graduate.sh` at the sandbox root — the **executable** graduation
+  script (NEW v3). Replaces the v1/v2 hand-edit checklist. Mechanically
+  copies files + edits the 7 live trees described in step 4.7.
 
 ### Conventions (codified for determinism)
 
 These were free choices in earlier drafts; codifying them removes
 improvisation from the procedure.
 
+- **`workflow_type` stamping.** Every `checkpoint_activity_trigger`
+  payload carries `workflow_type: workflow_type` (the variable read
+  once at the top of the orchestrator from `input_dict.get("type")`).
+  Without this, recordings are filename `unknown-...` and FleetEvents
+  arrive with `domain: null`. (Substrate-fix v2 contract.)
+- **HITL `persona`/`external_event`/`context`.** Every `kind: "suspended"`
+  payload stamps the persona-responder contract:
+  - `persona`: brief.phases[].persona
+  - `external_event`: brief.phases[].external_event (or default
+    `<phase_name>_decision`)
+  - `context`: a dict whose keys are brief.phases[].context_keys (or
+    default just the previous phase's name), each pulling from
+    `enriched.get(<key>)`.
+  Without this, the persona responder ignores the gate and the
+  workflow stalls forever.
 - **HITL external event name.** For every phase whose `kind: hitl`, the
-  orchestrator's `wait_for_external_event(...)` name is exactly
-  `<phase_name>_decision`, and the matching persona SKILL.md's `## Procedure`
-  step 3 says "the orchestrator is waiting on the `<phase_name>_decision`
-  event". Both places write the same string. Do not invent.
+  orchestrator's `wait_for_external_event(...)` name and the persona
+  SKILL.md's `external_event` frontmatter MUST match byte-for-byte.
 - **Activity-trigger names.** `<domain.name with - replaced by _>_<phase_name>_activity_trigger`.
   E.g. `fleet_travel_preapproval_employee_lookup_activity_trigger`.
 - **Graph builder names.** `build_<domain.name with - replaced by _>_<phase_name>_workflow`.
@@ -146,7 +181,7 @@ improvisation from the procedure.
 
 ### Step 3 — Inventory and isomorphism
 
-Before invoking any sub-skill, read **exactly these 8 files** end-to-end
+Before invoking any sub-skill, read **exactly these 9 files** end-to-end
 in this session. They are the canonical examples sub-skills mirror. Do
 not read more (you don't need them) and do not read fewer (you'll
 improvise the parts you didn't load). Drift in any of these files means
@@ -156,19 +191,26 @@ this SKILL.
 | # | Canonical example | Used by sub-skill |
 |---|---|---|
 | 1 | `api/server/skills/receipt-validator/SKILL.md` | `author-runtime-skill` (phase_agent mode) |
-| 2 | `api/server/personae/line_manager/SKILL.md` | `author-runtime-skill` (persona mode) |
-| 3 | `api/server/mcp_tools/claim_lookup.py` | `author-mcp-tool` |
-| 4 | `api/functions/workflows/expense_claim.py` | `author-durable-domain` (orchestrator + HITL pattern) |
-| 5 | `api/functions/workflows/activities.py` | `author-durable-domain` (activities module — reuses `_run_workflow` from here) |
-| 6 | `api/functions/graphs/classify.py` | `author-durable-domain` (per-phase agent graph) |
-| 7 | `api/functions/graphs/executors/agents/agent_rag_classifier.py` | `author-durable-domain` (agent executor) |
-| 8 | `api/functions/graphs/executors/validators/validate_classification_schema_node.py` | `author-durable-domain` (validator) |
+| 2 | `api/server/personae/line_manager/SKILL.md` | `author-persona` (NEW v3) |
+| 3 | `api/server/services/persona_responder.py` | `author-persona` (decision_code shape + sandbox builtins) |
+| 4 | `api/server/mcp_tools/claim_lookup.py` | `author-mcp-tool` |
+| 5 | `api/functions/workflows/expense_claim.py` | `author-durable-domain` (orchestrator + HITL contract; v2-stamped) |
+| 6 | `api/functions/workflows/activities.py` | `author-durable-domain` (activities module — reuses `_run_workflow` from here) |
+| 7 | `api/functions/graphs/classify.py` | `author-durable-domain` (per-phase agent graph) |
+| 8 | `api/functions/graphs/executors/agents/agent_rag_classifier.py` | `author-durable-domain` (agent executor) |
+| 9 | `api/functions/graphs/executors/validators/validate_classification_schema_node.py` | `author-durable-domain` (validator) |
 
 **For deterministic phases**, also note: `api/functions/graphs/_tracked_executor.py`
 for the `TrackedExecutor` constructor signature (used directly with
 `executor_type="deterministic"` and an inline `_<phase>_execute` async
 fn — there is no canonical deterministic-graph example to mirror, so
 follow the v1 graduated example at `api/functions/graphs/fleet_travel_preapproval_employee_lookup.py`).
+
+**For the substrate-fix contract** (workflow_type stamping +
+persona/external_event/context on suspended payloads), the live
+`expense_claim.py` and `hiring.py` are the canonical implementation;
+the new orchestrator MUST mirror their stamping shape exactly. The
+generated `fleet_travel_preapproval.py` is also a worked example.
 
 ### Step 4 — Generate into sandbox
 
@@ -182,7 +224,11 @@ once, passing the **structured arguments** below. Do not pass the brief
 as a whole — pass only the relevant slice. This is the boundary that
 keeps sub-skills deterministic.
 
-#### When invoking `author-runtime-skill` (mode: phase_agent)
+#### When invoking `author-runtime-skill` (phase_agent only)
+
+v3 note: persona authoring is now `author-persona`, not
+`author-runtime-skill`. `author-runtime-skill` only writes phase-agent
+SKILL.md files now.
 
 ```
 mode: phase_agent
@@ -194,15 +240,15 @@ available_mcp_tools:
   - ... (one per (mcp_tool, operation) pair the phase's external_systems[] resolves to)
 ```
 
-#### When invoking `author-runtime-skill` (mode: persona)
+#### When invoking `author-persona` (NEW v3)
 
 ```
-mode: persona
 output_path: <RUN_ROOT>/api/server/personae/<role>/SKILL.md
 brief: <the persona entry from brief.personae[]>
+domain_display_name: <brief.domain.display_name>
+default_external_event: <hitl_phase_name>_decision   # convention
 canonical_example_path: api/server/personae/line_manager/SKILL.md
-available_mcp_tools: []   # personae have empty allowed-tools by convention
-external_event_name: <hitl_phase_name>_decision   # convention; same string the orchestrator waits on
+responder_path: api/server/services/persona_responder.py  # for builtins reference
 ```
 
 #### When invoking `author-mcp-tool`
@@ -232,19 +278,44 @@ Each sub-skill writes its files to the sandbox path under the mirrored
 real-tree layout. **No sub-skill writes to a real path.** When a
 sub-skill returns, you continue with the next.
 
-After all sub-skills have run, only one more file remains for
-`compose-domain` itself to write:
+After all sub-skills have run, two more files remain for `compose-domain`
+itself to write:
 
-- `<RUN_ROOT>/GRADUATION.md` — hand-edit diff list. Use the template at
+- `<RUN_ROOT>/GRADUATION.md` — human-readable description of what
+  graduate.sh does. Use the template at
   `docs/superpowers/skills/compose-domain/templates/GRADUATION.md.tmpl`.
-  `author-durable-domain` returns the structured fragments
-  (orchestrator-import block, activity-trigger block, etc.) for you to
-  splice into the template. **Note:** v1 generated domains do NOT add a
-  `Workflow` record to `app_state.store` (the existing
-  `Workflow` / `ClaimData` / `HiringData` types are domain-specific). The
-  spawn helper in GRADUATION.md §5 must omit the
+  This file is reference, not action.
+- `<RUN_ROOT>/graduate.sh` — the **executable** script that mechanically
+  performs all the live-tree edits. Use the template at
+  `docs/superpowers/skills/compose-domain/templates/graduate.sh.tmpl`.
+  `author-durable-domain` returns the structured fragments (orchestrator-
+  import block, activity-trigger block, ramp-loop spawner entry,
+  inventory DOMAIN entry, etc.) for you to splice into the template.
+  Mark the file executable (`chmod +x`).
+
+  The graduate.sh script must:
+  1. Validate prereqs (live tree is a clean checkout of repo root).
+  2. Copy sandbox files to their real-tree paths.
+  3. Patch `function_app.py` (imports + orchestrator decorator + activity
+     decorators).
+  4. Patch `api/functions/graphs/__init__.py` (build_* exports).
+  5. Patch `api/server/services/simulator_orchestrator.py` (spawn helper
+     + add to `ramp_loop`'s `spawners` dict).
+  6. Patch `api/server/routes/simulator.py` (POST /api/simulator/<x> route).
+  7. Patch `api/server/services/blueprint_inventory.py` (DOMAINS entry
+     with workflow_type + phase_aliases).
+  8. Patch `api/shared/constants.py` (lift `<PHASE>_TIMEOUT` constants).
+  9. Print smoke commands + expected event sequence.
+
+  Each patch step is idempotent: if the same domain has already been
+  graduated (entry/import already present), the step is a no-op.
+
+  **Note v3:** generated domains DO NOT add a `Workflow` record to
+  `app_state.store` (the existing `Workflow` / `ClaimData` / `HiringData`
+  types are domain-specific). The spawn helper omits the
   `app_state.store.upsert_workflow(w)` call that `spawn_hiring_workflow`
-  uses.
+  uses. State lives in Durable + the FleetEvent stream + the bus's
+  `_workflow_types` cache.
 
 ### Step 5 — Self-check
 
@@ -260,10 +331,11 @@ that produced it, then delete the sandbox and re-run.
 If everything passes, end with:
 
 > Sandbox at `tools/scratch/compose-domain/<RUN_ID>/`. CHECKLIST passed.
-> Graduation is manual — see `<RUN_ID>/GRADUATION.md`.
+> Graduate by running `bash <RUN_ID>/graduate.sh` from repo root.
+> Then proceed to Step 7 (recorder verification).
 
 Do not graduate. Do not start the demo stack. Do not run any tests against
-the real trees. The skill ends here.
+the real trees. The skill ends here — the operator runs graduate.sh.
 
 ### Step 6 — Determinism check (operator-invoked, optional)
 
@@ -275,10 +347,45 @@ SKILLs that gave the author freedom — the fix is to codify that part
 here or in the matching sub-skill, then re-run.
 
 The HITL event-name convention, the activity-trigger naming convention,
-and the structured sub-skill input contracts in step 4 above are the
-specific fixes that emerged from the v1 → v2 iteration of this SKILL.
-Future iterations follow the same loop: improvise once, codify, re-run,
-diff.
+the structured sub-skill input contracts in step 4 above, and the v3
+workflow_type / persona-contract stamping rules are the specific fixes
+that emerged from the v1 → v2 → v3 iteration of this SKILL. Future
+iterations follow the same loop: improvise once, codify, re-run, diff.
+
+### Step 7 — Recorder verification (post-graduation, NEW v3)
+
+After the operator runs `graduate.sh` and confirms the smoke output is
+green, prompt them to record real walks for the new domain so the
+deployed page replays them. Print these commands verbatim:
+
+```bash
+# 1. Boot the autonomous stack so the new domain spawns automatically.
+#    Functions host + azurite already running.
+./scripts/profile-autonomous.sh &
+sleep 30
+
+# 2. Start the recorder.
+curl -X POST http://localhost:3001/api/blueprint/_recorder/start
+
+# 3. Let it run ~5 minutes so each domain completes ≥3 walks.
+sleep 300
+
+# 4. Stop the recorder; flush.
+curl -X POST http://localhost:3001/api/blueprint/_recorder/stop
+
+# 5. Inspect; prune any partial / single-event noise files; commit.
+ls -la data/blueprint-recordings/<domain.name>-*.jsonl
+find data/blueprint-recordings -name '*.jsonl' -size -200c -delete
+git add data/blueprint-recordings/<domain.name>-*.jsonl
+git commit -m "record(blueprint): real walks for <domain.display_name>"
+
+# 6. Redeploy the container app so the deployed page picks up the
+#    new recordings.
+./scripts/deploy-blueprint.sh
+```
+
+With this step, the new domain becomes visible on the deployed page
+within minutes of graduation. No synthetic templates needed.
 
 ## Anti-patterns (things you must not do)
 

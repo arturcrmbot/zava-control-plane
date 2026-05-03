@@ -22,8 +22,9 @@ in the sandbox — that hides the procedure bug.
 - [ ] §1.7  `<run-id>/api/functions/graphs/<domain>_<phase>.py` exists for every **non-HITL** phase. (HITL phases have no graph — the orchestrator does the wait directly, mirroring `expense_claim.py`.)
 - [ ] §1.8  `<run-id>/api/functions/graphs/executors/agents/agent_<domain>_<phase>.py` exists for every agent phase.
 - [ ] §1.9  `<run-id>/api/functions/graphs/executors/validators/validate_<domain>_<phase>.py` exists for every agent phase.
-- [ ] §1.10 `<run-id>/GRADUATION.md` exists.
-- [ ] §1.11 `<run-id>/REPORT.md` exists (this file is written last).
+- [ ] §1.10 `<run-id>/GRADUATION.md` exists (human-readable reference).
+- [ ] §1.11 `<run-id>/graduate.sh` exists, is `chmod +x`, and runs without args.
+- [ ] §1.12 `<run-id>/REPORT.md` exists (this file is written last).
 
 ## §2 — Brief integrity
 
@@ -31,6 +32,7 @@ in the sandbox — that hides the procedure bug.
 - [ ] §2.2  Every phase listed in the orchestrator appears in the brief in the same order.
 - [ ] §2.3  Every persona referenced by a HITL phase appears in `personae`.
 - [ ] §2.4  Every `external_systems[]` id referenced by any phase is defined.
+- [ ] §2.5  Every persona has both `decision_policy` (prose paragraph) AND `decision_code` (Python source) in the brief. (NEW v3.)
 
 ## §3 — Cross-references
 
@@ -57,6 +59,8 @@ in the sandbox — that hides the procedure bug.
 - [ ] §5.2  Every SKILL.md body has the required sections for its mode (`## Inputs / ## Procedure / ## Output` for phase agents; `## Decision policy / ## Procedure` for personae).
 - [ ] §5.3  No file in the sandbox contains a `TODO`, `FIXME`, `XXX`, `<placeholder>`, or `…` left over from a template slot.
 - [ ] §5.4  No file contains the words "AI-powered", "leverage", "synergy", or any equivalent marketing register.
+- [ ] §5.5  Every persona SKILL.md frontmatter contains `decision_policy` (executable Python), `external_event`, `workflow_label`. (NEW v3.)
+- [ ] §5.6  Persona `decision_policy` source uses only safe builtins per `api/server/services/persona_responder.py:_DECISION_BUILTINS` — no `import`, `open`, `os`, `subprocess`, `eval`, `__import__`. Verified by grep. (NEW v3.)
 
 ## §6 — Determinism
 
@@ -72,41 +76,53 @@ in the sandbox — that hides the procedure bug.
   of the SKILLs that gave the author freedom. Codify those parts.
 
 - [ ] §6.2  HITL convention: every HITL phase's `wait_for_external_event`
-  name in the orchestrator equals `<phase_name>_decision`, and every
-  persona SKILL.md's documented "the orchestrator is waiting on the `…`
-  event" string matches. Verified by `grep -E 'wait_for_external_event'
-  <run-id>/api/functions/workflows/*.py` and `grep -E 'waiting on the'
-  <run-id>/api/server/personae/*/SKILL.md`.
+  name in the orchestrator equals the persona SKILL.md's `external_event`
+  frontmatter field, byte-identical. Verified by
+  `grep -E 'wait_for_external_event' <run-id>/api/functions/workflows/*.py`
+  and `grep -E '^external_event:' <run-id>/api/server/personae/*/SKILL.md`.
 
-## §7 — GRADUATION.md completeness
+- [ ] §6.3  v3 substrate-fix contract: orchestrator stamps `workflow_type`
+  on EVERY checkpoint payload (workflow.started, every suspended, every
+  resumed, workflow.completed). Verified by
+  `grep -c '"workflow_type":' <run-id>/api/functions/workflows/<domain>.py`
+  — must be at least `(2 * num_hitl_phases) + 2`.
 
-- [ ] §7.1  Lists every file in §1 with target real-tree path.
-- [ ] §7.2  Provides the literal `function_app.py` diff (orchestration trigger + activity triggers + imports).
-- [ ] §7.3  Provides the literal `api/functions/workflows/activities.py` diff (imports + activity functions).
-- [ ] §7.4  Provides the literal `api/functions/graphs/__init__.py` diff (`build_<...>` exports).
-- [ ] §7.5  Provides the literal `api/server/services/simulator_orchestrator.py` diff (`spawn_<domain>_workflow`).
-- [ ] §7.6  Provides the literal `api/server/services/blueprint_inventory.py` diff (`DOMAINS` entry).
-- [ ] §7.7  Provides the literal `api/shared/constants.py` diff (`<PHASE>_TIMEOUT` constants).
-- [ ] §7.8  Lists smoke commands and expected FleetEvent sequence.
+- [ ] §6.4  v3 persona contract: every HITL `suspended` payload stamps
+  `persona`, `external_event`, `context`. Verified by
+  `grep -A 6 '"kind": "suspended"' <run-id>/api/functions/workflows/<domain>.py`
+  showing all three fields.
+
+## §7 — GRADUATION.md + graduate.sh completeness
+
+- [ ] §7.1  GRADUATION.md lists every file in §1 with target real-tree path.
+- [ ] §7.2  graduate.sh exists at the sandbox root, is executable.
+- [ ] §7.3  graduate.sh patches `function_app.py` (BEGIN/END markers; orchestrator decorator; activity decorators).
+- [ ] §7.4  graduate.sh patches `api/functions/graphs/__init__.py` (build_* exports).
+- [ ] §7.5  graduate.sh patches `api/server/services/simulator_orchestrator.py` (spawn helper + adds to `ramp_loop` spawners dict).
+- [ ] §7.6  graduate.sh patches `api/server/routes/simulator.py` (POST /api/simulator/<domain> handler).
+- [ ] §7.7  graduate.sh patches `api/server/services/blueprint_inventory.py` (DOMAINS entry with workflow_type + skills + phase_aliases).
+- [ ] §7.8  graduate.sh patches `api/shared/constants.py` (lifts `<PHASE>_TIMEOUT` constants and rewrites the orchestrator import).
+- [ ] §7.9  graduate.sh prints smoke commands + expected event sequence at the end.
+- [ ] §7.10 graduate.sh is idempotent: re-running on an already-graduated tree is a no-op (each step has a unique anchor it checks before appending).
+- [ ] §7.11 GRADUATION.md §Rollback lists every file/path graduate.sh touched.
 
 ---
 
-## Graduation (separate, manual, after the run ends)
+## Graduation (mechanical, post-self-check)
 
-The skill never graduates. The engineer does. Steps:
+v3 graduation is one command: `bash <run-id>/graduate.sh` from repo root.
+The script applies every patch idempotently. Steps:
 
 1. Read `<run-id>/REPORT.md` end-to-end. Every item PASS or N/A.
-2. Read `<run-id>/GRADUATION.md`.
-3. Copy files from `<run-id>/api/...` into the real `api/...` tree per the
-   §1 table.
-4. Apply each `function_app.py` / `activities.py` / `__init__.py` /
-   `simulator_orchestrator.py` / `blueprint_inventory.py` /
-   `constants.py` diff by hand. Each diff is shown literally — no
-   interpretation needed.
-5. Run `make test`. The existing tests must still pass.
-6. Run the smoke command from §7.8. Watch the FleetEvent sequence on
-   `/api/blueprint/stream` (or the existing observatory). The expected
-   sequence appears in the GRADUATION.md.
-7. If the smoke fails, the bug is in the SKILL.md, not in the graduated
-   files. Revert the graduation, fix the SKILL.md, delete the sandbox,
-   re-invoke. Re-graduate.
+2. Read `<run-id>/GRADUATION.md` (so you know what graduate.sh will do).
+3. Run `bash <run-id>/graduate.sh` from repo root.
+4. Restart FastAPI (`./scripts/profile-friday.sh` or
+   `./scripts/profile-autonomous.sh`).
+5. Run the smoke command graduate.sh prints. Watch the FleetEvent
+   sequence on `/api/blueprint/stream`.
+6. (Optional) Record real walks for replay; commit; redeploy.
+
+If the smoke fails, the bug is in the SKILL.md (compose-domain or one
+of the sub-skills), not in the graduated files. Run the rollback
+command from GRADUATION.md §Rollback, fix the SKILL, delete the
+sandbox, re-invoke. Re-graduate.

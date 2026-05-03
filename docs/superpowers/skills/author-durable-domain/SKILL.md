@@ -258,113 +258,90 @@ Use `templates/validator.py.tmpl`. Mirror
 guards are determined by the agent skill's stated output JSON schema —
 read the `## Output` section of the just-authored agent SKILL.md.
 
-### Step 8 — Write GRADUATION.md
+### Step 8 — Write GRADUATION.md and graduate.sh (v3)
 
-Use `templates/GRADUATION.md.tmpl`. The file lists every hand-edit the
-engineer must apply at graduation, with copy-pasteable diffs. Sections:
+In v3, GRADUATION.md is human-readable reference; `graduate.sh` is the
+**executable** that mechanically applies all the live-tree edits. The
+operator runs `bash graduate.sh` from repo root and gets a working
+graduated domain in seconds.
 
-1. **Copy these files** — table of `<sandbox-path> → <real-tree-path>`.
-   Generated domains create `api/server/personae/` if it does not
-   already exist.
-2. **Edit `function_app.py`** — show the literal block of new
-   `@app.orchestration_trigger` and `@app.activity_trigger` decorators to
-   add. Show the `from api.functions.workflows.<domain> import …` import
-   to add at the top.
-3. **`api/functions/workflows/activities.py`** — NO edit required. The
-   activities module reuses `_run_workflow` by importing it from this
-   file in `<domain>_activities.py`. State this explicitly so the
-   engineer doesn't go looking for an edit.
-4. **Edit `api/functions/graphs/__init__.py`** — show the new
-   `build_<domain>_<phase>_workflow` exports.
-5. **`api/functions/graphs/executors/agents/__init__.py`** and
-   **`api/functions/graphs/executors/validators/__init__.py`** —
-   NO edit required. These files are empty in the live tree;
-   per-phase graphs import the new modules directly
-   (`from api.functions.graphs.executors.agents import
-   agent_<domain>_<phase>`) without registration. Do NOT prescribe
-   any edit here.
-6. **Edit `api/server/services/simulator_orchestrator.py`** — show the
-   new `spawn_<domain>_workflow` helper. Mirror `spawn_hiring_workflow`
-   shape but **omit** the `app_state.store.upsert_workflow(w)` calls —
-   v1 generated domains do not upsert into the existing store (the
-   `Workflow` / `ClaimData` / `HiringData` types are domain-specific).
-   Add a comment in the helper noting this.
-7. **Edit `api/server/routes/simulator.py`** — show the new
-   `class <Domain>Body(BaseModel)` and `@router.post("/<domain>")` handler.
-8. **Edit `api/server/services/blueprint_inventory.py`** — show the new
-   entry to add to the `DOMAINS` list (`name`, `status: "live"`, `skills`).
-9. **Edit `api/shared/constants.py`** — show the `<PHASE>_TIMEOUT`
-   constants to lift out of the orchestrator.
-10. **Smoke test commands** — use this exact pattern (do NOT use
-    `/api/workflows`; generated domains don't appear there per §6 above):
+Use the templates at
+`docs/superpowers/skills/compose-domain/templates/GRADUATION.md.tmpl`
+and `docs/superpowers/skills/compose-domain/templates/graduate.sh.tmpl`.
 
-    ```bash
-    # 1. boot stack (azurite + functions host + fastapi)
-    bash scripts/boot-demo.sh &
-    sleep 30
+The `graduate.sh` script must perform these idempotent steps in order
+(each step a no-op if the change is already present):
 
-    # 2. fire one workflow; capture the returned id
-    RESPONSE=$(curl -s -X POST http://localhost:3001/api/simulator/<domain> \
-         -H 'Content-Type: application/json' -d '{}')
-    WORKFLOW_ID=$(echo "$RESPONSE" | python3 -c "import json,sys;print(json.load(sys.stdin)['workflow_id'])")
-    echo "spawned $WORKFLOW_ID"
+1. **Validate prereqs.** Run from repo root; check `git status` shows
+   no uncommitted edits to the files that will be patched (so any
+   failure is a clean rollback target). Confirm Azurite, Functions
+   host, FastAPI are running OR explicitly skip the smoke step.
+2. **Copy sandbox files.** All paths under `api/server/skills/<domain>-*`,
+   `api/server/personae/<role>/`, `api/server/mcp_tools/<new>.py`,
+   `api/functions/workflows/<domain>{,_activities}.py`,
+   `api/functions/graphs/<domain>_*.py`,
+   `api/functions/graphs/executors/agents/agent_<domain>_*.py`,
+   `api/functions/graphs/executors/validators/validate_<domain>_*.py`.
+   Idempotent: `cp -n` if file already there with same content,
+   else fail loudly.
+3. **Patch `function_app.py`.** Append the orchestrator-import block
+   between `# === BEGIN compose-domain imports ===` and
+   `# === END compose-domain imports ===` markers (idempotent: if the
+   block for this domain is already present, skip). Append the
+   `@app.orchestration_trigger`-decorated def. Append the activity
+   triggers.
+4. **Patch `api/functions/graphs/__init__.py`.** Append the
+   `from .<domain>_<phase> import build_<domain>_<phase>_workflow`
+   exports (idempotent: skip if already imported).
+5. **Patch `api/server/services/simulator_orchestrator.py`.** Append
+   the `spawn_<domain>_workflow` helper. Add `<domain>` to the
+   `spawners` dict in `ramp_loop` so the autonomous ramp picks it up.
+   v3 omits `app_state.store.upsert_workflow(w)` per substrate-fix.
+6. **Patch `api/server/routes/simulator.py`.** Add the
+   `class <Domain>Body(BaseModel)` and the
+   `@router.post("/<domain>")` handler.
+7. **Patch `api/server/services/blueprint_inventory.py`.** Append a new
+   `DOMAINS` dict entry **before** the first `aspirational` one. v3
+   contract: include `workflow_type`, `skills`, `phase_aliases`.
+8. **Patch `api/shared/constants.py`.** Append the `<PHASE>_TIMEOUT`
+   constants. Update the orchestrator file (already in real tree by
+   step 2) to import from constants and remove its local timedelta
+   declarations.
+9. **Print smoke commands** + expected event sequence at end. Do NOT
+   run the smoke automatically — the operator runs it after sanity-
+   checking the graduated tree.
 
-    # 3. (HITL only) close the gate by raising the external event directly
-    #    via Azure Durable Functions HTTP API — this needs the instance_id,
-    #    not the workflow_id. The Functions host exposes /runtime/webhooks/
-    #    durabletask/instances/<instance_id>/raiseEvent/<event_name>.
-    #    For v1 this step is operator-driven — the persona-responder
-    #    service that closes gates automatically does not yet exist.
-    ```
+Every patch step uses `git diff` markers or unique anchor strings so
+repeated runs are no-ops. If any step fails the script aborts loudly
+and prints the rollback command (`git checkout -- <files>`).
 
-    Watch `/api/blueprint/stream` for the expected FleetEvent sequence.
-11. **Rollback (if smoke fails)** — always include this exact block. The
-    bug is in a SKILL.md, not the graduated code. Reverting graduation,
-    fixing the SKILL.md, re-running, and re-graduating is the only
-    correct response.
+The GRADUATION.md describes (in human-readable form) what each step
+does and lists the rollback procedure. The operator reads it before
+running `graduate.sh` to know what's about to happen.
 
-    ```bash
-    # Rollback the graduation in one shot. This reverts every diff
-    # GRADUATION.md prescribed and removes every copied file.
-    git restore --source=HEAD~1 \
-        function_app.py \
-        api/functions/graphs/__init__.py \
-        api/server/services/simulator_orchestrator.py \
-        api/server/routes/simulator.py \
-        api/server/services/blueprint_inventory.py \
-        api/shared/constants.py
-    rm -rf \
-        api/server/skills/<domain>-* \
-        api/server/mcp_tools/<new_tools>.py \
-        api/functions/workflows/<domain>.py \
-        api/functions/workflows/<domain>_activities.py \
-        api/functions/graphs/<domain>_*.py \
-        api/functions/graphs/executors/agents/agent_<domain>_*.py \
-        api/functions/graphs/executors/validators/validate_<domain>_*.py
-    # If this is the first generated domain (no prior personae):
-    rm -rf api/server/personae/<role>/
-    # Then: fix the SKILL.md, delete the sandbox, re-invoke compose-domain.
-    ```
+### Step 9 — Self-check (v3)
 
-The GRADUATION.md does NOT execute anything. It is a checklist for a
-human.
-
-### Step 9 — Self-check
-
-- Every **non-HITL** phase from the brief has exactly one graph file and
-  one activity. HITL phases have neither (the orchestrator does the
-  wait directly).
+- Every **non-HITL** phase from the brief has exactly one graph file
+  and one activity. HITL phases have neither (the orchestrator does
+  the wait directly).
 - Every agent phase has exactly one agent executor and one validator.
-- Every HITL phase emits a `wait_for_external_event("<phase_name>_decision")`
-  paired with a `create_timer`. Convention: external event name is
-  `<phase_name>_decision`, byte-identical to the persona SKILL.md's
-  documented event name.
-- The orchestrator's emit sequence at entry/exit matches `expense_claim.py`.
+- The orchestrator reads `workflow_type` from `input_dict.get("type")`
+  ONCE at the top, then stamps it on EVERY `checkpoint_activity_trigger`
+  payload (including suspended, resumed, workflow.completed,
+  workflow.started). Without this, recordings break.
+- Every HITL phase emits a `wait_for_external_event` paired with a
+  `create_timer`. The suspended payload stamps the v3 contract:
+  `persona`, `external_event`, `context`. Without these, the persona
+  responder ignores the gate and the workflow stalls.
+- Convention: external event name is `<phase_name>_decision` (or the
+  brief's explicit override), byte-identical between the orchestrator
+  and the persona SKILL.md frontmatter.
 - The activity functions all use `_run_workflow` from
   `api.functions.workflows.activities`.
-- GRADUATION.md mentions every file in the file set, includes the
-  rollback block, and uses the smoke pattern from step 8 §10 (NOT
-  `/api/workflows`).
+- Both `GRADUATION.md` AND `graduate.sh` exist at the sandbox root.
+- `graduate.sh` is `chmod +x` and idempotent (re-running is a no-op).
+- `graduate.sh` adds the new domain to `ramp_loop`'s `spawners` dict,
+  so the autonomous ramp picks it up after graduation.
 - No `TODO` placeholder remains.
 
 If any check fails, fix in place; if you can't, stop.

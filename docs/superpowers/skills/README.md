@@ -26,10 +26,11 @@
 
 | Skill | Role |
 |---|---|
-| `compose-domain/` | Orchestrator. Reads a brief, plans the artefact set, calls sub-skills, writes a sandbox snapshot. Entry point. |
-| `author-runtime-skill/` | Sub-skill. Writes one runtime SKILL.md (phase agent or persona). Shape-isomorphic to existing skills under `api/server/skills/`. |
+| `compose-domain/` | Orchestrator. Reads a brief, plans the artefact set, calls sub-skills, writes a sandbox snapshot + executable `graduate.sh`. Entry point. |
+| `author-runtime-skill/` | Sub-skill. Writes ONE phase-agent SKILL.md to a sandbox path. Shape-isomorphic to existing skills under `api/server/skills/`. |
+| `author-persona/` | Sub-skill (NEW v3). Writes ONE persona SKILL.md to a sandbox path. Frontmatter contains executable `decision_policy` Python the persona_responder compiles. |
 | `author-mcp-tool/` | Sub-skill. Writes one in-process Python MCP tool stub. Shape-isomorphic to existing tools under `api/server/mcp_tools/`. |
-| `author-durable-domain/` | Sub-skill. Writes the Durable orchestrator file, activity functions, per-phase MAF graphs, and validators. Shape-isomorphic to `expense_claim.py` and friends. |
+| `author-durable-domain/` | Sub-skill. Writes the Durable orchestrator file (with v3 substrate-fix contract — workflow_type stamping + persona contract on suspended), activity functions, per-phase MAF graphs, validators, GRADUATION.md and `graduate.sh`. |
 
 ## How to invoke
 
@@ -47,10 +48,14 @@ sandbox**. The whole point is to make the procedure reliable. Then delete
 the sandbox run and re-invoke. Two runs against the same brief should diff
 to nothing meaningful.
 
-## Sandbox
+## Sandbox + graduation
 
-Generated artefacts go to `tools/scratch/compose-domain/<run-id>/` (gitignored).
-Nothing in this skill set ever writes to `api/server/`, `api/functions/`,
-`function_app.py`, or any other live tree on its own. Graduation into the
-real trees is a separate manual step against
-`compose-domain/CHECKLIST.md` §"Graduation".
+Generated artefacts go to `tools/scratch/compose-domain/<run-id>/`
+(gitignored). Nothing in this skill set ever writes to `api/server/`,
+`api/functions/`, `function_app.py`, or any other live tree on its own.
+
+Graduation in v3 is one command: `bash <run-id>/graduate.sh` from repo
+root. The script is idempotent (re-running on an already-graduated tree
+is a no-op) and prints rollback instructions if anything fails.
+
+See `compose-domain/CHECKLIST.md` §Graduation for the full procedure.
