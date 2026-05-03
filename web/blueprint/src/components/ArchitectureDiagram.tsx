@@ -322,6 +322,7 @@ export function ArchitectureDiagram() {
           viewBox={`0 0 ${W} ${H}`}
           width={W}
           height={H}
+          style={{ width: `${W}px`, height: `${H}px`, minWidth: `${W}px`, display: "block" }}
           preserveAspectRatio="xMinYMin meet"
           role="img"
           aria-label="Functional architecture: live domains on top, then their skills, then the MCP tools those skills allow-list. A row of always-on guarantees runs along the bottom and applies to every domain. Hover any chip to see relationships."
