@@ -5,6 +5,6 @@ from api.server.state import app_state
 router = APIRouter(prefix="/api/audit")
 
 
-@router.get("/")
+@router.get("")
 async def list_audit():
     return app_state.audit.list()

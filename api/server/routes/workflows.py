@@ -6,7 +6,7 @@ from api.server.services import economics, exception_narrative
 router = APIRouter(prefix="/api/workflows")
 
 
-@router.get("/")
+@router.get("")
 async def list_workflows(status: str | None = None, phase: str | None = None,
                          agency: str | None = None, has_exception: bool | None = None):
     items = app_state.store.list_workflows(status=status, phase=phase, agency=agency, has_exception=has_exception)

@@ -97,7 +97,7 @@ def _tile_summary(per_agent: dict) -> dict:
     }
 
 
-@router.get("/")
+@router.get("")
 async def list_evals(agent_label: str | None = None):
     if not foundry_client.is_configured():
         return _unconfigured_envelope()

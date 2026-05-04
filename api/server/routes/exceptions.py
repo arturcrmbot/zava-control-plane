@@ -24,7 +24,7 @@ class ResolveBody(BaseModel):
     resolved_by: str = "reviewer@wpp"
 
 
-@router.get("/")
+@router.get("")
 async def list_exceptions(include_resolved: bool = False):
     return [e.model_dump(by_alias=True) for e in app_state.store.list_exceptions(include_resolved=include_resolved)]
 

@@ -38,7 +38,7 @@ class ProposeChangeBody(BaseModel):
     proposed_by: str
 
 
-@router.get("/")
+@router.get("")
 async def list_policies():
     return [p.model_dump(by_alias=True) for p in app_state.store.list_policies()]
 
