@@ -4,17 +4,19 @@
 # files from across the tree).
 
 # --- Heavy dev artefacts -------------------------------------------------
-**/.venv/
-**/node_modules/
-**/__pycache__/
-**/.pytest_cache/
-**/.ruff_cache/
-**/.mypy_cache/
-**/dist/
-**/build/
-**/*.egg-info/
+# NOTE: bare names (no trailing slash) so the patterns also match in the
+# `az acr build` upload tar, not just inside the Docker build context.
+**/.venv
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/dist
+**/build
+**/*.egg-info
 **/.tsbuildinfo
-**/.vite/
+**/.vite
 
 # --- Local state ---------------------------------------------------------
 azurite-data/
@@ -51,15 +53,17 @@ api/functions/
 .ipynb_checkpoints/
 
 # --- Other Vite apps we don't deploy here --------------------------------
-web/client/
-web/portal/
+web/client
+web/portal
 
 # --- Tests / docs / fixtures we don't need in the image ------------------
-tests/
-mocks/
-data/synthetic/
-docs/
-screenshots/
+tests
+mocks
+data/synthetic
+data/portal
+docs
+screenshots
+tools/scratch
 *.pptx
 *.pdf
 
