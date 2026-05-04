@@ -14,8 +14,8 @@ export function Composition() {
           </h2>
           <p className="body">
             Read live from the running codebase. Hover any skill, MCP tool or
-            domain to see what it composes — and what composes it. New domains
-            do not require new letters; they recompose the same case.
+            domain to see what it relates to. New domains don&apos;t require
+            new letters; they recompose the same case.
           </p>
         </header>
 

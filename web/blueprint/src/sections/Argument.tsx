@@ -14,15 +14,15 @@ const captions: { label: string; title: string; body: string }[] = [
   },
   {
     label: "03 · MCPs",
-    title: "A federated capability layer over your real systems.",
+    title: "One adapter per system. Used by every agent.",
     body:
       "Workday, Concur, ServiceNow, Greenhouse, Graph — and your third-party APIs — surfaced as MCP tools with negotiated auth, schemas and contracts. The MCP servers are not agentic themselves. They are pure capability. Agents borrow them.",
   },
   {
-    label: "04 · Always-on guarantees",
-    title: "Blessed once. Not per project.",
+    label: "04 · The foundation",
+    title: "Identity, validation, audit and policy. Built once.",
     body:
-      "Every agent runs under its own identity. Every output is checked by a validator before it leaves. Every step writes itself to an immutable audit ledger. Policy lives in YAML, not code — compliance edits the rules, no engineer needed. The four guarantees are built into the harness once and carry into every domain after.",
+      "Every agent runs under its own identity. Every output is checked by a validator before it leaves. Every step writes itself to an immutable audit ledger. Policy lives in YAML, not code — compliance edits the rules, no engineer needed. Built into the substrate once, inherited by every domain after.",
   },
 ];
 
@@ -33,15 +33,22 @@ export function Argument() {
         <header className="argument__intro stack">
           <p className="subtitle">The architecture</p>
           <h2 className="section-title">
-            What ought to exist instead — <em>the four pieces, and the guarantees they share.</em>
+            What you ought to be using instead — <em>and we&apos;ve built it.</em>
           </h2>
           <p className="body">
-            None of the four pieces are interesting on their own. Together they
-            make a working environment that runs in your cloud. The harness
-            sits on top. Skills and MCPs and the systems they reach are stacked
-            beneath it. A row of always‑on guarantees — identity, validation,
-            audit, policy — runs along the bottom and applies to every layer
-            above.
+            None of the four pieces below are revolutionary. Skills are recent.
+            MCPs have been around but aren&apos;t widely used yet. The harness
+            is still in tech preview (about to go live). Together — and only
+            together — they form a <em>substrate</em>.
+          </p>
+          <p className="body">
+            A substrate is the ground layer that every agent runs on. It holds
+            the things you don&apos;t want each project to re-invent: who an
+            agent is, what it&apos;s allowed to do, where its actions get
+            recorded, which policies apply. Build the substrate once and every
+            domain you put on top inherits all of it for free. That&apos;s the
+            thing that makes the cost of the next domain collapse — not any one
+            piece, but all four operating as a single ground layer.
           </p>
         </header>
 
@@ -63,7 +70,7 @@ export function Argument() {
                 The cost of the next domain collapses because the alphabet is
                 already cast. Each new domain is a new orchestrator class plus
                 a small number of new skills, composed against the same MCPs,
-                identity and governance that were blessed for the first one.
+                identity and governance that were built for the first one.
                 Operators do not need retraining per agent.
               </p>
             </div>

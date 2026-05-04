@@ -49,7 +49,7 @@ export function Observatory() {
           <div className="stack">
             <p className="subtitle">The observatory</p>
             <h2 className="section-title">
-              <em>And here is what is happening, right now.</em>
+              <em>And here is what it looks like when it runs.</em>
             </h2>
           </div>
           <div className="observatory__header-right">
@@ -67,20 +67,19 @@ export function Observatory() {
           </div>
         </header>
 
-        <p className="body">
-          Each workflow lights up the map below. The active domain sits at the
-          centre. Phases orbit it; skills bloom around the active phase as
-          agents pick them up; calls travel out to the MCP tools on the rim.
-          When a validator blocks, the line turns red. When nothing&apos;s
-          firing, the map falls quiet.
-        </p>
-
         <p className="body observatory__note">
           What you&apos;re watching is a replay of real workflow walks
           captured from the running system &mdash; the same orchestrator,
-          skills and MCP tools described above, running locally on the
-          laptop these recordings came from. Same events, same cadence,
-          just played back so the page reads continuously.
+          skills and MCP tools described above, recorded on the laptop they
+          came from. Same events, same cadence, just played back so the page
+          reads continuously.
+        </p>
+
+        <p className="body">
+          Each workflow lights up the map. The active domain sits at the
+          centre, phases around it, skills picked up by agents as they go,
+          calls travelling out to the MCP tools on the rim. A validator block
+          shows red.
         </p>
 
         <div className="observatory__counters">

@@ -100,9 +100,9 @@ body {
 .headline {
   font-family: var(--serif);
   font-weight: 400;
-  font-size: clamp(2.75rem, 7vw, 5.25rem);
-  line-height: 1.02;
-  letter-spacing: -0.025em;
+  font-size: clamp(2.25rem, 5.2vw, 4rem);
+  line-height: 1.05;
+  letter-spacing: -0.022em;
   font-variation-settings: "opsz" 144;
   color: var(--ink);
 }
