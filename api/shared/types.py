@@ -112,7 +112,15 @@ class ActionLedgerEntry(BaseModel):
 
 class Workflow(BaseModel):
     id: str
-    type: Literal["invoice-p2p", "expense-claim", "hiring"] = "expense-claim"
+    type: Literal[
+        "invoice-p2p", "expense-claim", "hiring",
+        # Fleet/composed domains. Workflows of these types may exist in the
+        # store as synthesized stubs (built on first detail request from
+        # exception/event data) or — if a future change starts upserting
+        # them — as fully-populated records.
+        "travel-preapproval", "vendor-kyc", "employee-onboarding",
+        "it-access-request", "contract-renewal", "perf-review",
+    ] = "expense-claim"
     status: WorkflowStatus = "in_progress"
     current_phase: PhaseName = "Intake"
     created_at: float

@@ -39,6 +39,7 @@ class ProposeChangeBody(BaseModel):
 
 
 @router.get("")
+@router.get("/", include_in_schema=False)
 async def list_policies():
     return [p.model_dump(by_alias=True) for p in app_state.store.list_policies()]
 

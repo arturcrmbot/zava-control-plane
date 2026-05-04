@@ -25,6 +25,7 @@ class ResolveBody(BaseModel):
 
 
 @router.get("")
+@router.get("/", include_in_schema=False)
 async def list_exceptions(include_resolved: bool = False):
     return [e.model_dump(by_alias=True) for e in app_state.store.list_exceptions(include_resolved=include_resolved)]
 
