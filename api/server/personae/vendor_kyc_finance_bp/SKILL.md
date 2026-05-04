@@ -10,6 +10,8 @@ decision_policy: |
     entity_hits = kyc.get("entity_sanctions_hits") or []
     ubo_hits = ubo.get("ubo_sanctions_hits") or []
     media_hits = ubo.get("adverse_media_hits") or []
+    HIGH_RISK = {"RU", "BY", "IR", "KP", "SY", "VE"}
+    country = (kyc.get("country_of_incorporation") or "").upper()
     if entity_hits:
         decision = "reject"
         reason = (
@@ -27,6 +29,14 @@ decision_policy: |
         reason = (
             "adverse media hits: "
             + ", ".join(str(h) for h in media_hits[:3])
+        )
+    elif country in HIGH_RISK:
+        # Phase 6 escalate: even with a clean sweep, high-risk jurisdictions
+        # require human signoff. Gate stays open; FM picks up via triage.
+        decision = "escalate"
+        reason = (
+            f"high-risk jurisdiction {country!r} — clean sweep but "
+            f"requires human signoff per FCA enhanced due diligence"
         )
     else:
         decision = "approve"

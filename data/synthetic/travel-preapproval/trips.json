@@ -1,0 +1,402 @@
+[
+  {
+    "id": "TRP-001",
+    "employee_id": "EMP-8401",
+    "origin": "CDG",
+    "destination": "SIN",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "agency offsite",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-002",
+    "employee_id": "EMP-5777",
+    "origin": "JNB",
+    "destination": "GRU",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "agency offsite",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-003",
+    "employee_id": "EMP-1030",
+    "origin": "LAX",
+    "destination": "NRT",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "global town hall delegate",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-004",
+    "employee_id": "EMP-8444",
+    "origin": "CDG",
+    "destination": "NRT",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "creative pitch attendance",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-005",
+    "employee_id": "EMP-1503",
+    "origin": "CDG",
+    "destination": "CDG",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "creative pitch attendance",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-006",
+    "employee_id": "EMP-6627",
+    "origin": "HKG",
+    "destination": "JFK",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "agency offsite",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-007",
+    "employee_id": "EMP-4864",
+    "origin": "LHR",
+    "destination": "ORD",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "global town hall delegate",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-008",
+    "employee_id": "EMP-8426",
+    "origin": "JNB",
+    "destination": "LHR",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "agency offsite",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-009",
+    "employee_id": "EMP-4115",
+    "origin": "GRU",
+    "destination": "FRA",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "global town hall delegate",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-010",
+    "employee_id": "EMP-1432",
+    "origin": "ZRH",
+    "destination": "LAX",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "creative pitch attendance",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-011",
+    "employee_id": "EMP-8313",
+    "origin": "LHR",
+    "destination": "DXB",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "creative pitch attendance",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-012",
+    "employee_id": "EMP-4414",
+    "origin": "JNB",
+    "destination": "SYD",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "regional MD summit",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-013",
+    "employee_id": "EMP-6960",
+    "origin": "SIN",
+    "destination": "FRA",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "regional MD summit",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-014",
+    "employee_id": "EMP-7320",
+    "origin": "LHR",
+    "destination": "LHR",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "regional MD summit",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-015",
+    "employee_id": "EMP-2306",
+    "origin": "GRU",
+    "destination": "SYD",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "creative pitch attendance",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-016",
+    "employee_id": "EMP-3902",
+    "origin": "CDG",
+    "destination": "HKG",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "regional MD summit",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-017",
+    "employee_id": "EMP-5245",
+    "origin": "JFK",
+    "destination": "JNB",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "creative pitch attendance",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-018",
+    "employee_id": "EMP-2469",
+    "origin": "JFK",
+    "destination": "HKG",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "agency offsite",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-019",
+    "employee_id": "EMP-4015",
+    "origin": "HKG",
+    "destination": "SIN",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "creative pitch attendance",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-020",
+    "employee_id": "EMP-9823",
+    "origin": "FRA",
+    "destination": "JFK",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "regional MD summit",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-021",
+    "employee_id": "EMP-5534",
+    "origin": "HKG",
+    "destination": "JNB",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "agency offsite",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-022",
+    "employee_id": "EMP-7782",
+    "origin": "ZRH",
+    "destination": "HKG",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "Q3 client review",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-023",
+    "employee_id": "EMP-3069",
+    "origin": "LHR",
+    "destination": "SYD",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "creative pitch attendance",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-024",
+    "employee_id": "EMP-5543",
+    "origin": "LAX",
+    "destination": "ORD",
+    "depart_date": "2026-06-15",
+    "return_date": "2026-06-18",
+    "business_reason": "Q3 client review",
+    "scenario": "in-policy"
+  },
+  {
+    "id": "TRP-025",
+    "employee_id": "EMP-6067",
+    "origin": "LAX",
+    "destination": "FRA",
+    "depart_date": "2026-05-10",
+    "return_date": "2026-05-12",
+    "business_reason": "regulatory hearing \u2014 counsel required",
+    "scenario": "policy-exception"
+  },
+  {
+    "id": "TRP-026",
+    "employee_id": "EMP-1338",
+    "origin": "LAX",
+    "destination": "ZRH",
+    "depart_date": "2026-05-10",
+    "return_date": "2026-05-12",
+    "business_reason": "Cannes Lions critical attendance",
+    "scenario": "policy-exception"
+  },
+  {
+    "id": "TRP-027",
+    "employee_id": "EMP-9047",
+    "origin": "SIN",
+    "destination": "DXB",
+    "depart_date": "2026-05-10",
+    "return_date": "2026-05-12",
+    "business_reason": "regulatory hearing \u2014 counsel required",
+    "scenario": "policy-exception"
+  },
+  {
+    "id": "TRP-028",
+    "employee_id": "EMP-7906",
+    "origin": "JFK",
+    "destination": "ORD",
+    "depart_date": "2026-05-10",
+    "return_date": "2026-05-12",
+    "business_reason": "Cannes Lions critical attendance",
+    "scenario": "policy-exception"
+  },
+  {
+    "id": "TRP-029",
+    "employee_id": "EMP-2887",
+    "origin": "ORD",
+    "destination": "NRT",
+    "depart_date": "2026-05-10",
+    "return_date": "2026-05-12",
+    "business_reason": "Cannes Lions critical attendance",
+    "scenario": "policy-exception"
+  },
+  {
+    "id": "TRP-030",
+    "employee_id": "EMP-8470",
+    "origin": "NRT",
+    "destination": "LHR",
+    "depart_date": "2026-05-10",
+    "return_date": "2026-05-12",
+    "business_reason": "client emergency \u2014 same-week travel",
+    "scenario": "policy-exception"
+  },
+  {
+    "id": "TRP-031",
+    "employee_id": "EMP-4412",
+    "origin": "FRA",
+    "destination": "JNB",
+    "depart_date": "2026-05-10",
+    "return_date": "2026-05-12",
+    "business_reason": "Cannes Lions critical attendance",
+    "scenario": "policy-exception"
+  },
+  {
+    "id": "TRP-032",
+    "employee_id": "EMP-4227",
+    "origin": "ZRH",
+    "destination": "CDG",
+    "depart_date": "2026-05-10",
+    "return_date": "2026-05-12",
+    "business_reason": "regulatory hearing \u2014 counsel required",
+    "scenario": "policy-exception"
+  },
+  {
+    "id": "TRP-033",
+    "employee_id": "EMP-2576",
+    "origin": "CDG",
+    "destination": "CDG",
+    "depart_date": "2026-05-10",
+    "return_date": "2026-05-12",
+    "business_reason": "Cannes Lions critical attendance",
+    "scenario": "policy-exception"
+  },
+  {
+    "id": "TRP-034",
+    "employee_id": "EMP-4566",
+    "origin": "JFK",
+    "destination": "DXB",
+    "depart_date": "2026-05-10",
+    "return_date": "2026-05-12",
+    "business_reason": "client emergency \u2014 same-week travel",
+    "scenario": "policy-exception"
+  },
+  {
+    "id": "TRP-035",
+    "employee_id": "EMP-5089",
+    "origin": "JFK",
+    "destination": "JNB",
+    "depart_date": "2026-07-01",
+    "return_date": "2026-07-05",
+    "business_reason": "executive escort \u2014 CEO offsite",
+    "scenario": "high-cost-band"
+  },
+  {
+    "id": "TRP-036",
+    "employee_id": "EMP-8956",
+    "origin": "HKG",
+    "destination": "GRU",
+    "depart_date": "2026-07-01",
+    "return_date": "2026-07-05",
+    "business_reason": "first-class long-haul \u2014 back-to-back board meetings",
+    "scenario": "high-cost-band"
+  },
+  {
+    "id": "TRP-037",
+    "employee_id": "EMP-6084",
+    "origin": "HKG",
+    "destination": "SIN",
+    "depart_date": "2026-07-01",
+    "return_date": "2026-07-05",
+    "business_reason": "first-class long-haul \u2014 back-to-back board meetings",
+    "scenario": "high-cost-band"
+  },
+  {
+    "id": "TRP-038",
+    "employee_id": "EMP-1255",
+    "origin": "ORD",
+    "destination": "ORD",
+    "depart_date": "2026-07-01",
+    "return_date": "2026-07-05",
+    "business_reason": "private aviation request \u2014 schedule conflict",
+    "scenario": "high-cost-band"
+  },
+  {
+    "id": "TRP-039",
+    "employee_id": "EMP-7250",
+    "origin": "ZRH",
+    "destination": "DXB",
+    "depart_date": "2026-07-01",
+    "return_date": "2026-07-05",
+    "business_reason": "first-class long-haul \u2014 back-to-back board meetings",
+    "scenario": "high-cost-band"
+  },
+  {
+    "id": "TRP-040",
+    "employee_id": "EMP-6682",
+    "origin": "LHR",
+    "destination": "SIN",
+    "depart_date": "2026-07-01",
+    "return_date": "2026-07-05",
+    "business_reason": "executive escort \u2014 CEO offsite",
+    "scenario": "high-cost-band"
+  }
+]

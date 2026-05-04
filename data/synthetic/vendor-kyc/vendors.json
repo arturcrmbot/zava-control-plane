@@ -1,0 +1,296 @@
+[
+  {
+    "id": "VND-001",
+    "vendor_name": "Acme Holdings",
+    "country_of_incorporation": "GB",
+    "proposing_agency": "VMLY&R",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-002",
+    "vendor_name": "Northwind Trading",
+    "country_of_incorporation": "US",
+    "proposing_agency": "GroupM Central",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-003",
+    "vendor_name": "Initech Systems",
+    "country_of_incorporation": "DE",
+    "proposing_agency": "Ogilvy",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-004",
+    "vendor_name": "Globex Industries",
+    "country_of_incorporation": "NL",
+    "proposing_agency": "Mindshare",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-005",
+    "vendor_name": "Umbrella Logistics",
+    "country_of_incorporation": "US",
+    "proposing_agency": "EssenceMediacom",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-006",
+    "vendor_name": "Hooli Capital",
+    "country_of_incorporation": "DE",
+    "proposing_agency": "EssenceMediacom",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-007",
+    "vendor_name": "Pied Piper Services",
+    "country_of_incorporation": "JP",
+    "proposing_agency": "Grey",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-008",
+    "vendor_name": "Stark Materials",
+    "country_of_incorporation": "JP",
+    "proposing_agency": "GroupM Central",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-009",
+    "vendor_name": "Wonka Confectionery",
+    "country_of_incorporation": "SE",
+    "proposing_agency": "Ogilvy",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-010",
+    "vendor_name": "Monsters Power",
+    "country_of_incorporation": "JP",
+    "proposing_agency": "VMLY&R",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-011",
+    "vendor_name": "Tyrell Robotics",
+    "country_of_incorporation": "FR",
+    "proposing_agency": "Grey",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-012",
+    "vendor_name": "Cyberdyne Analytics",
+    "country_of_incorporation": "US",
+    "proposing_agency": "GroupM Central",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-013",
+    "vendor_name": "Soylent Foods",
+    "country_of_incorporation": "SE",
+    "proposing_agency": "Hogarth",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-014",
+    "vendor_name": "Wayne Enterprises",
+    "country_of_incorporation": "SE",
+    "proposing_agency": "VMLY&R",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-015",
+    "vendor_name": "Stark Industries",
+    "country_of_incorporation": "JP",
+    "proposing_agency": "Mindshare",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-016",
+    "vendor_name": "Oscorp Genetics",
+    "country_of_incorporation": "SE",
+    "proposing_agency": "Ogilvy",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-017",
+    "vendor_name": "Daily Planet Media",
+    "country_of_incorporation": "NL",
+    "proposing_agency": "Hogarth",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-018",
+    "vendor_name": "Daily Bugle Press",
+    "country_of_incorporation": "DE",
+    "proposing_agency": "Ogilvy",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-019",
+    "vendor_name": "InGen Bio",
+    "country_of_incorporation": "AE",
+    "proposing_agency": "Ogilvy",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-020",
+    "vendor_name": "Macrosoft Cloud",
+    "country_of_incorporation": "JP",
+    "proposing_agency": "Ogilvy",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-021",
+    "vendor_name": "Pinetree Hosting",
+    "country_of_incorporation": "SE",
+    "proposing_agency": "Hogarth",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-022",
+    "vendor_name": "Seabreeze Logistics",
+    "country_of_incorporation": "DE",
+    "proposing_agency": "Wavemaker",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-023",
+    "vendor_name": "Alpine Audit",
+    "country_of_incorporation": "NL",
+    "proposing_agency": "Hogarth",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-024",
+    "vendor_name": "Riverbend Consulting",
+    "country_of_incorporation": "US",
+    "proposing_agency": "Hogarth",
+    "scenario": "clean"
+  },
+  {
+    "id": "VND-025",
+    "vendor_name": "Pacific Maritime Holdings",
+    "country_of_incorporation": "KP",
+    "proposing_agency": "Wavemaker",
+    "scenario": "sanctions-hit-entity"
+  },
+  {
+    "id": "VND-026",
+    "vendor_name": "Eastern Star Trading",
+    "country_of_incorporation": "IR",
+    "proposing_agency": "EssenceMediacom",
+    "scenario": "sanctions-hit-entity"
+  },
+  {
+    "id": "VND-027",
+    "vendor_name": "Volga Industrial Group",
+    "country_of_incorporation": "SY",
+    "proposing_agency": "Ogilvy",
+    "scenario": "sanctions-hit-entity"
+  },
+  {
+    "id": "VND-028",
+    "vendor_name": "Caspian Resources",
+    "country_of_incorporation": "BY",
+    "proposing_agency": "EssenceMediacom",
+    "scenario": "sanctions-hit-entity"
+  },
+  {
+    "id": "VND-029",
+    "vendor_name": "Black Sea Shipping",
+    "country_of_incorporation": "RU",
+    "proposing_agency": "Hogarth",
+    "scenario": "sanctions-hit-entity"
+  },
+  {
+    "id": "VND-030",
+    "vendor_name": "Steppe Capital",
+    "country_of_incorporation": "RU",
+    "proposing_agency": "Grey",
+    "scenario": "sanctions-hit-entity"
+  },
+  {
+    "id": "VND-031",
+    "vendor_name": "Hooli Capital",
+    "country_of_incorporation": "DE",
+    "proposing_agency": "GroupM Central",
+    "scenario": "sanctions-hit-ubo"
+  },
+  {
+    "id": "VND-032",
+    "vendor_name": "Pied Piper Services",
+    "country_of_incorporation": "CH",
+    "proposing_agency": "EssenceMediacom",
+    "scenario": "sanctions-hit-ubo"
+  },
+  {
+    "id": "VND-033",
+    "vendor_name": "Stark Materials",
+    "country_of_incorporation": "CH",
+    "proposing_agency": "Grey",
+    "scenario": "sanctions-hit-ubo"
+  },
+  {
+    "id": "VND-034",
+    "vendor_name": "Wonka Confectionery",
+    "country_of_incorporation": "US",
+    "proposing_agency": "Hogarth",
+    "scenario": "sanctions-hit-ubo"
+  },
+  {
+    "id": "VND-035",
+    "vendor_name": "Monsters Power",
+    "country_of_incorporation": "GB",
+    "proposing_agency": "Mindshare",
+    "scenario": "sanctions-hit-ubo"
+  },
+  {
+    "id": "VND-036",
+    "vendor_name": "Tyrell Robotics",
+    "country_of_incorporation": "DE",
+    "proposing_agency": "Ogilvy",
+    "scenario": "sanctions-hit-ubo"
+  },
+  {
+    "id": "VND-037",
+    "vendor_name": "Black Sea Shipping",
+    "country_of_incorporation": "CH",
+    "proposing_agency": "GroupM Central",
+    "scenario": "adverse-media"
+  },
+  {
+    "id": "VND-038",
+    "vendor_name": "Steppe Capital",
+    "country_of_incorporation": "NL",
+    "proposing_agency": "GroupM Central",
+    "scenario": "adverse-media"
+  },
+  {
+    "id": "VND-039",
+    "vendor_name": "North Korean Goods Coop",
+    "country_of_incorporation": "AE",
+    "proposing_agency": "EssenceMediacom",
+    "scenario": "adverse-media"
+  },
+  {
+    "id": "VND-040",
+    "vendor_name": "Crimson Dawn Logistics",
+    "country_of_incorporation": "JP",
+    "proposing_agency": "Wavemaker",
+    "scenario": "adverse-media"
+  },
+  {
+    "id": "VND-041",
+    "vendor_name": "Phoenix Strategic",
+    "country_of_incorporation": "SG",
+    "proposing_agency": "Hogarth",
+    "scenario": "adverse-media"
+  },
+  {
+    "id": "VND-042",
+    "vendor_name": "Saffron Trading Co.",
+    "country_of_incorporation": "NL",
+    "proposing_agency": "EssenceMediacom",
+    "scenario": "adverse-media"
+  }
+]

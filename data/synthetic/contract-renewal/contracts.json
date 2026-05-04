@@ -1,0 +1,322 @@
+[
+  {
+    "id": "CNT-001",
+    "contract_id": "CNT-0001",
+    "vendor_name": "Acme Holdings",
+    "current_annual_value": 93549,
+    "proposed_annual_value": 93549,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-002",
+    "contract_id": "CNT-0002",
+    "vendor_name": "Northwind Trading",
+    "current_annual_value": 230162,
+    "proposed_annual_value": 230162,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-003",
+    "contract_id": "CNT-0003",
+    "vendor_name": "Initech Systems",
+    "current_annual_value": 85814,
+    "proposed_annual_value": 85814,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-004",
+    "contract_id": "CNT-0004",
+    "vendor_name": "Globex Industries",
+    "current_annual_value": 176957,
+    "proposed_annual_value": 176957,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-005",
+    "contract_id": "CNT-0005",
+    "vendor_name": "Umbrella Logistics",
+    "current_annual_value": 249474,
+    "proposed_annual_value": 249474,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-006",
+    "contract_id": "CNT-0006",
+    "vendor_name": "Hooli Capital",
+    "current_annual_value": 86848,
+    "proposed_annual_value": 86848,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-007",
+    "contract_id": "CNT-0007",
+    "vendor_name": "Pied Piper Services",
+    "current_annual_value": 111054,
+    "proposed_annual_value": 111054,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-008",
+    "contract_id": "CNT-0008",
+    "vendor_name": "Stark Materials",
+    "current_annual_value": 125578,
+    "proposed_annual_value": 125578,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-009",
+    "contract_id": "CNT-0009",
+    "vendor_name": "Wonka Confectionery",
+    "current_annual_value": 242202,
+    "proposed_annual_value": 242202,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-010",
+    "contract_id": "CNT-0010",
+    "vendor_name": "Monsters Power",
+    "current_annual_value": 155628,
+    "proposed_annual_value": 155628,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-011",
+    "contract_id": "CNT-0011",
+    "vendor_name": "Tyrell Robotics",
+    "current_annual_value": 88121,
+    "proposed_annual_value": 88121,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-012",
+    "contract_id": "CNT-0012",
+    "vendor_name": "Cyberdyne Analytics",
+    "current_annual_value": 160737,
+    "proposed_annual_value": 160737,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-013",
+    "contract_id": "CNT-0013",
+    "vendor_name": "Soylent Foods",
+    "current_annual_value": 161583,
+    "proposed_annual_value": 161583,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-014",
+    "contract_id": "CNT-0014",
+    "vendor_name": "Wayne Enterprises",
+    "current_annual_value": 147071,
+    "proposed_annual_value": 147071,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-015",
+    "contract_id": "CNT-0015",
+    "vendor_name": "Stark Industries",
+    "current_annual_value": 109264,
+    "proposed_annual_value": 109264,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-016",
+    "contract_id": "CNT-0016",
+    "vendor_name": "Oscorp Genetics",
+    "current_annual_value": 79559,
+    "proposed_annual_value": 79559,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-017",
+    "contract_id": "CNT-0017",
+    "vendor_name": "Daily Planet Media",
+    "current_annual_value": 249901,
+    "proposed_annual_value": 249901,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-018",
+    "contract_id": "CNT-0018",
+    "vendor_name": "Daily Bugle Press",
+    "current_annual_value": 227609,
+    "proposed_annual_value": 227609,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-019",
+    "contract_id": "CNT-0019",
+    "vendor_name": "InGen Bio",
+    "current_annual_value": 99891,
+    "proposed_annual_value": 99891,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-020",
+    "contract_id": "CNT-0020",
+    "vendor_name": "Macrosoft Cloud",
+    "current_annual_value": 173694,
+    "proposed_annual_value": 173694,
+    "scenario": "flat-renewal"
+  },
+  {
+    "id": "CNT-021",
+    "contract_id": "CNT-0021",
+    "vendor_name": "Hooli Capital",
+    "current_annual_value": 172722,
+    "proposed_annual_value": 290915,
+    "scenario": "price-jump"
+  },
+  {
+    "id": "CNT-022",
+    "contract_id": "CNT-0022",
+    "vendor_name": "Pied Piper Services",
+    "current_annual_value": 63341,
+    "proposed_annual_value": 98078,
+    "scenario": "price-jump"
+  },
+  {
+    "id": "CNT-023",
+    "contract_id": "CNT-0023",
+    "vendor_name": "Stark Materials",
+    "current_annual_value": 147870,
+    "proposed_annual_value": 247679,
+    "scenario": "price-jump"
+  },
+  {
+    "id": "CNT-024",
+    "contract_id": "CNT-0024",
+    "vendor_name": "Wonka Confectionery",
+    "current_annual_value": 65847,
+    "proposed_annual_value": 112990,
+    "scenario": "price-jump"
+  },
+  {
+    "id": "CNT-025",
+    "contract_id": "CNT-0025",
+    "vendor_name": "Monsters Power",
+    "current_annual_value": 147764,
+    "proposed_annual_value": 202710,
+    "scenario": "price-jump"
+  },
+  {
+    "id": "CNT-026",
+    "contract_id": "CNT-0026",
+    "vendor_name": "Tyrell Robotics",
+    "current_annual_value": 238791,
+    "proposed_annual_value": 348491,
+    "scenario": "price-jump"
+  },
+  {
+    "id": "CNT-027",
+    "contract_id": "CNT-0027",
+    "vendor_name": "Cyberdyne Analytics",
+    "current_annual_value": 61149,
+    "proposed_annual_value": 82471,
+    "scenario": "price-jump"
+  },
+  {
+    "id": "CNT-028",
+    "contract_id": "CNT-0028",
+    "vendor_name": "Soylent Foods",
+    "current_annual_value": 188833,
+    "proposed_annual_value": 295267,
+    "scenario": "price-jump"
+  },
+  {
+    "id": "CNT-029",
+    "contract_id": "CNT-0029",
+    "vendor_name": "Cyberdyne Analytics",
+    "current_annual_value": 129793,
+    "proposed_annual_value": 148738,
+    "scenario": "scope-expansion"
+  },
+  {
+    "id": "CNT-030",
+    "contract_id": "CNT-0030",
+    "vendor_name": "Soylent Foods",
+    "current_annual_value": 127300,
+    "proposed_annual_value": 150394,
+    "scenario": "scope-expansion"
+  },
+  {
+    "id": "CNT-031",
+    "contract_id": "CNT-0031",
+    "vendor_name": "Wayne Enterprises",
+    "current_annual_value": 224184,
+    "proposed_annual_value": 247294,
+    "scenario": "scope-expansion"
+  },
+  {
+    "id": "CNT-032",
+    "contract_id": "CNT-0032",
+    "vendor_name": "Stark Industries",
+    "current_annual_value": 78552,
+    "proposed_annual_value": 88347,
+    "scenario": "scope-expansion"
+  },
+  {
+    "id": "CNT-033",
+    "contract_id": "CNT-0033",
+    "vendor_name": "Oscorp Genetics",
+    "current_annual_value": 245211,
+    "proposed_annual_value": 270711,
+    "scenario": "scope-expansion"
+  },
+  {
+    "id": "CNT-034",
+    "contract_id": "CNT-0034",
+    "vendor_name": "Daily Planet Media",
+    "current_annual_value": 210396,
+    "proposed_annual_value": 235585,
+    "scenario": "scope-expansion"
+  },
+  {
+    "id": "CNT-035",
+    "contract_id": "CNT-0035",
+    "vendor_name": "Daily Bugle Press",
+    "current_annual_value": 76130,
+    "proposed_annual_value": 85617,
+    "scenario": "scope-expansion"
+  },
+  {
+    "id": "CNT-036",
+    "contract_id": "CNT-0036",
+    "vendor_name": "InGen Bio",
+    "current_annual_value": 191150,
+    "proposed_annual_value": 227605,
+    "scenario": "scope-expansion"
+  },
+  {
+    "id": "CNT-037",
+    "contract_id": "CNT-0037",
+    "vendor_name": "Daily Bugle Press",
+    "current_annual_value": 90131,
+    "proposed_annual_value": 82151,
+    "scenario": "below-market"
+  },
+  {
+    "id": "CNT-038",
+    "contract_id": "CNT-0038",
+    "vendor_name": "InGen Bio",
+    "current_annual_value": 87747,
+    "proposed_annual_value": 80611,
+    "scenario": "below-market"
+  },
+  {
+    "id": "CNT-039",
+    "contract_id": "CNT-0039",
+    "vendor_name": "Macrosoft Cloud",
+    "current_annual_value": 213302,
+    "proposed_annual_value": 180369,
+    "scenario": "below-market"
+  },
+  {
+    "id": "CNT-040",
+    "contract_id": "CNT-0040",
+    "vendor_name": "Pinetree Hosting",
+    "current_annual_value": 141994,
+    "proposed_annual_value": 129520,
+    "scenario": "below-market"
+  }
+]

@@ -9,15 +9,25 @@ decision_policy: |
     rbac = (context or {}).get("rbac_resolver") or {}
     lm_dec = (lm.get("decision") or "").lower()
     conflicts = rbac.get("sod_conflicts") or []
+    templates = rbac.get("selected_templates") or []
     if lm_dec != "approve":
         decision = "reject"
         reason = "line manager has not approved"
     elif conflicts:
         decision = "reject"
         reason = "SoD conflicts: " + ", ".join(conflicts[:3])
+    elif len(templates) >= 4:
+        # Phase 6 escalate: broad-scope requests need a human even when
+        # the line manager approved and SoD is clean. The FM picks this
+        # up via triage and surfaces it for operator review.
+        decision = "escalate"
+        reason = (
+            "broad scope (" + str(len(templates)) +
+            " templates) — requires human signoff per IT access policy"
+        )
     else:
         decision = "approve"
-        reason = "line manager approved; no SoD conflicts"
+        reason = "line manager approved; no SoD conflicts; scope within auto-approve band"
 ---
 
 # it_access_it_admin

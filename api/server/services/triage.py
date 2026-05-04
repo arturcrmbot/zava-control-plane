@@ -1,6 +1,7 @@
 from __future__ import annotations
 import time
 from api.shared.events import FleetEvent, wakes_fleet_manager
+from api.shared import domains as _registry
 
 
 class Triage:
@@ -8,7 +9,13 @@ class Triage:
         self._recent_dups: list[tuple[str, float]] = []
 
     def should_wake(self, e: FleetEvent) -> bool:
-        return wakes_fleet_manager(e)
+        # Phase 4 of feature-fleet-domain-substrate-1: in addition to the
+        # platform-wide WAKE_TYPES (workflow.exception.detected, hitl,
+        # SLA breach, anomaly, tick, claim.routed.red), wake the FM on
+        # any per-domain wake hint declared in the registry.
+        if wakes_fleet_manager(e):
+            return True
+        return e.type in _registry.all_wake_hints()
 
     def observe(self, e: FleetEvent, now: float | None = None) -> None:
         now = now if now is not None else time.time()

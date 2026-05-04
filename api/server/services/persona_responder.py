@@ -132,9 +132,15 @@ def _compile_decision_policy(role: str, source: str) -> PersonaHandler:
 
     The source runs in an isolated namespace where only ``context`` is in
     scope plus a small whitelist of safe builtins. The source MUST assign
-    ``decision`` (str: "approve" | "reject") and ``reason`` (str). Any
-    exception falls back to a reject with the exception text as the reason
-    — the orchestrator never sits forever on a broken persona policy.
+    ``decision`` (str: "approve" | "reject" | "escalate") and ``reason``
+    (str). Any exception falls back to a reject with the exception text
+    as the reason — the orchestrator never sits forever on a broken
+    persona policy.
+
+    The ``escalate`` verdict (Phase 6 of feature-fleet-domain-substrate-1)
+    means the persona refuses to auto-decide; the responder leaves the
+    Durable gate open and emits a richer FleetEvent so the FM picks it up
+    via triage.
     """
     cleaned = textwrap.dedent(source)
     try:
@@ -150,9 +156,10 @@ def _compile_decision_policy(role: str, source: str) -> PersonaHandler:
             return {"decision": "reject", "reason": f"persona handler error: {ex}"}
         decision = ns.get("decision")
         reason = ns.get("reason")
-        if decision not in {"approve", "reject"}:
+        if decision not in {"approve", "reject", "escalate"}:
             return {"decision": "reject",
-                    "reason": f"persona '{role}' produced invalid decision={decision!r}"}
+                    "reason": f"persona '{role}' produced invalid decision={decision!r} "
+                              f"(expected 'approve' | 'reject' | 'escalate')"}
         return {"decision": str(decision), "reason": str(reason or "")}
 
     return decide
@@ -229,9 +236,36 @@ async def _handle_hitl(event: FleetEvent) -> None:
         return
 
     event_name = external_event_override or persona.external_event
+    decision_str = decision_payload.get("decision")
+
+    # Phase 6 of feature-fleet-domain-substrate-1: when a persona returns
+    # `escalate`, do NOT raise the orchestration event. The Durable gate
+    # stays parked; we publish a richer FleetEvent so the FM picks it up
+    # via triage.should_wake (workflow.hitl.escalated is in WAKE_TYPES).
+    if decision_str == "escalate":
+        print(
+            f"[persona_responder] {persona_role} ESCALATED "
+            f"{data.get('workflow_id')} ({decision_payload.get('reason')}); "
+            f"gate {event_name!r} stays open for FM/operator"
+        )
+        try:
+            from api.server.state import app_state
+            app_state.bus.emit(FleetEvent(
+                type="workflow.hitl.escalated",
+                workflow_id=data.get("workflow_id"),
+                persona=persona_role,
+                reason=decision_payload.get("reason"),
+                context=context,
+                instance_id=instance_id,
+                external_event=event_name,
+            ))
+        except Exception as ex:
+            print(f"[persona_responder] failed to emit hitl.escalated: {ex}")
+        return
+
     print(
         f"[persona_responder] {persona_role} decided "
-        f"{decision_payload.get('decision')!r} for {data.get('workflow_id')} "
+        f"{decision_str!r} for {data.get('workflow_id')} "
         f"({data.get('reason')}); raising {event_name!r}"
     )
 

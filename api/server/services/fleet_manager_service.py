@@ -34,6 +34,31 @@ def _gh_token() -> str:
 _tracer = trace.get_tracer("wpp.fleet_manager")
 
 
+def _domain_catalogue_section() -> str:
+    """Render the registered-domains section appended to the FM skill text.
+
+    Reads api.shared.domains.DOMAINS at session-start time so a new
+    compose-domain graduation lands in the FM's prompt without editing
+    SKILL.md by hand.
+    """
+    from api.shared import domains as _registry
+    lines = ["## Domains under supervision (auto-templated from registry)\n"]
+    for d in _registry.DOMAINS.values():
+        gates = ", ".join(g.external_event for g in d.hitl_gates) or "(none)"
+        wakes = ", ".join(w.event for w in d.wake_hints) or "(none)"
+        lines.append(
+            f"- **{d.workflow_type}** — {d.display_name} · "
+            f"operator surface: {d.operator_surface} · "
+            f"HITL events: {gates} · wake hints: {wakes}"
+        )
+    lines.append(
+        "\nWhen reasoning about an event, identify the domain via the "
+        "`workflow_type` field on the bus and use the matching display "
+        "name + operator surface in any compose-exception copy."
+    )
+    return "\n".join(lines)
+
+
 class FleetManagerService:
     def __init__(self, *, bus: EventBus, store: StateStore, audit: AuditLogger,
                  model: str = "gpt-4.1", on_live: Callable[[dict], None] | None = None):
@@ -71,6 +96,7 @@ class FleetManagerService:
 
         skill_path = Path(__file__).resolve().parents[1] / "skills" / "fleet-manager" / "SKILL.md"
         skill_text = skill_path.read_text(encoding="utf-8")
+        skill_text += "\n\n" + _domain_catalogue_section()
         tools = build_fleet_manager_tools(self._store, self._audit)
 
         self._session = await self._client.create_session(

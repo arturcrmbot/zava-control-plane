@@ -14,6 +14,14 @@ decision_policy: |
     if pct_f is None:
         decision = "reject"
         reason = "missing cost_change_pct"
+    elif pct_f > 25.0:
+        # Phase 6 escalate: large price jumps need a human, not auto-reject.
+        # Auto-rejecting a 30% price-up may be the right call but we want the
+        # FM to surface it for operator review with policy + precedents.
+        decision = "escalate"
+        reason = (
+            "price jump " + str(pct_f) + "% > 25% — requires human signoff"
+        )
     elif pct_f > 10.0:
         decision = "reject"
         reason = "cost change " + str(pct_f) + "% exceeds 10% threshold"

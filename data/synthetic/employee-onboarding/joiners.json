@@ -1,0 +1,322 @@
+[
+  {
+    "id": "JNR-001",
+    "employee_id": "EMP-3401",
+    "department": "Finance",
+    "buddy_id": "EMP-4458",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-002",
+    "employee_id": "EMP-1520",
+    "department": "Engineering",
+    "buddy_id": "EMP-9434",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-003",
+    "employee_id": "EMP-4497",
+    "department": "Creative",
+    "buddy_id": "EMP-9440",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-004",
+    "employee_id": "EMP-4065",
+    "department": "Account",
+    "buddy_id": "EMP-7584",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-005",
+    "employee_id": "EMP-9309",
+    "department": "Strategy",
+    "buddy_id": "EMP-8212",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-006",
+    "employee_id": "EMP-6770",
+    "department": "Production",
+    "buddy_id": "EMP-9875",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-007",
+    "employee_id": "EMP-5856",
+    "department": "Account",
+    "buddy_id": "EMP-6096",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-008",
+    "employee_id": "EMP-1922",
+    "department": "Creative",
+    "buddy_id": "EMP-1910",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-009",
+    "employee_id": "EMP-7185",
+    "department": "Production",
+    "buddy_id": "EMP-7864",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-010",
+    "employee_id": "EMP-2761",
+    "department": "Creative",
+    "buddy_id": "EMP-9757",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-011",
+    "employee_id": "EMP-7951",
+    "department": "Finance",
+    "buddy_id": "EMP-5836",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-012",
+    "employee_id": "EMP-2358",
+    "department": "Engineering",
+    "buddy_id": "EMP-6092",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-013",
+    "employee_id": "EMP-8883",
+    "department": "Finance",
+    "buddy_id": "EMP-1892",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-014",
+    "employee_id": "EMP-4609",
+    "department": "Creative",
+    "buddy_id": "EMP-8353",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-015",
+    "employee_id": "EMP-7613",
+    "department": "PR",
+    "buddy_id": "EMP-6572",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-016",
+    "employee_id": "EMP-8346",
+    "department": "Data",
+    "buddy_id": "EMP-4308",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-017",
+    "employee_id": "EMP-5163",
+    "department": "Finance",
+    "buddy_id": "EMP-9309",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-018",
+    "employee_id": "EMP-8778",
+    "department": "Operations",
+    "buddy_id": "EMP-4900",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-019",
+    "employee_id": "EMP-2640",
+    "department": "Engineering",
+    "buddy_id": "EMP-5193",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-020",
+    "employee_id": "EMP-5538",
+    "department": "Creative",
+    "buddy_id": "EMP-4130",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-021",
+    "employee_id": "EMP-4424",
+    "department": "Operations",
+    "buddy_id": "EMP-5967",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-022",
+    "employee_id": "EMP-5166",
+    "department": "Engineering",
+    "buddy_id": "EMP-6193",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-023",
+    "employee_id": "EMP-8304",
+    "department": "Strategy",
+    "buddy_id": "EMP-6191",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-024",
+    "employee_id": "EMP-8967",
+    "department": "Data",
+    "buddy_id": "EMP-7517",
+    "start_date": "2026-06-15",
+    "scenario": "standard"
+  },
+  {
+    "id": "JNR-025",
+    "employee_id": "EMP-7894",
+    "department": "Operations",
+    "buddy_id": "EMP-8833",
+    "start_date": "2026-06-15",
+    "scenario": "elevated-access-request"
+  },
+  {
+    "id": "JNR-026",
+    "employee_id": "EMP-5007",
+    "department": "Engineering",
+    "buddy_id": "EMP-7994",
+    "start_date": "2026-06-15",
+    "scenario": "elevated-access-request"
+  },
+  {
+    "id": "JNR-027",
+    "employee_id": "EMP-1941",
+    "department": "Data",
+    "buddy_id": "EMP-2540",
+    "start_date": "2026-06-15",
+    "scenario": "elevated-access-request"
+  },
+  {
+    "id": "JNR-028",
+    "employee_id": "EMP-8714",
+    "department": "Engineering",
+    "buddy_id": "EMP-9103",
+    "start_date": "2026-06-15",
+    "scenario": "elevated-access-request"
+  },
+  {
+    "id": "JNR-029",
+    "employee_id": "EMP-6492",
+    "department": "Data",
+    "buddy_id": "EMP-3128",
+    "start_date": "2026-06-15",
+    "scenario": "elevated-access-request"
+  },
+  {
+    "id": "JNR-030",
+    "employee_id": "EMP-3500",
+    "department": "Operations",
+    "buddy_id": "EMP-8582",
+    "start_date": "2026-06-15",
+    "scenario": "elevated-access-request"
+  },
+  {
+    "id": "JNR-031",
+    "employee_id": "EMP-6248",
+    "department": "Engineering",
+    "buddy_id": "EMP-9085",
+    "start_date": "2026-06-15",
+    "scenario": "elevated-access-request"
+  },
+  {
+    "id": "JNR-032",
+    "employee_id": "EMP-6180",
+    "department": "Engineering",
+    "buddy_id": "EMP-7118",
+    "start_date": "2026-06-15",
+    "scenario": "elevated-access-request"
+  },
+  {
+    "id": "JNR-033",
+    "employee_id": "EMP-4358",
+    "department": "Engineering",
+    "buddy_id": "EMP-1707",
+    "start_date": "2026-06-15",
+    "scenario": "elevated-access-request"
+  },
+  {
+    "id": "JNR-034",
+    "employee_id": "EMP-9397",
+    "department": "Operations",
+    "buddy_id": "EMP-5550",
+    "start_date": "2026-06-15",
+    "scenario": "elevated-access-request"
+  },
+  {
+    "id": "JNR-035",
+    "employee_id": "CON-6073",
+    "department": "PR",
+    "buddy_id": "EMP-2532",
+    "start_date": "2026-06-15",
+    "scenario": "external-contractor"
+  },
+  {
+    "id": "JNR-036",
+    "employee_id": "CON-6407",
+    "department": "Production",
+    "buddy_id": "EMP-1059",
+    "start_date": "2026-06-15",
+    "scenario": "external-contractor"
+  },
+  {
+    "id": "JNR-037",
+    "employee_id": "CON-9118",
+    "department": "PR",
+    "buddy_id": "EMP-8486",
+    "start_date": "2026-06-15",
+    "scenario": "external-contractor"
+  },
+  {
+    "id": "JNR-038",
+    "employee_id": "CON-9609",
+    "department": "PR",
+    "buddy_id": "EMP-6342",
+    "start_date": "2026-06-15",
+    "scenario": "external-contractor"
+  },
+  {
+    "id": "JNR-039",
+    "employee_id": "CON-6831",
+    "department": "Production",
+    "buddy_id": "EMP-4514",
+    "start_date": "2026-06-15",
+    "scenario": "external-contractor"
+  },
+  {
+    "id": "JNR-040",
+    "employee_id": "CON-3789",
+    "department": "Production",
+    "buddy_id": "EMP-1212",
+    "start_date": "2026-06-15",
+    "scenario": "external-contractor"
+  }
+]
