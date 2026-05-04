@@ -1,7 +1,8 @@
 # src/shared/types.py
 from __future__ import annotations
+import warnings
 from typing import Literal
-from pydantic import BaseModel as _PydBaseModel, ConfigDict, Field
+from pydantic import BaseModel as _PydBaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
 
 
@@ -112,23 +113,25 @@ class ActionLedgerEntry(BaseModel):
 
 class Workflow(BaseModel):
     id: str
-    type: Literal[
-        "invoice-p2p", "expense-claim", "hiring",
-        # Fleet/composed domains. Workflows of these types may exist in the
-        # store as synthesized stubs (built on first detail request from
-        # exception/event data) or — if a future change starts upserting
-        # them — as fully-populated records.
-        "travel-preapproval", "vendor-kyc", "employee-onboarding",
-        "it-access-request", "contract-renewal", "perf-review",
-    ] = "expense-claim"
+    # type is the registry key (api.shared.domains.DOMAINS). Was a Literal
+    # union of the eight known workflow_types; widened to `str` so adding a
+    # 9th domain is a registry edit, not a types.py edit. The runtime asserts
+    # `type in DOMAINS` via the model_validator below.
+    type: str = "expense-claim"
     status: WorkflowStatus = "in_progress"
     current_phase: PhaseName = "Intake"
     created_at: float
     sla_due_at: float
-    # Invoice payload — set on type="invoice-p2p"; absent on expense claims.
+    # Domain-agnostic opaque payload. New code (fleet-* domains and any
+    # post-registry domain) writes its inputs here. POC1/POC2 keep using the
+    # typed fields below for back-compat; new domains leave those None.
+    payload: dict = Field(default_factory=dict)
+    # --- Deprecated typed payload fields. Kept for one release for back-compat
+    # with POC1 expense (`claim`) and the legacy invoice path (`vendor`,
+    # `invoice`). New code reads from `payload` instead. See
+    # api/shared/domains.py for the canonical per-domain shape.
     vendor: Vendor | None = None
     invoice: InvoiceData | None = None
-    # Expense payload — set on type="expense-claim"; absent on invoice workflows.
     claim: ClaimData | None = None
     verdict: Literal["green", "amber", "red"] | None = None
     jurisdiction: str
@@ -152,6 +155,27 @@ class Workflow(BaseModel):
     # extracted_json, latency_ms, tokens. Append-only; re-runs are kept.
     # Generic platform field — every domain that uses the wrapper benefits.
     agent_reasoning: list = Field(default_factory=list)
+
+    @field_validator("type")
+    @classmethod
+    def _check_type_against_registry(cls, v: str) -> str:
+        """Warn (don't raise) when `type` isn't a registered domain.
+
+        Imported lazily to avoid an import cycle if domains.py later wants
+        to reference shared types. Allows legacy `invoice-p2p` to keep
+        constructing for the in-flight workflow records the old orchestrator
+        left behind. Phase 1 of feature-fleet-domain-substrate-1.
+        """
+        from api.shared import domains as _domains  # local import on purpose
+        if v in _domains.DOMAINS or v == "invoice-p2p":
+            return v
+        warnings.warn(
+            f"Workflow.type={v!r} is not registered in api.shared.domains.DOMAINS; "
+            f"the FM and operator UI will not surface this domain correctly.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return v
 
 
 class Phase(BaseModel):

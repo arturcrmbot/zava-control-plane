@@ -16,11 +16,18 @@ from pathlib import Path
 from api.server.state import app_state
 from api.server.services.synthetic_data import (
     build_workflow, build_expense_workflow, build_hiring_workflow,
+    build_fleet_travel_preapproval_workflow,
+    build_fleet_vendor_kyc_workflow,
+    build_fleet_employee_onboarding_workflow,
+    build_fleet_it_access_request_workflow,
+    build_fleet_contract_renewal_workflow,
+    build_fleet_perf_review_workflow,
 )
 from api.server.services.durable_client import (
     schedule_new_orchestration, raise_orchestration_event,
 )
 from api.shared.expense_taxonomy import ReceiptFlavour
+from api.shared import domains as _registry
 
 _seq = 0
 _exp_seq = 0
@@ -100,6 +107,82 @@ def _pick_claim_for_flavour(flavour: str) -> str:
             f"no claim with receipt_mismatch_flavour={flavour!r} in {_CLAIMS_DIR}"
         )
     return _scenario_rng.choice(candidates)
+
+
+# --------------------------------------------------------------------------
+# Per-domain seed-corpus loader (Phase 5 of feature-fleet-domain-substrate-1).
+#
+# Each fleet-* domain has a seed JSON under
+# data/synthetic/<workflow_type>/<filename>.json carrying ≥40 records with
+# `id`, semantic fields, and a `scenario` tag. These supply spawner inputs
+# in place of the previously-hardcoded inline arrays.
+# --------------------------------------------------------------------------
+
+_CORPUS_ROOT = Path(__file__).resolve().parents[3] / "data" / "synthetic"
+
+_CORPUS_FILE: dict[str, str] = {
+    "travel-preapproval": "travel-preapproval/trips.json",
+    "vendor-kyc":         "vendor-kyc/vendors.json",
+    "employee-onboarding": "employee-onboarding/joiners.json",
+    "it-access-request":  "it-access-request/requests.json",
+    "contract-renewal":   "contract-renewal/contracts.json",
+    "perf-review":        "perf-review/reviewees.json",
+}
+
+# Per-(workflow_type) lazy cache. Each value is a list of record dicts.
+_corpus_cache: dict[str, list[dict]] = {}
+# Round-robin position per (workflow_type, scenario|None) so successive
+# spawns walk the corpus deterministically.
+_corpus_cursor: dict[tuple[str, str | None], int] = {}
+
+
+def _load_corpus(workflow_type: str) -> list[dict]:
+    """Read the per-domain seed JSON, cached. Returns [] if the file
+    doesn't exist yet (graceful: spawner falls back to inline synthesis)."""
+    cached = _corpus_cache.get(workflow_type)
+    if cached is not None:
+        return cached
+    rel = _CORPUS_FILE.get(workflow_type)
+    if not rel:
+        _corpus_cache[workflow_type] = []
+        return []
+    path = _CORPUS_ROOT / rel
+    if not path.exists():
+        _corpus_cache[workflow_type] = []
+        return []
+    try:
+        records = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(records, list):
+            print(f"[corpus] {path} is not a list; ignoring")
+            records = []
+    except Exception as ex:
+        print(f"[corpus] failed to load {path}: {ex}")
+        records = []
+    _corpus_cache[workflow_type] = records
+    return records
+
+
+def _pick_record(workflow_type: str, scenario: str | None = None) -> dict | None:
+    """Round-robin pick the next record from the per-domain corpus,
+    optionally filtered to records with a matching `scenario`. Returns
+    None if the corpus is empty (caller falls back to inline synthesis)."""
+    records = _load_corpus(workflow_type)
+    if not records:
+        return None
+    if scenario:
+        records = [r for r in records if r.get("scenario") == scenario]
+        if not records:
+            return None
+    key = (workflow_type, scenario)
+    idx = _corpus_cursor.get(key, 0) % len(records)
+    _corpus_cursor[key] = idx + 1
+    return records[idx]
+
+
+def reset_seed_corpus_cache() -> None:
+    """Test helper: invalidate the per-domain corpus cache + cursors."""
+    _corpus_cache.clear()
+    _corpus_cursor.clear()
 
 
 async def spawn_workflow(scenario: str | None = None) -> str:
@@ -226,36 +309,32 @@ async def spawn_travel_preapproval_workflow(
     employee_id: str | None = None,
     scenario: str | None = None,
 ) -> str:
-    """First generated-domain simulator entry: spawn a travel pre-approval
-    workflow. Optional `employee_id` picks a specific synthetic employee
-    (deterministic). Optional `scenario` tags the payload.
-
-    Note: generated domains do not currently upsert into app_state.store
-    (the existing Workflow / ClaimData / HiringData types are domain-
-    specific). State lives only in Durable + the FleetEvent stream.
+    """Spawn a travel pre-approval workflow. Picks a record from
+    data/synthetic/travel-preapproval/trips.json (filtered by `scenario`
+    when set); falls back to inline synthesis when the corpus is missing.
+    Upserts a Workflow record so the FM's `query_fleet` can see it.
     """
     global _travel_seq
     _travel_seq += 1
     wid = f"TRV-{_travel_seq:04d}"
-    eid = employee_id or f"EMP-{(_travel_seq * 17) % 9000 + 1000:04d}"
+    record = _pick_record("travel-preapproval", scenario=scenario) or {}
+    if employee_id:
+        record = {**record, "employee_id": employee_id}
+    w = build_fleet_travel_preapproval_workflow(wid, record=record)
+    app_state.store.upsert_workflow(w)
     payload: dict = {
         "workflow_id": wid,
         "type": "travel-preapproval",
-        "trip": {
-            "employee_id": eid,
-            "origin": "LHR",
-            "destination": "JFK",
-            "depart_date": "2026-06-15",
-            "return_date": "2026-06-18",
-            "business_reason": "Q3 client review",
-        },
+        "trip": w.payload.get("trip"),
     }
-    if scenario:
-        payload["scenario"] = scenario
+    if scenario or w.payload.get("scenario"):
+        payload["scenario"] = scenario or w.payload.get("scenario")
     try:
-        await schedule_new_orchestration(
+        result = await schedule_new_orchestration(
             payload, function_name="FleetTravelPreapprovalOrchestrator",
         )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
     except Exception as ex:
         print(f"[orchestrator] failed to schedule {wid}: {ex}")
     return wid
@@ -458,8 +537,14 @@ async def ramp_loop() -> None:
     tasks = []
     for i, domain in enumerate(valid_domains):
         spawn_fn = spawners[domain]
+        # Domain-specific scenario rotation: walk every distinct `scenario`
+        # tag in the seed corpus in order. None means "let the spawner
+        # round-robin records without filtering" (POC1/POC2 behaviour).
+        scenarios = _scenarios_for(domain)
         tasks.append(asyncio.create_task(
-            _per_domain_ramp(domain, spawn_fn, avg_interval, initial_delay=i * initial_stagger)
+            _per_domain_ramp(domain, spawn_fn, avg_interval,
+                             initial_delay=i * initial_stagger,
+                             scenario_rotation=scenarios)
         ))
 
     # Block forever; the loop is supervised by the FastAPI lifespan which
@@ -472,20 +557,73 @@ async def ramp_loop() -> None:
         raise
 
 
+def _scenarios_for(domain: str) -> list[str] | None:
+    """Return the scenario rotation for a domain. Interleaves scenarios
+    in proportion to their corpus frequency so the operator sees variety
+    inside the first 4-5 spawns instead of 24 cleans before any
+    interesting scenario fires.
+
+    Example for vendor-kyc (24 clean / 6 each of 3 risky):
+      ['clean', 'sanctions-hit-entity', 'clean', 'sanctions-hit-ubo',
+       'clean', 'adverse-media', 'clean', 'sanctions-hit-entity', ...]
+
+    None for POC1/POC2 (no per-domain seed file declared in _CORPUS_FILE).
+    """
+    if domain not in _CORPUS_FILE:
+        return None
+    records = _load_corpus(domain)
+    if not records:
+        return None
+    counts: dict[str, int] = {}
+    for r in records:
+        scen = r.get("scenario")
+        if scen:
+            counts[scen] = counts.get(scen, 0) + 1
+    if not counts:
+        return None
+    # Round-robin over scenario buckets, drawing in proportion to count.
+    # Sort scenarios alphabetically for determinism (apart from majority).
+    majority = max(counts.items(), key=lambda kv: kv[1])[0]
+    others = sorted(s for s in counts if s != majority)
+    rotation: list[str] = []
+    # Interleave: alternate majority with the next "other" scenario.
+    # Total length matches the corpus; majority shows ~half the rotation,
+    # others share the rest.
+    other_cursor = 0
+    for i in range(sum(counts.values())):
+        if i % 2 == 0 or not others:
+            rotation.append(majority)
+        else:
+            rotation.append(others[other_cursor % len(others)])
+            other_cursor += 1
+    return rotation
+
+
 async def _per_domain_ramp(
     domain: str,
     spawn_fn,
     avg_interval: float,
     initial_delay: float = 0.0,
+    scenario_rotation: list[str] | None = None,
 ) -> None:
     """One domain's spawn loop. Survives individual spawn failures so a
-    single domain outage doesn't stall the rest."""
+    single domain outage doesn't stall the rest. When `scenario_rotation`
+    is set, every spawn picks the next scenario in the list (cycling)."""
     if initial_delay > 0:
         await asyncio.sleep(initial_delay)
+    cursor = 0
     while True:
+        scenario = None
+        if scenario_rotation:
+            scenario = scenario_rotation[cursor % len(scenario_rotation)]
+            cursor += 1
         try:
-            wid = await spawn_fn()
-            print(f"[ramp][{domain}] spawned {wid}")
+            if scenario:
+                wid = await spawn_fn(scenario=scenario)
+            else:
+                wid = await spawn_fn()
+            print(f"[ramp][{domain}] spawned {wid}"
+                  + (f" scenario={scenario}" if scenario else ""))
         except Exception as ex:
             print(f"[ramp][{domain}] spawn failed: {ex}")
         # \u00b130% jitter so the cadence isn't robotic.
@@ -503,37 +641,30 @@ async def spawn_fleet_employee_onboarding_workflow(
     department: str | None = None,
     scenario: str | None = None,
 ) -> str:
-    """Generated-domain simulator entry: spawn an Employee onboarding
-    workflow. Optional `employee_id` picks a specific synthetic joiner
-    (deterministic). Optional `department` overrides the default. Optional
-    `scenario` tags the payload.
-
-    Note: generated domains do not currently upsert into app_state.store
-    (the existing Workflow / ClaimData / HiringData types are domain-
-    specific). State lives only in Durable + the FleetEvent stream.
-    """
+    """Spawn an Employee onboarding workflow from the seed corpus."""
     global _onb_seq
     _onb_seq += 1
     wid = f"ONB-{_onb_seq:04d}"
-    eid = employee_id or f"EMP-{(_onb_seq * 23) % 9000 + 1000:04d}"
-    bid = f"EMP-{(_onb_seq * 41) % 9000 + 1000:04d}"
-    dep = department or "Engineering"
+    record = _pick_record("employee-onboarding", scenario=scenario) or {}
+    if employee_id:
+        record = {**record, "employee_id": employee_id}
+    if department:
+        record = {**record, "department": department}
+    w = build_fleet_employee_onboarding_workflow(wid, record=record)
+    app_state.store.upsert_workflow(w)
     payload: dict = {
         "workflow_id": wid,
         "type": "employee-onboarding",
-        "joiner": {
-            "employee_id": eid,
-            "department": dep,
-            "buddy_id": bid,
-            "start_date": "2026-06-15",
-        },
+        "joiner": w.payload.get("joiner"),
     }
-    if scenario:
-        payload["scenario"] = scenario
+    if scenario or w.payload.get("scenario"):
+        payload["scenario"] = scenario or w.payload.get("scenario")
     try:
-        await schedule_new_orchestration(
+        result = await schedule_new_orchestration(
             payload, function_name="FleetEmployeeOnboardingOrchestrator",
         )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
     except Exception as ex:
         print(f"[orchestrator] failed to schedule {wid}: {ex}")
     return wid
@@ -550,37 +681,32 @@ async def spawn_fleet_vendor_kyc_workflow(
     proposing_agency: str | None = None,
     scenario: str | None = None,
 ) -> str:
-    """Spawn a Vendor onboarding & KYC workflow. Optional fields fall back
-    to deterministic synthetic vendor records.
-
-    Note: generated domains do not currently upsert into app_state.store
-    (the existing Workflow / ClaimData / HiringData types are domain-
-    specific). State lives only in Durable + the FleetEvent stream.
-    """
+    """Spawn a Vendor KYC workflow from the seed corpus."""
     global _fvk_seq
     _fvk_seq += 1
     wid = f"VKY-{_fvk_seq:04d}"
-    _names = ["Acme Holdings", "Northwind Trading", "Initech Systems",
-              "Globex Industries", "Umbrella Logistics", "Hooli Capital",
-              "Pied Piper Services", "Stark Materials"]
-    _countries = ["GB", "US", "DE", "FR", "JP", "AE", "SG", "CH"]
-    _agencies = ["Mindshare", "Wavemaker", "Mediacom", "EssenceMediacom",
-                 "Ogilvy", "Grey", "VMLY&R"]
+    record = _pick_record("vendor-kyc", scenario=scenario) or {}
+    if vendor_name:
+        record = {**record, "vendor_name": vendor_name}
+    if country:
+        record = {**record, "country_of_incorporation": country}
+    if proposing_agency:
+        record = {**record, "proposing_agency": proposing_agency}
+    w = build_fleet_vendor_kyc_workflow(wid, record=record)
+    app_state.store.upsert_workflow(w)
     payload: dict = {
         "workflow_id": wid,
         "type": "vendor-kyc",
-        "vendor": {
-            "name": vendor_name or _names[(_fvk_seq * 7) % len(_names)],
-            "country_of_incorporation": country or _countries[(_fvk_seq * 5) % len(_countries)],
-            "proposing_agency": proposing_agency or _agencies[(_fvk_seq * 3) % len(_agencies)],
-        },
+        "vendor": w.payload.get("vendor"),
     }
-    if scenario:
-        payload["scenario"] = scenario
+    if scenario or w.payload.get("scenario"):
+        payload["scenario"] = scenario or w.payload.get("scenario")
     try:
-        await schedule_new_orchestration(
+        result = await schedule_new_orchestration(
             payload, function_name="FleetVendorKycOrchestrator",
         )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
     except Exception as ex:
         print(f"[orchestrator] failed to schedule {wid}: {ex}")
     return wid
@@ -598,46 +724,36 @@ async def spawn_fleet_it_access_request_workflow(
     business_justification: str | None = None,
     scenario: str | None = None,
 ) -> str:
-    """Generated-domain simulator entry: spawn an IT access request
-    workflow. Optional `employee_id` picks a specific synthetic employee
-    (deterministic). Optional `department` overrides the default. Optional
-    `requested_role_templates` overrides the default 2-template request.
-    Optional `business_justification` overrides the default rationale.
-    Optional `scenario` tags the payload.
-
-    Note: generated domains do not currently upsert into app_state.store
-    (the existing Workflow / ClaimData / HiringData types are domain-
-    specific). State lives only in Durable + the FleetEvent stream.
-    """
+    """Spawn an IT access request workflow from the seed corpus."""
     global _itar_seq
     _itar_seq += 1
     wid = f"ITAR-{_itar_seq:04d}"
-    eid = employee_id or f"EMP-{(_itar_seq * 19) % 9000 + 1000:04d}"
-    dep = department or "Finance"
-    templates = requested_role_templates or [
-        f"tmpl-{dep.lower()[:3]}-g3-{(_itar_seq * 7) % 100:02d}",
-        f"tmpl-{dep.lower()[:3]}-g3-{(_itar_seq * 11) % 100:02d}",
-    ]
-    bj = business_justification or (
-        "Project rotation onto Q3 finance-analytics workstream; "
-        "needs read-access to dashboards and write-access to scenario folder."
-    )
+    record = _pick_record("it-access-request", scenario=scenario) or {}
+    overrides = {}
+    if employee_id:
+        overrides["employee_id"] = employee_id
+    if department:
+        overrides["department"] = department
+    if requested_role_templates:
+        overrides["requested_role_templates"] = requested_role_templates
+    if business_justification:
+        overrides["business_justification"] = business_justification
+    record = {**record, **overrides}
+    w = build_fleet_it_access_request_workflow(wid, record=record)
+    app_state.store.upsert_workflow(w)
     payload: dict = {
         "workflow_id": wid,
         "type": "it-access-request",
-        "request": {
-            "employee_id": eid,
-            "department": dep,
-            "requested_role_templates": templates,
-            "business_justification": bj,
-        },
+        "request": w.payload.get("request"),
     }
-    if scenario:
-        payload["scenario"] = scenario
+    if scenario or w.payload.get("scenario"):
+        payload["scenario"] = scenario or w.payload.get("scenario")
     try:
-        await schedule_new_orchestration(
+        result = await schedule_new_orchestration(
             payload, function_name="FleetItAccessRequestOrchestrator",
         )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
     except Exception as ex:
         print(f"[orchestrator] failed to schedule {wid}: {ex}")
     return wid
@@ -652,31 +768,28 @@ async def spawn_fleet_contract_renewal_workflow(
     contract_id: str | None = None,
     scenario: str | None = None,
 ) -> str:
-    """Generated-domain simulator entry: spawn a Contract renewal workflow.
-    Optional `contract_id` picks a specific synthetic contract
-    (deterministic). Optional `scenario` tags the payload.
-
-    Note: generated domains do not currently upsert into app_state.store
-    (the existing Workflow / ClaimData / HiringData types are domain-
-    specific). State lives only in Durable + the FleetEvent stream.
-    """
+    """Spawn a Contract renewal workflow from the seed corpus."""
     global _crn_seq
     _crn_seq += 1
     wid = f"CRN-{_crn_seq:04d}"
-    cid = contract_id or f"CRN-{(_crn_seq * 23) % 9000 + 1000:04d}"
+    record = _pick_record("contract-renewal", scenario=scenario) or {}
+    if contract_id:
+        record = {**record, "contract_id": contract_id}
+    w = build_fleet_contract_renewal_workflow(wid, record=record)
+    app_state.store.upsert_workflow(w)
     payload: dict = {
         "workflow_id": wid,
         "type": "contract-renewal",
-        "contract": {
-            "contract_id": cid,
-        },
+        "contract": w.payload.get("contract"),
     }
-    if scenario:
-        payload["scenario"] = scenario
+    if scenario or w.payload.get("scenario"):
+        payload["scenario"] = scenario or w.payload.get("scenario")
     try:
-        await schedule_new_orchestration(
+        result = await schedule_new_orchestration(
             payload, function_name="FleetContractRenewalOrchestrator",
         )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
     except Exception as ex:
         print(f"[orchestrator] failed to schedule {wid}: {ex}")
     return wid
@@ -692,34 +805,30 @@ async def spawn_fleet_perf_review_workflow(
     cycle: str | None = None,
     scenario: str | None = None,
 ) -> str:
-    """Generated-domain simulator entry: spawn a Performance review workflow.
-    Optional `employee_id` picks a specific synthetic reviewee
-    (deterministic). Optional `cycle` overrides the default cycle label.
-    Optional `scenario` tags the payload.
-
-    Note: generated domains do not currently upsert into app_state.store
-    (the existing Workflow / ClaimData / HiringData types are domain-
-    specific). State lives only in Durable + the FleetEvent stream.
-    """
+    """Spawn a Performance review workflow from the seed corpus."""
     global _prr_seq
     _prr_seq += 1
     wid = f"PRR-{_prr_seq:04d}"
-    eid = employee_id or f"EMP-{(_prr_seq * 31) % 9000 + 1000:04d}"
-    cyc = cycle or "2026-H1"
+    record = _pick_record("perf-review", scenario=scenario) or {}
+    if employee_id:
+        record = {**record, "employee_id": employee_id}
+    if cycle:
+        record = {**record, "cycle": cycle}
+    w = build_fleet_perf_review_workflow(wid, record=record)
+    app_state.store.upsert_workflow(w)
     payload: dict = {
         "workflow_id": wid,
         "type": "perf-review",
-        "review": {
-            "employee_id": eid,
-            "cycle": cyc,
-        },
+        "review": w.payload.get("review"),
     }
-    if scenario:
-        payload["scenario"] = scenario
+    if scenario or w.payload.get("scenario"):
+        payload["scenario"] = scenario or w.payload.get("scenario")
     try:
-        await schedule_new_orchestration(
+        result = await schedule_new_orchestration(
             payload, function_name="FleetPerfReviewOrchestrator",
         )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
     except Exception as ex:
         print(f"[orchestrator] failed to schedule {wid}: {ex}")
     return wid

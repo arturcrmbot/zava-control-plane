@@ -34,7 +34,9 @@ def _agent_tried(ledger: list[ActionLedgerEntry], limit: int = 5) -> list[str]:
 def _describe_subject(workflow: Workflow) -> tuple[str, str]:
     """Return (subject_phrase, amount_str) tailored to the workflow type.
 
-    Expense claims read from `workflow.claim`; invoices from `workflow.invoice`.
+    Expense claims read from `workflow.claim`; invoices from `workflow.invoice`;
+    fleet/composed domains (vendor-kyc, travel-preapproval, etc.) read from
+    `workflow.payload` per the domain registry.
     """
     if workflow.type == "expense-claim" and workflow.claim:
         c = workflow.claim
@@ -48,6 +50,44 @@ def _describe_subject(workflow: Workflow) -> tuple[str, str]:
         amount_str = ""
         subject = f"Hiring workflow {workflow.id}"
         return subject, amount_str
+    # Fleet/composed domains — payload-shaped.
+    p = workflow.payload or {}
+    if workflow.type == "vendor-kyc" and p.get("vendor"):
+        v = p["vendor"]
+        return (
+            f"Vendor KYC for {v.get('name', '<vendor>')} "
+            f"({v.get('country_of_incorporation', '?')})"
+        ), ""
+    if workflow.type == "travel-preapproval" and p.get("trip"):
+        t = p["trip"]
+        return (
+            f"Travel pre-approval for {t.get('employee_id', '<emp>')} "
+            f"{t.get('origin', '?')}→{t.get('destination', '?')}"
+        ), ""
+    if workflow.type == "employee-onboarding" and p.get("joiner"):
+        j = p["joiner"]
+        return (
+            f"Onboarding for {j.get('employee_id', '<emp>')} "
+            f"({j.get('department', '?')})"
+        ), ""
+    if workflow.type == "it-access-request" and p.get("request"):
+        r = p["request"]
+        return (
+            f"IT access for {r.get('employee_id', '<emp>')} "
+            f"({len(r.get('requested_role_templates', []))} role templates)"
+        ), ""
+    if workflow.type == "contract-renewal" and p.get("contract"):
+        c = p["contract"]
+        return (
+            f"Contract renewal {c.get('contract_id', '<contract>')} "
+            f"with {c.get('vendor_name', '<vendor>')}"
+        ), ""
+    if workflow.type == "perf-review" and p.get("review"):
+        r = p["review"]
+        return (
+            f"Perf review for {r.get('employee_id', '<emp>')} "
+            f"({r.get('cycle', '?')})"
+        ), ""
     inv = workflow.invoice
     vendor = workflow.vendor.name if workflow.vendor else "<unknown vendor>"
     if inv:

@@ -12,4 +12,6 @@ def test_does_not_wake_on_phase_started():
 
 
 def test_wake_set_size():
-    assert len(WAKE_TYPES) == 7
+    # 7 platform-wide wake types + workflow.hitl.escalated added in Phase 6
+    # of feature-fleet-domain-substrate-1 (persona escalate verdict).
+    assert len(WAKE_TYPES) == 8

@@ -168,3 +168,178 @@ def build_hiring_workflow(workflow_id: str, candidate_id: str | None = None) -> 
         },
         agent_outputs=agent_outputs,
     )
+
+
+# ---------------------------------------------------------------------------
+# Fleet-* builders (compose-domain v3 generated domains).
+#
+# Each builder constructs a Workflow with workflow_type set, a sensible
+# initial current_phase (matches the FIRST step.started the orchestrator
+# emits), and `payload` carrying the domain-specific input dict that the
+# orchestration generator and downstream activities read.
+#
+# Builders are intentionally tolerant: pass `record=<dict-from-seed-corpus>`
+# for the Phase 5 path, OR pass individual kwargs to synthesise inline.
+# ---------------------------------------------------------------------------
+
+
+def _now_with_jitter() -> tuple[float, float]:
+    """Return (created_at, sla_due_at) with a domain-default 7-day SLA."""
+    now = time.time()
+    return now, now + 7 * 86400
+
+
+def build_fleet_travel_preapproval_workflow(
+    workflow_id: str, record: dict | None = None,
+) -> Workflow:
+    """Travel pre-approval workflow record. `record` is one trip from
+    data/synthetic/travel-preapproval/trips.json when seeded; otherwise a
+    minimal trip is synthesised inline."""
+    r = record or {}
+    employee_id = r.get("employee_id") or f"EMP-{random.randint(1000, 9999):04d}"
+    trip = {
+        "employee_id": employee_id,
+        "origin": r.get("origin", "LHR"),
+        "destination": r.get("destination", "JFK"),
+        "depart_date": r.get("depart_date", "2026-06-15"),
+        "return_date": r.get("return_date", "2026-06-18"),
+        "business_reason": r.get("business_reason", "Q3 client review"),
+    }
+    created_at, sla = _now_with_jitter()
+    return Workflow(
+        id=workflow_id,
+        type="travel-preapproval",
+        current_phase="Employee Lookup",
+        created_at=created_at,
+        sla_due_at=sla,
+        jurisdiction="London-WPP",
+        agency="WPP",
+        payload={"trip": trip, "scenario": r.get("scenario")},
+    )
+
+
+def build_fleet_vendor_kyc_workflow(
+    workflow_id: str, record: dict | None = None,
+) -> Workflow:
+    """Vendor KYC workflow record. `record` is one vendor from
+    data/synthetic/vendor-kyc/vendors.json when seeded."""
+    r = record or {}
+    vendor = {
+        "name": r.get("vendor_name", f"Acme {workflow_id}"),
+        "country_of_incorporation": r.get("country_of_incorporation", "GB"),
+        "proposing_agency": r.get("proposing_agency", "Mindshare"),
+    }
+    created_at, sla = _now_with_jitter()
+    return Workflow(
+        id=workflow_id,
+        type="vendor-kyc",
+        current_phase="Vendor Intake",
+        created_at=created_at,
+        sla_due_at=sla,
+        jurisdiction=f"{vendor['country_of_incorporation']}-WPP",
+        agency=vendor["proposing_agency"],
+        payload={"vendor": vendor, "scenario": r.get("scenario")},
+    )
+
+
+def build_fleet_employee_onboarding_workflow(
+    workflow_id: str, record: dict | None = None,
+) -> Workflow:
+    """Employee onboarding workflow record. `record` is one joiner from
+    data/synthetic/employee-onboarding/joiners.json when seeded."""
+    r = record or {}
+    joiner = {
+        "employee_id": r.get("employee_id") or f"EMP-{random.randint(1000, 9999):04d}",
+        "department": r.get("department", "Engineering"),
+        "buddy_id": r.get("buddy_id") or f"EMP-{random.randint(1000, 9999):04d}",
+        "start_date": r.get("start_date", "2026-06-15"),
+    }
+    created_at, sla = _now_with_jitter()
+    return Workflow(
+        id=workflow_id,
+        type="employee-onboarding",
+        current_phase="Employee Lookup",
+        created_at=created_at,
+        sla_due_at=sla,
+        jurisdiction="London-WPP",
+        agency="WPP",
+        payload={"joiner": joiner, "scenario": r.get("scenario")},
+    )
+
+
+def build_fleet_it_access_request_workflow(
+    workflow_id: str, record: dict | None = None,
+) -> Workflow:
+    """IT access request workflow record. `record` is one request from
+    data/synthetic/it-access-request/requests.json when seeded."""
+    r = record or {}
+    request = {
+        "employee_id": r.get("employee_id") or f"EMP-{random.randint(1000, 9999):04d}",
+        "department": r.get("department", "Finance"),
+        "requested_role_templates": r.get("requested_role_templates",
+                                          ["tmpl-fin-g3-01", "tmpl-fin-g3-02"]),
+        "business_justification": r.get(
+            "business_justification",
+            "Project rotation onto Q3 finance-analytics workstream.",
+        ),
+    }
+    created_at, sla = _now_with_jitter()
+    return Workflow(
+        id=workflow_id,
+        type="it-access-request",
+        current_phase="Employee Lookup",
+        created_at=created_at,
+        sla_due_at=sla,
+        jurisdiction="London-WPP",
+        agency="WPP",
+        payload={"request": request, "scenario": r.get("scenario")},
+    )
+
+
+def build_fleet_contract_renewal_workflow(
+    workflow_id: str, record: dict | None = None,
+) -> Workflow:
+    """Contract renewal workflow record. `record` is one contract from
+    data/synthetic/contract-renewal/contracts.json when seeded."""
+    r = record or {}
+    contract = {
+        "contract_id": r.get("contract_id") or f"CNT-{random.randint(1000, 9999):04d}",
+        "vendor_name": r.get("vendor_name", "Globex Industries"),
+        "current_annual_value": r.get("current_annual_value", 100000),
+        "proposed_annual_value": r.get("proposed_annual_value", 110000),
+    }
+    created_at, sla = _now_with_jitter()
+    return Workflow(
+        id=workflow_id,
+        type="contract-renewal",
+        current_phase="Contract Lookup",
+        created_at=created_at,
+        sla_due_at=sla,
+        jurisdiction="London-WPP",
+        agency="WPP",
+        payload={"contract": contract, "scenario": r.get("scenario")},
+    )
+
+
+def build_fleet_perf_review_workflow(
+    workflow_id: str, record: dict | None = None,
+) -> Workflow:
+    """Performance review workflow record. `record` is one reviewee from
+    data/synthetic/perf-review/reviewees.json when seeded."""
+    r = record or {}
+    review = {
+        "employee_id": r.get("employee_id") or f"EMP-{random.randint(1000, 9999):04d}",
+        "cycle": r.get("cycle", "2026-H1"),
+        "prior_rating": r.get("prior_rating", "meets"),
+    }
+    created_at, sla = _now_with_jitter()
+    return Workflow(
+        id=workflow_id,
+        type="perf-review",
+        current_phase="Employee Lookup",
+        created_at=created_at,
+        sla_due_at=sla,
+        jurisdiction="London-WPP",
+        agency="WPP",
+        payload={"review": review, "scenario": r.get("scenario")},
+    )

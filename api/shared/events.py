@@ -3,6 +3,12 @@ from __future__ import annotations
 from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
+# Documentation-only catalogue of canonical event types. Per Phase 4 of
+# feature-fleet-domain-substrate-1, FleetEvent.type is plain `str` so
+# per-domain wake hints declared in api/shared/domains.py (e.g.
+# `vendor.kyc.high_risk`) can flow through the bus without each domain
+# editing this file. Triage + WAKE_TYPES still gate which events wake
+# the FM.
 FleetEventType = Literal[
     "workflow.started",
     "workflow.phase.started",
@@ -10,6 +16,7 @@ FleetEventType = Literal[
     "workflow.phase.failed",
     "workflow.exception.detected",
     "workflow.hitl.requested",
+    "workflow.hitl.escalated",
     "workflow.sla.breach_imminent",
     "workflow.policy.violation",
     "workflow.resolved",
@@ -54,14 +61,19 @@ FleetEventType = Literal[
 class FleetEvent(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    type: FleetEventType
+    # Was a Literal[FleetEventType] union; widened to str so per-domain
+    # wake-hint events declared in api.shared.domains can flow through
+    # without editing this file. The FleetEventType literal above stays
+    # as the canonical catalogue for documentation + WAKE_TYPES membership.
+    type: str
     workflow_id: str | None = None
     # All other fields permitted via extra="allow"
 
 
-WAKE_TYPES: frozenset[FleetEventType] = frozenset({
+WAKE_TYPES: frozenset[str] = frozenset({
     "workflow.exception.detected",
     "workflow.hitl.requested",
+    "workflow.hitl.escalated",
     "workflow.sla.breach_imminent",
     "workflow.policy.violation",
     "fleet.anomaly.detected",

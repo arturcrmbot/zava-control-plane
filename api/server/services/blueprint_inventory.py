@@ -40,187 +40,110 @@ MCP_TOOLS_DIR = REPO_ROOT / "api" / "server" / "mcp_tools"
 
 
 # --------------------------------------------------------------------------
-# Domain manifest. Single source of truth.
+# Domain manifest.
+#
+# Phase 1 of feature-fleet-domain-substrate-1: name/status/workflow_type/
+# skills are sourced from api.shared.domains.DOMAINS so the registry
+# remains the single source of truth. phase_aliases (a UI concern: which
+# skill orbits which phase ring on the mind-map) stays local because it
+# encodes a visual layout, not an integration fact. Aspirational entries
+# (Procurement / Legal / IT) keep their hand-authored shape.
 # --------------------------------------------------------------------------
-DOMAINS: list[dict[str, Any]] = [
-    {
-        "name": "Finance Compliance",
-        "status": "live",
-        "workflow_type": "expense-claim",
-        "skills": [
-            "field-extractor",
-            "line-item-extractor",
-            "rag-classifier",
-            "receipt-validator",
-            "escalation-advisor",
-            "notification-composer",
-            "arbitration",
-            "anomaly-flagger",
-            "exception-classifier",
-            "resolution-recommender",
-            "root-cause-explainer",
-            "audit-summariser",
-            "use-document-intelligence",
-        ],
-        "phase_aliases": {
-            "field-extractor": "Intake",
-            "line-item-extractor": "Intake",
-            "rag-classifier": "Classify",
-            "receipt-validator": "Receipt",
-            "escalation-advisor": "Route",
-            "notification-composer": "Notify",
-            "arbitration": "Arbitrate",
-            "audit-summariser": "Audit",
-        },
+
+# UI phase-orbit aliases per workflow_type. Skills not listed here appear in
+# the orbit without a phase label.
+_PHASE_ALIASES: dict[str, dict[str, str]] = {
+    "expense-claim": {
+        "field-extractor": "Intake",
+        "line-item-extractor": "Intake",
+        "rag-classifier": "Classify",
+        "receipt-validator": "Receipt",
+        "escalation-advisor": "Route",
+        "notification-composer": "Notify",
+        "arbitration": "Arbitrate",
+        "audit-summariser": "Audit",
     },
-    {
-        "name": "Hiring",
-        "status": "live",
-        "workflow_type": "hiring",
-        "skills": [
-            "budget-checker",
-            "jd-drafter",
-            "sourcing-orchestrator",
-            "cv-crystalliser",
-            "auto-shortlister",
-            "voice-screener",
-            "interview-recommender",
-            "interview-coordinator",
-            "jurisdiction-router",
-            "betrvg-checker",
-            "offer-personaliser",
-            "exception-classifier",
-            "use-document-intelligence",
-        ],
-        "phase_aliases": {
-            "budget-checker": "Budget",
-            "jd-drafter": "Job Design",
-            "sourcing-orchestrator": "Sourcing",
-            "cv-crystalliser": "Triage",
-            "auto-shortlister": "Screening",
-            "voice-screener": "Voice",
-            "interview-recommender": "Interview",
-            "interview-coordinator": "Interview",
-            "jurisdiction-router": "Compliance",
-            "betrvg-checker": "Compliance",
-            "offer-personaliser": "Offer",
-        },
+    "hiring": {
+        "budget-checker": "Budget",
+        "jd-drafter": "Job Design",
+        "sourcing-orchestrator": "Sourcing",
+        "cv-crystalliser": "Triage",
+        "auto-shortlister": "Screening",
+        "voice-screener": "Voice",
+        "interview-recommender": "Interview",
+        "interview-coordinator": "Interview",
+        "jurisdiction-router": "Compliance",
+        "betrvg-checker": "Compliance",
+        "offer-personaliser": "Offer",
     },
-    {
+    "travel-preapproval": {
+        "fleet-travel-preapproval-policy-fit-checker": "Policy fit",
+    },
+    "employee-onboarding": {
+        "fleet-employee-onboarding-access-drafter": "Access drafter",
+        "fleet-employee-onboarding-induction-planner": "Induction planner",
+    },
+    "vendor-kyc": {
+        "vendor_intake": "Vendor Intake",
+        "kyc_diligence": "KYC Diligence",
+        "ubo_resolver": "UBO Resolver",
+        "finance_signoff": "Finance Signoff",
+    },
+    "it-access-request": {
+        "fleet-it-access-request-rbac-resolver": "RBAC resolver",
+        "fleet-it-access-request-access-risk-assessor": "Access risk assessor",
+    },
+    "contract-renewal": {
+        "fleet-contract-renewal-market-benchmarker": "Market benchmarker",
+        "fleet-contract-renewal-renewal-terms-drafter": "Renewal terms drafter",
+    },
+    "perf-review": {
+        "fleet-perf-review-peer-feedback-aggregator": "Peer feedback aggregator",
+        "fleet-perf-review-calibration-drafter": "Calibration drafter",
+    },
+}
+
+
+def _build_domain_manifest() -> list[dict[str, Any]]:
+    """Compose the page's domain list from the registry + UI aliases.
+
+    Live domains are derived from api.shared.domains.DOMAINS so a new
+    compose-domain graduation auto-appears here. Aspirational domains
+    (no workflow_type yet) and the legacy 'Onboarding' surface stay as
+    hand-authored entries below.
+    """
+    from api.shared import domains as _registry
+    out: list[dict[str, Any]] = []
+    for d in _registry.DOMAINS.values():
+        out.append({
+            "name": d.display_name,
+            "status": "live",
+            "workflow_type": d.workflow_type,
+            "skills": list(d.skills),
+            "phase_aliases": _PHASE_ALIASES.get(d.workflow_type, {}),
+        })
+    # Legacy "Onboarding" surface — still rendered as a separate ring on
+    # the mind-map even though it shares the hiring orchestrator.
+    out.append({
         "name": "Onboarding",
         "status": "live",
         "workflow_type": "onboarding",
-        "skills": [
-            "onboarding-buddy",
-        ],
-        "phase_aliases": {
-            "onboarding-buddy": "Onboarding",
-        },
-    },
-    {
-        # First domain composed by compose-domain (sandbox 20260503-104041,
-        # graduated commit 7146290d). Lives in api/functions/workflows/
-        # fleet_travel_preapproval.py + per-phase graphs; the runtime emits
-        # workflow_type="travel-preapproval" via the simulator entry.
-        "name": "Travel pre-approval",
-        "status": "live",
-        "workflow_type": "travel-preapproval",
-        "skills": [
-            "fleet-travel-preapproval-policy-fit-checker",
-        ],
-        "phase_aliases": {
-            "fleet-travel-preapproval-policy-fit-checker": "Policy fit",
-        },
-    },
-    {
-        "name": "Employee onboarding",
-        "status": "live",
-        "workflow_type": "employee-onboarding",
-        "skills": [
-            "fleet-employee-onboarding-access-drafter",
-            "fleet-employee-onboarding-induction-planner",
-        ],
-        "phase_aliases": {
-            "fleet-employee-onboarding-access-drafter": "Access drafter",
-            "fleet-employee-onboarding-induction-planner": "Induction planner",
-        },
-    },
-    {
-        "name": "Vendor onboarding & KYC",
-        "status": "live",
-        "workflow_type": "vendor-kyc",
-        "skills": [
-            "fleet-vendor-kyc-kyc-diligence-checker",
-            "fleet-vendor-kyc-ubo-resolver",
-        ],
-        "phase_aliases": {
-            "vendor_intake": "Vendor Intake",
-            "kyc_diligence": "KYC Diligence",
-            "ubo_resolver": "UBO Resolver",
-            "finance_signoff": "Finance Signoff",
-        },
-    },
-    {
-        "name": "IT access request",
-        "status": "live",
-        "workflow_type": "it-access-request",
-        "skills": [
-            "fleet-it-access-request-rbac-resolver",
-            "fleet-it-access-request-access-risk-assessor",
-        ],
-        "phase_aliases": {
-            "fleet-it-access-request-rbac-resolver": "RBAC resolver",
-            "fleet-it-access-request-access-risk-assessor": "Access risk assessor",
-        },
-    },
-    {
-        "name": "Contract renewal",
-        "status": "live",
-        "workflow_type": "contract-renewal",
-        "skills": [
-            "fleet-contract-renewal-market-benchmarker",
-            "fleet-contract-renewal-renewal-terms-drafter",
-        ],
-        "phase_aliases": {
-            "fleet-contract-renewal-market-benchmarker": "Market benchmarker",
-            "fleet-contract-renewal-renewal-terms-drafter": "Renewal terms drafter",
-        },
-    },
-    {
-        "name": "Performance review",
-        "status": "live",
-        "workflow_type": "perf-review",
-        "skills": [
-            "fleet-perf-review-peer-feedback-aggregator",
-            "fleet-perf-review-calibration-drafter",
-        ],
-        "phase_aliases": {
-            "fleet-perf-review-peer-feedback-aggregator": "Peer feedback aggregator",
-            "fleet-perf-review-calibration-drafter": "Calibration drafter",
-        },
-    },
-    {
-        "name": "Procurement",
-        "status": "aspirational",
-        "workflow_type": None,
-        "skills": [],
-        "phase_aliases": {},
-    },
-    {
-        "name": "Legal",
-        "status": "aspirational",
-        "workflow_type": None,
-        "skills": [],
-        "phase_aliases": {},
-    },
-    {
-        "name": "IT",
-        "status": "aspirational",
-        "workflow_type": None,
-        "skills": [],
-        "phase_aliases": {},
-    },
-]
+        "skills": ["onboarding-buddy"],
+        "phase_aliases": {"onboarding-buddy": "Onboarding"},
+    })
+    # Aspirational rings (designed, not shipped).
+    for label in ("Procurement", "Legal", "IT"):
+        out.append({
+            "name": label,
+            "status": "aspirational",
+            "workflow_type": None,
+            "skills": [],
+            "phase_aliases": {},
+        })
+    return out
+
+
+DOMAINS: list[dict[str, Any]] = _build_domain_manifest()
 
 # --------------------------------------------------------------------------
 # Aspirational meta-skills — designed but not yet shipped.

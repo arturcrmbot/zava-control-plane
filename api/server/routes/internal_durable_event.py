@@ -7,6 +7,7 @@ from api.server.state import app_state
 from api.server.services.exception_factory import (
     compose_hitl_exception, compose_validator_exception
 )
+from api.server.services import pending_gates
 from api.shared.events import FleetEvent
 from api.shared.types import Phase, OtelSpan, ActionLedgerEntry, McpCall
 
@@ -289,6 +290,14 @@ async def receive_durable_event(body: DurableEventBody):
         _ledger(wid, kind="agent", actor_id="orchestrator",
                 action="suspended",
                 details={"reason": reason, "wait_kind": wait_kind})
+        # Cache the active gate so the operator-resolve route knows which
+        # external_event to raise on the orchestration when this exception
+        # is closed. Cleared on resumed / workflow.completed below.
+        pending_gates.record(
+            wid,
+            phase=body.payload.get("phase"),
+            external_event=body.payload.get("external_event"),
+        )
         w = app_state.store.get_workflow(wid)
         if w:
             w.status = "awaiting_hitl"
@@ -325,6 +334,9 @@ async def receive_durable_event(body: DurableEventBody):
     elif body.kind == "resumed":
         _ledger(wid, kind="agent", actor_id="orchestrator",
                 action="resumed", details={})
+        # Gate is closed; drop its cache entry so a stale pending row
+        # doesn't bleed into a later suspend on a different gate.
+        pending_gates.clear(wid)
         w = app_state.store.get_workflow(wid)
         if w:
             w.status = "in_progress"
@@ -412,6 +424,7 @@ async def receive_durable_event(body: DurableEventBody):
         _emit("workflow.resolved", wid, resolution="completed")
         # Drop the workflow_type cache entry; the workflow is done.
         _workflow_types.pop(wid, None)
+        pending_gates.clear(wid)
 
     elif body.kind == "log.action":
         # Ledger-only event from the UI (Fork/Rollback illustrative stubs).
@@ -434,5 +447,6 @@ async def receive_durable_event(body: DurableEventBody):
             w.status = "failed"
             w.current_phase = "Approval"
         _auto_resolve_open(wid, "auto-resolved:rejected")
+        pending_gates.clear(wid)
 
     return {"received": True}

@@ -4,31 +4,22 @@ from fastapi import APIRouter, HTTPException
 from api.server.state import app_state
 from api.server.services import economics, exception_narrative
 from api.shared.types import Workflow
+from api.shared import domains as _registry
 
 router = APIRouter(prefix="/api/workflows")
 
 
-# Fleet/composed domains that the simulator spawns into Durable but does not
-# currently upsert into app_state.store (state lives only in Durable + the
-# FleetEvent stream). Mapping lets the detail endpoint synthesize a minimal
-# Workflow record so the UI can still render a useful page.
-_FLEET_PREFIX_TO_TYPE: dict[str, str] = {
-    "TRV":  "travel-preapproval",
-    "VKY":  "vendor-kyc",
-    "ONB":  "employee-onboarding",
-    "ITAR": "it-access-request",
-    "CRN":  "contract-renewal",
-    "PRR":  "perf-review",
-}
-
-
 def _synthesize_workflow(workflow_id: str) -> Workflow | None:
-    """Build a minimal Workflow stub for a fleet/composed domain workflow that
-    isn't in the store. Used by the detail endpoint so clicking through from
-    the exception queue or dashboard shows a usable page instead of 404."""
-    prefix = workflow_id.split("-", 1)[0]
-    wf_type = _FLEET_PREFIX_TO_TYPE.get(prefix)
-    if wf_type is None:
+    """Last-resort stub for a workflow that isn't in the store.
+
+    Phase 2 of feature-fleet-domain-substrate-1 made every spawner upsert
+    into app_state.store, so this path should rarely fire. Kept as a
+    defensive fallback for workflows that arrive via webhook before the
+    spawn path runs (e.g. recorded blueprint replays). Resolves the
+    workflow_type via the domain registry by workflow_id prefix.
+    """
+    domain = _registry.by_prefix(workflow_id)
+    if domain is None:
         return None
     excs = [
         e for e in app_state.store.list_exceptions(include_resolved=True)
@@ -38,11 +29,11 @@ def _synthesize_workflow(workflow_id: str) -> Workflow | None:
     created_at = min((e.created_at for e in excs), default=time.time())
     return Workflow(
         id=workflow_id,
-        type=wf_type,  # type: ignore[arg-type]
+        type=domain.workflow_type,
         status="awaiting_hitl" if open_exc else "in_progress",
         current_phase="Intake",
         created_at=created_at,
-        sla_due_at=created_at + 7 * 86400,  # nominal 7d SLA
+        sla_due_at=created_at + 7 * 86400,
         jurisdiction="London-WPP",
         agency="WPP",
         active_exception_id=open_exc.id if open_exc else None,
