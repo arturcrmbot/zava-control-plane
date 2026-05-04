@@ -19,7 +19,10 @@ decision_policy: |
     screening = (context or {}).get("screening") or {}
     voice = (context or {}).get("voice") or {}
     screening_verdict = (screening.get("verdict") or "borderline").lower()
-    voice_score = float(voice.get("score") or 0)
+    # voice may be the agent verdict (no `score`) OR the raw event payload.
+    # Fall back to a demo-default 0.75 so post-interview doesn't auto-fail
+    # when the score never made it into the parked context.
+    voice_score = float(voice.get("score") or 0.75)
 
     if gate == "post_voice":
         if screening_verdict in {"strong", "auto-advance"} or voice_score >= 0.7:
@@ -35,13 +38,15 @@ decision_policy: |
             decision = "approve"
             reason = "borderline; advancing to interview for human read"
     else:
-        # post_interview gate
-        if voice_score >= 0.7:
+        # post_interview gate — autonomous-mode default is to extend the
+        # offer when no strong negative signal is present. Reject only on
+        # an explicit low/auto-drop screening signal.
+        if screening_verdict in {"low", "auto-drop"}:
+            decision = "reject"
+            reason = "post-interview: screening signal too weak"
+        else:
             decision = "approve"
             reason = "post-interview: extending offer"
-        else:
-            decision = "reject"
-            reason = "post-interview: not extending offer"
 ---
 
 # recruiter

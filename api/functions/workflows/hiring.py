@@ -278,7 +278,9 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
     invite_payload = invite_event.result if hasattr(invite_event, "result") else {}
     invite_decision = (invite_payload.get("decision") or "").lower() if isinstance(invite_payload, dict) else ""
 
-    if invite_decision != "invite":
+    # Accept both the orchestrator-native vocabulary ("invite") and the
+    # canonical persona verdict ("approve") that persona_responder emits.
+    if invite_decision not in {"invite", "approve"}:
         # Recruiter rejected at gate 1 — auto-reject email + close workflow.
         # Pass name/email through the payload because the worker process's
         # in-memory candidate store is independent of FastAPI's.
@@ -418,7 +420,7 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
     post_payload = decision_event.result if hasattr(decision_event, "result") else {}
     post_decision = (post_payload.get("decision") or "").lower() if isinstance(post_payload, dict) else ""
 
-    if post_decision != "offer":
+    if post_decision not in {"offer", "approve"}:
         # Recruiter rejected at gate 3 — auto-reject email + close workflow.
         _cand_dict = enriched.get("candidate") or {}
         yield context.call_activity("send_rejection_email_activity_trigger", {

@@ -1,10 +1,24 @@
-import { PHASE_ORDER, EXPENSE_PHASE_ORDER, HIRING_PHASE_ORDER, type Phase, type PhaseName, type Workflow } from "@shared/types";
+import {
+  PHASE_ORDER, EXPENSE_PHASE_ORDER, HIRING_PHASE_ORDER,
+  TRAVEL_PREAPPROVAL_PHASE_ORDER, VENDOR_KYC_PHASE_ORDER,
+  EMPLOYEE_ONBOARDING_PHASE_ORDER, IT_ACCESS_REQUEST_PHASE_ORDER,
+  CONTRACT_RENEWAL_PHASE_ORDER, PERF_REVIEW_PHASE_ORDER,
+  type Phase, type PhaseName, type Workflow,
+} from "@shared/types";
 import { Check, Loader2, Ban, CircleDashed } from "lucide-react";
 
 function phaseOrderFor(type: Workflow["type"] | undefined): PhaseName[] {
-  if (type === "expense-claim") return EXPENSE_PHASE_ORDER;
-  if (type === "hiring") return HIRING_PHASE_ORDER;
-  return PHASE_ORDER;
+  switch (type) {
+    case "expense-claim":         return EXPENSE_PHASE_ORDER;
+    case "hiring":                return HIRING_PHASE_ORDER;
+    case "travel-preapproval":    return TRAVEL_PREAPPROVAL_PHASE_ORDER;
+    case "vendor-kyc":            return VENDOR_KYC_PHASE_ORDER;
+    case "employee-onboarding":   return EMPLOYEE_ONBOARDING_PHASE_ORDER;
+    case "it-access-request":     return IT_ACCESS_REQUEST_PHASE_ORDER;
+    case "contract-renewal":      return CONTRACT_RENEWAL_PHASE_ORDER;
+    case "perf-review":           return PERF_REVIEW_PHASE_ORDER;
+    default:                      return PHASE_ORDER;     // legacy invoice-p2p
+  }
 }
 
 type Status = "completed" | "in_progress" | "blocked" | "pending";

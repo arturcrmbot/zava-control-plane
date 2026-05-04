@@ -445,7 +445,11 @@ async def receive_durable_event(body: DurableEventBody):
         w = app_state.store.get_workflow(wid)
         if w:
             w.status = "failed"
-            w.current_phase = "Approval"
+            # NOTE: legacy invoice-p2p code used to overwrite current_phase
+            # to "Approval" here; that was a P2P-specific assumption that's
+            # now wrong for hiring (Interview/Offer rejection) and the six
+            # fleet-* domains (each has its own gate names). Keep
+            # current_phase as whatever it was when the rejection landed.
         _auto_resolve_open(wid, "auto-resolved:rejected")
         pending_gates.clear(wid)
 

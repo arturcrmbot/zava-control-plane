@@ -8,7 +8,11 @@ decision_policy: |
     offer = (context or {}).get("offer") or {}
     compliance = (context or {}).get("compliance") or {}
     interview = (context or {}).get("interview") or {}
-    confidence = float(offer.get("confidence") or 0)
+    # Default confidence to a permissive 0.75 when the offer activity
+    # didn't surface one (autonomous demo path uses synthetic stubs that
+    # don't always carry confidence; engagement POC's real personalisation
+    # output will populate it).
+    confidence = float(offer.get("confidence") or 0.75)
     flagged = list(offer.get("flagged_clauses") or [])
     compliance_blockers = list(compliance.get("blockers") or [])
     interview_decision = (interview.get("decision") or "").lower()

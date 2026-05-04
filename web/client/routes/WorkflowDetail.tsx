@@ -144,7 +144,7 @@ export default function WorkflowDetail() {
                   </a>
                 );
               }
-              if (w.type === "expense_claim") {
+              if (w.type === "expense-claim") {
                 return (
                   <a href={`/reviewer-queue?workflow=${encodeURIComponent(w.id)}`}
                      className="text-blue-600 hover:underline">

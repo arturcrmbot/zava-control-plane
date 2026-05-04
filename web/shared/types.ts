@@ -8,7 +8,16 @@ export type PhaseName =
   | "Classify" | "Validate Receipt" | "Route" | "Notify" | "Arbitrate" | "Audit"
   // POC2 Hiring (Talent Lifecycle)
   | "Budget" | "Job Design" | "Sourcing" | "Triage" | "Screening"
-  | "Voice" | "Interview" | "Compliance" | "Offer" | "Onboarding";
+  | "Voice" | "Interview" | "Compliance" | "Offer" | "Onboarding"
+  // Fleet/composed domains (compose-domain v3 - generated phase names)
+  | "Employee Lookup" | "Policy Fit Check" | "Manager Approval"
+  | "Vendor Intake" | "KYC Diligence" | "UBO Resolver" | "Finance Signoff"
+  | "Access Drafter" | "IT Admin Approval" | "Induction Planner"
+  | "RBAC Resolver" | "Risk Assessor" | "Line Manager Approval"
+  | "Contract Lookup" | "Market Benchmarker" | "Renewal Terms Drafter"
+  | "Contract Owner Signoff"
+  | "Peer Feedback Aggregator" | "Calibration Drafter"
+  | "HR Calibration" | "Line Manager Delivery";
 
 export const PHASE_ORDER: PhaseName[] = [
   "Intake", "Validation", "Routing", "Approval", "Payment", "Reconciliation"
@@ -21,6 +30,33 @@ export const EXPENSE_PHASE_ORDER: PhaseName[] = [
 export const HIRING_PHASE_ORDER: PhaseName[] = [
   "Budget", "Job Design", "Sourcing", "Triage", "Screening",
   "Voice", "Interview", "Compliance", "Offer", "Onboarding"
+];
+
+// Fleet/composed domains (per api/shared/domains.py registry).
+// HITL gate names use Title Case here to match what the orchestrator
+// emits via step.started; the orchestrator stamps snake_case `phase` on
+// suspended payloads (see fleet_*_orchestration generators) but the
+// store's current_phase tracks step.started's name.
+export const TRAVEL_PREAPPROVAL_PHASE_ORDER: PhaseName[] = [
+  "Employee Lookup", "Policy Fit Check", "Manager Approval",
+];
+export const VENDOR_KYC_PHASE_ORDER: PhaseName[] = [
+  "Vendor Intake", "KYC Diligence", "UBO Resolver", "Finance Signoff",
+];
+export const EMPLOYEE_ONBOARDING_PHASE_ORDER: PhaseName[] = [
+  "Employee Lookup", "Access Drafter", "IT Admin Approval", "Induction Planner",
+];
+export const IT_ACCESS_REQUEST_PHASE_ORDER: PhaseName[] = [
+  "Employee Lookup", "RBAC Resolver", "Risk Assessor",
+  "Line Manager Approval", "IT Admin Approval",
+];
+export const CONTRACT_RENEWAL_PHASE_ORDER: PhaseName[] = [
+  "Contract Lookup", "Market Benchmarker", "Renewal Terms Drafter",
+  "Finance Signoff", "Contract Owner Signoff",
+];
+export const PERF_REVIEW_PHASE_ORDER: PhaseName[] = [
+  "Employee Lookup", "Peer Feedback Aggregator", "Calibration Drafter",
+  "HR Calibration", "Line Manager Delivery",
 ];
 
 export type WorkflowStatus =
@@ -88,7 +124,12 @@ export interface ActionLedgerEntry {
 
 export interface Workflow {
   id: string;
-  type: "invoice-p2p" | "expense-claim" | "hiring";
+  type:
+    | "invoice-p2p" | "expense-claim" | "hiring"
+    // Fleet/composed domains (compose-domain v3). Same shape as the rest;
+    // domain-specific inputs go in `payload`.
+    | "travel-preapproval" | "vendor-kyc" | "employee-onboarding"
+    | "it-access-request" | "contract-renewal" | "perf-review";
   status: WorkflowStatus;
   currentPhase: PhaseName;
   createdAt: number;
@@ -98,6 +139,8 @@ export interface Workflow {
   invoice?: InvoiceData;
   // Expense payload — set on type="expense-claim"
   claim?: ClaimData;
+  // Fleet/composed domains payload — set on the six fleet-* types.
+  payload?: Record<string, unknown>;
   verdict?: Verdict;
   jurisdiction: string;
   agency: string;
