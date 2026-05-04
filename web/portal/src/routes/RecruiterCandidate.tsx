@@ -11,8 +11,10 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   getCandidateDetail,
+  getCandidateEmails,
   type AgentReasoning,
   type CandidateDetail,
+  type CandidateEmail,
   type CrystalliserOutput,
 } from "../lib/api";
 import {
@@ -20,6 +22,9 @@ import {
   AwaitingBookingPanel,
   PostInterviewPanel,
 } from "../components/InterviewPanels";
+import PhaseProgress from "../components/PhaseProgress";
+import AgentReasoningTimeline from "../components/AgentReasoningTimeline";
+import CommunicationsPanel from "../components/CommunicationsPanel";
 
 const ROLE_LABELS: Record<string, string> = {
   "REQ-SDE-USA-DEMO": "Senior Data Engineer · USA",
@@ -68,12 +73,18 @@ function levelsFor(roleTitle: string | undefined | null): string[] {
 export default function RecruiterCandidate() {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<CandidateDetail | null>(null);
+  const [emails, setEmails] = useState<CandidateEmail[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   async function refresh() {
     if (!id) return;
     try {
-      setData(await getCandidateDetail(id));
+      const [detail, mails] = await Promise.all([
+        getCandidateDetail(id),
+        getCandidateEmails(id).catch(() => [] as CandidateEmail[]),
+      ]);
+      setData(detail);
+      setEmails(mails);
       setError(null);
     } catch (e) {
       setError(String(e));
@@ -152,6 +163,17 @@ export default function RecruiterCandidate() {
         </div>
       </div>
 
+      {/* Phase stepper — shows where the candidate is in the 7-step pipeline */}
+      <div className="panel">
+        <div className="panel-header">
+          <span>Pipeline progress</span>
+          <span className="text-xs font-normal text-slate-500">refreshes every 8s</span>
+        </div>
+        <div className="panel-body">
+          <PhaseProgress phase={w.phase ?? "apply"} />
+        </div>
+      </div>
+
       {/* Phase 7 sub-wait action panels */}
       {w.awaiting_reason === "awaiting_interview_invite" && (
         <InterviewInvitePanel
@@ -183,22 +205,29 @@ export default function RecruiterCandidate() {
         />
       )}
 
-      {/* What the AI learned */}
-      <div className="panel-elevated">
+      {/* CV summary — what the cv_crystalliser agent extracted */}
+      <div className="panel">
         <div className="panel-header">
-          <span>What we learned · cv_crystalliser</span>
+          <span>CV summary</span>
           {cv?.extraction_status === "failed" && (
             <span className="chip-danger">extraction failed</span>
           )}
-          {!latestRun && !profile._source && (
+          {!latestRun && !profile._source && cv?.extraction_status !== "failed" && (
             <span className="chip-info">awaiting LLM run</span>
           )}
-          {latestRun?.latency_ms != null && (
-            <span className="chip-info">{(latestRun.latency_ms / 1000).toFixed(1)}s · {latestRun.tool_calls?.length ?? 0} tool call(s)</span>
+          {verdict?.decision && (
+            <span className={`chip-${
+              verdict.decision === "shortlist" ? "success" :
+              verdict.decision === "drop" ? "danger" : "warning"
+            }`}>
+              verdict: {verdict.decision}
+              {typeof verdict.confidence === "number" && (
+                <> · {(verdict.confidence * 100).toFixed(0)}%</>
+              )}
+            </span>
           )}
         </div>
         <div className="panel-body grid grid-cols-1 sm:grid-cols-2 gap-5">
-          {/* Profile */}
           <div>
             <h3 className="text-xs uppercase tracking-wider text-slate-500 mb-2">Profile</h3>
             <dl className="text-sm space-y-1.5">
@@ -219,10 +248,12 @@ export default function RecruiterCandidate() {
                 </div>
               </>
             )}
+          </div>
 
+          <div>
             {Array.isArray(profile.work_history) && profile.work_history.length > 0 && (
               <>
-                <h3 className="text-xs uppercase tracking-wider text-slate-500 mt-4 mb-2">Recent work</h3>
+                <h3 className="text-xs uppercase tracking-wider text-slate-500 mb-2">Recent work</h3>
                 <div className="text-sm space-y-2">
                   {profile.work_history.slice(0, 3).map((r, i) => (
                     <div key={i}>
@@ -233,97 +264,30 @@ export default function RecruiterCandidate() {
                 </div>
               </>
             )}
-          </div>
-
-          {/* Real LLM reasoning trace */}
-          <div>
-            <h3 className="text-xs uppercase tracking-wider text-slate-500 mb-2">How the agent reasoned</h3>
-            {!latestRun ? (
-              <p className="text-sm text-slate-500 italic">No reasoning trace recorded yet — agent has not completed.</p>
-            ) : (
-              <div className="space-y-3">
-                {(latestRun.tool_calls ?? []).map((tc, i) => (
-                  <details key={i} className="border border-slate-200 rounded-lg bg-slate-50">
-                    <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-700 flex items-center justify-between">
-                      <span>
-                        <span className="phase-bubble phase-bubble-done !inline-flex !w-5 !h-5 !text-[10px] mr-2">{i + 1}</span>
-                        tool · <code className="text-indigo-700">{tc.name}</code>
-                      </span>
-                      <span className="text-slate-500">
-                        {tc.success === false ? <span className="text-red-600">failed</span> : "ok"}
-                        {tc.latency_ms != null && <> · {tc.latency_ms}ms</>}
-                      </span>
-                    </summary>
-                    <div className="px-3 pb-3 space-y-2">
-                      {tc.args && (
-                        <div>
-                          <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">args</div>
-                          <pre className="text-[11px] text-slate-700 bg-white border border-slate-200 rounded p-2 whitespace-pre-wrap break-all">{tc.args}</pre>
-                        </div>
-                      )}
-                      {tc.result && (
-                        <div>
-                          <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">result</div>
-                          <pre className="text-[11px] text-slate-700 bg-white border border-slate-200 rounded p-2 whitespace-pre-wrap break-all max-h-48 overflow-auto">{tc.result.length > 1200 ? tc.result.slice(0, 1200) + "…" : tc.result}</pre>
-                        </div>
-                      )}
-                    </div>
-                  </details>
-                ))}
-
-                {latestRun.response_text && (
-                  <details className="border border-slate-200 rounded-lg bg-white">
-                    <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-slate-700">
-                      final LLM response
-                      {latestRun.usage && (
-                        <span className="text-slate-500 ml-2">
-                          · in {latestRun.usage.input_tokens ?? "?"} / out {latestRun.usage.output_tokens ?? "?"} tok
-                        </span>
-                      )}
-                    </summary>
-                    <pre className="px-3 pb-3 text-[11px] text-slate-700 whitespace-pre-wrap break-all max-h-64 overflow-auto">{latestRun.response_text}</pre>
-                  </details>
-                )}
-
-                {cvReasoning.length > 1 && (
-                  <p className="text-[11px] text-slate-500">{cvReasoning.length - 1} earlier run(s) — see workflow trace.</p>
-                )}
-              </div>
-            )}
-
-            {cv?.extraction_status === "failed" && (
+            {verdict?.rationale && (
               <>
-                <h3 className="text-xs uppercase tracking-wider text-slate-500 mt-4 mb-2">Verdict</h3>
-                <div className="rounded-lg border p-3 bg-red-50 border-red-200">
-                  <div className="text-sm"><strong>Extraction failed — no verdict</strong></div>
-                  <p className="text-xs text-slate-700 mt-1">
-                    {(cv as { extraction_error?: string }).extraction_error
-                      ?? "The agent did not return a profile. Inspect the tool-call result above."}
-                  </p>
-                </div>
+                <h3 className="text-xs uppercase tracking-wider text-slate-500 mt-4 mb-2">Verdict rationale</h3>
+                <p className="text-sm text-slate-700">{verdict.rationale}</p>
               </>
             )}
-            {verdict?.decision && (
+            {cv?.extraction_status === "failed" && (
               <>
-                <h3 className="text-xs uppercase tracking-wider text-slate-500 mt-4 mb-2">Verdict</h3>
-                <div className={`rounded-lg border p-3 ${
-                  verdict.decision === "shortlist" ? "bg-emerald-50 border-emerald-200" :
-                  verdict.decision === "drop" ? "bg-red-50 border-red-200" :
-                  "bg-amber-50 border-amber-200"
-                }`}>
-                  <div className="text-sm">
-                    <strong className="capitalize">{verdict.decision}</strong>
-                    {typeof verdict.confidence === "number" && (
-                      <span className="text-slate-500 ml-2 text-xs">confidence {(verdict.confidence * 100).toFixed(0)}%</span>
-                    )}
-                  </div>
-                  {verdict.rationale && <p className="text-xs text-slate-700 mt-1">{verdict.rationale}</p>}
-                </div>
+                <h3 className="text-xs uppercase tracking-wider text-slate-500 mt-4 mb-2">Extraction error</h3>
+                <p className="text-xs text-slate-700">
+                  {(cv as { extraction_error?: string }).extraction_error
+                    ?? "The agent did not return a profile."}
+                </p>
               </>
             )}
           </div>
         </div>
       </div>
+
+      {/* Per-agent reasoning timeline — every agent run, not just CV */}
+      <AgentReasoningTimeline runs={data.agent_reasoning ?? []} />
+
+      {/* Communications — every email sent to the candidate */}
+      <CommunicationsPanel emails={emails} />
 
       {/* Voice transcript */}
       {transcript.length > 0 && (

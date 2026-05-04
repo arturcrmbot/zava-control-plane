@@ -146,6 +146,7 @@ def make_handler(app_state) -> Callable[[FleetEvent], None]:
                 to=candidate.get("email") or "unknown@example.com",
                 subject=subject,
                 html_body=html,
+                candidate_id=candidate_id,
             )
         except EmailSendError as exc:  # pragma: no cover — surfaces in logs
             print(f"[portal] shortlist email send failed: {exc}")
@@ -195,6 +196,7 @@ async def _spawn_hire_orchestration(app_state, *, candidate_id: str, workflow_id
                 to=candidate.get("email") or "unknown@example.com",
                 subject=subject,
                 html_body=html,
+                candidate_id=candidate_id,
             )
         except EmailSendError as exc:  # pragma: no cover
             print(f"[portal] application-received email send failed: {exc}")
@@ -309,6 +311,7 @@ def make_offer_hitl_handler(app_state) -> Callable[[FleetEvent], None]:
                 to=candidate.get("email") or "unknown@example.com",
                 subject="Your offer is ready",
                 html_body=html,
+                candidate_id=candidate_id,
             )
         except EmailSendError as exc:  # pragma: no cover
             print(f"[portal] offer email send failed: {exc}")

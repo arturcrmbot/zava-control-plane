@@ -317,3 +317,17 @@ async def admin_candidate_detail(candidate_id: str):
             for p in (getattr(wf, "phase_events", None) or [])
         ],
     }
+
+
+@router.get("/admin/candidate/{candidate_id}/emails")
+async def admin_candidate_emails(candidate_id: str):
+    """List every email persisted for this candidate (newest-first).
+
+    Reads from the email outbox directory (sidecar JSON written by
+    EmailSender.send when candidate_id is supplied). Emails sent before
+    the metadata sidecar was added are not surfaced.
+    """
+    candidate = app_state.store.get_candidate(candidate_id)
+    if candidate is None:
+        raise HTTPException(404, "candidate not found")
+    return {"emails": app_state.email_sender.list_for_candidate(candidate_id)}

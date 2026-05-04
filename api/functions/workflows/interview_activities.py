@@ -95,6 +95,7 @@ def send_book_interview_email_activity(payload: dict) -> dict:
             to=email or "unknown@example.com",
             subject=subject,
             html_body=html,
+            candidate_id=candidate_id,
         )
     except EmailSendError as exc:  # pragma: no cover
         return {"sent": False, "reason": str(exc)}
@@ -146,6 +147,7 @@ def send_rejection_email_activity(payload: dict) -> dict:
             to=email or "unknown@example.com",
             subject=subject,
             html_body=html,
+            candidate_id=candidate_id,
         )
     except EmailSendError as exc:  # pragma: no cover
         return {"sent": False, "reason": str(exc)}

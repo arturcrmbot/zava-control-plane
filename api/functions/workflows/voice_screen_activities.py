@@ -81,6 +81,7 @@ def send_screen_email_activity(payload: dict) -> dict:
             to=candidate.get("email") or "unknown@example.com",
             subject=subject,
             html_body=html,
+            candidate_id=candidate_id,
         )
     except EmailSendError as exc:  # pragma: no cover — surfaces in logs
         return {"sent": False, "reason": str(exc)}

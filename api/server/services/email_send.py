@@ -19,6 +19,7 @@ import base64
 import hashlib
 import hmac
 import json
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -104,10 +105,18 @@ class EmailSender:
         self.outbox_dir = Path(outbox_dir)
         self.outbox_dir.mkdir(parents=True, exist_ok=True)
 
-    def send(self, *, to: str, subject: str, html_body: str) -> str:
+    def send(
+        self,
+        *,
+        to: str,
+        subject: str,
+        html_body: str,
+        candidate_id: str | None = None,
+    ) -> str:
         if self.connection_string is None:
             message_id = f"local-{uuid.uuid4().hex}"
             self._write_outbox(message_id, html_body)
+            self._write_meta(message_id, to=to, subject=subject, candidate_id=candidate_id)
             return message_id
 
         endpoint, access_key = _parse_connection_string(self.connection_string)
@@ -159,8 +168,60 @@ class EmailSender:
 
         message_id = payload.get("id") or f"local-{uuid.uuid4().hex}"
         self._write_outbox(message_id, html_body)
+        self._write_meta(message_id, to=to, subject=subject, candidate_id=candidate_id)
         return message_id
 
     def _write_outbox(self, message_id: str, html_body: str) -> None:
         path = self.outbox_dir / f"{message_id}.html"
         path.write_text(html_body, encoding="utf-8")
+
+    def _write_meta(
+        self,
+        message_id: str,
+        *,
+        to: str,
+        subject: str,
+        candidate_id: str | None,
+    ) -> None:
+        # Sidecar JSON so the recruiter UI can list emails sent per candidate
+        # without parsing HTML. Best-effort — never raises.
+        try:
+            path = self.outbox_dir / f"{message_id}.json"
+            path.write_text(
+                json.dumps({
+                    "id": message_id,
+                    "to": to,
+                    "subject": subject,
+                    "candidate_id": candidate_id,
+                    "sent_at": time.time(),
+                }),
+                encoding="utf-8",
+            )
+        except Exception:  # pragma: no cover
+            pass
+
+    def list_for_candidate(self, candidate_id: str) -> list[dict[str, Any]]:
+        """Return metadata + html_body for every email persisted for this
+        candidate, newest-first. Skips legacy files without a sidecar JSON.
+        """
+        rows: list[dict[str, Any]] = []
+        if not self.outbox_dir.exists():
+            return rows
+        for meta_path in self.outbox_dir.glob("*.json"):
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if meta.get("candidate_id") != candidate_id:
+                continue
+            html_path = self.outbox_dir / f"{meta['id']}.html"
+            html_body = html_path.read_text(encoding="utf-8") if html_path.exists() else ""
+            rows.append({
+                "id": meta["id"],
+                "to": meta.get("to", ""),
+                "subject": meta.get("subject", ""),
+                "sent_at": meta.get("sent_at", 0),
+                "html_body": html_body,
+            })
+        rows.sort(key=lambda r: r.get("sent_at", 0), reverse=True)
+        return rows

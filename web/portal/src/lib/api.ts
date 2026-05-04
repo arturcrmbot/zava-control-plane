@@ -262,3 +262,23 @@ export async function postPostInterviewDecision(
   }
   if (!resp.ok) throw new Error(`post-interview-decision failed (${resp.status})`);
 }
+
+// ────────────────────────────────────────────────────────────────────
+// Recruiter — emails sent to a candidate
+
+export type CandidateEmail = {
+  id: string;
+  to: string;
+  subject: string;
+  sent_at: number;
+  html_body: string;
+};
+
+export async function getCandidateEmails(id: string): Promise<CandidateEmail[]> {
+  const resp = await fetch(
+    `/api/portal/admin/candidate/${encodeURIComponent(id)}/emails`,
+  );
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const body = (await resp.json()) as { emails?: CandidateEmail[] };
+  return Array.isArray(body.emails) ? body.emails : [];
+}

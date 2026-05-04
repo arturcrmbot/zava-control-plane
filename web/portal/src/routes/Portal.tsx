@@ -102,11 +102,17 @@ export default function Portal() {
     try {
       const resp = await fetch(`/api/portal/status/${encodeURIComponent(token)}`);
       if (!resp.ok) {
-        setError(
+        // 404 most commonly = stale link from a previous demo session
+        // (the in-memory token store was reset). 410 = link expired.
+        // Either way the candidate needs a fresh status link from the
+        // most recent application — guide them rather than show a code.
+        const message =
           resp.status === 410
             ? "This link has expired. Please request a new one from the recruiter team."
-            : `Status load failed (${resp.status})`,
-        );
+            : resp.status === 404
+            ? "This link is no longer active — most likely it's from an earlier session that has been reset. Open the latest 'Application received' email we sent you, or reply to it and we'll resend the link."
+            : `Status load failed (${resp.status}). Please try again in a moment.`;
+        setError(message);
         return;
       }
       const body = (await resp.json()) as StatusResponse;
@@ -129,12 +135,13 @@ export default function Portal() {
       <div className="max-w-2xl mx-auto p-6 sm:p-10">
         <div className="panel">
           <div className="panel-header">
-            <span><span className="status-dot status-dot-error"/> Unable to load your portal</span>
+            <span><span className="status-dot status-dot-error"/> Link no longer active</span>
           </div>
-          <div className="panel-body text-sm text-slate-700 space-y-2">
-            <p className="text-red-700">{error}</p>
+          <div className="panel-body text-sm text-slate-700 space-y-3">
+            <p>{error}</p>
             <p className="text-xs text-slate-500">
-              If this keeps happening, reply to your application email and we'll send a fresh link.
+              If you don't see the latest email, check spam or reply to any
+              previous message from us — we'll send a fresh link.
             </p>
           </div>
         </div>
