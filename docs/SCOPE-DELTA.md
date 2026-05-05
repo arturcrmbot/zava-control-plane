@@ -10,10 +10,20 @@ WPP can't tell which one we mean.
 | Where it runs | Single laptop, localhost only | Vendor-hosted Azure environment per WPP's RFP §9 |
 | Audience | GBB internal + reviewers + technical evaluators | WPP evaluators + AI CoE + Finance / HR sponsors |
 | Owner | This repo | A future engagement repo seeded from this code |
-| Data | Synthetic fixtures committed to `data/synthetic/` | WPP-supplied datasets (3,430 claims + ground-truth labels for POC1; HR sandbox + 200-CV synthetic gym for POC2) |
-| Status | Mid-build · target tag `v0.8-poc1-feature-complete` | Not started · begins at signed contract + kickoff |
+| Data | Synthetic fixtures committed to `data/synthetic/` (POC1 + POC2 + per-fleet-domain corpora) | WPP-supplied datasets (3,430 claims + ground-truth labels for POC1; HR sandbox + 200-CV synthetic gym for POC2) |
+| Scope reach | **Eight live domains** on a single substrate — POC1 expense + POC2 hiring + six fleet-* domains graduated by `compose-domain` (v1 then v3) and brought to first-class FM parity | The bid commits to POC1 and POC2; the six fleet-* domains demonstrate the substrate's *composition* claim that adding domain N+1 is a config change, not an integration project |
+| Status | Substrate-complete · 8 domains run unattended via the autonomous demo loop | Not started · begins at signed contract + kickoff |
 
 The lab build proves the **shape**. The engagement POC proves the shape **at WPP scale, on Azure, with WPP data, in front of WPP evaluators**.
+
+The lab build also carries a third claim the bid response does not need
+to make verbatim: that the substrate is **composable**, not just
+reusable — i.e. that the same Durable + MAF + GHCP + Fleet-Manager spine
+hosts radically different business processes (expense compliance, talent
+lifecycle, vendor KYC, IT access, performance review, contract renewal,
+employee onboarding, travel pre-approval) without per-domain plumbing.
+This is the conversation we want to have once the bid claims are
+accepted.
 
 ---
 
@@ -21,14 +31,15 @@ The lab build proves the **shape**. The engagement POC proves the shape **at WPP
 
 The platform layer is the load-bearing reuse. None of this changes when we move from laptop to engagement:
 
-- Three-tier architecture: Fleet Manager (long-lived FastAPI session) / `ExpenseClaimOrchestrator` (Durable Functions) / ephemeral agentic loops per phase
-- 7-phase per-claim flow + the validator-as-guardrail edge pattern
-- 12 skills with `allowed-tools` frontmatter; agent identity model (`finance-agent@wpp` + `fleet-manager-agent`)
-- 14 MCP tools with identical Pydantic schemas — **the MCP contract is the swap-in seam**
-- React Control Plane UI + SSC Reviewer Queue
+- Three-tier architecture: Fleet Manager (long-lived FastAPI session) / `<Domain>Orchestrator` (Durable Functions) / ephemeral agentic loops per phase
+- Per-domain phase flow + the validator-as-guardrail edge pattern
+- Skills with `allowed-tools` frontmatter; per-domain agent identity model (`finance-agent@wpp` for POC1, `hiring-agent@wpp` for POC2, `fleet-manager-agent` for the supervisor session)
+- MCP tools with identical Pydantic schemas — **the MCP contract is the swap-in seam**
+- React Control Plane UI + SSC Reviewer Queue + Candidate Portal
 - OTEL emission path, audit ledger shape, bulk HITL pattern, hooks for non-revocable sends
+- **The domain registry pattern** ([`api/shared/domains.py`](../api/shared/domains.py)) — every per-domain integration fact lives in one dataclass, every generic substrate layer (FM skill text, simulator spawners, resolve route, blueprint inventory, triage wake set) reads from it. Adding the ninth domain — engagement-POC or otherwise — is a registry entry plus a YAML brief through `compose-domain`, not a refactor.
 
-Same code runs on the laptop and on Azure. Backend implementations differ; agent code, skill prompts, and validator logic are unchanged.
+Same code runs on the laptop and on Azure. Backend implementations differ; agent code, skill prompts, validator logic, registry shape, and the composition meta-skill are unchanged.
 
 ---
 
@@ -56,13 +67,91 @@ Same code runs on the laptop and on Azure. Backend implementations differ; agent
 
 ### Lab build status against the 13 acceptance criteria
 
-(Snapshot of where this repo is — see [poc1-status.md](poc1-status.md) for live state. Last refreshed 2026-05-01.)
+(Snapshot of where this repo is — see [poc1-status.md](poc1-status.md) for live state. Last refreshed 2026-05-04.)
 
 - ✅ All 13 ACs demoable on the laptop. AC #1 fleet view · #2 exception-only · #3 bulk approval · #4 accuracy pipeline (Foundry-backed; rag-classifier prompt tuned 2026-05-01: 60% → 70% on 10-claim smoke, zero green→red false flags) · #5 receipt cross-validation (real DI) · #6 progressive enforcement · #7 autonomous learning · #8 SSC Reviewer queue · #9 multi-EMS Control Plane · #10 EMS extensibility narration · #11 region failure simulator · #12 immutable audit + reporting · #13 cost-per-task report
 
 **AC #4 — explicitly punted to engagement-POC scope.** Running the full 300-claim synthetic-corpus accuracy gate is not a useful number — the real metric is ≥95% on WPP's 3,430-line dataset (40% of POC1 score per the brief). The pipeline + prompt are demonstrably working; we'll run the corpus gate when WPP supplies their data after engagement kickoff.
 
 The engagement POC must hit all 13 live in front of WPP. The lab build is converging on demoable evidence for the platform claims; the engagement POC then exercises the same code against real systems and real data.
+
+---
+
+## Substrate-level work that landed since the bid was written
+
+The bid response (§10.1, §11, §B.4, §B.5) describes the engagement POC1
++ POC2 deliverables. The lab build has gone further than the bid
+commits to, in ways that **strengthen** the bid claims rather than
+extend them:
+
+- **Domain registry centralised.** Every per-domain fact (workflow_type,
+  prefix, orchestrator name, HITL gate → persona / external_event
+  mapping, operator surface, optional wake hints) lives in
+  [`api/shared/domains.py`](../api/shared/domains.py). Adding a domain
+  becomes a registry entry. Read by FM skill text, simulator spawners,
+  resolve route, blueprint inventory, triage.
+- **`Workflow.payload` generalised.** The per-domain field sprawl on
+  `Workflow` (`claim`, `invoice`, `metadata`) is replaced with a single
+  opaque `payload: dict`. POC1/POC2 reads keep working via back-compat
+  properties; all eight domains upsert into `StateStore` and surface in
+  `query_fleet`.
+- **Generalised resolve route.** Operator clicks on the exception queue
+  resolve the right Durable external event for any domain via a
+  `pending_gates` cache populated on every `suspended` event, with the
+  registry as cold-cache fallback. Zero per-domain branches.
+- **Fleet Manager domain-aware.** The FM session's skill text is
+  composed at boot from the static SKILL.md plus a templated
+  *"Domains under supervision"* block built from the registry; per-domain
+  wake hints (`vendor.kyc.high_risk`, `access.scope.privileged`,
+  `travel.policy.exception`, etc.) extend the wake set without editing
+  shared event types.
+- **Per-domain seed corpora.** Six fleet-* domains carry
+  `data/synthetic/<workflow_type>/*.json` (≥40 records each, scenario-
+  tagged: `clean` / `policy-exception` / `privileged-broad` etc.). The
+  autonomous ramp loop rotates through scenarios per domain.
+- **Persona `escalate` verdict.** Persona `decision_policy` blocks now
+  return one of three verdicts — `approve`, `reject`, `escalate`. The
+  third leaves the Durable gate open and emits a
+  `workflow.hitl.escalated` event tagged with the originating role,
+  which the FM picks up via triage and composes into an enriched
+  exception. Demonstrated in `vendor_kyc_finance_bp` (high-risk
+  jurisdictions), `it_access_it_admin` (broad-scope role templates),
+  `contract_finance_bp` (price jump >25%).
+- **Six fleet-* domains in `main`.** `travel-preapproval`, `vendor-kyc`,
+  `employee-onboarding`, `it-access-request`, `contract-renewal`,
+  `perf-review` — graduated from YAML briefs by `compose-domain` v1
+  then v3, and brought to substrate parity per
+  [`plan/feature-fleet-domain-substrate-1.md`](../plan/feature-fleet-domain-substrate-1.md)
+  (all six phases shipped). They run end-to-end on the autonomous loop,
+  appear in `query_fleet`, are resolvable from the operator UI, and
+  produce FM-escalated exception traffic.
+
+Why this matters for the bid: every one of these is **a load-bearing
+reuse** that survives the move to Azure. The bid doesn't have to claim
+them, but they make the platform claim more credible if WPP technical
+evaluators look closely at the code.
+
+## Foundry credibility lift (2026-05-05)
+
+A second batch of work landed the day before the Friday demo, narrowing
+the lab-vs-engagement gap on three axes the bid lists explicitly. Full
+plan: [`plan/feature-foundry-credibility-friday-1.md`](../plan/feature-foundry-credibility-friday-1.md).
+
+| Axis | Before 2026-05-05 | After 2026-05-05 |
+|---|---|---|
+| **Foundry Tracing tab** | OTEL spans emitted with all the right `gen_ai.*` semantic conventions, but `APPLICATIONINSIGHTS_CONNECTION_STRING=` was empty in `.env`. Nothing left the laptop. | App Insights conn string wired into both processes (FastAPI + Functions). The Foundry portal's *Tracing* tab at https://ai.azure.com surfaces every `gen_ai.generate_content` span with `gen_ai.agent.name`, `gen_ai.request.model`, `wpp.skill`, `gen_ai.usage.input_tokens` / `output_tokens`, plus tool-call children. Same shape Microsoft Agent Framework / Semantic Kernel / OpenAI Agents SDK / GHCP SDK all share. The demo can switch tabs from the local UI to the Foundry portal and walk a live workflow. |
+| **Cost-per-task (AC #13)** | Two hardcoded constants in `economics.py` (`MODEL_CALL_RATE = $0.02`, `COMPUTE_RATE_PER_SECOND = $0.0001`). Numbers were synthetic. | Cost derived from real `gen_ai.usage.*` span attributes × published Azure per-million-token rates ([`model_pricing.py`](../api/server/services/model_pricing.py); `gpt-4.1` $2/$8 per M, `gpt-4.1-mini` $0.40/$1.60, source URL + date in module docstring). The `costPerTaskUsd` on the Workflow detail tile is now Microsoft's number, derived from Microsoft's telemetry, against Microsoft's published pricing. |
+| **Immutable audit (AC #12)** | `audit_logger.py` was `self._entries: list[dict] = []` — zero persistence. "Immutable audit + 7-12 year retention" was a narrated bid claim. | `audit_logger.log()` dual-writes to in-memory list + an Azure Storage append blob (one per `workflow_id`, container `audit-ledger` on `apexdemo62525`, version-level immutability enabled via `--enable-vlw`). Auth via `AzureCliCredential` against the existing tenant. The blob URL surfaces on the workflow detail response as `auditBlobUrl`. The bid claim is now literal on the lab side. |
+| **POC2 evaluator coverage** | Only `rag-classifier` and `arbitration` (POC1) had per-agent evaluator sets. All seven hiring agents fell through to a generic `coherence/fluency/tool_call_validity/violence/hate_unfairness` default. | Three deterministic evaluators added to [`custom_evaluators.py`](../api/server/eval/custom_evaluators.py): `CVFieldExtractionAccuracy` (joins `cvs/*.json` ground truth), `ShortlistDecisionMatch`, `JurisdictionRoutingCorrectness`. Wired in `_PER_AGENT` for all 7 hiring agents (`cv-crystalliser`, `auto-shortlister`, `jurisdiction-router`, `betrvg-checker`, `voice-screener`, `interview-recommender`, `offer-personaliser`). LLM-judges (`groundedness`, `relevance`, `coherence`) added per-agent based on the agent's expected output shape. Evaluations UI splits into Finance / Hiring sections. |
+
+**What this does NOT do** — still engagement-POC scope:
+- Migrate GHCP SDK agents to Foundry-hosted `PromptAgentDefinition` agents.
+- Register agents through APIM AI Gateway as Foundry custom agents.
+- Light up the Foundry Control Plane *Operate* / per-agent *Monitor* tab + `EvaluationRule` continuous-eval rules (those bind to a `agent_name` registered with Foundry).
+- Real Foundry IQ / Fabric IQ swap-ins for `policy_search` / `employee_history`.
+- Real EMS connections, real Cosmos DB, real Entra Agent ID, real APIM private endpoints.
+
+But the seam is now narrower than the bid suggested: in engagement scope the agents register via AI Gateway, which lights up the Operate tab — *same App Insights resource, same span shape, just a different agent registration mechanism*. The lab build is one preview-feature flip away from full Foundry surface coverage.
 
 ---
 

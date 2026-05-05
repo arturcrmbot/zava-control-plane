@@ -19,6 +19,9 @@ from api.server.eval.custom_evaluators import (
     PolicyClauseCited,
     ToolCallValidity,
     GoldLabelMatch,
+    CVFieldExtractionAccuracy,
+    ShortlistDecisionMatch,
+    JurisdictionRoutingCorrectness,
 )
 
 
@@ -111,6 +114,32 @@ _PER_AGENT: dict[str, tuple[str, ...]] = {
         "groundedness", "relevance", "coherence", "tool_call_validity",
         "violence", "hate_unfairness",
     ),
+    # POC2 hiring — added 2026-05-05 per
+    # plan/feature-foundry-credibility-friday-1.md TASK-016. Three new
+    # deterministic evaluators join the labels CSV in
+    # data/synthetic/hiring/ to score CV extraction, shortlist decision,
+    # and jurisdiction routing.
+    "cv-crystalliser": (
+        "groundedness", "tool_call_validity", "cv_field_extraction_accuracy",
+    ),
+    "auto-shortlister": (
+        "relevance", "tool_call_validity", "shortlist_decision_match",
+    ),
+    "jurisdiction-router": (
+        "tool_call_validity", "jurisdiction_routing_correctness",
+    ),
+    "betrvg-checker": (
+        "groundedness", "relevance",
+    ),
+    "voice-screener": (
+        "relevance", "coherence",
+    ),
+    "interview-recommender": (
+        "coherence", "relevance",
+    ),
+    "offer-personaliser": (
+        "coherence", "fluency",
+    ),
 }
 _DEFAULT: tuple[str, ...] = (
     "coherence", "fluency", "tool_call_validity",
@@ -132,6 +161,12 @@ def evaluators_for(agent_label: str) -> dict[str, Any]:
             out[n] = ToolCallValidity()
         elif n == "gold_label_match":
             out[n] = GoldLabelMatch()
+        elif n == "cv_field_extraction_accuracy":
+            out[n] = CVFieldExtractionAccuracy()
+        elif n == "shortlist_decision_match":
+            out[n] = ShortlistDecisionMatch()
+        elif n == "jurisdiction_routing_correctness":
+            out[n] = JurisdictionRoutingCorrectness()
         else:
             out[n] = _build_llm_evaluator(n)
     return out
@@ -140,6 +175,11 @@ def evaluators_for(agent_label: str) -> dict[str, Any]:
 _CONTEXT_TOOLS: dict[str, tuple[str, ...]] = {
     "rag-classifier": ("policy_search",),
     "arbitration": ("precedents_search", "policy_search"),
+    # POC2 hiring — contextual MCP tools whose `result` is the grounding
+    # signal for `groundedness` evaluators.
+    "cv-crystalliser": ("ocr_extract",),
+    "jurisdiction-router": ("policy_search",),
+    "betrvg-checker": ("policy_search",),
 }
 
 

@@ -25,6 +25,7 @@ type DetailResp = {
   mcpCalls: McpCall[];
   economics: Economics;
   narrative: Narrative | null;
+  auditBlobUrl?: string | null;
 };
 
 const TABS = ["Overview", "Phases", "Traces", "Ledger", "Amplification", "Timeline"] as const;
@@ -182,6 +183,21 @@ export default function WorkflowDetail() {
         </div>
 
         <WorkflowHeaderTiles workflow={w} />
+        {/* 2026-05-05: Foundry Tracing deep link for the demo's tab-switch
+            beat. The portal doesn't support a workflow-id pre-filter via
+            URL, so we land on the project-level Tracing pane and the
+            operator filters by `customDimensions.workflow_id` once. */}
+        <div className="flex items-center justify-end -mt-2">
+          <a
+            href="https://ai.azure.com/build/tracing"
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-blue-700 hover:underline inline-flex items-center gap-1"
+            title={`Open Foundry Tracing for this workflow. Filter by customDimensions.workflow_id == "${w.id}".`}
+          >
+            View in Foundry Tracing →
+          </a>
+        </div>
         <PhaseRibbon workflow={w} phases={d.phases} />
 
         <div className="flex flex-wrap gap-1 border-b border-slate-200">
@@ -281,7 +297,10 @@ export default function WorkflowDetail() {
       <div className="col-span-1 space-y-3">
         <EconomicsPanel e={d.economics} />
         <FleetAssignment spans={d.spans} />
-        <AuditTrail ledger={w.actionLedger as ActionLedgerEntry[]} />
+        <AuditTrail
+          ledger={w.actionLedger as ActionLedgerEntry[]}
+          blobUrl={d.auditBlobUrl ?? null}
+        />
       </div>
     </div>
   );

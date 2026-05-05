@@ -222,6 +222,11 @@ async def run_agent_session(
         span.set_attribute("gen_ai.agent.name", "finance-agent")
         if skill_label:
             span.set_attribute("wpp.skill", skill_label)
+        # 2026-05-05: workflow_id stamped so Foundry Tracing can filter
+        # spans by workflow. Span attribute → App Insights customDimensions.
+        if workflow_id:
+            span.set_attribute("workflow.id", workflow_id)
+            span.set_attribute("wpp.workflow.id", workflow_id)
         span.set_attribute("wpp.tools.count", len(tools))
         if attachments:
             span.set_attribute("gen_ai.attachments.count", len(attachments))

@@ -75,4 +75,7 @@ async def get_workflow(id: str):
         "mcpCalls": [c.model_dump(by_alias=True) for c in mcp_calls],
         "economics": eco,
         "narrative": narrative,
+        # Live append-blob URL for AC #12 immutable audit. None when the
+        # cloud audit path isn't configured (CI / unit tests).
+        "auditBlobUrl": app_state.audit.blob_url_for(id),
     }

@@ -2,15 +2,29 @@
 goal: Bring the six weekend-generated `fleet-*` domains up to first-class Fleet-Manager substrate parity with POC1 (expense) and POC2 (hiring), so all eight domains run unattended, register in shared state, surface in operator + FM views, and produce demo-grade narrative variety.
 version: 1.0
 date_created: 2026-05-04
-last_updated: 2026-05-04
+last_updated: 2026-05-05
 owner: WPP Control Plane POC1 — substrate
-status: 'Planned'
+status: 'Completed'
 tags: [feature, architecture, refactor, substrate, fleet-manager]
 ---
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
+![Status: Completed](https://img.shields.io/badge/status-Completed-green)
+
+**Update 2026-05-05:** All six implementation phases shipped to `main`
+in commits `eef6d7fb` (Phases 1–3: registry, generalised
+`Workflow.payload`, generalised resolve route), `cbe01787` (Phases 4–6:
+Fleet Manager domain awareness, per-domain seed corpora, persona
+`escalate` verdict), and `0d13bbf8` (per-domain phase ribbon, hiring
+HITL contract, no-clobber on rejection). Verified by
+`tests/api/shared/test_domains_registry.py`,
+`tests/api/server/test_workflow_payload.py`,
+`tests/api/server/test_resolve_route_per_domain.py`,
+`tests/api/server/test_fleet_manager_domain_awareness.py`,
+`tests/api/server/test_seed_corpora.py`,
+`tests/api/server/test_persona_escalate.py`. Per-domain task
+checkboxes below are kept as the source-of-truth implementation log.
 
 POC1 (expense) and POC2 (hiring) are first-class citizens of the Fleet Manager substrate: they upsert `Workflow` records into the in-process `StateStore`, light up `query_fleet`, resolve HITL gates from the operator UI, and carry domain-aware language inside the FM skill. The six `fleet-*` domains generated over the weekend (`travel-preapproval`, `vendor-kyc`, `employee-onboarding`, `it-access-request`, `contract-renewal`, `perf-review`) execute end-to-end on the same Durable + MAF spine, light up the blueprint observatory, and (with `PERSONA_AUTO_CLOSE`) close their own HITL gates — but they are invisible to `query_fleet`, the operator UI cannot resolve their gates by hand, the FM skill has no language for them, their inputs cycle through tiny hardcoded arrays so the demo rail is monotonic, and every persona returns binary `approve`/`reject` so the FM has no escalated exception traffic from the new domains.
 

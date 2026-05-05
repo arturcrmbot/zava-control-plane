@@ -21,8 +21,8 @@ Handover doc for the technical team. Three sections: where we are against the br
 | 9 | Multi-EMS Control Plane | ✅ | [concur-mcp/](../mocks/concur-mcp/), [maconomy-mcp/](../mocks/maconomy-mcp/), [claim_lookup.py](../api/server/mcp_tools/claim_lookup.py) |
 | 10 | EMS extensibility narration | ✅ | Maconomy rebound to expense surface + 2-file diff property. [demo-ems-extensibility.md](demo-ems-extensibility.md) |
 | 11 | Region failure recovery | ✅ | [simulator_orchestrator.py::simulate_region_failure](../api/server/services/simulator_orchestrator.py); `/api/simulator/region-failure` route. |
-| 12 | Immutable audit + reporting | ✅ | [audit-summariser/SKILL.md](../api/server/skills/audit-summariser/SKILL.md), [audit.py](../api/functions/graphs/audit.py), [audit_query.py](../api/server/mcp_tools/audit_query.py) |
-| 13 | Cost-per-task report | ✅ | [query_economics.py](../api/server/mcp_tools/query_economics.py) + FM `report.cost_per_task` skill section |
+| 12 | Immutable audit + reporting | ✅ + real | [audit-summariser/SKILL.md](../api/server/skills/audit-summariser/SKILL.md), [audit.py](../api/functions/graphs/audit.py), [audit_query.py](../api/server/mcp_tools/audit_query.py). **2026-05-05:** rewrote [audit_logger.py](../api/server/services/audit_logger.py) to dual-write every entry to an Azure Storage append blob (`apexdemo62525/audit-ledger/<workflow_id>.jsonl`) with version-level immutability enabled. The blob URL surfaces on the workflow detail response (`auditBlobUrl`). The bid claim is now literal, not narrated. See [`plan/feature-foundry-credibility-friday-1.md`](../plan/feature-foundry-credibility-friday-1.md) Phase 4. |
+| 13 | Cost-per-task report | ✅ + real | [query_economics.py](../api/server/mcp_tools/query_economics.py) + FM `report.cost_per_task` skill section. **2026-05-05:** [`economics.py`](../api/server/services/economics.py) rewritten to derive cost from real `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` span attributes × published Azure per-million-token rates ([`model_pricing.py`](../api/server/services/model_pricing.py), `gpt-4.1` $2/$8, `gpt-4.1-mini` $0.40/$1.60, sourced 2026-05-05). The two synthetic constants `MODEL_CALL_RATE` and `COMPUTE_RATE_PER_SECOND` deleted. Numbers on screen are now Microsoft's numbers. |
 
 **13 demoable.** AC #4 pipeline + prompt are working (10-claim smoke at 70% post-tuning, zero green→red worst-case-default false flags). The full 300-claim corpus run is **reserved for engagement-POC scope** — the brief's ≥95% target is on WPP's 3,430-claim real dataset, not our synthetic 300; we'll run it post engagement kickoff when WPP supplies their data.
 
@@ -119,7 +119,14 @@ flowchart LR
 
 ## 3. What's left
 
-Lab-build is complete on every AC and on every demo-ready stream. Remaining work is **operational** (run the demo, fix bugs found in dry-run) — not feature work. Three concrete items:
+Lab-build is complete on every AC and on every demo-ready stream. POC1's
+code now sits inside a substrate that hosts seven other domains (POC2
+hiring + six fleet-* domains graduated by `compose-domain` and brought
+to first-class FM parity per
+[`plan/feature-fleet-domain-substrate-1.md`](../plan/feature-fleet-domain-substrate-1.md)
+— all six phases shipped). Remaining work for POC1 specifically is
+**operational** (run the demo, fix bugs found in dry-run) — not feature
+work. Three concrete items:
 
 1. **One clean end-to-end stack boot through to onboarding-video render.** All avatar-render fixes are committed (V1/V2 prompt rules; custom-subdomain endpoint; per-role character/style; mp4-download auth). Just needs a stable Functions-host startup to confirm `onboarding_video_url` lands on workflow metadata. Use [`scripts/run-func.bat`](../scripts/run-func.bat) for the env-pinned boot.
 2. **30-min demo dry run** — walk all 22 POC2 capability beats per [poc2-DEMO.md](poc2-DEMO.md). Walk all 13 POC1 ACs per [DEMO.md](DEMO.md). Capture bugs as we go.
@@ -133,7 +140,7 @@ Lab-build is complete on every AC and on every demo-ready stream. Remaining work
 - Front Door / APIM / Private Endpoint network posture.
 - Entra Agent ID for `finance-agent@wpp` + OBO for human-triggered actions.
 
-### What landed 2026-04-29 → 2026-05-01
+### What landed 2026-04-29 → 2026-05-05
 
 - Demo polish: receipt thumbnails + 4-button reviewer actions ([ReviewerQueue.tsx](../web/client/routes/ReviewerQueue.tsx)), Policy What-If with real impact numbers, Analytics page, Economics page.
 - Foundry eval integration: `evaluate()` batch + online subscriber + sqlite EvalStore + 3 custom evaluators + per-agent evaluator set + UI over `/api/evals/summary`. `agent.completed` event plumbed through all 13 agent executors and bridged across the Functions-host → FastAPI process boundary.
@@ -143,8 +150,10 @@ Lab-build is complete on every AC and on every demo-ready stream. Remaining work
 - Candidate portal (`web/portal/`) — `/apply`, `/portal`, `/screen`, `/recruiter` — fully styled.
 - Native WebRTC voice + Azure AI Speech avatar + ACS Email send wired.
 - AG-UI scorecard rendering on `WorkflowDetail` for hiring workflows.
-- Recruiter view moved out of admin Control Plane into the portal app.
+- Recruiter view moved out of admin Control Plane into the portal app, then enriched with phase stepper, per-agent reasoning timeline, and communications panel.
 - rag-classifier prompt tuned: 60% → 70% on 10-claim smoke, V1+V2 verdict-integrity rules eliminate green→red worst-case-default false flags.
+- **Substrate v3 (2026-05-03 → 05-04):** event vocabulary + personae + autonomous responder; blueprint editorial microsite + ACA deploy; `compose-domain` meta-skill v1→v3; first-graduated `fleet-travel-preapproval`; weekend batch of five more fleet-* domains (`vendor-kyc`, `employee-onboarding`, `it-access-request`, `contract-renewal`, `perf-review`) graduated end-to-end; central domain registry (`api/shared/domains.py`); `Workflow.payload` generalised; generalised resolve route; FM domain awareness with per-domain wake hints; per-domain seed corpora (≥40 records each); persona `escalate` verdict; per-domain phase ribbon; hiring HITL contract fix; no-clobber on rejection.
+- **Foundry credibility lift (2026-05-05):** App Insights conn string wired into both processes — every `gen_ai.generate_content` span (with `gen_ai.usage.*`, `wpp.skill`, `tool.server.*`) flows to Foundry's *Tracing* tab. `economics.compute()` derives `modelCostUsd` from real token telemetry × published per-million rates (no more synthetic constants). [`audit_logger.py`](../api/server/services/audit_logger.py) dual-writes every entry to an Azure Storage append blob with version-level immutability — the bid's "immutable audit" claim now literal on the lab side. Six new POC2 hiring evaluators wired (CV field accuracy, shortlist decision match, jurisdiction routing correctness + LLM-judges for voice/interview/offer agents). Full plan + per-task evidence: [`plan/feature-foundry-credibility-friday-1.md`](../plan/feature-foundry-credibility-friday-1.md).
 
 ---
 
@@ -160,7 +169,7 @@ Lab-build is complete on every AC and on every demo-ready stream. Remaining work
 | Local dev | [DEVELOPMENT.md](DEVELOPMENT.md) |
 | Demo script | [DEMO.md](DEMO.md) |
 
-**Current tag:** `v0.8-poc1-platform-complete`. Lab-build feature complete; remaining work is one operational dry run + demo recording. AC #4 corpus-wide gate is engagement-POC scope (real WPP data).
+**Current tag target:** `v0.8-poc1-platform-complete` (POC1 lab-build feature complete; remaining work is one operational dry run + demo recording). The substrate now hosts eight domains — see [SCOPE-DELTA.md](SCOPE-DELTA.md) for what's reused vs swapped at engagement-POC time, and [`plan/feature-fleet-domain-substrate-1.md`](../plan/feature-fleet-domain-substrate-1.md) for the substrate-parity work that landed. AC #4 corpus-wide gate is engagement-POC scope (real WPP data).
 
 ---
 

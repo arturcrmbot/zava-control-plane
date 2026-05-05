@@ -191,6 +191,51 @@ FM invokes `query_economics` (168h window) and produces a
 `compose_exception` tile with total / avg / by-verdict breakdown. If
 red avg > 3× green avg, the tile flags the ratio.
 
+> **The cost number is real.** As of 2026-05-05 [`economics.py`](../api/server/services/economics.py)
+> derives `modelCostUsd` from the live `gen_ai.usage.input_tokens` /
+> `gen_ai.usage.output_tokens` span attributes the agent wrapper records,
+> multiplied by published Azure per-million-token rates from
+> [`model_pricing.py`](../api/server/services/model_pricing.py)
+> (`gpt-4.1` $2/$8, `gpt-4.1-mini` $0.40/$1.60). The same span shape goes
+> to App Insights, so the on-screen number agrees with Foundry's by
+> construction. See [`plan/feature-foundry-credibility-friday-1.md`](../plan/feature-foundry-credibility-friday-1.md) Phase 2.
+
+### Beat 11b — Foundry Tracing tab (2 min · proves the substrate isn't a mock)
+
+Open https://ai.azure.com → project `azureai_swedencentral_arzielinski` →
+*Tracing* (left nav). Filter by `cloud_RoleName == "control-plane-server"`
+and the last 1 hour. Show:
+
+- The trace tree for the workflow you just clicked into (Beats 2/4/9).
+- Per-span attributes: `gen_ai.system=github_copilot`,
+  `gen_ai.request.model=gpt-4.1`, `gen_ai.agent.name=finance-agent`,
+  `wpp.skill=rag-classifier` (or whichever skill ran).
+- `gen_ai.response` event carrying the model's actual content.
+- `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens` driving
+  the on-screen cost figure.
+- Tool-call children (`tool.server.policy_search`, `tool.server.precedents_search`,
+  etc.) with timing.
+
+Operator's pitch: *"This is the same App Insights resource the engagement
+POC will use; same OTEL semantic conventions Microsoft Agent Framework /
+Semantic Kernel / OpenAI Agents SDK / GHCP SDK all share. The only thing
+that changes in engagement scope is the agent registration mechanism."*
+
+If the trace doesn't appear (App Insights ingestion delay is ~2–5 min),
+fall back to a recorded screenshot at `docs/screenshots/foundry-tracing-poc1.png`.
+
+### Beat 11c — Immutable audit blob (1 min · AC #12, made literal)
+
+Open the Workflow Detail of the workflow you just walked. Click the
+"Open audit ledger →" link in the audit panel. Lands in the Azure portal
+on a versioned, immutability-policy-protected append blob containing
+every `audit.*` event for that workflow as JSON-lines.
+
+Operator's pitch: *"AC #12 'immutable audit + 7-12 year retention' \u2014
+the lab build's storage account has version-level immutability enabled
+right now. Engagement scope swaps the 7-day retention for 7-12 years and
+adds a worm-style legal hold; same code path, same blob shape."*
+
 ### Beat 12 — EMS extensibility narration (2 min · AC #10)
 
 Open a terminal next to the browser tab and walk
@@ -252,8 +297,8 @@ gaps). If live demo flakes, fall back to recorded `docs/demo-failover.mp4`.
 | #9 Multi-EMS uniformity | 7, 12 | ✅ |
 | #10 EMS extensibility | 12 | ✅ |
 | #11 Region failure recovery | 13 | ✅ |
-| #12 Immutable audit + reporting | 11 | ✅ |
-| #13 Cost-per-task | 11 | ✅ |
+| #12 Immutable audit + reporting | 11, 11c | ✅ + real append-blob URL |
+| #13 Cost-per-task | 11, 11b | ✅ + real token-derived numbers |
 
 ---
 

@@ -123,6 +123,7 @@ from api.server.routes.fleet import router as fleet_router
 from api.server.routes.accuracy import router as accuracy_router
 from api.server.routes.policy_md import router as policy_md_router
 from api.server.routes.receipts import router as receipts_router
+from api.server.routes.foundry import router as foundry_router
 # POC2 multi-surface + frontier endpoints (§4.6, §4.14, §4.19)
 from api.server.routes.webhooks_servicenow import router as webhooks_servicenow_router
 from api.server.routes.webhooks_finance_bp import router as webhooks_finance_bp_router
@@ -143,7 +144,8 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           a2a_router,
           portal_router, portal_voice_router, portal_interview_router,
           portal_admin_decisions_router,
-          blueprint_router):
+          blueprint_router,
+          foundry_router):
     app.include_router(r)
 
 # Mount the built blueprint Vite bundle if present (production deploy).

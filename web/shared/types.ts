@@ -254,7 +254,22 @@ export interface McpCall {
   durationMs: number;
 }
 
+export interface EconomicsPerModel {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  calls: number;
+  costUsd: number;
+}
+
 export interface Economics {
+  // NEW (2026-05-05): real model cost from gen_ai.usage.* span attributes.
+  modelCostUsd: number;
+  inputTokens: number;
+  outputTokens: number;
+  pricingSource: string;
+  perModel: EconomicsPerModel[];
+  // DEPRECATED alias of modelCostUsd, kept for back-compat.
   computeCostUsd: number;
   modelCalls: number;
   toolCalls: number;
@@ -285,4 +300,7 @@ export interface WorkflowDetail {
   mcpCalls: McpCall[];
   economics: Economics;
   narrative: Narrative | null;
+  // NEW (2026-05-05): live append-blob URL for the workflow's immutable
+  // audit ledger. null when the cloud audit path isn't configured.
+  auditBlobUrl?: string | null;
 }

@@ -53,6 +53,16 @@ _DECLARED_TOOLS: dict[str, list[str]] = {
     "exception_classifier": [],
     "resolution_recommender": [],
     "root_cause_explainer": [],
+    # POC2 hiring — lifted from each skill's allowed-tools frontmatter at
+    # api/server/skills/<skill>/SKILL.md, per
+    # plan/feature-foundry-credibility-friday-1.md TASK-017.
+    "cv-crystalliser":      ["linkedin_profile_fetch", "ocr_extract"],
+    "auto-shortlister":     ["scoring_rubric_load"],
+    "jurisdiction-router":  ["policy_search", "betrvg_check", "eeo_check"],
+    "betrvg-checker":       ["graph_mail", "policy_search"],
+    "voice-screener":       ["acs_dial", "transcript_score"],
+    "interview-recommender": [],
+    "offer-personaliser":   ["offer_template_fetch", "comp_band_lookup"],
 }
 
 
@@ -140,6 +150,10 @@ async def _score_row(row: EvalRow, *, attempt: int = 0) -> None:
                 context=row.context,
                 tool_calls=row.tool_calls,
                 declared_tools=_declared_tools_for(row.agent_label),
+                # Plumb workflow_id so deterministic evaluators (CV field
+                # accuracy, jurisdiction routing) can fall back to it when
+                # the response JSON omits candidate_id.
+                workflow_id=row.workflow_id,
             )
             return (name, result if isinstance(result, dict) else None, None)
         except Exception as ex:

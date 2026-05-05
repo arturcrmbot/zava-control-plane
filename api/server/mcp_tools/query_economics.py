@@ -21,6 +21,7 @@ from opentelemetry import trace
 from pydantic import BaseModel, Field
 
 from ._otel import traced_tool
+from api.server.services import economics
 from api.server.state import app_state
 
 
@@ -48,7 +49,14 @@ def _group_avg_cost(items: list[dict]) -> dict:
 
 @traced_tool("query.economics")
 def query(window_hours: int = 24 * 7) -> dict:
-    """Aggregate per-workflow tokens / cost over the last `window_hours`."""
+    """Aggregate per-workflow tokens / cost over the last `window_hours`.
+
+    Cost is derived per workflow from OTEL spans via
+    `services.economics.compute()` — see
+    plan/feature-foundry-credibility-friday-1.md TASK-013 for the swap from
+    `w.tokens_spent` / `w.cost_usd` (never written, always 0) to real
+    `gen_ai.usage.*` attributes recorded by the agent wrapper.
+    """
     span = trace.get_current_span()
     span.set_attribute("wpp.economics.window_hours", window_hours)
 
@@ -57,10 +65,17 @@ def query(window_hours: int = 24 * 7) -> dict:
     for w in app_state.store.list_workflows():
         if w.created_at < cutoff:
             continue
+        eco = economics.compute(
+            w,
+            spans=app_state.store.get_spans(w.id),
+            mcp_calls=app_state.store.get_mcp_calls(w.id),
+        )
         items.append({
             "workflow_id": w.id,
-            "tokens_spent": w.tokens_spent,
-            "cost_usd": w.cost_usd,
+            "tokens_spent": eco["inputTokens"] + eco["outputTokens"],
+            "input_tokens": eco["inputTokens"],
+            "output_tokens": eco["outputTokens"],
+            "cost_usd": eco["modelCostUsd"],
             "verdict": getattr(w, "verdict", None),
         })
 
@@ -76,6 +91,7 @@ def query(window_hours: int = 24 * 7) -> dict:
         "avg_cost_per_task_usd": round(total_cost / n, 6) if n else 0,
         "by_verdict": _group_avg_cost(items),
         "items": items[:50],
+        "pricing_source": "azure-published-2026-05-05",
     }
 
 

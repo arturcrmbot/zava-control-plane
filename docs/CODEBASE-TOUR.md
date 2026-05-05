@@ -10,17 +10,24 @@ acceptance-criteria status, defer to [poc1-status.md](poc1-status.md) and
 ## The repo in one breath
 
 A composable agentic substrate (skills + MCP tools + harness +
-governance) running on a single laptop, with three business domains
+governance) running on a single laptop, with **eight business domains**
 composed on top of it:
 
 - **POC1 — finance expense compliance** (7 phases, 13 ACs) — pivoted from
   invoice-P2P on 2026-04-27.
 - **POC2 — HR talent lifecycle** (10 phases, 22 capabilities) — built
   out across late April / early May, demo-ready.
-- **Fleet travel pre-approval** — first domain graduated end-to-end by
-  the [`compose-domain`](superpowers/skills/compose-domain/SKILL.md)
-  meta-skill (v1, 2026-05-03). Real proof that adding a domain is
-  composition, not construction.
+- **Six fleet-* domains** graduated end-to-end by the
+  [`compose-domain`](superpowers/skills/compose-domain/SKILL.md)
+  meta-skill — `travel-preapproval` (v1, the existence proof) plus
+  `vendor-kyc`, `employee-onboarding`, `it-access-request`,
+  `contract-renewal`, `perf-review` (v3, 2026-05-03). All eight reach
+  Fleet-Manager substrate parity per the
+  [feature-fleet-domain-substrate-1](../plan/feature-fleet-domain-substrate-1.md)
+  plan: registered in the central [`api/shared/domains.py`](../api/shared/domains.py)
+  registry, upserted into `StateStore`, resolvable from the operator
+  exception queue, and cycling per-domain seed corpora through the
+  autonomous demo loop.
 
 Everything runtime runs locally except the model API (GitHub Copilot)
 and the optional OTEL export (App Insights). One thing is in the cloud:
@@ -39,12 +46,13 @@ Fleet Manager (FastAPI long-lived GHCP session)  ← always-on, 1 instance, OWNS
          │ triage-filtered events         │ SSE
          │
 <Domain>Orchestrator (Durable Functions)         ← 1 per work item, N phases, HITL waits at zero compute
-         ▲                                          (ExpenseClaim · Hiring · FleetTravelPreapproval)
+         ▲                                          (8 orchestrators — see api/shared/domains.py)
          │ activity per phase
          │
 Per-phase Pregel graphs (ephemeral GHCP sessions) ← stateless, load skills + MCP tools per phase, exit
          │
 Mock MCP servers                                  ← Node + Express; 3 finance + 7 HR/comms (POC2)
+                                                    — fleet-* domains use deterministic stubs in api/server/mcp_tools/
 ```
 
 Two GHCP **agent identities**: `finance-agent` / `hiring-agent` /
@@ -95,13 +103,30 @@ post-interview decision), Phase 9 (Offer · candidate accept/decline).
 Full walkthrough in [poc2-quick-demo.md](poc2-quick-demo.md); status table
 in [poc2-status.md](poc2-status.md).
 
-### Fleet travel pre-approval — first composed domain
+### Six fleet-* domains — the compose-domain output
 
-Defined in [api/functions/workflows/fleet_travel_preapproval.py](../api/functions/workflows/fleet_travel_preapproval.py).
 Graduated end-to-end by the [`compose-domain`](superpowers/skills/compose-domain/SKILL.md)
-meta-skill from a YAML brief ([fleet-travel-preapproval-brief.yaml](superpowers/specs/fleet-travel-preapproval-brief.yaml)).
-This is the existence proof for the substrate's central claim — that
-*the act of building the next agent is itself agentic*.
+meta-skill from YAML briefs (one per domain, under
+[`superpowers/specs/fleet-*-brief.yaml`](superpowers/specs/)). The
+existence proof for the substrate's central claim — that *the act of
+building the next agent is itself agentic*.
+
+| Domain | Orchestrator file | Phases | Personae at HITL gates |
+|---|---|---|---|
+| Travel pre-approval | [`fleet_travel_preapproval.py`](../api/functions/workflows/fleet_travel_preapproval.py) | 3 | `line_manager` |
+| Vendor onboarding & KYC | [`fleet_vendor_kyc.py`](../api/functions/workflows/fleet_vendor_kyc.py) | 4 | `vendor_kyc_finance_bp` |
+| Employee onboarding | [`fleet_employee_onboarding.py`](../api/functions/workflows/fleet_employee_onboarding.py) | 4 | `onboarding_it_admin` |
+| IT access request | [`fleet_it_access_request.py`](../api/functions/workflows/fleet_it_access_request.py) | 5 | `it_access_line_manager`, `it_access_it_admin` |
+| Contract renewal | [`fleet_contract_renewal.py`](../api/functions/workflows/fleet_contract_renewal.py) | 5 | `contract_finance_bp`, `contract_line_manager` |
+| Performance review | [`fleet_perf_review.py`](../api/functions/workflows/fleet_perf_review.py) | 5 | `perf_review_hr_bp`, `perf_review_line_manager` |
+
+The substrate-parity work is captured in
+[`plan/feature-fleet-domain-substrate-1.md`](../plan/feature-fleet-domain-substrate-1.md):
+six shipped phases that brought every fleet-* domain to first-class
+standing alongside POC1/POC2 — registry, generalised `Workflow.payload`,
+generalised resolve route, FM domain awareness, per-domain seed
+corpora (≥40 records each, scenario-tagged), and the persona
+`escalate` verdict.
 
 ### How a phase graph is built (universal pattern)
 
@@ -129,10 +154,15 @@ The substrate doesn't pin counts; everything is walked from disk:
   `query_economics`, `query_reviewer_decisions`). Authored via
   [author-mcp-tool](superpowers/skills/author-mcp-tool/SKILL.md).
 - **Personae** — every `SKILL.md` under [api/server/personae/](../api/server/personae/)
-  (`claim_submitter`, `finance_bp`, `line_manager`, `ssc_reviewer`,
-  `recruiter`, `hr_bp`, `candidate`). Drive the autonomous responder so
-  HITL gates close themselves during the demo. Authored via
-  [author-persona](superpowers/skills/author-persona/SKILL.md).
+  (15 today across POC1 + POC2 + the six fleet-* domains: e.g.
+  `claim_submitter`, `ssc_reviewer`, `recruiter`, `hr_bp`,
+  `vendor_kyc_finance_bp`, `it_access_it_admin`,
+  `contract_finance_bp`, `perf_review_hr_bp`). Drive the autonomous
+  responder so HITL gates close themselves during the demo — each
+  persona's `decision_policy` block returns one of three verdicts:
+  `approve`, `reject`, or `escalate` (the latter leaves the Durable
+  gate open and emits a `workflow.hitl.escalated` event for the FM).
+  Authored via [author-persona](superpowers/skills/author-persona/SKILL.md).
 
 The live counts and graph of how they all connect surface at
 `GET /api/blueprint/composition` and render on the [blueprint
@@ -198,11 +228,14 @@ the contract in [tests/e2e/smoke.spec.ts](../tests/e2e/smoke.spec.ts).
   [poc1-status.md §1](poc1-status.md#1-acceptance-criteria--status).
 - **POC2** — 22 capabilities, status table in
   [poc2-status.md §1](poc2-status.md#1-capability-matrix--starting-state).
-- **Fleet travel pre-approval** — graduated by `compose-domain` v1; the
-  brief that produced it is
-  [fleet-travel-preapproval-brief.yaml](superpowers/specs/fleet-travel-preapproval-brief.yaml).
-  Three more briefs sit ready (`fleet-employee-onboarding-brief.yaml`,
-  `fleet-it-access-request-brief.yaml`, `fleet-vendor-kyc-brief.yaml`).
+- **Six fleet-* domains** — graduated by `compose-domain` (v1 then v3);
+  briefs under [superpowers/specs/fleet-*-brief.yaml](superpowers/specs/).
+  All six brought to substrate parity per
+  [plan/feature-fleet-domain-substrate-1.md](../plan/feature-fleet-domain-substrate-1.md):
+  registered in `api/shared/domains.py`, run end-to-end via the
+  autonomous demo loop, fully visible to `query_fleet`, resolvable
+  from the operator UI, and produce FM-escalated traffic when persona
+  `decision_policy` returns `escalate`.
 
 **Don't duplicate the status tables elsewhere.**
 

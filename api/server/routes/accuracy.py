@@ -12,7 +12,7 @@ from pathlib import Path
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
-from api.server.eval import batch_runner, foundry_client
+from api.server.eval import batch_runner, foundry_client, hiring_batch_runner
 from api.server.eval.store import default_store
 from api.server.state import app_state
 from api.shared.events import FleetEvent
@@ -108,3 +108,63 @@ async def get_by_id(run_id: str):
     if last is None or last.get("run_id") != run_id:
         raise HTTPException(404, f"no report for run_id {run_id!r}")
     return last
+
+
+# --------------------------------------------------------------------------
+# POC2 hiring batch — mirrors the POC1 flow but routes to hiring_batch_runner.
+# Per plan/feature-foundry-credibility-friday-1.md TASK-020.
+# --------------------------------------------------------------------------
+
+
+_HIRING_CVS_DIR = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "hiring" / "cvs"
+
+
+class HiringRunRequest(BaseModel):
+    sample_size: int | None = 5  # default-low to avoid GHCP token burn
+    log_to_foundry: bool = False  # opt-in Foundry portal logging
+
+
+@router.post("/run/hiring", status_code=202)
+async def post_run_hiring(req: HiringRunRequest, background: BackgroundTasks):
+    if not foundry_client.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "configured": False,
+                "reason": "Foundry not configured; refusing to run a fake hiring batch.",
+            },
+        )
+
+    all_candidates = sorted(p.stem for p in _HIRING_CVS_DIR.glob("C-*.json"))
+    if not all_candidates:
+        raise HTTPException(404, "no hiring CVs in data/synthetic/hiring/cvs/")
+    if req.sample_size and req.sample_size > len(all_candidates):
+        raise HTTPException(
+            400,
+            f"sample_size {req.sample_size} exceeds corpus size {len(all_candidates)}",
+        )
+
+    candidate_ids = (
+        all_candidates[: req.sample_size] if req.sample_size else all_candidates
+    )
+    run_id = f"hire-acc-{uuid.uuid4().hex[:8]}"
+
+    async def _execute_and_cache():
+        try:
+            await hiring_batch_runner.run(
+                candidate_ids,
+                run_id=run_id,
+                publish=_bus_publish,
+                log_to_foundry=req.log_to_foundry,
+            )
+        except Exception as ex:
+            log.exception("hiring batch run %s failed", run_id)
+            _bus_publish({
+                "type": "hiring_accuracy.complete",
+                "run_id": run_id,
+                "summary": {"error": str(ex)[:200]},
+            })
+
+    background.add_task(_execute_and_cache)
+    return {"run_id": run_id, "n": len(candidate_ids),
+            "log_to_foundry": req.log_to_foundry}

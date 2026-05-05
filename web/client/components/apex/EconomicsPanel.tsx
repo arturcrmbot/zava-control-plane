@@ -1,13 +1,23 @@
 // web/client/components/apex/EconomicsPanel.tsx
 import type { Economics } from "@shared/types";
 
+function _fmtTokens(n: number | undefined): string {
+  if (!n) return "0";
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + "k";
+  return String(n);
+}
+
 export default function EconomicsPanel({ e }: { e: Economics }) {
+  const cost = (e.modelCostUsd ?? e.computeCostUsd ?? 0).toFixed(4);
   const tiles = [
-    { k: "Compute cost", v: `$${e.computeCostUsd.toFixed(2)}` },
-    { k: "Model calls",  v: String(e.modelCalls) },
-    { k: "Tool calls",   v: String(e.toolCalls) },
-    { k: "Days elapsed", v: String(e.daysElapsed.toFixed(1)) },
-    { k: "SLA token",    v: e.slaToken },
+    { k: "Model cost",    v: `$${cost}` },
+    { k: "Input tokens",  v: _fmtTokens(e.inputTokens) },
+    { k: "Output tokens", v: _fmtTokens(e.outputTokens) },
+    { k: "Model calls",   v: String(e.modelCalls) },
+    { k: "Tool calls",    v: String(e.toolCalls) },
+    { k: "Days elapsed",  v: String(e.daysElapsed.toFixed(1)) },
+    { k: "SLA token",     v: e.slaToken },
   ];
   return (
     <div className="panel" data-testid="economics-panel">
@@ -19,6 +29,11 @@ export default function EconomicsPanel({ e }: { e: Economics }) {
             <div className="text-sm font-semibold text-slate-900 truncate">{t.v}</div>
           </div>
         ))}
+        {e.pricingSource && (
+          <div className="text-[10px] text-slate-400 pt-1" title="Source of per-million-token rates">
+            pricing: {e.pricingSource}
+          </div>
+        )}
       </div>
     </div>
   );

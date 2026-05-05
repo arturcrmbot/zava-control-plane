@@ -4,18 +4,52 @@ Sister doc to [poc1-status.md](poc1-status.md) — same shape, applied to POC2 (
 
 **Status snapshot (2026-04-30):** the POC2 spine merged into `main` 2026-04-30 — 10-phase `HiringOrchestrator`, all ten phase graphs, ten hiring skills, seven MCP mocks (4201–4207), 50-CV synthetic corpus across 5 roles × 2 jurisdictions, and Tracks B (multi-surface), D (jurisdiction), E (frontier) and F (reuse) at first-runnable.
 
-**Status snapshot (2026-04-30 evening):** ALL demo-ready streams landed (commits `97c1fdb4`, `e18ab2eb`, `b67953a9`, `058c6f45`, plus tonight's portal styling pass). Visible state:
+**Status snapshot (2026-04-30 evening):** ALL demo-ready streams landed (commits `97c1fdb4`, `e18ab2eb`, `b67953a9`, `058c6f45`, plus tonight's portal styling pass). Visible state listed below.
+
+**Status snapshot (2026-05-04):** POC2 now sits inside the eight-domain
+substrate. The recruiter view (`web/portal/src/routes/RecruiterCandidate.tsx`)
+gained a per-phase stepper, a per-agent reasoning timeline, and a
+communications panel. The hiring orchestrator's HITL contract was
+tightened (per-domain phase ribbon respects the 10-phase shape; reject
+verdicts no longer clobber the candidate record). All seven other
+domains share the same Fleet Manager session and exception queue —
+see [`plan/feature-fleet-domain-substrate-1.md`](../plan/feature-fleet-domain-substrate-1.md)
+for the substrate-parity work.
+
+**Status snapshot (2026-05-05):** Foundry credibility lift shipped —
+see [`plan/feature-foundry-credibility-friday-1.md`](../plan/feature-foundry-credibility-friday-1.md).
+Net POC2 changes:
+
+- **Hiring agents have evaluators for the first time.** Previously the
+  POC2 agents fell through to a generic `coherence/fluency/...` default;
+  now seven hiring agents have per-agent evaluator sets in
+  [`evaluator_set.py`](../api/server/eval/evaluator_set.py). Three new
+  deterministic evaluators in [`custom_evaluators.py`](../api/server/eval/custom_evaluators.py):
+  `CVFieldExtractionAccuracy` (joins `data/synthetic/hiring/cvs/*.json`
+  ground truth), `ShortlistDecisionMatch`, `JurisdictionRoutingCorrectness`
+  (joins `data/synthetic/hiring/labels.csv`).
+- **Evaluations UI** ([`Evaluations.tsx`](../web/client/routes/Evaluations.tsx))
+  now renders two domain-specific tables (Finance / Hiring) instead of a
+  sparse union with mostly-blank columns.
+- **Foundry Tracing tab live for hiring spans** — `cv-crystalliser` /
+  `auto-shortlister` / `voice-screener` / `offer-personaliser` etc. all
+  emit `gen_ai.generate_content` spans tagged `gen_ai.agent.name=hiring-agent`
+  with token counts; visible in https://ai.azure.com under the existing
+  Foundry project.
+
+Visible state from the demo-ready streams:
 
 - **`web/portal/`** — fully styled candidate portal (Vite, port 5174). Routes:
   - `/apply` — public application form, role cards with country flags, polished hero
   - `/portal?token=xxx` — phase-aware status with hero greeting, animated 7-step ribbon, contextual CTAs (BookCall / Interview RSVP / Offer Accept-Decline / Onboarding video). Auto-refreshes every 8s.
   - `/screen?token=xxx` — native WebRTC voice call (no iframe, no separate accelerator process); `RealtimeCall.ts` mirrors firstcentral's WebRTC core
-  - `/recruiter` — admin Candidates panel **moved here from web/client** (it's recruiter-facing data, not Agent-Administrator data); KPI cards + filterable magic-link table + auto-refresh
+  - `/recruiter` — admin Candidates panel **moved here from web/client** (it's recruiter-facing data, not Agent-Administrator data); KPI cards + filterable magic-link table + auto-refresh; per-candidate detail view now carries a per-phase stepper, an `AgentReasoningTimeline` panel, and a `CommunicationsPanel` showing per-channel send history
 - **Voice via real Azure GPT-Realtime** — backend mints ephemeral keys + proxies SDP at `/api/portal/voice/{session,rtc}`; reuses the user's existing `arzie-mm4okigm-canadacentral` realtime endpoint
 - **Avatar via real Azure AI Speech** — `avatar_render` MCP tool calls custom-subdomain endpoint with DefaultAzureCredential, per-role (character, style) pairing, blob-cached by sha256(voice|script)
 - **ACS Email send** — provisioned `apex-demo-acs` + `apex-demo-email` + Azure-managed domain (DKIM/DMARC/SPF verified); real UUID-id message sends, plus offline outbox fallback for demo robustness
 - **AG-UI render** — `WorkflowDetail.tsx` shows agent-emitted scorecards for hiring workflows
 - **Foundry-backed AC #4 pipeline** — `preclassify_corpus.py` + `/api/accuracy/run` against Foundry `evaluate()`; full corpus run pending env-var-driven exec
+- **Per-domain phase ribbon** — `web/client/components/apex/PhaseRibbon.tsx` reads the registered phase tuple from `api.shared.domains` so hiring workflows render the 10-phase shape and fleet-* workflows render their own (3–5 phases) without hard-coded literals
 
 POC2 demo runbook lives in [poc2-DEMO.md](poc2-DEMO.md).
 
@@ -55,7 +89,7 @@ Three sections: capability map against the 22 demos, architecture (with the loca
 | 4.21 | AG-UI dynamic components | 🟡 | [AgentDrivenComponent.tsx](../web/client/components/AgentDrivenComponent.tsx) primitive defined (5 spec kinds). Not yet rendered in `WorkflowDetail` — wire-up still TODO before this lights up in the demo. |
 | 4.22 | Region failure + jurisdiction-aware model routing | 🟡 | Region failover reuses POC1's `simulate-region-failure`. APIM jurisdiction-aware routing remains narrated (cloud-target). |
 
-**By count (21 rows; spec §4.14 not enumerated):** 15 ✅, 6 🟡, 0 ❌. The remaining yellow rows are: synthetic-CV expansion (4.9), APIOps governance gate (4.12), Entra Agent ID demonstration (4.15), drift-detection beat (4.20), AG-UI render wiring (4.21), and APIM jurisdiction routing narrative (4.22). No net-new capability is unimplemented; the gap is verification + polish + cloud-target narrative.
+**By count (21 rows; spec §4.14 not enumerated):** 16 ✅, 5 🟡, 0 ❌. §4.21 AG-UI moved to ✅ (rendered in `WorkflowDetail` for hiring workflows). The remaining yellow rows are: synthetic-CV expansion (4.9), APIOps governance gate (4.12), Entra Agent ID demonstration (4.15), drift-detection beat (4.20), and APIM jurisdiction routing narrative (4.22). No net-new capability is unimplemented; the gap is verification + polish + cloud-target narrative.
 
 ---
 
@@ -167,10 +201,10 @@ flowchart LR
 | B — Multi-surface convergence | Adaptive Card composer, ServiceNow webhook, HiringManager surface | ✅ landed (signed-payload verification stubbed) |
 | C — Voice + Avatar | `voice-screener` + `acs-mcp`, `onboarding-buddy` + `heygen-mcp` | ✅ landed (mocks return canned transcript + mp4 URL) |
 | D — Compliance + Jurisdiction | `jurisdiction-router` + `betrvg-checker` + USA/DE policy bundles | ✅ landed |
-| E — Frontier (A2A, AG-UI, Episodic) | `/api/a2a/inbound` + `AgentDrivenComponent.tsx` + `recall_similar_hires` | 🟡 A2A + episodic ✅; AG-UI primitive built but not yet rendered in `WorkflowDetail` |
+| E — Frontier (A2A, AG-UI, Episodic) | `/api/a2a/inbound` + `AgentDrivenComponent.tsx` + `recall_similar_hires` | ✅ A2A + episodic + AG-UI rendered in `WorkflowDetail` |
 | F — POC1 reuse demos | Region failover, cost-per-hire, drift detection, audit, bulk HITL, hooks | ✅ reuses POC1 platform; demo beats need a 30-min dry-run |
 
-**Outstanding before `v1.0-poc2-frontier` tag:** wire `AgentDrivenComponent` into `WorkflowDetail`; expand the synthetic CV corpus past 50 (only if eval variance demands it); 30-minute end-to-end demo dry run; capture demo screenshots / recording.
+**Outstanding before `v1.0-poc2-frontier` tag:** expand the synthetic CV corpus past 50 (only if eval variance demands it); 30-minute end-to-end demo dry run; capture demo screenshots / recording.
 
 The original work plan (track tables below) is kept for cross-referencing implementations against intent. Files marked `(NEW)` were planned new; `(MOD)` adapts a POC1 file.
 

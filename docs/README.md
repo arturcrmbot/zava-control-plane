@@ -44,6 +44,7 @@ The single source for "what's true today". When facts change, edit here.
 |---|---|---|
 | [poc1-status.md](poc1-status.md) | POC1 build state | The AC #1–13 table, per-claim 7-phase flow, remaining-work plan |
 | [poc2-status.md](poc2-status.md) | POC2 build state | The 22-capability matrix, six work tracks, 12-week shape, current demo-ready state |
+| [SCOPE-DELTA.md](SCOPE-DELTA.md) | Lab build vs engagement POC | What's identical, what swaps at engagement-POC time, what landed at the substrate level since the bid was written |
 | [blueprint.md](blueprint.md) | The pitch (manuscript → press; case of type) | The argument the substrate is making to the audience; copy + reasoning |
 | [poc1-architecture.svg](poc1-architecture.svg) | POC1 cloud-target architecture diagram (Apex 6-layer view). Mirrors `poc2-architecture.svg`. |
 | [poc2-architecture.svg](poc2-architecture.svg) | POC2 cloud-target architecture diagram. Referenced from `poc2-status.md`. |
@@ -110,14 +111,15 @@ Most recent first.
 | [2026-04-30-doc-intelligence-skill-design.md](superpowers/specs/2026-04-30-doc-intelligence-skill-design.md) | OCR + Document Intelligence skill |
 | [2026-04-28-poc2-talent-lifecycle-design.md](superpowers/specs/2026-04-28-poc2-talent-lifecycle-design.md) | POC2 design spec |
 | [2026-04-27-poc1-expense-compliance-pivot-design.md](superpowers/specs/2026-04-27-poc1-expense-compliance-pivot-design.md) | POC1 pivot decision spec |
-| `fleet-*-brief.yaml` (4 files) | Domain briefs that feed `compose-domain`. `fleet-travel-preapproval-brief.yaml` is the one already graduated. |
+| `fleet-*-brief.yaml` (6 files: travel-preapproval, vendor-kyc, employee-onboarding, it-access-request, contract-renewal, perf-review) | Domain briefs that fed `compose-domain`. All six graduated to `main` 2026-05-03 and brought to substrate parity 2026-05-04. |
 
-#### Plans (`superpowers/plans/`)
+#### Plans (`superpowers/plans/` and `plan/`)
 
 Active and executed plans, most recent first.
 
 | Plan | Status |
 |---|---|
+| [`../plan/feature-fleet-domain-substrate-1.md`](../plan/feature-fleet-domain-substrate-1.md) | Executed — brought all six fleet-* domains to first-class FM substrate parity (registry, generalised payload, generalised resolve route, FM domain awareness, seed corpora, persona `escalate` verdict) |
 | [2026-05-01-recruiter-hitl-gates.md](superpowers/plans/2026-05-01-recruiter-hitl-gates.md) | Executed |
 | [2026-04-30-candidate-portal-plan.md](superpowers/plans/2026-04-30-candidate-portal-plan.md) | Executed |
 | [2026-04-30-voice-real-plan.md](superpowers/plans/2026-04-30-voice-real-plan.md) | Executed |
@@ -145,7 +147,9 @@ Active and executed plans, most recent first.
 | Skill list | Walked from `api/server/skills/*/SKILL.md` at runtime; surfaced live by [`/api/blueprint/composition`](../api/server/routes/blueprint.py) | No hand-maintained list anywhere |
 | MCP tool list | Walked from `api/server/mcp_tools/*.py` at runtime; surfaced live by [`/api/blueprint/composition`](../api/server/routes/blueprint.py) | No hand-maintained list anywhere |
 | Persona list | [`api/server/personae/*/SKILL.md`](../api/server/personae/) | Reference by directory |
-| Domain list | [`DOMAINS` manifest in blueprint_inventory.py](../api/server/services/blueprint_inventory.py) | Reference by file |
+| Domain registry (the single source of truth for every per-domain integration fact) | [`api/shared/domains.py`](../api/shared/domains.py) | Other docs link, don't restate |
+| Lab build vs engagement POC delta | [SCOPE-DELTA.md](SCOPE-DELTA.md) | Other docs link, don't restate |
+| Substrate-parity work for the six fleet-* domains | [`../plan/feature-fleet-domain-substrate-1.md`](../plan/feature-fleet-domain-substrate-1.md) | Other docs link |
 | Blueprint deploy procedure | [blueprint-microsite-contributor-guide.md §Deploying to Azure](blueprint-microsite-contributor-guide.md#deploying-to-azure) | Other docs link, don't re-document |
 | Compose-domain procedure | [superpowers/skills/compose-domain/SKILL.md](superpowers/skills/compose-domain/SKILL.md) | Same |
 | Port table | [README.md](../README.md) (canonical) + [CODEBASE-TOUR.md](CODEBASE-TOUR.md) + [ARCHITECTURE.md](ARCHITECTURE.md) — duplicated by intent (different entry points) | — |

@@ -1,7 +1,12 @@
 // web/client/components/apex/AuditTrail.tsx
 import type { ActionLedgerEntry } from "@shared/types";
 
-export default function AuditTrail({ ledger }: { ledger: ActionLedgerEntry[] }) {
+export default function AuditTrail({
+  ledger, blobUrl,
+}: {
+  ledger: ActionLedgerEntry[];
+  blobUrl?: string | null;
+}) {
   const last = ledger.slice(-8).reverse();
   return (
     <div className="panel" data-testid="audit-trail">
@@ -19,6 +24,22 @@ export default function AuditTrail({ ledger }: { ledger: ActionLedgerEntry[] }) 
             </div>
           </div>
         ))}
+        {blobUrl ? (
+          <div className="pt-2 mt-2 border-t border-slate-200">
+            <a
+              href={blobUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-blue-700 hover:underline inline-flex items-center gap-1"
+              title="Immutable append-blob on Azure Storage (version-level immutability enabled)"
+            >
+              Open immutable audit ledger →
+            </a>
+            <div className="text-[10px] text-slate-400 mt-0.5">
+              every entry above is also appended to this blob
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

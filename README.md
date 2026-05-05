@@ -6,14 +6,27 @@ top of it. Production-shaped — [Microsoft Agent Framework](https://learn.micro
 durable workflows for orchestration, GHCP SDK Python for agent identities,
 a long-lived Fleet Manager session supervising exceptions in real time.
 
-Two domains are live in `main` and one is graduated from the
-[`compose-domain`](docs/superpowers/skills/compose-domain/SKILL.md) meta-skill:
+**Eight domains live in `main`.** Two were hand-built (POC1 finance,
+POC2 hiring); six were graduated end-to-end by the
+[`compose-domain`](docs/superpowers/skills/compose-domain/SKILL.md)
+meta-skill (v3) over a single weekend. Every per-domain integration
+fact (workflow_type, prefix, orchestrator, HITL gates, persona,
+operator surface, wake hints) lives in a single registry —
+[`api/shared/domains.py`](api/shared/domains.py) — so the substrate's
+generic layers (Fleet Manager skill text, simulator spawners, exception
+resolve route, blueprint inventory) read every domain at runtime
+instead of switching on hard-coded literals.
 
 | Domain | Where it lives | Status |
 |---|---|---|
 | **POC1** — Finance expense compliance | [`api/functions/workflows/expense_claim.py`](api/functions/workflows/expense_claim.py) — 7 phases | Live · 13 ACs, brief in [docs/poc1-brief.md](docs/poc1-brief.md), status in [docs/poc1-status.md](docs/poc1-status.md) |
 | **POC2** — HR talent lifecycle | [`api/functions/workflows/hiring.py`](api/functions/workflows/hiring.py) — 10 phases | Live · 22 capabilities, status in [docs/poc2-status.md](docs/poc2-status.md), demo in [docs/poc2-DEMO.md](docs/poc2-DEMO.md) |
-| **Fleet travel pre-approval** | [`api/functions/workflows/fleet_travel_preapproval.py`](api/functions/workflows/fleet_travel_preapproval.py) | Graduated by `compose-domain` v1; first proof that adding a domain is composition, not construction |
+| **Fleet travel pre-approval** | [`api/functions/workflows/fleet_travel_preapproval.py`](api/functions/workflows/fleet_travel_preapproval.py) — 3 phases | Composed · `compose-domain` v1; first existence proof |
+| **Fleet vendor onboarding & KYC** | [`api/functions/workflows/fleet_vendor_kyc.py`](api/functions/workflows/fleet_vendor_kyc.py) — 4 phases | Composed · `compose-domain` v3 |
+| **Fleet employee onboarding** | [`api/functions/workflows/fleet_employee_onboarding.py`](api/functions/workflows/fleet_employee_onboarding.py) — 4 phases | Composed · `compose-domain` v3 |
+| **Fleet IT access request** | [`api/functions/workflows/fleet_it_access_request.py`](api/functions/workflows/fleet_it_access_request.py) — 5 phases | Composed · `compose-domain` v3 |
+| **Fleet contract renewal** | [`api/functions/workflows/fleet_contract_renewal.py`](api/functions/workflows/fleet_contract_renewal.py) — 5 phases | Composed · `compose-domain` v3 |
+| **Fleet performance review** | [`api/functions/workflows/fleet_perf_review.py`](api/functions/workflows/fleet_perf_review.py) — 5 phases | Composed · `compose-domain` v3 |
 
 The pitch behind this is captured in [docs/blueprint.md](docs/blueprint.md);
 the live editorial microsite that visualises the substrate is
@@ -54,9 +67,13 @@ make up                                        # boots azurite + POC1 mocks + Fa
 ```
 
 UI at http://localhost:5173, candidate portal at http://localhost:5174.
-The simulator's domain-aware ramp loop trickles real expense, hiring,
-and travel-preapproval workflows into the dashboard automatically when
-the substrate is up. The blueprint microsite runs separately
+The simulator's domain-aware ramp loop trickles real workflows from
+all eight domains into the dashboard automatically when the substrate
+is up; the [persona responder](api/server/services/persona_responder.py)
+closes HITL gates per the configured `PERSONA_AUTO_CLOSE` allow-list
+(personae now support a third `escalate` verdict for high-risk inputs,
+which leaves the gate open and produces an enriched FM exception).
+The blueprint microsite runs separately
 (`npm run dev:blueprint` → http://localhost:5175); see the
 [contributor guide](docs/blueprint-microsite-contributor-guide.md).
 

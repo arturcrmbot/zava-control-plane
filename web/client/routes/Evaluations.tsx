@@ -89,10 +89,22 @@ export default function Evaluations() {
                           "_sample_output", "_pass", "_result"];
   const _isMetaKey = (k: string) =>
     k.startsWith("gpt_") || _META_SUFFIXES.some(s => k.endsWith(s));
-  const allEvalNames = Array.from(
-    new Set(byAgent.flatMap(a => Object.keys(a.scores).filter(k => !_isMetaKey(k))))
-  ).sort();
   const rows = rowsEnv?.rows ?? [];
+
+  // POC2 hiring agents — added 2026-05-05 per
+  // plan/feature-foundry-credibility-friday-1.md TASK-021. The split lets
+  // each table show only its domain-relevant evaluator columns instead of
+  // a sparse union table.
+  const _HIRING_AGENTS = new Set([
+    "cv-crystalliser", "auto-shortlister", "jurisdiction-router",
+    "betrvg-checker", "voice-screener", "interview-recommender",
+    "offer-personaliser",
+  ]);
+  const hiringAgents = byAgent.filter(a => _HIRING_AGENTS.has(a.agent_label));
+  const financeAgents = byAgent.filter(a => !_HIRING_AGENTS.has(a.agent_label));
+  const _evalNamesFor = (group: typeof byAgent) => Array.from(
+    new Set(group.flatMap(a => Object.keys(a.scores).filter(k => !_isMetaKey(k))))
+  ).sort();
 
   const _primaryScores = (s: Record<string, number | string>) =>
     Object.entries(s)
@@ -117,35 +129,15 @@ export default function Evaluations() {
       </div>
 
       {byAgent.length > 0 ? (
-        <div className="panel">
-          <div className="panel-header">By agent</div>
-          <table className="text-xs w-full">
-            <thead>
-              <tr className="text-slate-500">
-                <th className="text-left px-3 py-2">agent</th>
-                <th className="text-right px-3 py-2">n</th>
-                {allEvalNames.map(n => (
-                  <th key={n} className="text-right px-3 py-2">{n}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {byAgent.map(a => (
-                <tr key={a.agent_label}>
-                  <td className="px-3 py-2 font-mono">{a.agent_label}</td>
-                  <td className="px-3 py-2 text-right">{a.n}</td>
-                  {allEvalNames.map(n => {
-                    const v = a.scores[n];
-                    return (
-                      <td key={n} className="px-3 py-2 text-right">
-                        {typeof v === "number" ? v.toFixed(2) : "—"}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-3">
+          {financeAgents.length > 0 ? (
+            <ByAgentTable label="Finance (POC1)" agents={financeAgents}
+                          evalNames={_evalNamesFor(financeAgents)} />
+          ) : null}
+          {hiringAgents.length > 0 ? (
+            <ByAgentTable label="Hiring (POC2)" agents={hiringAgents}
+                          evalNames={_evalNamesFor(hiringAgents)} />
+          ) : null}
         </div>
       ) : null}
 
@@ -191,6 +183,47 @@ function StatusBadge({ status }: { status: string }) {
             : status === "pending"   ? "bg-amber-100 text-amber-800"
             :                          "bg-slate-100 text-slate-700";
   return <span className={`text-[10px] px-1.5 py-0.5 rounded ${cls}`}>{status}</span>;
+}
+
+function ByAgentTable({
+  label, agents, evalNames,
+}: {
+  label: string;
+  agents: { agent_label: string; n: number; scores: Record<string, number> }[];
+  evalNames: string[];
+}) {
+  return (
+    <div className="panel">
+      <div className="panel-header">{label} \u2014 by agent</div>
+      <table className="text-xs w-full">
+        <thead>
+          <tr className="text-slate-500">
+            <th className="text-left px-3 py-2">agent</th>
+            <th className="text-right px-3 py-2">n</th>
+            {evalNames.map(n => (
+              <th key={n} className="text-right px-3 py-2">{n}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-200">
+          {agents.map(a => (
+            <tr key={a.agent_label}>
+              <td className="px-3 py-2 font-mono">{a.agent_label}</td>
+              <td className="px-3 py-2 text-right">{a.n}</td>
+              {evalNames.map(n => {
+                const v = a.scores[n];
+                return (
+                  <td key={n} className="px-3 py-2 text-right">
+                    {typeof v === "number" ? v.toFixed(2) : "—"}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 function Tile({ label, tile }: { label: string; tile?: TileBody }) {
