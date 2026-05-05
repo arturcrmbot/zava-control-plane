@@ -28,6 +28,7 @@ type Derivation = {
   action: string;
   value?: number | null;
   category?: string | null;
+  geography?: string | null;
 };
 
 /**
@@ -104,6 +105,38 @@ function deriveMatrixRequest(w: Workflow): Derivation | null {
       action: "ap_invoice_approval",
       value: p.invoice?.amount_gbp,
       category: p.invoice?.category ?? "standard",
+    };
+  }
+  if (t === "purchase-order") {
+    const p = (w.payload ?? {}) as { purchase_order?: { amount_gbp?: number; category?: string } };
+    return {
+      action: "purchase_order_approval",
+      value: p.purchase_order?.amount_gbp,
+      category: p.purchase_order?.category ?? "standard",
+    };
+  }
+  if (t === "contract-review") {
+    const p = (w.payload ?? {}) as { contract_review?: { amount_gbp?: number; contract_type?: string } };
+    return {
+      action: "contract_review_signoff",
+      value: p.contract_review?.amount_gbp,
+      category: p.contract_review?.contract_type ?? "msa",
+    };
+  }
+  if (t === "privacy-dpia") {
+    const p = (w.payload ?? {}) as { dpia?: { risk_tier?: string; geography?: string } };
+    return {
+      action: "privacy_dpia_signoff",
+      category: p.dpia?.risk_tier ?? "low_risk",
+      geography: p.dpia?.geography ?? "EMEA",
+    };
+  }
+  if (t === "treasury-fx") {
+    const p = (w.payload ?? {}) as { treasury_op?: { notional_gbp?: number } };
+    return {
+      action: "treasury_fx_hedge",
+      value: p.treasury_op?.notional_gbp,
+      category: "standard",
     };
   }
   return null;

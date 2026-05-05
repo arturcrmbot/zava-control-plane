@@ -389,3 +389,130 @@ def fleet_ap_invoice_invoice_lookup_activity_trigger(payload: dict) -> dict:
 def fleet_ap_invoice_three_way_match_activity_trigger(payload: dict) -> dict:
     return fleet_ap_invoice_three_way_match_activity(payload)
 # === END hand-graduated fleet-ap-invoice ===
+
+# === BEGIN hand-graduated wave 2: fleet-purchase-order ===
+from api.functions.workflows.fleet_purchase_order import (
+    fleet_purchase_order_orchestration,
+)
+from api.functions.workflows.fleet_purchase_order_activities import (
+    fleet_purchase_order_po_lookup_activity,
+    fleet_purchase_order_supplier_check_activity,
+    fleet_purchase_order_authority_resolve_activity,
+)
+
+
+@app.orchestration_trigger(context_name="context")
+def FleetPurchaseOrderOrchestrator(context: df.DurableOrchestrationContext):
+    return fleet_purchase_order_orchestration(context)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_purchase_order_po_lookup_activity_trigger(payload: dict) -> dict:
+    return fleet_purchase_order_po_lookup_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_purchase_order_supplier_check_activity_trigger(payload: dict) -> dict:
+    return fleet_purchase_order_supplier_check_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_purchase_order_authority_resolve_activity_trigger(payload: dict) -> dict:
+    return fleet_purchase_order_authority_resolve_activity(payload)
+# === END hand-graduated wave 2: fleet-purchase-order ===
+
+
+# === BEGIN hand-graduated wave 2: fleet-contract-review ===
+from api.functions.workflows.fleet_contract_review import (
+    fleet_contract_review_orchestration,
+)
+from api.functions.workflows.fleet_contract_review_activities import (
+    fleet_contract_review_contract_intake_activity,
+    fleet_contract_review_risk_classify_activity,
+    fleet_contract_review_authority_resolve_activity,
+)
+
+
+@app.orchestration_trigger(context_name="context")
+def FleetContractReviewOrchestrator(context: df.DurableOrchestrationContext):
+    return fleet_contract_review_orchestration(context)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_contract_review_contract_intake_activity_trigger(payload: dict) -> dict:
+    return fleet_contract_review_contract_intake_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_contract_review_risk_classify_activity_trigger(payload: dict) -> dict:
+    return fleet_contract_review_risk_classify_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_contract_review_authority_resolve_activity_trigger(payload: dict) -> dict:
+    return fleet_contract_review_authority_resolve_activity(payload)
+# === END hand-graduated wave 2: fleet-contract-review ===
+
+
+# === BEGIN hand-graduated wave 2: fleet-privacy-dpia ===
+from api.functions.workflows.fleet_privacy_dpia import (
+    fleet_privacy_dpia_orchestration,
+)
+from api.functions.workflows.fleet_privacy_dpia_activities import (
+    fleet_privacy_dpia_dpia_intake_activity,
+    fleet_privacy_dpia_risk_classify_activity,
+    fleet_privacy_dpia_authority_resolve_activity,
+)
+
+
+@app.orchestration_trigger(context_name="context")
+def FleetPrivacyDpiaOrchestrator(context: df.DurableOrchestrationContext):
+    return fleet_privacy_dpia_orchestration(context)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_privacy_dpia_dpia_intake_activity_trigger(payload: dict) -> dict:
+    return fleet_privacy_dpia_dpia_intake_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_privacy_dpia_risk_classify_activity_trigger(payload: dict) -> dict:
+    return fleet_privacy_dpia_risk_classify_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_privacy_dpia_authority_resolve_activity_trigger(payload: dict) -> dict:
+    return fleet_privacy_dpia_authority_resolve_activity(payload)
+# === END hand-graduated wave 2: fleet-privacy-dpia ===
+
+
+# === BEGIN hand-graduated wave 2: fleet-treasury-fx ===
+from api.functions.workflows.fleet_treasury_fx import (
+    fleet_treasury_fx_orchestration,
+)
+from api.functions.workflows.fleet_treasury_fx_activities import (
+    fleet_treasury_fx_op_lookup_activity,
+    fleet_treasury_fx_position_check_activity,
+    fleet_treasury_fx_authority_resolve_activity,
+)
+
+
+@app.orchestration_trigger(context_name="context")
+def FleetTreasuryFxOrchestrator(context: df.DurableOrchestrationContext):
+    return fleet_treasury_fx_orchestration(context)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_treasury_fx_op_lookup_activity_trigger(payload: dict) -> dict:
+    return fleet_treasury_fx_op_lookup_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_treasury_fx_position_check_activity_trigger(payload: dict) -> dict:
+    return fleet_treasury_fx_position_check_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_treasury_fx_authority_resolve_activity_trigger(payload: dict) -> dict:
+    return fleet_treasury_fx_authority_resolve_activity(payload)
+# === END hand-graduated wave 2: fleet-treasury-fx ===

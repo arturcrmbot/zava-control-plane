@@ -118,3 +118,47 @@ from .fleet_ap_invoice_invoice_lookup import (
 from .fleet_ap_invoice_three_way_match import (
     build_fleet_ap_invoice_three_way_match_workflow,
 )
+
+# Hand-graduated wave 2: purchase-order
+from .fleet_purchase_order_po_lookup import (
+    build_fleet_purchase_order_po_lookup_workflow,
+)
+from .fleet_purchase_order_supplier_check import (
+    build_fleet_purchase_order_supplier_check_workflow,
+)
+from .fleet_purchase_order_authority_resolve import (
+    build_fleet_purchase_order_authority_resolve_workflow,
+)
+
+# Hand-graduated wave 2: contract-review
+from .fleet_contract_review_contract_intake import (
+    build_fleet_contract_review_contract_intake_workflow,
+)
+from .fleet_contract_review_risk_classify import (
+    build_fleet_contract_review_risk_classify_workflow,
+)
+from .fleet_contract_review_authority_resolve import (
+    build_fleet_contract_review_authority_resolve_workflow,
+)
+
+# Hand-graduated wave 2: privacy-dpia
+from .fleet_privacy_dpia_dpia_intake import (
+    build_fleet_privacy_dpia_dpia_intake_workflow,
+)
+from .fleet_privacy_dpia_risk_classify import (
+    build_fleet_privacy_dpia_risk_classify_workflow,
+)
+from .fleet_privacy_dpia_authority_resolve import (
+    build_fleet_privacy_dpia_authority_resolve_workflow,
+)
+
+# Hand-graduated wave 2: treasury-fx
+from .fleet_treasury_fx_op_lookup import (
+    build_fleet_treasury_fx_op_lookup_workflow,
+)
+from .fleet_treasury_fx_position_check import (
+    build_fleet_treasury_fx_position_check_workflow,
+)
+from .fleet_treasury_fx_authority_resolve import (
+    build_fleet_treasury_fx_authority_resolve_workflow,
+)

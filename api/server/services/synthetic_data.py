@@ -370,3 +370,95 @@ def build_fleet_ap_invoice_workflow(
         agency="WPP",
         payload={"invoice": invoice, "scenario": r.get("scenario")},
     )
+
+
+# Hand-graduated wave 2: purchase-order, contract-review, privacy-dpia, treasury-fx
+
+def build_fleet_purchase_order_workflow(workflow_id: str, record: dict | None = None) -> Workflow:
+    """Purchase Order workflow record. `record` is one PO from data/synthetic/purchase-order/pos.json."""
+    r = record or {}
+    purchase_order = {
+        "po_id": r.get("po_id") or f"PO-2026-{random.randint(10000, 99999):05d}",
+        "vendor_name": r.get("vendor_name", "Globex Industries"),
+        "amount_gbp": r.get("amount_gbp", 5000),
+        "category": r.get("category", "standard"),
+        "supplier_on_approved_list": r.get("supplier_on_approved_list", True),
+    }
+    created_at, sla = _now_with_jitter()
+    return Workflow(
+        id=workflow_id,
+        type="purchase-order",
+        current_phase="PO Lookup",
+        created_at=created_at,
+        sla_due_at=sla,
+        jurisdiction="London-WPP",
+        agency="WPP",
+        payload={"purchase_order": purchase_order, "scenario": r.get("scenario")},
+    )
+
+
+def build_fleet_contract_review_workflow(workflow_id: str, record: dict | None = None) -> Workflow:
+    """Contract Review workflow record."""
+    r = record or {}
+    contract_review = {
+        "contract_id": r.get("contract_id") or f"CR-2026-{random.randint(10000, 99999):05d}",
+        "vendor_name": r.get("vendor_name", "Acme Holdings"),
+        "contract_type": r.get("contract_type", "msa"),
+        "amount_gbp": r.get("amount_gbp", 50000),
+        "deviates_from_template": r.get("deviates_from_template", False),
+    }
+    created_at, sla = _now_with_jitter()
+    return Workflow(
+        id=workflow_id,
+        type="contract-review",
+        current_phase="Contract Intake",
+        created_at=created_at,
+        sla_due_at=sla,
+        jurisdiction="London-WPP",
+        agency="WPP",
+        payload={"contract_review": contract_review, "scenario": r.get("scenario")},
+    )
+
+
+def build_fleet_privacy_dpia_workflow(workflow_id: str, record: dict | None = None) -> Workflow:
+    """Privacy DPIA workflow record."""
+    r = record or {}
+    dpia = {
+        "dpia_id": r.get("dpia_id") or f"DPIA-2026-{random.randint(10000, 99999):05d}",
+        "system_name": r.get("system_name", "Unnamed System"),
+        "risk_tier": r.get("risk_tier", "low_risk"),
+        "geography": r.get("geography", "EMEA"),
+    }
+    created_at, sla = _now_with_jitter()
+    return Workflow(
+        id=workflow_id,
+        type="privacy-dpia",
+        current_phase="DPIA Intake",
+        created_at=created_at,
+        sla_due_at=sla,
+        jurisdiction="London-WPP",
+        agency="WPP",
+        payload={"dpia": dpia, "scenario": r.get("scenario")},
+    )
+
+
+def build_fleet_treasury_fx_workflow(workflow_id: str, record: dict | None = None) -> Workflow:
+    """Treasury FX workflow record."""
+    r = record or {}
+    treasury_op = {
+        "op_id": r.get("op_id") or f"FX-2026-{random.randint(10000, 99999):05d}",
+        "op_kind": r.get("op_kind", "spot-hedge"),
+        "currency_pair": r.get("currency_pair", "GBP/USD"),
+        "notional_gbp": r.get("notional_gbp", 250000),
+    }
+    created_at, sla = _now_with_jitter()
+    return Workflow(
+        id=workflow_id,
+        type="treasury-fx",
+        current_phase="Op Lookup",
+        created_at=created_at,
+        sla_due_at=sla,
+        jurisdiction="London-WPP",
+        agency="WPP",
+        payload={"treasury_op": treasury_op, "scenario": r.get("scenario")},
+    )

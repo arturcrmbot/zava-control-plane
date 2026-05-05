@@ -323,6 +323,100 @@ DOMAINS: dict[str, Domain] = {
             WakeHint("invoice.value.controller_band", "Invoice >£25k routed to controller"),
         ),
     ),
+
+    # ----- Hand-graduated wave 2 (10th–13th live domains) -----
+    # All four use a 4-phase pattern:
+    #   Phase 1 deterministic lookup -> Phase 2 deterministic check ->
+    #   Phase 3 Authority Resolve (calls matrix MCP, picks approver_role
+    #   dynamically) -> Phase 4 HITL approver_signoff. The HitlGate
+    #   persona below is the *most-likely* / lowest-band approver; the
+    #   actual responder uses the resolved approver_role from the
+    #   suspended payload's persona field, so any of the matrix-routed
+    #   roles can take the gate.
+    "purchase-order": Domain(
+        workflow_type="purchase-order",
+        display_name="Purchase Order",
+        workflow_id_prefix="POW",
+        orchestrator_name="FleetPurchaseOrderOrchestrator",
+        operator_surface="procurement",
+        phases=(
+            Phase("PO Lookup", "deterministic"),
+            Phase("Supplier Check", "deterministic"),
+            Phase("Authority Resolve", "deterministic"),
+            Phase("approver_signoff", "hitl"),
+        ),
+        hitl_gates=(
+            HitlGate("approver_signoff", "purchase_order_approval_decision", "line_manager"),
+        ),
+        skills=(),
+        wake_hints=(
+            WakeHint("po.supplier.unapproved", "PO supplier not on approved list"),
+            WakeHint("po.value.cpo_band", "PO >£500k routed to CPO"),
+        ),
+    ),
+    "contract-review": Domain(
+        workflow_type="contract-review",
+        display_name="Contract Review",
+        workflow_id_prefix="CRW",
+        orchestrator_name="FleetContractReviewOrchestrator",
+        operator_surface="legal",
+        phases=(
+            Phase("Contract Intake", "deterministic"),
+            Phase("Risk Classify", "deterministic"),
+            Phase("Authority Resolve", "deterministic"),
+            Phase("approver_signoff", "hitl"),
+        ),
+        hitl_gates=(
+            HitlGate("approver_signoff", "contract_review_signoff_decision", "contracts_counsel"),
+        ),
+        skills=(),
+        wake_hints=(
+            WakeHint("contract.template.deviation", "Contract deviates from template"),
+            WakeHint("contract.value.material", "Contract MSA >£250k routed to GC"),
+        ),
+    ),
+    "privacy-dpia": Domain(
+        workflow_type="privacy-dpia",
+        display_name="Privacy DPIA",
+        workflow_id_prefix="DPI",
+        orchestrator_name="FleetPrivacyDpiaOrchestrator",
+        operator_surface="privacy",
+        phases=(
+            Phase("DPIA Intake", "deterministic"),
+            Phase("Risk Classify", "deterministic"),
+            Phase("Authority Resolve", "deterministic"),
+            Phase("approver_signoff", "hitl"),
+        ),
+        hitl_gates=(
+            HitlGate("approver_signoff", "dpia_signoff_decision", "dpo"),
+        ),
+        skills=(),
+        wake_hints=(
+            WakeHint("dpia.risk.high", "DPIA flagged as high-risk processing"),
+            WakeHint("dpia.gdpr.art_35", "EMEA high-risk DPIA — GDPR Art. 35 trigger"),
+        ),
+    ),
+    "treasury-fx": Domain(
+        workflow_type="treasury-fx",
+        display_name="Treasury FX",
+        workflow_id_prefix="TFX",
+        orchestrator_name="FleetTreasuryFxOrchestrator",
+        operator_surface="treasury",
+        phases=(
+            Phase("Op Lookup", "deterministic"),
+            Phase("Position Check", "deterministic"),
+            Phase("Authority Resolve", "deterministic"),
+            Phase("approver_signoff", "hitl"),
+        ),
+        hitl_gates=(
+            HitlGate("approver_signoff", "treasury_signoff_decision", "treasurer"),
+        ),
+        skills=(),
+        wake_hints=(
+            WakeHint("fx.position.over_limit", "FX op exceeds per-pair trading limit"),
+            WakeHint("fx.value.cfo_band", "FX op >£1M routed to CFO"),
+        ),
+    ),
 }
 
 

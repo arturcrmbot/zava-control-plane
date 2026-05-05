@@ -23,6 +23,10 @@ from api.server.services.synthetic_data import (
     build_fleet_contract_renewal_workflow,
     build_fleet_perf_review_workflow,
     build_fleet_ap_invoice_workflow,
+    build_fleet_purchase_order_workflow,
+    build_fleet_contract_review_workflow,
+    build_fleet_privacy_dpia_workflow,
+    build_fleet_treasury_fx_workflow,
 )
 from api.server.services.durable_client import (
     schedule_new_orchestration, raise_orchestration_event,
@@ -129,6 +133,10 @@ _CORPUS_FILE: dict[str, str] = {
     "contract-renewal":   "contract-renewal/contracts.json",
     "perf-review":        "perf-review/reviewees.json",
     "ap-invoice":         "ap-invoice/invoices.json",
+    "purchase-order":     "purchase-order/pos.json",
+    "contract-review":    "contract-review/contracts.json",
+    "privacy-dpia":       "privacy-dpia/dpias.json",
+    "treasury-fx":        "treasury-fx/ops.json",
 }
 
 # Per-(workflow_type) lazy cache. Each value is a list of record dicts.
@@ -506,6 +514,10 @@ async def ramp_loop() -> None:
         "contract-renewal": spawn_fleet_contract_renewal_workflow,
         "perf-review": spawn_fleet_perf_review_workflow,
         "ap-invoice": spawn_fleet_ap_invoice_workflow,
+        "purchase-order": spawn_fleet_purchase_order_workflow,
+        "contract-review": spawn_fleet_contract_review_workflow,
+        "privacy-dpia": spawn_fleet_privacy_dpia_workflow,
+        "treasury-fx": spawn_fleet_treasury_fx_workflow,
     }
 
     domains_csv = os.getenv("SIMULATOR_RAMP_DOMAINS", "").strip()
@@ -872,3 +884,143 @@ async def spawn_fleet_ap_invoice_workflow(
         print(f"[orchestrator] failed to schedule {wid}: {ex}")
     return wid
 # === END hand-graduated fleet-ap-invoice ===
+
+
+# === BEGIN hand-graduated wave 2: fleet-purchase-order ===
+_po_seq = 0
+
+
+async def spawn_fleet_purchase_order_workflow(
+    po_id: str | None = None,
+    scenario: str | None = None,
+) -> str:
+    global _po_seq
+    _po_seq += 1
+    wid = f"POW-{_po_seq:04d}"
+    record = _pick_record("purchase-order", scenario=scenario) or {}
+    if po_id:
+        record = {**record, "po_id": po_id}
+    w = build_fleet_purchase_order_workflow(wid, record=record)
+    app_state.store.upsert_workflow(w)
+    payload: dict = {
+        "workflow_id": wid,
+        "type": "purchase-order",
+        "purchase_order": w.payload.get("purchase_order"),
+    }
+    if scenario or w.payload.get("scenario"):
+        payload["scenario"] = scenario or w.payload.get("scenario")
+    try:
+        result = await schedule_new_orchestration(
+            payload, function_name="FleetPurchaseOrderOrchestrator",
+        )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    return wid
+# === END hand-graduated wave 2: fleet-purchase-order ===
+
+
+# === BEGIN hand-graduated wave 2: fleet-contract-review ===
+_cr_seq = 0
+
+
+async def spawn_fleet_contract_review_workflow(
+    contract_id: str | None = None,
+    scenario: str | None = None,
+) -> str:
+    global _cr_seq
+    _cr_seq += 1
+    wid = f"CRW-{_cr_seq:04d}"
+    record = _pick_record("contract-review", scenario=scenario) or {}
+    if contract_id:
+        record = {**record, "contract_id": contract_id}
+    w = build_fleet_contract_review_workflow(wid, record=record)
+    app_state.store.upsert_workflow(w)
+    payload: dict = {
+        "workflow_id": wid,
+        "type": "contract-review",
+        "contract_review": w.payload.get("contract_review"),
+    }
+    if scenario or w.payload.get("scenario"):
+        payload["scenario"] = scenario or w.payload.get("scenario")
+    try:
+        result = await schedule_new_orchestration(
+            payload, function_name="FleetContractReviewOrchestrator",
+        )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    return wid
+# === END hand-graduated wave 2: fleet-contract-review ===
+
+
+# === BEGIN hand-graduated wave 2: fleet-privacy-dpia ===
+_dpi_seq = 0
+
+
+async def spawn_fleet_privacy_dpia_workflow(
+    dpia_id: str | None = None,
+    scenario: str | None = None,
+) -> str:
+    global _dpi_seq
+    _dpi_seq += 1
+    wid = f"DPI-{_dpi_seq:04d}"
+    record = _pick_record("privacy-dpia", scenario=scenario) or {}
+    if dpia_id:
+        record = {**record, "dpia_id": dpia_id}
+    w = build_fleet_privacy_dpia_workflow(wid, record=record)
+    app_state.store.upsert_workflow(w)
+    payload: dict = {
+        "workflow_id": wid,
+        "type": "privacy-dpia",
+        "dpia": w.payload.get("dpia"),
+    }
+    if scenario or w.payload.get("scenario"):
+        payload["scenario"] = scenario or w.payload.get("scenario")
+    try:
+        result = await schedule_new_orchestration(
+            payload, function_name="FleetPrivacyDpiaOrchestrator",
+        )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    return wid
+# === END hand-graduated wave 2: fleet-privacy-dpia ===
+
+
+# === BEGIN hand-graduated wave 2: fleet-treasury-fx ===
+_tfx_seq = 0
+
+
+async def spawn_fleet_treasury_fx_workflow(
+    op_id: str | None = None,
+    scenario: str | None = None,
+) -> str:
+    global _tfx_seq
+    _tfx_seq += 1
+    wid = f"TFX-{_tfx_seq:04d}"
+    record = _pick_record("treasury-fx", scenario=scenario) or {}
+    if op_id:
+        record = {**record, "op_id": op_id}
+    w = build_fleet_treasury_fx_workflow(wid, record=record)
+    app_state.store.upsert_workflow(w)
+    payload: dict = {
+        "workflow_id": wid,
+        "type": "treasury-fx",
+        "treasury_op": w.payload.get("treasury_op"),
+    }
+    if scenario or w.payload.get("scenario"):
+        payload["scenario"] = scenario or w.payload.get("scenario")
+    try:
+        result = await schedule_new_orchestration(
+            payload, function_name="FleetTreasuryFxOrchestrator",
+        )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    return wid
+# === END hand-graduated wave 2: fleet-treasury-fx ===

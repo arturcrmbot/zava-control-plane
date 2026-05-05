@@ -53,3 +53,9 @@ LINE_MANAGER_DELIVERY_TIMEOUT: timedelta = timedelta(hours=24)
 # Hand-graduated: fleet-ap-invoice
 AP_CLERK_SIGNOFF_TIMEOUT: timedelta = timedelta(hours=24)
 CONTROLLER_SIGNOFF_TIMEOUT: timedelta = timedelta(hours=72)
+
+# Hand-graduated wave 2: PO / contract-review / DPIA / treasury-fx
+PURCHASE_ORDER_SIGNOFF_TIMEOUT: timedelta = timedelta(hours=48)
+CONTRACT_REVIEW_SIGNOFF_TIMEOUT: timedelta = timedelta(hours=48)
+DPIA_SIGNOFF_TIMEOUT: timedelta = timedelta(hours=72)
+TREASURY_SIGNOFF_TIMEOUT: timedelta = timedelta(hours=24)

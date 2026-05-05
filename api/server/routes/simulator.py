@@ -290,3 +290,91 @@ async def inject_fleet_ap_invoice(body: FleetApInvoiceBody):
     )
     return {"workflow_id": workflow_id}
 # === END hand-graduated fleet-ap-invoice ===
+
+
+# === BEGIN hand-graduated wave 2: fleet-purchase-order ===
+from api.server.services.simulator_orchestrator import (  # noqa: E402
+    spawn_fleet_purchase_order_workflow,
+)
+
+
+class FleetPurchaseOrderBody(BaseModel):
+    po_id: str | None = None
+    scenario: str | None = None
+
+
+@router.post("/fleet-purchase-order")
+async def inject_fleet_purchase_order(body: FleetPurchaseOrderBody):
+    """Hand-graduated domain simulator: spawn a purchase-order workflow."""
+    workflow_id = await spawn_fleet_purchase_order_workflow(
+        po_id=body.po_id,
+        scenario=body.scenario,
+    )
+    return {"workflow_id": workflow_id}
+# === END hand-graduated wave 2: fleet-purchase-order ===
+
+
+# === BEGIN hand-graduated wave 2: fleet-contract-review ===
+from api.server.services.simulator_orchestrator import (  # noqa: E402
+    spawn_fleet_contract_review_workflow,
+)
+
+
+class FleetContractReviewBody(BaseModel):
+    contract_id: str | None = None
+    scenario: str | None = None
+
+
+@router.post("/fleet-contract-review")
+async def inject_fleet_contract_review(body: FleetContractReviewBody):
+    """Hand-graduated domain simulator: spawn a contract-review workflow."""
+    workflow_id = await spawn_fleet_contract_review_workflow(
+        contract_id=body.contract_id,
+        scenario=body.scenario,
+    )
+    return {"workflow_id": workflow_id}
+# === END hand-graduated wave 2: fleet-contract-review ===
+
+
+# === BEGIN hand-graduated wave 2: fleet-privacy-dpia ===
+from api.server.services.simulator_orchestrator import (  # noqa: E402
+    spawn_fleet_privacy_dpia_workflow,
+)
+
+
+class FleetPrivacyDpiaBody(BaseModel):
+    dpia_id: str | None = None
+    scenario: str | None = None
+
+
+@router.post("/fleet-privacy-dpia")
+async def inject_fleet_privacy_dpia(body: FleetPrivacyDpiaBody):
+    """Hand-graduated domain simulator: spawn a privacy-dpia workflow."""
+    workflow_id = await spawn_fleet_privacy_dpia_workflow(
+        dpia_id=body.dpia_id,
+        scenario=body.scenario,
+    )
+    return {"workflow_id": workflow_id}
+# === END hand-graduated wave 2: fleet-privacy-dpia ===
+
+
+# === BEGIN hand-graduated wave 2: fleet-treasury-fx ===
+from api.server.services.simulator_orchestrator import (  # noqa: E402
+    spawn_fleet_treasury_fx_workflow,
+)
+
+
+class FleetTreasuryFxBody(BaseModel):
+    op_id: str | None = None
+    scenario: str | None = None
+
+
+@router.post("/fleet-treasury-fx")
+async def inject_fleet_treasury_fx(body: FleetTreasuryFxBody):
+    """Hand-graduated domain simulator: spawn a treasury-fx workflow."""
+    workflow_id = await spawn_fleet_treasury_fx_workflow(
+        op_id=body.op_id,
+        scenario=body.scenario,
+    )
+    return {"workflow_id": workflow_id}
+# === END hand-graduated wave 2: fleet-treasury-fx ===

@@ -371,6 +371,30 @@ PERSONAS: dict[str, Persona] = {
         uses_authority_mcp=True,
         description="Reviews compensation calibrations and sizes executive offers; advisory authority on outlier ratings, sign-off on executive packages.",
     ),
+    # ----- Top-tier finance escalation targets (registered to make the
+    #       dynamic-persona orchestrators in purchase-order, contract-review,
+    #       privacy-dpia and treasury-fx work cleanly when matrix lookups
+    #       resolve to these roles) -----
+    "finance_controller": Persona(
+        role="finance_controller",
+        archetype="approver",
+        scope_function="finance",
+        workflow_label="Finance — controller",
+        external_event_default="finance_controller_signoff_decision",
+        default_authority_band="material expense / AP / contract renewal above BP delegation",
+        uses_authority_mcp=True,
+        description="Finance Controller; sign-off authority for material commitments above the BP delegation but below CFO.",
+    ),
+    "cfo": Persona(
+        role="cfo",
+        archetype="approver",
+        scope_function="finance",
+        workflow_label="Finance — executive",
+        external_event_default="cfo_signoff_decision",
+        default_authority_band="top-band finance — material AP, executive offers, large hedges, top-band travel",
+        uses_authority_mcp=True,
+        description="Chief Financial Officer; sign-off authority for top-band finance commitments across every domain.",
+    ),
 }
 
 

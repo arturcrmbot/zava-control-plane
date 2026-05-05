@@ -131,7 +131,9 @@ export interface Workflow {
     | "travel-preapproval" | "vendor-kyc" | "employee-onboarding"
     | "it-access-request" | "contract-renewal" | "perf-review"
     // Hand-graduated curve-proof domain.
-    | "ap-invoice";
+    | "ap-invoice"
+    // Hand-graduated wave 2: matrix-driven dynamic-persona domains.
+    | "purchase-order" | "contract-review" | "privacy-dpia" | "treasury-fx";
   status: WorkflowStatus;
   currentPhase: PhaseName;
   createdAt: number;
