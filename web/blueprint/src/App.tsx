@@ -3,6 +3,7 @@ import { Analogy } from "./sections/Analogy";
 import { Argument } from "./sections/Argument";
 import { Composition } from "./sections/Composition";
 import { Personae } from "./sections/Personae";
+import { Authority } from "./sections/Authority";
 import { MetaSkill } from "./sections/MetaSkill";
 import { Observatory } from "./sections/Observatory";
 import { Closing } from "./sections/Closing";
@@ -29,8 +30,10 @@ export default function App() {
       <Argument />
       <hr className="rule" />
       <Composition />
+      <hr className="rule" />
       <Personae />
       <hr className="rule" />
+      <Authority />
       <hr className="rule" />
       <MetaSkill />
       <hr className="rule" />
