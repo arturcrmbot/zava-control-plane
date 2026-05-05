@@ -1,183 +1,101 @@
-# DEMO — Vendor day runbook (Fri 8-May → Wed 13-May 2026)
+# Demo flow — Microsoft / WPP vendor presentation
 
-Operator runbook for the **2-hour WPP vendor presentation slot**. Six
-slots; the three demo slots (2, 3, 4) are 75 minutes total and all live.
-Single presenter. POC2 surfaces are fair game inside Slot 2 wherever
-they reinforce the substrate story.
+Live, single-presenter walkthrough of the Microsoft Apex submission for
+the WPP Agentic AI RFP. Three demo slots inside the 2-hour vendor day:
+75 minutes of live evidence across the Control Plane and the two POCs,
+backed by 30 minutes of probe Q&A on the running stack.
 
-This file is **deliberately high-level** — the operator knows what to
-say. Each slot lists the beats in order, the live URL, and the AC /
-talking-point anchor. Detailed per-beat scripts (curl payloads, inject
-recipes, fallbacks) live in `docs/DEMO.md.bak` if you need them; the
-substrate's autonomous loop produces enough live traffic that you
-mostly don't.
-
-> **Other demos.** [poc2-DEMO.md](poc2-DEMO.md) (full POC2 hiring
-> walk) and [poc2-quick-demo.md](poc2-quick-demo.md) (5–8-min apply →
-> offer compressed) remain useful for rehearsing the POC2 mechanics.
-> [blueprint.md](blueprint.md) is the editorial pitch the substrate
-> carries.
-
----
-
-## Pre-flight (15 min before guests)
-
-| | |
-|---|---|
-| Boot stack | `make reset && make up` — wait for "All services up" + 30s simulator warm-up |
-| Sanity check | `curl -s http://localhost:3001/api/foundry/health \| python3 -m json.tool` — every check should be green |
-| Sign in | `az login` (audit blob URL must resolve), `gh auth status` |
-| Tabs to open | `localhost:5173/` (Fleet) · `:5173/reviewer-queue` · `:5173/policy` · `:5173/evaluations` · `:5174/recruiter` (POC2) · `https://ai.azure.com/build/tracing` (Foundry portal) |
-| Spare terminal | for `curl` injects, `git diff`, ad-hoc Q&A |
-| Backup | recorded `docs/projectapexdemo.mp4` if anything flakes |
-
-If `/api/foundry/health` returns anything red — STOP. Fix before guests
-arrive. The Foundry Tracing tab beat is the single biggest credibility
-moment; an empty Tracing tab undoes the demo.
-
----
-
-## Slot 1 · Partnership vision (15 min)
-
-Not in this runbook — separate deliverable.
+Everything below is **live** against the running substrate — no slides,
+no recorded segments. The operator narrates over real workflows the
+substrate is processing autonomously throughout.
 
 ---
 
 ## Slot 2 · Live Control Plane demo — 30 min
 
-> **The differentiator slot.** This is where today's Foundry-credibility
-> work has to land. Lean on these three moments: (a) tab to Foundry
-> Tracing showing the workflow you just clicked, (b) cost number
-> derived from real token telemetry × published Azure rates, (c) audit
-> ledger as a live immutable blob URL.
+The operator-facing surface of the Apex framework. This is the day-one
+experience for a WPP Finance Controller supervising a fleet of agentic
+expense workflows.
 
-| # | Beat | Time | URL | Anchor |
-|---|---|---|---|---|
-| 1 | Open Fleet — ~30 in-flight workflows ramping in autonomously | 2m | `/` | AC #1, #2 |
-| 2 | Drill into one Amber → Phases / Reasoning / Amplification tabs | 3m | `/workflows/<id>` | AC #4 |
-| 3 | Bulk approve a clause cluster (`§3.1 Meals` × ~12 claims) | 2m | `/exception-queue` | AC #3 |
-| 4 | **Tab to Foundry Tracing** → same workflow, full span tree, gen_ai.usage tokens | 5m | `https://ai.azure.com/build/tracing` filtered on `customDimensions.workflow_id` | **Differentiator** |
-| 5 | Back to UI → cost tile reads from real `gen_ai.usage.*` × published rates | 2m | `/workflows/<id>` Economics panel | AC #13 (literal) |
-| 6 | **"Open immutable audit ledger →"** opens the live versioned append blob | 2m | `/workflows/<id>` audit panel | AC #12 (literal) |
-| 7 | FM rail ask `> what's our cost-per-task this week?` | 2m | right rail | AC #13 |
-| 8 | Reviewer queue → arbitration recommendation pre-selected | 3m | `/reviewer-queue` | AC #8 |
-| 9 | Justification round-trip live (Red claim → simulator persona replies → reviewer accepts) | 4m | `/workflows/<id>` | AC #7 partial |
-| 10 | Autonomy proposal — seed 50 reviewer decisions, FM tick → policy panel | 3m | `/policy` | AC #7 |
-| 11 | Evaluations page — Hiring section shows live POC2 evaluator scores | 2m | `/evaluations` | New 2026-05-05 |
+| # | Beat | Time | Acceptance criterion |
+|---|---|---|---|
+| 1 | Open Fleet dashboard — ~30 in-flight workflows the substrate is processing autonomously | 2m | AC #1 fleet view · AC #2 exception-only surfacing |
+| 2 | Drill into a flagged workflow — phases, agent reasoning, policy citations | 3m | AC #4 policy-driven classification |
+| 3 | Bulk approve a clustered exception (one decision, many workflows) | 2m | AC #3 bulk action |
+| 4 | Switch to Microsoft Foundry portal — the same workflow as a distributed trace with token telemetry, tool calls, agent identities | 5m | Telemetry escapes the substrate; same observability stack the engagement POC will use |
+| 5 | Cost-per-task tile — derived from real model token telemetry × published Azure rates | 2m | AC #13 cost-per-task report |
+| 6 | Open the workflow's immutable audit ledger — versioned, retention-policy-protected append blob | 2m | AC #12 immutable audit |
+| 7 | Ask the Fleet Manager in natural language for a cost summary across the week | 2m | AC #13 reporting |
+| 8 | SSC Reviewer queue — arbitration recommendation pre-composed with cited precedent | 3m | AC #8 reviewer interface |
+| 9 | Justification round-trip — Red workflow → notification → justification → arbitration → resolution end-to-end | 4m | AC #7 autonomous learning loop |
+| 10 | Behaviour-change proposal — Fleet Manager observes 50+ consistent reviewer decisions and proposes an autonomy promotion | 3m | AC #7 autonomous learning |
+| 11 | Continuous evaluation page — both POCs' agents scored against ground truth and Microsoft Foundry evaluators | 2m | AC #4 evaluation pipeline |
 
-**Reserve (asked-on-demand only):** EMS extensibility 2-file diff (AC #10), region failure simulator (AC #11). Pull either if a committee member probes — both are 2 min.
+Reserve evidence available on request: EMS extensibility (AC #10),
+region failure recovery (AC #11), repeat-offender escalation (AC #6).
 
 ---
 
 ## Slot 3 · POC1 architecture walkthrough — 15 min
 
-Three layers, narrated, **with a live anchor per layer** so it doesn't
-feel like a slide deck.
+Architecture talk grounded in **live evidence per layer** — no abstract
+diagrams without something running on screen to back the claim.
 
-| Layer | Time | Talking thread | Live anchor |
-|---|---|---|---|
-| **Context** | 3m | WPP operator + WPP staff + Workday/Concur/Maconomy + Foundry — who talks to what | Fleet dashboard `/` shows multi-EMS fleet (one card from each EMS, no source label on the card — uniformity claim) |
-| **Container** | 5m | Three tiers: Fleet Manager (FastAPI) / Durable Functions orchestrator / per-phase agentic loops + MCP mocks. Validators as the "bounded probabilism" edge. | Drill into a workflow → Phases tab shows the per-phase deterministic / agent / validator executor mix |
-| **Component — Fleet Manager** | 5m | Long-lived GHCP session, triage filters bus events, `query_fleet`/`compose_exception`/`propose_skill_amplification` MCP tools, debounce + coalesce so token spend is sane | FM rail → `> summarise <claim>` shows real tool calls with timings |
-| Q from operator | 2m | "Where would you like me to dig?" | reserve |
+| Layer | Time | What we show |
+|---|---|---|
+| Context | 3m | Operator surface, EMS connections, Microsoft Foundry boundary. Live: the multi-EMS fleet view shows uniform claim cards regardless of source. |
+| Container | 5m | Three tiers — long-lived Fleet Manager session, Durable Functions orchestrator, ephemeral per-phase agentic loops. Validators as the deterministic edge between agent reasoning and downstream state. Live: drill into a workflow's phases and see the deterministic / agent / validator executor mix. |
+| Component — Fleet Manager | 5m | Single supervisor session, triage filter, debouncing queue, MCP toolkit. Live: ask the Fleet Manager a question and watch its tool calls and reasoning stream. |
+| Operator probe | 2m | "Where would you like me to dig?" |
 
-**Reserve evidence on tap:**
-- AC #4 accuracy pipeline → `/evaluations` Finance section + Foundry portal Evaluations pane
-- AC #5 receipt OCR → `/workflows/<id>` Receipt panel + Foundry trace showing `tool.server.ocr_extract`
-- AC #6 progressive enforcement → repeat-offender ramp injection
-- AC #9 multi-EMS uniformity → Concur/Workday/Maconomy claims side by side
+Reserve evidence available on request: continuous evaluation against
+the corpus, real OCR via Azure Document Intelligence, progressive
+enforcement on a repeat offender, multi-EMS uniformity side-by-side.
 
 ---
 
 ## Slot 4 · POC2 architecture walkthrough — 30 min
 
-Same architecture story + **POC2 layer overlay** (the 10-phase
-HiringOrchestrator + 7 hiring MCP mocks + per-jurisdiction policy
-bundles). Double the time = double the depth + walk the candidate
-journey end-to-end.
+Same architectural shape, different domain — the POC2 hiring lifecycle
+on the same substrate. Walks the candidate journey end-to-end and shows
+the four genuinely new capabilities (voice, avatar, A2A, jurisdiction
+switching) live.
 
-| Beat | Time | Live anchor |
+| Beat | Time | What we show |
 |---|---|---|
-| Reuse story — same C4 shape, different orchestrator | 3m | Open `api/shared/domains.py` → eight domains in one registry, hiring sits next to expense |
-| Candidate apply → portal status URL emits in seconds | 3m | `/apply` form on `:5174` |
-| Triage / cv-crystalliser — multimodal CV + LinkedIn extraction | 5m | `/recruiter/<id>` shows extracted profile + AG-UI scorecard; Foundry Tracing tab shows `wpp.skill=cv_crystalliser` span with `gen_ai.usage.*` |
-| Voice screen — real Azure GPT-Realtime via WebRTC | 5m | `/screen?token=…` → real call, no iframe; transcript scoring beat |
-| Jurisdiction switch — flip USA → DE, watch BetrVG step appear | 3m | re-spawn with `country=DE` |
-| Multi-surface convergence — five HITL surfaces in 12 min compressed | 5m | Adaptive Card → ServiceNow webhook → A2A inbound → recruiter UI → email |
-| Hiring evaluator coverage (new 2026-05-05) | 3m | `/evaluations` Hiring section: cv_field_extraction_accuracy, jurisdiction_routing_correctness, shortlist_decision_match against `data/synthetic/hiring/labels.csv` ground truth. Optional: trigger `POST /api/accuracy/run/hiring` and let it complete in background. |
-| Onboarding avatar render | 2m | `/portal?token=…` after offer accept |
-| Q from operator | 1m | reserve |
+| Substrate reuse | 3m | The platform layer is identical between POC1 and POC2 — the orchestrator class and the per-phase graphs change; everything else is reused. |
+| Candidate apply → live portal status | 3m | Public application form spawns the hiring orchestrator and emits a magic-link status URL within seconds. |
+| Triage / CV crystallisation | 5m | Multimodal extraction from the candidate's CV PDF + LinkedIn profile, scored by per-field accuracy evaluators against ground truth. |
+| Voice screen | 5m | Real Azure GPT-Realtime voice screen via WebRTC, with transcript scoring. |
+| Jurisdiction switching | 3m | Flip the country flag USA → Germany; the workflow grows a Compliance step (BetrVG works-council notification) without any code change. |
+| Multi-surface convergence | 5m | One hire walks across five different human surfaces — operator dashboard, Adaptive Card, ServiceNow, recruiter view, candidate portal — without losing identity or state. |
+| Continuous hiring evaluations | 3m | Per-agent evaluator scores for CV extraction accuracy, jurisdiction routing correctness, shortlist decision quality — joined to ground truth from the synthetic CV corpus. |
+| Onboarding avatar | 2m | Personalised welcome video rendered for the new hire. |
+| Operator probe | 1m | "Where would you like me to dig?" |
 
-**Reserve evidence on tap:**
-- A2A boundary (§4.19) → `POST /api/a2a/inbound` from a stand-in candidate PA
-- AG-UI dynamic components (§4.21) → Senior Data Engineer vs Creative Director scorecards differ
-- Region failover (§4.22) → `simulate-region-failure` against in-flight hires
-- Per-domain phase ribbon — every domain renders its own 3–10 phase shape from registry
+Reserve evidence available on request: A2A boundary inbound from a
+candidate's personal agent, dynamic AG-UI scorecards differing by role
+family, region failover against in-flight hires.
 
 ---
 
 ## Slot 5 · Q&A — 30 min
 
-Live stack stays up; pull up live evidence on demand. The reserve lists
-in slots 2/3/4 cover most likely probes.
+Live stack remains running. The committee's standard probe questions
+are answered against real evidence on screen.
 
-**Anticipated probes — quick lookup:**
+Anticipated themes the operator is rehearsed on:
 
-| Probe | Live answer |
-|---|---|
-| "Where does the cost number come from?" | `economics.py` reads `gen_ai.usage.*` span attributes × `model_pricing.py` published Azure rates. Show the source URL + date in the module docstring. |
-| "Is the audit really immutable?" | Click the audit ledger link → Azure portal shows version-level immutability policy on the container. `apexdemo62525/audit-ledger`. |
-| "How many domains can the substrate hold?" | `api/shared/domains.py` registry — eight today, adding the ninth via [`compose-domain`](superpowers/skills/compose-domain/SKILL.md) is a YAML brief. Six of the eight were graduated by the meta-skill in a single weekend. |
-| "Where do you swap GHCP for Foundry-hosted agents?" | The agent wrapper in `_wrapper.py` — same OTEL semantic conventions Microsoft Agent Framework / Semantic Kernel / OpenAI Agents SDK / GHCP all share. Foundry Tracing accepts spans from any of them. |
-| "How is Foundry IQ swapped in for `policy_search`?" | The MCP contract is the seam. The Pydantic schema on `policy_search` doesn't change; the implementation moves from local sentence-transformers to Foundry IQ. Show [SCOPE-DELTA.md](SCOPE-DELTA.md) row. |
-| "Where's the engagement-POC vs lab-build line?" | [SCOPE-DELTA.md](SCOPE-DELTA.md) — the substrate stays, the implementations swap. |
-| "Show me one skill" | Open `api/server/skills/rag-classifier/SKILL.md` — frontmatter + allowed-tools + prompt. Model picks tools from the manifest, not from prompt-stuffing. |
+- Provenance of cost numbers and how they roll up
+- Immutability of the audit ledger (live verification, not narrated)
+- How a ninth domain is added — the substrate's central claim
+- Where Microsoft Foundry surfaces (tracing, evaluation, observability)
+  fit alongside the agent runtime
+- The seam from the lab build to the engagement POC at signed contract
+  — what changes, what stays
+- Skills + MCP tool allow-lists vs prompt engineering
+- Engagement-POC scope vs lab-build scope — what is real today, what is
+  Microsoft committing to deliver during the engagement
 
----
-
-## Slot 6 · Internal debrief — 15 min
-
-Not in this runbook. Capture scores while fresh on the WPP scorecard.
-
----
-
-## Failure surfaces
-
-| Symptom | Cause | Fallback |
-|---|---|---|
-| Foundry Tracing tab empty | App Insights ingestion delay (~2-5 min) | Run a workflow as the first action of slot 2; tab over later. If still empty, screenshot at `docs/screenshots/foundry-tracing-poc1.png` |
-| Audit blob URL 403s | `az login` expired or wrong tenant | `az login --tenant 16b3c013-d300-468d-ac64-7eda0820b6d3` |
-| Functions host slow / metadata timeout | Cold-start latency on this machine | Use `scripts/run-func.bat`; reboot if necessary; fall back to recorded `docs/projectapexdemo.mp4` |
-| Voice screen mic blocked | Browser permission | Pre-approve mic for `localhost:5174` before guests arrive |
-| FM rail unresponsive | Triage debounce window | Inject one Red claim to wake the session, then retry |
-| Region failure beat flakes | Functions host doesn't restart cleanly | Skip live, narrate the architecture; `docs/demo-failover.mp4` if recorded |
-
----
-
-## Between takes
-
-```bash
-# Ctrl-C the make-up terminal
-make reset    # wipe Azurite + sqlite eval store
-make up       # fresh stack
-```
-
-The audit blob `audit-ledger` container persists across takes. To start
-fresh:
-
-```bash
-az storage blob delete-batch --account-name apexdemo62525 \
-  --source audit-ledger --auth-mode login
-```
-
----
-
-## Appendix — what landed when
-
-- 2026-05-05 — Foundry credibility lift: live Tracing tab, real cost numbers, immutable audit blob, POC2 evaluator coverage. See [`plan/feature-foundry-credibility-friday-1.md`](../plan/feature-foundry-credibility-friday-1.md).
-- 2026-05-04 — Eight-domain substrate parity. See [`plan/feature-fleet-domain-substrate-1.md`](../plan/feature-fleet-domain-substrate-1.md).
-- 2026-05-03 — `compose-domain` v3 + 5 fleet-* domains graduated.
-- 2026-04-30 — POC2 spine merged + candidate portal + voice/avatar real.
-- 2026-04-27 — POC1 pivot to expense compliance.
-
-Per-AC coverage and code anchors live in [`poc1-status.md`](poc1-status.md) §1 (POC1) and [`poc2-status.md`](poc2-status.md) §1 (POC2).
+Each anticipated question maps to a live artefact the operator can
+pull up within seconds.
