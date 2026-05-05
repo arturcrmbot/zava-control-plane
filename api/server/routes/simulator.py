@@ -268,3 +268,25 @@ async def inject_fleet_perf_review(body: FleetPerfReviewBody):
     )
     return {"workflow_id": workflow_id}
 # === END compose-domain fleet-perf-review ===
+
+
+# === BEGIN hand-graduated fleet-ap-invoice ===
+from api.server.services.simulator_orchestrator import (  # noqa: E402
+    spawn_fleet_ap_invoice_workflow,
+)
+
+
+class FleetApInvoiceBody(BaseModel):
+    invoice_id: str | None = None
+    scenario: str | None = None
+
+
+@router.post("/fleet-ap-invoice")
+async def inject_fleet_ap_invoice(body: FleetApInvoiceBody):
+    """Hand-graduated domain simulator: spawn an AP invoice workflow."""
+    workflow_id = await spawn_fleet_ap_invoice_workflow(
+        invoice_id=body.invoice_id,
+        scenario=body.scenario,
+    )
+    return {"workflow_id": workflow_id}
+# === END hand-graduated fleet-ap-invoice ===

@@ -364,3 +364,28 @@ def fleet_perf_review_peer_feedback_aggregator_activity_trigger(payload: dict) -
 def fleet_perf_review_calibration_drafter_activity_trigger(payload: dict) -> dict:
     return fleet_perf_review_calibration_drafter_activity(payload)
 # === END compose-domain fleet-perf-review ===
+
+# === BEGIN hand-graduated fleet-ap-invoice ===
+from api.functions.workflows.fleet_ap_invoice import (
+    fleet_ap_invoice_orchestration,
+)
+from api.functions.workflows.fleet_ap_invoice_activities import (
+    fleet_ap_invoice_invoice_lookup_activity,
+    fleet_ap_invoice_three_way_match_activity,
+)
+
+
+@app.orchestration_trigger(context_name="context")
+def FleetApInvoiceOrchestrator(context: df.DurableOrchestrationContext):
+    return fleet_ap_invoice_orchestration(context)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_ap_invoice_invoice_lookup_activity_trigger(payload: dict) -> dict:
+    return fleet_ap_invoice_invoice_lookup_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_ap_invoice_three_way_match_activity_trigger(payload: dict) -> dict:
+    return fleet_ap_invoice_three_way_match_activity(payload)
+# === END hand-graduated fleet-ap-invoice ===

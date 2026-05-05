@@ -22,6 +22,7 @@ from api.server.services.synthetic_data import (
     build_fleet_it_access_request_workflow,
     build_fleet_contract_renewal_workflow,
     build_fleet_perf_review_workflow,
+    build_fleet_ap_invoice_workflow,
 )
 from api.server.services.durable_client import (
     schedule_new_orchestration, raise_orchestration_event,
@@ -127,6 +128,7 @@ _CORPUS_FILE: dict[str, str] = {
     "it-access-request":  "it-access-request/requests.json",
     "contract-renewal":   "contract-renewal/contracts.json",
     "perf-review":        "perf-review/reviewees.json",
+    "ap-invoice":         "ap-invoice/invoices.json",
 }
 
 # Per-(workflow_type) lazy cache. Each value is a list of record dicts.
@@ -503,6 +505,7 @@ async def ramp_loop() -> None:
         "it-access-request": spawn_fleet_it_access_request_workflow,
         "contract-renewal": spawn_fleet_contract_renewal_workflow,
         "perf-review": spawn_fleet_perf_review_workflow,
+        "ap-invoice": spawn_fleet_ap_invoice_workflow,
     }
 
     domains_csv = os.getenv("SIMULATOR_RAMP_DOMAINS", "").strip()
@@ -833,3 +836,39 @@ async def spawn_fleet_perf_review_workflow(
         print(f"[orchestrator] failed to schedule {wid}: {ex}")
     return wid
 # === END compose-domain fleet-perf-review ===
+
+
+# === BEGIN hand-graduated fleet-ap-invoice ===
+_api_seq = 0
+
+
+async def spawn_fleet_ap_invoice_workflow(
+    invoice_id: str | None = None,
+    scenario: str | None = None,
+) -> str:
+    """Spawn an AP-invoice workflow from the seed corpus."""
+    global _api_seq
+    _api_seq += 1
+    wid = f"API-{_api_seq:04d}"
+    record = _pick_record("ap-invoice", scenario=scenario) or {}
+    if invoice_id:
+        record = {**record, "invoice_id": invoice_id}
+    w = build_fleet_ap_invoice_workflow(wid, record=record)
+    app_state.store.upsert_workflow(w)
+    payload: dict = {
+        "workflow_id": wid,
+        "type": "ap-invoice",
+        "invoice": w.payload.get("invoice"),
+    }
+    if scenario or w.payload.get("scenario"):
+        payload["scenario"] = scenario or w.payload.get("scenario")
+    try:
+        result = await schedule_new_orchestration(
+            payload, function_name="FleetApInvoiceOrchestrator",
+        )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    return wid
+# === END hand-graduated fleet-ap-invoice ===

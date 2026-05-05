@@ -292,6 +292,37 @@ DOMAINS: dict[str, Domain] = {
             WakeHint("perf.calibration.outlier", "Calibration draft is a >2-band outlier"),
         ),
     ),
+    # ----- Hand-graduated: AP invoice (9th live domain) -----
+    # Proves the curve: once the substrate primitives (authority MCP +
+    # persona registry + compose-persona) are in place, the next domain
+    # reuses them without per-persona engineering. ap_clerk + controller
+    # personae are unchanged from Phase 6 graduation — they decide gates
+    # against AP-001..AP-004 in the matrix.
+    "ap-invoice": Domain(
+        workflow_type="ap-invoice",
+        display_name="AP invoice",
+        workflow_id_prefix="API",
+        orchestrator_name="FleetApInvoiceOrchestrator",
+        operator_surface="ap-clerk",
+        phases=(
+            Phase("Invoice Lookup", "deterministic"),
+            Phase("Three-Way Match", "deterministic"),
+            Phase("ap_clerk_signoff", "hitl"),
+            Phase("controller_signoff", "hitl"),
+        ),
+        hitl_gates=(
+            HitlGate("ap_clerk_signoff", "ap_invoice_processing_decision", "ap_clerk"),
+            HitlGate("controller_signoff", "controller_signoff_decision", "controller"),
+        ),
+        skills=(
+            # Deterministic phases — no agent skills today.
+            # Engagement-POC graduation adds a real LLM-driven line-item validator.
+        ),
+        wake_hints=(
+            WakeHint("invoice.three_way_match.failed", "Invoice failed three-way match"),
+            WakeHint("invoice.value.controller_band", "Invoice >£25k routed to controller"),
+        ),
+    ),
 }
 
 

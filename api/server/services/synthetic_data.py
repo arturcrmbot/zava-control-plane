@@ -343,3 +343,30 @@ def build_fleet_perf_review_workflow(
         agency="WPP",
         payload={"review": review, "scenario": r.get("scenario")},
     )
+
+
+def build_fleet_ap_invoice_workflow(
+    workflow_id: str, record: dict | None = None,
+) -> Workflow:
+    """AP invoice workflow record. `record` is one invoice from
+    data/synthetic/ap-invoice/invoices.json when seeded."""
+    r = record or {}
+    invoice = {
+        "invoice_id": r.get("invoice_id") or f"INV-2026-{random.randint(10000, 99999):05d}",
+        "vendor_name": r.get("vendor_name", "Globex Industries"),
+        "amount_gbp": r.get("amount_gbp", 1500),
+        "category": r.get("category", "standard"),
+        "currency": r.get("currency", "GBP"),
+        "po_id": r.get("po_id"),  # may be None for missing-po scenario
+    }
+    created_at, sla = _now_with_jitter()
+    return Workflow(
+        id=workflow_id,
+        type="ap-invoice",
+        current_phase="Invoice Lookup",
+        created_at=created_at,
+        sla_due_at=sla,
+        jurisdiction="London-WPP",
+        agency="WPP",
+        payload={"invoice": invoice, "scenario": r.get("scenario")},
+    )

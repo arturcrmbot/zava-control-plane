@@ -98,6 +98,14 @@ function deriveMatrixRequest(w: Workflow): Derivation | null {
       : "on_track";
     return { action: "perf_calibration_signoff", category: cat };
   }
+  if (t === "ap-invoice") {
+    const p = (w.payload ?? {}) as { invoice?: { amount_gbp?: number; category?: string } };
+    return {
+      action: "ap_invoice_approval",
+      value: p.invoice?.amount_gbp,
+      category: p.invoice?.category ?? "standard",
+    };
+  }
   return null;
 }
 

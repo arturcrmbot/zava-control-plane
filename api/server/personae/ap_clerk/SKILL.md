@@ -6,9 +6,17 @@ workflow_label: AP / Finance
 external_event: ap_invoice_processing_decision
 decision_policy: |
     invoice = (context or {}).get("invoice") or {}
-    match = (context or {}).get("three_way_match") or {}
-    matched = bool(match.get("ok", False))
-    value_raw = invoice.get("amount_gbp") or invoice.get("amount") or 0
+    # The orchestrator may pass either the validator wrapper (matched at the
+    # top level + payload nested under 'three_way_match') or the raw verdict.
+    match_outer = (context or {}).get("three_way_match") or {}
+    inner = match_outer.get("three_way_match") or match_outer
+    matched = bool(match_outer.get("matched") or inner.get("matched"))
+    value_raw = (
+        inner.get("invoice_amount_gbp")
+        or invoice.get("amount_gbp")
+        or invoice.get("amount")
+        or 0
+    )
     try:
         value = float(value_raw)
     except (TypeError, ValueError):
@@ -27,7 +35,10 @@ decision_policy: |
         reason = "missing invoice amount"
     elif not matched:
         decision = "escalate"
-        reason = "three-way match failed — controller review required"
+        reason = (
+            "three-way match failed (matrix rule " + rule
+            + ") — controller review required"
+        )
     elif auth.get("allowed"):
         decision = "approve"
         reason = (
@@ -36,7 +47,10 @@ decision_policy: |
         )
     else:
         decision = "escalate"
-        reason = "value outside AP clerk delegation per " + rule + " — controller review required"
+        reason = (
+            "value outside AP clerk delegation per " + rule
+            + " (GBP " + str(value) + ") — controller review required"
+        )
 ---
 
 # ap_clerk

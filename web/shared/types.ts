@@ -129,7 +129,9 @@ export interface Workflow {
     // Fleet/composed domains (compose-domain v3). Same shape as the rest;
     // domain-specific inputs go in `payload`.
     | "travel-preapproval" | "vendor-kyc" | "employee-onboarding"
-    | "it-access-request" | "contract-renewal" | "perf-review";
+    | "it-access-request" | "contract-renewal" | "perf-review"
+    // Hand-graduated curve-proof domain.
+    | "ap-invoice";
   status: WorkflowStatus;
   currentPhase: PhaseName;
   createdAt: number;
