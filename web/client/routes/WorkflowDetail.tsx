@@ -16,6 +16,7 @@ import InterventionProtocols from "../components/apex/InterventionProtocols";
 import EconomicsPanel from "../components/apex/EconomicsPanel";
 import FleetAssignment from "../components/apex/FleetAssignment";
 import AuditTrail from "../components/apex/AuditTrail";
+import AuthorityCard from "../components/apex/AuthorityCard";
 import ExecutionTimelineTab from "../components/apex/ExecutionTimelineTab";
 
 type DetailResp = {
@@ -295,6 +296,7 @@ export default function WorkflowDetail() {
       </div>
 
       <div className="col-span-1 space-y-3">
+        <AuthorityCard workflow={w} />
         <EconomicsPanel e={d.economics} />
         <FleetAssignment spans={d.spans} />
         <AuditTrail
