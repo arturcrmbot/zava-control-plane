@@ -7,7 +7,11 @@ external_event: finance_signoff_decision
 decision_policy: |
     rt = (context or {}).get("renewal_terms_drafter") or {}
     pct = rt.get("cost_change_pct")
-    proposed_value = rt.get("proposed_annual_value_usd")
+    # The orchestrator may pass either the raw skill payload (proposed_value
+    # at top level) or the validator's wrapper (payload nested under
+    # 'renewal_terms_drafter' or 'payload'). Read whichever is present.
+    inner = rt.get("renewal_terms_drafter") or rt.get("payload") or rt
+    proposed_value = inner.get("proposed_annual_value_usd") or rt.get("proposed_annual_value_usd")
     try:
         pct_f = float(pct) if pct is not None else None
     except (TypeError, ValueError):
