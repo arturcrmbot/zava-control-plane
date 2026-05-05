@@ -1,0 +1,378 @@
+/**
+ * A domain cluster — a swarm of stars (workflows) softly clustered around a
+ * 3D anchor point. No solid shell — just the stars themselves forming the
+ * constellation.
+ *
+ * Three zoom levels:
+ *   FAR   (dist > MID_DIST):  swarm of points, cluster name visible
+ *   MID   (FOCUS .. MID):     each star labelled with its workflow_id +
+ *                             current phase
+ *   CLOSE (dist < FOCUS):     per-workflow activity rail — the recent
+ *                             skill / tool / validator events as small
+ *                             ephemeral text labels next to each star.
+ *                             This is the "mind-map per workflow" view
+ *                             the user wants when they zoom in.
+ *
+ * Cluster also exposes a click handler so the parent can fly the camera
+ * to focus on it.
+ */
+
+import { Billboard, Text } from "@react-three/drei";
+import { useFrame, type ThreeEvent } from "@react-three/fiber";
+import { useMemo, useRef, useState } from "react";
+import * as THREE from "three";
+
+import { computeStarVisual } from "../../lib/constellation/starLifecycle";
+import type { Mote } from "../../lib/constellation/types";
+
+interface Props {
+  workflowType: string;
+  displayName: string;
+  position: [number, number, number];
+  motesRef: React.MutableRefObject<Map<string, Mote[]>>;
+  bornMapRef: React.MutableRefObject<Map<string, number>>;
+  diedMapRef: React.MutableRefObject<Map<string, number>>;
+  color: string;
+  cameraRef: React.MutableRefObject<THREE.Camera | null>;
+  /** When set, identifies the cluster the user has focused on. Other
+   *  clusters use this to hide their own labels so the focused view is
+   *  uncluttered. */
+  focusedClusterPos?: THREE.Vector3 | null;
+  /** Called when the user clicks anywhere on this cluster. */
+  onFocus?: (clusterPos: [number, number, number]) => void;
+}
+
+const N_MAX = 96;
+/** Camera-distance thresholds for level-of-detail. */
+const FOCUS_DIST = 5.0;
+const MID_DIST = 9.0;
+
+// Build a soft circular sprite once. Bloom needs round bright cores to
+// look like stars — the default square Points sprite kills the magic.
+function makeStarTexture(): THREE.Texture {
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const grad = ctx.createRadialGradient(
+    size / 2,
+    size / 2,
+    0,
+    size / 2,
+    size / 2,
+    size / 2,
+  );
+  grad.addColorStop(0, "rgba(255,255,255,1)");
+  grad.addColorStop(0.25, "rgba(255,255,255,0.9)");
+  grad.addColorStop(0.55, "rgba(255,255,255,0.35)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+export function DomainCluster({
+  workflowType,
+  displayName,
+  position,
+  motesRef,
+  bornMapRef,
+  diedMapRef,
+  color,
+  cameraRef,
+  focusedClusterPos,
+  onFocus,
+}: Props) {
+  const groupRef = useRef<THREE.Group>(null);
+  const baseColor = useMemo(() => new THREE.Color(color), [color]);
+  const starTex = useMemo(makeStarTexture, []);
+
+  const jitterRef = useRef<Map<string, [number, number, number]>>(new Map());
+  /** Snapshot of motes for the currently-rendered LOD frame so MID/CLOSE
+   *  per-workflow components can read positions without recomputing. */
+  const moteFrameRef = useRef<
+    Array<{ mote: Mote; x: number; y: number; z: number }>
+  >([]);
+  /** LOD level for this cluster, updated each frame. */
+  const [lod, setLod] = useState<"far" | "mid" | "close">("far");
+  /** Distance-based label opacity, 0..1, updated each frame. */
+  const [labelOpacity, setLabelOpacity] = useState(1);
+
+  const starGeom = useMemo(() => {
+    const geom = new THREE.BufferGeometry();
+    const pos = new Float32Array(N_MAX * 3);
+    const col = new Float32Array(N_MAX * 3);
+    const size = new Float32Array(N_MAX);
+    geom.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geom.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    geom.setAttribute("size", new THREE.BufferAttribute(size, 1));
+    geom.setDrawRange(0, 0);
+    return geom;
+  }, []);
+
+  useFrame(({ clock }) => {
+    const motes = motesRef.current.get(workflowType) ?? [];
+    const t = clock.getElapsedTime();
+    const now = performance.now();
+    const posAttr = starGeom.getAttribute("position") as THREE.BufferAttribute;
+    const colAttr = starGeom.getAttribute("color") as THREE.BufferAttribute;
+    const sizeAttr = starGeom.getAttribute("size") as THREE.BufferAttribute;
+    const posArr = posAttr.array as Float32Array;
+    const colArr = colAttr.array as Float32Array;
+    const sizeArr = sizeAttr.array as Float32Array;
+
+    const base = { r: baseColor.r, g: baseColor.g, b: baseColor.b };
+
+    let drawCount = 0;
+    const culled: string[] = [];
+    const frame: Array<{ mote: Mote; x: number; y: number; z: number }> = [];
+    for (let i = 0; i < motes.length && drawCount < N_MAX; i++) {
+      const m = motes[i];
+      const bornAt = bornMapRef.current.get(m.id) ?? now;
+      if (!bornMapRef.current.has(m.id)) bornMapRef.current.set(m.id, now);
+      const diedAt = diedMapRef.current.get(m.id) ?? null;
+
+      const v = computeStarVisual(m, base, now, bornAt, diedAt);
+      if (v.dead) {
+        culled.push(m.id);
+        continue;
+      }
+
+      let jit = jitterRef.current.get(m.id);
+      if (!jit) {
+        // Marsaglia rejection sampling for uniform-volume distribution.
+        let x = 0,
+          y = 0,
+          z = 0,
+          s = 2;
+        while (s >= 1 || s === 0) {
+          x = Math.random() * 2 - 1;
+          y = Math.random() * 2 - 1;
+          z = Math.random() * 2 - 1;
+          s = x * x + y * y + z * z;
+        }
+        const r = Math.cbrt(Math.random()) * 1.3;
+        jit = [x * r, y * r, z * r];
+        jitterRef.current.set(m.id, jit);
+      }
+      const drift = 0.05;
+      const dx = Math.sin(t * 0.3 + m.seed * 0.7) * drift;
+      const dy = Math.cos(t * 0.27 + m.seed * 0.91) * drift;
+      const dz = Math.sin(t * 0.21 + m.seed * 1.13) * drift;
+
+      const fx = jit[0] + dx;
+      const fy = jit[1] + dy;
+      const fz = jit[2] + dz;
+
+      posArr[drawCount * 3] = fx;
+      posArr[drawCount * 3 + 1] = fy;
+      posArr[drawCount * 3 + 2] = fz;
+
+      colArr[drawCount * 3] = v.r;
+      colArr[drawCount * 3 + 1] = v.g;
+      colArr[drawCount * 3 + 2] = v.b;
+      sizeArr[drawCount] = 0.36 * v.scale;
+      frame.push({ mote: m, x: fx, y: fy, z: fz });
+      drawCount++;
+    }
+
+    if (culled.length > 0) {
+      for (const id of culled) {
+        bornMapRef.current.delete(id);
+        diedMapRef.current.delete(id);
+        jitterRef.current.delete(id);
+      }
+      const cleaned = motes.filter((m) => !culled.includes(m.id));
+      motesRef.current.set(workflowType, cleaned);
+    }
+
+    starGeom.setDrawRange(0, drawCount);
+    posAttr.needsUpdate = true;
+    colAttr.needsUpdate = true;
+    sizeAttr.needsUpdate = true;
+    moteFrameRef.current = frame;
+
+    // Distance + LOD.
+    const cam = cameraRef.current;
+    if (cam) {
+      const wp = new THREE.Vector3(...position);
+      const dist = cam.position.distanceTo(wp);
+      const next = dist < FOCUS_DIST ? "close" : dist < MID_DIST ? "mid" : "far";
+      if (next !== lod) setLod(next);
+
+      // Cluster name visibility: fully visible at FAR, fades through MID,
+      // hidden at CLOSE so per-workflow detail isn't drowned out. Also
+      // suppressed entirely when another cluster has been focused (the
+      // user has zoomed in elsewhere; my label would just be noise).
+      let nextOpacity = 0;
+      const isFocusedElsewhere = !!(
+        focusedClusterPos && focusedClusterPos.distanceTo(wp) > 0.5
+      );
+      if (isFocusedElsewhere) {
+        nextOpacity = 0;
+      } else if (dist > MID_DIST) {
+        nextOpacity = 1;
+      } else if (dist > FOCUS_DIST) {
+        nextOpacity = (dist - FOCUS_DIST) / (MID_DIST - FOCUS_DIST);
+      }
+      const rounded = Math.round(nextOpacity * 10) / 10;
+      if (rounded !== labelOpacity) {
+        setLabelOpacity(rounded);
+      }
+    }
+  });
+
+  // A transparent invisible click-target sphere — clicks bubble up so the
+  // parent can fly the camera here.
+  const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    onFocus?.(position);
+  };
+
+  return (
+    <group ref={groupRef} position={position}>
+      {/* Click target — invisible but pickable. Generous radius so it's
+          easy to hit at overview distance. */}
+      <mesh onClick={handleClick}>
+        <sphereGeometry args={[2.8, 12, 12]} />
+        <meshBasicMaterial
+          transparent
+          opacity={0.001}
+          depthWrite={false}
+          colorWrite={false}
+        />
+      </mesh>
+
+      {/* The stars themselves. Round soft sprite + additive blending +
+          bloom downstream = actual stars, not square dots. */}
+      <points geometry={starGeom}>
+        <pointsMaterial
+          map={starTex}
+          vertexColors
+          size={0.35}
+          sizeAttenuation
+          transparent
+          opacity={1}
+          depthWrite={false}
+          alphaTest={0.01}
+          blending={THREE.AdditiveBlending}
+        />
+      </points>
+
+      {/* Cluster label — visible at FAR / MID, hidden at CLOSE. */}
+      {labelOpacity > 0.02 ? (
+        <Billboard position={[0, 1.5, 0]}>
+          <Text
+            fontSize={0.32}
+            color="#e9e7e3"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.008}
+            outlineColor="#0a0a0c"
+            fillOpacity={labelOpacity}
+            outlineOpacity={labelOpacity}
+          >
+            {displayName}
+          </Text>
+          <Text
+            position={[0, -0.32, 0]}
+            fontSize={0.16}
+            color="#7e7c76"
+            anchorX="center"
+            anchorY="middle"
+            fillOpacity={labelOpacity * 0.85}
+          >
+            {workflowType}
+          </Text>
+        </Billboard>
+      ) : null}
+
+      {/* MID / CLOSE per-workflow detail. Rendered as React children of
+          this group so they inherit the cluster's local space. */}
+      {(lod === "mid" || lod === "close") &&
+        moteFrameRef.current.map(({ mote, x, y, z }) => (
+          <WorkflowDetail
+            key={mote.id}
+            mote={mote}
+            position={[x, y, z]}
+            lod={lod}
+          />
+        ))}
+    </group>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Per-workflow detail label — visible only when the camera is close enough.
+// ---------------------------------------------------------------------------
+function WorkflowDetail({
+  mote,
+  position,
+  lod,
+}: {
+  mote: Mote;
+  position: [number, number, number];
+  lod: "mid" | "close";
+}) {
+  // MID: just the wid + most recent skill.
+  // CLOSE: full trail.
+  return (
+    <group position={position}>
+      <Billboard position={[0.10, 0.05, 0]}>
+        {/* anchorX="left" so labels grow rightward and don't overlap the star */}
+        <Text
+          fontSize={0.05}
+          color="#e9e7e3"
+          anchorX="left"
+          anchorY="middle"
+          outlineWidth={0.0015}
+          outlineColor="#0a0a0c"
+        >
+          {mote.id}
+        </Text>
+        {mote.lastSkill ? (
+          <Text
+            position={[0, -0.07, 0]}
+            fontSize={0.038}
+            color="#f4a300"
+            anchorX="left"
+            anchorY="middle"
+            outlineWidth={0.001}
+            outlineColor="#0a0a0c"
+          >
+            {`▸ ${mote.lastSkill}`}
+          </Text>
+        ) : null}
+        {lod === "close" && mote.lastTool ? (
+          <Text
+            position={[0, -0.13, 0]}
+            fontSize={0.038}
+            color="#7faed4"
+            anchorX="left"
+            anchorY="middle"
+            outlineWidth={0.001}
+            outlineColor="#0a0a0c"
+          >
+            {`→ ${mote.lastTool}`}
+          </Text>
+        ) : null}
+        {lod === "close" && mote.state === "blocked" ? (
+          <Text
+            position={[0, -0.19, 0]}
+            fontSize={0.038}
+            color="#c54a3d"
+            anchorX="left"
+            anchorY="middle"
+            outlineWidth={0.001}
+            outlineColor="#0a0a0c"
+          >
+            ✕ validator blocked
+          </Text>
+        ) : null}
+      </Billboard>
+    </group>
+  );
+}

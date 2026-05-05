@@ -5,8 +5,20 @@ import { Composition } from "./sections/Composition";
 import { MetaSkill } from "./sections/MetaSkill";
 import { Observatory } from "./sections/Observatory";
 import { Closing } from "./sections/Closing";
+import { ConstellationPage } from "./pages/ConstellationPage";
 
 export default function App() {
+  // Standalone full-screen constellation view, addressable via
+  //   /?view=constellation
+  // Bypasses the editorial page entirely so the visual lives on its own
+  // and can be projected, recorded, or deployed independently.
+  if (typeof window !== "undefined") {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("view") === "constellation") {
+      return <ConstellationPage />;
+    }
+  }
+
   return (
     <div className="page">
       <Opening />

@@ -1,0 +1,565 @@
+/**
+ * The Constellation — substrate sphere at centre, domain clusters scattered
+ * in 3D space around it, all rendered as soft additive points + bloom for
+ * the luminous look.
+ *
+ * Navigation: drag to rotate, scroll/pinch to zoom, right-click drag to pan.
+ *
+ * Cluster positions are deterministic from the workflow_type string so the
+ * picture is stable across reloads — the same domain always sits at the
+ * same spot in the sky.
+ */
+
+import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Bloom, EffectComposer } from "@react-three/postprocessing";
+import { useEffect, useMemo, useRef, useState } from "react";
+import * as THREE from "three";
+
+import type { ObservatoryEvent } from "../lib/types";
+import { describeDomainOrbits } from "../lib/constellation/types";
+import type { Mote, Pulse } from "../lib/constellation/types";
+import { buildSubstrateMap } from "../lib/constellation/substrateMap";
+import { useComposition } from "../lib/useComposition";
+import { useObservatory } from "../lib/useObservatory";
+
+import { DomainCluster } from "./constellation/DomainCluster";
+import { SubstrateSphere } from "./constellation/SubstrateSphere";
+
+interface Props {
+  status: "watching" | "connecting" | "offline";
+  /** When true, fills its parent (used by the standalone page). */
+  fullScreen?: boolean;
+}
+
+// Distinct cluster tints. Picked from a warm-cool palette so the orbit
+// reads as a constellation, not a heatmap.
+const DOMAIN_PALETTE = [
+  "#f4a300", // amber
+  "#e87a5d", // coral
+  "#5fb3a8", // teal
+  "#9b7ed4", // violet
+  "#d4b95f", // gold
+  "#7faed4", // cool blue
+  "#c25f9e", // magenta
+  "#5fd49d", // mint
+  "#d49b5f", // burnt orange
+  "#a8d45f", // lime
+  "#5f9bd4", // sky
+];
+
+const SCENE_RADIUS = 8.5;
+
+/**
+ * Place clusters around the substrate as a Fibonacci-on-sphere scatter so
+ * they read as a 3D constellation, not a flat ring. Stable per workflow_type.
+ */
+function clusterPositions(
+  workflowTypes: string[],
+): Map<string, [number, number, number]> {
+  const out = new Map<string, [number, number, number]>();
+  const n = workflowTypes.length;
+  const phi = Math.PI * (3 - Math.sqrt(5));
+  // Sort for determinism.
+  const sorted = [...workflowTypes].sort((a, b) => a.localeCompare(b));
+  for (let i = 0; i < n; i++) {
+    const y = 1 - (i / Math.max(1, n - 1)) * 2;
+    const r = Math.sqrt(1 - y * y);
+    const theta = phi * i;
+    const x = Math.cos(theta) * r;
+    const z = Math.sin(theta) * r;
+    out.set(sorted[i], [
+      x * SCENE_RADIUS,
+      // Compress Y a bit so clusters cluster around the equatorial plane —
+      // a pure sphere distribution has too many points at the poles for an
+      // initial framing camera.
+      y * SCENE_RADIUS * 0.55,
+      z * SCENE_RADIUS,
+    ]);
+  }
+  return out;
+}
+
+export function Constellation({ status, fullScreen = false }: Props) {
+  const { data: composition } = useComposition();
+  const orbits = useMemo(() => describeDomainOrbits(composition), [composition]);
+  const positions = useMemo(
+    () => clusterPositions(orbits.map((o) => o.workflowType)),
+    [orbits],
+  );
+  const substrate = useMemo(
+    () => buildSubstrateMap(composition, 2400),
+    [composition],
+  );
+
+  // Reverse lookup: display name (what the SSE stream emits as `domain`) →
+  // canonical workflow_type (what we key clusters by). The composition
+  // tree's workflow_types map is workflow_type → display_name; invert.
+  // We also fold workflow_id prefixes (EXP, HIRE, ITAR, ...) as a fallback
+  // for events that arrive without a `domain` field.
+  const nameToType = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!composition) return map;
+    for (const [wt, name] of Object.entries(composition.workflow_types)) {
+      map.set(name, wt);
+      map.set(wt, wt); // tolerate events that already carry the canonical type
+    }
+    return map;
+  }, [composition]);
+
+  const prefixToType = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!composition) return map;
+    // Workflow_id prefix is the leading uppercase token before "-".
+    // We don't have a direct prefix → workflow_type map in the
+    // composition tree (it lives in api/shared/domains.py), so derive
+    // a best-effort one from the workflow_types map.
+    const known: Record<string, string> = {
+      EXP: "expense-claim",
+      HIRE: "hiring",
+      TRV: "travel-preapproval",
+      VKY: "vendor-kyc",
+      ONB: "employee-onboarding",
+      ITAR: "it-access-request",
+      CRN: "contract-renewal",
+      PRR: "perf-review",
+    };
+    for (const [prefix, wt] of Object.entries(known)) {
+      if (composition.workflow_types[wt]) map.set(prefix, wt);
+    }
+    return map;
+  }, [composition]);
+
+  // Mutable scene state — the canvas reads it inside useFrame, the SSE
+  // handler writes it. Decoupled from React so we don't re-render 60Hz.
+  const pulsesRef = useRef<Pulse[]>([]);
+  const motesRef = useRef<Map<string, Mote[]>>(new Map());
+  const bornMapRef = useRef<Map<string, number>>(new Map());
+  const diedMapRef = useRef<Map<string, number>>(new Map());
+  const progressRef = useRef<Map<string, number>>(new Map());
+  const widToTypeRef = useRef<Map<string, string>>(new Map());
+  const cameraRef = useRef<THREE.Camera | null>(null);
+
+  // SSE → state. The canvas is the only thing that re-renders.
+  useObservatory({
+    bufferSize: 1,
+    onEvent: (e) => {
+      handleEvent(e, {
+        substrate,
+        pulsesRef,
+        motesRef,
+        bornMapRef,
+        diedMapRef,
+        progressRef,
+        widToTypeRef,
+        nameToType,
+        prefixToType,
+      });
+    },
+  });
+
+  // Camera fly target. When set, the CameraRig animates the camera to it
+  // smoothly. Cleared when arrival completes.
+  const [flyTo, setFlyTo] = useState<{
+    target: THREE.Vector3;
+    camPos: THREE.Vector3;
+  } | null>(null);
+  /** Persistent focus — the cluster the camera is currently parked at, or
+   *  null when in overview. Used so non-focused cluster names hide. */
+  const [focusedClusterPos, setFocusedClusterPos] = useState<
+    THREE.Vector3 | null
+  >(null);
+
+  const handleClusterFocus = (clusterPos: [number, number, number]) => {
+    const target = new THREE.Vector3(...clusterPos);
+    // Position the camera ~7 units away so we land in MID lod (cluster
+    // labels fade, per-workflow ids appear) without star sprites or text
+    // ballooning. User can then zoom further with scroll if they want.
+    const dirFromOrigin = target.clone().normalize();
+    const camPos = target.clone().add(dirFromOrigin.multiplyScalar(7.5));
+    camPos.y += 1.5;
+    setFlyTo({ target, camPos });
+    setFocusedClusterPos(target);
+  };
+
+  const handleResetCamera = () => {
+    setFlyTo({
+      target: new THREE.Vector3(0, 0, 0),
+      camPos: new THREE.Vector3(0, 3, 22),
+    });
+    setFocusedClusterPos(null);
+  };
+
+  return (
+    <div className={`constellation${fullScreen ? " constellation--full" : ""}`}>
+      <Canvas
+        dpr={[1, 2]}
+        gl={{ antialias: false, alpha: false }}
+        style={{ background: "#0a0a0c" }}
+      >
+        <PerspectiveCamera
+          makeDefault
+          position={[0, 3, 22]}
+          fov={42}
+        />
+        <CameraHandle cameraRef={cameraRef} />
+        <CameraRig flyTo={flyTo} onArrived={() => setFlyTo(null)} />
+        <OrbitControls
+          enablePan
+          enableZoom
+          enableRotate
+          minDistance={1.5}
+          maxDistance={45}
+          dampingFactor={0.08}
+          rotateSpeed={0.6}
+          zoomSpeed={0.8}
+        />
+
+        {/* Backdrop: a very faint star field so the empty space doesn't
+            read as flat black when the substrate fades to one side. */}
+        <BackdropStars count={500} radius={60} />
+
+        {/* Centre: the substrate. */}
+        <SubstrateSphere substrate={substrate} pulsesRef={pulsesRef} />
+
+        {/* Scattered domain clusters. */}
+        {orbits.map((d, i) => {
+          const pos = positions.get(d.workflowType) ?? [0, 0, 0];
+          return (
+            <DomainCluster
+              key={d.workflowType}
+              workflowType={d.workflowType}
+              displayName={d.displayName}
+              position={pos as [number, number, number]}
+              motesRef={motesRef}
+              bornMapRef={bornMapRef}
+              diedMapRef={diedMapRef}
+              color={DOMAIN_PALETTE[i % DOMAIN_PALETTE.length]}
+              cameraRef={cameraRef}
+              focusedClusterPos={focusedClusterPos}
+              onFocus={handleClusterFocus}
+            />
+          );
+        })}
+
+        {/* Subtle fill so the substrate has a hint of form even before bloom. */}
+        <ambientLight intensity={0.25} />
+
+        {/* Bloom is what turns the points into stars. */}
+        <EffectComposer>
+          <Bloom
+            intensity={1.4}
+            luminanceThreshold={0.15}
+            luminanceSmoothing={0.85}
+            mipmapBlur
+          />
+        </EffectComposer>
+      </Canvas>
+
+      <div className="constellation__hud">
+        <div className="constellation__hud-status">
+          {status === "watching"
+            ? "● live"
+            : status === "connecting"
+            ? "○ connecting"
+            : "× offline"}
+        </div>
+        <div className="constellation__hud-help">
+          drag · scroll to zoom · click a domain in the panel to fly in
+        </div>
+        <div className="constellation__hud-legend">
+          <span style={{ color: "#f4a300" }}>●</span> skills
+          {" · "}
+          <span style={{ color: "#7faed4" }}>●</span> mcp tools
+          {" · "}
+          <span style={{ color: "#c54a3d" }}>●</span> validators
+        </div>
+      </div>
+
+      {/* Domain navigator panel — a guaranteed way to fly to any cluster. */}
+      <div className="constellation__nav">
+        <div className="constellation__nav-title">domains</div>
+        {orbits.map((d, i) => {
+          const pos = positions.get(d.workflowType) ?? [0, 0, 0];
+          const tint = DOMAIN_PALETTE[i % DOMAIN_PALETTE.length];
+          return (
+            <button
+              key={d.workflowType}
+              type="button"
+              className="constellation__nav-item"
+              onClick={() => handleClusterFocus(pos as [number, number, number])}
+            >
+              <span
+                className="constellation__nav-swatch"
+                style={{ background: tint, boxShadow: `0 0 8px ${tint}` }}
+              />
+              <span className="constellation__nav-label">{d.displayName}</span>
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          className="constellation__nav-item constellation__nav-item--reset"
+          onClick={handleResetCamera}
+        >
+          <span className="constellation__nav-swatch constellation__nav-swatch--reset" />
+          <span className="constellation__nav-label">overview</span>
+        </button>
+      </div>
+
+      <button
+        type="button"
+        className="constellation__reset"
+        onClick={handleResetCamera}
+        title="Return to overview"
+      >
+        ↺ overview
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CameraRig — eased fly-to-target animation. When `flyTo` is set, eases the
+// camera position + OrbitControls target toward the requested values. Calls
+// `onArrived` once close enough so the parent can clear the request.
+// ---------------------------------------------------------------------------
+function CameraRig({
+  flyTo,
+  onArrived,
+}: {
+  flyTo: { target: THREE.Vector3; camPos: THREE.Vector3 } | null;
+  onArrived: () => void;
+}) {
+  const { camera, controls } = useThree() as {
+    camera: THREE.Camera;
+    controls: { target: THREE.Vector3; update: () => void } | null;
+  };
+  const hasArrived = useRef(false);
+
+  useEffect(() => {
+    hasArrived.current = false;
+  }, [flyTo]);
+
+  useFrame((_, delta) => {
+    if (!flyTo || hasArrived.current) return;
+    // Higher = snappier. Scale by delta to keep the ease frame-rate independent.
+    const k = 1 - Math.exp(-6 * delta);
+    camera.position.lerp(flyTo.camPos, k);
+    if (controls) {
+      controls.target.lerp(flyTo.target, k);
+      controls.update();
+    }
+    const posDelta = camera.position.distanceTo(flyTo.camPos);
+    const tgtDelta = controls
+      ? controls.target.distanceTo(flyTo.target)
+      : 0;
+    if (posDelta < 0.05 && tgtDelta < 0.05) {
+      hasArrived.current = true;
+      onArrived();
+    }
+  });
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Tiny helper: capture the active camera into a ref so DomainCluster can
+// distance-fade its label.
+// ---------------------------------------------------------------------------
+function CameraHandle({
+  cameraRef,
+}: {
+  cameraRef: React.MutableRefObject<THREE.Camera | null>;
+}) {
+  const { camera } = useThree();
+  useEffect(() => {
+    cameraRef.current = camera;
+  }, [camera, cameraRef]);
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Backdrop stars: a far-away point cloud that gives the scene depth.
+// ---------------------------------------------------------------------------
+function BackdropStars({
+  count,
+  radius,
+}: {
+  count: number;
+  radius: number;
+}) {
+  const geom = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    const col = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      // Random unit vector × radius, with some variation in distance.
+      let x = 0, y = 0, z = 0, s = 2;
+      while (s >= 1 || s === 0) {
+        x = Math.random() * 2 - 1;
+        y = Math.random() * 2 - 1;
+        z = Math.random() * 2 - 1;
+        s = x * x + y * y + z * z;
+      }
+      const len = Math.sqrt(s);
+      const r = radius * (0.85 + Math.random() * 0.3);
+      pos[i * 3] = (x / len) * r;
+      pos[i * 3 + 1] = (y / len) * r;
+      pos[i * 3 + 2] = (z / len) * r;
+      const v = 0.18 + Math.random() * 0.35;
+      col[i * 3] = v * 0.95;
+      col[i * 3 + 1] = v * 0.92;
+      col[i * 3 + 2] = v * 0.90;
+    }
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    return g;
+  }, [count, radius]);
+
+  return (
+    <points geometry={geom}>
+      <pointsMaterial
+        vertexColors
+        size={0.12}
+        sizeAttenuation
+        transparent
+        opacity={0.85}
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </points>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SSE event folding.
+// ---------------------------------------------------------------------------
+
+interface FoldCtx {
+  substrate: ReturnType<typeof buildSubstrateMap>;
+  pulsesRef: React.MutableRefObject<Pulse[]>;
+  motesRef: React.MutableRefObject<Map<string, Mote[]>>;
+  bornMapRef: React.MutableRefObject<Map<string, number>>;
+  diedMapRef: React.MutableRefObject<Map<string, number>>;
+  progressRef: React.MutableRefObject<Map<string, number>>;
+  widToTypeRef: React.MutableRefObject<Map<string, string>>;
+  /** display_name | workflow_type → canonical workflow_type. */
+  nameToType: Map<string, string>;
+  /** workflow_id prefix ("EXP", "ITAR", ...) → canonical workflow_type. */
+  prefixToType: Map<string, string>;
+}
+
+function handleEvent(e: ObservatoryEvent, ctx: FoldCtx): void {
+  const now = performance.now();
+  const wid = e.workflow_id ?? null;
+
+  // Resolve the canonical workflow_type. Try, in order:
+  //   1. e.domain → look up in nameToType (handles "Finance Compliance" →
+  //      "expense-claim" AND already-canonical "expense-claim" passes through)
+  //   2. workflow_id prefix → look up in prefixToType ("EXP-0773" → "expense-claim")
+  //   3. cached widToType from a prior event for this workflow
+  let wtype: string | null = null;
+  if (e.domain) wtype = ctx.nameToType.get(e.domain) ?? null;
+  if (!wtype && wid) {
+    const idx = wid.indexOf("-");
+    if (idx > 0) {
+      const prefix = wid.slice(0, idx);
+      wtype = ctx.prefixToType.get(prefix) ?? null;
+    }
+  }
+  if (!wtype && wid) wtype = ctx.widToTypeRef.current.get(wid) ?? null;
+  if (wid && wtype) ctx.widToTypeRef.current.set(wid, wtype);
+
+  // Substrate pulses.
+  if (e.skill) {
+    const idx = ctx.substrate.skillIdx.get(e.skill);
+    if (idx !== undefined) {
+      ctx.pulsesRef.current.push({ dotIdx: idx, startMs: now, blocked: false });
+    }
+  }
+  if (e.tool) {
+    const idx = ctx.substrate.toolIdx.get(e.tool);
+    if (idx !== undefined) {
+      ctx.pulsesRef.current.push({ dotIdx: idx, startMs: now, blocked: false });
+    }
+  }
+  if (e.type === "durable.validator.blocked" && e.skill) {
+    // Events emit validator names already snake_case ("validate_*_schema");
+    // try the name as-is first, then fall back to constructing one.
+    const candidates = [
+      e.skill,
+      `validate_${e.skill.replace(/-/g, "_")}`,
+    ];
+    for (const c of candidates) {
+      const idx = ctx.substrate.validatorIdx.get(c);
+      if (idx !== undefined) {
+        ctx.pulsesRef.current.push({ dotIdx: idx, startMs: now, blocked: true });
+        break;
+      }
+    }
+  }
+
+  // Workflow lifecycle → stars in the matching cluster.
+  if (!wid || !wtype) return;
+  const list = ctx.motesRef.current.get(wtype) ?? [];
+  let mote = list.find((m) => m.id === wid);
+  if (!mote) {
+    mote = {
+      id: wid,
+      lastSeenMs: now,
+      workflowType: wtype,
+      progress: 0.05,
+      state: "alive",
+      seed: hashString(wid) % 1000,
+      trail: [],
+    };
+    list.push(mote);
+    ctx.motesRef.current.set(wtype, list);
+  }
+  mote.lastSeenMs = now;
+
+  // Track recent activity so close-zoom can show what each workflow is doing.
+  if (e.skill) {
+    mote.lastSkill = e.skill;
+    mote.trail = [
+      { ts: now, label: e.skill, kind: "skill" as const },
+      ...(mote.trail ?? []),
+    ].slice(0, 6);
+  }
+  if (e.tool) {
+    mote.lastTool = e.tool;
+    mote.trail = [
+      { ts: now, label: e.tool, kind: "tool" as const },
+      ...(mote.trail ?? []),
+    ].slice(0, 6);
+  }
+
+  const stepCount = (ctx.progressRef.current.get(wid) ?? 0) + 1;
+  ctx.progressRef.current.set(wid, stepCount);
+  mote.progress = Math.min(0.05 + stepCount * 0.05, 0.95);
+
+  if (
+    e.type === "durable.workflow.completed" ||
+    e.type === "workflow.resolved"
+  ) {
+    if (mote.state !== "completed") {
+      mote.state = "completed";
+      mote.progress = 1.0;
+      ctx.diedMapRef.current.set(wid, now);
+    }
+  } else if (e.type === "durable.validator.blocked") {
+    if (mote.state !== "blocked") {
+      mote.state = "blocked";
+      ctx.diedMapRef.current.set(wid, now);
+    }
+  }
+}
+
+function hashString(s: string): number {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) {
+    h = (h * 33) ^ s.charCodeAt(i);
+  }
+  return Math.abs(h);
+}
