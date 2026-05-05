@@ -7,9 +7,12 @@ external_event: reviewer_decision
 decision_policy: |
     # Mirror the modal pattern in the existing reviewer-decision corpus:
     # accept-justification on small meals/travel claims, reject on
-    # everything else. The thresholds are deliberately conservative —
-    # the demo intent is that ~70% of routed claims accept on the
-    # first review, ~30% reject.
+    # everything else. The thresholds are no longer inlined here —
+    # they live in the delegated-authority matrix
+    # (data/synthetic/authority/matrix.json) and are resolved via the
+    # `authority_check` sandbox builtin. This persona's behaviour is
+    # unchanged: the matrix rules EXP-001..EXP-022 encode the same
+    # band logic that used to live in this file.
     claim = (context or {}).get("claim") or {}
     classify = (context or {}).get("classify") or {}
     arbitrate = (context or {}).get("arbitrate") or {}
@@ -18,28 +21,29 @@ decision_policy: |
     currency = (claim.get("currency") or "").upper()
     rec = (arbitrate.get("recommendation") or "").lower()
 
+    auth = authority_check(
+        role="ssc_reviewer",
+        action="expense_claim_approval",
+        category=category,
+        value=amount,
+    )
+
     if rec == "reject":
         decision = "reject"
         reason = "agreed with arbitration recommendation: reject"
-    elif category in {"meals", "travel", "accommodation"} and amount <= 500:
+    elif auth.get("allowed"):
         decision = "approve"
         reason = (
-            "accept-justification: " + category + " "
-            + currency + " " + str(amount) + " within delegation"
+            "accept-justification within SSC delegation per "
+            + str(auth.get("governing_rule_id") or "authority matrix")
+            + ": " + category + " " + currency + " " + str(amount)
         )
-    elif category == "entertainment" and amount > 250:
-        decision = "reject"
-        reason = (
-            "entertainment over delegation: " + currency + " " + str(amount)
-        )
-    elif amount > 1000:
-        decision = "reject"
-        reason = "amount over delegation: " + currency + " " + str(amount)
     else:
-        decision = "approve"
+        decision = "reject"
         reason = (
-            "accept-justification: " + category + " "
-            + currency + " " + str(amount) + " within delegation"
+            "outside SSC delegation per "
+            + str(auth.get("governing_rule_id") or "authority matrix")
+            + ": " + category + " " + currency + " " + str(amount)
         )
 ---
 
@@ -47,13 +51,16 @@ decision_policy: |
 
 You are the **SSC reviewer** (Shared Service Centre operator) for the
 **Finance Compliance** workflow.
+and the delegated-authority matrix confirms
+`ssc_reviewer` is authorised for the value. Reject otherwise.
 
-## Decision policy
-
-Accept the agent's arbitration recommendation when the claim is in a
-delegated category (meals / travel / accommodation) and below £500,
-OR when the agent recommended reject. Reject entertainment over £250
-and any claim over £1000. Otherwise accept the justification.
+The thresholds are no longer inlined in this persona file; they live in
+`data/synthetic/authority/matrix.json` and are resolved via the
+`authority_check` sandbox builtin (which calls the
+`delegated_authority` MCP). The matrix rules `EXP-003`, `EXP-012`,
+`EXP-021`, etc. encode the same SSC delegation bands that used to be
+hardcoded here — so a change to the £500 / £250 / £1000 limits is a
+JSON edit, not a code change
 
 This mirrors the modal accept-justification pattern in the existing
 reviewer-decision corpus (`data/synthetic/labels.csv`) — small,

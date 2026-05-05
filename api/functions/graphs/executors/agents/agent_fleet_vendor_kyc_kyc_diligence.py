@@ -9,6 +9,7 @@ No prompt-stuffing.
 """
 from __future__ import annotations
 
+from api.server.mcp_tools.delegated_authority import delegated_authority_resolve_approver_tool
 from api.server.mcp_tools.vendor_registry import (
     vendor_registry_lookup_vendor_tool,
     vendor_registry_list_filings_tool,
@@ -35,7 +36,11 @@ async def execute(input: dict) -> dict:
         f"screen the legal entity for the country of incorporation and "
         f"each additional country surfaced in the filings.\n"
         f"Reason about registry status, filing footprint, and sanctions "
-        f"exposure per your skill spec. Return exactly the JSON object "
+        f"exposure per your skill spec. Then call "
+        f"`delegated_authority_resolve_approver(action=\"vendor_kyc_signoff\", "
+        f"category=<\"sanctions_hit\" / \"high_risk\" / \"medium_risk\" / \"low_risk\">)` "
+        f"to identify the matrix-resolved approver and surface it as "
+        f"`resolved_approver`. Return exactly the JSON object "
         f"specified in your skill instructions — no prose, no markdown."
     )
     result = await run_agent_session(
@@ -44,6 +49,7 @@ async def execute(input: dict) -> dict:
             vendor_registry_lookup_vendor_tool,
             vendor_registry_list_filings_tool,
             sanctions_api_screen_entity_tool,
+            delegated_authority_resolve_approver_tool,
         ],
         skill_dir=_SKILL_DIR,
         skill_label="fleet-vendor-kyc-kyc-diligence-checker",

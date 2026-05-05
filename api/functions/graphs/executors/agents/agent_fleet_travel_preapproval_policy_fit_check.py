@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from api.server.mcp_tools.concur_travel_policy import concur_travel_policy_get_policy_tool
 from api.server.mcp_tools.concur_travel_search import concur_travel_search_search_options_tool
+from api.server.mcp_tools.delegated_authority import delegated_authority_resolve_approver_tool
 
 from ._wrapper import SKILLS_DIR, run_agent_session
 
@@ -33,12 +34,20 @@ async def execute(input: dict) -> dict:
         f"applicable policy slice. Use `concur_travel_search_search_options"
         f"(origin, destination, depart_date, return_date)` to load booking "
         f"options. Reason about policy fit and cost band per your skill spec. "
+        f"Then call `delegated_authority_resolve_approver(action=\"travel_preapproval\", "
+        f"category=<\"international\" if origin and destination differ in country, "
+        f"else \"domestic\">, value=<cheapest_total_usd>)` to identify the "
+        f"matrix-resolved approver and surface it as `resolved_approver`. "
         f"Return exactly the JSON object specified in your skill instructions "
         f"— no prose, no markdown."
     )
     result = await run_agent_session(
         prompt=prompt,
-        tools=[concur_travel_policy_get_policy_tool, concur_travel_search_search_options_tool],
+        tools=[
+            concur_travel_policy_get_policy_tool,
+            concur_travel_search_search_options_tool,
+            delegated_authority_resolve_approver_tool,
+        ],
         skill_dir=_SKILL_DIR,
         skill_label="fleet-travel-preapproval-policy-fit-checker",
         workflow_id=workflow_id,

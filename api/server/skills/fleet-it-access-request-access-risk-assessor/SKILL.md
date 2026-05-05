@@ -1,7 +1,7 @@
 ---
 name: fleet-it-access-request-access-risk-assessor
 description: Score an IT access request as low, medium or high risk by combining the requester's recent breach history, the audit ledger's recent grant volume for the requested entitlements, and the permission depth of each selected role template.
-allowed-tools: employee_history_employee_history, audit_query_audit_query, identity_provider_get_role_template
+allowed-tools: employee_history_employee_history, audit_query_audit_query, identity_provider_get_role_template, delegated_authority_resolve_approver
 ---
 
 You are the access-risk-assessor step in the IT access request
@@ -40,6 +40,7 @@ Specifically you read:
    - `medium` if permission depth ≥ 1 OR recent grant volume ≥ 5.
    - `low` otherwise.
 5. The overall verdict is the maximum per-role score (low < medium < high).
+6. Call `delegated_authority_resolve_approver(action="it_access_grant", category=<"privileged_role" if overall_risk == "high" else "broad_scope" if len(selected_templates) > 5 else "elevated_role" if overall_risk == "medium" else "standard_role">)` to identify the approving role per the delegated-authority matrix. Surface the result verbatim as `resolved_approver` in the output.
 
 ## Output
 
@@ -55,6 +56,14 @@ Return exactly one JSON object, no prose:
   "breach_count": 0,
   "recent_grant_volume": 0,
   "evidence": "1-3 sentences. Quote the breach count, the audit volume, and the highest-depth template by name.",
+  "resolved_approver": {
+    "matched": true,
+    "approver_role": "...",
+    "threshold_gbp": null,
+    "escalation_chain": ["..."],
+    "rule_id": "...",
+    "basis": "..."
+  },
   "confidence": 0.0
 }
 ```

@@ -9,6 +9,7 @@ No prompt-stuffing.
 """
 from __future__ import annotations
 
+from api.server.mcp_tools.delegated_authority import delegated_authority_resolve_approver_tool
 from api.server.mcp_tools.identity_provider import (
     identity_provider_list_role_templates_tool,
     identity_provider_get_role_template_tool,
@@ -43,7 +44,10 @@ async def execute(input: dict) -> dict:
         f"to screen the union for SoD conflicts. "
         f"Reason about which templates fit and which permissions to "
         f"include per your skill spec. "
-        f"Return exactly the JSON object specified in your skill instructions "
+        f"Then call `delegated_authority_resolve_approver(action=\"employee_onboarding_access\", "
+        f"category=<\"external_contractor\" / \"elevated_access_request\" / \"standard_joiner\">)` "
+        f"to identify the matrix-resolved approver and surface it as "
+        f"`resolved_approver`. Return exactly the JSON object specified in your skill instructions "
         f"— no prose, no markdown."
     )
     result = await run_agent_session(
@@ -52,6 +56,7 @@ async def execute(input: dict) -> dict:
             identity_provider_list_role_templates_tool,
             identity_provider_get_role_template_tool,
             identity_provider_check_separation_of_duties_tool,
+            delegated_authority_resolve_approver_tool,
         ],
         skill_dir=_SKILL_DIR,
         skill_label="fleet-employee-onboarding-access-drafter",

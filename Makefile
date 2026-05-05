@@ -1,4 +1,4 @@
-.PHONY: install dev mcp server functions funcvenv test test-e2e clean azurite-up azurite-down reset up
+.PHONY: install dev mcp mcp-authority server functions funcvenv test test-e2e clean azurite-up azurite-down reset up
 
 install:
 	uv sync
@@ -18,6 +18,10 @@ reset:
 
 mcp:
 	npm run dev:mcp
+
+# Run only the delegated authority MCP standalone for ad-hoc inspection.
+mcp-authority:
+	cd mocks/authority-mcp && PORT=4108 npx tsx server.ts
 
 server:
 	uv run uvicorn api.server.main:app --port 3001 --reload

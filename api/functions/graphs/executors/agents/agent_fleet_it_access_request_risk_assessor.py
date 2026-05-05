@@ -9,6 +9,7 @@ No prompt-stuffing.
 """
 from __future__ import annotations
 
+from api.server.mcp_tools.delegated_authority import delegated_authority_resolve_approver_tool
 from api.server.mcp_tools.employee_history import employee_history_tool
 from api.server.mcp_tools.audit_query import audit_query_tool
 from api.server.mcp_tools.identity_provider import (
@@ -47,7 +48,10 @@ async def execute(input: dict) -> dict:
         f"template to recompute permission depth (count of high-sensitivity "
         f"permissions like `*.write`, `*.approve`, `secrets.*`). "
         f"Reason about per-role and overall risk per your skill spec. "
-        f"Return exactly the JSON object specified in your skill instructions "
+        f"Then call `delegated_authority_resolve_approver(action=\"it_access_grant\", "
+        f"category=<\"privileged_role\" / \"broad_scope\" / \"elevated_role\" / \"standard_role\">)` "
+        f"to identify the matrix-resolved approver and surface it as "
+        f"`resolved_approver`. Return exactly the JSON object specified in your skill instructions "
         f"— no prose, no markdown."
     )
     result = await run_agent_session(
@@ -56,6 +60,7 @@ async def execute(input: dict) -> dict:
             employee_history_tool,
             audit_query_tool,
             identity_provider_get_role_template_tool,
+            delegated_authority_resolve_approver_tool,
         ],
         skill_dir=_SKILL_DIR,
         skill_label="fleet-it-access-request-access-risk-assessor",

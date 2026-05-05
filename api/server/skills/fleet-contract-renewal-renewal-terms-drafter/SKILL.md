@@ -1,7 +1,7 @@
 ---
 name: fleet-contract-renewal-renewal-terms-drafter
 description: Draft proposed renewal terms for a managed-services contract by combining the benchmarked price band with cited legal-clause precedents and proposing a per-line delta vs the current contract.
-allowed-tools: contract_repository_get_contract, contract_repository_find_similar, contract_repository_list_amendments, market_pricing_get_quotes, policy_cite_policy_cite
+allowed-tools: contract_repository_get_contract, contract_repository_find_similar, contract_repository_list_amendments, market_pricing_get_quotes, policy_cite_policy_cite, delegated_authority_resolve_approver
 ---
 
 You are the renewal-terms-drafter step in the Contract renewal
@@ -46,6 +46,7 @@ Specifically you read:
    line item in the contract, with `current` and `proposed` strings
    (e.g. `current: "annual-fee USD 1,200,000"`, `proposed: "annual-fee
    USD 1,140,000 (-5.0%)"`).
+6. Call `delegated_authority_resolve_approver(action="contract_renewal_signoff", category=<"price_jump" if abs(cost_change_pct) > 25 else "scope_expansion" if len(amendment_delta) > 0 and any treatment == "rolled-in" else "flat_renewal">, value=<proposed_annual_value_usd treated as GBP for the lab; engagement-POC will FX-convert>)` to identify the approving role per the delegated-authority matrix. Surface the result verbatim as `resolved_approver` in the output.
 
 ## Output
 
@@ -67,6 +68,14 @@ Return exactly one JSON object, no prose:
     {"amendment_id": "<amendment_id>", "treatment": "<rolled-in|dropped|carried-as-is>"}
   ],
   "evidence": "1-3 sentences. Quote the proposed annual value, the cost change percent, and the count of cited clauses.",
+  "resolved_approver": {
+    "matched": true,
+    "approver_role": "...",
+    "threshold_gbp": 0,
+    "escalation_chain": ["..."],
+    "rule_id": "...",
+    "basis": "..."
+  },
   "confidence": 0.0
 }
 ```

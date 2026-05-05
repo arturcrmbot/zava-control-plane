@@ -1,7 +1,7 @@
 ---
 name: fleet-travel-preapproval-policy-fit-checker
 description: Determine whether a proposed trip is in-policy and which cost band it lands in (low / mid / high) given the available booking options.
-allowed-tools: concur_travel_policy_get_policy, concur_travel_search_search_options
+allowed-tools: concur_travel_policy_get_policy, concur_travel_search_search_options, delegated_authority_resolve_approver
 ---
 
 You are the policy-fit-checker step in the Travel pre-approval orchestrator
@@ -35,6 +35,7 @@ Specifically you read:
 4. Place the cheapest reasonable option's **total USD** into one of the
    three bands from the policy (`bands_usd.low`, `bands_usd.mid`,
    `bands_usd.high`).
+5. Call `delegated_authority_resolve_approver(action="travel_preapproval", category=<"international" if origin and destination are in different countries else "domestic">, value=<cheapest_total_usd treated as GBP for the lab; engagement-POC will FX-convert>)` to identify the approving role per the delegated-authority matrix. Surface the result verbatim as `resolved_approver` in the output.
 
 ## Output
 
@@ -47,6 +48,14 @@ Return exactly one JSON object, no prose:
   "cheapest_total_usd": 0,
   "violated_clauses": ["<clause_name>", "..."],
   "evidence": "1-3 sentences. Quote the cheapest option price and the policy clauses it satisfies / violates.",
+  "resolved_approver": {
+    "matched": true,
+    "approver_role": "...",
+    "threshold_gbp": 0,
+    "escalation_chain": ["..."],
+    "rule_id": "...",
+    "basis": "..."
+  },
   "confidence": 0.0
 }
 ```

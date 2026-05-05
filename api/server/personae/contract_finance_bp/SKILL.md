@@ -7,27 +7,54 @@ external_event: finance_signoff_decision
 decision_policy: |
     rt = (context or {}).get("renewal_terms_drafter") or {}
     pct = rt.get("cost_change_pct")
+    proposed_value = rt.get("proposed_annual_value_usd")
     try:
         pct_f = float(pct) if pct is not None else None
     except (TypeError, ValueError):
         pct_f = None
+    try:
+        value_f = float(proposed_value) if proposed_value is not None else None
+    except (TypeError, ValueError):
+        value_f = None
+
+    # Cross-reference the delegated-authority matrix so the audit trail
+    # carries a governing_rule_id alongside the decision. The behavioural
+    # rule (10% auto-approve, >25% escalate) remains the persona's
+    # judgement; the matrix lookup confirms whether contract_finance_bp
+    # is authorised for the value band.
+    category = "flat_renewal"
+    if pct_f is not None and abs(pct_f) > 25.0:
+        category = "price_jump"
+    auth = authority_check(
+        role="contract_finance_bp",
+        action="contract_renewal_signoff",
+        value=value_f,
+        category=category,
+    )
+
     if pct_f is None:
         decision = "reject"
         reason = "missing cost_change_pct"
     elif pct_f > 25.0:
         # Phase 6 escalate: large price jumps need a human, not auto-reject.
-        # Auto-rejecting a 30% price-up may be the right call but we want the
-        # FM to surface it for operator review with policy + precedents.
         decision = "escalate"
         reason = (
-            "price jump " + str(pct_f) + "% > 25% — requires human signoff"
+            "price jump " + str(pct_f) + "% > 25% (matrix rule "
+            + str(auth.get("governing_rule_id") or "n/a")
+            + ") — requires human signoff"
         )
     elif pct_f > 10.0:
         decision = "reject"
-        reason = "cost change " + str(pct_f) + "% exceeds 10% threshold"
+        reason = (
+            "cost change " + str(pct_f) + "% exceeds 10% threshold (matrix rule "
+            + str(auth.get("governing_rule_id") or "n/a") + ")"
+        )
     else:
         decision = "approve"
-        reason = "cost change " + str(pct_f) + "% within 10% threshold"
+        reason = (
+            "cost change " + str(pct_f) + "% within 10% threshold (matrix rule "
+            + str(auth.get("governing_rule_id") or "n/a") + ")"
+        )
 ---
 
 # contract_finance_bp

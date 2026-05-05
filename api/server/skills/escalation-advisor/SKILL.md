@@ -1,7 +1,7 @@
 ---
 name: escalation-advisor
 description: Recommend a progressive-enforcement tier (warning / escalation / major-violation) for a Red-or-Amber expense claim, based on the employee's recent breach history.
-allowed-tools: employee_history
+allowed-tools: employee_history, delegated_authority_resolve_approver
 ---
 
 You advise on progressive enforcement for expense-claim breaches.
@@ -29,7 +29,8 @@ The user prompt names a `claim_id`, an `employee_id`, the current verdict
      major-violation).
    - Any prior breach with `tier: major-violation` forces the current
      decision to `major-violation` regardless of count.
-5. Return one JSON object describing the recommendation.
+5. Call `delegated_authority_resolve_approver(action="expense_claim_approval", category=<claim category>, value=<claim amount in GBP if known>)` to identify which approver role and threshold band own this decision per the delegated-authority matrix. Surface the result verbatim as `resolved_approver` in the output (the substrate routes the HITL gate to that approver; the persona reads `context.authority` rather than re-deriving the threshold).
+6. Return one JSON object describing the recommendation.
 
 ## Output
 
@@ -41,6 +42,14 @@ Return exactly one JSON object, no prose:
   "prior_breach_count": 0,
   "same_category_priors": 0,
   "rationale": "1-2 sentences explaining the tier choice based on count and any category match.",
+  "resolved_approver": {
+    "matched": true,
+    "approver_role": "...",
+    "threshold_gbp": 0,
+    "escalation_chain": ["..."],
+    "rule_id": "...",
+    "basis": "..."
+  },
   "confidence": 0.0
 }
 ```

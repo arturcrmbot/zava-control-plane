@@ -141,3 +141,36 @@ We have already built the thing. We are giving it to you, running, and helping y
 - [poc2-status.md](poc2-status.md) — the hiring build (domain two)
 - [SCOPE-DELTA.md](SCOPE-DELTA.md) — what runs in the lab vs. what an engagement deploys
 - [ARCHITECTURE.md](ARCHITECTURE.md) — the three-tier substrate the pitch describes
+
+---
+
+## Persona library
+
+> Updated 2026-05-05 — see [`plan/feature-authority-and-personae-1.md`](../plan/feature-authority-and-personae-1.md) for the work that landed this.
+
+The substrate ships with **29 registered personae** across 8 corporate functions. 15 of them are wired into HITL gates on the 8 live domains; the remaining 14 are *available cast* — graduated via the [`compose-persona`](superpowers/skills/compose-persona/SKILL.md) meta-skill ahead of the domains that will use them. Adding the next dozen domains in any of these functions is a `compose-domain` brief, not a persona-authoring exercise.
+
+Every persona's structural metadata lives in [`api/shared/personas.py`](../api/shared/personas.py). Behaviour (the `decision_policy` block) lives in `api/server/personae/<role>/SKILL.md`. 15 of the 29 read thresholds from the [delegated-authority MCP](../mocks/authority-mcp/) instead of inlining them — flipping a numeric limit is a JSON edit on `data/synthetic/authority/matrix.json`, not a code change.
+
+### By function
+
+| Function | Personae |
+|---|---|
+| **Finance** (9) | `controller`, `fpa_analyst`, `ap_clerk`, `treasurer`, `finance_bp`, `ssc_reviewer`, `claim_submitter`, `contract_finance_bp`, `vendor_kyc_finance_bp` |
+| **HR** (6) | `hr_bp`, `recruiter`, `line_manager`, `perf_review_hr_bp`, `perf_review_line_manager`, `comp_ben_analyst` |
+| **IT** (4) | `change_manager`, `it_access_it_admin`, `it_access_line_manager`, `onboarding_it_admin` |
+| **Procurement** (3) | `category_manager`, `sourcing_lead`, `cpo` |
+| **Legal** (2) + **Privacy** (1) | `contracts_counsel`, `gc`, `dpo` |
+| **Commercial** (3) | `account_director`, `project_manager`, `contract_line_manager` |
+| **Candidate** (1) | `candidate` |
+
+### By archetype
+
+- **Approvers (21)** — sign off the gate. Default position for most personae.
+- **Reviewers (4)** — `comp_ben_analyst`, `contracts_counsel`, `fpa_analyst`, `ssc_reviewer`. Examine and may flag without final sign-off.
+- **Subjects (3)** — `ap_clerk`, `candidate`, `claim_submitter`. The person the workflow is *about*.
+- **Delegates (1)** — `project_manager`. Stands in for an approver and escalates upward.
+
+### What this proves
+
+The Phase-6 graduations took on the order of an hour per persona because the meta-skill writes the SKILL.md, the registry entry, and the graduation script from a YAML brief. The next dozen personae cost the same. The next hundred cost the same. The "compositor itself is an agent" claim isn't a future hope — it's the procedure these personae arrived through.

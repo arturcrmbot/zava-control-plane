@@ -9,6 +9,7 @@ No prompt-stuffing.
 """
 from __future__ import annotations
 
+from api.server.mcp_tools.delegated_authority import delegated_authority_resolve_approver_tool
 from api.server.mcp_tools.performance_norms import (
     performance_norms_get_grade_distribution_tool,
     performance_norms_get_calibration_history_tool,
@@ -54,7 +55,11 @@ async def execute(input: dict) -> dict:
         f"to re-read the peer reviews for the narrative. "
         f"Reason about a proposed rating + distribution_fit verdict per "
         f"your skill spec. "
-        f"Return exactly the JSON object specified in your skill instructions "
+        f"Then call `delegated_authority_resolve_approver(action=\"perf_calibration_signoff\", "
+        f"category=<\"calibration_outlier\" if distribution_fit is not \"fits\", "
+        f"\"promotion_candidate\" if proposed_rating == \"outstanding\", "
+        f"else \"on_track\">)` to identify the matrix-resolved approver and "
+        f"surface it as `resolved_approver`. Return exactly the JSON object specified in your skill instructions "
         f"— no prose, no markdown."
     )
     result = await run_agent_session(
@@ -64,6 +69,7 @@ async def execute(input: dict) -> dict:
             performance_norms_get_calibration_history_tool,
             feedback_collector_list_360_tool,
             feedback_collector_get_okr_results_tool,
+            delegated_authority_resolve_approver_tool,
         ],
         skill_dir=_SKILL_DIR,
         skill_label="fleet-perf-review-calibration-drafter",

@@ -116,6 +116,56 @@ def _split_frontmatter(text: str) -> tuple[dict[str, Any], str]:
 # Builtins the decision_policy code is allowed to use. Tightly scoped so a
 # typo in a SKILL.md can't reach into the FastAPI process beyond computing a
 # decision against the context dict.
+#
+# `authority_check` is the substrate seam to the delegated_authority MCP —
+# personae call it when they want to confirm "am I authorised to sign this
+# off?" instead of inlining a numeric threshold. The wrapper is sync and
+# defensive: any HTTP error returns a denied result with the error text as
+# the reason, so the persona's worst-case behaviour is "leave the gate open"
+# rather than crash.
+def _sandbox_authority_check(
+    role: str,
+    action: str,
+    value: float | None = None,
+    category: str | None = None,
+    business_unit: str | None = None,
+    geography: str | None = None,
+    requester_role: str | None = None,
+) -> dict[str, Any]:
+    """Sandbox-callable wrapper around delegated_authority.check_authority.
+
+    Returns a plain dict (not a Pydantic object) so decision_policy code
+    can read fields without importing types. Falls back to
+    ``{allowed: False, reason: "...", governing_rule_id: None}`` on any
+    httpx error — the persona then knows to defer rather than guess.
+    """
+    try:
+        # Imported lazily so persona_responder doesn't pull httpx in import-time
+        # contexts where the authority MCP isn't reachable (tests, dry runs).
+        from api.server.mcp_tools.delegated_authority import check_authority
+
+        result = check_authority(
+            role=role,
+            action=action,
+            value=value,
+            category=category,
+            business_unit=business_unit,
+            geography=geography,
+            requester_role=requester_role,
+        )
+        return {
+            "allowed": result.allowed,
+            "reason": result.reason,
+            "governing_rule_id": result.governing_rule_id,
+        }
+    except Exception as ex:  # pragma: no cover — defensive only
+        return {
+            "allowed": False,
+            "reason": f"authority MCP unreachable: {ex}",
+            "governing_rule_id": None,
+        }
+
+
 _DECISION_BUILTINS: dict[str, Any] = {
     "isinstance": isinstance, "len": len,
     "str": str, "int": int, "float": float, "bool": bool,
@@ -123,6 +173,7 @@ _DECISION_BUILTINS: dict[str, Any] = {
     "min": min, "max": max, "abs": abs, "round": round,
     "any": any, "all": all, "sum": sum,
     "True": True, "False": False, "None": None,
+    "authority_check": _sandbox_authority_check,
 }
 
 
@@ -194,7 +245,43 @@ def _load_personae() -> dict[str, PersonaDefinition]:
             )
         except Exception as ex:
             print(f"[persona_responder] failed to load {skill_path}: {ex}")
+    _validate_against_registry(out)
     return out
+
+
+def _validate_against_registry(loaded: dict[str, "PersonaDefinition"]) -> None:
+    """Cross-check loaded personae against api.shared.personas.PERSONAS.
+
+    Warnings only (never raises) so a missing registry entry doesn't
+    block startup. Surfaces three classes of drift:
+      - registry entry without a SKILL.md (someone added to the registry
+        but didn't graduate the persona file)
+      - SKILL.md without a registry entry (someone graduated a persona
+        without updating the registry)
+      - registry's `external_event_default` differs from SKILL.md's
+        `external_event`
+    """
+    try:
+        from api.shared.personas import PERSONAS
+    except Exception as ex:  # pragma: no cover — defensive only
+        print(f"[persona_responder] could not import persona registry: {ex}")
+        return
+
+    loaded_roles = set(loaded.keys())
+    registry_roles = set(PERSONAS.keys())
+
+    for missing in registry_roles - loaded_roles:
+        print(f"[persona_responder] registry has '{missing}' but no SKILL.md exists")
+    for stray in loaded_roles - registry_roles:
+        print(f"[persona_responder] SKILL.md '{stray}' has no registry entry "
+              f"in api.shared.personas.PERSONAS")
+    for role in loaded_roles & registry_roles:
+        skill = loaded[role]
+        reg = PERSONAS[role]
+        if reg.external_event_default and reg.external_event_default != skill.external_event:
+            print(f"[persona_responder] {role}: registry external_event_default="
+                  f"{reg.external_event_default!r} differs from SKILL.md external_event="
+                  f"{skill.external_event!r}")
 
 
 # --------------------------------------------------------------------------

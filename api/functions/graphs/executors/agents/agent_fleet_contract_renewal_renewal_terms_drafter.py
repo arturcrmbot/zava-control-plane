@@ -14,6 +14,7 @@ from api.server.mcp_tools.contract_repository import (
     contract_repository_find_similar_tool,
     contract_repository_list_amendments_tool,
 )
+from api.server.mcp_tools.delegated_authority import delegated_authority_resolve_approver_tool
 from api.server.mcp_tools.market_pricing import market_pricing_get_quotes_tool
 from api.server.mcp_tools.policy_cite import policy_cite_tool
 
@@ -56,7 +57,12 @@ async def execute(input: dict) -> dict:
         f"text. "
         f"Reason about a renewal price inside the benchmark band per "
         f"your skill spec. "
-        f"Return exactly the JSON object specified in your skill instructions "
+        f"Then call `delegated_authority_resolve_approver(action=\"contract_renewal_signoff\", "
+        f"category=<\"price_jump\" if abs(cost_change_pct) > 25, "
+        f"\"scope_expansion\" if amendment_delta has rolled-in entries, "
+        f"else \"flat_renewal\">, value=<proposed_annual_value_usd>)` to "
+        f"identify the matrix-resolved approver and surface it as "
+        f"`resolved_approver`. Return exactly the JSON object specified in your skill instructions "
         f"— no prose, no markdown."
     )
     result = await run_agent_session(
@@ -67,6 +73,7 @@ async def execute(input: dict) -> dict:
             contract_repository_list_amendments_tool,
             market_pricing_get_quotes_tool,
             policy_cite_tool,
+            delegated_authority_resolve_approver_tool,
         ],
         skill_dir=_SKILL_DIR,
         skill_label="fleet-contract-renewal-renewal-terms-drafter",

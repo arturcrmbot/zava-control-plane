@@ -1,7 +1,7 @@
 ---
 name: fleet-perf-review-calibration-drafter
 description: Draft a proposed performance rating + narrative for the reviewee by combining the cycle's OKR results with the grade-band distribution norm and the reviewee's calibration history.
-allowed-tools: performance_norms_get_grade_distribution, performance_norms_get_calibration_history, feedback_collector_list_360, feedback_collector_get_okr_results
+allowed-tools: performance_norms_get_grade_distribution, performance_norms_get_calibration_history, feedback_collector_list_360, feedback_collector_get_okr_results, delegated_authority_resolve_approver
 ---
 
 You are the calibration-drafter step in the Performance review
@@ -52,6 +52,7 @@ Specifically you read:
      or `"below-expectations"` AND the cycle's OKR achievement percent
      is `>=90%` (the OKR record says we should rate higher, the
      distribution forced a lower rating).
+7. Call `delegated_authority_resolve_approver(action="perf_calibration_signoff", category=<"calibration_outlier" if distribution_fit in ("over-cluster", "under-cluster") else "promotion_candidate" if proposed_rating == "outstanding" else "on_track">)` to identify the approving role per the delegated-authority matrix. Surface the result verbatim as `resolved_approver` in the output.
 
 ## Output
 
@@ -72,6 +73,14 @@ Return exactly one JSON object, no prose:
     {"cycle": "<cycle>", "rating": "<rating>"}
   ],
   "evidence": "1-3 sentences. Quote the OKR achievement percent, the proposed rating, and the headroom that drove distribution_fit.",
+  "resolved_approver": {
+    "matched": true,
+    "approver_role": "...",
+    "threshold_gbp": null,
+    "escalation_chain": ["..."],
+    "rule_id": "...",
+    "basis": "..."
+  },
   "confidence": 0.0
 }
 ```

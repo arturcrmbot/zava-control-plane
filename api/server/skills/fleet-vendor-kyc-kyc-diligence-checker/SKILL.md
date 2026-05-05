@@ -1,7 +1,7 @@
 ---
 name: fleet-vendor-kyc-kyc-diligence-checker
 description: Look the proposed vendor up in the registry, list their regulatory filings, and screen the legal entity against sanctions for the country of incorporation and any country the filings reference.
-allowed-tools: vendor_registry_lookup_vendor, vendor_registry_list_filings, sanctions_api_screen_entity
+allowed-tools: vendor_registry_lookup_vendor, vendor_registry_list_filings, sanctions_api_screen_entity, delegated_authority_resolve_approver
 ---
 
 You are the kyc-diligence-checker step in the Vendor onboarding & KYC
@@ -31,6 +31,7 @@ Specifically you read:
    discovered in step 2.
 4. Aggregate every sanctions hit returned across all calls into one
    `entity_sanctions_hits` list (empty if all calls returned no hits).
+5. Call `delegated_authority_resolve_approver(action="vendor_kyc_signoff", category=<"sanctions_hit" if entity_sanctions_hits else "high_risk" if high-risk jurisdiction or adverse media else "medium_risk" if filings_24m_count == 0 else "low_risk">)` to identify the approving role per the delegated-authority matrix. Surface the result verbatim as `resolved_approver` in the output.
 
 ## Output
 
@@ -47,6 +48,14 @@ Return exactly one JSON object, no prose:
     {"list": "OFAC-SDN", "matched_name": "...", "country": "...", "score": 0.0}
   ],
   "evidence": "1-3 sentences. Cite the registry record, the count of filings, and the screening verdict per country.",
+  "resolved_approver": {
+    "matched": true,
+    "approver_role": "...",
+    "threshold_gbp": null,
+    "escalation_chain": ["..."],
+    "rule_id": "...",
+    "basis": "..."
+  },
   "confidence": 0.0
 }
 ```
