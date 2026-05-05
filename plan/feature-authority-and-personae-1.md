@@ -1,16 +1,41 @@
 ---
 goal: Land two substrate primitives — a Delegated Authority MCP and a `compose-persona` meta-skill — so every approval gate in every domain resolves through one matrix instead of inline thresholds, and so new personae are composed from a brief instead of hand-authored. End state: the substrate visibly "breathes" (the persona library grows from ~16 to ~30 without per-role engineering, every approval surfaces an explainable authority resolution), and adding a domain in any new corporate function reduces to (a) a `compose-domain` brief, (b) a `compose-persona` brief per new role, (c) zero edits to skills/orchestrators that approve.
-version: 1.0
+version: 1.1
 date_created: 2026-05-05
 last_updated: 2026-05-05
 owner: Apex substrate
-status: 'Planned'
+status: 'Completed'
 tags: [feature, architecture, substrate, mcp, persona, authority]
 ---
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
+![Status: Completed](https://img.shields.io/badge/status-Completed-green)
+
+**Update 2026-05-05:** All seven phases shipped to `main` in commits
+`48cf174c` (Phases 1–6: authority MCP + matrix + Python wrapper +
+skill wiring + persona registry + threshold migration + compose-persona
+meta-skill + 14 graduated personae), `dfda1d50` (Phase 7 backend +
+Personae section on the blueprint microsite), and follow-on commits
+for the Authority Matrix page (TASK-037) and the Authority resolution
+card on Control Plane WorkflowDetail (TASK-035). The personas count
+landed at **29** (15 original + 14 graduated), of which **15 read
+thresholds from the delegated-authority matrix** instead of inlining
+them.
+
+Live validation: the 80-rule matrix MCP (`mocks/authority-mcp/` :4108)
+resolved all 8 canonical domain test cases live; the FastAPI persona
+responder loads the full 29 personae cleanly and closes gates
+autonomously per `PERSONA_AUTO_CLOSE` (now wired in `.env` for the
+default demo profile); the blueprint microsite renders the persona
+library + authority matrix sections live from `/api/personas` and
+`/api/authority/matrix`; the Control Plane workflow detail surfaces
+the matched approver chip + governing rule_id on every workflow whose
+type maps into the matrix.
+
+65 new tests passing across the new modules (registry validation, route
+proxies, persona parity, skill wiring assertions). Per-task checkboxes
+below are kept as the source-of-truth implementation log.
 
 Today every HITL gate in the substrate resolves through a hand-authored persona whose `decision_policy` carries threshold values inline (e.g. `abs(delta) > 10000` in `finance_bp`, `>25%` price-jump in `contract_finance_bp`, broad-scope role list in `it_access_it_admin`). That works for 8 domains × ~16 personae. It does not scale to the corporate-function map we're targeting (~50 domains, ~50 personae), and it can't survive the customer composing their own — every threshold change is a code edit a human has to land.
 
