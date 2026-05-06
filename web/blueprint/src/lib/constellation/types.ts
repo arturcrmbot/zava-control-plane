@@ -19,8 +19,25 @@ export interface Mote {
   workflowType: string;
   /** 0..1 progress through the workflow (rough — derived from event count). */
   progress: number;
-  /** State: alive, completed (briefly bright then fade), blocked (red flash). */
-  state: "alive" | "completed" | "blocked";
+  /**
+   * State machine for the mote:
+   *   - alive       : routine progress through the workflow
+   *   - awaiting    : suspended on a HITL gate (workflow.hitl.requested
+   *                   or durable.suspended). Renders magenta with a slow
+   *                   size-pulse so the operator can see "the bot stopped
+   *                   and asked a human".
+   *   - exception   : workflow.exception.detected or workflow.policy.violation
+   *                   tripped — orange tint, faster pulse. Sticky until
+   *                   resumed.
+   *   - completed   : durable.workflow.completed / workflow.resolved —
+   *                   bright flash then fade.
+   *   - blocked     : durable.validator.blocked — red flash then fade.
+   */
+  state: "alive" | "awaiting" | "exception" | "completed" | "blocked";
+  /** Set when an SLA proximity event has fired for this workflow. */
+  slaBreach?: boolean;
+  /** True if a HITL gate has been escalated (deeper magenta + faster pulse). */
+  escalated?: boolean;
   /** Random per-mote orbit angle inside its parent orb. */
   seed: number;
   /** Most recent skill that fired for this workflow (label fodder). */

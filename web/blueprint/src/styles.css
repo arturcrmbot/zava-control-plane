@@ -900,6 +900,26 @@ body.constellation-page-body {
 
 .constellation__hud-legend {
   letter-spacing: 0.04em;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.constellation__hud-legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem;
+  align-items: center;
+}
+
+.constellation__hud-legend-label {
+  color: var(--ink-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.55rem;
+  margin-right: 0.5rem;
+  min-width: 4rem;
+  display: inline-block;
 }
 
 .constellation__reset {

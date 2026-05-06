@@ -2,12 +2,18 @@
  * Star = a single in-flight or recently-completed workflow.
  *
  * Lifecycle:
- *   - born:     fade in alpha 0→1 + scale 0.4→1 over BIRTH_MS
- *   - alive:    soft idle twinkle, gentle drift inside the cluster
+ *   - born:      fade in alpha 0→1 + scale 0.4→1 over BIRTH_MS
+ *   - alive:     soft idle twinkle, gentle drift inside the cluster
+ *   - awaiting:  parked on a HITL gate. Magenta tint, slow size-pulse.
+ *                Sticky — stays until durable.resumed (or any subsequent
+ *                step event) flips it back to alive. Does NOT decay.
+ *   - exception: workflow.exception.detected / policy.violation tripped.
+ *                Orange tint, faster pulse. Also sticky.
  *   - completed: bright flash to amber-white, then fade out over DIE_MS
- *   - blocked:  red flash, then fade out over DIE_MS
+ *   - blocked:   red flash, then fade out over DIE_MS
  *
- * After fully fading, the star is removed from the cluster.
+ * After fully fading (only completed/blocked do), the star is removed from
+ * the cluster.
  */
 import type { Mote } from "../constellation/types";
 
@@ -31,6 +37,15 @@ export interface StarVisual {
   /** True if star should be culled this frame. */
   dead: boolean;
 }
+
+// Tints for the sticky non-fatal states. Picked to be visually distinct
+// from the per-domain palette without clashing with the validator-red.
+const AWAITING_R = 0.85;
+const AWAITING_G = 0.40;
+const AWAITING_B = 0.92; // magenta-violet
+const EXCEPTION_R = 0.95;
+const EXCEPTION_G = 0.55;
+const EXCEPTION_B = 0.18; // orange
 
 export function computeStarVisual(
   m: Mote,
@@ -80,7 +95,40 @@ export function computeStarVisual(
     };
   }
 
-  // Alive: soft twinkle + idle dimming.
+  // Sticky non-fatal states — no diedAt, no decay, just a tinted pulse.
+  if (m.state === "awaiting") {
+    // Slow ~0.5Hz size+brightness pulse. Escalated gates pulse ~2x faster
+    // and run a touch hotter so the operator's eye snaps to them.
+    const speed = m.escalated ? 0.0050 : 0.0028;
+    const tw = 0.6 + 0.4 * Math.sin(nowMs * speed + m.seed * 0.21);
+    const sat = m.escalated ? 1.15 : 1.0;
+    const alpha = Math.min(1, birth) * (0.85 + 0.15 * tw);
+    const scale = (0.4 + 0.6 * birth) * (1.05 + 0.45 * tw);
+    return {
+      alpha,
+      scale,
+      r: AWAITING_R * sat * tw + baseColor.r * 0.10,
+      g: AWAITING_G * sat * tw + baseColor.g * 0.10,
+      b: AWAITING_B * sat * tw + baseColor.b * 0.10,
+      dead: false,
+    };
+  }
+  if (m.state === "exception") {
+    const tw = 0.55 + 0.45 * Math.sin(nowMs * 0.0065 + m.seed * 0.41);
+    const alpha = Math.min(1, birth) * (0.9 + 0.1 * tw);
+    const scale = (0.4 + 0.6 * birth) * (1.1 + 0.5 * tw);
+    return {
+      alpha,
+      scale,
+      r: EXCEPTION_R * tw + baseColor.r * 0.10,
+      g: EXCEPTION_G * tw + baseColor.g * 0.10,
+      b: EXCEPTION_B * tw + baseColor.b * 0.10,
+      dead: false,
+    };
+  }
+
+  // Alive: soft twinkle + idle dimming. SLA breach overlays a slow
+  // amber→red beat on top of the domain tint without leaving "alive".
   const tw = 0.75 + 0.35 * Math.sin(nowMs * 0.0018 + m.seed * 0.31);
   const idleDim =
     sinceLastSeen > IDLE_DIM_MS
@@ -89,6 +137,18 @@ export function computeStarVisual(
   const alpha = Math.min(1, birth) * idleDim;
   const scale = (0.4 + 0.6 * birth) * (0.85 + 0.3 * m.progress);
   const bright = tw * (0.6 + 0.5 * m.progress);
+  if (m.slaBreach) {
+    // Pulse toward red-amber while keeping a hint of the domain tint.
+    const beat = 0.5 + 0.5 * Math.sin(nowMs * 0.006 + m.seed * 0.13);
+    return {
+      alpha,
+      scale: scale * (1 + 0.2 * beat),
+      r: baseColor.r * bright * 0.5 + 0.95 * beat,
+      g: baseColor.g * bright * 0.5 + 0.30 * beat,
+      b: baseColor.b * bright * 0.5 + 0.20 * beat,
+      dead: sinceLastSeen > HARD_TTL_MS,
+    };
+  }
   return {
     alpha,
     scale,

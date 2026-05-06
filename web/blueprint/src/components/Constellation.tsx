@@ -268,11 +268,26 @@ export function Constellation({ status, fullScreen = false }: Props) {
           drag · scroll to zoom · click a domain in the panel to fly in
         </div>
         <div className="constellation__hud-legend">
-          <span style={{ color: "#f4a300" }}>●</span> skills
-          {" · "}
-          <span style={{ color: "#7faed4" }}>●</span> mcp tools
-          {" · "}
-          <span style={{ color: "#c54a3d" }}>●</span> validators
+          <div className="constellation__hud-legend-row">
+            <span className="constellation__hud-legend-label">substrate</span>
+            <span style={{ color: "#f4a300" }}>●</span> skill
+            {" · "}
+            <span style={{ color: "#7faed4" }}>●</span> tool
+            {" · "}
+            <span style={{ color: "#c54a3d" }}>●</span> validator block
+          </div>
+          <div className="constellation__hud-legend-row">
+            <span className="constellation__hud-legend-label">workflow</span>
+            <span style={{ color: "#bdbdbd" }}>●</span> alive
+            {" · "}
+            <span style={{ color: "#d966ec" }}>●</span> awaiting human
+            {" · "}
+            <span style={{ color: "#f28a3d" }}>●</span> exception
+            {" · "}
+            <span style={{ color: "#c54a3d" }}>●</span> blocked
+            {" · "}
+            <span style={{ color: "#fff5d8" }}>★</span> completed
+          </div>
         </div>
       </div>
 
@@ -543,6 +558,16 @@ function handleEvent(e: ObservatoryEvent, ctx: FoldCtx): void {
   ctx.progressRef.current.set(wid, stepCount);
   mote.progress = Math.min(0.05 + stepCount * 0.05, 0.95);
 
+  // ---------------------------------------------------------------------
+  // State machine. Order matters — terminal states win, then sticky
+  // non-fatal states (awaiting / exception), then auto-resume.
+  // ---------------------------------------------------------------------
+  const isStepEvent =
+    e.type === "durable.step.started" ||
+    e.type === "durable.step.completed" ||
+    e.type === "durable.executor.invoked" ||
+    e.type === "agent.completed";
+
   if (
     e.type === "durable.workflow.completed" ||
     e.type === "workflow.resolved"
@@ -556,6 +581,39 @@ function handleEvent(e: ObservatoryEvent, ctx: FoldCtx): void {
     if (mote.state !== "blocked") {
       mote.state = "blocked";
       ctx.diedMapRef.current.set(wid, now);
+    }
+  } else if (
+    e.type === "workflow.exception.detected" ||
+    e.type === "workflow.policy.violation"
+  ) {
+    // Sticky orange — workflow is in trouble but not terminal. Cleared
+    // when a subsequent step or durable.resumed event fires.
+    if (mote.state !== "exception" && mote.state !== "blocked") {
+      mote.state = "exception";
+    }
+  } else if (
+    e.type === "workflow.hitl.requested" ||
+    e.type === "durable.suspended"
+  ) {
+    // Sticky magenta — the bot stopped to ask a human.
+    if (
+      mote.state !== "awaiting" &&
+      mote.state !== "blocked" &&
+      mote.state !== "completed"
+    ) {
+      mote.state = "awaiting";
+      mote.escalated = false;
+    }
+  } else if (e.type === "workflow.hitl.escalated") {
+    mote.state = "awaiting";
+    mote.escalated = true;
+  } else if (e.type === "workflow.sla.breach_imminent") {
+    mote.slaBreach = true;
+  } else if (e.type === "durable.resumed" || isStepEvent) {
+    // Auto-resume: any forward motion clears sticky non-fatal states.
+    if (mote.state === "awaiting" || mote.state === "exception") {
+      mote.state = "alive";
+      mote.escalated = false;
     }
   }
 }
