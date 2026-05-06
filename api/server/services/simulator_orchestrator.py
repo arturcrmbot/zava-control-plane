@@ -27,6 +27,7 @@ from api.server.services.synthetic_data import (
     build_fleet_contract_review_workflow,
     build_fleet_privacy_dpia_workflow,
     build_fleet_treasury_fx_workflow,
+    build_creative_campaign_workflow,
 )
 from api.server.services.durable_client import (
     schedule_new_orchestration, raise_orchestration_event,
@@ -136,6 +137,7 @@ _CORPUS_FILE: dict[str, str] = {
     "purchase-order":     "purchase-order/pos.json",
     "contract-review":    "contract-review/contracts.json",
     "privacy-dpia":       "privacy-dpia/dpias.json",
+    "creative-campaign":  "creative-campaign/briefs.json",
     "treasury-fx":        "treasury-fx/ops.json",
 }
 
@@ -517,6 +519,7 @@ async def ramp_loop() -> None:
         "purchase-order": spawn_fleet_purchase_order_workflow,
         "contract-review": spawn_fleet_contract_review_workflow,
         "privacy-dpia": spawn_fleet_privacy_dpia_workflow,
+        "creative-campaign": spawn_creative_campaign_workflow,
         "treasury-fx": spawn_fleet_treasury_fx_workflow,
     }
 
@@ -1024,3 +1027,44 @@ async def spawn_fleet_treasury_fx_workflow(
         print(f"[orchestrator] failed to schedule {wid}: {ex}")
     return wid
 # === END hand-graduated wave 2: fleet-treasury-fx ===
+
+
+# === BEGIN POC3: creative-campaign ===
+_cmp_seq = 0
+
+
+async def spawn_creative_campaign_workflow(
+    brief_id: str | None = None,
+    scenario: str | None = None,
+) -> str:
+    """Spawn a creative-campaign workflow. Picks a record from
+    data/synthetic/creative-campaign/briefs.json (filtered by `scenario`
+    when set); falls back to inline synthesis when the corpus is missing.
+    Upserts a Workflow record so the FM's `query_fleet` can see it.
+    """
+    global _cmp_seq
+    _cmp_seq += 1
+    wid = f"CMP-{_cmp_seq:04d}"
+    record = _pick_record("creative-campaign", scenario=scenario) or {}
+    if brief_id:
+        record = {**record, "id": brief_id}
+    w = build_creative_campaign_workflow(wid, record=record)
+    app_state.store.upsert_workflow(w)
+    payload: dict = {
+        "workflow_id": wid,
+        "type": "creative-campaign",
+        "brief": w.payload.get("brief"),
+        "brief_id": (w.payload.get("brief") or {}).get("id"),
+    }
+    if scenario or w.payload.get("scenario"):
+        payload["scenario"] = scenario or w.payload.get("scenario")
+    try:
+        result = await schedule_new_orchestration(
+            payload, function_name="CreativeCampaignOrchestrator",
+        )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    return wid
+# === END POC3: creative-campaign ===

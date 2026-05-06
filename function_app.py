@@ -516,3 +516,47 @@ def fleet_treasury_fx_position_check_activity_trigger(payload: dict) -> dict:
 def fleet_treasury_fx_authority_resolve_activity_trigger(payload: dict) -> dict:
     return fleet_treasury_fx_authority_resolve_activity(payload)
 # === END hand-graduated wave 2: fleet-treasury-fx ===
+
+
+# === BEGIN POC3: creative-campaign ===
+from api.functions.workflows.creative_campaign import (  # noqa: E402
+    creative_campaign_orchestration,
+)
+from api.functions.workflows.creative_campaign_activities import (  # noqa: E402
+    creative_brief_synthesis_activity,
+    creative_insight_audience_activity,
+    creative_concept_fanout_activity,
+    creative_storyboard_render_activity,
+    creative_package_handoff_activity,
+)
+
+
+@app.orchestration_trigger(context_name="context")
+def CreativeCampaignOrchestrator(context: df.DurableOrchestrationContext):
+    return creative_campaign_orchestration(context)
+
+
+@app.activity_trigger(input_name="payload")
+def creative_brief_synthesis_activity_trigger(payload: dict) -> dict:
+    return creative_brief_synthesis_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def creative_insight_audience_activity_trigger(payload: dict) -> dict:
+    return creative_insight_audience_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def creative_concept_fanout_activity_trigger(payload: dict) -> dict:
+    return creative_concept_fanout_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def creative_storyboard_render_activity_trigger(payload: dict) -> dict:
+    return creative_storyboard_render_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def creative_package_handoff_activity_trigger(payload: dict) -> dict:
+    return creative_package_handoff_activity(payload)
+# === END POC3: creative-campaign ===

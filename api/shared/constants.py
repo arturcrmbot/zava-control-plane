@@ -59,3 +59,13 @@ PURCHASE_ORDER_SIGNOFF_TIMEOUT: timedelta = timedelta(hours=48)
 CONTRACT_REVIEW_SIGNOFF_TIMEOUT: timedelta = timedelta(hours=48)
 DPIA_SIGNOFF_TIMEOUT: timedelta = timedelta(hours=72)
 TREASURY_SIGNOFF_TIMEOUT: timedelta = timedelta(hours=24)
+
+# POC3 creative-campaign — five HITL gates per the AI-Agency storyboard.
+# brief_capture is the multi-party voice intake (CD + strategist + brand
+# manager); the other four are the four numbered gates (◆1..◆4). All are
+# resolvable by the creative_director persona.
+CREATIVE_BRIEF_CAPTURE_TIMEOUT: timedelta = timedelta(hours=4)
+CREATIVE_BRIEF_APPROVAL_TIMEOUT: timedelta = timedelta(hours=24)
+CREATIVE_CONCEPT_LOCK_TIMEOUT: timedelta = timedelta(hours=24)
+CREATIVE_STORYBOARD_APPROVAL_TIMEOUT: timedelta = timedelta(hours=24)
+CREATIVE_FINAL_SIGNOFF_TIMEOUT: timedelta = timedelta(hours=48)

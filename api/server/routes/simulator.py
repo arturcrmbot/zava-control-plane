@@ -378,3 +378,25 @@ async def inject_fleet_treasury_fx(body: FleetTreasuryFxBody):
     )
     return {"workflow_id": workflow_id}
 # === END hand-graduated wave 2: fleet-treasury-fx ===
+
+
+# === BEGIN POC3: creative-campaign ===
+from api.server.services.simulator_orchestrator import (  # noqa: E402
+    spawn_creative_campaign_workflow,
+)
+
+
+class CreativeCampaignBody(BaseModel):
+    brief_id: str | None = None
+    scenario: str | None = None
+
+
+@router.post("/creative-campaign")
+async def inject_creative_campaign(body: CreativeCampaignBody):
+    """POC3: spawn a creative-campaign workflow."""
+    workflow_id = await spawn_creative_campaign_workflow(
+        brief_id=body.brief_id,
+        scenario=body.scenario,
+    )
+    return {"workflow_id": workflow_id}
+# === END POC3: creative-campaign ===

@@ -162,3 +162,13 @@ from .fleet_treasury_fx_position_check import (
 from .fleet_treasury_fx_authority_resolve import (
     build_fleet_treasury_fx_authority_resolve_workflow,
 )
+
+# POC3: creative-campaign (5 agentic phase graphs; HITL phases are pure
+# orchestrator yields — no graph needed). Real per-phase skills land in
+# Phase 4 of plan/feature-poc3-ai-agency-1.md; v1 ships against the
+# shared agent_creative_stub + validate_creative_stub pair.
+from .creative_brief_synthesis import build_creative_brief_synthesis_workflow
+from .creative_insight_audience import build_creative_insight_audience_workflow
+from .creative_concept_fanout import build_creative_concept_fanout_workflow
+from .creative_storyboard_render import build_creative_storyboard_render_workflow
+from .creative_package_handoff import build_creative_package_handoff_workflow

@@ -462,3 +462,39 @@ def build_fleet_treasury_fx_workflow(workflow_id: str, record: dict | None = Non
         agency="WPP",
         payload={"treasury_op": treasury_op, "scenario": r.get("scenario")},
     )
+
+
+# POC3: creative-campaign
+
+def build_creative_campaign_workflow(
+    workflow_id: str, record: dict | None = None,
+) -> Workflow:
+    """Creative campaign workflow record. `record` is one brief from
+    data/synthetic/creative-campaign/briefs.json when seeded; otherwise
+    a minimal brief is synthesised inline."""
+    r = record or {}
+    brief = {
+        "id": r.get("id") or f"BRF-{random.randint(1000, 9999):04d}",
+        "client_brand": r.get("client_brand", "Solene"),
+        "category": r.get("category", "luxury_fragrance"),
+        "audience": r.get("audience", "Aspirational European 25-44"),
+        "mandatory_messages": r.get(
+            "mandatory_messages",
+            ["regenerative provenance", "low-impact craftsmanship"],
+        ),
+        "channels": r.get("channels", ["CTV", "OOH", "social"]),
+        "kpis": r.get("kpis", {"awareness": "+15%", "intent": "+8%"}),
+        "constraints": r.get("constraints", []),
+        "jurisdictions": r.get("jurisdictions", ["UK", "FR"]),
+    }
+    created_at, sla = _now_with_jitter()
+    return Workflow(
+        id=workflow_id,
+        type="creative-campaign",
+        current_phase="brief_capture",
+        created_at=created_at,
+        sla_due_at=sla,
+        jurisdiction=brief["jurisdictions"][0] + "-WPP",
+        agency=r.get("agency", "Ogilvy"),
+        payload={"brief": brief, "scenario": r.get("scenario")},
+    )

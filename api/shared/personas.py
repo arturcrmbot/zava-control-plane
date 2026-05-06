@@ -395,6 +395,21 @@ PERSONAS: dict[str, Persona] = {
         uses_authority_mcp=True,
         description="Chief Financial Officer; sign-off authority for top-band finance commitments across every domain.",
     ),
+    # ----- POC3 creative-campaign -----
+    # One persona owns all five HITL gates (brief_capture + ◆1..◆4); the
+    # decision_policy block branches on `phase`. See
+    # api/server/personae/creative_director/SKILL.md.
+    "creative_director": Persona(
+        role="creative_director",
+        archetype="approver",
+        scope_function="commercial",
+        workflow_label="Creative Campaign",
+        external_event_default="brief_approval_decision",
+        description=(
+            "Owns the five HITL gates of a creative campaign: brief capture (voice intake),"
+            " brief approval, concept lock, storyboard approval, final signoff."
+        ),
+    ),
 }
 
 

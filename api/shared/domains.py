@@ -417,6 +417,55 @@ DOMAINS: dict[str, Domain] = {
             WakeHint("fx.value.cfo_band", "FX op >£1M routed to CFO"),
         ),
     ),
+
+    # ----- POC3 — Creative Campaign (AI-Agency demo) -----
+    # Per plan/feature-poc3-ai-agency-1.md. The four storyboard-defined HITL
+    # gates (◆1 brief approval, ◆2 concept lock, ◆3 storyboard approval,
+    # ◆4 final signoff) plus the Phase-1 voice intake (parks waiting for the
+    # creative director to complete the multi-party briefing call) are all
+    # five entries below. Phase 1 ships every phase as a stub against canned
+    # image fixtures under data/synthetic/creative-campaign/cached/; Phases
+    # 2–4 swap stubs for real Foundry gpt-image-2 + brand-RAG.
+    "creative-campaign": Domain(
+        workflow_type="creative-campaign",
+        display_name="Creative Campaign",
+        workflow_id_prefix="CMP",
+        orchestrator_name="CreativeCampaignOrchestrator",
+        operator_surface="producer-queue",
+        phases=(
+            Phase("brief_capture", "hitl"),
+            Phase("Brief Synthesis", "agent"),
+            Phase("brief_approval", "hitl"),
+            Phase("Insight & Audience", "agent"),
+            Phase("Concept Fan-out", "agent"),
+            Phase("concept_lock", "hitl"),
+            Phase("Storyboard Render", "agent"),
+            Phase("storyboard_approval", "hitl"),
+            Phase("final_signoff", "hitl"),
+            Phase("Package & Handoff", "agent"),
+        ),
+        hitl_gates=(
+            HitlGate("brief_capture", "voice_complete", "creative_director"),
+            HitlGate("brief_approval", "brief_approval_decision", "creative_director"),
+            HitlGate("concept_lock", "concept_lock_decision", "creative_director"),
+            HitlGate("storyboard_approval", "storyboard_approval_decision",
+                     "creative_director"),
+            HitlGate("final_signoff", "final_signoff_decision", "creative_director"),
+        ),
+        skills=(
+            "creative-briefer",
+            "brief-synthesiser",
+            "concept-curator",
+            "brand-guardian",
+            "storyboard-curator",
+        ),
+        wake_hints=(
+            WakeHint("creative.content_safety.rejected",
+                     "gpt-image-2 RAI filter rejected a render"),
+            WakeHint("creative.brand.distinctiveness_low",
+                     "Concept route scored below distinctiveness threshold"),
+        ),
+    ),
 }
 
 

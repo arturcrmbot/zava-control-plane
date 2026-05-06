@@ -211,7 +211,21 @@ def _compile_decision_policy(role: str, source: str) -> PersonaHandler:
             return {"decision": "reject",
                     "reason": f"persona '{role}' produced invalid decision={decision!r} "
                               f"(expected 'approve' | 'reject' | 'escalate')"}
-        return {"decision": str(decision), "reason": str(reason or "")}
+        out: dict[str, Any] = {
+            "decision": str(decision),
+            "reason": str(reason or ""),
+        }
+        # Optional `extra` dict from the policy: merge into the resolving
+        # event payload so multi-gate personae (e.g. creative_director)
+        # can pass per-gate context downstream — transcripts after voice
+        # intake, locked_route after concept_lock, etc. Existing personae
+        # that don't define `extra` are unaffected.
+        extra = ns.get("extra")
+        if isinstance(extra, dict):
+            for k, v in extra.items():
+                if k not in out:
+                    out[k] = v
+        return out
 
     return decide
 

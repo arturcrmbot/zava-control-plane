@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+<rect width="1280" height="720" fill="#2d4a8f"/>
+<rect x="0" y="540" width="1280" height="180" fill="#c0c8d4" opacity="0.4"/>
+<circle cx="853" cy="240" r="120" fill="#1a2845" opacity="0.35"/>
+<circle cx="320" cy="480" r="72" fill="#1a2845" opacity="0.55"/>
+<text x="640" y="352" font-family="Helvetica,Arial,sans-serif" font-size="36" font-weight="700" fill="#ffffff" text-anchor="middle">Voltari Pulse</text>
+<text x="640" y="384" font-family="Helvetica,Arial,sans-serif" font-size="16" fill="#ffffff" text-anchor="middle" opacity="0.85">still 2 of 4</text>
+</svg>
