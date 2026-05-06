@@ -25,7 +25,7 @@ import { useComposition } from "../lib/useComposition";
 import { useObservatory } from "../lib/useObservatory";
 
 import { DomainCluster } from "./constellation/DomainCluster";
-import { SubstrateSphere } from "./constellation/SubstrateSphere";
+import { SubstrateSphere, SubstrateLabel } from "./constellation/SubstrateSphere";
 
 interface Props {
   status: "watching" | "connecting" | "offline";
@@ -290,6 +290,12 @@ export function Constellation({ status, fullScreen = false }: Props) {
 
         {/* Centre: the substrate. */}
         <SubstrateSphere substrate={substrate} pulsesRef={pulsesRef} />
+
+        {/* Substrate centre label so the bright sphere has a name. */}
+        <SubstrateLabel
+          cameraRef={cameraRef}
+          focusedClusterPos={focusedClusterPos}
+        />
 
         {/* Photon arcs: substrate dot → cluster anchor on every event. */}
         <PhotonArcs arcsRef={arcsRef} />

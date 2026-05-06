@@ -11,8 +11,9 @@
  * decays over ~1.2s.
  */
 
-import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { Billboard, Text } from "@react-three/drei";
+import { useFrame, useThree } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 import { sunflowerSphere } from "../../lib/constellation/sunflower";
@@ -177,5 +178,98 @@ export function SubstrateSphere({
         blending={THREE.AdditiveBlending}
       />
     </points>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SubstrateLabel — a billboard caption that sits at the substrate centre,
+// fades out as the camera approaches a cluster so it doesn't crowd the
+// per-workflow detail. Names what the bright sphere actually IS so the
+// photon arcs leaving from it have a semantic anchor:
+//
+//     "the substrate"
+//     "skills · MCP tools · validators"
+//     "shared by every domain"
+//
+// Without this label, new viewers see "some bright thing in the middle
+// with arrows shooting out" and have no way to read it. With it, the
+// arcs read as "X capability fired for Y domain" automatically.
+// ---------------------------------------------------------------------------
+export function SubstrateLabel({
+  cameraRef,
+  /** When non-null, hide the label entirely — operator has flown into a
+   *  cluster and is concentrating on per-workflow detail. */
+  focusedClusterPos,
+}: {
+  cameraRef: React.MutableRefObject<THREE.Camera | null>;
+  focusedClusterPos: THREE.Vector3 | null;
+}) {
+  const { camera: liveCamera } = useThree();
+  const cam = cameraRef.current ?? liveCamera;
+  const [opacity, setOpacity] = useState(1);
+
+  useFrame(() => {
+    // Distance from camera to substrate centre. Resting/overview camera
+    // sits at ~22 units, so we fade between FAR fully visible and NEAR
+    // fully hidden as the viewer zooms in.
+    const dist = cam.position.length();
+    let next: number;
+    if (focusedClusterPos) {
+      next = 0;
+    } else if (dist > 14) {
+      next = 1;
+    } else if (dist > 6) {
+      next = (dist - 6) / 8;
+    } else {
+      next = 0;
+    }
+    const rounded = Math.round(next * 10) / 10;
+    if (rounded !== opacity) setOpacity(rounded);
+  });
+
+  if (opacity < 0.02) return null;
+
+  return (
+    <Billboard position={[0, 0, 0]}>
+      <Text
+        position={[0, 0.55, 0]}
+        fontSize={0.42}
+        color="#e9e7e3"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.012}
+        outlineColor="#0a0a0c"
+        fillOpacity={opacity}
+        outlineOpacity={opacity}
+      >
+        the substrate
+      </Text>
+      <Text
+        position={[0, 0.10, 0]}
+        fontSize={0.16}
+        color="#bdbdbd"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.005}
+        outlineColor="#0a0a0c"
+        fillOpacity={opacity * 0.95}
+        outlineOpacity={opacity * 0.95}
+      >
+        skills · MCP tools · validators
+      </Text>
+      <Text
+        position={[0, -0.18, 0]}
+        fontSize={0.13}
+        color="#7e7c76"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.0035}
+        outlineColor="#0a0a0c"
+        fillOpacity={opacity * 0.85}
+        outlineOpacity={opacity * 0.85}
+      >
+        shared by every domain
+      </Text>
+    </Billboard>
   );
 }
