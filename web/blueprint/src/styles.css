@@ -1036,6 +1036,145 @@ body.constellation-page-body {
   border-color: rgba(255, 138, 255, 0.7);
 }
 
+/* Workflow inspector — DOM panel opened by clicking a star at MID/CLOSE LOD. */
+.constellation__inspector {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  width: 22rem;
+  background: rgba(14, 14, 16, 0.92);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: var(--space-3);
+  font-family: var(--mono-family);
+  font-size: 0.7rem;
+  color: var(--ink-dim);
+  pointer-events: all;
+  z-index: 6;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  /* Below the live status pill in the top right, but flush with the right
+     edge so it doesn't crowd the canvas. */
+  margin-top: 1.5rem;
+}
+
+.constellation__inspector--gone {
+  opacity: 0.7;
+}
+
+.constellation__inspector-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.constellation__inspector-wid {
+  color: var(--ink);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  flex: 1;
+}
+
+.constellation__inspector-state {
+  font-size: 0.6rem;
+  text-transform: lowercase;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+}
+
+.constellation__inspector-close {
+  background: transparent;
+  border: none;
+  color: var(--ink-mute);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.3rem;
+  transition: color 150ms ease;
+}
+
+.constellation__inspector-close:hover {
+  color: var(--ink);
+}
+
+.constellation__inspector-domain {
+  color: var(--ink-mute);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  margin-bottom: 0.5rem;
+}
+
+.constellation__inspector-asking {
+  color: #d966ec;
+  font-size: 0.7rem;
+  margin-bottom: 0.7rem;
+  padding: 0.45rem 0.55rem;
+  background: rgba(40, 18, 50, 0.55);
+  border-left: 2px solid #d966ec;
+}
+
+.constellation__inspector-reason {
+  color: var(--ink-mute);
+  font-style: italic;
+}
+
+.constellation__inspector-trail-title {
+  color: var(--ink-mute);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  margin-bottom: 0.35rem;
+}
+
+.constellation__inspector-trail {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.constellation__inspector-trail-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+  border-bottom: 1px dotted rgba(255, 255, 255, 0.05);
+  font-size: 0.66rem;
+}
+
+.constellation__inspector-trail-kind {
+  font-weight: 600;
+  width: 1rem;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.constellation__inspector-trail-label {
+  color: var(--ink);
+  word-break: break-all;
+}
+
+.constellation__inspector-empty {
+  color: var(--ink-mute);
+  font-style: italic;
+  font-size: 0.65rem;
+}
+
+.constellation__inspector-foot {
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--rule);
+  color: var(--ink-mute);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-align: right;
+}
+
 .constellation__nav {
   position: absolute;
   top: var(--space-4);

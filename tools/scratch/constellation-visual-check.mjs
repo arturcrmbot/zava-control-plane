@@ -121,6 +121,29 @@ await page.waitForTimeout(15_000);
 await page.screenshot({ path: `${OUT}/${LABEL}-08-projector-after15s.png` });
 console.log(`[${ts()}] snap 08 projector after 15s`);
 
+// Open inspector for any active workflow via the dev hook.
+const inspectorWid = await page
+  .evaluate(() => {
+    const fn = window.__cstlSelect;
+    const probe = window.__cstlAnyAliveWid;
+    const wid = (probe && probe()) || "HIRE-0001";
+    if (fn) fn(wid);
+    return wid;
+  })
+  .catch(() => null);
+console.log(`[${ts()}] inspector probe -> ${inspectorWid}`);
+await page.waitForTimeout(2_000);
+await page.screenshot({ path: `${OUT}/${LABEL}-09-inspector.png` });
+console.log(`[${ts()}] snap 09 inspector`);
+
+// Read the inspector content for an explicit assertion.
+const inspectorText = await page
+  .$eval(".constellation__inspector", (el) =>
+    el.textContent.trim().replace(/\s+/g, " "),
+  )
+  .catch(() => "(no inspector)");
+console.log(`[${ts()}] inspector text: ${inspectorText.slice(0, 200)}`);
+
 // Read the live counts from the DOM so we can attest activity numerically.
 const counts = await page
   .$eval(".constellation__counts", (el) => el.textContent.trim())

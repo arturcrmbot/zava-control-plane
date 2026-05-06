@@ -40,6 +40,9 @@ interface Props {
   focusedClusterPos?: THREE.Vector3 | null;
   /** Called when the user clicks anywhere on this cluster. */
   onFocus?: (clusterPos: [number, number, number]) => void;
+  /** Called when the user clicks an individual mote at MID/CLOSE LOD —
+   *  the trail panel uses this to drill into one workflow. */
+  onSelectWorkflow?: (workflowId: string) => void;
 }
 
 const N_MAX = 96;
@@ -121,6 +124,7 @@ export function DomainCluster({
   cameraRef,
   focusedClusterPos,
   onFocus,
+  onSelectWorkflow,
 }: Props) {
   const groupRef = useRef<THREE.Group>(null);
   const baseColor = useMemo(() => new THREE.Color(color), [color]);
@@ -422,6 +426,7 @@ export function DomainCluster({
             mote={mote}
             position={[x, y, z]}
             lod={lod}
+            onSelect={onSelectWorkflow}
           />
         ))}
     </group>
@@ -435,15 +440,35 @@ function WorkflowDetail({
   mote,
   position,
   lod,
+  onSelect,
 }: {
   mote: Mote;
   position: [number, number, number];
   lod: "mid" | "close";
+  onSelect?: (workflowId: string) => void;
 }) {
   // MID: just the wid + most recent skill.
   // CLOSE: full trail.
   return (
     <group position={position}>
+      {/* Click target — invisible sphere around the star. Generous radius
+          so it's easy to hit even at MID LOD where stars are tiny. */}
+      {onSelect ? (
+        <mesh
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(mote.id);
+          }}
+        >
+          <sphereGeometry args={[0.18, 8, 8]} />
+          <meshBasicMaterial
+            transparent
+            opacity={0.001}
+            depthWrite={false}
+            colorWrite={false}
+          />
+        </mesh>
+      ) : null}
       <Billboard position={[0.10, 0.05, 0]}>
         {/* anchorX="left" so labels grow rightward and don't overlap the star */}
         <Text

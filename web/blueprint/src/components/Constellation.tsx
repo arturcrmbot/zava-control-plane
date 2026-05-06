@@ -216,6 +216,34 @@ export function Constellation({ status, fullScreen = false }: Props) {
   const [projectorMode, setProjectorMode] = useState(false);
   const lastFollowedRef = useRef<string | null>(null);
 
+  /** workflow_id of the mote currently selected for the inspector panel.
+   *  Set by clicking a star at MID/CLOSE LOD; cleared by the panel's
+   *  close button or by Escape. */
+  const [selectedWid, setSelectedWid] = useState<string | null>(null);
+
+  // Dev-only hook: lets the visual smoke check open the inspector
+  // without trying to mouse-click a tiny 3D sphere from headless Chrome.
+  // Production users never see this; nothing in the app calls it.
+  useEffect(() => {
+    const w = window as unknown as {
+      __cstlSelect?: (id: string | null) => void;
+      __cstlAnyAliveWid?: () => string | null;
+    };
+    w.__cstlSelect = setSelectedWid;
+    w.__cstlAnyAliveWid = () => {
+      for (const list of motesRef.current.values()) {
+        for (const m of list) {
+          if (m.state === "alive" || m.state === "awaiting") return m.id;
+        }
+      }
+      return null;
+    };
+    return () => {
+      delete w.__cstlSelect;
+      delete w.__cstlAnyAliveWid;
+    };
+  }, []);
+
   useEffect(() => {
     if (!projectorMode) {
       lastFollowedRef.current = null;
@@ -264,6 +292,12 @@ export function Constellation({ status, fullScreen = false }: Props) {
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "0" || e.key === "Escape") {
+        // Escape closes the inspector first, then drops to overview if
+        // it was already closed. 0 always goes to overview.
+        if (e.key === "Escape" && selectedWid) {
+          setSelectedWid(null);
+          return;
+        }
         handleResetCamera();
         return;
       }
@@ -334,6 +368,7 @@ export function Constellation({ status, fullScreen = false }: Props) {
               cameraRef={cameraRef}
               focusedClusterPos={focusedClusterPos}
               onFocus={handleClusterFocus}
+              onSelectWorkflow={setSelectedWid}
             />
           );
         })}
@@ -445,6 +480,18 @@ export function Constellation({ status, fullScreen = false }: Props) {
       >
         {projectorMode ? "● auto-follow" : "○ auto-follow"}
       </button>
+
+      {/* Workflow inspector — opens when the operator clicks a star at
+          MID/CLOSE LOD. Reads its data from motesRef on a slow tick so
+          the rolling trail updates while the panel is open. */}
+      {selectedWid ? (
+        <WorkflowInspector
+          workflowId={selectedWid}
+          motesRef={motesRef}
+          orbits={orbits}
+          onClose={() => setSelectedWid(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -786,6 +833,160 @@ function DomainNavCount({
         <span style={{ color: "#f28a3d", marginLeft: 4 }}>!{exception}</span>
       ) : null}
     </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// WorkflowInspector — DOM panel showing the rolling event trail of a single
+// workflow. Opened by clicking a star at MID/CLOSE LOD. Polls motesRef on
+// a slow tick so the trail updates while the panel is open. Auto-closes
+// itself if the workflow vanishes (cluster culled it after fade-out).
+// ---------------------------------------------------------------------------
+function WorkflowInspector({
+  workflowId,
+  motesRef,
+  orbits,
+  onClose,
+}: {
+  workflowId: string;
+  motesRef: React.MutableRefObject<Map<string, Mote[]>>;
+  orbits: { workflowType: string; displayName: string }[];
+  onClose: () => void;
+}) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((t) => t + 1), 600);
+    return () => window.clearInterval(id);
+  }, []);
+  void tick;
+
+  // Find the mote across all clusters.
+  let foundMote: Mote | null = null;
+  let foundDomain: string | null = null;
+  for (const o of orbits) {
+    const list = motesRef.current.get(o.workflowType) ?? [];
+    const m = list.find((x) => x.id === workflowId);
+    if (m) {
+      foundMote = m;
+      foundDomain = o.displayName;
+      break;
+    }
+  }
+
+  if (!foundMote) {
+    // Mote was culled — show a faded "ended" panel for a moment, then
+    // close. We close immediately here for simplicity.
+    return (
+      <div className="constellation__inspector constellation__inspector--gone">
+        <div className="constellation__inspector-head">
+          <span className="constellation__inspector-wid">{workflowId}</span>
+          <button
+            type="button"
+            className="constellation__inspector-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+        <div className="constellation__inspector-empty">
+          workflow has finished and faded from the cluster
+        </div>
+      </div>
+    );
+  }
+
+  const stateColor =
+    foundMote.state === "awaiting"
+      ? "#d966ec"
+      : foundMote.state === "exception"
+      ? "#f28a3d"
+      : foundMote.state === "blocked"
+      ? "#c54a3d"
+      : foundMote.state === "completed"
+      ? "#fff5d8"
+      : "#bdbdbd";
+
+  return (
+    <div className="constellation__inspector">
+      <div className="constellation__inspector-head">
+        <span className="constellation__inspector-wid">{workflowId}</span>
+        <span
+          className="constellation__inspector-state"
+          style={{ color: stateColor }}
+        >
+          {foundMote.state}
+          {foundMote.escalated ? " · escalated" : ""}
+          {foundMote.slaBreach ? " · sla breach" : ""}
+        </span>
+        <button
+          type="button"
+          className="constellation__inspector-close"
+          onClick={onClose}
+          aria-label="Close"
+        >
+          ×
+        </button>
+      </div>
+      <div className="constellation__inspector-domain">{foundDomain}</div>
+      {foundMote.state === "awaiting" && foundMote.awaitingPersona ? (
+        <div className="constellation__inspector-asking">
+          ⊙ asking{" "}
+          <span style={{ color: "#d966ec" }}>
+            {foundMote.awaitingPersona
+              .split("_")
+              .map((s) =>
+                s.length <= 3
+                  ? s.toUpperCase()
+                  : s.charAt(0).toUpperCase() + s.slice(1),
+              )
+              .join(" ")}
+          </span>
+          {foundMote.awaitingReason ? (
+            <span className="constellation__inspector-reason">
+              {" — " + foundMote.awaitingReason.replace(/_/g, " ")}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+      <div className="constellation__inspector-trail-title">recent events</div>
+      <ul className="constellation__inspector-trail">
+        {(foundMote.trail ?? []).length === 0 ? (
+          <li className="constellation__inspector-empty">(no events yet)</li>
+        ) : (
+          (foundMote.trail ?? []).map((entry, i) => (
+            <li
+              key={`${entry.ts}-${i}`}
+              className="constellation__inspector-trail-item"
+            >
+              <span
+                className="constellation__inspector-trail-kind"
+                style={{
+                  color:
+                    entry.kind === "tool"
+                      ? "#7faed4"
+                      : entry.kind === "validator"
+                      ? "#c54a3d"
+                      : "#f4a300",
+                }}
+              >
+                {entry.kind === "tool"
+                  ? "→"
+                  : entry.kind === "validator"
+                  ? "✕"
+                  : "▸"}
+              </span>
+              <span className="constellation__inspector-trail-label">
+                {entry.label}
+              </span>
+            </li>
+          ))
+        )}
+      </ul>
+      <div className="constellation__inspector-foot">
+        progress {Math.round((foundMote.progress ?? 0) * 100)}% · esc to close
+      </div>
+    </div>
   );
 }
 
