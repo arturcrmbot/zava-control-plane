@@ -291,6 +291,9 @@ export function Constellation({ status, fullScreen = false }: Props) {
         </div>
       </div>
 
+      {/* Live counts ribbon — projector-friendly running totals. */}
+      <CountsRibbon motesRef={motesRef} orbits={orbits} />
+
       {/* Domain navigator panel — a guaranteed way to fly to any cluster. */}
       <div className="constellation__nav">
         <div className="constellation__nav-title">domains</div>
@@ -309,6 +312,7 @@ export function Constellation({ status, fullScreen = false }: Props) {
                 style={{ background: tint, boxShadow: `0 0 8px ${tint}` }}
               />
               <span className="constellation__nav-label">{d.displayName}</span>
+              <DomainNavCount workflowType={d.workflowType} motesRef={motesRef} />
             </button>
           );
         })}
@@ -444,6 +448,129 @@ function BackdropStars({
         blending={THREE.AdditiveBlending}
       />
     </points>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CountsRibbon — running totals across all clusters, refreshed on a slow
+// tick so it doesn't churn React 60Hz. Also tracks lifetime "completed" by
+// observing motes leaving the alive bucket.
+// ---------------------------------------------------------------------------
+function CountsRibbon({
+  motesRef,
+  orbits,
+}: {
+  motesRef: React.MutableRefObject<Map<string, Mote[]>>;
+  orbits: { workflowType: string }[];
+}) {
+  const [tick, setTick] = useState(0);
+  const seenCompletedRef = useRef<Map<string, true>>(new Map());
+  const completedTotalRef = useRef(0);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((t) => t + 1), 750);
+    return () => window.clearInterval(id);
+  }, []);
+
+  // Walk all motes once per tick to get the snapshot.
+  let alive = 0;
+  let awaiting = 0;
+  let exception = 0;
+  let blocked = 0;
+  for (const o of orbits) {
+    const list = motesRef.current.get(o.workflowType) ?? [];
+    for (const m of list) {
+      if (m.state === "alive") alive++;
+      else if (m.state === "awaiting") awaiting++;
+      else if (m.state === "exception") exception++;
+      else if (m.state === "blocked") blocked++;
+      if (m.state === "completed" && !seenCompletedRef.current.has(m.id)) {
+        seenCompletedRef.current.set(m.id, true);
+        completedTotalRef.current += 1;
+      }
+    }
+  }
+  // Reference tick to avoid the unused-var lint when React isn't tracking it.
+  void tick;
+
+  return (
+    <div className="constellation__counts" role="status">
+      <span className="constellation__counts-item">
+        <span className="constellation__counts-num">{alive}</span> alive
+      </span>
+      <span className="constellation__counts-sep">·</span>
+      <span
+        className="constellation__counts-item"
+        style={{ color: awaiting > 0 ? "#d966ec" : undefined }}
+      >
+        <span className="constellation__counts-num">{awaiting}</span> awaiting
+      </span>
+      <span className="constellation__counts-sep">·</span>
+      <span
+        className="constellation__counts-item"
+        style={{ color: exception > 0 ? "#f28a3d" : undefined }}
+      >
+        <span className="constellation__counts-num">{exception}</span> exception
+      </span>
+      <span className="constellation__counts-sep">·</span>
+      <span
+        className="constellation__counts-item"
+        style={{ color: blocked > 0 ? "#c54a3d" : undefined }}
+      >
+        <span className="constellation__counts-num">{blocked}</span> blocked
+      </span>
+      <span className="constellation__counts-sep">·</span>
+      <span className="constellation__counts-item">
+        <span className="constellation__counts-num">
+          {completedTotalRef.current}
+        </span>{" "}
+        completed
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DomainNavCount — small in-flight badge next to a nav-panel domain entry.
+// Shares the same slow tick cadence as CountsRibbon.
+// ---------------------------------------------------------------------------
+function DomainNavCount({
+  workflowType,
+  motesRef,
+}: {
+  workflowType: string;
+  motesRef: React.MutableRefObject<Map<string, Mote[]>>;
+}) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((t) => t + 1), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  void tick;
+  const list = motesRef.current.get(workflowType) ?? [];
+  let inFlight = 0;
+  let awaiting = 0;
+  let exception = 0;
+  for (const m of list) {
+    if (m.state === "alive" || m.state === "awaiting" || m.state === "exception") {
+      inFlight++;
+    }
+    if (m.state === "awaiting") awaiting++;
+    if (m.state === "exception") exception++;
+  }
+  if (inFlight === 0) {
+    return <span className="constellation__nav-count constellation__nav-count--zero">·</span>;
+  }
+  return (
+    <span className="constellation__nav-count">
+      {inFlight}
+      {awaiting > 0 ? (
+        <span style={{ color: "#d966ec", marginLeft: 4 }}>⊙{awaiting}</span>
+      ) : null}
+      {exception > 0 ? (
+        <span style={{ color: "#f28a3d", marginLeft: 4 }}>!{exception}</span>
+      ) : null}
+    </span>
   );
 }
 

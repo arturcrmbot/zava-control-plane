@@ -922,6 +922,57 @@ body.constellation-page-body {
   display: inline-block;
 }
 
+/* Live counts ribbon — bottom-centre, projector-friendly. */
+.constellation__counts {
+  position: absolute;
+  bottom: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.55rem;
+  align-items: baseline;
+  background: rgba(14, 14, 16, 0.82);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 0.5rem 0.95rem;
+  font-family: var(--mono-family);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-dim);
+  pointer-events: none;
+  z-index: 5;
+  white-space: nowrap;
+}
+
+.constellation__counts-num {
+  color: var(--ink);
+  font-weight: 600;
+  margin-right: 0.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.constellation__counts-sep {
+  color: var(--ink-mute);
+  opacity: 0.5;
+}
+
+.constellation__counts-item {
+  transition: color 300ms ease;
+}
+
+/* Per-domain in-flight badge inside the nav panel. */
+.constellation__nav-count {
+  margin-left: auto;
+  font-size: 0.65rem;
+  color: var(--ink-mute);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.constellation__nav-count--zero {
+  opacity: 0.3;
+}
+
 .constellation__reset {
   position: absolute;
   bottom: var(--space-3);
