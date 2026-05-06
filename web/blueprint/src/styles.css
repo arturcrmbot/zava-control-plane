@@ -866,7 +866,11 @@ body.constellation-page-body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  padding: var(--space-3) var(--space-4) var(--space-4) var(--space-4);
+  /* Bottom padding leaves room for the absolutely-positioned counts
+   * ribbon (~2.4rem tall + var(--space-3) bottom offset) so the
+   * naturally-bottom-anchored legend doesn't sit underneath it. */
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + 3rem)
+    var(--space-4);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
