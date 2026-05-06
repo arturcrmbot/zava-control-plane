@@ -313,13 +313,23 @@ async def receive_durable_event(body: DurableEventBody):
         # suspended payload so the responder can close the gate without a
         # human in the loop. Hand-built domains (expense / hiring) omit
         # these fields, so the responder ignores their HITL events.
+        # Inject `phase` into the context dict so multi-gate personae
+        # (e.g. creative_director) can branch on it. The orchestrator
+        # carries `phase` at the same level as `context` in its suspended
+        # payload; merging it into `context` here means SKILL.md
+        # decision_policy blocks can read `context["phase"]` without
+        # caring about the FleetEvent shape.
+        _enriched_context = dict(body.payload.get("context") or {})
+        _phase = body.payload.get("phase")
+        if _phase and "phase" not in _enriched_context:
+            _enriched_context["phase"] = _phase
         _emit(
             "workflow.hitl.requested", wid,
             reason=reason, wait_kind=wait_kind,
             instance_id=body.instance_id,
             persona=body.payload.get("persona"),
             external_event=body.payload.get("external_event"),
-            context=body.payload.get("context"),
+            context=_enriched_context,
         )
         # Canonical durable.suspended carries the same payload so the
         # observatory can render the pause + the recorder can capture it.

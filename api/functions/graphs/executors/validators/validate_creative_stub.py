@@ -14,8 +14,15 @@ from __future__ import annotations
 async def execute(input: dict) -> dict:
     """Permissive validator: ok=True when the agent stub returned a phase
     tag. The phase-specific real validators (one per agentic phase) land
-    in Phase 4."""
+    in Phase 4.
+
+    Returns the agent's input merged with the validator verdict so the
+    orchestrator's downstream consumers (HITL gate persona, FastAPI
+    payload-stash route) can read both the agent's structured output
+    AND the validator's ok/blocked_reason in a single dict. Same shape
+    the real per-phase validators in Phase 4 will produce.
+    """
     phase = input.get("phase")
     if not phase:
-        return {"ok": False, "blocked_reason": "missing phase tag from agent"}
-    return {"ok": True, "validated_phase": phase}
+        return {**input, "ok": False, "blocked_reason": "missing phase tag from agent"}
+    return {**input, "ok": True, "validated_phase": phase}
