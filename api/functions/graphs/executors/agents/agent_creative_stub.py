@@ -16,10 +16,30 @@ canned blob URLs so the WorkflowDetail surface has something to render.
 Replaced in Phase 4 by real GHCP-SDK agents loading the per-phase
 SKILL.md (creative-briefer, brief-synthesiser, concept-curator,
 brand-guardian, storyboard-curator).
+
+Phase-3 swap: when `image_gen.is_configured()` (CREATIVE_REAL_FOUNDRY=1
++ Foundry/Storage env), the concept_fanout and storyboard_render
+branches call the `image_gen` MCP tool to render real gpt-image-2
+images in parallel via asyncio.gather, falling back to the canned
+SVG paths on any failure (RAI rejection, API error, network blip).
+The MCP boundary stays clean — image_gen knows nothing about cached
+fixtures; the fallback lives here in the caller, exactly the way a
+v2 Adobe Firefly / Runway / Veo MCP swap would land.
 """
 from __future__ import annotations
+import asyncio
 import json
+import os
 from pathlib import Path
+
+from api.server.mcp_tools import image_gen
+
+
+# Quality tier for stub-driven renders. Demo default is medium (~$0.04/image,
+# 18 images per workflow ⇒ ~$0.75/run at low cache utilisation). Override
+# with CREATIVE_IMAGE_QUALITY=low for cheaper / faster dev iteration.
+_STUB_QUALITY = os.environ.get("CREATIVE_IMAGE_QUALITY", "medium")
+_STUB_SIZE = os.environ.get("CREATIVE_IMAGE_SIZE", "1024x1024")
 
 # data/synthetic/creative-campaign/cached/<brief-id>/route-A/{1..4}.svg etc.
 _CACHED_ROOT = (
@@ -37,6 +57,73 @@ def _cached_urls(brief_id: str, sub: str, count: int, ext: str = "svg") -> list[
     for i in range(1, count + 1):
         out.append(f"creative-campaign/cached/{brief_id}/{sub}/{i}.{ext}")
     return out
+
+
+# -------------------------------------------------- Phase-3 real-render hook
+
+
+def _build_concept_prompt(brief: dict, route_headline: str, route_desc: str, idx: int) -> str:
+    """Construct a gpt-image-2 prompt for one concept still. Stub-grade —
+    Phase 4's real concept-curator skill will produce richer, art-directed
+    prompts via gpt-5.2 + the brand-RAG corpus. For Phase 3 we just need
+    something plausible enough to render demo imagery.
+
+    No human faces, no logos, no text — keeps the output RAI-clean and
+    aesthetically agency-credible (product-only luxury photography)."""
+    brand = brief.get("client_brand", "Solene")
+    category = (brief.get("category", "luxury_fragrance")).replace("_", " ")
+    audience = brief.get("audience", "European luxury 25-44")
+    return (
+        f"Editorial product photography for {brand}, a {category} brand. "
+        f"Creative route: {route_headline} — {route_desc}. "
+        f"Frame {idx} of 4. Audience: {audience}. "
+        f"Composition: cinematic, premium, magazine-shoot quality. "
+        f"No people, no text, no logos. Natural light. 35mm photographic feel."
+    )
+
+
+def _build_storyboard_prompt(brief: dict, frame_caption: str, idx: int) -> str:
+    """One storyboard frame prompt, captioned by intent. Same RAI-clean rules
+    as concept stills — product / landscape / craftsmanship subjects only."""
+    brand = brief.get("client_brand", "Solene")
+    category = (brief.get("category", "luxury_fragrance")).replace("_", " ")
+    return (
+        f"Storyboard frame {idx} of 6 for a {brand} {category} film. "
+        f"Scene: {frame_caption}. "
+        f"Style: cinematic still, hand-painted concept-art feel, soft-focus. "
+        f"No people in frame, no text overlay, no brand marks rendered."
+    )
+
+
+async def _render_or_fallback(prompt: str, fallback_url: str) -> str:
+    """Call image_gen in a thread (it's sync) and return the SAS URL on
+    success, or the cached fixture URL on any failure. Failure modes
+    include: not configured (canned-fixture path is the dev default),
+    content_safety_rejection (RAI flagged the prompt — Phase 4 skill
+    rewrites; stub just falls back), api_error (network blip).
+
+    The fall-back behaviour means a partial Foundry outage during a demo
+    degrades gracefully to placeholders rather than killing the workflow.
+    """
+    if not image_gen.is_configured():
+        return fallback_url
+    try:
+        result = await asyncio.to_thread(
+            image_gen.image_gen,
+            prompt=prompt,
+            size=_STUB_SIZE,
+            quality=_STUB_QUALITY,
+        )
+    except Exception as ex:  # noqa: BLE001 — never let a render kill the workflow
+        print(f"[creative-stub] image_gen raised {ex!r}; using fixture")
+        return fallback_url
+    if result.result_type == "success" and result.image_url:
+        return result.image_url
+    print(
+        f"[creative-stub] image_gen failed code={result.error_code} "
+        f"err={result.error}; using fixture"
+    )
+    return fallback_url
 
 
 def _load_brief(brief_id: str | None) -> dict:
@@ -122,11 +209,14 @@ async def execute(input: dict) -> dict:
         }
 
     if phase in ("Concept Fan-out", "concept_fanout"):
-        # Three strategic routes, each with 4 cached stills + scores.
-        # Real concept-curator skill lands in Phase 4; image_gen MCP in
-        # Phase 3 swaps the cached URLs for live gpt-image-2 outputs.
+        # Three strategic routes, each with 4 stills + scores. When
+        # CREATIVE_REAL_FOUNDRY=1 the still URLs come from a parallel
+        # gpt-image-2 burst (~5-15s for 12 images at medium quality);
+        # otherwise we return the canned SVG paths. Either way the UI
+        # contract (3 routes × 4 stills + brand_fit + distinctiveness)
+        # is identical so the Phase-5 frontend doesn't branch.
         bid = brief.get("id") or brief_id or "BRF-001"
-        routes = [
+        route_specs = [
             {
                 "route_name": "route-A",
                 "headline": "Origin",
@@ -134,7 +224,6 @@ async def execute(input: dict) -> dict:
                     "Cinematic minimalism — single-source botanicals, "
                     "stillness, monochrome typography."
                 ),
-                "stills": _cached_urls(bid, "route-A", 4),
                 "brand_fit": 0.91,
                 "distinctiveness": 0.74,
             },
@@ -145,7 +234,6 @@ async def execute(input: dict) -> dict:
                     "Social-first vibrancy — kinetic close-ups, vivid "
                     "colour blocks, ASMR-led product reveals."
                 ),
-                "stills": _cached_urls(bid, "route-B", 4),
                 "brand_fit": 0.88,
                 "distinctiveness": 0.86,
             },
@@ -156,34 +244,75 @@ async def execute(input: dict) -> dict:
                     "Provenance-led — landscape vistas, regenerative "
                     "farms, natural light, hand-illustrated supers."
                 ),
-                "stills": _cached_urls(bid, "route-C", 4),
                 "brand_fit": 0.83,
                 "distinctiveness": 0.81,
             },
         ]
+        # Build the (prompt, fallback_url) pair for every still up-front so
+        # we can fire one big asyncio.gather across all 12 in parallel.
+        render_jobs: list[tuple[int, int, str, str]] = []
+        for r_idx, spec in enumerate(route_specs):
+            cached = _cached_urls(bid, spec["route_name"], 4)
+            for s_idx in range(4):
+                prompt = _build_concept_prompt(
+                    brief, spec["headline"], spec["description"], s_idx + 1
+                )
+                render_jobs.append((r_idx, s_idx, prompt, cached[s_idx]))
+
+        rendered = await asyncio.gather(
+            *(_render_or_fallback(p, f) for _, _, p, f in render_jobs)
+        )
+
+        # Stitch the flat result list back into 3 routes × 4 stills.
+        routes: list[dict] = []
+        for r_idx, spec in enumerate(route_specs):
+            stills = [
+                rendered[i]
+                for i, (rr, _, _, _) in enumerate(render_jobs)
+                if rr == r_idx
+            ]
+            routes.append({**spec, "stills": stills})
+
         return {
             "phase": phase,
             "workflow_id": workflow_id,
             "routes": routes,
             "content_safety_flag": False,
+            "image_source": (
+                "foundry.gpt-image-2" if image_gen.is_configured() else "fixture"
+            ),
             "stub": True,
         }
 
     if phase in ("Storyboard Render", "storyboard_render"):
         bid = brief.get("id") or brief_id or "BRF-001"
+        captions = [
+            "Open: regenerative farm at dawn",
+            "Cut: hands tending botanicals",
+            "Close-up: product reveal",
+            "Brand mark: Solene wordmark",
+            "Tagline: 'Where it begins'",
+            "End frame: package on plinth",
+        ]
+        cached = _cached_urls(bid, "storyboard", 6)
+        rendered = await asyncio.gather(
+            *(
+                _render_or_fallback(
+                    _build_storyboard_prompt(brief, cap, idx + 1),
+                    cached[idx],
+                )
+                for idx, cap in enumerate(captions)
+            )
+        )
         return {
             "phase": phase,
             "workflow_id": workflow_id,
-            "frames": _cached_urls(bid, "storyboard", 6),
-            "frame_captions": [
-                "Open: regenerative farm at dawn",
-                "Cut: hands tending botanicals",
-                "Close-up: product reveal",
-                "Brand mark: Solene wordmark",
-                "Tagline: 'Where it begins'",
-                "End frame: package on plinth",
-            ],
+            "frames": rendered,
+            "frame_captions": captions,
             "content_safety_flag": False,
+            "image_source": (
+                "foundry.gpt-image-2" if image_gen.is_configured() else "fixture"
+            ),
             "stub": True,
         }
 

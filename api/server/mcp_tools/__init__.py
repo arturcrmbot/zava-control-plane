@@ -8,6 +8,7 @@ from .query_reviewer_decisions import query_reviewer_decisions_tool
 from .query_economics import query_economics_tool
 from . import claim_lookup  # noqa: F401  (Phase 1 Intake — Workday/Concur dispatcher)
 from . import avatar_render  # noqa: F401  (Phase 10 Onboarding — Azure Speech avatar)
+from . import image_gen  # noqa: F401  (POC3 — Foundry gpt-image-2 for creative-campaign)
 
 
 def build_fleet_manager_tools(store, audit):
