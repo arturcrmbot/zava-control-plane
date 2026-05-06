@@ -9,7 +9,6 @@ import Evaluations from "./routes/Evaluations";
 import Economics from "./routes/Economics";
 import WorkflowDetail from "./routes/WorkflowDetail";
 import HiringManager from "./routes/HiringManager";
-import Constellation from "./routes/Constellation";
 import FleetManagerRail from "./components/FleetManagerRail";
 
 const nav = [
@@ -20,8 +19,20 @@ const nav = [
   { to: "/analytics",      label: "Analytics" },
   { to: "/evals",          label: "Evaluations" },
   { to: "/economics",      label: "Economics" },
-  { to: "/constellation",  label: "Constellation" },
 ];
+
+// Constellation lives in the separate blueprint app — opening it inside the
+// dashboard's grid layout squashes it into a tiny middle column. Render it
+// as a plain external link so it goes full-screen in its own tab.
+const VITE_PORTS = new Set(["5173", "5174", "5175"]);
+function constellationUrl(): string {
+  const fromEnv = (import.meta.env.VITE_BLUEPRINT_URL as string | undefined)?.trim();
+  if (fromEnv) return `${fromEnv.replace(/\/$/, "")}/?view=constellation`;
+  if (typeof window !== "undefined" && VITE_PORTS.has(window.location.port)) {
+    return `${window.location.protocol}//${window.location.hostname}:5175/?view=constellation`;
+  }
+  return "/?view=constellation";
+}
 
 export default function App() {
   return (
@@ -42,6 +53,14 @@ export default function App() {
               {n.label}
             </NavLink>
           ))}
+          <a
+            href={constellationUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block text-sm px-3 py-1.5 rounded outline-none focus-visible:ring-2 focus-visible:ring-blue-300 text-slate-700 hover:bg-slate-100"
+          >
+            Constellation ↗
+          </a>
         </aside>
 
         <main className="p-6 overflow-y-auto overflow-x-hidden min-w-0">
@@ -55,7 +74,6 @@ export default function App() {
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/evals" element={<Evaluations />} />
             <Route path="/economics" element={<Economics />} />
-            <Route path="/constellation" element={<Constellation />} />
             {/* POC2 surfaces */}
             <Route path="/hiring-manager/:workflowId?" element={<HiringManager />} />
           </Routes>
