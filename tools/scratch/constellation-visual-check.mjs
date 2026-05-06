@@ -105,22 +105,6 @@ await page.waitForTimeout(3_500);
 await page.screenshot({ path: `${OUT}/${LABEL}-06-keyboard-3.png` });
 console.log(`[${ts()}] snap 06 after key 3`);
 
-// Keyboard: P toggles projector mode on.
-await page.keyboard.press("0");
-await page.waitForTimeout(1_500);
-await page.keyboard.press("p");
-await page.waitForTimeout(1_000);
-await page.screenshot({ path: `${OUT}/${LABEL}-07-projector-on.png` });
-const projectorState = await page
-  .$eval(".constellation__projector", (el) => el.textContent)
-  .catch(() => "(no toggle)");
-console.log(`[${ts()}] snap 07 projector toggle text: "${projectorState}"`);
-
-// Wait long enough (15s) for the projector tick (9s) to fire and move the camera.
-await page.waitForTimeout(15_000);
-await page.screenshot({ path: `${OUT}/${LABEL}-08-projector-after15s.png` });
-console.log(`[${ts()}] snap 08 projector after 15s`);
-
 // Open inspector for any active workflow via the dev hook.
 const inspectorWid = await page
   .evaluate(() => {
@@ -133,8 +117,8 @@ const inspectorWid = await page
   .catch(() => null);
 console.log(`[${ts()}] inspector probe -> ${inspectorWid}`);
 await page.waitForTimeout(2_000);
-await page.screenshot({ path: `${OUT}/${LABEL}-09-inspector.png` });
-console.log(`[${ts()}] snap 09 inspector`);
+await page.screenshot({ path: `${OUT}/${LABEL}-07-inspector.png` });
+console.log(`[${ts()}] snap 07 inspector`);
 
 // Read the inspector content for an explicit assertion.
 const inspectorText = await page
@@ -168,8 +152,7 @@ const summary = {
   counts,
   legend,
   flew,
-  projectorState,
-  shots: 8,
+  shots: 7,
 };
 writeFileSync(`${OUT}/${LABEL}.json`, JSON.stringify(summary, null, 2));
 

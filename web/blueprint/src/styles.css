@@ -1001,41 +1001,6 @@ body.constellation-page-body {
   background: rgba(30, 30, 36, 0.85);
 }
 
-.constellation__projector {
-  position: absolute;
-  bottom: var(--space-3);
-  right: calc(var(--space-4) + 8.5rem);
-  background: rgba(20, 20, 24, 0.78);
-  border: 1px solid var(--rule);
-  color: var(--ink-dim);
-  padding: 0.45rem 0.85rem;
-  font-family: var(--mono-family);
-  font-size: 0.62rem;
-  letter-spacing: 0.10em;
-  text-transform: lowercase;
-  cursor: pointer;
-  border-radius: 2px;
-  transition: color 200ms ease, border-color 200ms ease, background 200ms ease;
-  pointer-events: all;
-}
-
-.constellation__projector:hover {
-  color: var(--ink);
-  border-color: var(--ink-mute);
-  background: rgba(30, 30, 36, 0.85);
-}
-
-.constellation__projector--on {
-  color: #d966ec;
-  border-color: rgba(217, 102, 236, 0.55);
-  background: rgba(38, 18, 44, 0.85);
-}
-
-.constellation__projector--on:hover {
-  color: #ff8aff;
-  border-color: rgba(255, 138, 255, 0.7);
-}
-
 /* Workflow inspector — DOM panel opened by clicking a star at MID/CLOSE LOD. */
 .constellation__inspector {
   position: absolute;
