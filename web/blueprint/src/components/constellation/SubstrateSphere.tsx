@@ -17,6 +17,7 @@ import * as THREE from "three";
 
 import { sunflowerSphere } from "../../lib/constellation/sunflower";
 import type { Pulse, SubstrateMap } from "../../lib/constellation/types";
+import { SUBSTRATE_RADIUS } from "../../lib/constellation/types";
 
 interface Props {
   substrate: SubstrateMap;
@@ -40,7 +41,11 @@ const COL_PULSE_SKILL = new THREE.Color("#f4a300"); // amber — matches HUD leg
 const COL_PULSE_TOOL = new THREE.Color("#7faed4"); // cool blue — matches HUD legend
 const COL_PULSE_VALIDATOR = new THREE.Color("#c54a3d"); // red — alarm, only on .blocked
 
-export function SubstrateSphere({ substrate, pulsesRef, radius = 2.6 }: Props) {
+export function SubstrateSphere({
+  substrate,
+  pulsesRef,
+  radius = SUBSTRATE_RADIUS,
+}: Props) {
   const pointsRef = useRef<THREE.Points>(null);
 
   const geometry = useMemo(() => {

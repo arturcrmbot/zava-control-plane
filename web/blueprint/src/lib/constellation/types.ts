@@ -68,6 +68,33 @@ export interface Pulse {
 }
 
 /**
+ * A photon arc: a thin glowing line drawn from the substrate dot that
+ * just fired to the cluster anchor of the workflow it fired for.
+ *
+ * The arcs are the "I can SEE the wiring" moment — they make the otherwise
+ * abstract substrate↔domain coupling visible in real time. Capped low
+ * so a high-volume burst doesn't drown the canvas.
+ */
+export interface PhotonArc {
+  /** Time the arc started (ms epoch). Drives the alpha/length decay. */
+  startMs: number;
+  /** Substrate-dot end (world space, on the substrate sphere surface). */
+  fromX: number;
+  fromY: number;
+  fromZ: number;
+  /** Cluster-anchor end (world space, deep in the swarm). */
+  toX: number;
+  toY: number;
+  toZ: number;
+  /** Same colour vocabulary as Pulse: skill amber / tool blue / validator red. */
+  kind: "skill" | "tool" | "validator";
+}
+
+/** Substrate sphere radius — shared between SubstrateSphere and the
+ *  arc system so arcs land exactly on the sphere surface. */
+export const SUBSTRATE_RADIUS = 2.6;
+
+/**
  * Manifest of which substrate dot belongs to which skill / MCP tool /
  * validator. Built once at mount time from the composition tree.
  */

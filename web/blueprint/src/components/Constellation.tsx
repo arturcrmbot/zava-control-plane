@@ -17,9 +17,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 import type { ObservatoryEvent } from "../lib/types";
-import { describeDomainOrbits } from "../lib/constellation/types";
-import type { Mote, Pulse } from "../lib/constellation/types";
+import { describeDomainOrbits, SUBSTRATE_RADIUS } from "../lib/constellation/types";
+import type { Mote, PhotonArc, Pulse } from "../lib/constellation/types";
 import { buildSubstrateMap } from "../lib/constellation/substrateMap";
+import { sunflowerSphere } from "../lib/constellation/sunflower";
 import { useComposition } from "../lib/useComposition";
 import { useObservatory } from "../lib/useObservatory";
 
@@ -91,6 +92,13 @@ export function Constellation({ status, fullScreen = false }: Props) {
     () => buildSubstrateMap(composition, 2400),
     [composition],
   );
+  /** Cached substrate dot positions in world space — needed to draw the
+   *  arcs from the firing dot to the cluster anchor. Generated with the
+   *  exact same sunflower coil at the exact same radius the sphere uses. */
+  const substrateDotPositions = useMemo(
+    () => sunflowerSphere(substrate.total, SUBSTRATE_RADIUS),
+    [substrate.total],
+  );
 
   // Reverse lookup: display name (what the SSE stream emits as `domain`) →
   // canonical workflow_type (what we key clusters by). The composition
@@ -133,6 +141,7 @@ export function Constellation({ status, fullScreen = false }: Props) {
   // Mutable scene state — the canvas reads it inside useFrame, the SSE
   // handler writes it. Decoupled from React so we don't re-render 60Hz.
   const pulsesRef = useRef<Pulse[]>([]);
+  const arcsRef = useRef<PhotonArc[]>([]);
   const motesRef = useRef<Map<string, Mote[]>>(new Map());
   const bornMapRef = useRef<Map<string, number>>(new Map());
   const diedMapRef = useRef<Map<string, number>>(new Map());
@@ -146,7 +155,10 @@ export function Constellation({ status, fullScreen = false }: Props) {
     onEvent: (e) => {
       handleEvent(e, {
         substrate,
+        substrateDotPositions,
+        clusterPositions: positions,
         pulsesRef,
+        arcsRef,
         motesRef,
         bornMapRef,
         diedMapRef,
@@ -221,6 +233,9 @@ export function Constellation({ status, fullScreen = false }: Props) {
 
         {/* Centre: the substrate. */}
         <SubstrateSphere substrate={substrate} pulsesRef={pulsesRef} />
+
+        {/* Photon arcs: substrate dot → cluster anchor on every event. */}
+        <PhotonArcs arcsRef={arcsRef} />
 
         {/* Scattered domain clusters. */}
         {orbits.map((d, i) => {
@@ -452,6 +467,110 @@ function BackdropStars({
 }
 
 // ---------------------------------------------------------------------------
+// PhotonArcs — thin glowing lines from substrate dot → cluster anchor that
+// fade over ARC_DECAY_MS. One LineSegments mesh with MAX_ARCS*2 vertices
+// per frame. Lines belonging to dead arcs are zero-lengthed (start == end)
+// so they collapse to nothing without us needing to resize the buffer.
+// ---------------------------------------------------------------------------
+const ARC_DECAY_MS = 1100;
+const ARC_COL_SKILL = new THREE.Color("#f4a300");
+const ARC_COL_TOOL = new THREE.Color("#7faed4");
+const ARC_COL_VALIDATOR = new THREE.Color("#c54a3d");
+
+function PhotonArcs({
+  arcsRef,
+}: {
+  arcsRef: React.MutableRefObject<PhotonArc[]>;
+}) {
+  const linesRef = useRef<THREE.LineSegments>(null);
+
+  const geometry = useMemo(() => {
+    const geom = new THREE.BufferGeometry();
+    // 2 vertices per arc, 3 floats per vertex (xyz) and 3 per colour.
+    geom.setAttribute(
+      "position",
+      new THREE.BufferAttribute(new Float32Array(MAX_ARCS * 2 * 3), 3),
+    );
+    geom.setAttribute(
+      "color",
+      new THREE.BufferAttribute(new Float32Array(MAX_ARCS * 2 * 3), 3),
+    );
+    geom.setDrawRange(0, 0);
+    return geom;
+  }, []);
+
+  useEffect(() => () => geometry.dispose(), [geometry]);
+
+  useFrame(() => {
+    const lines = linesRef.current;
+    if (!lines) return;
+    const arcs = arcsRef.current;
+    const now = performance.now();
+    const posAttr = geometry.getAttribute("position") as THREE.BufferAttribute;
+    const colAttr = geometry.getAttribute("color") as THREE.BufferAttribute;
+    const posArr = posAttr.array as Float32Array;
+    const colArr = colAttr.array as Float32Array;
+
+    let writeIdx = 0;
+    for (let i = 0; i < arcs.length && writeIdx < MAX_ARCS; i++) {
+      const a = arcs[i];
+      const age = now - a.startMs;
+      if (age >= ARC_DECAY_MS) continue;
+      const k = 1 - age / ARC_DECAY_MS;
+      // Ease-out so the head lingers, the tail vanishes fast.
+      const fade = k * k;
+      const tint =
+        a.kind === "validator"
+          ? ARC_COL_VALIDATOR
+          : a.kind === "tool"
+          ? ARC_COL_TOOL
+          : ARC_COL_SKILL;
+      // Animate the arc head growing from substrate dot toward cluster
+      // anchor in the first ~40% of life, then the whole line fades. This
+      // gives a "shooting" feel rather than a flicker.
+      const grow = Math.min(1, (1 - k) * 2.5);
+      const ex = a.fromX + (a.toX - a.fromX) * grow;
+      const ey = a.fromY + (a.toY - a.fromY) * grow;
+      const ez = a.fromZ + (a.toZ - a.fromZ) * grow;
+
+      const v = writeIdx * 6;
+      posArr[v] = a.fromX;
+      posArr[v + 1] = a.fromY;
+      posArr[v + 2] = a.fromZ;
+      posArr[v + 3] = ex;
+      posArr[v + 4] = ey;
+      posArr[v + 5] = ez;
+      // Tail dim, head bright — gives the line directionality.
+      colArr[v] = tint.r * fade * 0.35;
+      colArr[v + 1] = tint.g * fade * 0.35;
+      colArr[v + 2] = tint.b * fade * 0.35;
+      colArr[v + 3] = tint.r * fade * 1.4;
+      colArr[v + 4] = tint.g * fade * 1.4;
+      colArr[v + 5] = tint.b * fade * 1.4;
+
+      arcs[writeIdx++] = a;
+    }
+    arcs.length = writeIdx;
+
+    geometry.setDrawRange(0, writeIdx * 2);
+    posAttr.needsUpdate = true;
+    colAttr.needsUpdate = true;
+  });
+
+  return (
+    <lineSegments ref={linesRef} geometry={geometry}>
+      <lineBasicMaterial
+        vertexColors
+        transparent
+        opacity={0.95}
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </lineSegments>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // CountsRibbon — running totals across all clusters, refreshed on a slow
 // tick so it doesn't churn React 60Hz. Also tracks lifetime "completed" by
 // observing motes leaving the alive bucket.
@@ -580,7 +699,14 @@ function DomainNavCount({
 
 interface FoldCtx {
   substrate: ReturnType<typeof buildSubstrateMap>;
+  /** World-space positions of every substrate dot, indexed the same as
+   *  substrate.skillIdx / .toolIdx / .validatorIdx values. */
+  substrateDotPositions: THREE.Vector3[];
+  /** workflow_type → cluster anchor world position. Used as the arc
+   *  destination so substrate→domain coupling becomes visible. */
+  clusterPositions: Map<string, [number, number, number]>;
   pulsesRef: React.MutableRefObject<Pulse[]>;
+  arcsRef: React.MutableRefObject<PhotonArc[]>;
   motesRef: React.MutableRefObject<Map<string, Mote[]>>;
   bornMapRef: React.MutableRefObject<Map<string, number>>;
   diedMapRef: React.MutableRefObject<Map<string, number>>;
@@ -590,6 +716,42 @@ interface FoldCtx {
   nameToType: Map<string, string>;
   /** workflow_id prefix ("EXP", "ITAR", ...) → canonical workflow_type. */
   prefixToType: Map<string, string>;
+}
+
+/** Hard cap on simultaneously-rendered photon arcs. A high-volume burst
+ *  (e.g. ~100 events/s during a stress demo) would otherwise saturate the
+ *  canvas with white-out lines; capping keeps it readable. Oldest arcs are
+ *  evicted FIFO. */
+const MAX_ARCS = 60;
+
+/** Push a photon arc from a substrate dot to a cluster anchor, FIFO-evicting
+ *  the oldest if we're at the cap. Silently drops if we can't resolve the
+ *  cluster (no wtype yet, or wtype not on the orbit ring). */
+function pushArc(
+  ctx: FoldCtx,
+  dotIdx: number,
+  wtype: string | null,
+  now: number,
+  kind: "skill" | "tool" | "validator",
+): void {
+  if (!wtype) return;
+  const cluster = ctx.clusterPositions.get(wtype);
+  if (!cluster) return;
+  const from = ctx.substrateDotPositions[dotIdx];
+  if (!from) return;
+  if (ctx.arcsRef.current.length >= MAX_ARCS) {
+    ctx.arcsRef.current.shift();
+  }
+  ctx.arcsRef.current.push({
+    startMs: now,
+    fromX: from.x,
+    fromY: from.y,
+    fromZ: from.z,
+    toX: cluster[0],
+    toY: cluster[1],
+    toZ: cluster[2],
+    kind,
+  });
 }
 
 function handleEvent(e: ObservatoryEvent, ctx: FoldCtx): void {
@@ -614,16 +776,23 @@ function handleEvent(e: ObservatoryEvent, ctx: FoldCtx): void {
   if (wid && wtype) ctx.widToTypeRef.current.set(wid, wtype);
 
   // Substrate pulses — colour by category so the legend is honest.
+  // Each pulse also fires a photon arc from the substrate dot's world
+  // position to the cluster anchor, so substrate↔domain coupling becomes
+  // visible. Arcs are best-effort: if we don't know which cluster the
+  // event belongs to (no wtype yet), we just skip the arc and keep the
+  // pulse — the substrate still reads as alive.
   if (e.skill) {
     const idx = ctx.substrate.skillIdx.get(e.skill);
     if (idx !== undefined) {
       ctx.pulsesRef.current.push({ dotIdx: idx, startMs: now, kind: "skill" });
+      pushArc(ctx, idx, wtype, now, "skill");
     }
   }
   if (e.tool) {
     const idx = ctx.substrate.toolIdx.get(e.tool);
     if (idx !== undefined) {
       ctx.pulsesRef.current.push({ dotIdx: idx, startMs: now, kind: "tool" });
+      pushArc(ctx, idx, wtype, now, "tool");
     }
   }
   if (e.type === "durable.validator.blocked" && e.skill) {
@@ -641,6 +810,7 @@ function handleEvent(e: ObservatoryEvent, ctx: FoldCtx): void {
           startMs: now,
           kind: "validator",
         });
+        pushArc(ctx, idx, wtype, now, "validator");
         break;
       }
     }
