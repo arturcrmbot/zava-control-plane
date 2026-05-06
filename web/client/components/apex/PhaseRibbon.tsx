@@ -3,6 +3,9 @@ import {
   TRAVEL_PREAPPROVAL_PHASE_ORDER, VENDOR_KYC_PHASE_ORDER,
   EMPLOYEE_ONBOARDING_PHASE_ORDER, IT_ACCESS_REQUEST_PHASE_ORDER,
   CONTRACT_RENEWAL_PHASE_ORDER, PERF_REVIEW_PHASE_ORDER,
+  AP_INVOICE_PHASE_ORDER, PURCHASE_ORDER_PHASE_ORDER,
+  CONTRACT_REVIEW_PHASE_ORDER, PRIVACY_DPIA_PHASE_ORDER,
+  TREASURY_FX_PHASE_ORDER,
   type Phase, type PhaseName, type Workflow,
 } from "@shared/types";
 import { Check, Loader2, Ban, CircleDashed } from "lucide-react";
@@ -17,6 +20,11 @@ function phaseOrderFor(type: Workflow["type"] | undefined): PhaseName[] {
     case "it-access-request":     return IT_ACCESS_REQUEST_PHASE_ORDER;
     case "contract-renewal":      return CONTRACT_RENEWAL_PHASE_ORDER;
     case "perf-review":           return PERF_REVIEW_PHASE_ORDER;
+    case "ap-invoice":            return AP_INVOICE_PHASE_ORDER;
+    case "purchase-order":        return PURCHASE_ORDER_PHASE_ORDER;
+    case "contract-review":       return CONTRACT_REVIEW_PHASE_ORDER;
+    case "privacy-dpia":          return PRIVACY_DPIA_PHASE_ORDER;
+    case "treasury-fx":           return TREASURY_FX_PHASE_ORDER;
     default:                      return PHASE_ORDER;     // legacy invoice-p2p
   }
 }

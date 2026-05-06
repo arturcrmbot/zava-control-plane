@@ -17,7 +17,13 @@ export type PhaseName =
   | "Contract Lookup" | "Market Benchmarker" | "Renewal Terms Drafter"
   | "Contract Owner Signoff"
   | "Peer Feedback Aggregator" | "Calibration Drafter"
-  | "HR Calibration" | "Line Manager Delivery";
+  | "HR Calibration" | "Line Manager Delivery"
+  // Hand-graduated wave 2 fleet domains
+  | "Invoice Lookup" | "Three-Way Match"
+  | "PO Lookup" | "Supplier Check" | "Authority Resolve"
+  | "Contract Intake" | "Risk Classify"
+  | "DPIA Intake"
+  | "Op Lookup" | "Position Check";
 
 export const PHASE_ORDER: PhaseName[] = [
   "Intake", "Validation", "Routing", "Approval", "Payment", "Reconciliation"
@@ -57,6 +63,21 @@ export const CONTRACT_RENEWAL_PHASE_ORDER: PhaseName[] = [
 export const PERF_REVIEW_PHASE_ORDER: PhaseName[] = [
   "Employee Lookup", "Peer Feedback Aggregator", "Calibration Drafter",
   "HR Calibration", "Line Manager Delivery",
+];
+export const AP_INVOICE_PHASE_ORDER: PhaseName[] = [
+  "Invoice Lookup", "Three-Way Match", "Authority Resolve",
+];
+export const PURCHASE_ORDER_PHASE_ORDER: PhaseName[] = [
+  "PO Lookup", "Supplier Check", "Authority Resolve",
+];
+export const CONTRACT_REVIEW_PHASE_ORDER: PhaseName[] = [
+  "Contract Intake", "Risk Classify", "Authority Resolve",
+];
+export const PRIVACY_DPIA_PHASE_ORDER: PhaseName[] = [
+  "DPIA Intake", "Risk Classify", "Authority Resolve",
+];
+export const TREASURY_FX_PHASE_ORDER: PhaseName[] = [
+  "Op Lookup", "Position Check", "Authority Resolve",
 ];
 
 export type WorkflowStatus =
