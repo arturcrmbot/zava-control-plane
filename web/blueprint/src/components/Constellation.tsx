@@ -148,6 +148,11 @@ export function Constellation({ status, fullScreen = false }: Props) {
   const progressRef = useRef<Map<string, number>>(new Map());
   const widToTypeRef = useRef<Map<string, string>>(new Map());
   const cameraRef = useRef<THREE.Camera | null>(null);
+  /** Rolling per-cluster event timestamps (ms). Used by projector mode
+   *  to pick the loudest cluster every few seconds. Bounded by trimming
+   *  on read — we don't trim on write because the trim cost is cheap and
+   *  the read happens at 1Hz, not 60Hz. */
+  const eventTimesRef = useRef<Map<string, number[]>>(new Map());
 
   // SSE → state. The canvas is the only thing that re-renders.
   useObservatory({
@@ -164,6 +169,7 @@ export function Constellation({ status, fullScreen = false }: Props) {
         diedMapRef,
         progressRef,
         widToTypeRef,
+        eventTimesRef,
         nameToType,
         prefixToType,
       });
@@ -201,6 +207,81 @@ export function Constellation({ status, fullScreen = false }: Props) {
     });
     setFocusedClusterPos(null);
   };
+
+  // ----- Projector mode (auto-follow) ---------------------------------
+  // When enabled, every PROJECTOR_TICK_MS the camera flies to whichever
+  // cluster has had the most events in the last PROJECTOR_WINDOW_MS,
+  // unless that's the cluster we're already parked at. Lets a demo run
+  // unattended on a screen and always frame the loudest activity.
+  const [projectorMode, setProjectorMode] = useState(false);
+  const lastFollowedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!projectorMode) {
+      lastFollowedRef.current = null;
+      return;
+    }
+    const PROJECTOR_TICK_MS = 9_000;
+    const PROJECTOR_WINDOW_MS = 12_000;
+    const id = window.setInterval(() => {
+      const now = performance.now();
+      const cutoff = now - PROJECTOR_WINDOW_MS;
+      let bestType: string | null = null;
+      let bestCount = 0;
+      for (const [wt, times] of eventTimesRef.current.entries()) {
+        // Trim while we're here.
+        let firstFresh = 0;
+        while (firstFresh < times.length && times[firstFresh] < cutoff) {
+          firstFresh++;
+        }
+        if (firstFresh > 0) times.splice(0, firstFresh);
+        if (times.length > bestCount) {
+          bestCount = times.length;
+          bestType = wt;
+        }
+      }
+      // Need at least a few events in the window to bother flying — saves
+      // us from oscillating between near-silent clusters.
+      if (!bestType || bestCount < 3) return;
+      if (lastFollowedRef.current === bestType) return;
+      const pos = positions.get(bestType);
+      if (!pos) return;
+      lastFollowedRef.current = bestType;
+      handleClusterFocus(pos);
+    }, PROJECTOR_TICK_MS);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectorMode, positions]);
+
+  // ----- Keyboard shortcuts -------------------------------------------
+  // Number keys 1-9 jump to that cluster's index in the nav-panel order.
+  // 0 returns to overview. P toggles projector mode. Helpful both for
+  // live demos (no mouse needed) and for screenshots.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Don't hijack typing into form elements.
+      const tag = (e.target as HTMLElement | null)?.tagName ?? "";
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "0" || e.key === "Escape") {
+        handleResetCamera();
+        return;
+      }
+      if (e.key === "p" || e.key === "P") {
+        setProjectorMode((p) => !p);
+        return;
+      }
+      const n = parseInt(e.key, 10);
+      if (!isNaN(n) && n >= 1 && n <= 9 && orbits[n - 1]) {
+        const wt = orbits[n - 1].workflowType;
+        const pos = positions.get(wt);
+        if (pos) handleClusterFocus(pos);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orbits, positions]);
 
   return (
     <div className={`constellation${fullScreen ? " constellation--full" : ""}`}>
@@ -345,9 +426,24 @@ export function Constellation({ status, fullScreen = false }: Props) {
         type="button"
         className="constellation__reset"
         onClick={handleResetCamera}
-        title="Return to overview"
+        title="Return to overview (key: 0 / esc)"
       >
         ↺ overview
+      </button>
+
+      {/* Projector mode toggle — sits next to the overview button.
+          When on, the camera flies to the loudest cluster every ~9s.
+          Visual state matches the on/off so a glance tells the operator
+          they're in unattended mode. Key: P. */}
+      <button
+        type="button"
+        className={`constellation__projector${
+          projectorMode ? " constellation__projector--on" : ""
+        }`}
+        onClick={() => setProjectorMode((p) => !p)}
+        title="Auto-follow loudest cluster (key: P)"
+      >
+        {projectorMode ? "● auto-follow" : "○ auto-follow"}
       </button>
     </div>
   );
@@ -712,6 +808,8 @@ interface FoldCtx {
   diedMapRef: React.MutableRefObject<Map<string, number>>;
   progressRef: React.MutableRefObject<Map<string, number>>;
   widToTypeRef: React.MutableRefObject<Map<string, string>>;
+  /** Per-cluster rolling event timestamps for projector-mode auto-follow. */
+  eventTimesRef: React.MutableRefObject<Map<string, number[]>>;
   /** display_name | workflow_type → canonical workflow_type. */
   nameToType: Map<string, string>;
   /** workflow_id prefix ("EXP", "ITAR", ...) → canonical workflow_type. */
@@ -774,6 +872,14 @@ function handleEvent(e: ObservatoryEvent, ctx: FoldCtx): void {
   }
   if (!wtype && wid) wtype = ctx.widToTypeRef.current.get(wid) ?? null;
   if (wid && wtype) ctx.widToTypeRef.current.set(wid, wtype);
+
+  // Per-cluster activity ledger for projector mode (auto-follow camera).
+  // We push a timestamp on every event we can attribute to a cluster.
+  if (wtype) {
+    const arr = ctx.eventTimesRef.current.get(wtype) ?? [];
+    arr.push(now);
+    ctx.eventTimesRef.current.set(wtype, arr);
+  }
 
   // Substrate pulses — colour by category so the legend is honest.
   // Each pulse also fires a photon arc from the substrate dot's world
