@@ -991,11 +991,12 @@ interface FoldCtx {
   prefixToType: Map<string, string>;
 }
 
-/** Hard cap on simultaneously-rendered photon arcs. A high-volume burst
- *  (e.g. ~100 events/s during a stress demo) would otherwise saturate the
- *  canvas with white-out lines; capping keeps it readable. Oldest arcs are
- *  evicted FIFO. */
-const MAX_ARCS = 60;
+/** Hard cap on simultaneously-rendered photon arcs. With the substrate
+ *  centre label + dot-hover tooltip giving viewers a way to read what
+ *  individual dots are, the arcs' job is reduced to "show the substrate
+ *  is firing FOR these domains right now" — and fewer arcs read more
+ *  cleanly than more. Oldest arcs are evicted FIFO. */
+const MAX_ARCS = 20;
 
 /** Push a photon arc from a substrate dot to a cluster anchor, FIFO-evicting
  *  the oldest if we're at the cap. Silently drops if we can't resolve the
