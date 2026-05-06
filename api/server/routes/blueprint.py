@@ -71,7 +71,11 @@ _OBSERVATORY_TYPES: set[str] = {
     "durable.validator.blocked",
     "workflow.exception.detected",
     "workflow.hitl.requested",
+    "workflow.hitl.escalated",
+    "workflow.policy.violation",
+    "workflow.sla.breach_imminent",
     "durable.suspended",
+    "durable.resumed",
     "durable.workflow.completed",
     "workflow.resolved",
 }
