@@ -31,6 +31,12 @@ app_state.fm = FleetManagerService(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_otel("control-plane-server")
+    # Governance kernel — see plan/feature-agent-governance-toolkit-1.md
+    # (TASK-004). Idempotent. Logs AGT version + policy_version +
+    # enforcement_mode at boot. Phase 1: returns ALLOW for everything;
+    # call sites are wired in Phase 2.
+    from api.server.services.governance import init_governance
+    init_governance()
     try:
         await app_state.fm.start()
     except Exception as ex:

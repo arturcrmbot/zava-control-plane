@@ -38,6 +38,14 @@ dependencies = [
   # Candidate portal — multipart parsing for FastAPI UploadFile
   "python-multipart>=0.0.20",
   "reportlab>=4.5.0",
+  # Microsoft Agent Governance Toolkit — runtime governance core for the
+  # substrate. Mediates every MCP tool call + every authority resolution
+  # via api.server.services.governance.GovernanceKernel. See
+  # plan/feature-agent-governance-toolkit-1.md (CON-002: this is the only
+  # import surface for agent_os.*, agentmesh.*, etc.). Pinned to 3.4.* —
+  # AGT is in Public Preview; breaking changes possible before GA so we
+  # bump deliberately, narrowly, and through one file.
+  "agent-governance-toolkit[full]>=3.4,<3.5",
 ]
 
 [dependency-groups]

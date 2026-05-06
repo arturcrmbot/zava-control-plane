@@ -17,6 +17,10 @@ __pycache__/
 
 # Azure Functions / Azurite
 azurite-data/
+# Note: azurite-data/ already ignored above. Phase 5 of the AGT plan
+# generates dev Ed25519 keypairs into azurite-data/agt-keys/ so
+# private keys never land in git. See
+# plan/feature-agent-governance-toolkit-1.md TASK-007.
 local.settings.json
 .env
 .env.local

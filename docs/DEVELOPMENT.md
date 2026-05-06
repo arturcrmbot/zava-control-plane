@@ -98,6 +98,33 @@ Layout:
 make reset   # wipes Azurite state (azurite-data/)
 ```
 
+## Governance (AGT)
+
+The substrate's runtime governance is the [Microsoft Agent Governance
+Toolkit](https://github.com/microsoft/agent-governance-toolkit) (AGT,
+v3.4.x), wired in per
+[plan/feature-agent-governance-toolkit-1.md](../plan/feature-agent-governance-toolkit-1.md).
+The kernel lives at
+[api/server/services/governance/](../api/server/services/governance/);
+that package is the **only** import surface for `agent_os.*`,
+`agentmesh.*`, and friends across the codebase (CON-002).
+
+Smoke targets:
+
+```bash
+make agt-doctor   # diagnostic — installed packages + plugin health
+make agt-verify   # OWASP Agentic Top 10 self-check (ASI-01..ASI-10)
+```
+
+Both run against whatever's installed in the project venv (`uv sync`).
+The `agt` binary lives at `.venv/bin/agt`.
+
+Phase status: see the per-phase status badge at the top of
+[plan/feature-agent-governance-toolkit-1.md](../plan/feature-agent-governance-toolkit-1.md).
+Phase 1 is wiring-only — the kernel is constructed at FastAPI startup
+and at Functions worker module load but returns ALLOW for everything;
+real policy enforcement lands in Phase 2 onwards.
+
 Then Ctrl-C `make up` and restart — that clears in-memory Fleet
 Manager + simulator state (not persisted).
 

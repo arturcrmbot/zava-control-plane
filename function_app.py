@@ -44,6 +44,15 @@ from api.functions.workflows.activities import (
 # Wire OTEL at worker module-load; DF orchestrator + activity spans export to Foundry.
 init_otel("control-plane-functions")
 
+# Governance kernel — see plan/feature-agent-governance-toolkit-1.md
+# (TASK-004). Idempotent module-load init mirroring the FastAPI side. The
+# Functions worker shares the same singleton via the in-process module
+# global; in dev they are separate processes and so each gets its own
+# kernel — that is fine, the kernel is read-mostly and policy is loaded
+# from the same source files at boot.
+from api.server.services.governance import init_governance
+init_governance()
+
 
 app = df.DFApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 

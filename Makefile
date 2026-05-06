@@ -1,4 +1,4 @@
-.PHONY: install dev mcp mcp-authority server functions funcvenv test test-e2e clean azurite-up azurite-down reset up
+.PHONY: install dev mcp mcp-authority server functions funcvenv test test-e2e clean azurite-up azurite-down reset up agt-doctor agt-verify
 
 install:
 	uv sync
@@ -60,3 +60,15 @@ test-e2e:
 clean:
 	docker compose down -v
 	rm -rf .venv .funcvenv .python_packages node_modules dist __pycache__ .pytest_cache .ruff_cache azurite-data test-results
+
+# --- Governance (AGT) -------------------------------------------------------
+# See plan/feature-agent-governance-toolkit-1.md (TASK-006). The two
+# targets below are the operator-facing entry points to the Microsoft
+# Agent Governance Toolkit CLI; they run against whatever's installed
+# in the project venv (`uv sync`).
+
+agt-doctor:
+	.venv/bin/agt doctor
+
+agt-verify:
+	.venv/bin/agt verify
