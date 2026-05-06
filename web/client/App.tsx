@@ -9,6 +9,7 @@ import Evaluations from "./routes/Evaluations";
 import Economics from "./routes/Economics";
 import WorkflowDetail from "./routes/WorkflowDetail";
 import HiringManager from "./routes/HiringManager";
+import Constellation from "./routes/Constellation";
 import FleetManagerRail from "./components/FleetManagerRail";
 
 const nav = [
@@ -19,6 +20,7 @@ const nav = [
   { to: "/analytics",      label: "Analytics" },
   { to: "/evals",          label: "Evaluations" },
   { to: "/economics",      label: "Economics" },
+  { to: "/constellation",  label: "Constellation" },
 ];
 
 export default function App() {
@@ -53,6 +55,7 @@ export default function App() {
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/evals" element={<Evaluations />} />
             <Route path="/economics" element={<Economics />} />
+            <Route path="/constellation" element={<Constellation />} />
             {/* POC2 surfaces */}
             <Route path="/hiring-manager/:workflowId?" element={<HiringManager />} />
           </Routes>
