@@ -1,23 +1,30 @@
 """Concept Fan-out graph (POC3 Phase 4).
 
-  agent_creative_stub -> validate_creative_stub -> terminal
+  agent_creative_stub -> validate_brand_guardian -> terminal
 
 Phase 4 of the creative-campaign orchestrator. v1 stub returns three
-concept routes with cached-fixture URLs + brand-fit / distinctiveness
-scores. Real implementation in Phase 4 of the plan: `concept-curator`
-skill (gpt-5.4) generates three strategic routes; `image_gen` MCP
-renders 4 stills per route via Foundry `gpt-image-2`; `brand-guardian`
-skill (gpt-4.1-mini) scores each still against the brand-RAG corpus.
+concept routes with cached-fixture URLs. Phase 2 of the plan adds
+`brand-guardian` as the validator: it reads the brand corpus,
+queries `query_brand_corpus` once per route, and overlays
+brand_fit / distinctiveness / violations on top of the agent's draft
+scores.
 
-Followed by HITL gate ◆2 (concept_lock) where the CD picks the winning
-route — see `creative_director` persona's `decision_policy`.
+Phase 4 of the plan replaces the agent stub with a real
+`concept-curator` skill (gpt-5.4) that generates three strategic
+routes; `image_gen` MCP renders 4 stills per route via Foundry
+`gpt-image-2`. brand-guardian (Phase 2) stays as the validator —
+the same code applies whether the routes were stubbed or rendered
+for real.
+
+Followed by HITL gate ◆2 (concept_lock) where the CD picks the
+winning route — see `creative_director` persona's `decision_policy`.
 """
 from __future__ import annotations
 from agent_framework import Workflow, WorkflowBuilder
 
 from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
 from api.functions.graphs.executors.agents import agent_creative_stub
-from api.functions.graphs.executors.validators import validate_creative_stub
+from api.functions.graphs.executors.validators import validate_brand_guardian
 
 
 def build_creative_concept_fanout_workflow() -> Workflow:
@@ -28,10 +35,10 @@ def build_creative_concept_fanout_workflow() -> Workflow:
         fn=agent_creative_stub.execute,
     )
     n2 = TrackedExecutor(
-        id="val_concept_fanout",
-        name="validate_concept_fanout_schema",
-        executor_type="validator",
-        fn=validate_creative_stub.execute,
+        id="val_brand_guardian_concept",
+        name="agent_brand_guardian",
+        executor_type="agent",
+        fn=validate_brand_guardian.execute,
     )
     term = TerminalExecutor(id="terminal")
     return (
