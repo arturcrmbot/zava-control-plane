@@ -41,8 +41,13 @@ export interface Pulse {
   dotIdx: number;
   /** Time the pulse started (ms epoch). */
   startMs: number;
-  /** Pulse colour: amber for normal, red for validator-blocked. */
-  blocked: boolean;
+  /**
+   * What kind of dot this is — drives the pulse colour:
+   *   - "skill"     → amber (matches the resting warm tint, brightened)
+   *   - "tool"      → cool blue (matches resting cool tint, brightened)
+   *   - "validator" → red (the validator-blocked alarm colour)
+   */
+  kind: "skill" | "tool" | "validator";
 }
 
 /**

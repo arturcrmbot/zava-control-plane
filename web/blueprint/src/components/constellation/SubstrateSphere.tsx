@@ -36,8 +36,9 @@ const COL_SKILL = new THREE.Color("#5a4824"); // dim warm
 const COL_TOOL = new THREE.Color("#3d4658"); // dim cool
 const COL_VALIDATOR = new THREE.Color("#5a3024"); // dim warm-red
 
-const COL_PULSE_AMBER = new THREE.Color("#f4a300");
-const COL_PULSE_RED = new THREE.Color("#c54a3d");
+const COL_PULSE_SKILL = new THREE.Color("#f4a300"); // amber — matches HUD legend
+const COL_PULSE_TOOL = new THREE.Color("#7faed4"); // cool blue — matches HUD legend
+const COL_PULSE_VALIDATOR = new THREE.Color("#c54a3d"); // red — alarm, only on .blocked
 
 export function SubstrateSphere({ substrate, pulsesRef, radius = 2.6 }: Props) {
   const pointsRef = useRef<THREE.Points>(null);
@@ -140,7 +141,12 @@ export function SubstrateSphere({ substrate, pulsesRef, radius = 2.6 }: Props) {
       const age = now - pulse.startMs;
       if (age >= PULSE_DECAY_MS) continue; // drop dead pulse
       const k = 1 - age / PULSE_DECAY_MS;
-      const targetCol = pulse.blocked ? COL_PULSE_RED : COL_PULSE_AMBER;
+      const targetCol =
+        pulse.kind === "validator"
+          ? COL_PULSE_VALIDATOR
+          : pulse.kind === "tool"
+          ? COL_PULSE_TOOL
+          : COL_PULSE_SKILL;
       const idx = pulse.dotIdx * 3;
       // Lerp from resting toward pulse colour by k.
       arr[idx] = arr[idx] * (1 - k) + targetCol.r * k * 1.3;

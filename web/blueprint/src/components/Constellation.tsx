@@ -471,17 +471,17 @@ function handleEvent(e: ObservatoryEvent, ctx: FoldCtx): void {
   if (!wtype && wid) wtype = ctx.widToTypeRef.current.get(wid) ?? null;
   if (wid && wtype) ctx.widToTypeRef.current.set(wid, wtype);
 
-  // Substrate pulses.
+  // Substrate pulses — colour by category so the legend is honest.
   if (e.skill) {
     const idx = ctx.substrate.skillIdx.get(e.skill);
     if (idx !== undefined) {
-      ctx.pulsesRef.current.push({ dotIdx: idx, startMs: now, blocked: false });
+      ctx.pulsesRef.current.push({ dotIdx: idx, startMs: now, kind: "skill" });
     }
   }
   if (e.tool) {
     const idx = ctx.substrate.toolIdx.get(e.tool);
     if (idx !== undefined) {
-      ctx.pulsesRef.current.push({ dotIdx: idx, startMs: now, blocked: false });
+      ctx.pulsesRef.current.push({ dotIdx: idx, startMs: now, kind: "tool" });
     }
   }
   if (e.type === "durable.validator.blocked" && e.skill) {
@@ -494,7 +494,11 @@ function handleEvent(e: ObservatoryEvent, ctx: FoldCtx): void {
     for (const c of candidates) {
       const idx = ctx.substrate.validatorIdx.get(c);
       if (idx !== undefined) {
-        ctx.pulsesRef.current.push({ dotIdx: idx, startMs: now, blocked: true });
+        ctx.pulsesRef.current.push({
+          dotIdx: idx,
+          startMs: now,
+          kind: "validator",
+        });
         break;
       }
     }
