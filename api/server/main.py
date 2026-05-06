@@ -128,6 +128,7 @@ from api.server.routes.fleet import router as fleet_router
 from api.server.routes.accuracy import router as accuracy_router
 from api.server.routes.policy_md import router as policy_md_router
 from api.server.routes.receipts import router as receipts_router
+from api.server.routes.creative_campaign_assets import router as creative_campaign_assets_router
 from api.server.routes.foundry import router as foundry_router
 # POC2 multi-surface + frontier endpoints (§4.6, §4.14, §4.19)
 from api.server.routes.webhooks_servicenow import router as webhooks_servicenow_router
@@ -147,7 +148,7 @@ from api.server.routes.authority import router as authority_router
 for r in (stream_router, workflows_router, exceptions_router, policy_router,
           simulator_router, audit_router, evals_router, orchestration_router,
           durable_event_router, fleet_router, accuracy_router, policy_md_router,
-          receipts_router,
+          receipts_router, creative_campaign_assets_router,
           webhooks_servicenow_router, webhooks_finance_bp_router,
           a2a_router,
           portal_router, portal_voice_router, portal_interview_router,

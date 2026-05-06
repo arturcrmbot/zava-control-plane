@@ -57,6 +57,26 @@ def _suspend(workflow_id: str, instance_id: str, *, phase: str,
     }
 
 
+def _publish_phase_output(workflow_id: str, instance_id: str, *,
+                          slot: str, payload_data: dict) -> dict:
+    """Emit a `creative.phase.output` checkpoint carrying the agentic phase's
+    output dict so the FastAPI side can stash it on `workflow.payload[slot]`
+    for the UI's CreativeCampaignArtefacts component to render. The slot
+    name matches the keys CreativeCampaignArtefacts looks for:
+    brief_synthesis, insight_audience, concept_fanout, storyboard_render,
+    package_handoff."""
+    # Strip the orchestrator-control fields so we only stash the agent's
+    # actual output (the keys the persona's decision_policy reads).
+    cleaned = {k: v for k, v in (payload_data or {}).items()
+               if k not in ("workflow_id", "instance_id", "phase", "stub")}
+    return {
+        "workflow_id": workflow_id,
+        "instance_id": instance_id,
+        "kind": "creative.phase.output",
+        "payload": {"slot": slot, "data": cleaned},
+    }
+
+
 def creative_campaign_orchestration(
     context: df.DurableOrchestrationContext,
 ) -> Generator[Any, Any, dict]:
@@ -71,6 +91,15 @@ def creative_campaign_orchestration(
         "kind": "workflow.started",
         "payload": {"domain": "creative-campaign", "workflow_type": workflow_type},
     })
+
+    # Publish the seed brief upfront so the UI's brief scorecard renders
+    # before brief_synthesis runs (during the voice-intake suspend the
+    # operator can already see what the campaign is about).
+    if enriched.get("brief"):
+        yield context.call_activity("checkpoint_activity_trigger", _publish_phase_output(
+            workflow_id, context.instance_id,
+            slot="brief", payload_data=enriched["brief"],
+        ))
 
     # ------------------------------------------------------------------
     # Phase 1: brief_capture — multi-party voice intake (HITL).
@@ -116,6 +145,10 @@ def creative_campaign_orchestration(
         "creative_brief_synthesis_activity_trigger", enriched,
     )
     enriched["brief_synthesis"] = brief_synthesis_result
+    yield context.call_activity("checkpoint_activity_trigger", _publish_phase_output(
+        workflow_id, context.instance_id,
+        slot="brief_synthesis", payload_data=brief_synthesis_result,
+    ))
 
     # ------------------------------------------------------------------
     # Phase 3: brief_approval — HITL ◆1.
@@ -171,6 +204,10 @@ def creative_campaign_orchestration(
         "creative_insight_audience_activity_trigger", enriched,
     )
     enriched["insight_audience"] = insight_result
+    yield context.call_activity("checkpoint_activity_trigger", _publish_phase_output(
+        workflow_id, context.instance_id,
+        slot="insight_audience", payload_data=insight_result,
+    ))
 
     # ------------------------------------------------------------------
     # Phase 5: Concept Fan-out — agent generates 3 routes; each route
@@ -180,6 +217,10 @@ def creative_campaign_orchestration(
         "creative_concept_fanout_activity_trigger", enriched,
     )
     enriched["concept_fanout"] = concept_result
+    yield context.call_activity("checkpoint_activity_trigger", _publish_phase_output(
+        workflow_id, context.instance_id,
+        slot="concept_fanout", payload_data=concept_result,
+    ))
 
     # ------------------------------------------------------------------
     # Phase 6: concept_lock — HITL ◆2. CD picks the winning route.
@@ -208,6 +249,12 @@ def creative_campaign_orchestration(
         return {"status": "timeout", "phase": "concept_lock"}
     concept_timer.cancel()
     enriched["concept_lock_decision"] = concept_event.result
+    # Publish the lock decision so the UI's concept_tiles component can
+    # render the 'locked' state on the chosen route and hide the buttons.
+    yield context.call_activity("checkpoint_activity_trigger", _publish_phase_output(
+        workflow_id, context.instance_id,
+        slot="concept_lock_decision", payload_data=concept_event.result or {},
+    ))
 
     if (concept_event.result or {}).get("decision") == "reject":
         yield context.call_activity("checkpoint_activity_trigger", {
@@ -232,6 +279,10 @@ def creative_campaign_orchestration(
         "creative_storyboard_render_activity_trigger", enriched,
     )
     enriched["storyboard_render"] = storyboard_result
+    yield context.call_activity("checkpoint_activity_trigger", _publish_phase_output(
+        workflow_id, context.instance_id,
+        slot="storyboard_render", payload_data=storyboard_result,
+    ))
 
     # ------------------------------------------------------------------
     # Phase 8: storyboard_approval — HITL ◆3.
@@ -332,6 +383,10 @@ def creative_campaign_orchestration(
         "creative_package_handoff_activity_trigger", enriched,
     )
     enriched["package_handoff"] = package_result
+    yield context.call_activity("checkpoint_activity_trigger", _publish_phase_output(
+        workflow_id, context.instance_id,
+        slot="package_handoff", payload_data=package_result,
+    ))
 
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,

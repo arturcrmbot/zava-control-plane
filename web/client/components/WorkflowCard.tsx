@@ -31,16 +31,40 @@ const PROGRESS_BAR: Record<Workflow["status"], string> = {
   failed: "bg-red-500",
 };
 
-const DOMAIN_LABEL: Record<Workflow["type"], string> = {
+const DOMAIN_LABEL: Record<string, string> = {
   "expense-claim": "expense",
   "hiring": "hiring",
   "invoice-p2p": "invoice",
+  "travel-preapproval": "travel",
+  "vendor-kyc": "kyc",
+  "employee-onboarding": "onboarding",
+  "it-access-request": "it access",
+  "contract-renewal": "contract",
+  "perf-review": "perf review",
+  "ap-invoice": "ap",
+  "purchase-order": "po",
+  "contract-review": "contract review",
+  "privacy-dpia": "dpia",
+  "treasury-fx": "treasury",
+  "creative-campaign": "creative",
 };
 
-const DOMAIN_COLOR: Record<Workflow["type"], string> = {
+const DOMAIN_COLOR: Record<string, string> = {
   "expense-claim": "bg-sky-50 text-sky-700 ring-1 ring-sky-200",
   "hiring": "bg-violet-50 text-violet-700 ring-1 ring-violet-200",
   "invoice-p2p": "bg-slate-50 text-slate-600 ring-1 ring-slate-200",
+  "travel-preapproval": "bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200",
+  "vendor-kyc": "bg-orange-50 text-orange-700 ring-1 ring-orange-200",
+  "employee-onboarding": "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+  "it-access-request": "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200",
+  "contract-renewal": "bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200",
+  "perf-review": "bg-pink-50 text-pink-700 ring-1 ring-pink-200",
+  "ap-invoice": "bg-stone-50 text-stone-700 ring-1 ring-stone-200",
+  "purchase-order": "bg-teal-50 text-teal-700 ring-1 ring-teal-200",
+  "contract-review": "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
+  "privacy-dpia": "bg-red-50 text-red-700 ring-1 ring-red-200",
+  "treasury-fx": "bg-lime-50 text-lime-700 ring-1 ring-lime-200",
+  "creative-campaign": "bg-fuchsia-50 text-fuchsia-700 ring-1 ring-fuchsia-200",
 };
 
 function hiringSubtitle(metadata: Record<string, unknown> | undefined): string {
@@ -89,9 +113,9 @@ export default function WorkflowCard({ w }: { w: Workflow }) {
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <span
-            className={`text-[10px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${DOMAIN_COLOR[w.type]}`}
+            className={`text-[10px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${DOMAIN_COLOR[w.type] ?? "bg-slate-50 text-slate-600 ring-1 ring-slate-200"}`}
           >
-            {DOMAIN_LABEL[w.type]}
+            {DOMAIN_LABEL[w.type] ?? w.type}
           </span>
           <div className="font-semibold text-sm text-slate-900 truncate">{w.id}</div>
         </div>

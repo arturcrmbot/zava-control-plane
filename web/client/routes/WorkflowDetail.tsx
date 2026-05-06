@@ -9,6 +9,7 @@ import OtelSpanTree from "../components/OtelSpanTree";
 import PhaseTimeline from "../components/PhaseTimeline";
 import SkillAmplificationPanel from "../components/SkillAmplificationPanel";
 import AgentDrivenComponent, { type AgentComponentSpec } from "../components/AgentDrivenComponent";
+import CreativeCampaignArtefacts from "../components/apex/CreativeCampaignArtefacts";
 import PhaseRibbon from "../components/apex/PhaseRibbon";
 import WorkflowHeaderTiles from "../components/apex/WorkflowHeaderTiles";
 import ExceptionAnalysisCard from "../components/apex/ExceptionAnalysisCard";
@@ -224,6 +225,9 @@ export default function WorkflowDetail() {
                   ))}
                 </div>
               </section>
+            )}
+            {w.type === "creative-campaign" && (
+              <CreativeCampaignArtefacts workflow={w} onChange={refresh} />
             )}
             {w.claim && <ReceiptPanel claim={w.claim} />}
             {d.narrative && d.activeException && (

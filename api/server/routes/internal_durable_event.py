@@ -365,6 +365,70 @@ async def receive_durable_event(body: DurableEventBody):
         if agent and isinstance(output, dict):
             app_state.store.append_agent_output(wid, agent, output)
 
+    elif body.kind == "creative.phase.output":
+        # POC3 Phase 5: per-phase output stash for the creative-campaign
+        # WorkflowDetail surface. The orchestrator emits one of these after
+        # every agentic phase carrying {slot, data}; we merge into
+        # workflow.payload[slot] so CreativeCampaignArtefacts can read the
+        # brief scorecard, concept tiles, storyboard strip, etc. without
+        # waiting for the workflow to complete.
+        p = body.payload or {}
+        slot = str(p.get("slot") or "")
+        data = p.get("data") or {}
+        if slot:
+            w = app_state.store.get_workflow(wid)
+            if w is not None:
+                # Workflow.payload is a dict[str, Any] on every domain. Merge
+                # this slot in (overwriting prior value for the same slot).
+                if not isinstance(w.payload, dict):
+                    w.payload = {}
+                w.payload[slot] = data
+                app_state.store.upsert_workflow(w)
+        # Emit a lightweight observatory event so the SSE stream / blueprint
+        # mind-map can pulse the right phase ring.
+        _emit("creative.phase.output", wid, slot=slot)
+
+    elif body.kind in {
+        "concept_lock_decision",
+        "brief_approval_decision",
+        "storyboard_approval_decision",
+        "final_signoff_decision",
+    }:
+        # POC3 Phase 5: UI-driven HITL gate resolution for creative-campaign.
+        # The CreativeCampaignArtefacts component's "Lock route" button (and
+        # the equivalent Approve/Reject buttons for the other three gates)
+        # POST here directly with the decision payload; we raise the
+        # corresponding Durable orchestration event so the workflow advances.
+        # The persona auto-close path (used by the demo's autonomous loop)
+        # goes via persona_responder instead — both code paths converge on
+        # the same wait_for_external_event in the orchestrator.
+        from api.server.services.durable_client import raise_orchestration_event
+        from api.server.services import pending_gates as _pending
+        w = app_state.store.get_workflow(wid)
+        if w is not None:
+            payload_to_raise = dict(body.payload or {})
+            # Stash the decision onto workflow.payload so the UI's
+            # CreativeCampaignArtefacts component reflects the locked
+            # state immediately (same shape the orchestrator would emit
+            # via creative.phase.output once Functions is in the loop).
+            if not isinstance(w.payload, dict):
+                w.payload = {}
+            w.payload[body.kind] = payload_to_raise
+            app_state.store.upsert_workflow(w)
+            if w.orchestration_instance_id:
+                try:
+                    await raise_orchestration_event(
+                        w.orchestration_instance_id, body.kind, payload_to_raise,
+                    )
+                except Exception as ex:
+                    print(f"[creative] failed to raise {body.kind} for {wid}: {ex}")
+            _ledger(wid, kind="human",
+                    actor_id=str(payload_to_raise.get("resolved_by") or "operator"),
+                    action=f"creative.{body.kind}",
+                    details=payload_to_raise)
+            _auto_resolve_open(wid, f"auto-resolved:{body.kind}")
+            _pending.clear(wid)
+
     elif body.kind == "offer_letter_ready":
         # Cross-process bridge: agent_offer_personaliser renders the offer
         # letter PDF in the Functions worker, then sends this webhook so
