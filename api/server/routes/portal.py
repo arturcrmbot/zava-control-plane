@@ -8,6 +8,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, UploadFile, File
+from fastapi.responses import FileResponse
 
 from api.server.services.durable_client import raise_orchestration_event
 from api.server.services.magic_link import (
@@ -18,6 +19,11 @@ from api.server.state import app_state
 from api.shared.events import FleetEvent
 
 router = APIRouter(prefix="/api/portal", tags=["portal"])
+
+# Where pre-rendered welcome videos live, keyed by slugified candidate name.
+# Populated automatically the first time agent_onboarding renders for that
+# candidate (see api/functions/graphs/executors/agents/agent_onboarding.py).
+_PRERECORD_DIR = Path(__file__).resolve().parents[3] / "data" / "portal" / "welcome-videos"
 
 
 # ----------------------------------------------------------------- Task 5: apply
@@ -142,6 +148,28 @@ def _next_action_for_phase(phase) -> str | None:
     if phase == "Offer":
         return "decide_offer"
     return None
+
+
+@router.get("/welcome-video/{filename}")
+async def welcome_video(filename: str):
+    """Serve a pre-rendered welcome MP4 by slug.
+
+    Files live under data/portal/welcome-videos/<slug>.mp4 and are
+    written automatically the first time agent_onboarding succeeds for
+    a given candidate name. This route makes the demo immune to Azurite
+    state resets and avoids the 60-120s cold render on subsequent runs.
+
+    Hardened path-traversal guard: refuse anything that escapes the
+    pre-record directory or doesn't end in .mp4.
+    """
+    if not filename.endswith(".mp4") or "/" in filename or ".." in filename:
+        raise HTTPException(400, "filename must be <slug>.mp4")
+    path = (_PRERECORD_DIR / filename).resolve()
+    if not str(path).startswith(str(_PRERECORD_DIR.resolve())):
+        raise HTTPException(400, "invalid filename")
+    if not path.is_file():
+        raise HTTPException(404, f"no pre-recorded video for {filename}")
+    return FileResponse(path, media_type="video/mp4")
 
 
 # ----------------------------------------------------- Task 7: offer accept/decline

@@ -81,6 +81,9 @@ data/.eval/
 
 # Candidate portal local artefacts (magic-link sqlite, email outbox)
 data/portal/
+# Exception: pre-rendered welcome avatars are curated demo assets, not runtime state.
+!data/portal/welcome-videos/
+!data/portal/welcome-videos/*.mp4
 logs/azurite.log
 logs/*
 
