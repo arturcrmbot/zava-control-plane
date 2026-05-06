@@ -3,20 +3,26 @@
 The candidate portal /apply form posts a `role_id` (one of the three demo
 reqs) and expects a workflow to attach to. This module is the bridge: at
 lifespan startup we read `data/synthetic/hiring/reqs.json`, materialise a
-`Workflow` for each entry, and upsert it into the StateStore so the
-role_id reverse index is populated.
+`Workflow` for each entry, upsert it into the StateStore so the
+role_id reverse index is populated, and then schedule a real
+`HiringOrchestrator` Durable run so the workflow actually progresses
+through phases (instead of sitting forever at a placeholder Triage).
 
-Idempotent — re-running upsert with the same workflow id is a no-op.
+Idempotent for the upsert; the orchestration is only scheduled when the
+workflow doesn't already have an `orchestration_instance_id` (i.e. on a
+cold-start, not on a re-entrant lifespan reload).
 
 See docs/superpowers/plans/2026-04-30-candidate-portal-plan.md Task 14.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from pathlib import Path
 
 from api.shared.types import Workflow
+from api.server.services.durable_client import schedule_new_orchestration
 
 _REQS_FILE = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "hiring" / "reqs.json"
 
@@ -29,8 +35,9 @@ def _market_for_jurisdiction(jurisdiction: str) -> str:
     return "London-WPP"
 
 
-def seed_demo_reqs(app_state) -> list[str]:
-    """Read the reqs fixture and upsert one Workflow per entry. Returns the
+async def seed_demo_reqs(app_state) -> list[str]:
+    """Read the reqs fixture, upsert one Workflow per entry, and schedule a
+    real HiringOrchestrator Durable instance against each. Returns the
     list of workflow ids that were materialised so callers can log a tally.
 
     No-op when the fixture file is missing — non-portal demos run fine
@@ -52,10 +59,10 @@ def seed_demo_reqs(app_state) -> list[str]:
             spawned.append(workflow_id)
             continue
         jurisdiction = req.get("jurisdiction", "USA")
-        app_state.store.upsert_workflow(Workflow(
+        w = Workflow(
             id=workflow_id,
             type="hiring",
-            current_phase="Triage",
+            current_phase="Budget",
             created_at=now,
             sla_due_at=now + 7 * 86400,
             jurisdiction=_market_for_jurisdiction(jurisdiction),
@@ -66,6 +73,33 @@ def seed_demo_reqs(app_state) -> list[str]:
                 "role_jurisdiction": jurisdiction,
                 "demo_seed": True,
             },
-        ))
+        )
+        app_state.store.upsert_workflow(w)
         spawned.append(workflow_id)
+        # Kick a real HiringOrchestrator instance so the workflow actually
+        # progresses through phases instead of sitting at a placeholder.
+        # Functions host typically binds 5–10 s after FastAPI; retry on
+        # connection-refused for up to ~60 s.
+        payload = {
+            "workflow_id": workflow_id,
+            "type": "hiring",
+            "role_id": role_id,
+            "role_title": req.get("title"),
+            "jurisdiction": jurisdiction,
+            "agency": w.agency,
+            "demo_seed": True,
+        }
+        for attempt in range(12):  # 12 × 5 s = 60 s
+            try:
+                result = await schedule_new_orchestration(
+                    payload, function_name="HiringOrchestrator",
+                )
+                w.orchestration_instance_id = result.get("id")
+                app_state.store.upsert_workflow(w)
+                break
+            except Exception as ex:
+                if attempt == 11:
+                    print(f"[portal_seed] gave up scheduling {workflow_id} after 60s: {ex}")
+                    break
+                await asyncio.sleep(5)
     return spawned

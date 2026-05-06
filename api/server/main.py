@@ -67,17 +67,22 @@ async def lifespan(app: FastAPI):
     # Seed three demo HiringOrchestrator workflows so the candidate portal's
     # /apply form always has a workflow to attach to (one per req in
     # data/synthetic/hiring/reqs.json). Idempotent — safe to re-run.
+    # Run as a background task so FastAPI startup is not blocked while
+    # seed_demo_reqs waits for the Functions host to bind.
     from api.server.services.portal_seed import seed_demo_reqs
-    try:
-        seeded = seed_demo_reqs(app_state)
-        if seeded:
-            print(f"[server] seeded {len(seeded)} demo hiring reqs: {seeded}")
-    except Exception as ex:
-        print(f"[server] portal demo-req seeding failed: {ex}")
+    async def _seed_in_background():
+        try:
+            seeded = await seed_demo_reqs(app_state)
+            if seeded:
+                print(f"[server] seeded {len(seeded)} demo hiring reqs: {seeded}")
+        except Exception as ex:
+            print(f"[server] portal demo-req seeding failed: {ex}")
+    seed_task = asyncio.create_task(_seed_in_background())
     try:
         yield
     finally:
         ramp_task.cancel()
+        seed_task.cancel()
         try:
             _portal_orch_off()
         except Exception:
