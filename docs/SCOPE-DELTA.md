@@ -11,7 +11,7 @@ WPP can't tell which one we mean.
 | Audience | GBB internal + reviewers + technical evaluators | WPP evaluators + AI CoE + Finance / HR sponsors |
 | Owner | This repo | A future engagement repo seeded from this code |
 | Data | Synthetic fixtures committed to `data/synthetic/` (POC1 + POC2 + per-fleet-domain corpora + 80-rule authority matrix) | WPP-supplied datasets (3,430 claims + ground-truth labels for POC1; HR sandbox + 200-CV synthetic gym for POC2) |
-| Scope reach | **Thirteen live domains** on a single substrate — POC1 expense + POC2 hiring + eleven fleet-* domains graduated by `compose-domain` (v1 → v3) and brought to first-class FM parity. Plus **29 registered personae** (15 hand-authored + 14 graduated by `compose-persona`) resolving every approval through one delegated-authority matrix. POC3 (creative-campaign / AI-agency demo) planned next as a fourteenth domain. | The bid commits to POC1 and POC2; the eleven fleet-* domains demonstrate the substrate's *composition* claim that adding domain N+1 is a config change, not an integration project |
+| Scope reach | **Thirteen live domains** on a single substrate — POC1 expense + POC2 hiring + eleven fleet-* domains graduated by `compose-domain` (v1 → v3) and brought to first-class FM parity. Plus **29 registered personae** (15 hand-authored + 14 graduated by `compose-persona`) resolving every approval through one delegated-authority matrix. | The bid commits to POC1 and POC2; the eleven fleet-* domains demonstrate the substrate's *composition* claim that adding domain N+1 is a config change, not an integration project |
 | Status | Substrate-complete · 13 domains run unattended via the autonomous demo loop · two meta-skills shipped (`compose-domain`, `compose-persona`) | Not started · begins at signed contract + kickoff |
 
 The lab build proves the **shape**. The engagement POC proves the shape **at WPP scale, on Azure, with WPP data, in front of WPP evaluators**.
@@ -190,40 +190,6 @@ explainability surface, different data source.
 
 ---
 
-## POC3 — sister POC for the AI-agency demo (planned, 2026-05-05)
-
-A third sister POC has been scoped on top of the existing substrate as
-the **fourteenth domain**: `creative-campaign`. Driven by the AI-agency
-storyboard prepared for James MacGregor (Sr Dir Industry Advisory IBB).
-Plan: [`plan/feature-poc3-ai-agency-1.md`](../plan/feature-poc3-ai-agency-1.md)
-(status: planned).
-
-The shape:
-
-- One new domain through `compose-domain` (no new substrate code)
-- Multi-party voice brief (reusing POC2's `voice-screener` Realtime mechanic)
-- Specialist-agent fan-out (insight, audience, brand-guardian, concept-curator)
-- Foundry `gpt-image-2` for concept stills + storyboard frames (real Azure call, same MCP-tool wrapper pattern as `ocr_extract` / `avatar_render`)
-- Four HITL approval gates landing in our Control Plane (the supervisor surface, hero of the demo)
-- Federation to Figma as the agency's existing design surface (not a competing canvas)
-
-Two deliberate scope cuts vs. the storyboard, both for operational
-safety on a live demo:
-
-1. **No video generation in v1** — Sora-2 is Foundry preview, gated by Limited Access (verified empty SKU listing on current subscription), 1–5min latency, 2-job concurrency cap. Storyboard frames + brand brief hand off to the agency's existing video team in Frame.io / Premiere. Sora-2 / Runway / Veo narrated as v2 plug-ins via the same MCP shape.
-2. **No M365 Cowork in v1** — Cowork is M365 Frontier preview; voice intake to Control Plane is sufficient for the same beat with zero Frontier dependency.
-
-The storyboard itself plus a Constellation-view sidebar entry shipped
-ahead of the implementation — see commits `b0e54cdc` (POC3 storyboard
-pptx + plan), `103f9ac5` (Constellation baked into the client),
-`98acc04b` (Constellation as a sidebar link in a new tab), and
-`86e17a39` (standalone Constellation visualisation on the blueprint
-microsite). The Constellation view is the visual proof of the
-"composable substrate" claim: 13 live domains rendered as one graph,
-operator can drill into any one.
-
----
-
 ## POC2 — closing fast
 
 POC2 in the lab landed on `main` 2026-04-30 — the spine merge brought the 10-phase `HiringOrchestrator`, ten hiring skills, seven MCP mocks (4201–4207), a 50-CV synthetic corpus across 5 roles × 2 jurisdictions, and Tracks B (multi-surface) / D (jurisdiction) / E (frontier: A2A inbound + episodic recall + AG-UI primitive) / F (POC1 reuse). See [poc2-status.md](poc2-status.md) §1 for the per-capability matrix — 17/22 ✅, 5/22 🟡, 0/22 ❌.
@@ -267,7 +233,7 @@ The bid response sections (§10.1, §11, §B.4, §B.5) describe **the engagement
 
 When recording / demoing for WPP evaluation:
 
-- **If we record from the lab build**, frame it as *"the architecture proven on a laptop; same code runs on Azure; here's the swap-in seam"*. Honest, derisks the technical claim, but is not the engagement POC. The current vendor-day flow is the 4-act, 40-minute structure in [DEMO.md](DEMO.md) — Act 1 substrate (FM + 13 domains + Constellation), Act 2 POC1 (expense), Act 3 POC2 (hiring), Act 4 composability (compose-domain + compose-persona + authority).
+- **If we record from the lab build**, frame it as *"the architecture proven on a laptop; same code runs on Azure; here's the swap-in seam"*. Honest, derisks the technical claim, but is not the engagement POC. The current vendor-day flow is the 4-act, 40-minute structure in [DEMO.md](DEMO.md).
 - **If we record from the engagement POC**, that lands after kickoff with WPP's data and sandbox credentials. Higher fidelity but on the engagement timeline.
 
 Both are valid; pick consciously.
