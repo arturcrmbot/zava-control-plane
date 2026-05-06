@@ -13,7 +13,7 @@ import base64
 
 import httpx
 import pytest
-from openai import BadRequestError
+from openai import BadRequestError, RateLimitError
 
 from api.server.mcp_tools import image_gen
 
@@ -30,6 +30,15 @@ def _bad_request(message: str, *, code: str | None = None) -> BadRequestError:
     if code:
         body["error"]["code"] = code
     return BadRequestError(message=message, response=resp, body=body)
+
+
+def _rate_limit(retry_after: int = 30) -> RateLimitError:
+    """Build a RateLimitError with a real httpx Response carrying
+    Retry-After. Mirrors what gpt-image-2 returns when over quota."""
+    req = httpx.Request("POST", "https://example.com/v1/images/generations")
+    resp = httpx.Response(429, headers={"retry-after": str(retry_after)}, request=req)
+    body: dict = {"error": {"code": "RateLimitReached", "message": "throttled"}}
+    return RateLimitError(message="rate limited", response=resp, body=body)
 
 
 # ------------------------------------------------------------------ helpers
@@ -246,3 +255,127 @@ def test_compute_hash_is_deterministic_and_input_sensitive():
     assert h1 != image_gen._compute_hash("luxe bottle", "1024x1536", "gpt-image-2", "medium")
     assert h1 != image_gen._compute_hash("luxe bottle", "1024x1024", "gpt-image-1", "medium")
     assert h1 != image_gen._compute_hash("luxe bottle", "1024x1024", "gpt-image-2", "high")
+
+
+# ------------------------------------------------------------------ conn-string
+
+
+def test_augment_azurite_conn_string_adds_missing_endpoints():
+    """Azurite-shaped conn string with only BlobEndpoint gets queue/table
+    endpoints derived (10000 -> 10001/10002)."""
+    cs = (
+        "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;"
+        "AccountKey=KEY==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
+    )
+    out = image_gen._augment_azurite_conn_string(cs)
+    assert "QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1" in out
+    assert "TableEndpoint=http://127.0.0.1:10002/devstoreaccount1" in out
+    # Original parts preserved
+    assert "AccountName=devstoreaccount1" in out
+    assert "BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1" in out
+
+
+def test_augment_azurite_conn_string_noop_when_complete():
+    """Already-complete Azurite conn string passes through unchanged."""
+    cs = (
+        "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;"
+        "AccountKey=KEY==;"
+        "BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
+        "QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;"
+        "TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+    )
+    assert image_gen._augment_azurite_conn_string(cs) == cs
+
+
+def test_augment_azurite_conn_string_noop_for_real_azure():
+    """Real Azure storage uses EndpointSuffix; never augment those — we
+    don't want to derive non-Azurite endpoints from a real BlobEndpoint."""
+    cs = (
+        "DefaultEndpointsProtocol=https;AccountName=apexdemo;"
+        "AccountKey=REAL==;EndpointSuffix=core.windows.net;"
+    )
+    assert image_gen._augment_azurite_conn_string(cs) == cs
+
+
+# ------------------------------------------------------------------ rate limit
+
+
+def test_image_gen_429_then_success_succeeds(monkeypatch):
+    """One 429 then a 200 ⇒ retry path catches the 429, sleeps the
+    retry-after, retries, returns success. The activity caller should
+    never see the 429 in this case."""
+    _set_real_env(monkeypatch)
+    monkeypatch.setenv("AZURE_OPENAI_IMAGE_RETRY_BUDGET_S", "5")
+    monkeypatch.setattr(
+        image_gen, "_compute_hash", lambda prompt, size, model, quality: "rl1"
+    )
+    fake = _FakeBlob(existing=set())
+    monkeypatch.setattr(image_gen, "_blob_store", lambda: fake)
+
+    # Sleep is mocked so the test runs in microseconds, not 30s.
+    sleeps: list[float] = []
+    import time as _time
+    monkeypatch.setattr(_time, "sleep", lambda s: sleeps.append(s))
+
+    png_bytes = b"\x89PNG\r\n\x1a\n" + b"y" * 32
+
+    class _FakeImage:
+        b64_json = base64.b64encode(png_bytes).decode("ascii")
+        revised_prompt = None
+
+    class _FakeResp:
+        data = [_FakeImage()]
+
+    call_log: list[str] = []
+
+    class _FakeImages:
+        def generate(self, **kw):
+            call_log.append("call")
+            if len(call_log) == 1:
+                raise _rate_limit(retry_after=2)
+            return _FakeResp()
+
+    class _FakeClient:
+        images = _FakeImages()
+
+    monkeypatch.setattr(image_gen, "_openai_client", lambda: _FakeClient())
+
+    result = image_gen.image_gen(prompt="anything", quality="low")
+    assert result.result_type == "success"
+    assert result.cached is False
+    assert len(call_log) == 2  # one 429, one success
+    assert sleeps == [2]  # honoured retry-after
+
+
+def test_image_gen_429_persistent_exceeds_budget_returns_rate_limited(monkeypatch):
+    """Persistent 429s past the retry budget ⇒ structured rate_limited
+    error so the caller falls back to fixture rather than hanging."""
+    _set_real_env(monkeypatch)
+    monkeypatch.setenv("AZURE_OPENAI_IMAGE_RETRY_BUDGET_S", "5")
+    monkeypatch.setattr(
+        image_gen, "_compute_hash", lambda prompt, size, model, quality: "rl2"
+    )
+    monkeypatch.setattr(image_gen, "_blob_store", lambda: _FakeBlob())
+
+    import time as _time
+    sleeps: list[float] = []
+    monkeypatch.setattr(_time, "sleep", lambda s: sleeps.append(s))
+
+    class _FakeImages:
+        def generate(self, **kw):
+            # Each call asks us to wait 60s — fits one retry then we're
+            # out of the 5s budget on the second 429.
+            raise _rate_limit(retry_after=60)
+
+    class _FakeClient:
+        images = _FakeImages()
+
+    monkeypatch.setattr(image_gen, "_openai_client", lambda: _FakeClient())
+
+    result = image_gen.image_gen(prompt="anything", quality="low")
+    assert result.result_type == "failure"
+    assert result.error_code == "rate_limited"
+    assert result.prompt_hash == "rl2"
+    # No sleeps — first 429's retry-after (60s) already exceeds the
+    # 5s budget, so we bail without sleeping.
+    assert sleeps == []

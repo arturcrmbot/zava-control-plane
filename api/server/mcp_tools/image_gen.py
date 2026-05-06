@@ -34,7 +34,7 @@ import json
 import os
 
 from copilot.tools import ToolResult, define_tool
-from openai import AzureOpenAI, BadRequestError
+from openai import AzureOpenAI, BadRequestError, RateLimitError
 from pydantic import BaseModel, Field
 
 from api.server.services.blob_store import BlobStore
@@ -115,6 +115,13 @@ def _cost_for(size: str, quality: str) -> float:
 # ----------------------------------------------------------- lazy singletons
 
 
+# Hard cap on a single gpt-image-2 render. Empirically a low-quality 1024x1024
+# render lands in 3-7s; medium 5-12s; high up to 25s. 60s is generous; the
+# default OpenAI SDK timeout is unbounded which can wedge a Functions worker
+# indefinitely on a network blip. Override with AZURE_OPENAI_IMAGE_TIMEOUT_S.
+_DEFAULT_HTTP_TIMEOUT_S = 60.0
+
+
 def _openai_client() -> AzureOpenAI:
     """Entra-ID-only — no API keys. Uses DefaultAzureCredential which picks
     up `az login` locally and managed identity in Container Apps."""
@@ -124,6 +131,9 @@ def _openai_client() -> AzureOpenAI:
         DefaultAzureCredential(),
         "https://cognitiveservices.azure.com/.default",
     )
+    timeout_s = float(
+        os.environ.get("AZURE_OPENAI_IMAGE_TIMEOUT_S") or _DEFAULT_HTTP_TIMEOUT_S
+    )
     return AzureOpenAI(
         azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
         azure_ad_token_provider=token_provider,
@@ -132,12 +142,57 @@ def _openai_client() -> AzureOpenAI:
         api_version=os.environ.get(
             "AZURE_OPENAI_IMAGE_API_VERSION", "2025-04-01-preview"
         ),
+        # Bound HTTP wait so a single hung render can't wedge the Functions
+        # worker / FastAPI request that's waiting on it.
+        timeout=timeout_s,
+        # One retry inside the SDK is enough; we have our own
+        # graceful-fallback in the caller if this still fails.
+        max_retries=1,
     )
 
 
+def _augment_azurite_conn_string(cs: str) -> str:
+    """Azurite's three services live on three ports; the SDK's
+    `from_connection_string` requires explicit Queue + Table endpoints
+    OR an EndpointSuffix. Some demo .env files only carry BlobEndpoint
+    (because the rest of the stack doesn't need queue/table). When we
+    detect this partial shape, derive Queue + Table endpoints from
+    BlobEndpoint by swapping the port. Keeps a single conn-string in
+    .env workable for both image_gen and the rest of the stack.
+
+    No-op when:
+      - The conn string already carries QueueEndpoint+TableEndpoint
+      - The conn string carries EndpointSuffix (real Azure storage)
+      - The shape is unrecognised (we don't try to repair real Azure)
+    """
+    parts = dict(p.split("=", 1) for p in cs.split(";") if "=" in p)
+    if "EndpointSuffix" in parts:
+        return cs
+    if "QueueEndpoint" in parts and "TableEndpoint" in parts:
+        return cs
+    blob_ep = parts.get("BlobEndpoint", "")
+    # Azurite ports: 10000 blob, 10001 queue, 10002 table
+    if "10000" not in blob_ep:
+        return cs
+    queue_ep = blob_ep.replace(":10000", ":10001")
+    table_ep = blob_ep.replace(":10000", ":10002")
+    extra = []
+    if "QueueEndpoint" not in parts:
+        extra.append(f"QueueEndpoint={queue_ep}")
+    if "TableEndpoint" not in parts:
+        extra.append(f"TableEndpoint={table_ep}")
+    if not extra:
+        return cs
+    sep = "" if cs.endswith(";") else ";"
+    return cs + sep + ";".join(extra) + ";"
+
+
 def _blob_store() -> BlobStore:
+    cs = _augment_azurite_conn_string(
+        os.environ["AZURE_STORAGE_CONNECTION_STRING"]
+    )
     return BlobStore(
-        connection_string=os.environ["AZURE_STORAGE_CONNECTION_STRING"],
+        connection_string=cs,
         container=_BLOB_CONTAINER,
     )
 
@@ -204,51 +259,97 @@ def image_gen(
             prompt_hash=sha,
         )
 
-    # Real Foundry call.
-    try:
-        resp = _openai_client().images.generate(
-            model=chosen_model,
-            prompt=prompt,
-            n=1,
-            size=size,
-            quality=quality,
-        )
-    except BadRequestError as e:
-        # gpt-image-2 RAI rejection — surface a structured error code so
-        # the orchestrator can raise the `creative.content_safety.rejected`
-        # workflow exception (TASK-018, the Stage-7 demo beat).
-        # The Foundry SDK puts the safety code in three different places
-        # depending on SDK version + how it was raised; sniff all of them.
-        msg = str(e) or getattr(e, "message", "") or ""
-        body = getattr(e, "body", None) or {}
-        body_err = body.get("error", {}) if isinstance(body, dict) else {}
-        body_code = (body_err.get("code") or "") if isinstance(body_err, dict) else ""
-        sniff = " ".join(str(x) for x in (msg, body_code, getattr(e, "code", "") or ""))
-        if (
-            "content_filter" in sniff
-            or "content_policy" in sniff
-            or "moderation" in sniff
-            or "safety" in sniff.lower()
-        ):
+    # Real Foundry call. Retry on 429 (rate limit) up to a few times — our
+    # demo deployment is throttled to 4 req/min and parallel renders blow
+    # straight through it. The OpenAI SDK's built-in retry honours
+    # Retry-After but max_retries=1 isn't enough when the whole demo is a
+    # burst. Cap total retry budget at 90s so a stuck workflow falls back
+    # to the fixture rather than hanging the activity.
+    import time as _time
+    _attempt = 0
+    _retry_budget_s = float(
+        os.environ.get("AZURE_OPENAI_IMAGE_RETRY_BUDGET_S", "90")
+    )
+    _budget_used = 0.0
+    last_429: RateLimitError | None = None
+    while True:
+        _attempt += 1
+        try:
+            resp = _openai_client().images.generate(
+                model=chosen_model,
+                prompt=prompt,
+                n=1,
+                size=size,
+                quality=quality,
+            )
+            break
+        except RateLimitError as e:  # 429
+            last_429 = e
+            # Foundry tells us to retry after N seconds in the body; default
+            # to 30s when not present (the SDK's own backoff would do this).
+            retry_after = 30
+            try:
+                retry_after = int(
+                    (e.response.headers.get("retry-after") if e.response else None)
+                    or 30
+                )
+            except Exception:
+                retry_after = 30
+            if _budget_used + retry_after > _retry_budget_s:
+                # Out of budget — surface as failure so the caller falls
+                # back to a fixture URL. Better than hanging.
+                return ImageGenResult(
+                    result_type="failure",
+                    error=(
+                        f"gpt-image-2 rate-limited after {_attempt} attempts; "
+                        f"would need {retry_after}s more (budget {_retry_budget_s}s)"
+                    ),
+                    error_code="rate_limited",
+                    prompt_hash=sha,
+                )
+            print(
+                f"[image_gen] 429 from gpt-image-2 (attempt {_attempt}); "
+                f"sleeping {retry_after}s and retrying"
+            )
+            _time.sleep(retry_after)
+            _budget_used += retry_after
+            continue
+        except BadRequestError as e:
+            # gpt-image-2 RAI rejection — surface a structured error code so
+            # the orchestrator can raise the `creative.content_safety.rejected`
+            # workflow exception (TASK-018, the Stage-7 demo beat).
+            # The Foundry SDK puts the safety code in three different places
+            # depending on SDK version + how it was raised; sniff all of them.
+            msg = str(e) or getattr(e, "message", "") or ""
+            body = getattr(e, "body", None) or {}
+            body_err = body.get("error", {}) if isinstance(body, dict) else {}
+            body_code = (body_err.get("code") or "") if isinstance(body_err, dict) else ""
+            sniff = " ".join(str(x) for x in (msg, body_code, getattr(e, "code", "") or ""))
+            if (
+                "content_filter" in sniff
+                or "content_policy" in sniff
+                or "moderation" in sniff
+                or "safety" in sniff.lower()
+            ):
+                return ImageGenResult(
+                    result_type="failure",
+                    error=f"gpt-image-2 RAI rejected prompt: {msg[:200]}",
+                    error_code="content_safety_rejection",
+                    prompt_hash=sha,
+                )
             return ImageGenResult(
                 result_type="failure",
-                error=f"gpt-image-2 RAI rejected prompt: {msg[:200]}",
-                error_code="content_safety_rejection",
+                error=f"image generation failed: {msg[:200]}",
+                error_code="api_error",
                 prompt_hash=sha,
             )
-        return ImageGenResult(
-            result_type="failure",
-            error=f"image generation failed: {msg[:200]}",
-            error_code="api_error",
-            prompt_hash=sha,
-        )
-    except Exception as e:  # noqa: BLE001 — unknown Foundry SDK errors
-        return ImageGenResult(
-            result_type="failure",
-            error=f"image generation failed: {e}",
-            error_code="api_error",
-            prompt_hash=sha,
-        )
+        except Exception as e:  # noqa: BLE001 — unknown Foundry SDK errors
+            return ImageGenResult(
+                result_type="failure",
+                error=f"image generation failed: {e}",
+                error_code="api_error",
+                prompt_hash=sha,
+            )
 
     img = resp.data[0]
     b64 = getattr(img, "b64_json", None)

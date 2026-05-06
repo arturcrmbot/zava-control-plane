@@ -41,6 +41,14 @@ from api.server.mcp_tools import image_gen
 _STUB_QUALITY = os.environ.get("CREATIVE_IMAGE_QUALITY", "medium")
 _STUB_SIZE = os.environ.get("CREATIVE_IMAGE_SIZE", "1024x1024")
 
+# Hard cap on simultaneous gpt-image-2 calls per workflow phase. Going wide
+# (12 in flight) wedges the Azure Functions Python worker's gRPC heartbeat
+# AND blows through the 4-req/min Foundry quota on our demo deployment.
+# Default 2 keeps the worker responsive and stays inside the rate limit
+# (image_gen handles 429 with retry-after, but minimising 429 hits keeps
+# wall time low). Override per environment with CREATIVE_IMAGE_CONCURRENCY.
+_STUB_CONCURRENCY = int(os.environ.get("CREATIVE_IMAGE_CONCURRENCY", "2"))
+
 # data/synthetic/creative-campaign/cached/<brief-id>/route-A/{1..4}.svg etc.
 _CACHED_ROOT = (
     Path(__file__).resolve().parents[5] / "data" / "synthetic" / "creative-campaign" / "cached"
@@ -95,7 +103,8 @@ def _build_storyboard_prompt(brief: dict, frame_caption: str, idx: int) -> str:
     )
 
 
-async def _render_or_fallback(prompt: str, fallback_url: str) -> str:
+async def _render_or_fallback(prompt: str, fallback_url: str,
+                              sem: asyncio.Semaphore | None = None) -> str:
     """Call image_gen in a thread (it's sync) and return the SAS URL on
     success, or the cached fixture URL on any failure. Failure modes
     include: not configured (canned-fixture path is the dev default),
@@ -104,26 +113,35 @@ async def _render_or_fallback(prompt: str, fallback_url: str) -> str:
 
     The fall-back behaviour means a partial Foundry outage during a demo
     degrades gracefully to placeholders rather than killing the workflow.
+
+    `sem` bounds in-flight concurrency. None == unbounded (the smoke
+    test path); the activity passes a semaphore to keep the Functions
+    worker responsive under 12+ parallel renders.
     """
     if not image_gen.is_configured():
         return fallback_url
-    try:
-        result = await asyncio.to_thread(
-            image_gen.image_gen,
-            prompt=prompt,
-            size=_STUB_SIZE,
-            quality=_STUB_QUALITY,
+    async def _run() -> str:
+        try:
+            result = await asyncio.to_thread(
+                image_gen.image_gen,
+                prompt=prompt,
+                size=_STUB_SIZE,
+                quality=_STUB_QUALITY,
+            )
+        except Exception as ex:  # noqa: BLE001 — never let a render kill the workflow
+            print(f"[creative-stub] image_gen raised {ex!r}; using fixture")
+            return fallback_url
+        if result.result_type == "success" and result.image_url:
+            return result.image_url
+        print(
+            f"[creative-stub] image_gen failed code={result.error_code} "
+            f"err={result.error}; using fixture"
         )
-    except Exception as ex:  # noqa: BLE001 — never let a render kill the workflow
-        print(f"[creative-stub] image_gen raised {ex!r}; using fixture")
         return fallback_url
-    if result.result_type == "success" and result.image_url:
-        return result.image_url
-    print(
-        f"[creative-stub] image_gen failed code={result.error_code} "
-        f"err={result.error}; using fixture"
-    )
-    return fallback_url
+    if sem is None:
+        return await _run()
+    async with sem:
+        return await _run()
 
 
 def _load_brief(brief_id: str | None) -> dict:
@@ -249,7 +267,9 @@ async def execute(input: dict) -> dict:
             },
         ]
         # Build the (prompt, fallback_url) pair for every still up-front so
-        # we can fire one big asyncio.gather across all 12 in parallel.
+        # we can fire one big asyncio.gather across all 12 in parallel,
+        # bounded by a semaphore so a Functions worker doesn't stall on
+        # 12 simultaneous in-flight HTTP calls.
         render_jobs: list[tuple[int, int, str, str]] = []
         for r_idx, spec in enumerate(route_specs):
             cached = _cached_urls(bid, spec["route_name"], 4)
@@ -259,8 +279,9 @@ async def execute(input: dict) -> dict:
                 )
                 render_jobs.append((r_idx, s_idx, prompt, cached[s_idx]))
 
+        sem = asyncio.Semaphore(_STUB_CONCURRENCY)
         rendered = await asyncio.gather(
-            *(_render_or_fallback(p, f) for _, _, p, f in render_jobs)
+            *(_render_or_fallback(p, f, sem) for _, _, p, f in render_jobs)
         )
 
         # Stitch the flat result list back into 3 routes × 4 stills.
@@ -295,11 +316,13 @@ async def execute(input: dict) -> dict:
             "End frame: package on plinth",
         ]
         cached = _cached_urls(bid, "storyboard", 6)
+        sem = asyncio.Semaphore(_STUB_CONCURRENCY)
         rendered = await asyncio.gather(
             *(
                 _render_or_fallback(
                     _build_storyboard_prompt(brief, cap, idx + 1),
                     cached[idx],
+                    sem,
                 )
                 for idx, cap in enumerate(captions)
             )
