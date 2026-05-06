@@ -10,9 +10,9 @@ WPP can't tell which one we mean.
 | Where it runs | Single laptop, localhost only | Vendor-hosted Azure environment per WPP's RFP §9 |
 | Audience | GBB internal + reviewers + technical evaluators | WPP evaluators + AI CoE + Finance / HR sponsors |
 | Owner | This repo | A future engagement repo seeded from this code |
-| Data | Synthetic fixtures committed to `data/synthetic/` (POC1 + POC2 + per-fleet-domain corpora) | WPP-supplied datasets (3,430 claims + ground-truth labels for POC1; HR sandbox + 200-CV synthetic gym for POC2) |
-| Scope reach | **Eight live domains** on a single substrate — POC1 expense + POC2 hiring + six fleet-* domains graduated by `compose-domain` (v1 then v3) and brought to first-class FM parity | The bid commits to POC1 and POC2; the six fleet-* domains demonstrate the substrate's *composition* claim that adding domain N+1 is a config change, not an integration project |
-| Status | Substrate-complete · 8 domains run unattended via the autonomous demo loop | Not started · begins at signed contract + kickoff |
+| Data | Synthetic fixtures committed to `data/synthetic/` (POC1 + POC2 + per-fleet-domain corpora + 80-rule authority matrix) | WPP-supplied datasets (3,430 claims + ground-truth labels for POC1; HR sandbox + 200-CV synthetic gym for POC2) |
+| Scope reach | **Thirteen live domains** on a single substrate — POC1 expense + POC2 hiring + eleven fleet-* domains graduated by `compose-domain` (v1 → v3) and brought to first-class FM parity. Plus **29 registered personae** (15 hand-authored + 14 graduated by `compose-persona`) resolving every approval through one delegated-authority matrix. POC3 (creative-campaign / AI-agency demo) planned next as a fourteenth domain. | The bid commits to POC1 and POC2; the eleven fleet-* domains demonstrate the substrate's *composition* claim that adding domain N+1 is a config change, not an integration project |
+| Status | Substrate-complete · 13 domains run unattended via the autonomous demo loop · two meta-skills shipped (`compose-domain`, `compose-persona`) | Not started · begins at signed contract + kickoff |
 
 The lab build proves the **shape**. The engagement POC proves the shape **at WPP scale, on Azure, with WPP data, in front of WPP evaluators**.
 
@@ -21,9 +21,11 @@ to make verbatim: that the substrate is **composable**, not just
 reusable — i.e. that the same Durable + MAF + GHCP + Fleet-Manager spine
 hosts radically different business processes (expense compliance, talent
 lifecycle, vendor KYC, IT access, performance review, contract renewal,
-employee onboarding, travel pre-approval) without per-domain plumbing.
-This is the conversation we want to have once the bid claims are
-accepted.
+employee onboarding, travel pre-approval, AP-invoice match, purchase
+orders, contract review, privacy DPIA, treasury FX) without per-domain
+plumbing — and that approvals across all of them resolve through one
+delegated-authority matrix instead of inline thresholds. This is the
+conversation we want to have once the bid claims are accepted.
 
 ---
 
@@ -37,7 +39,9 @@ The platform layer is the load-bearing reuse. None of this changes when we move 
 - MCP tools with identical Pydantic schemas — **the MCP contract is the swap-in seam**
 - React Control Plane UI + SSC Reviewer Queue + Candidate Portal
 - OTEL emission path, audit ledger shape, bulk HITL pattern, hooks for non-revocable sends
-- **The domain registry pattern** ([`api/shared/domains.py`](../api/shared/domains.py)) — every per-domain integration fact lives in one dataclass, every generic substrate layer (FM skill text, simulator spawners, resolve route, blueprint inventory, triage wake set) reads from it. Adding the ninth domain — engagement-POC or otherwise — is a registry entry plus a YAML brief through `compose-domain`, not a refactor.
+- **The domain registry pattern** ([`api/shared/domains.py`](../api/shared/domains.py)) — every per-domain integration fact lives in one dataclass, every generic substrate layer (FM skill text, simulator spawners, resolve route, blueprint inventory, triage wake set) reads from it. Adding the next domain — engagement-POC or otherwise — is a registry entry plus a YAML brief through `compose-domain`, not a refactor. Five domains have been added through this seam since the bid was written (AP-invoice, purchase-order, contract-review, privacy-DPIA, treasury-FX) without touching any orchestrator-side substrate code.
+- **The persona registry pattern** ([`api/shared/personas.py`](../api/shared/personas.py)) — sister to the domain registry; one `Persona` dataclass per role with archetype + scope + authority-band metadata. Read by the FM skill text composer, the persona responder, the blueprint inventory, and the operator-UI persona library. 14 of the 29 personae landed via the `compose-persona` meta-skill from a YAML brief, no hand-authoring.
+- **The delegated-authority MCP** ([`mocks/authority-mcp/` :4108](../mocks/authority-mcp/)) — an 80-rule matrix in [`data/synthetic/authority/matrix.json`](../data/synthetic/authority/matrix.json) that resolves `(action, value, category, business_unit, geography, requester_role) → approver` for every approval gate in every domain. Skills call it for routing; personae call it for thresholds. Same MCP-contract-as-swap-in-seam claim as `policy_search` / `employee_history`: deterministic JSON now, Foundry IQ later.
 
 Same code runs on the laptop and on Azure. Backend implementations differ; agent code, skill prompts, validator logic, registry shape, and the composition meta-skill are unchanged.
 
@@ -117,14 +121,17 @@ extend them:
   exception. Demonstrated in `vendor_kyc_finance_bp` (high-risk
   jurisdictions), `it_access_it_admin` (broad-scope role templates),
   `contract_finance_bp` (price jump >25%).
-- **Six fleet-* domains in `main`.** `travel-preapproval`, `vendor-kyc`,
+- **Eleven fleet-* domains in `main`.** `travel-preapproval`, `vendor-kyc`,
   `employee-onboarding`, `it-access-request`, `contract-renewal`,
-  `perf-review` — graduated from YAML briefs by `compose-domain` v1
-  then v3, and brought to substrate parity per
+  `perf-review`, `ap-invoice`, `purchase-order`, `contract-review`,
+  `privacy-dpia`, `treasury-fx` — graduated from YAML briefs by
+  `compose-domain` v1 → v3, and brought to substrate parity per
   [`plan/feature-fleet-domain-substrate-1.md`](../plan/feature-fleet-domain-substrate-1.md)
   (all six phases shipped). They run end-to-end on the autonomous loop,
   appear in `query_fleet`, are resolvable from the operator UI, and
-  produce FM-escalated exception traffic.
+  produce FM-escalated exception traffic. The last five were added
+  *after* the substrate primitives stabilised — concrete evidence that
+  domain N+1 is registry + brief, not engineering.
 
 Why this matters for the bid: every one of these is **a load-bearing
 reuse** that survives the move to Azure. The bid doesn't have to claim
@@ -152,6 +159,68 @@ plan: [`plan/feature-foundry-credibility-friday-1.md`](../plan/feature-foundry-c
 - Real EMS connections, real Cosmos DB, real Entra Agent ID, real APIM private endpoints.
 
 But the seam is now narrower than the bid suggested: in engagement scope the agents register via AI Gateway, which lights up the Operate tab — *same App Insights resource, same span shape, just a different agent registration mechanism*. The lab build is one preview-feature flip away from full Foundry surface coverage.
+
+---
+
+## Authority + persona substrate (2026-05-05 → 2026-05-06)
+
+A second substrate primitive landed alongside `compose-domain` to take
+the substrate from "8 domains × ~16 hand-authored personae with inline
+thresholds" to "13 domains × 29 registered personae with every approval
+resolving through one matrix". Full plan, all seven phases shipped:
+[`plan/feature-authority-and-personae-1.md`](../plan/feature-authority-and-personae-1.md).
+
+| Axis | Before | After |
+|---|---|---|
+| **Approval routing** | Each persona inlined its own threshold (`abs(delta) > 10000` in `finance_bp`, price-jump `>25%` in `contract_finance_bp`, broad-scope role list in `it_access_it_admin`, etc.). Threshold changes were per-file Python edits. | An 80-rule matrix in [`data/synthetic/authority/matrix.json`](../data/synthetic/authority/matrix.json) covers every action across all 13 domains with multi-dimensional rules (action × value-band × category × business-unit × geography × requester-role). The [`mocks/authority-mcp/` :4108](../mocks/authority-mcp/) Node mock walks rules in precedence order; `delegated_authority_resolve_approver` and `_check_authority` MCP tools wrap it. **15 of 29 personae now read thresholds from the matrix instead of inlining them.** |
+| **Persona library** | 16 hand-authored personae across the 8 domains, each ~250-line SKILL.md with a `decision_policy` Python block. Adding a role meant a developer-day. | 29 personae registered ([`api/shared/personas.py`](../api/shared/personas.py) — frozen `Persona` dataclass: role, archetype, scope_function, scope_business_unit, scope_geography, default_authority_band, workflow_label, external_event_default, uses_authority_mcp). 14 of those graduated from the new `compose-persona` meta-skill against YAML briefs (AP clerk, controller, FP&A analyst, sourcing lead, category manager, contracts counsel, DPO, account director, project manager, change manager, comp & ben analyst, mobility specialist, treasurer, recruiter). Generated personae carry a `generated_by: compose-persona/v1` provenance line. |
+| **Operator surfacing** | Approver decisions appeared on the workflow detail tile with no traceable basis ("approved by `finance_bp`"). | The Control Plane WorkflowDetail now renders an **Authority resolution card** (TASK-035) showing the matched approver chip + governing `rule_id` + `basis` text on every workflow whose action maps into the matrix. The blueprint microsite has new `/authority` and `/personae` pages (TASK-037 + Phase 7) reading live from `/api/personas` and `/api/authority/matrix`. Reviewers can click through from a closed gate to the rule that closed it. |
+| **Composability proof** | Domains added via `compose-domain` worked, but each one still needed bespoke persona authoring for its HITL gates. | `compose-persona` mirrors `compose-domain`'s five-step procedure (brief → SKILL.md + decision_code → registry entry → graduate.sh → operator review). A new domain in any new corporate function reduces to: (a) a `compose-domain` brief, (b) a `compose-persona` brief per new role, (c) zero edits to skills/orchestrators that approve. Five new domains (AP-invoice → treasury-FX) and 14 new personae graduated this way without touching substrate code. |
+
+The substrate now visibly **breathes**: persona count grew from 16 → 29
+without per-role engineering, the registry is the single source of
+truth for FM skill text + persona responder + microsite + UI, and every
+approval is explainable down to the rule that governed it.
+
+What this does NOT change for the engagement POC: the matrix backend
+is still the deterministic Node mock. In engagement scope the same
+`delegated_authority_*` MCP contracts swap to a Foundry IQ index over
+WPP's actual delegated-authority matrix — same Pydantic shapes, same
+explainability surface, different data source.
+
+---
+
+## POC3 — sister POC for the AI-agency demo (planned, 2026-05-05)
+
+A third sister POC has been scoped on top of the existing substrate as
+the **fourteenth domain**: `creative-campaign`. Driven by the AI-agency
+storyboard prepared for James MacGregor (Sr Dir Industry Advisory IBB).
+Plan: [`plan/feature-poc3-ai-agency-1.md`](../plan/feature-poc3-ai-agency-1.md)
+(status: planned).
+
+The shape:
+
+- One new domain through `compose-domain` (no new substrate code)
+- Multi-party voice brief (reusing POC2's `voice-screener` Realtime mechanic)
+- Specialist-agent fan-out (insight, audience, brand-guardian, concept-curator)
+- Foundry `gpt-image-2` for concept stills + storyboard frames (real Azure call, same MCP-tool wrapper pattern as `ocr_extract` / `avatar_render`)
+- Four HITL approval gates landing in our Control Plane (the supervisor surface, hero of the demo)
+- Federation to Figma as the agency's existing design surface (not a competing canvas)
+
+Two deliberate scope cuts vs. the storyboard, both for operational
+safety on a live demo:
+
+1. **No video generation in v1** — Sora-2 is Foundry preview, gated by Limited Access (verified empty SKU listing on current subscription), 1–5min latency, 2-job concurrency cap. Storyboard frames + brand brief hand off to the agency's existing video team in Frame.io / Premiere. Sora-2 / Runway / Veo narrated as v2 plug-ins via the same MCP shape.
+2. **No M365 Cowork in v1** — Cowork is M365 Frontier preview; voice intake to Control Plane is sufficient for the same beat with zero Frontier dependency.
+
+The storyboard itself plus a Constellation-view sidebar entry shipped
+ahead of the implementation — see commits `b0e54cdc` (POC3 storyboard
+pptx + plan), `103f9ac5` (Constellation baked into the client),
+`98acc04b` (Constellation as a sidebar link in a new tab), and
+`86e17a39` (standalone Constellation visualisation on the blueprint
+microsite). The Constellation view is the visual proof of the
+"composable substrate" claim: 13 live domains rendered as one graph,
+operator can drill into any one.
 
 ---
 
@@ -198,7 +267,7 @@ The bid response sections (§10.1, §11, §B.4, §B.5) describe **the engagement
 
 When recording / demoing for WPP evaluation:
 
-- **If we record from the lab build**, frame it as *"the architecture proven on a laptop; same code runs on Azure; here's the swap-in seam"*. Honest, derisks the technical claim, but is not the engagement POC.
+- **If we record from the lab build**, frame it as *"the architecture proven on a laptop; same code runs on Azure; here's the swap-in seam"*. Honest, derisks the technical claim, but is not the engagement POC. The current vendor-day flow is the 4-act, 40-minute structure in [DEMO.md](DEMO.md) — Act 1 substrate (FM + 13 domains + Constellation), Act 2 POC1 (expense), Act 3 POC2 (hiring), Act 4 composability (compose-domain + compose-persona + authority).
 - **If we record from the engagement POC**, that lands after kickoff with WPP's data and sandbox credentials. Higher fidelity but on the engagement timeline.
 
 Both are valid; pick consciously.
