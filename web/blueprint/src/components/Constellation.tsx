@@ -153,10 +153,6 @@ export function Constellation({ status, fullScreen = false }: Props) {
    *  on read — we don't trim on write because the trim cost is cheap and
    *  the read happens at 1Hz, not 60Hz. */
   const eventTimesRef = useRef<Map<string, number[]>>(new Map());
-  /** Heartbeat ring start timestamps (ms epoch). Each event pushes one;
-   *  the renderer expands + fades each ring then drops it. Capped to
-   *  keep the canvas calm during high-volume bursts. */
-  const heartbeatsRef = useRef<number[]>([]);
 
   // SSE → state. The canvas is the only thing that re-renders.
   useObservatory({
@@ -174,7 +170,6 @@ export function Constellation({ status, fullScreen = false }: Props) {
         progressRef,
         widToTypeRef,
         eventTimesRef,
-        heartbeatsRef,
         nameToType,
         prefixToType,
       });
@@ -353,10 +348,6 @@ export function Constellation({ status, fullScreen = false }: Props) {
 
         {/* Centre: the substrate. */}
         <SubstrateSphere substrate={substrate} pulsesRef={pulsesRef} />
-
-        {/* Heartbeat rings: a faint expanding ring leaves the substrate
-            on every event so system pulse rate is visible from afar. */}
-        <HeartbeatRings heartbeatsRef={heartbeatsRef} />
 
         {/* Photon arcs: substrate dot → cluster anchor on every event. */}
         <PhotonArcs arcsRef={arcsRef} />
@@ -723,107 +714,6 @@ function PhotonArcs({
 }
 
 // ---------------------------------------------------------------------------
-// HeartbeatRings — a faint thin ring expands outward from the substrate
-// on every event. Multiple concurrent rings co-exist (capped at MAX_BEATS).
-// Each ring lives for HEARTBEAT_LIFE_MS, growing from SUBSTRATE_RADIUS to
-// SUBSTRATE_RADIUS+REACH while fading to zero opacity.
-//
-// One mesh per ring is fine here because we have few of them; using a Mesh
-// + RingGeometry per ring lets each have its own scale + material.opacity
-// without a custom shader.
-// ---------------------------------------------------------------------------
-const HEARTBEAT_LIFE_MS = 2200;
-const MAX_BEATS = 10;
-const HEARTBEAT_REACH = 1.6;
-
-function HeartbeatRings({
-  heartbeatsRef,
-}: {
-  heartbeatsRef: React.MutableRefObject<number[]>;
-}) {
-  const groupRef = useRef<THREE.Group>(null);
-  // Pre-allocate MAX_BEATS meshes; we'll show/hide and resize them.
-  const meshes = useMemo(() => {
-    const arr: { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial }[] = [];
-    for (let i = 0; i < MAX_BEATS; i++) {
-      // Thin ring: inner just inside the substrate radius, outer slightly out.
-      const geom = new THREE.RingGeometry(0.96, 1.0, 64, 1);
-      const mat = new THREE.MeshBasicMaterial({
-        color: new THREE.Color("#7faed4"),
-        transparent: true,
-        opacity: 0,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        side: THREE.DoubleSide,
-      });
-      const mesh = new THREE.Mesh(geom, mat);
-      mesh.visible = false;
-      arr.push({ mesh, mat });
-    }
-    return arr;
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      for (const { mesh, mat } of meshes) {
-        mesh.geometry.dispose();
-        mat.dispose();
-      }
-    };
-  }, [meshes]);
-
-  useFrame(() => {
-    const beats = heartbeatsRef.current;
-    const now = performance.now();
-    // Drop expired beats from the head; we always keep the most recent
-    // MAX_BEATS for rendering.
-    let writeIdx = 0;
-    for (let i = 0; i < beats.length; i++) {
-      if (now - beats[i] < HEARTBEAT_LIFE_MS) {
-        beats[writeIdx++] = beats[i];
-      }
-    }
-    beats.length = writeIdx;
-    if (beats.length > MAX_BEATS) {
-      beats.splice(0, beats.length - MAX_BEATS);
-    }
-
-    // Render: each beat assigned to one of the pre-allocated meshes.
-    for (let i = 0; i < meshes.length; i++) {
-      const { mesh, mat } = meshes[i];
-      const beat = beats[i];
-      if (beat === undefined) {
-        mesh.visible = false;
-        continue;
-      }
-      const age = now - beat;
-      const k = age / HEARTBEAT_LIFE_MS; // 0..1
-      const radius = SUBSTRATE_RADIUS + HEARTBEAT_REACH * k;
-      // Slight squash so it reads as a wave, not a sphere outline.
-      mesh.scale.set(radius, radius, radius);
-      // Always face the camera-equivalent plane (approximate by yaw=0).
-      // Three rings simultaneously rotated at random angles would feel
-      // chaotic — we keep them flat in the world XZ plane and let the
-      // camera orbit reveal them.
-      mesh.rotation.x = -Math.PI / 2;
-      // Quick rise to peak, then long ease-out fade.
-      const opacity =
-        k < 0.15 ? k / 0.15 * 0.45 : 0.45 * Math.pow(1 - (k - 0.15) / 0.85, 1.3);
-      mat.opacity = opacity;
-      mesh.visible = opacity > 0.01;
-    }
-  });
-
-  return (
-    <group ref={groupRef}>
-      {meshes.map(({ mesh }, i) => (
-        <primitive key={i} object={mesh} />
-      ))}
-    </group>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // CountsRibbon — running totals across all clusters, refreshed on a slow
 // tick so it doesn't churn React 60Hz. Also tracks lifetime "completed" by
 // observing motes leaving the alive bucket.
@@ -1121,9 +1011,6 @@ interface FoldCtx {
   widToTypeRef: React.MutableRefObject<Map<string, string>>;
   /** Per-cluster rolling event timestamps for projector-mode auto-follow. */
   eventTimesRef: React.MutableRefObject<Map<string, number[]>>;
-  /** Heartbeat ring queue. Each event pushes a timestamp here; the
-   *  renderer expands + fades each ring then drops it. */
-  heartbeatsRef: React.MutableRefObject<number[]>;
   /** display_name | workflow_type → canonical workflow_type. */
   nameToType: Map<string, string>;
   /** workflow_id prefix ("EXP", "ITAR", ...) → canonical workflow_type. */
@@ -1193,15 +1080,6 @@ function handleEvent(e: ObservatoryEvent, ctx: FoldCtx): void {
     const arr = ctx.eventTimesRef.current.get(wtype) ?? [];
     arr.push(now);
     ctx.eventTimesRef.current.set(wtype, arr);
-  }
-
-  // Substrate heartbeat — every event ripples a ring outward from the
-  // centre. Capped to avoid drowning the canvas during high-volume bursts.
-  // We don't gate on wtype: heartbeats fire even for events we couldn't
-  // attribute to a cluster, because the heartbeat is "the system is
-  // alive" feedback, not "this domain just did X".
-  if (ctx.heartbeatsRef.current.length < 12) {
-    ctx.heartbeatsRef.current.push(now);
   }
 
   // Substrate pulses — colour by category so the legend is honest.
