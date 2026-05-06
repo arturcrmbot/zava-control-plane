@@ -901,16 +901,24 @@ function handleEvent(e: ObservatoryEvent, ctx: FoldCtx): void {
       mote.state = "awaiting";
       mote.escalated = false;
     }
+    // Capture who's being asked and why so the HITL satellite can render.
+    if (e.persona) mote.awaitingPersona = e.persona;
+    if (e.reason) mote.awaitingReason = e.reason;
   } else if (e.type === "workflow.hitl.escalated") {
     mote.state = "awaiting";
     mote.escalated = true;
+    if (e.persona) mote.awaitingPersona = e.persona;
+    if (e.reason) mote.awaitingReason = e.reason;
   } else if (e.type === "workflow.sla.breach_imminent") {
     mote.slaBreach = true;
   } else if (e.type === "durable.resumed" || isStepEvent) {
-    // Auto-resume: any forward motion clears sticky non-fatal states.
+    // Auto-resume: any forward motion clears sticky non-fatal states +
+    // the HITL satellite (the human answered, the bot moved on).
     if (mote.state === "awaiting" || mote.state === "exception") {
       mote.state = "alive";
       mote.escalated = false;
+      mote.awaitingPersona = null;
+      mote.awaitingReason = null;
     }
   }
 }

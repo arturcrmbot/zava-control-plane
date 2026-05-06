@@ -61,5 +61,9 @@ export interface ObservatoryEvent {
   executor_type?: string | null;
   /** "start" | "complete" | "error" | null */
   stage?: string | null;
+  /** Persona being asked when this is a HITL gate / suspend event. */
+  persona?: string | null;
+  /** Short slug describing why the workflow paused / errored. */
+  reason?: string | null;
   ts: number;
 }

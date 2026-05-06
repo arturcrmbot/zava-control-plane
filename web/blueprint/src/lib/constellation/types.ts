@@ -38,6 +38,13 @@ export interface Mote {
   slaBreach?: boolean;
   /** True if a HITL gate has been escalated (deeper magenta + faster pulse). */
   escalated?: boolean;
+  /** Persona being asked while this mote is in the awaiting state.
+   *  Drives the HITL satellite label so operators can see WHO the bot
+   *  is waiting on, not just that it stopped. */
+  awaitingPersona?: string | null;
+  /** Short reason slug (e.g. "awaiting_finance_signoff") shown under
+   *  the persona name on the satellite. */
+  awaitingReason?: string | null;
   /** Random per-mote orbit angle inside its parent orb. */
   seed: number;
   /** Most recent skill that fired for this workflow (label fodder). */

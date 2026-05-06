@@ -372,7 +372,59 @@ function WorkflowDetail({
             ✕ validator blocked
           </Text>
         ) : null}
+        {/* HITL satellite — show WHO the bot is waiting on. Magenta to
+            match the awaiting-state mote tint. Always rendered when the
+            mote is awaiting (not just CLOSE) because the persona is the
+            single most demo-worthy answer to "what's it doing?". */}
+        {mote.state === "awaiting" && mote.awaitingPersona ? (
+          <Text
+            position={[0, -0.19, 0]}
+            fontSize={0.044}
+            color={mote.escalated ? "#ff6fed" : "#d966ec"}
+            anchorX="left"
+            anchorY="middle"
+            outlineWidth={0.0015}
+            outlineColor="#0a0a0c"
+          >
+            {`⊙ ${mote.escalated ? "ESCALATED → " : "asking "}${formatPersona(
+              mote.awaitingPersona,
+            )}`}
+          </Text>
+        ) : null}
+        {lod === "close" &&
+        mote.state === "awaiting" &&
+        mote.awaitingReason ? (
+          <Text
+            position={[0, -0.25, 0]}
+            fontSize={0.034}
+            color="#a674b8"
+            anchorX="left"
+            anchorY="middle"
+            outlineWidth={0.001}
+            outlineColor="#0a0a0c"
+          >
+            {formatReason(mote.awaitingReason)}
+          </Text>
+        ) : null}
       </Billboard>
     </group>
   );
+}
+
+/** Turn snake_case persona keys ("contract_finance_bp") into a
+ *  human-friendly label ("Contract Finance BP"). */
+function formatPersona(p: string): string {
+  return p
+    .split("_")
+    .map((seg) =>
+      seg.length <= 3
+        ? seg.toUpperCase()
+        : seg.charAt(0).toUpperCase() + seg.slice(1),
+    )
+    .join(" ");
+}
+
+/** Reason slugs are snake_case verbs ("awaiting_finance_signoff"). */
+function formatReason(r: string): string {
+  return r.replace(/_/g, " ");
 }

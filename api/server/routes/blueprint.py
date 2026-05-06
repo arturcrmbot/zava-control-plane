@@ -130,6 +130,11 @@ def _normalise_event(event: FleetEvent) -> dict[str, Any] | None:
         "workflow_id": workflow_id,
         "executor_type": data.get("executor_type"),
         "stage": data.get("stage"),
+        # HITL / suspended events carry the persona that was asked plus a
+        # short reason slug ("awaiting_finance_signoff" etc). Forwarded so
+        # the Constellation can render a satellite next to awaiting motes.
+        "persona": data.get("persona"),
+        "reason": data.get("reason"),
         "ts": data.get("ts") or time.time(),
     }
 
