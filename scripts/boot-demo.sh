@@ -64,6 +64,14 @@ fi
 npm run demo:portal &
 pids+=($!)
 
+echo "==> blueprint preview (Constellation)"
+if [[ ! -d web/blueprint/dist ]]; then
+  echo "    blueprint/dist missing — building..."
+  npm run build:blueprint
+fi
+npm run demo:blueprint &
+pids+=($!)
+
 launch_func() {
   case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*)
@@ -99,11 +107,12 @@ fi
 cat <<EOF
 
 All services should be up. Ports:
-  UI:         http://localhost:5173
-  Portal:     http://localhost:5174
-  FastAPI:    http://localhost:3001
-  Functions:  http://localhost:7071
-  Azurite:    10000-10002
+  UI:           http://localhost:5173
+  Portal:       http://localhost:5174
+  Constellation: http://localhost:5175
+  FastAPI:      http://localhost:3001
+  Functions:    http://localhost:7071
+  Azurite:      10000-10002
 
 Inject:
   curl -X POST http://localhost:3001/api/simulator/inject -H "Content-Type: application/json" -d '{"scenario":"demo-fail"}'
