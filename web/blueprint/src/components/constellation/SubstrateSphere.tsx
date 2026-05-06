@@ -265,15 +265,22 @@ export function SubstrateLabel({
 
   if (opacity < 0.02) return null;
 
+  // Anchor the label ABOVE the substrate sphere (radius 2.6), not at
+  // its centre — the sphere's additive-blended bright dots + bloom would
+  // otherwise drown the text under any non-trivial activity. Sitting it
+  // above keeps the text against dark sky regardless of how busy the
+  // substrate gets, while still reading as "this is what the sphere
+  // below me is".
+  const Y = SUBSTRATE_RADIUS + 0.9; // ~3.5
   return (
-    <Billboard position={[0, 0, 0]}>
+    <Billboard position={[0, Y, 0]}>
       <Text
         position={[0, 0.55, 0]}
-        fontSize={0.42}
+        fontSize={0.5}
         color="#e9e7e3"
         anchorX="center"
         anchorY="middle"
-        outlineWidth={0.012}
+        outlineWidth={0.018}
         outlineColor="#0a0a0c"
         fillOpacity={opacity}
         outlineOpacity={opacity}
@@ -282,11 +289,11 @@ export function SubstrateLabel({
       </Text>
       <Text
         position={[0, 0.10, 0]}
-        fontSize={0.16}
+        fontSize={0.20}
         color="#bdbdbd"
         anchorX="center"
         anchorY="middle"
-        outlineWidth={0.005}
+        outlineWidth={0.008}
         outlineColor="#0a0a0c"
         fillOpacity={opacity * 0.95}
         outlineOpacity={opacity * 0.95}
@@ -294,12 +301,12 @@ export function SubstrateLabel({
         skills · MCP tools · validators
       </Text>
       <Text
-        position={[0, -0.18, 0]}
-        fontSize={0.13}
+        position={[0, -0.20, 0]}
+        fontSize={0.16}
         color="#7e7c76"
         anchorX="center"
         anchorY="middle"
-        outlineWidth={0.0035}
+        outlineWidth={0.005}
         outlineColor="#0a0a0c"
         fillOpacity={opacity * 0.85}
         outlineOpacity={opacity * 0.85}
