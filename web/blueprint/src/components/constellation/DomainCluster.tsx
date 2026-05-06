@@ -47,6 +47,16 @@ const N_MAX = 96;
 const FOCUS_DIST = 5.0;
 const MID_DIST = 9.0;
 
+// SLA halo thresholds — DEMO-TIME heuristic. We don't have a per-domain
+// real SLA budget on the wire yet (server only emits a discrete
+// workflow.sla.breach_imminent flag), so the halo uses age-since-birth as
+// a proxy. Workflows fresher than AGE_AMBER_MS get no halo (calm canvas
+// during normal flow); past that an amber ring; past AGE_RED_MS a red
+// ring that grows. Tune these to match how brisk the demo feels — values
+// here are tuned for the recorded-template replay pacing.
+const AGE_AMBER_MS = 18_000;
+const AGE_RED_MS = 40_000;
+
 // Build a soft circular sprite once. Bloom needs round bright cores to
 // look like stars — the default square Points sprite kills the magic.
 function makeStarTexture(): THREE.Texture {
@@ -74,6 +84,32 @@ function makeStarTexture(): THREE.Texture {
   return tex;
 }
 
+// Build a hollow ring sprite used to draw the SLA halo around aging
+// motes. A thin annulus with soft edges so additive blending + bloom
+// reads as a glowing halo, not a hard circle.
+function makeRingTexture(): THREE.Texture {
+  const size = 96;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const cx = size / 2;
+  const cy = size / 2;
+  // Inner edge (transparent) to outer edge (transparent), peaking at
+  // ~0.78 radius — that's the visible ring band.
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size / 2);
+  grad.addColorStop(0.0, "rgba(255,255,255,0)");
+  grad.addColorStop(0.55, "rgba(255,255,255,0)");
+  grad.addColorStop(0.78, "rgba(255,255,255,0.85)");
+  grad.addColorStop(0.92, "rgba(255,255,255,0.25)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+}
+
 export function DomainCluster({
   workflowType,
   displayName,
@@ -89,6 +125,7 @@ export function DomainCluster({
   const groupRef = useRef<THREE.Group>(null);
   const baseColor = useMemo(() => new THREE.Color(color), [color]);
   const starTex = useMemo(makeStarTexture, []);
+  const ringTex = useMemo(makeRingTexture, []);
 
   const jitterRef = useRef<Map<string, [number, number, number]>>(new Map());
   /** Snapshot of motes for the currently-rendered LOD frame so MID/CLOSE
@@ -113,6 +150,26 @@ export function DomainCluster({
     return geom;
   }, []);
 
+  // Parallel geometry for SLA halos. Same N_MAX cap; each frame we write
+  // a halo only for alive motes whose age has crossed AGE_AMBER_MS.
+  const haloGeom = useMemo(() => {
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute(
+      "position",
+      new THREE.BufferAttribute(new Float32Array(N_MAX * 3), 3),
+    );
+    geom.setAttribute(
+      "color",
+      new THREE.BufferAttribute(new Float32Array(N_MAX * 3), 3),
+    );
+    geom.setAttribute(
+      "size",
+      new THREE.BufferAttribute(new Float32Array(N_MAX), 1),
+    );
+    geom.setDrawRange(0, 0);
+    return geom;
+  }, []);
+
   useFrame(({ clock }) => {
     const motes = motesRef.current.get(workflowType) ?? [];
     const t = clock.getElapsedTime();
@@ -123,6 +180,20 @@ export function DomainCluster({
     const posArr = posAttr.array as Float32Array;
     const colArr = colAttr.array as Float32Array;
     const sizeArr = sizeAttr.array as Float32Array;
+
+    const haloPosAttr = haloGeom.getAttribute(
+      "position",
+    ) as THREE.BufferAttribute;
+    const haloColAttr = haloGeom.getAttribute(
+      "color",
+    ) as THREE.BufferAttribute;
+    const haloSizeAttr = haloGeom.getAttribute(
+      "size",
+    ) as THREE.BufferAttribute;
+    const haloPosArr = haloPosAttr.array as Float32Array;
+    const haloColArr = haloColAttr.array as Float32Array;
+    const haloSizeArr = haloSizeAttr.array as Float32Array;
+    let haloCount = 0;
 
     const base = { r: baseColor.r, g: baseColor.g, b: baseColor.b };
 
@@ -177,6 +248,37 @@ export function DomainCluster({
       sizeArr[drawCount] = 0.36 * v.scale;
       frame.push({ mote: m, x: fx, y: fy, z: fz });
       drawCount++;
+
+      // SLA halo: alive motes only, age-based heuristic. Aging amber
+      // ring at AGE_AMBER_MS, growing red at AGE_RED_MS, blocked/awaiting/
+      // exception/completed states all skip the halo to keep the canvas
+      // calm (those states already have their own loud signal). Server-
+      // emitted slaBreach forces the red halo regardless of age.
+      if (m.state === "alive" && haloCount < N_MAX) {
+        const age = now - bornAt;
+        const wantHalo = m.slaBreach || age >= AGE_AMBER_MS;
+        if (wantHalo) {
+          const isRed = m.slaBreach || age >= AGE_RED_MS;
+          // Brightness pulses slowly so the halo feels alive rather than
+          // pasted on. Faster pulse when red.
+          const pulse = isRed
+            ? 0.7 + 0.3 * Math.sin(now * 0.005 + m.seed * 0.13)
+            : 0.6 + 0.25 * Math.sin(now * 0.0028 + m.seed * 0.21);
+          const r = isRed ? 1.0 : 0.95;
+          const g = isRed ? 0.25 : 0.62;
+          const b = isRed ? 0.18 : 0.1;
+          haloPosArr[haloCount * 3] = fx;
+          haloPosArr[haloCount * 3 + 1] = fy;
+          haloPosArr[haloCount * 3 + 2] = fz;
+          haloColArr[haloCount * 3] = r * pulse;
+          haloColArr[haloCount * 3 + 1] = g * pulse;
+          haloColArr[haloCount * 3 + 2] = b * pulse;
+          // Halo grows ~25% as it transitions amber → red, so the visual
+          // pressure rises with the colour shift.
+          haloSizeArr[haloCount] = isRed ? 1.05 : 0.85;
+          haloCount++;
+        }
+      }
     }
 
     if (culled.length > 0) {
@@ -194,6 +296,11 @@ export function DomainCluster({
     colAttr.needsUpdate = true;
     sizeAttr.needsUpdate = true;
     moteFrameRef.current = frame;
+
+    haloGeom.setDrawRange(0, haloCount);
+    haloPosAttr.needsUpdate = true;
+    haloColAttr.needsUpdate = true;
+    haloSizeAttr.needsUpdate = true;
 
     // Distance + LOD.
     const cam = cameraRef.current;
@@ -256,6 +363,22 @@ export function DomainCluster({
           sizeAttenuation
           transparent
           opacity={1}
+          depthWrite={false}
+          alphaTest={0.01}
+          blending={THREE.AdditiveBlending}
+        />
+      </points>
+
+      {/* SLA halo ring around aging alive motes — drawn before the stars
+          but additively, so the star core sits inside the halo. */}
+      <points geometry={haloGeom}>
+        <pointsMaterial
+          map={ringTex}
+          vertexColors
+          size={1}
+          sizeAttenuation
+          transparent
+          opacity={0.85}
           depthWrite={false}
           alphaTest={0.01}
           blending={THREE.AdditiveBlending}
