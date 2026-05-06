@@ -181,6 +181,12 @@ export function Constellation({ status, fullScreen = false }: Props) {
   const [focusedClusterPos, setFocusedClusterPos] = useState<
     THREE.Vector3 | null
   >(null);
+  /** Display name of the cluster the operator just clicked into. Drives
+   *  the "FOCUSED · X" pill at the top of the canvas so the click
+   *  obviously landed (the camera flight alone is easy to miss). */
+  const [focusedClusterName, setFocusedClusterName] = useState<string | null>(
+    null,
+  );
 
   const handleClusterFocus = (clusterPos: [number, number, number]) => {
     const target = new THREE.Vector3(...clusterPos);
@@ -192,6 +198,22 @@ export function Constellation({ status, fullScreen = false }: Props) {
     camPos.y += 1.5;
     setFlyTo({ target, camPos });
     setFocusedClusterPos(target);
+    // Reverse lookup: which orbit's position matches what we were given.
+    // positions is workflow_type → [x,y,z]; find by approx-equal.
+    let matchedName: string | null = null;
+    for (const o of orbits) {
+      const p = positions.get(o.workflowType);
+      if (
+        p &&
+        Math.abs(p[0] - clusterPos[0]) < 0.01 &&
+        Math.abs(p[1] - clusterPos[1]) < 0.01 &&
+        Math.abs(p[2] - clusterPos[2]) < 0.01
+      ) {
+        matchedName = o.displayName;
+        break;
+      }
+    }
+    setFocusedClusterName(matchedName);
   };
 
   const handleResetCamera = () => {
@@ -200,6 +222,7 @@ export function Constellation({ status, fullScreen = false }: Props) {
       camPos: new THREE.Vector3(0, 3, 22),
     });
     setFocusedClusterPos(null);
+    setFocusedClusterName(null);
   };
 
   /** workflow_id of the mote currently selected for the inspector panel.
@@ -437,6 +460,26 @@ export function Constellation({ status, fullScreen = false }: Props) {
           orbits={orbits}
           onClose={() => setSelectedWid(null)}
         />
+      ) : null}
+
+      {/* Focused-cluster pill — confirms a click landed. Without this the
+          camera flight is easy to miss because the substrate dominates
+          the new view; the pill explicitly says "you flew to X". */}
+      {focusedClusterName ? (
+        <div className="constellation__focus-pill">
+          <span className="constellation__focus-pill-label">focused</span>
+          <span className="constellation__focus-pill-name">
+            {focusedClusterName}
+          </span>
+          <button
+            type="button"
+            className="constellation__focus-pill-close"
+            onClick={handleResetCamera}
+            title="Return to overview (key: 0 / esc)"
+          >
+            ×
+          </button>
+        </div>
       ) : null}
 
       {/* Substrate dot hover tooltip — names the skill / tool / validator

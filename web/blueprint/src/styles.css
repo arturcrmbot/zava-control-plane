@@ -1032,6 +1032,56 @@ body.constellation-page-body {
   word-break: break-all;
 }
 
+/* Focused-cluster pill — top-centre, confirms a cluster click landed. */
+.constellation__focus-pill {
+  position: absolute;
+  top: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(14, 14, 16, 0.92);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem 0.35rem 1.1rem;
+  font-family: var(--mono-family);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  pointer-events: all;
+  z-index: 6;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+}
+
+.constellation__focus-pill-label {
+  color: var(--ink-mute);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+
+.constellation__focus-pill-name {
+  color: #f4a300;
+  font-weight: 600;
+}
+
+.constellation__focus-pill-close {
+  background: transparent;
+  border: none;
+  color: var(--ink-mute);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  margin-left: 0.2rem;
+  transition: color 150ms ease;
+}
+
+.constellation__focus-pill-close:hover {
+  color: var(--ink);
+}
+
 /* Workflow inspector — DOM panel opened by clicking a star at MID/CLOSE LOD. */
 .constellation__inspector {
   position: absolute;
