@@ -207,6 +207,15 @@ export function Constellation({ status, fullScreen = false }: Props) {
    *  close button or by Escape. */
   const [selectedWid, setSelectedWid] = useState<string | null>(null);
 
+  /** Substrate dot under the pointer, if any. Drives the hover tooltip
+   *  that names the skill / tool / validator a dot represents. */
+  const [hoveredDot, setHoveredDot] = useState<{
+    kind: "skill" | "tool" | "validator";
+    label: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
   // Dev-only hook: lets the visual smoke check open the inspector
   // without trying to mouse-click a tiny 3D sphere from headless Chrome.
   // Production users never see this; nothing in the app calls it.
@@ -289,7 +298,11 @@ export function Constellation({ status, fullScreen = false }: Props) {
         <BackdropStars count={500} radius={60} />
 
         {/* Centre: the substrate. */}
-        <SubstrateSphere substrate={substrate} pulsesRef={pulsesRef} />
+        <SubstrateSphere
+          substrate={substrate}
+          pulsesRef={pulsesRef}
+          onHoverDot={setHoveredDot}
+        />
 
         {/* Substrate centre label so the bright sphere has a name. */}
         <SubstrateLabel
@@ -424,6 +437,36 @@ export function Constellation({ status, fullScreen = false }: Props) {
           orbits={orbits}
           onClose={() => setSelectedWid(null)}
         />
+      ) : null}
+
+      {/* Substrate dot hover tooltip — names the skill / tool / validator
+          the operator's pointing at. Positioned next to the cursor; the
+          kind colour matches the HUD legend. */}
+      {hoveredDot ? (
+        <div
+          className="constellation__dot-tooltip"
+          style={{
+            left: hoveredDot.x + 12,
+            top: hoveredDot.y + 12,
+          }}
+        >
+          <span
+            className="constellation__dot-tooltip-kind"
+            style={{
+              color:
+                hoveredDot.kind === "tool"
+                  ? "#7faed4"
+                  : hoveredDot.kind === "validator"
+                  ? "#c54a3d"
+                  : "#f4a300",
+            }}
+          >
+            {hoveredDot.kind}
+          </span>
+          <span className="constellation__dot-tooltip-label">
+            {hoveredDot.label}
+          </span>
+        </div>
       ) : null}
     </div>
   );

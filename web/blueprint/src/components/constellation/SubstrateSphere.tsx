@@ -26,6 +26,20 @@ interface Props {
   pulsesRef: React.MutableRefObject<Pulse[]>;
   /** Sphere radius in scene units. */
   radius?: number;
+  /**
+   * Called when the pointer hovers over a substrate dot. Receives the
+   * dot's metadata (skill / tool / validator + label) plus the pointer's
+   * client-space (x, y) so the parent can position a DOM tooltip.
+   * Called with `null` when the pointer leaves the points mesh.
+   */
+  onHoverDot?: (
+    info: {
+      kind: "skill" | "tool" | "validator";
+      label: string;
+      x: number;
+      y: number;
+    } | null,
+  ) => void;
   /** Optional caption (e.g. "the substrate"). */
 }
 
@@ -46,6 +60,7 @@ export function SubstrateSphere({
   substrate,
   pulsesRef,
   radius = SUBSTRATE_RADIUS,
+  onHoverDot,
 }: Props) {
   const pointsRef = useRef<THREE.Points>(null);
 
@@ -167,7 +182,28 @@ export function SubstrateSphere({
   });
 
   return (
-    <points ref={pointsRef} geometry={geometry}>
+    <points
+      ref={pointsRef}
+      geometry={geometry}
+      onPointerMove={(e) => {
+        if (!onHoverDot) return;
+        // r3f gives index of the picked vertex on a Points mesh.
+        const idx = e.index;
+        if (idx === undefined || idx === null) return;
+        const meta = substrate.dotMeta[idx];
+        if (!meta) {
+          // Filler dot — no real capability here. Don't show a tooltip;
+          // calling onHoverDot(null) would flicker every frame as the
+          // pointer moved between filler and real dots.
+          return;
+        }
+        e.stopPropagation();
+        onHoverDot({ kind: meta.kind, label: meta.label, x: e.clientX, y: e.clientY });
+      }}
+      onPointerOut={() => {
+        if (onHoverDot) onHoverDot(null);
+      }}
+    >
       <pointsMaterial
         vertexColors
         size={0.05}

@@ -31,9 +31,17 @@ export function buildSubstrateMap(
   const toolIdx = new Map<string, number>();
   const validatorIdx = new Map<string, number>();
   const category = new Uint8Array(totalDots);
+  const dotMeta: SubstrateMap["dotMeta"] = new Array(totalDots).fill(null);
 
   if (!composition) {
-    return { total: totalDots, skillIdx, toolIdx, validatorIdx, category };
+    return {
+      total: totalDots,
+      skillIdx,
+      toolIdx,
+      validatorIdx,
+      category,
+      dotMeta,
+    };
   }
 
   const skills = [...composition.skills]
@@ -54,6 +62,7 @@ export function buildSubstrateMap(
     skillIdx.set(name, cursor);
     skillIdx.set(snakeOf(name), cursor);
     category[cursor] = 1;
+    dotMeta[cursor] = { kind: "skill", label: name };
     cursor++;
   }
 
@@ -67,6 +76,7 @@ export function buildSubstrateMap(
       // No operations declared — give the MCP itself one dot.
       toolIdx.set(mcp.name, cursor);
       category[cursor] = 2;
+      dotMeta[cursor] = { kind: "tool", label: mcp.name };
       cursor++;
       continue;
     }
@@ -77,6 +87,7 @@ export function buildSubstrateMap(
       toolIdx.set(joined, cursor);
       if (firstDot < 0) firstDot = cursor;
       category[cursor] = 2;
+      dotMeta[cursor] = { kind: "tool", label: `${mcp.name}.${op}` };
       cursor++;
     }
     if (firstDot >= 0 && !toolIdx.has(mcp.name)) {
@@ -89,8 +100,16 @@ export function buildSubstrateMap(
     if (cursor >= totalDots) break;
     validatorIdx.set(name, cursor);
     category[cursor] = 3;
+    dotMeta[cursor] = { kind: "validator", label: name };
     cursor++;
   }
 
-  return { total: totalDots, skillIdx, toolIdx, validatorIdx, category };
+  return {
+    total: totalDots,
+    skillIdx,
+    toolIdx,
+    validatorIdx,
+    category,
+    dotMeta,
+  };
 }

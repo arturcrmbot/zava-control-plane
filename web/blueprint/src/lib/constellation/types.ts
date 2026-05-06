@@ -116,6 +116,16 @@ export interface SubstrateMap {
   validatorIdx: Map<string, number>;
   /** For each dot, its category — used for resting colour tint. */
   category: Uint8Array; // 0 = filler, 1 = skill, 2 = tool, 3 = validator
+  /**
+   * Reverse lookup keyed by dot index → display metadata for the
+   * substrate hover tooltip. `null` for filler dots that don't represent
+   * a real capability. The label is the human-readable name (kebab for
+   * skills, "<mcp>.<op>" for tools, validator name as-is).
+   */
+  dotMeta: Array<
+    | { kind: "skill" | "tool" | "validator"; label: string }
+    | null
+  >;
 }
 
 /**
