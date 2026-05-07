@@ -73,78 +73,125 @@ Let me show you the fleet."
 
 ## Pillar 1 · Control Plane — 6 min
 
-> Surface: `http://localhost:5173/fleet`. Role: Agent Administrator.
+> Surface: `http://localhost:5173/fleet`. Role chip top-right says
+> Agent Administrator.
 
-"This is the Finance Controller's view. They don't log into Workday.
-They don't log into Concur. They govern the fleet that does.
+"OK so this is the Control Plane — the Finance Controller's view.
+The framing here matters: this person, in the target operating
+model, never logs into the EMS. They never open Workday. They never
+open Concur. Their job is to govern the fleet of agents that does.
+That's the whole shift POC1 is making the case for — operators move
+up a layer, from doing the work to overseeing the work.
 
-*(point at the grid)* About *(count)* workflows live right now. Greens
-auto-process — the agent talks to the EMS, validates the receipt,
-applies the policy, posts back. The ones that need a human surface
-here as exceptions. **AC #1 and AC #2 — single view across 30+,
-exception-only.**
+*(point at the grid)* Right now there's something like *(count)*
+workflows in flight. The greens you can see are auto-processing —
+the agent's pulled the claim from the EMS mock, run the receipt
+through Document Intelligence, applied the policy, posted back. No
+human has touched any of those, and most of the time no human ever
+will. The exceptions — the reds — are the ones the agents have
+flagged because they hit something they don't have authority to
+decide on their own. And that's all the controller sees by default.
+You can flip the toggle to see the full fleet, but the default is
+exception-only, because the whole point is that 95% of the volume
+shouldn't need their attention.
 
-### What gets read and written
+The really nice property here, and I think this is genuinely one of
+the more elegant pieces of the design — the controller and the
+agents are looking at the same data. There isn't an 'admin
+dashboard' database that's separate from the workflow database.
+There's one event bus. The agents emit events as they work, the
+controller subscribes to those same events, and when the controller
+makes a decision, that decision goes back onto the same bus as a
+signed event. The audit chain has the agent's actions and the
+human's actions in one stream, in the order they actually happened.
 
-Read: every workflow's state, phase, agent reasoning, cost, audit
-chain — all live off the same event bus. The Control Plane is a
-subscriber, not a poller. There's a single always-on session — we
-call it the Fleet Manager — that owns the cross-fleet view.
+### Drilling into one
 
-Write: human decisions, kill switches, autonomy threshold changes,
-bulk actions. Every write is a signed event into the same chain the
-agents are writing into. There's no separate 'admin database'. The
-operator and the agents share one ledger.
+*(click into a red EXP-NNNN — the STALLED · Exception at Arbitrate
+tile)*
 
-### Drill in
-
-*(click the red EXP-NNNN — STALLED at Arbitrate)*
-
-The agent's already done Intake, Classify, Receipt, Route — all
-green, no human touched any of it. It's parked at Arbitrate because
-the policy said this one needs a human.
+So this one is parked at Arbitrate. Look at the phase ribbon — the
+agent has done Intake, Classify, Receipt, Route, all green, and
+then it stopped. The reason it stopped is the receipt total didn't
+match the claim line — that's the cross-validation step at Receipt,
+where the OCR comes off the receipt PNG and gets reconciled against
+the structured claim from the EMS. Mismatch, so the verdict went
+red, so the workflow's now waiting on a human.
 
 *(point at the reasoning panel)*
 
-It's not asking 'what should we do'. It's drafted a recommendation —
-here's the policy clause, here are two prior arbitrations that look
-similar, here's the way I'd lean. The reviewer's job is concur or
-override. **AC #5 — receipt cross-validation — happened up here at
-Receipt; the OCR total didn't match the claim line, that's why it
-went red.**
+But the agent hasn't just stopped and gone 'over to you'. It's
+drafted a recommendation. Here's the policy clause it would invoke,
+here's two prior arbitrations of similar shape, here's how it would
+lean. The reviewer's job is concur or override — it's not 'decide
+this from cold', it's 'sanity-check the agent's draft'. That's the
+productivity unlock. You're not removing humans, you're moving them
+from data entry to judgement, and the data entry has been done for
+them.
 
-### Decide
+### Taking a decision
 
 *(click Reject)*
 
-Header flips. Phase ribbon paints Arbitrate red. Two new entries in
-the ledger — my decision signed as `finance-controller@wpp`, then
-`workflow.rejected`. Out of the queue. Done.
+Watch what happens. *(wait one beat)* Header tile flips to red.
+Phase ribbon paints Arbitrate red. Two new entries appear in the
+ledger at the bottom — my decision, signed as
+`finance-controller@wpp`, and right after it the workflow-rejected
+event. Go back to the fleet — *(click /fleet)* — and it's gone from
+the exception queue.
+
+Whole round-trip is signed and chained, which I'll come back to
+when we get to governance. The point right now is the operator's
+loop is fast — see, decide, gone — and the audit trail is being
+written underneath without them having to think about it.
 
 ### Bulk
 
 *(open BulkHitlModal — don't fire)*
 
-Same controller will get clustered exceptions — six claims, same
-vendor, same week, same reason. One decision across the cluster, one
-signature, six ledger entries. **AC #3.**
+Real-world this controller doesn't get exceptions one at a time.
+They get clusters. Six claims, same vendor, same week, all flagged
+the same way. This bulk modal lets them take one decision and
+apply it across the cluster — one signature, six ledger entries,
+all linked back to the cluster id. Same governance properties, one
+click.
 
-### Customisation — what you'd actually change
+### What you'd actually customise
 
-This UI is a React app over a documented event bus and REST surface.
-Two ways customers extend it:
+Customer question that always comes up — 'how would my team
+extend this'. The Control Plane is a React app sitting on top of a
+documented event bus and a documented REST surface. There's no
+proprietary low-code studio in the way. Two patterns we've used
+ourselves:
 
-- **New panels** — drop a component, subscribe to the event stream,
-  call the same REST. We did this for the SSC Reviewer queue at
-  `/reviewer-queue` — different role, different sort, same data.
-- **New actions** — register a typed event handler on the FastAPI
-  side and surface it as a button. The audit and signing are
-  inherited.
+If you want a new view — a different operator role with a different
+sort or filter — you drop in a new component, subscribe to the same
+event stream, call the same REST endpoints. The SSC Reviewer queue
+at `/reviewer-queue` is exactly that. Different role, different
+sort, same data underneath. Took an afternoon.
 
-Cost tile here is real `gen_ai.usage` token telemetry × Microsoft's
-published rates. Where the SDK doesn't return token counts we estimate
-from prompt + tool payload, and every span carries a provenance tag —
-`sdk` or `estimated`. Same number Foundry shows. **AC #13.**"
+If you want a new action — a new button that does a new thing — you
+register a typed event handler on the FastAPI side and surface it as
+a button in the UI. The signing, the ledger entry, the OTEL span
+— all of that is inherited from the event handler base class. You
+don't write audit code; the substrate writes audit code for you
+once you declare the action.
+
+### Cost — and the honesty bit
+
+*(point at the cost tile)*
+
+Quick word on this number, because every CFO in the room is going
+to ask. This is real `gen_ai.usage` token telemetry off the agent
+runs, multiplied by Microsoft's published per-million-token rates,
+sourced this week. Not a synthetic constant. The honest caveat —
+the model SDK doesn't always emit token counts on every call. When
+it doesn't, we estimate from prompt length plus tool payload, and
+crucially every span carries a provenance tag — it either says
+`sdk` or `estimated`. So your auditor can always tell which is
+which on a per-call basis. The number on this tile is the same
+number Foundry will show you when you open the same workflow in
+the Foundry tracing tab."
 
 ---
 
