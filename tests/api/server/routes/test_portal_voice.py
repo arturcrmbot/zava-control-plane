@@ -70,8 +70,10 @@ def voice_client(tmp_path, monkeypatch):
     that side-step the full-app wire-up.
     """
     monkeypatch.setenv("PORTAL_DATA_DIR", str(tmp_path / "portal"))
-    monkeypatch.delenv("AZURE_STORAGE_CONNECTION_STRING", raising=False)
-    monkeypatch.delenv("ACS_EMAIL_CONNECTION_STRING", raising=False)
+    # setenv('') not delenv: load_dotenv() at api.server.state import time
+    # would otherwise re-populate these from .env (Azurite, not running).
+    monkeypatch.setenv("AZURE_STORAGE_CONNECTION_STRING", "")
+    monkeypatch.setenv("ACS_EMAIL_CONNECTION_STRING", "")
     monkeypatch.setenv("PORTAL_BASE_URL", "http://localhost:5174")
 
     import sys

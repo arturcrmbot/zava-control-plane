@@ -40,13 +40,26 @@ class BlobStore:
         self._svc = BlobServiceClient.from_connection_string(
             connection_string, api_version=self._API_VERSION
         )
+        # NOTE: create_container() is intentionally lazy — see _ensure_container.
+        # Calling it here meant any module-level `from api.server.state import
+        # app_state` would block on Azurite/Storage being reachable, which is
+        # routinely false in unit tests and in any process that doesn't actually
+        # touch blob storage.
+        self._container_ready = False
+
+    def _ensure_container(self) -> None:
+        """Create the container on first use; idempotent and best-effort."""
+        if self._container_ready:
+            return
         try:
-            self._svc.create_container(container)
+            self._svc.create_container(self.container)
         except Exception:
             # Already exists, or race with another process — fine.
             pass
+        self._container_ready = True
 
     def put(self, name: str, data: bytes, *, content_type: str) -> str:
+        self._ensure_container()
         client = self._svc.get_blob_client(self.container, name)
         client.upload_blob(
             data,

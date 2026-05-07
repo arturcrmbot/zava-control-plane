@@ -14,7 +14,6 @@ import pytest
 from api.server.services import persona_responder
 from api.server.services.event_bus import EventBus
 from api.server.services.triage import Triage
-from api.server.state import app_state
 from api.shared.events import FleetEvent
 
 
@@ -23,6 +22,21 @@ def _reset_personae(monkeypatch):
     # Force reload from disk + ensure vendor_kyc_finance_bp is auto-close.
     monkeypatch.setenv("PERSONA_AUTO_CLOSE", "vendor_kyc_finance_bp")
     persona_responder.PERSONA_DEFINITIONS = persona_responder._load_personae()
+
+
+# Re-resolve `app_state` at call-time. Other test modules (notably
+# tests/api/server/routes/test_portal_voice.py::voice_client) do
+# `sys.modules.pop("api.server.state", ...)` then re-import, which mints a
+# fresh module object with a fresh AppState singleton. A module-level
+# `from api.server.state import app_state` here would freeze a reference
+# to the *old* instance, so when persona_responder does its lazy
+# `from api.server.state import app_state` it would resolve via the NEW
+# sys.modules entry — different object, different bus, captured events
+# never arrive. Going through importlib.import_module each time forces
+# us to read whatever module object is *currently* in sys.modules.
+def _current_app_state():
+    import importlib
+    return importlib.import_module("api.server.state").app_state
 
 
 def test_escalate_does_not_raise_orchestration_event(monkeypatch):
@@ -37,7 +51,7 @@ def test_escalate_does_not_raise_orchestration_event(monkeypatch):
 
     # Use a fresh bus + capture emitted events.
     bus = EventBus()
-    monkeypatch.setattr(app_state, "bus", bus)
+    monkeypatch.setattr(_current_app_state(), "bus", bus)
     captured: list[FleetEvent] = []
     bus.on_any(lambda e: captured.append(e))
 
