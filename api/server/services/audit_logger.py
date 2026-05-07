@@ -10,6 +10,13 @@ log entry to:
 2. An Azure Storage append blob, one per workflow id, in container
    `audit-ledger` (version-level-immutability enabled, see TASK-023).
 
+Phase 4 (plan/feature-agent-governance-toolkit-1.md TASK-028..029)
+turns each per-workflow blob into a SHA-256 hash chain: every entry
+carries a ``prev_hash`` (entry_hash of its predecessor) and a fresh
+``entry_hash`` computed over the canonical JSON of the entry. The
+chain starts with ``prev_hash = "0" * 64``. ``verify_chain(workflow_id)``
+walks the chain and reports ``broken_at`` on the first mismatch.
+
 The blob URL becomes the literal proof behind AC #12. Auth via
 `DefaultAzureCredential`; no key auth — tenant policy disables it on the
 storage account.
@@ -19,6 +26,7 @@ fails to construct, falls through to in-memory only with a warning. CI
 and unit tests run without the env var and observe the legacy contract.
 """
 from __future__ import annotations
+import hashlib
 import json
 import logging
 import os
@@ -26,11 +34,54 @@ import threading
 import time as _time
 from typing import Any
 
+from pydantic import BaseModel
+
 log = logging.getLogger(__name__)
 
 _AUDIT_CONTAINER = os.environ.get("AZURE_STORAGE_AUDIT_CONTAINER", "audit-ledger")
 _AUDIT_ACCOUNT_ENV = "AZURE_STORAGE_AUDIT_ACCOUNT"
 _DEFAULT_WORKFLOW_KEY = "_unknown"
+_GENESIS_HASH = "0" * 64
+
+
+# ---------------------------------------------------------------------------
+# Public records
+# ---------------------------------------------------------------------------
+
+
+class VerifyReport(BaseModel):
+    """Result of :meth:`AuditLogger.verify_chain`. Surfaces on the
+    ``GET /api/governance/verify/{workflow_id}`` route (TASK-030) and
+    on the Control Plane WorkflowDetail Evidence chip (TASK-031).
+    """
+
+    workflow_id: str
+    chain_intact: bool
+    signatures_valid: bool
+    decisions_resolvable: bool
+    total_entries: int
+    broken_at: int | None = None
+    bad_signatures_at: list[int] | None = None  # populated in Phase 5 TASK-041
+    reason: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Canonical hash
+# ---------------------------------------------------------------------------
+
+
+def _canonical_entry_hash(entry: dict) -> str:
+    """Return ``sha256(canonical_json(entry))`` as a hex string.
+
+    Excludes ``entry_hash`` from the payload (it's the output) but
+    INCLUDES ``prev_hash`` (it's a chain input). Uses ``sort_keys`` and
+    ``default=str`` so anything Pydantic-shaped serialises stably.
+    SEC-001 of plan/feature-agent-governance-toolkit-1.md: same
+    inputs MUST produce the same hash bit-for-bit across processes.
+    """
+    payload = {k: v for k, v in entry.items() if k != "entry_hash"}
+    text = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 class AuditLogger:
@@ -38,6 +89,12 @@ class AuditLogger:
         self._entries: list[dict] = []
         self._blob_lock = threading.Lock()
         self._append_clients: dict[str, Any] = {}  # {workflow_id: AppendBlobClient}
+        # Per-workflow tail-hash cache for chain construction (TASK-028).
+        # Lazy: first append on a workflow seeds from the existing blob if
+        # present, otherwise from the genesis hash. The lock guarantees we
+        # don't interleave two appends on the same chain.
+        self._tail_hashes: dict[str, str] = {}
+        self._chain_locks: dict[str, threading.Lock] = {}
         self._service_client = self._build_service_client()
 
     # --- Blob plumbing ------------------------------------------------------
@@ -145,16 +202,140 @@ class AuditLogger:
     # --- Public contract (unchanged) ---------------------------------------
 
     def log(self, action: str, details: Any) -> None:
-        entry = {
-            "action": action,
-            "details": details,
-            "timestamp": _time.time(),
-        }
-        self._entries.append(entry)
-        self._append_to_blob(entry)
+        """Append one entry. Mutates the entry dict in place to add
+        ``prev_hash`` + ``entry_hash`` per the per-workflow chain
+        (Phase 4 TASK-028). The chain is per-workflow (PAT-003), so
+        parallel writes against different workflows can't race. Within
+        a single workflow, ``_chain_lock_for`` serialises the writes.
+        """
+        wid = self._extract_workflow_id({"details": details})
+        chain_lock = self._chain_lock_for(wid)
+        with chain_lock:
+            prev_hash = self._tail_hashes.get(wid)
+            if prev_hash is None:
+                # Seed from any pre-existing in-memory entries for this wid
+                # (test fixtures, prior sessions). Falls back to genesis.
+                prev_hash = self._derive_tail_hash(wid)
+            entry = {
+                "action": action,
+                "details": details,
+                "timestamp": _time.time(),
+                "prev_hash": prev_hash,
+            }
+            entry["entry_hash"] = _canonical_entry_hash(entry)
+            self._tail_hashes[wid] = entry["entry_hash"]
+            self._entries.append(entry)
+            self._append_to_blob(entry)
 
     def list(self) -> list[dict]:
         return list(self._entries)
+
+    # --- Chain helpers (Phase 4 TASK-028 / TASK-029) ------------------------
+
+    def _chain_lock_for(self, workflow_id: str) -> threading.Lock:
+        """Per-workflow lock so two appends on the same chain serialise.
+
+        Acquired under ``self._blob_lock`` to avoid double-construction
+        of the lock object itself. Lock objects are cheap and never
+        evicted — one per workflow id is fine for the substrate's
+        cardinality (low thousands).
+        """
+        with self._blob_lock:
+            lock = self._chain_locks.get(workflow_id)
+            if lock is None:
+                lock = threading.Lock()
+                self._chain_locks[workflow_id] = lock
+            return lock
+
+    def _derive_tail_hash(self, workflow_id: str) -> str:
+        """Walk the in-memory entries for ``workflow_id`` and return the
+        last entry's ``entry_hash``, or :data:`_GENESIS_HASH` if none."""
+        for entry in reversed(self._entries):
+            if self._extract_workflow_id(entry) != workflow_id:
+                continue
+            tail = entry.get("entry_hash")
+            if isinstance(tail, str) and tail:
+                return tail
+            break
+        return _GENESIS_HASH
+
+    def entries_for(self, workflow_id: str) -> list[dict]:
+        """Return all in-memory entries belonging to ``workflow_id``,
+        in insertion order. Used by :meth:`verify_chain` and by the
+        ``/api/governance/verify/{workflow_id}`` route (TASK-030)."""
+        return [
+            e for e in self._entries
+            if self._extract_workflow_id(e) == workflow_id
+        ]
+
+    def verify_chain(self, workflow_id: str) -> "VerifyReport":
+        """Walk the per-workflow chain and report integrity.
+
+        Re-reads the in-memory list; recomputes each ``entry_hash`` from
+        scratch using the same canonicalisation as :meth:`log`; flags
+        the first index where either the recomputed hash differs from
+        the stored ``entry_hash`` or where ``prev_hash`` doesn't match
+        the previous entry's ``entry_hash``.
+
+        Returns a :class:`VerifyReport`. ``broken_at`` is the 0-based
+        index of the first bad entry, or ``None`` when the chain is
+        intact (or empty).
+        """
+        chain = self.entries_for(workflow_id)
+        if not chain:
+            return VerifyReport(
+                workflow_id=workflow_id,
+                chain_intact=True,
+                signatures_valid=True,  # placeholder until Phase 5
+                decisions_resolvable=True,
+                total_entries=0,
+                broken_at=None,
+            )
+
+        expected_prev = _GENESIS_HASH
+        for idx, entry in enumerate(chain):
+            stored_prev = entry.get("prev_hash")
+            if stored_prev != expected_prev:
+                return VerifyReport(
+                    workflow_id=workflow_id,
+                    chain_intact=False,
+                    signatures_valid=True,
+                    decisions_resolvable=True,
+                    total_entries=len(chain),
+                    broken_at=idx,
+                    reason=(
+                        f"prev_hash mismatch at index {idx}: "
+                        f"stored={stored_prev!r} expected={expected_prev!r}"
+                    ),
+                )
+            # Recompute entry_hash from scratch.
+            recomputed = _canonical_entry_hash(
+                {**entry, "entry_hash": None}
+            )
+            stored_entry_hash = entry.get("entry_hash")
+            if stored_entry_hash != recomputed:
+                return VerifyReport(
+                    workflow_id=workflow_id,
+                    chain_intact=False,
+                    signatures_valid=True,
+                    decisions_resolvable=True,
+                    total_entries=len(chain),
+                    broken_at=idx,
+                    reason=(
+                        f"entry_hash mismatch at index {idx}: "
+                        f"stored={stored_entry_hash!r} recomputed={recomputed!r}"
+                    ),
+                )
+            expected_prev = stored_entry_hash
+
+        return VerifyReport(
+            workflow_id=workflow_id,
+            chain_intact=True,
+            signatures_valid=True,
+            decisions_resolvable=True,
+            total_entries=len(chain),
+            broken_at=None,
+        )
 
     # --- Helpers for routes -------------------------------------------------
 

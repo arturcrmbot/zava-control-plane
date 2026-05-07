@@ -109,6 +109,22 @@ class ActionLedgerEntry(BaseModel):
     action: str
     revocable: bool
     details: dict
+    # ----------------------------------------------------------------------
+    # Governance crypto fields (Phase 4 of plan/feature-agent-governance-toolkit-1.md
+    # TASK-026). All optional with default=None so the 17 existing test
+    # sites that construct ActionLedgerEntry directly remain green
+    # (REQ-004 back-compat). Populated by:
+    #   - prev_hash / entry_hash: AuditLogger.log() when chaining (TASK-028)
+    #   - decision_id / policy_version / enforcement_mode: the chokepoints
+    #     (call_mcp + @traced_tool) when a governance decision was made
+    #   - actor_jws: AgentIdentityStore.sign_action() (Phase 5, TASK-039)
+    # ----------------------------------------------------------------------
+    prev_hash: str | None = None
+    entry_hash: str | None = None
+    actor_jws: str | None = None
+    decision_id: str | None = None
+    policy_version: str | None = None
+    enforcement_mode: Literal["log_only", "enforce"] | None = None
 
 
 class Workflow(BaseModel):
