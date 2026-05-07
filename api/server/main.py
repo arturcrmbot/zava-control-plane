@@ -73,15 +73,21 @@ async def lifespan(app: FastAPI):
     # data/synthetic/hiring/reqs.json). Idempotent — safe to re-run.
     # Run as a background task so FastAPI startup is not blocked while
     # seed_demo_reqs waits for the Functions host to bind.
-    from api.server.services.portal_seed import seed_demo_reqs
-    async def _seed_in_background():
-        try:
-            seeded = await seed_demo_reqs(app_state)
-            if seeded:
-                print(f"[server] seeded {len(seeded)} demo hiring reqs: {seeded}")
-        except Exception as ex:
-            print(f"[server] portal demo-req seeding failed: {ex}")
-    seed_task = asyncio.create_task(_seed_in_background())
+    # Gated by PORTAL_SEED_REQS=1; off by default so the POC2 demo can
+    # walk a real apply → triage → screen flow without three pre-existing
+    # HIRE-DEMO-* workflows in the queue.
+    if _os.environ.get("PORTAL_SEED_REQS") == "1":
+        from api.server.services.portal_seed import seed_demo_reqs
+        async def _seed_in_background():
+            try:
+                seeded = await seed_demo_reqs(app_state)
+                if seeded:
+                    print(f"[server] seeded {len(seeded)} demo hiring reqs: {seeded}")
+            except Exception as ex:
+                print(f"[server] portal demo-req seeding failed: {ex}")
+        seed_task = asyncio.create_task(_seed_in_background())
+    else:
+        seed_task = asyncio.create_task(asyncio.sleep(0))
 
     # Wire bus -> hub fan-out inside the lifespan so each app instance owns
     # exactly one subscription. Previously this lived at module import time,

@@ -455,6 +455,44 @@ async def simulate_region_failure(stop_seconds: int = 10) -> dict:
     }
 
 
+async def _wait_for_functions_host(timeout_seconds: float = 120.0) -> bool:
+    """Block until the Azure Functions host on :7071 answers, or the
+    timeout elapses.
+
+    Without this guard the ramp loop fires its first spawn ~immediately
+    after FastAPI starts, while the Functions host is still loading
+    extension bundles. The first spawn then fails with "All connection
+    attempts failed", the workflow is upserted into StateStore but never
+    scheduled on Durable, and the operator sees a workflow stuck at
+    Intake forever.
+
+    Returns True if the host is reachable, False on timeout. The caller
+    starts ramping either way \u2014 a missing Functions host is the
+    operator's call to debug, not a reason to silently wedge the ramp.
+    """
+    import httpx
+    base = os.getenv("FUNCTIONS_HOST", "http://localhost:7071").rstrip("/")
+    deadline = asyncio.get_event_loop().time() + timeout_seconds
+    interval = 1.0
+    print(f"[ramp] waiting for Functions host at {base} ...")
+    async with httpx.AsyncClient(timeout=2.0) as client:
+        while asyncio.get_event_loop().time() < deadline:
+            try:
+                r = await client.get(f"{base}/")
+                if r.status_code < 500:
+                    print(f"[ramp] Functions host ready ({r.status_code})")
+                    return True
+            except Exception:
+                pass
+            await asyncio.sleep(interval)
+            interval = min(interval * 1.5, 5.0)
+    print(
+        f"[ramp] WARNING: Functions host did not bind within {timeout_seconds}s; "
+        "ramping anyway. Early spawns may fail."
+    )
+    return False
+
+
 async def ramp_loop() -> None:
     """Domain-aware steady-state ramp loop.
 
@@ -490,6 +528,13 @@ async def ramp_loop() -> None:
     if not enabled:
         print("[ramp] disabled (SIMULATOR_RAMP_ENABLED=0); use POST /api/simulator/{inject,hire,travel} to fire workflows by hand")
         return
+
+    # Boot-race guard: the FastAPI lifespan kicks the ramp loop a few
+    # seconds before the Functions host finishes binding port 7071. Any
+    # spawn fired in that window fails with "All connection attempts
+    # failed" and leaves an orphan workflow stuck at Intake — confusing
+    # during a demo. Probe the host until it answers or we hit the cap.
+    await _wait_for_functions_host(timeout_seconds=120.0)
 
     # Deprecation warning for any operator still on the old vars.
     deprecated_set = [
