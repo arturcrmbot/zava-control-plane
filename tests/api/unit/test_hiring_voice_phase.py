@@ -47,6 +47,9 @@ class _StubContext:
         offer_decision: dict | None = None,
         voice_event: dict | None = None,
         voice_times_out: bool = False,
+        invite_decision: dict | None = None,
+        booked_decision: dict | None = None,
+        post_decision: dict | None = None,
     ):
         self.instance_id = "instance-hire-1"
         self.current_utc_datetime = datetime(2026, 4, 28, 12, 0, tzinfo=timezone.utc)
@@ -56,6 +59,13 @@ class _StubContext:
         self._offer_decision = offer_decision or {"decision": "approve"}
         self._voice_event = voice_event
         self._voice_times_out = voice_times_out
+        # New Phase-7 HITL events introduced in 1b7c8bc4 ("replace stub
+        # Phase 7 with three-wait HITL sequence"). Default to the green
+        # path so existing voice/legacy tests continue to reach status=
+        # completed without having to spell every gate out.
+        self._invite_decision = invite_decision or {"decision": "invite"}
+        self._booked_decision = booked_decision or {"slot": "2026-05-01T10:00Z"}
+        self._post_decision = post_decision or {"decision": "offer", "level": "L4", "rating": 4}
         self.calls: list[tuple[str, dict]] = []
 
     def get_input(self):
@@ -89,6 +99,12 @@ class _StubContext:
             return _StubExternalEvent(name, self._offer_decision)
         if name == "voice_complete":
             return _StubExternalEvent(name, self._voice_event)
+        if name == "interview_invite":
+            return _StubExternalEvent(name, self._invite_decision)
+        if name == "interview_booked":
+            return _StubExternalEvent(name, self._booked_decision)
+        if name == "offer_decision":
+            return _StubExternalEvent(name, self._post_decision)
         return _StubExternalEvent(name)
 
     def create_timer(self, fire_at):
