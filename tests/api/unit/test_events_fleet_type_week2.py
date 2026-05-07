@@ -11,10 +11,28 @@ from typing import get_args
 
 import pytest
 
-# Side-effect import: wires app_state.bus.on_any → hub.broadcast("fleet", ...)
+# Side-effect import: brings the FastAPI app + routes into scope. Note:
+# bus.on_any -> hub.broadcast wiring used to live at module import time but
+# was hoisted into the FastAPI lifespan so each app instance owns exactly
+# one subscription (see api/server/main.py). The autouse fixture below
+# replays that wiring per test so the broadcast assertions still hold.
 import api.server.main  # noqa: F401
 from api.server.state import app_state
 from api.shared.events import FleetEvent, FleetEventType
+
+
+@pytest.fixture(autouse=True)
+def _wire_bus_to_hub():
+    off = app_state.bus.on_any(
+        lambda e: app_state.hub.broadcast("fleet", e.model_dump())
+    )
+    try:
+        yield
+    finally:
+        try:
+            off()
+        except Exception:
+            pass
 
 
 WEEK2_TYPES = [

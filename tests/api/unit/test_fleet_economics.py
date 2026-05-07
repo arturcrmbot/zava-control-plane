@@ -33,7 +33,17 @@ def test_fleet_economics_endpoint_rolls_up_active_only() -> None:
         app_state.store.append_span(OtelSpan(
             trace_id=wid, span_id="s", name="executor.a",
             start_ms=0, end_ms=1000,
-            attributes={"workflow.id": wid, "executor.type": "agent"},
+            # economics.compute() now derives cost from real OTEL token
+            # telemetry rather than counting calls. Stamp gen_ai.* attrs so
+            # the rollup produces a non-zero cost we can assert against.
+            attributes={
+                "workflow.id": wid,
+                "executor.type": "agent",
+                "gen_ai.system": "github_copilot",
+                "gen_ai.request.model": "gpt-4.1",
+                "gen_ai.usage.input_tokens": 1000,
+                "gen_ai.usage.output_tokens": 500,
+            },
         ))
     r = TestClient(app).get("/api/fleet/economics")
     assert r.status_code == 200
