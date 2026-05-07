@@ -1,15 +1,21 @@
-"""Read-only routes that surface the delegated-authority MCP.
+"""Read-only routes that surface the delegated-authority matrix.
 
 Backs:
-  - GET  /api/authority/health   — proxy the MCP /health
+  - GET  /api/authority/health   — proxy the MCP /health (always HTTP)
   - POST /api/authority/resolve  — body { action, value?, category?, ... }
   - POST /api/authority/check    — body { role, action, value?, category?, ... }
   - GET  /api/authority/matrix   — full ordered ruleset (read-through)
 
-The route does no caching — the MCP itself is a sub-millisecond rule
-walk and `/reload` lets the JSON be edited live during demos. Wraps
-`api.server.mcp_tools.delegated_authority` so the underlying transport
-(httpx) and Pydantic shapes are reused.
+Resolve / check route through the in-process governance kernel by
+default (Phase 3 TASK-022..024 of plan/feature-agent-governance-toolkit-1.md):
+both wrap ``api.server.mcp_tools.delegated_authority.resolve_approver`` /
+``check_authority`` which prefer ``governance.kernel().resolve_approver(...)``
+and only fall back to HTTP when ``AUTHORITY_MCP_URL`` is set in env
+(Foundry-IQ engagement-POC swap-in seam, REQ-002).
+
+The /health endpoint always uses HTTP because it intentionally probes
+liveness of the configured MCP, not the in-process kernel (which is
+trivially healthy whenever this process is running).
 """
 from __future__ import annotations
 

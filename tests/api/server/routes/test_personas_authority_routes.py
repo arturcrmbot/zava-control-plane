@@ -153,3 +153,46 @@ def test_authority_check_route(client, monkeypatch):
     body = r.json()
     assert body["allowed"] is True
     assert body["governing_rule_id"] == "EXP-003"
+
+
+# --------------------------------------------------------------------------
+# Phase 3 TASK-024 — routes use in-process kernel by default (no httpx)
+# --------------------------------------------------------------------------
+
+
+def test_authority_resolve_route_in_process_default(client, monkeypatch):
+    """With AUTHORITY_MCP_URL unset, the route MUST resolve via the
+    in-process kernel; httpx MUST NOT be touched."""
+    monkeypatch.delenv("AUTHORITY_MCP_URL", raising=False)
+    import api.server.mcp_tools.delegated_authority as da
+
+    def _boom(*a, **kw):
+        raise AssertionError("httpx.post called when AUTHORITY_MCP_URL unset")
+    monkeypatch.setattr(da.httpx, "post", _boom)
+
+    r = client.post("/api/authority/resolve", json={
+        "action": "expense_claim_approval", "category": "meals", "value": 1000,
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["matched"] is True
+    assert body["rule_id"] == "EXP-003"
+    assert body["approver_role"] == "ssc_reviewer"
+
+
+def test_authority_check_route_in_process_default(client, monkeypatch):
+    monkeypatch.delenv("AUTHORITY_MCP_URL", raising=False)
+    import api.server.mcp_tools.delegated_authority as da
+
+    def _boom(*a, **kw):
+        raise AssertionError("httpx.post called when AUTHORITY_MCP_URL unset")
+    monkeypatch.setattr(da.httpx, "post", _boom)
+
+    r = client.post("/api/authority/check", json={
+        "role": "ssc_reviewer", "action": "expense_claim_approval",
+        "category": "meals", "value": 1000,
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["allowed"] is True
+    assert body["governing_rule_id"] == "EXP-003"
