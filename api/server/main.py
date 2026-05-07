@@ -84,11 +84,35 @@ async def lifespan(app: FastAPI):
         except Exception as ex:
             print(f"[server] portal demo-req seeding failed: {ex}")
     seed_task = asyncio.create_task(_seed_in_background())
+
+    # Wire bus -> hub fan-out inside the lifespan so each app instance owns
+    # exactly one subscription. Previously this lived at module import time,
+    # which under uvicorn --reload accumulated a fresh subscription per
+    # reload — every event then fanned out N× and old AppState references
+    # leaked. Capturing the unsubscribe and calling it on teardown closes
+    # that loop.
+    _bus_to_hub_off = app_state.bus.on_any(
+        lambda e: app_state.hub.broadcast("fleet", e.model_dump())
+    )
+
     try:
         yield
     finally:
+        try:
+            _bus_to_hub_off()
+        except Exception:
+            pass
         ramp_task.cancel()
         seed_task.cancel()
+        # Await the cancelled tasks so their teardown actually completes
+        # before the lifespan returns. Without this, a partially-running
+        # seed (which calls into the Functions host over HTTP) can leave
+        # an open httpx connection or a half-scheduled orchestration.
+        for t in (ramp_task, seed_task):
+            try:
+                await t
+            except (asyncio.CancelledError, Exception):
+                pass
         try:
             _portal_orch_off()
         except Exception:
@@ -99,6 +123,10 @@ async def lifespan(app: FastAPI):
             pass
         try:
             await app_state.fm.stop()
+        except Exception:
+            pass
+        try:
+            await app_state.aclose()
         except Exception:
             pass
         await lifespan_shutdown(app)
@@ -117,8 +145,9 @@ async def health():
     return {"ok": True}
 
 
-# Wire bus -> hub fan-out: every bus event broadcast on "fleet" topic
-app_state.bus.on_any(lambda e: app_state.hub.broadcast("fleet", e.model_dump()))
+# Bus -> hub fan-out is wired inside the lifespan (see above) so each app
+# instance owns exactly one subscription. Do not subscribe at import time;
+# under uvicorn --reload that accumulates one extra listener per reload.
 
 
 from api.server.routes.stream import router as stream_router

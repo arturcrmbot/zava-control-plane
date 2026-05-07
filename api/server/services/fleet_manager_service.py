@@ -90,34 +90,82 @@ class FleetManagerService:
             print(f"[fleet-manager] gh auth token failed: {ex}; not starting")
             return
 
+        # The CopilotClient owns a node subprocess. If anything between
+        # `client.start()` and `_started = True` raises, we must tear that
+        # subprocess down here \u2014 otherwise the lifespan's `try: stop() except`
+        # finds nothing to stop and the orphan keeps running across reloads.
         config = SubprocessConfig(github_token=token, log_level="warning")
         self._client = CopilotClient(config)
-        await self._client.start()  # explicit start (alternative to async-with for long-lived)
+        try:
+            await self._client.start()  # explicit start (alternative to async-with for long-lived)
 
-        skill_path = Path(__file__).resolve().parents[1] / "skills" / "fleet-manager" / "SKILL.md"
-        skill_text = skill_path.read_text(encoding="utf-8")
-        skill_text += "\n\n" + _domain_catalogue_section()
-        tools = build_fleet_manager_tools(self._store, self._audit)
+            skill_path = Path(__file__).resolve().parents[1] / "skills" / "fleet-manager" / "SKILL.md"
+            skill_text = skill_path.read_text(encoding="utf-8")
+            skill_text += "\n\n" + _domain_catalogue_section()
+            tools = build_fleet_manager_tools(self._store, self._audit)
 
-        self._session = await self._client.create_session(
-            on_permission_request=PermissionHandler.approve_all,
-            model=self._model,
-            tools=tools,
-            system_message={"mode": "append", "content": skill_text},
-        )
+            self._session = await self._client.create_session(
+                on_permission_request=PermissionHandler.approve_all,
+                model=self._model,
+                tools=tools,
+                system_message={"mode": "append", "content": skill_text},
+            )
 
-        # Subscribe to session events (single catch-all; filter inside)
-        self._unsub_session_events = self._session.on(self._on_session_event)
+            # Subscribe to session events (single catch-all; filter inside)
+            self._unsub_session_events = self._session.on(self._on_session_event)
 
-        # Subscribe to the bus — every event flows through triage
-        self._unsub_bus = self._bus.on_any(self._observe)
+            # Subscribe to the bus \u2014 every event flows through triage
+            self._unsub_bus = self._bus.on_any(self._observe)
 
-        # Periodic 30s tick
-        self._tick_task = asyncio.create_task(self._tick_loop())
+            # Periodic 30s tick
+            self._tick_task = asyncio.create_task(self._tick_loop())
+        except Exception as ex:
+            print(f"[fleet-manager] start failed mid-init: {ex}; cleaning up")
+            await self._safe_partial_teardown()
+            raise
 
         self._started = True
         print("[fleet-manager] started")
         self._on_live({"kind": "idle", "timestamp": time.time()})
+
+    async def _safe_partial_teardown(self) -> None:
+        """Tear down whatever was constructed before start() raised.
+
+        Mirrors stop() but every step is best-effort and the order matches
+        construction-reverse: tick task, bus sub, session sub, session,
+        client. Leaves attributes nulled so a retried start() begins fresh.
+        """
+        if self._tick_task is not None:
+            self._tick_task.cancel()
+            try:
+                await self._tick_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._tick_task = None
+        if self._unsub_bus is not None:
+            try:
+                self._unsub_bus()
+            except Exception:
+                pass
+            self._unsub_bus = None
+        if self._unsub_session_events is not None:
+            try:
+                self._unsub_session_events()
+            except Exception:
+                pass
+            self._unsub_session_events = None
+        if self._session is not None:
+            try:
+                await self._session.disconnect()
+            except Exception:
+                pass
+            self._session = None
+        if self._client is not None:
+            try:
+                await self._client.stop()
+            except Exception:
+                pass
+            self._client = None
 
     def _on_session_event(self, event) -> None:
         if event.type == SessionEventType.TOOL_EXECUTION_START:

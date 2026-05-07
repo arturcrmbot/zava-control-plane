@@ -74,5 +74,22 @@ class AppState:
         # is set (Azurite locally, real Storage in cloud).
         self.blob_store = _build_blob_store()
 
+    async def aclose(self) -> None:
+        """Release pooled / long-lived resources owned by this AppState.
+
+        Called from the FastAPI lifespan teardown so that under
+        uvicorn --reload (or any teardown / re-construct cycle) we don't
+        leak the BlobServiceClient's underlying httpx pool. MagicLinkStore
+        and EmailSender open connections per-call and need no close.
+        """
+        if self.blob_store is not None:
+            svc = getattr(self.blob_store, "_svc", None)
+            if svc is not None:
+                try:
+                    # BlobServiceClient is sync; close() releases the pool.
+                    svc.close()
+                except Exception:
+                    pass
+
 
 app_state = AppState()

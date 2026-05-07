@@ -14,15 +14,33 @@ from api.shared.types import Phase, OtelSpan, ActionLedgerEntry, McpCall
 router = APIRouter(prefix="/internal")
 
 # Executor span start times, keyed by (workflow_id, executor_name) so we can
-# compute end_ms when stage=complete/error arrives.
+# compute end_ms when stage=complete/error arrives. Bounded with FIFO
+# eviction so a workflow that misses its `complete` / `error` stage event
+# (process crash, redelivery, etc.) cannot leak entries forever.
+_SPAN_STARTS_MAX = 10_000
 _span_starts: dict[tuple[str, str], float] = {}
 
 # Per-workflow workflow_type cache. Populated on first checkpoint event that
 # carries `workflow_type` in its payload (orchestrators stamp it onto every
 # emit). Used to enrich every FleetEvent emitted on this workflow's behalf so
 # /api/blueprint/stream consumers can resolve `domain` consistently — not
-# just on the trickle templates.
+# just on the trickle templates. Cleared on workflow.completed /
+# workflow.rejected; bounded as a backstop in case a workflow never reaches
+# a terminal event.
+_WORKFLOW_TYPES_MAX = 10_000
 _workflow_types: dict[str, str] = {}
+
+
+def _bounded_set(d: dict, key, value, max_size: int) -> None:
+    """Insertion-order FIFO eviction. dict in CPython 3.7+ preserves
+    insertion order; popping the first key gives oldest-first eviction.
+    Cheap and good enough for these caches."""
+    if key not in d and len(d) >= max_size:
+        try:
+            d.pop(next(iter(d)))
+        except StopIteration:
+            pass
+    d[key] = value
 
 
 def _emit(event_type, workflow_id: str, **fields) -> None:
@@ -77,7 +95,7 @@ async def receive_durable_event(body: DurableEventBody):
     # once.
     wt_in = body.payload.get("workflow_type")
     if wt_in and wid not in _workflow_types:
-        _workflow_types[wid] = wt_in
+        _bounded_set(_workflow_types, wid, wt_in, _WORKFLOW_TYPES_MAX)
 
     app_state.orchestration_history.setdefault(wid, []).append({
         "kind": body.kind, "payload": body.payload, "at": now
@@ -159,7 +177,7 @@ async def receive_durable_event(body: DurableEventBody):
             duration_ms=int(body.payload.get("duration_ms", 0)),
         )
         if stage == "start":
-            _span_starts[(wid, name)] = now
+            _bounded_set(_span_starts, (wid, name), now, _SPAN_STARTS_MAX)
         elif stage in ("complete", "error"):
             dur_ms = int(body.payload.get("duration_ms", 0))
             dur_s = dur_ms / 1000.0
@@ -498,6 +516,8 @@ async def receive_durable_event(body: DurableEventBody):
         _emit("workflow.resolved", wid, resolution="completed")
         # Drop the workflow_type cache entry; the workflow is done.
         _workflow_types.pop(wid, None)
+        for k in [k for k in _span_starts if k[0] == wid]:
+            _span_starts.pop(k, None)
         pending_gates.clear(wid)
 
     elif body.kind == "log.action":
@@ -526,5 +546,12 @@ async def receive_durable_event(body: DurableEventBody):
             # current_phase as whatever it was when the rejection landed.
         _auto_resolve_open(wid, "auto-resolved:rejected")
         pending_gates.clear(wid)
+        # Drop the workflow_type cache entry + any leftover span starts
+        # for this workflow; it has reached a terminal state. Mirrors the
+        # cleanup on workflow.completed above. Without this, rejected
+        # workflows accumulate forever in the per-process caches.
+        _workflow_types.pop(wid, None)
+        for k in [k for k in _span_starts if k[0] == wid]:
+            _span_starts.pop(k, None)
 
     return {"received": True}

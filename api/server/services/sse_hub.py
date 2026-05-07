@@ -28,11 +28,31 @@ class SSEHub:
             except asyncio.QueueFull:
                 pass
 
-    async def stream(self, topic: Topic) -> AsyncIterator[str]:
+    async def stream(self, topic: Topic, request: Any | None = None) -> AsyncIterator[str]:
+        """Yield queued messages for `topic` until the client disconnects.
+
+        When `request` is supplied (a Starlette/FastAPI Request), the loop
+        wakes every 15s to check `request.is_disconnected()` and yields a
+        heartbeat ":\\n\\n" comment so intermediaries (proxies, load
+        balancers) don't reap the idle connection. Without this poll, a
+        suspended `await q.get()` keeps the subscriber alive across client
+        teardowns, which over an open/close cycle leaks queues + listeners.
+        """
         q = self.subscribe(topic)
         try:
             while True:
-                msg = await q.get()
-                yield msg
+                if request is None:
+                    msg = await q.get()
+                    yield msg
+                    continue
+                try:
+                    msg = await asyncio.wait_for(q.get(), timeout=15.0)
+                    yield msg
+                except asyncio.TimeoutError:
+                    if await request.is_disconnected():
+                        break
+                    # SSE comment line keeps the connection alive without
+                    # triggering an event handler client-side.
+                    yield ":\n\n"
         finally:
             self.unsubscribe(topic, q)
