@@ -13,6 +13,9 @@
     "AZURE_STORAGE_CONNECTION_STRING": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;",
     "AVATAR_TRANSPORT": "real",
     "FLEET_MANAGER_MODEL": "gpt-4.1",
-    "AUTHORITY_MCP_URL": "http://localhost:4108"
+    "AUTHORITY_MCP_URL": "http://localhost:4108",
+    "_governance_comment": "Phase 6 of plan/feature-agent-governance-toolkit-1.md. AGT_ENFORCE='1' makes the kernel raise GovernanceDenied on a deny; '0' (default) records but doesn't raise. Iterate registries to convergence before flipping to enforce. AGT_DEFAULT_ACTOR labels un-attributed call_mcp() invocations; the gate skips that literal so legacy paths don't auto-deny.",
+    "AGT_ENFORCE": "0",
+    "AGT_DEFAULT_ACTOR": "unknown-agent"
   }
 }

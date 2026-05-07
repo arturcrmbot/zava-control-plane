@@ -9,6 +9,9 @@
     "FASTAPI_WEBHOOK_URL": "http://localhost:3001/internal/durable-event",
     "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT": "",
     "languageWorkers__python__defaultExecutablePath": "c:/dev/ghcp sdk stuff/.funcvenv/Scripts/python.exe",
-    "LANGUAGE_WORKERS__PYTHON__DEFAULTEXECUTABLEPATH": "c:/dev/ghcp sdk stuff/.funcvenv/Scripts/python.exe"
+    "LANGUAGE_WORKERS__PYTHON__DEFAULTEXECUTABLEPATH": "c:/dev/ghcp sdk stuff/.funcvenv/Scripts/python.exe",
+    "_governance_comment": "Phase 6 of plan/feature-agent-governance-toolkit-1.md. AGT_ENFORCE flips the kernel from log-only (records every deny but never raises) to enforce (raises GovernanceDenied on a deny, which renders as a workflow exception). Default: '0' (log-only) so existing tests + the autonomous loop keep passing while the registry settles. Flip to '1' once you've iterated registries to convergence. AGT_DEFAULT_ACTOR labels un-attributed call_mcp() invocations; the gate skips that literal so legacy paths don't auto-deny under enforce.",
+    "AGT_ENFORCE": "0",
+    "AGT_DEFAULT_ACTOR": "unknown-agent"
   }
 }

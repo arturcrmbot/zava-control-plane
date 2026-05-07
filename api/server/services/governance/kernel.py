@@ -313,16 +313,133 @@ class GovernanceKernel:
 
         latency_us = max(1, (time.perf_counter_ns() - t0) // 1000)
         action_str = getattr(result.action, "value", str(result.action))
+        mode = self.enforcement_mode
 
-        return Decision(
+        # Phase 6 TASK-047: capability + reversibility + value gates.
+        # The AGT bundle handles tool registration + matrix audits; the
+        # registry-driven gates live in Python because PolicyCondition is
+        # single-field-only (no AND), and the registry is the source of
+        # truth for per-agent allowlists / value ceilings anyway.
+        gate = self._registry_gate(
+            actor=actor,
+            tool=tool,
+            value=context.get("value"),
+            tool_entry=manifest_entry,
+        )
+        if gate is not None:
+            decision = Decision(
+                allowed=False,
+                policy_version=self.policy_version,
+                rule_id=gate[0],
+                action="deny",
+                reason=gate[1],
+                enforcement_mode=mode,
+                latency_us=int(latency_us),
+            )
+            if mode == "enforce":
+                raise GovernanceDenied(decision)
+            return decision
+
+        decision = Decision(
             allowed=bool(result.allowed),
             policy_version=self.policy_version,
             rule_id=result.matched_rule,
             action=action_str,
             reason=result.reason or "",
-            enforcement_mode=self.enforcement_mode,
+            enforcement_mode=mode,
             latency_us=int(latency_us),
         )
+        if mode == "enforce" and not decision.allowed:
+            raise GovernanceDenied(decision)
+        return decision
+
+    def _registry_gate(
+        self,
+        *,
+        actor: str,
+        tool: str,
+        value: Any,
+        tool_entry: ToolManifestEntry | None,
+    ) -> tuple[str, str] | None:
+        """Phase 6 TASK-047 — registry-driven enforcement gates.
+
+        Returns ``(rule_id, reason)`` to deny, or ``None`` to fall
+        through to the AGT bundle. Gates checked in order:
+
+          1. Unknown actor (not in :data:`AGENTS`).
+          2. Tool not in actor's ``allowed_tools``.
+          3. Actor is ``reversible_only=True`` and the tool's manifest
+             entry says ``reversible=false``.
+          4. Tool carries a numeric value, the actor has a non-None
+             ``max_value_gbp``, and value > that ceiling.
+          5. Unknown tool — only enforced when the actor IS registered
+             (an unknown tool from an unknown actor falls through; the
+             "unknown actor" message is more useful).
+
+        ``unknown-agent`` (the default fallback in call_mcp) is treated
+        as a special "log-only" actor — the gate skips for it so
+        un-attributed calls don't break under enforce mode (they still
+        get audited via the AGT bundle's tool rule). Phase 7 may
+        tighten this further.
+        """
+        # Soft escape hatch: the un-attributed default actor is allowed
+        # through so legacy code paths that haven't been registry-mapped
+        # don't auto-deny under enforce. Real agents (everything in
+        # AGENTS) get the full gate treatment.
+        if actor in (None, "", "unknown", "unknown-agent"):
+            return None
+
+        from api.shared.agents import get as _get_agent  # local: avoids cycles
+
+        agent_entry = _get_agent(actor)
+        if agent_entry is None:
+            return (
+                f"deny:unknown_agent:{actor}",
+                f"actor {actor!r} not in api.shared.agents.AGENTS registry",
+            )
+
+        if tool_entry is None:
+            # Tool isn't in the manifest. Don't auto-deny on this path —
+            # SEC-004's CI catches missing manifest entries; runtime
+            # treats it as "we don't know enough to gate".
+            return None
+
+        if tool not in agent_entry.allowed_tools:
+            return (
+                f"deny:capability:{actor}:{tool}",
+                (
+                    f"actor {actor!r} not authorised for tool {tool!r} "
+                    f"(allowed_tools: {list(agent_entry.allowed_tools)!r})"
+                ),
+            )
+
+        if agent_entry.reversible_only and not tool_entry.reversible:
+            return (
+                f"deny:reversibility:{actor}:{tool}",
+                (
+                    f"actor {actor!r} is reversible_only=True but tool "
+                    f"{tool!r} is non-reversible per data/policies/tools.yaml"
+                ),
+            )
+
+        if (
+            agent_entry.max_value_gbp is not None
+            and value is not None
+        ):
+            try:
+                v = float(value)
+            except (TypeError, ValueError):
+                v = None
+            if v is not None and v > agent_entry.max_value_gbp:
+                return (
+                    f"deny:value_ceiling:{actor}:{tool}",
+                    (
+                        f"value GBP {v} exceeds {actor!r}'s max_value_gbp "
+                        f"of {agent_entry.max_value_gbp}"
+                    ),
+                )
+
+        return None
 
     # --- Authority resolution (Phase 3 — TASK-020) ---------------------------
 

@@ -16,6 +16,16 @@ domains, see [plan/feature-fleet-domain-substrate-1.md](../plan/feature-fleet-do
 
 ## Three tiers
 
+> **Phase 6 of [feature-agent-governance-toolkit-1](../plan/feature-agent-governance-toolkit-1.md)
+> adds a fourth tier — the in-process governance kernel
+> ([api/server/services/governance/](../api/server/services/governance/)).
+> Every MCP tool call routes through `kernel.evaluate_tool_call()`
+> before the network hop; every audit ledger entry carries a SHA-256
+> hash chain plus an Ed25519 JWS receipt for entries written by
+> registered agents; `agt verify` validates the chain end-to-end.
+> The kernel is reentrant, in-process, and has no separate runtime —
+> it lives inside both the FastAPI process and the Functions worker.**
+
 ```
 ┌───────────────────────────────────────────────────────────────────┐
 │                    Fleet Manager (FastAPI)                        │
@@ -35,6 +45,16 @@ domains, see [plan/feature-fleet-domain-substrate-1.md](../plan/feature-fleet-do
            ▼
 ┌───────────────────────────────────────────────────────────────────┐
 │   Mock MCP servers — finance (4101-4103) + HR/comms (4201-4207)   │
+└───────────────────────────────────────────────────────────────────┘
+            ▲                          ▲
+            │ every call evaluated     │
+            ▼                          ▼
+┌───────────────────────────────────────────────────────────────────┐
+│   Governance kernel (in-process)                                  │
+│   ◦ AGT policy bundle compiled from matrix.json + tools.yaml      │
+│   ◦ Per-agent capability + reversibility + value-ceiling gates    │
+│   ◦ SHA-256 hash-chained audit ledger + Ed25519 JWS receipts      │
+│   ◦ GET /api/governance/verify/{wf}  →  VerifyReport              │
 └───────────────────────────────────────────────────────────────────┘
 
 * Blueprint also ships as a single container to Azure Container Apps;

@@ -55,9 +55,15 @@ def test_evaluate_tool_call_returns_allow_in_phase_2() -> None:
     """Phase 2 default is still allow-everything (log_only), but the
     policy_version is now the real compiled-bundle short hash, not the
     phase-1 sentinel. Decisions for known tools carry the matched
-    ``tool:<id>`` rule_id; unknown tools fall through to the default."""
+    ``tool:<id>`` rule_id; unknown tools fall through to the default.
+
+    Phase 6 added registry gates: the actor must be in api.shared.agents.AGENTS
+    AND the tool must be in actor.allowed_tools. We use ``rag-classifier``
+    (registered) + ``claim.lookup`` (in its allowed_tools) so the gate
+    passes and we observe the underlying AGT bundle's tool rule.
+    """
     decision = kernel().evaluate_tool_call(
-        actor="finance-agent",
+        actor="rag-classifier",
         tool="claim.lookup",
         args={"limit": 5},
         workflow_id="EXP-DEMO-01",
@@ -77,10 +83,13 @@ def test_evaluate_tool_call_returns_allow_in_phase_2() -> None:
 
 
 def test_evaluate_tool_call_unknown_tool_falls_through_to_default() -> None:
-    """Tools absent from ``tools.yaml`` get the default ALLOW (log_only).
-    Phase 6 will tighten this to deny via the manifest gate."""
+    """Tools absent from ``tools.yaml`` get the default ALLOW (log_only)
+    when called via the soft 'unknown-agent' actor (Phase 6's soft
+    escape hatch for un-attributed legacy paths). A registered actor
+    calling an unknown tool falls through too — the registry gate only
+    denies known-bad tool calls."""
     decision = kernel().evaluate_tool_call(
-        actor="finance-agent",
+        actor="unknown-agent",
         tool="never.heard.of.this.tool",
         args={},
     )
