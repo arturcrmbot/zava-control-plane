@@ -43,8 +43,11 @@ from .kernel import (
     kernel,
 )
 from .boot import init_governance
+from .authority import ApproverResolution, AuthorityCheck
 
 __all__ = [
+    "ApproverResolution",
+    "AuthorityCheck",
     "Decision",
     "GovernanceDenied",
     "GovernanceKernel",

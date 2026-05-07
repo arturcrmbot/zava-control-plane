@@ -35,9 +35,11 @@ def init_governance() -> GovernanceKernel:
     """
     k = kernel()
     log.info(
-        "governance: kernel ready, agt_version=%s, policy_version=%s, enforcement=%s",
+        "governance: kernel ready, agt_version=%s, policy_version=%s, "
+        "rules=%d, enforcement=%s",
         _agt_version(),
         k.policy_version,
+        k.rule_count,
         k.enforcement_mode,
     )
     return k

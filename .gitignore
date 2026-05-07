@@ -101,3 +101,4 @@ data/synthetic/hiring/cv-pdfs/C-[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]
 # Migration bundle artefacts — personal runbook + deck source
 instruction.md
 AI-Transformation-in-Days.pptx
+.github/*

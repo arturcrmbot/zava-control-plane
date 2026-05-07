@@ -1,0 +1,534 @@
+# MCP Tool Manifest (AGT)
+# ===========================================================================
+# Per plan/feature-agent-governance-toolkit-1.md TASK-009. This file is the
+# CANONICAL declaration of every MCP tool the substrate calls. The kernel
+# (api/server/services/governance/kernel.py) reads this manifest at boot via
+# api/server/services/governance/manifest.py to (a) enumerate the tools the
+# policy bundle covers and (b) extract per-call value/reversibility metadata
+# for the policy decision context.
+#
+# Schema (validated by Pydantic in manifest.py):
+#   id:                    canonical tool name (string, unique)
+#   reversible:            true  if the call has no externally visible side
+#                          effect (read-only / search / list / lookup / get).
+#                          false if the call mutates external state.
+#   requires_capability:   str | null — optional capability name that the
+#                          calling agent must declare in its registry entry
+#                          (Phase 5+).  null means no capability gate.
+#   requires_authority:    true if the call needs an authority resolution
+#                          (matrix.json) before execution. Phase 3 wires the
+#                          kernel into the authority MCP fold-in.
+#   value_field:           str | null — JSON-path inside ``args`` (dotted) at
+#                          which the GBP value sits, e.g. ``claim.amount_gbp``.
+#                          null if the call carries no monetary value.
+#   scope_function:        the operating function ("finance" / "hiring" /
+#                          "creative" / "shared") this tool belongs to.
+#   description:           one-line human-facing description; surfaces in the
+#                          policy bundle YAML and in the Control Plane chips.
+#
+# Reversibility convention (SEC-004):
+#   *.write_*, *.submit_*, *.send_*, *.cancel_*, *.delete_*, *.create_*,
+#   *.post*, *.book_*  ->  reversible: false
+#   *.list_*, *.get_*, *.search_*, *.lookup_*, *.query_*, *.find_*,
+#   *.check_*, *.resolve_*  ->  reversible: true
+#
+# AUDIT NOTE — provenance of this list (TASK-008):
+#   - 47 server-side @traced_tool entries grepped from
+#     api/server/mcp_tools/*.py via:
+#       grep -rE '@traced_tool\(' api/server/mcp_tools/ --include='*.py'
+#     last refresh: see this file's git log.
+#   - Functions-side call_mcp call sites found in
+#     api/functions/graphs/executors/deterministic/record_decision.py
+#     (D365.postGLEntry).  Other Functions-side tools surface via the
+#     Workday/Concur claim-management endpoints exercised in
+#     tests/api/unit/test_workday_claim_endpoints.py and
+#     tests/api/unit/test_concur_claim_endpoints.py — listed under the
+#     "Functions-side / claim management" section below.
+#
+# DRY rule: the reversibility flag lives HERE and only here. Persona
+# SKILL.md / agent SKILL.md may reference it (`see tools.yaml#X`) but
+# may NOT carry a duplicate flag.
+# ===========================================================================
+
+tools:
+
+  # -------------------------------------------------------------------------
+  # Authority / governance plane (delegated_authority.py)
+  # -------------------------------------------------------------------------
+  - id: authority.resolve_approver
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: >-
+      Resolve the approver chain for a (action, value, business_unit,
+      geography, requester_role) tuple against the matrix. Pure read.
+
+  - id: authority.check_authority
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: >-
+      Check whether a specific approver role is authorised for a given
+      (action, value, ...) tuple. Pure read.
+
+  # -------------------------------------------------------------------------
+  # Finance — claim lookup / structured / receipt / summary
+  # -------------------------------------------------------------------------
+  - id: claim.lookup
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Look up an expense claim by id (Workday or Concur backend).
+
+  - id: claim.getStructured
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Fetch the structured claim payload (line items + categories).
+
+  - id: claim.getReceipt
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Fetch the OCR'd receipt blob for a claim line.
+
+  - id: claim.summary
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Generate a one-line LLM summary of a claim for HITL display.
+
+  - id: ocr.extract
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Run Document Intelligence OCR on a receipt blob.
+
+  # -------------------------------------------------------------------------
+  # Finance — Concur travel
+  # -------------------------------------------------------------------------
+  - id: concur_travel.search.search_options
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Search Concur Travel for matching itinerary options.
+
+  - id: concur_travel.policy.get_policy
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Fetch the Concur Travel policy for a given trip context.
+
+  # -------------------------------------------------------------------------
+  # Finance — invoice + vendor + market pricing
+  # -------------------------------------------------------------------------
+  - id: invoice_repository.get_invoice
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Fetch a single invoice record by id from the AP repository.
+
+  - id: invoice_repository.find_three_way_match
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Three-way-match (invoice / PO / GR) lookup for an invoice.
+
+  - id: vendor_registry.lookup_vendor
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Look up a vendor by id or name in the vendor master.
+
+  - id: vendor_registry.list_filings
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: List a vendor's regulatory filings.
+
+  - id: vendor_registry.list_ubos
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: List a vendor's ultimate beneficial owners (UBOs).
+
+  - id: market_pricing.get_quotes
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Fetch comparable market price quotes for a SKU / service.
+
+  - id: sanctions_api.screen_entity
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Screen a vendor / counterparty against sanctions watchlists.
+
+  - id: adverse_media.search
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Adverse-media search against a vendor / counterparty.
+
+  # -------------------------------------------------------------------------
+  # Finance — contract repository
+  # -------------------------------------------------------------------------
+  - id: contract_repository.get_contract
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Fetch a contract record (terms, parties, value).
+
+  - id: contract_repository.list_amendments
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: List amendments attached to a contract.
+
+  - id: contract_repository.find_similar
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Find contracts similar to a given exemplar (precedent search).
+
+  # -------------------------------------------------------------------------
+  # Hiring / HR — Workday HR + employee history + perf norms + feedback
+  # -------------------------------------------------------------------------
+  - id: workday_hr.employee.get_employee
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: hiring
+    description: Fetch an employee record from Workday HR.
+
+  - id: employee.history
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: hiring
+    description: Employee history (claims, perf, mobility) over a window.
+
+  - id: performance_norms.get_grade_distribution
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: hiring
+    description: Fetch the grade-distribution norm for a band / function.
+
+  - id: performance_norms.get_calibration_history
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: hiring
+    description: Fetch prior calibration outcomes for a population.
+
+  - id: feedback_collector.list_360
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: hiring
+    description: List the 360 feedback responses gathered for a reviewee.
+
+  - id: feedback_collector.get_okr_results
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: hiring
+    description: Fetch OKR results for a reviewee in a cycle.
+
+  - id: recall.similar_hires
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: hiring
+    description: Recall hires similar to a candidate (skills + level + market).
+
+  - id: propose_skill_amplification
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: hiring
+    description: Propose role-skill amplification for a candidate / hire.
+
+  # -------------------------------------------------------------------------
+  # Identity / IAM — separation of duties + role templates
+  # -------------------------------------------------------------------------
+  - id: identity_provider.check_separation_of_duties
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: Check SoD conflicts for a proposed role assignment.
+
+  - id: identity_provider.get_role_template
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: Fetch the canonical role template (entitlements + scopes).
+
+  - id: identity_provider.list_role_templates
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: List all role templates available for a function.
+
+  # -------------------------------------------------------------------------
+  # Calendar — finds + bookings (book_event is non-reversible)
+  # -------------------------------------------------------------------------
+  - id: calendar_service.find_availability
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: Find shared availability across attendees.
+
+  - id: calendar_service.get_room_options
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: Get bookable room options for a meeting.
+
+  - id: calendar_service.book_event
+    reversible: false
+    requires_capability: calendar_write
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: Book a calendar event. Visible side-effect; non-reversible.
+
+  # -------------------------------------------------------------------------
+  # Policy / precedent / fleet / audit / traces — read-only knowledge plane
+  # -------------------------------------------------------------------------
+  - id: policy.search
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: Search the policy corpus (RAG over policy.md).
+
+  - id: policy.cite
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: Cite the matching policy clause for a given context.
+
+  - id: precedents.search
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: Search the precedents corpus for prior decisions.
+
+  - id: query_fleet
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: Query the fleet topology (workflows, statuses, owners).
+
+  - id: query_traces
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: Query OTel traces by attribute predicates.
+
+  - id: query.economics
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: Query workflow economics (cost / latency / token spend).
+
+  - id: query.reviewer_decisions
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: Query historical reviewer decisions for a workflow class.
+
+  - id: audit.query
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: Query the audit ledger for entries matching a predicate.
+
+  # -------------------------------------------------------------------------
+  # Brand / creative (POC2-adjacent; kept for forward parity)
+  # -------------------------------------------------------------------------
+  - id: brand_rag
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: creative
+    description: RAG over the brand corpus.
+
+  - id: image_gen
+    reversible: false
+    requires_capability: image_generation
+    requires_authority: false
+    value_field: null
+    scope_function: creative
+    description: Generate a brand image. Stores the artefact; non-reversible.
+
+  - id: avatar.render
+    reversible: false
+    requires_capability: avatar_render
+    requires_authority: false
+    value_field: null
+    scope_function: creative
+    description: Render an avatar video via HeyGen. Stores artefact; non-reversible.
+
+  # -------------------------------------------------------------------------
+  # Workflow exception composer + dry-run policy + skill amp
+  # -------------------------------------------------------------------------
+  - id: compose_exception
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: Compose a workflow-exception narrative for HITL display.
+
+  - id: dry_run_policy
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: Dry-run a policy evaluation against a sample context.
+
+  # -------------------------------------------------------------------------
+  # Functions-side / claim management (call_mcp via record_decision +
+  # Workday/Concur graphs exercised by the autonomous loop)
+  # -------------------------------------------------------------------------
+  - id: postGLEntry
+    reversible: false
+    requires_capability: gl_post
+    requires_authority: true
+    value_field: amount
+    scope_function: finance
+    description: Post a GL entry into D365. Non-reversible; authority-gated.
+
+  - id: getVendor
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Fetch a vendor record from D365.
+
+  - id: listExpenseReports
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: List Concur expense reports matching a query.
+
+  - id: getExpenseLine
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Fetch a single expense line item from Concur.
+
+  - id: getExpenseClaim
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: Fetch a Workday expense claim.
+
+  - id: listClaimsForApproval
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: List Workday expense claims awaiting approval.
+
+  - id: listEmployeeClaimHistory
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: finance
+    description: List an employee's prior expense claims.
+
+  - id: submitJustification
+    reversible: false
+    requires_capability: claim_justify
+    requires_authority: true
+    value_field: amount_gbp
+    scope_function: finance
+    description: Submit a justification on a held claim. Non-reversible.

@@ -51,22 +51,42 @@ def test_init_governance_is_idempotent() -> None:
     assert a is kernel()
 
 
-def test_evaluate_tool_call_returns_allow_in_phase_1() -> None:
-    """Phase 1 default is allow-everything; this is intentional and load-bearing
-    for the Phase-2 wiring step that introduces no behavioural change."""
+def test_evaluate_tool_call_returns_allow_in_phase_2() -> None:
+    """Phase 2 default is still allow-everything (log_only), but the
+    policy_version is now the real compiled-bundle short hash, not the
+    phase-1 sentinel. Decisions for known tools carry the matched
+    ``tool:<id>`` rule_id; unknown tools fall through to the default."""
     decision = kernel().evaluate_tool_call(
         actor="finance-agent",
-        tool="concur.list_claims",
+        tool="claim.lookup",
         args={"limit": 5},
         workflow_id="EXP-DEMO-01",
     )
     assert isinstance(decision, Decision)
     assert decision.allowed is True
-    assert decision.policy_version == "phase1-noop"
+    # Phase 2: real bundle hash. 12 hex chars.
+    assert decision.policy_version != "phase1-noop"
+    assert len(decision.policy_version) == 12
+    assert all(c in "0123456789abcdef" for c in decision.policy_version)
     assert decision.enforcement_mode == "log_only"
-    assert decision.rule_id is None
+    # Known tool — matched against its registered audit rule.
+    assert decision.rule_id == "tool:claim.lookup"
+    assert decision.action == "audit"
     assert decision.decision_id  # non-empty uuid
     assert decision.latency_us >= 1
+
+
+def test_evaluate_tool_call_unknown_tool_falls_through_to_default() -> None:
+    """Tools absent from ``tools.yaml`` get the default ALLOW (log_only).
+    Phase 6 will tighten this to deny via the manifest gate."""
+    decision = kernel().evaluate_tool_call(
+        actor="finance-agent",
+        tool="never.heard.of.this.tool",
+        args={},
+    )
+    assert decision.allowed is True
+    assert decision.rule_id is None
+    assert decision.action == "allow"
 
 
 def test_decision_id_is_unique_per_call() -> None:
