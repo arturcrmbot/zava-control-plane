@@ -544,124 +544,228 @@ single weekend that way."
 
 ---
 
-## Pillar 5 · Advanced capabilities — POC2 — 6 min
+## Pillar 5 · Advanced capabilities — POC2 — 8 min
 
 > Surface: candidate portal at `:5174/apply`. Close the Control
 > Plane tab so the audience isn't half-watching the fleet while
-> you're trying to walk a candidate journey.
+> you're trying to walk a candidate journey. Have the recruiter
+> view (`:5174/recruiter`) ready in a second tab — that's where
+> most of this happens.
 
 "OK pivot. Completely different domain — hiring. Completely
 different audience for the surfaces — candidate, recruiter, hiring
-manager. The reason I want to show you POC2 right after POC1 is
-that the engine running underneath is *the same engine* — same
-durable orchestrator, same agent graphs, same governance kernel,
-same audit blob with the same Evidence chip you just saw. What's
-different is the surfaces and the multimodality.
+manager, three actors. The reason I want to show you POC2 right
+after POC1 is that the engine running underneath is *the same
+engine* — same durable orchestrator, same agent graphs, same AGT
+governance kernel, same audit chain with the same Evidence
+verification. What changes is the surfaces and the multimodality.
 
-It's worth saying — we did not build POC2 by retrofitting POC1.
-POC2 dropped in clean as a separate domain, through the registry
-we just talked about. So this is the substrate's claim made
-literal: 'one platform, many domains' isn't an aspiration, it's
-something we did and you're about to see it.
+It's worth saying explicitly — we did not build POC2 by
+retrofitting POC1. It dropped in clean as a separate domain through
+the registry I mentioned earlier. So 'one platform, many domains'
+isn't aspirational — what you're about to see is the proof.
 
-Four moments. Apply, AI triage, voice screen, offer.
+End-to-end this is six moments. Apply, AI triage, voice screen,
+three interview gates, offer, onboarding. I'll move briskly because
+there's a lot to show.
 
-### Moment one — apply
+### Moment one — apply (30 sec)
 
 *(open `:5174/apply`, pick Senior Data Engineer · USA, drop in
 `data/synthetic/hiring/cv-pdfs/C-SE-USA-00.pdf`, submit, copy the
 candidate id)*
 
-Public form. No login, no SSO. This is what a candidate sees on a
+Public form, no login, no SSO. This is what a candidate sees on a
 careers page. Behind that — orchestrator spawned, magic-link
 status URL has gone out via real Azure Communication Services
-email, the workflow is already running through Triage. So even
-before the recruiter has looked at this person, the system is
-working.
+email, the workflow is already running through Triage. The
+candidate has a working `/portal?token=…` URL before any human
+has looked at them.
 
-### Moment two — AI triage with real OCR
+### Moment two — AI triage with real OCR (60 sec)
 
 *(open `:5174/recruiter`, click into the candidate)*
 
-This panel — *What we learned* — is the live trace from the agent
-that's reading the CV. The row that says `tool · ocr_extract` is a
-real Azure Document Intelligence call against the PDF. Below that
-you see the structured profile the agent extracted, the token
-usage, the latency.
+The panel here — *What we learned · cv_crystalliser* — is the
+live trace from the agent that's reading the CV. The row that
+says `tool · ocr_extract` is a real Azure Document Intelligence
+call against the PDF. Below that you see the structured profile
+the agent extracted, the token usage, the latency.
 
-One thing I want to call out specifically because it's a
-deliberate design choice — if Document Intelligence had failed,
-or returned low confidence, you would see a red chip here and *no
+One thing I want to call out specifically because it's a deliberate
+design choice — if Document Intelligence had failed, or returned
+low confidence, you would see a red chip here and *no
 recommendation*. The agent is wired to refuse to fabricate a
-verdict when it doesn't have ground truth. It's allowed to say 'I
-couldn't read this'. For HR, especially in jurisdictions like the
-EU where automated decision-making is regulated, that 'don't
-hallucinate when you don't know' property is more important than
-any individual feature on the page.
+verdict when it doesn't have ground truth. For HR, especially in
+jurisdictions like the EU where automated decision-making on
+candidates is regulated, that 'don't hallucinate when you don't
+know' property matters more than any individual feature on the
+page.
 
-### Moment three — real voice screen, real WebRTC
+### Moment three — real voice screen, real WebRTC (90 sec)
 
 *(in the recruiter view → Active magic links → copy the `screen`
-token)*
+token. Open `/screen?token=…` in a new tab, allow mic.)*
 
-*(open `/screen?token=…` in a new tab, allow mic when prompted)*
+Live call to Azure GPT-Realtime over WebRTC. Real voice, real
+model, real latency. The agent on the other end is briefed off the
+candidate's CV — it'll ask role-relevant questions.
 
-This is a live call to Azure GPT-Realtime over WebRTC. Real voice,
-real model, real latency. *(have a 20–30 second conversation —
-generic intro questions are fine. End the call.)*
+*(Have a 20–30 second conversation. Generic intro questions are
+fine. End the call.)*
 
-The transcript posts back to the workflow, the orchestrator
-resumes, the recommendation lands in the recruiter's queue.
+Transcript posts back, workflow resumes, recommendation lands in
+the recruiter's queue.
 
-> *(if the mic is being awkward: there's an env switch
+> *(if mic is being awkward: there's an env switch
 > `VITE_VOICE_TRANSPORT=canned` that plays a recorded transcript
-> through the same callback. Same code path, no live mic.)*
+> through the same callback. Same code path. Or curl the
+> `/api/portal/voice/complete` endpoint with a stub transcript —
+> the runbook has the one-liner.)*
 
-### Moment four — offer + onboarding avatar
+### Moment four — three interview gates (3 min)
 
-*(open `/portal?token=…` for an offered candidate)*
+This is where the orchestrator earns its keep. Phase 7 of the
+hiring workflow has three sequential human gates, and each one
+parks the orchestrator on a different external event. The
+recruiter view paints a different decision panel for each one —
+all keyed off the workflow's current `awaiting_reason`. So the
+human always sees the right thing to do next; they never have to
+remember which step they're on.
 
-There are three more HITL gates between screen and offer — invite
-to interview, candidate picks slot, post-interview decision —
-which I'll skip in the interest of time but they're all here if
-you want to come back to them. Skipping to offer.
+**Gate ① — invite to interview?**
 
-Candidate accepts. Phase 10 is Onboarding. *(wait for the avatar to
-render)*. That's a real Azure AI Speech avatar. Personalised
-welcome video, voice synthesis, blob-cached by the SHA of voice
-plus script so the second render of the same content is free. From
-a candidate-experience point of view, that's the moment your new
-hire stops being a row in a spreadsheet.
+*(refresh the recruiter page if needed — auto-polls every 8s)*
 
-### What this proves — and why it matters for the architecture
+The `interview-recommender` agent has already run with the CV plus
+the screening verdict plus the voice transcript as context. It's
+drafted a recommendation card here — *AI recommends: advance,
+strong on Spark, vague on stakeholder management — would push on
+EM experience in interview*, plus a few talking points.
 
-Two things to take away from POC2 before we close.
+*(click Invite to interview)*
 
-First — the engine that ran this hire is the same engine that ran
-the expense claims. Same Durable orchestration. Same Agent
-Framework graphs per phase. Same MCP tool layer. Same AGT
-governance kernel. Same audit chain. The surfaces are
-purpose-built for the actors — candidate sees a portal, recruiter
-sees a queue, hiring manager sees a different queue. But the
-substrate underneath is identical, and that's the point.
+Same shape as the expense Arbitrate gate — the agent doesn't
+decide, it recommends, and the human approves or overrides. The
+audit chain captures both.
 
-Second — POC2 demonstrates a few capabilities POC1 doesn't need.
-Real WebRTC voice with model-driven conversation. Real avatar
-synthesis. Real Document Intelligence on a different document
-class. Real ACS email-out. And jurisdiction-conditional behaviour
-— if I rerun this with a German candidate, the same code path
-adds a Compliance phase for the German works-council notification,
-because the workflow graph is data-driven off the candidate's
-country. So 'multi-region, multi-jurisdiction' isn't a roadmap
-item, it's the same workflow taking a different branch through the
-graph based on data.
+**Gate ② — candidate picks a slot**
 
-> *(reserve beats if asked: jurisdiction switching with
-> `C-SE-DE-00`; Hiring Manager surface at
+The orchestrator is now parked waiting on the candidate. The
+candidate has been emailed a single-use, 7-day-TTL `book_interview`
+token.
+
+*(in recruiter view, copy the `book` token from active magic
+links. Open `/book?token=…` in a new tab.)*
+
+Fifteen slots — five weekdays times three slots per day, eighty
+percent available so it looks realistic.
+
+*(pick one)*
+
+Page flips to *Interview booked*. Token is consumed — single use,
+can't be replayed. Behind the scenes the booking event raises and
+the recommender runs a second time with the slot context.
+
+**Gate ③ — post-interview decision**
+
+*(back to recruiter view)*
+
+Pretend the interview happened, in Teams, the day of the slot. Now
+the recruiter is back to make the post-interview call.
+
+The panel has rotated again. Rating buttons one to five. Decision
+dropdown — offer or reject. Level dropdown sourced per role
+family — for an SDE that's mid / senior / staff / principal.
+Notes textarea. And another AI rec card on top — *AI recommends:
+advance, suggested level: senior, rationale…*
+
+*(rating 4, decision Offer, level Senior, notes 'Strong on Spark,
+communicates clearly'. Submit.)*
+
+Workflow advances through Compliance into Phase 9, the offer
+letter generation.
+
+### Moment five — candidate accepts (30 sec)
+
+The candidate now has an `offer`-scope token; they've been emailed
+the offer URL.
+
+*(open `/portal?token=…`, click Accept)*
+
+Workflow moves into Phase 10. Onboarding.
+
+### Moment six — onboarding avatar (60 sec)
+
+*(wait for the avatar to render on the portal)*
+
+That's a real Azure AI Speech avatar. Personalised welcome video,
+voice synthesis, blob-cached by SHA of voice plus script so the
+second render of the same content is free. From a candidate-
+experience point of view, that's the moment your new hire stops
+being a row in a spreadsheet — and from a cost point of view,
+it's the kind of thing that used to need a video team.
+
+### Moment seven — the recruiter view as the money shot (60 sec)
+
+*(linger on the completed candidate page in recruiter view)*
+
+This is the page I'd point at if you ever wanted to summarise what
+this whole stack does for one user. One scroll, top to bottom:
+
+- Header — name, role, jurisdiction, current phase, download CV.
+- *What we learned* — the canonical profile from the LLM
+  extraction.
+- *How the agent reasoned* — every `ocr_extract` call expanded
+  with arguments and trimmed results, plus the final agent
+  response.
+- *Voice screening transcript* — turn by turn.
+- *Audit timeline* — every orchestration step with timestamps.
+  `interview_invite`, `interview_booked`, `offer_decision`,
+  `workflow.completed` — all there, all signed.
+- *Active magic links* — empty now, all consumed or expired.
+
+Same audit chain as POC1, same Evidence verification works on this
+workflow too. *(if there's time, show the Evidence chip on the
+admin view of this hiring workflow — same three sub-chips, same
+green.)*
+
+### Quick admin-side comparison
+
+*(switch back to the Control Plane at `:5173`, find the same
+hiring workflow in the list)*
+
+Worth thirty seconds on this. Same workflow, but viewed from the
+operator surface — and notice the language: the wait label says
+*Awaiting operator review*, the deep-link reads *Open recruiter
+view*. There's zero hiring-specific vocabulary on this page. Open
+any expense workflow side by side — same neutral labels, but the
+deep-link there says *Open reviewer queue*. The Control Plane is
+domain-agnostic; the role-specific surfaces hang off it. That's
+the platform split working as designed.
+
+### What POC2 proves that POC1 couldn't
+
+Before we close, the things POC2 is proving that POC1 can't:
+
+- Real WebRTC voice agent in production-shaped configuration.
+- Real avatar synthesis at the candidate-facing edge.
+- Real Document Intelligence on a different document class —
+  same MCP tool, different prompt, different output schema.
+- Real Azure Communication Services email at the boundary.
+- Multi-actor, multi-surface workflow — candidate, recruiter,
+  hiring manager — coordinated through one orchestration.
+- Jurisdiction-conditional behaviour — rerun this with
+  `C-SE-DE-00` and the same code path adds a Compliance phase
+  for the German works-council notification, because the graph is
+  data-driven off the candidate's country.
+
+> *(reserve beats if asked: Hiring Manager surface at
 > `/hiring-manager/HIRE-NNNN`; episodic memory via the
-> `recall_similar_hires` MCP tool that pulls past hires in the same
-> role family + jurisdiction; A2A boundary at `/api/a2a/inbound`
-> for agent-to-agent updates from a candidate's PA.)*"
+> `recall_similar_hires` MCP tool; A2A boundary at
+> `/api/a2a/inbound` for agent-to-agent updates from a candidate's
+> PA; the `Reject at Gate ①` and `Reject at Gate ③` paths each
+> emit a different templated candidate-facing email.)*"
 
 ---
 
