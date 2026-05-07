@@ -166,6 +166,32 @@ AUTHORITY_MCP_LIVE=1 \
   uv run pytest tests/api/server/services/governance/test_authority_parity.py -v
 ```
 
+### Audit ledger hash chain (Phase 4)
+
+Every audit ledger entry written via `AuditLogger.log()` carries a
+`prev_hash` + `entry_hash` (SHA-256 over canonical JSON). The chain is
+per-workflow; tampering with any field of any historical entry is
+detected by `AuditLogger.verify_chain(workflow_id)` and surfaces on
+`GET /api/governance/verify/{workflow_id}` and the Control Plane
+WorkflowDetail Evidence chip.
+
+Backfill historical workflows that pre-date this wiring with:
+
+```bash
+# Walks azurite-data/__blobstorage__/audit-ledger/*.jsonl by default.
+uv run python scripts/agt_backfill_chain.py
+
+# Dry-run first if you want to see what would change.
+uv run python scripts/agt_backfill_chain.py --dry-run
+
+# Or point at a different root.
+uv run python scripts/agt_backfill_chain.py --root /path/to/blobs
+```
+
+Idempotent — re-running on already-chained blobs is a no-op. Each
+rewrite goes through a `.bak` sibling + atomic rename so a crash
+mid-run leaves the original intact.
+
 Then Ctrl-C `make up` and restart — that clears in-memory Fleet
 Manager + simulator state (not persisted).
 
