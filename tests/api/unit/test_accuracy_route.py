@@ -70,7 +70,18 @@ def _configured(monkeypatch):
 
 def test_post_run_returns_run_id_and_accepted_status(_configured):
     from api.server.eval import batch_runner
-    with patch.object(batch_runner, "run", AsyncMock(return_value=_fake_report(3))):
+    from api.functions.graphs.executors.agents import agent_rag_classifier
+    # The route schedules a background task that pre-classifies every claim
+    # via rag_execute (real Copilot call) BEFORE handing rows to
+    # batch_runner.run. TestClient awaits background tasks before unblocking
+    # the caller, so without mocking rag_execute the test would hang on the
+    # first GHCP call. Patch both.
+    fake_classify = AsyncMock(return_value={
+        "classification": {"verdict": "green", "reasoning": "ok",
+                           "policy_clause": "T-1"},
+    })
+    with patch.object(batch_runner, "run", AsyncMock(return_value=_fake_report(3))), \
+         patch.object(agent_rag_classifier, "execute", fake_classify):
         resp = client.post("/api/accuracy/run", json={"sample_size": 3})
     assert resp.status_code == 202
     body = resp.json()
