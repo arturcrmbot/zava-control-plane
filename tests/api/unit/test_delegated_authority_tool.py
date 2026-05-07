@@ -5,6 +5,15 @@ Two test surfaces:
   - Live integration (skipped unless AUTHORITY_MCP_LIVE=1): hit the real Node mock
     on port 4108 and assert the 8 canonical resolutions from
     mocks/authority-mcp/test/resolver.test.ts.
+
+Phase 3 TASK-022 note: the default backend for ``resolve_approver`` /
+``check_authority`` is now the in-process governance kernel; the HTTP
+path is reached only when ``AUTHORITY_MCP_URL`` is set in env. The unit
+tests below explicitly enter the HTTP branch via the autouse fixture
+``_force_http_backend`` so the existing httpx-MockTransport assertions
+remain meaningful (they validate the engagement-POC swap-in seam).
+In-process resolver coverage lives in
+``tests/api/server/services/governance/test_authority_resolver.py``.
 """
 from __future__ import annotations
 
@@ -16,6 +25,15 @@ import httpx
 import pytest
 
 from api.server.mcp_tools import delegated_authority as da
+
+
+@pytest.fixture(autouse=True)
+def _force_http_backend(monkeypatch):
+    """Force the HTTP fallback path. The unit tests below stub
+    ``httpx.post`` and assert HTTP request shape; that path is only
+    taken when ``AUTHORITY_MCP_URL`` is present (TASK-022)."""
+    monkeypatch.setenv("AUTHORITY_MCP_URL", "http://127.0.0.1:4108")
+    yield
 
 
 # --------------------------------------------------------------------------
@@ -201,6 +219,46 @@ def test_tool_returns_failure_on_http_error(monkeypatch):
     result = asyncio.run(da.delegated_authority_resolve_approver_tool.handler(inv))
     assert result.result_type == "failure"
     assert "unreachable" in result.text_result_for_llm.lower()
+
+
+# --------------------------------------------------------------------------
+# Phase 3 TASK-022 — default backend is in-process when env var unset
+# --------------------------------------------------------------------------
+
+
+def test_resolve_approver_uses_kernel_when_env_unset(monkeypatch):
+    """With AUTHORITY_MCP_URL absent, the call MUST go through the
+    in-process kernel and httpx MUST NOT be touched."""
+    # Override the autouse fixture's env setting.
+    monkeypatch.delenv("AUTHORITY_MCP_URL", raising=False)
+    # Sentinel — fail loudly if anything reaches httpx.
+    def _boom(*a, **kw):
+        raise AssertionError("httpx.post called when AUTHORITY_MCP_URL unset")
+    monkeypatch.setattr(da.httpx, "post", _boom)
+
+    result = da.resolve_approver(
+        action="expense_claim_approval", category="meals", value=180
+    )
+    assert result.matched is True
+    assert result.rule_id == "EXP-002"
+    assert result.approver_role == "line_manager"
+
+
+def test_check_authority_uses_kernel_when_env_unset(monkeypatch):
+    """Same for check_authority: kernel by default, no httpx."""
+    monkeypatch.delenv("AUTHORITY_MCP_URL", raising=False)
+    def _boom(*a, **kw):
+        raise AssertionError("httpx.post called when AUTHORITY_MCP_URL unset")
+    monkeypatch.setattr(da.httpx, "post", _boom)
+
+    result = da.check_authority(
+        role="ssc_reviewer",
+        action="expense_claim_approval",
+        category="meals",
+        value=1000,
+    )
+    assert result.allowed is True
+    assert result.governing_rule_id == "EXP-003"
 
 
 # --------------------------------------------------------------------------

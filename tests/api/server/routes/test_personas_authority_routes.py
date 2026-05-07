@@ -116,6 +116,9 @@ def test_authority_resolve_route(client, monkeypatch):
         })
 
     import api.server.mcp_tools.delegated_authority as da
+    # Force the HTTP fallback path so the httpx mock is observable
+    # (Phase 3 TASK-022 default backend is in-process).
+    monkeypatch.setenv("AUTHORITY_MCP_URL", "http://127.0.0.1:4108")
     monkeypatch.setattr(da.httpx, "post", _stub_post(handler))
 
     r = client.post("/api/authority/resolve", json={
@@ -137,6 +140,9 @@ def test_authority_check_route(client, monkeypatch):
         })
 
     import api.server.mcp_tools.delegated_authority as da
+    # Force the HTTP fallback path so the httpx mock is observable
+    # (Phase 3 TASK-022 default backend is in-process).
+    monkeypatch.setenv("AUTHORITY_MCP_URL", "http://127.0.0.1:4108")
     monkeypatch.setattr(da.httpx, "post", _stub_post(handler))
 
     r = client.post("/api/authority/check", json={

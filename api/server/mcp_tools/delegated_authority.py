@@ -1,9 +1,10 @@
-"""delegated_authority MCP tool — resolve approver and check authority via the
-authority-mcp Node mock (default :4108).
+"""delegated_authority MCP tool — resolve approver and check authority.
 
 This is the MCP-tool seam for the substrate's delegated-authority matrix.
-The matrix data lives in `data/synthetic/authority/matrix.json`; the Node
-mock at `mocks/authority-mcp/` walks it; this Python wrapper exposes it
+The matrix data lives in `data/synthetic/authority/matrix.json`; the
+in-process governance kernel
+([api/server/services/governance/kernel.py](../services/governance/kernel.py))
+walks it (Phase 3, TASK-022); this Python wrapper exposes that surface
 to agent skills (via `@define_tool`) and to the persona responder (via
 the plain `resolve_approver` / `check_authority` callables).
 
@@ -28,9 +29,15 @@ Skills that consume this tool (audit list — TASK-012):
   - fleet-employee-onboarding-access-drafter
   - fleet-perf-review-calibration-drafter
 
-Engagement-POC swap: backend points at the authority-mcp Node mock by
-default; setting `AUTHORITY_MCP_URL` to a Foundry IQ-backed endpoint
-swaps the data without touching skill or persona code.
+Backend selection (Phase 3, TASK-022):
+  - Default: in-process via ``governance.kernel().resolve_approver(...)``
+    — sub-millisecond, no network hop, same matrix.json source of
+    truth as the compiled policy bundle.
+  - Fallback: HTTP round-trip to ``$AUTHORITY_MCP_URL`` (preserves the
+    Foundry-IQ engagement-POC swap-in seam, REQ-002 of
+    plan/feature-agent-governance-toolkit-1.md). Set the env var to a
+    Foundry-backed endpoint; the wire format is unchanged so skill +
+    persona code keeps working.
 """
 from __future__ import annotations
 
@@ -46,11 +53,31 @@ from pydantic import BaseModel, Field
 from ._otel import traced_tool
 
 
+# Legacy default — kept so ``_base_url()`` (used by /api/authority/health
+# only) still points at the local Node mock when nothing's configured.
+# No other callers depend on it; routing of resolve/check goes through
+# the kernel by default after TASK-022.
 _DEFAULT_URL = "http://127.0.0.1:4108"
 
 
 def _base_url() -> str:
+    """Return the configured authority-MCP URL (default: local Node mock).
+
+    Used by the ``/api/authority/health`` proxy route; resolve/check
+    no longer route via this URL by default — they prefer the in-process
+    kernel and only fall back to HTTP when ``_http_fallback_enabled()``.
+    """
     return os.environ.get("AUTHORITY_MCP_URL", _DEFAULT_URL).rstrip("/")
+
+
+def _http_fallback_enabled() -> bool:
+    """True iff ``AUTHORITY_MCP_URL`` is explicitly set in env.
+
+    The presence of the env var is the operator's signal that they want
+    the engagement-POC swap-in path (Foundry-IQ-backed MCP). Absent it,
+    the in-process governance kernel handles every resolve/check call.
+    """
+    return bool(os.environ.get("AUTHORITY_MCP_URL"))
 
 
 # ---------------------------------------------------------------------------
@@ -97,10 +124,11 @@ def resolve_approver(
 ) -> ApproverResolution:
     """Walk the matrix and return the first matching rule.
 
-    Returns an `ApproverResolution` with `matched=False` and `reason`
-    populated when no rule matches. Network/HTTP errors raise — they are
-    a substrate misconfiguration (mock not running) and should surface
-    loudly rather than silently degrade authority resolution.
+    Default backend (Phase 3 TASK-022): in-process governance kernel
+    — sub-millisecond, no network hop. HTTP fallback only when
+    ``AUTHORITY_MCP_URL`` is set in env (engagement-POC swap-in seam).
+    Returns an ``ApproverResolution`` with ``matched=False`` and ``reason``
+    populated when no rule matches.
     """
     span = trace.get_current_span()
     span.set_attribute("apex.authority.action", action)
@@ -109,23 +137,43 @@ def resolve_approver(
     if value is not None:
         span.set_attribute("apex.authority.value_gbp", float(value))
 
-    payload = {
-        "action": action,
-        "value": value,
-        "category": category,
-        "requester_role": requester_role,
-        "business_unit": business_unit,
-        "geography": geography,
-    }
-    url = f"{_base_url()}/resolve_approver"
-    resp = httpx.post(url, json=payload, timeout=5.0)
-    resp.raise_for_status()
-    body = resp.json()
-    span.set_attribute("apex.authority.matched", bool(body.get("matched")))
-    if body.get("matched"):
-        span.set_attribute("apex.authority.rule_id", str(body.get("rule_id") or ""))
-        span.set_attribute("apex.authority.approver_role", str(body.get("approver_role") or ""))
-    return ApproverResolution(**body)
+    if _http_fallback_enabled():
+        # Engagement-POC swap-in path. Wire format unchanged.
+        span.set_attribute("apex.authority.backend", "http")
+        payload = {
+            "action": action,
+            "value": value,
+            "category": category,
+            "requester_role": requester_role,
+            "business_unit": business_unit,
+            "geography": geography,
+        }
+        url = f"{_base_url()}/resolve_approver"
+        resp = httpx.post(url, json=payload, timeout=5.0)
+        resp.raise_for_status()
+        body = resp.json()
+        result = ApproverResolution(**body)
+    else:
+        # Default in-process path.
+        from api.server.services.governance import kernel  # local: avoid import cycles
+        span.set_attribute("apex.authority.backend", "in_process")
+        kernel_result = kernel().resolve_approver(
+            action=action,
+            value=value,
+            category=category,
+            requester_role=requester_role,
+            business_unit=business_unit,
+            geography=geography,
+        )
+        # Re-shape into the local Pydantic class so callers see a single,
+        # stable type regardless of backend.
+        result = ApproverResolution(**kernel_result.model_dump())
+
+    span.set_attribute("apex.authority.matched", bool(result.matched))
+    if result.matched:
+        span.set_attribute("apex.authority.rule_id", str(result.rule_id or ""))
+        span.set_attribute("apex.authority.approver_role", str(result.approver_role or ""))
+    return result
 
 
 @traced_tool("authority.check_authority")
@@ -138,26 +186,47 @@ def check_authority(
     geography: str | None = None,
     requester_role: str | None = None,
 ) -> AuthorityCheck:
-    """Check whether a specific role is authorised for a given action+value+scope."""
+    """Check whether a specific role is authorised for a given action+value+scope.
+
+    Default backend (Phase 3 TASK-022): in-process governance kernel.
+    HTTP fallback only when ``AUTHORITY_MCP_URL`` is set in env.
+    """
     span = trace.get_current_span()
     span.set_attribute("apex.authority.role", role)
     span.set_attribute("apex.authority.action", action)
 
-    payload = {
-        "role": role,
-        "action": action,
-        "value": value,
-        "category": category,
-        "business_unit": business_unit,
-        "geography": geography,
-        "requester_role": requester_role,
-    }
-    url = f"{_base_url()}/check_authority"
-    resp = httpx.post(url, json=payload, timeout=5.0)
-    resp.raise_for_status()
-    body = resp.json()
-    span.set_attribute("apex.authority.allowed", bool(body.get("allowed")))
-    return AuthorityCheck(**body)
+    if _http_fallback_enabled():
+        span.set_attribute("apex.authority.backend", "http")
+        payload = {
+            "role": role,
+            "action": action,
+            "value": value,
+            "category": category,
+            "business_unit": business_unit,
+            "geography": geography,
+            "requester_role": requester_role,
+        }
+        url = f"{_base_url()}/check_authority"
+        resp = httpx.post(url, json=payload, timeout=5.0)
+        resp.raise_for_status()
+        body = resp.json()
+        result = AuthorityCheck(**body)
+    else:
+        from api.server.services.governance import kernel  # local: avoid import cycles
+        span.set_attribute("apex.authority.backend", "in_process")
+        kernel_result = kernel().check_authority(
+            role=role,
+            action=action,
+            value=value,
+            category=category,
+            business_unit=business_unit,
+            geography=geography,
+            requester_role=requester_role,
+        )
+        result = AuthorityCheck(**kernel_result.model_dump())
+
+    span.set_attribute("apex.authority.allowed", bool(result.allowed))
+    return result
 
 
 # ---------------------------------------------------------------------------
