@@ -84,6 +84,82 @@ def _canonical_entry_hash(entry: dict) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _extract_agent_id(details: Any) -> str | None:
+    """Pluck ``agent_id`` (or ``agent_label``) out of an entry's details
+    dict. Returns ``None`` when neither key is present or the value is
+    empty. Phase 5 TASK-039: this is what triggers JWS signing inside
+    :meth:`AuditLogger.log`. Tolerant to non-dict ``details`` (returns
+    None) so legacy callers don't break."""
+    if not isinstance(details, dict):
+        return None
+    for k in ("agent_id", "agent_label"):
+        v = details.get(k)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return None
+
+
+def _try_sign(agent_id: str, action: str, payload: Any) -> str | None:
+    """Best-effort JWS signing via the governance kernel. Returns the
+    JWS Compact string, or ``None`` on any failure (unknown agent,
+    kernel not available yet during early boot, identity-store error).
+
+    Audit writes MUST NEVER raise into the caller — losing the
+    signature on one entry surfaces as ``actor_jws=None`` and is
+    detected by :meth:`AuditLogger.verify_chain` (signatures_valid
+    becomes False), which is the right escalation surface.
+    """
+    try:
+        from api.server.services.governance import kernel as _gov_kernel
+        k = _gov_kernel()
+        if not k.identity.has(agent_id):
+            return None
+        body = payload if isinstance(payload, dict) else {"value": payload}
+        return k.sign_action(agent_id, action, body)
+    except Exception as ex:  # pragma: no cover — defensive
+        log.warning(
+            "audit_logger: sign_action failed for agent_id=%s action=%s: %s",
+            agent_id, action, ex,
+        )
+        return None
+
+
+def _verify_signatures(chain: list[dict]) -> list[int]:
+    """Return the list of indices in ``chain`` whose ``actor_jws`` is
+    missing-when-required or fails verification (Phase 5 TASK-041).
+
+    An entry is considered "requiring a signature" iff its details
+    dict carries an ``agent_id`` (or ``agent_label``) that the kernel's
+    identity store knows about. Entries with no agent_id are skipped
+    silently — they're human-actor entries (HITL gates etc.) which
+    Phase 5 doesn't sign.
+    """
+    try:
+        from api.server.services.governance import kernel as _gov_kernel
+        k = _gov_kernel()
+    except Exception:
+        # Kernel not constructable (very early boot). Treat signatures
+        # as unverifiable rather than invalid; no caller should be
+        # checking the chain in that state anyway.
+        return []
+
+    bad: list[int] = []
+    for idx, entry in enumerate(chain):
+        agent_id = _extract_agent_id(entry.get("details"))
+        if agent_id is None:
+            continue  # human-actor entry; nothing to verify
+        if not k.identity.has(agent_id):
+            continue  # unknown agent — registry hasn't caught up; not a sig failure
+        jws = entry.get("actor_jws")
+        if not isinstance(jws, str) or not jws:
+            bad.append(idx)
+            continue
+        details = entry.get("details") if isinstance(entry.get("details"), dict) else {"value": entry.get("details")}
+        if not k.verify_jws(agent_id, jws, details):
+            bad.append(idx)
+    return bad
+
+
 class AuditLogger:
     def __init__(self) -> None:
         self._entries: list[dict] = []
@@ -204,9 +280,15 @@ class AuditLogger:
     def log(self, action: str, details: Any) -> None:
         """Append one entry. Mutates the entry dict in place to add
         ``prev_hash`` + ``entry_hash`` per the per-workflow chain
-        (Phase 4 TASK-028). The chain is per-workflow (PAT-003), so
-        parallel writes against different workflows can't race. Within
-        a single workflow, ``_chain_lock_for`` serialises the writes.
+        (Phase 4 TASK-028). When ``details`` carries an ``agent_id``
+        registered in :data:`api.shared.agents.AGENTS`, the entry is
+        also signed via the governance kernel into ``actor_jws`` BEFORE
+        the chain hash is computed (Phase 5 TASK-039), so the JWS is
+        part of the hashed payload and cannot be swapped after the fact.
+
+        The chain is per-workflow (PAT-003), so parallel writes against
+        different workflows can't race. Within a single workflow,
+        ``_chain_lock_for`` serialises the writes.
         """
         wid = self._extract_workflow_id({"details": details})
         chain_lock = self._chain_lock_for(wid)
@@ -222,6 +304,12 @@ class AuditLogger:
                 "timestamp": _time.time(),
                 "prev_hash": prev_hash,
             }
+            # Phase 5 TASK-039: sign entries that carry an agent_id.
+            agent_id = _extract_agent_id(details)
+            if agent_id is not None:
+                jws = _try_sign(agent_id, action, details)
+                if jws is not None:
+                    entry["actor_jws"] = jws
             entry["entry_hash"] = _canonical_entry_hash(entry)
             self._tail_hashes[wid] = entry["entry_hash"]
             self._entries.append(entry)
@@ -280,13 +368,20 @@ class AuditLogger:
         Returns a :class:`VerifyReport`. ``broken_at`` is the 0-based
         index of the first bad entry, or ``None`` when the chain is
         intact (or empty).
+
+        Phase 5 TASK-041: also verifies every entry's ``actor_jws``
+        against the registered agent pubkey via the governance kernel.
+        Failures populate ``bad_signatures_at`` (list of indices) and
+        flip ``signatures_valid`` to False — the chain itself can still
+        be intact while a signature has gone bad (e.g. key rotation
+        without re-signing historical entries).
         """
         chain = self.entries_for(workflow_id)
         if not chain:
             return VerifyReport(
                 workflow_id=workflow_id,
                 chain_intact=True,
-                signatures_valid=True,  # placeholder until Phase 5
+                signatures_valid=True,
                 decisions_resolvable=True,
                 total_entries=0,
                 broken_at=None,
@@ -308,7 +403,6 @@ class AuditLogger:
                         f"stored={stored_prev!r} expected={expected_prev!r}"
                     ),
                 )
-            # Recompute entry_hash from scratch.
             recomputed = _canonical_entry_hash(
                 {**entry, "entry_hash": None}
             )
@@ -328,13 +422,19 @@ class AuditLogger:
                 )
             expected_prev = stored_entry_hash
 
+        # Chain is intact. Now sweep signatures (TASK-041). Every entry
+        # whose details carry an agent_id MUST have a matching actor_jws,
+        # and that JWS MUST verify against the registered pubkey.
+        bad_sig_indices = _verify_signatures(chain)
+
         return VerifyReport(
             workflow_id=workflow_id,
             chain_intact=True,
-            signatures_valid=True,
+            signatures_valid=not bad_sig_indices,
             decisions_resolvable=True,
             total_entries=len(chain),
             broken_at=None,
+            bad_signatures_at=bad_sig_indices or None,
         )
 
     # --- Helpers for routes -------------------------------------------------

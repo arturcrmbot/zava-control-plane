@@ -1,19 +1,18 @@
 // web/client/features/governance/EvidencePanel.tsx
 //
-// Phase 4 TASK-031 of plan/feature-agent-governance-toolkit-1.md.
+// Phase 4 TASK-031 + Phase 5 TASK-042 of plan/feature-agent-governance-toolkit-1.md.
 //
 // Sidebar card on WorkflowDetail. Fetches GET /api/governance/verify/{wf}
 // and renders three chips:
-//   - chain ✓/✗     (real, served by AuditLogger.verify_chain)
-//   - signatures ✓/✗ (placeholder green; real verification lands Phase 5
-//                     TASK-041 — verify Ed25519 actor_jws against per-agent
-//                     pubkeys)
+//   - chain ✓/✗      (real, served by AuditLogger.verify_chain)
+//   - signatures ✓/✗ (real after Phase 5 TASK-041 — Ed25519 JWS verified
+//                     against per-agent pubkeys)
 //   - decisions ✓/✗  (placeholder; will resolve every entry's decision_id
-//                     against the in-process kernel in Phase 5)
+//                     against the in-process kernel in Phase 7)
 //
-// Click expands the card to show total_entries, broken_at (when broken),
-// the human-readable reason, and the policy_version short hash. No
-// new top-level navigation (CON-004).
+// Click expands to show total_entries, broken_at (when broken), the
+// human-readable reason, and bad_signatures_at when signatures fail.
+// No new top-level navigation (CON-004).
 import { useEffect, useState } from "react";
 
 type VerifyReport = {
@@ -84,21 +83,24 @@ export default function EvidencePanel({ workflowId }: Props) {
     };
   }, [workflowId]);
 
-  // Hide the card entirely on transport errors — it's an affordance,
-  // not a primary surface, and the rest of WorkflowDetail still works.
   if (error) return null;
-  // Also hide before the first response lands so it doesn't pop in
-  // half-rendered.
   if (!report) return null;
-  // Empty chain (vacuously intact) on a fresh workflow: don't bother
-  // showing the card until there's something to verify.
   if (report.total_entries === 0) return null;
 
   const allGreen =
     report.chain_intact && report.signatures_valid && report.decisions_resolvable;
 
+  // Tooltip-on-hover summary (TASK-042). Fits on one line.
+  const sigCount = report.bad_signatures_at
+    ? `${report.total_entries - report.bad_signatures_at.length}/${report.total_entries}`
+    : `${report.total_entries}/${report.total_entries}`;
+  const tooltip = `chain: ${report.chain_intact ? "intact" : "broken"} | signatures: ${sigCount} valid | entries: ${report.total_entries}`;
+
   return (
-    <div className="rounded-md border border-zinc-200 bg-white p-3">
+    <div
+      className="rounded-md border border-zinc-200 bg-white p-3"
+      title={tooltip}
+    >
       <button
         type="button"
         className="w-full text-left"
@@ -119,8 +121,7 @@ export default function EvidencePanel({ workflowId }: Props) {
         </div>
         <div className="space-y-1">
           <Chip label="chain" ok={report.chain_intact} />
-          {/* signatures + decisions are placeholders until Phase 5 / 7 */}
-          <Chip label="signatures" ok={report.signatures_valid} pending />
+          <Chip label="signatures" ok={report.signatures_valid} />
           <Chip label="decisions" ok={report.decisions_resolvable} pending />
         </div>
       </button>
@@ -130,6 +131,10 @@ export default function EvidencePanel({ workflowId }: Props) {
           <div>
             <span className="text-zinc-500">entries:</span>{" "}
             <span className="font-mono">{report.total_entries}</span>
+          </div>
+          <div>
+            <span className="text-zinc-500">signatures:</span>{" "}
+            <span className="font-mono">{sigCount} valid</span>
           </div>
           {report.broken_at !== null && (
             <div className="text-rose-700">
@@ -149,7 +154,7 @@ export default function EvidencePanel({ workflowId }: Props) {
             </div>
           )}
           <div className="pt-1 text-[10px] uppercase tracking-wide text-zinc-400">
-            See plan/feature-agent-governance-toolkit-1.md (Phase 4)
+            See plan/feature-agent-governance-toolkit-1.md (Phase 4 + 5)
           </div>
         </div>
       )}

@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field
 from .manifest import ToolManifestEntry, load_tools_yaml
 from .policy_compiler import CompiledBundle, compile_bundle
 from . import authority as _authority
+from .identity import AgentIdentityStore
 
 EnforcementMode = Literal["log_only", "enforce"]
 
@@ -117,6 +118,77 @@ def _load_matrix(path: Path | None = None) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# JWS Compact (EdDSA) — Phase 5 TASK-038 / TASK-040
+# ---------------------------------------------------------------------------
+
+
+def _b64url(data: bytes) -> str:
+    """Base64url-encode without padding (RFC 7515 §2)."""
+    import base64
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+def _b64url_decode(text: str) -> bytes:
+    import base64
+    pad = "=" * (-len(text) % 4)
+    return base64.urlsafe_b64decode(text + pad)
+
+
+def _payload_hash(payload: Mapping[str, Any]) -> str:
+    """sha256 hex of ``payload`` canonicalised the same way as the audit
+    chain (sort_keys=True, default=str). SEC-001 of the plan."""
+    import hashlib
+    text = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _jws_sign(
+    identity: AgentIdentityStore, agent_id: str, body: Mapping[str, Any]
+) -> str:
+    """Produce a JWS Compact-Serialization string (RFC 7515) with EdDSA.
+
+    Format: ``b64url(header) . b64url(body) . b64url(signature)``.
+    Header: ``{"alg":"EdDSA","typ":"JWT","kid":agent_id}``.
+    """
+    header = {"alg": "EdDSA", "typ": "JWT", "kid": agent_id}
+    h = _b64url(json.dumps(header, sort_keys=True).encode("utf-8"))
+    p = _b64url(json.dumps(body, sort_keys=True, default=str).encode("utf-8"))
+    signing_input = f"{h}.{p}".encode("ascii")
+    signature = identity.sign(agent_id, signing_input)
+    return f"{h}.{p}.{_b64url(signature)}"
+
+
+def _jws_verify(
+    identity: AgentIdentityStore, jws: str
+) -> tuple[bool, dict[str, Any] | None]:
+    """Verify a JWS Compact string. Returns (ok, decoded_body_or_None).
+
+    Returns ``(False, None)`` on any malformation, unknown ``kid``, or
+    signature failure. The caller (:meth:`GovernanceKernel.verify_jws`)
+    additionally checks ``iss`` and ``payload_hash``.
+    """
+    try:
+        h_b64, p_b64, s_b64 = jws.split(".")
+    except ValueError:
+        return False, None
+    try:
+        header = json.loads(_b64url_decode(h_b64))
+        body = json.loads(_b64url_decode(p_b64))
+        signature = _b64url_decode(s_b64)
+    except Exception:
+        return False, None
+    if header.get("alg") != "EdDSA":
+        return False, None
+    kid = header.get("kid")
+    if not isinstance(kid, str) or not identity.has(kid):
+        return False, None
+    signing_input = f"{h_b64}.{p_b64}".encode("ascii")
+    if not identity.verify(kid, signing_input, signature):
+        return False, None
+    return True, body
+
+
+# ---------------------------------------------------------------------------
 # Kernel
 # ---------------------------------------------------------------------------
 
@@ -150,6 +222,14 @@ class GovernanceKernel:
         self._matrix: list[dict[str, Any]] = matrix
         self._bundle: CompiledBundle = bundle
         self._evaluator: PolicyEvaluator = PolicyEvaluator(policies=[bundle.document])
+
+        # Phase 5 (TASK-037): Ed25519 identity store. Construction is
+        # idempotent — second boot loads keys from
+        # ``azurite-data/agt-keys/`` (dev) or
+        # ``data/governance/agent-pubkeys/`` (prod). Lazy import of
+        # AGENTS to avoid pulling api.shared.agents at module-load time.
+        from api.shared.agents import all_agent_ids
+        self._identity = AgentIdentityStore(all_agent_ids())
 
     # --- Public properties ---------------------------------------------------
 
@@ -297,6 +377,64 @@ class GovernanceKernel:
             business_unit=business_unit,
             geography=geography,
         )
+
+    # --- Identity (Phase 5 — TASK-038 / TASK-040) ----------------------------
+
+    @property
+    def identity(self) -> AgentIdentityStore:
+        """The kernel's keystore. Exposed for tests + for
+        :class:`AuditLogger` (which signs entries via this seam)."""
+        return self._identity
+
+    def sign_action(
+        self,
+        agent_id: str,
+        action: str,
+        payload: dict[str, Any],
+    ) -> str:
+        """Return a JWS Compact-Serialization signed by ``agent_id``.
+
+        Header: ``{"alg":"EdDSA","typ":"JWT","kid":"<agent_id>"}``.
+        Body: ``{"iss":<agent_id>, "action":<action>,
+                 "payload_hash":<sha256(canonical_json(payload))>,
+                 "iat":<unix epoch seconds>}``.
+
+        The caller (TASK-039 inside ``AuditLogger.log()``) writes the
+        return value to ``entry["actor_jws"]`` BEFORE the chain hash is
+        computed, so the JWS is part of the hashed payload.
+        """
+        body = {
+            "iss": agent_id,
+            "action": action,
+            "payload_hash": _payload_hash(payload),
+            "iat": int(time.time()),
+        }
+        return _jws_sign(self._identity, agent_id, body)
+
+    def verify_jws(
+        self,
+        agent_id: str,
+        jws: str,
+        expected_payload: dict[str, Any],
+    ) -> bool:
+        """Verify a JWS Compact string.
+
+        Returns True iff:
+          - The signature validates against ``agent_id``'s public key.
+          - The header's ``kid`` matches ``agent_id``.
+          - The body's ``iss`` matches ``agent_id``.
+          - The body's ``payload_hash`` matches ``sha256(canonical_json(expected_payload))``.
+
+        Pure read of the in-memory pubkey map; no Key Vault round-trip.
+        """
+        ok, body = _jws_verify(self._identity, jws)
+        if not ok or body is None:
+            return False
+        if body.get("iss") != agent_id:
+            return False
+        if body.get("payload_hash") != _payload_hash(expected_payload):
+            return False
+        return True
 
 
 # ---------------------------------------------------------------------------
