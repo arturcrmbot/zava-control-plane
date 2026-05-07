@@ -52,14 +52,31 @@ dev: azurite-up
 # by the governance kernel. Use `make up-with-authority-mock` (or set
 # BOOT_DEMO_WITH_AUTHORITY_MOCK=1) to bring it up alongside for parity
 # testing or for the engagement-POC swap-in dry run.
+#
+# We `env -u` the demo-config vars before invoking boot-demo.sh so that
+# whatever a previous `source scripts/profile-everything.sh` left exported
+# in this shell does not silently override the .env defaults. Without this
+# guard, running constellation-mode in a shell and then re-running `make up`
+# would auto-close every persona at boot and break the manual POC1+POC2
+# walkthrough.
 up:
-	bash scripts/boot-demo.sh
+	env -u PERSONA_AUTO_CLOSE \
+	    -u SIMULATOR_RAMP_ENABLED \
+	    -u SIMULATOR_RAMP_AVG_INTERVAL_SECONDS \
+	    -u SIMULATOR_RAMP_DOMAINS \
+	    -u PORTAL_SEED_REQS \
+	    bash scripts/boot-demo.sh
 
 # Bring up the full stack PLUS the authority-mcp Node mock on :4108.
 # Pair with AUTHORITY_MCP_URL=http://127.0.0.1:4108 in env to actually
 # route through the HTTP path (kernel is the default otherwise).
 up-with-authority-mock:
-	BOOT_DEMO_WITH_AUTHORITY_MOCK=1 bash scripts/boot-demo.sh
+	env -u PERSONA_AUTO_CLOSE \
+	    -u SIMULATOR_RAMP_ENABLED \
+	    -u SIMULATOR_RAMP_AVG_INTERVAL_SECONDS \
+	    -u SIMULATOR_RAMP_DOMAINS \
+	    -u PORTAL_SEED_REQS \
+	    BOOT_DEMO_WITH_AUTHORITY_MOCK=1 bash scripts/boot-demo.sh
 
 # Stop everything `make up` started, including grandchildren that
 # `boot-demo.sh`'s SIGINT trap can leak (notably `func` itself, which
