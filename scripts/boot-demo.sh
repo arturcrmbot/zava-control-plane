@@ -45,7 +45,19 @@ echo "    azurite ready; warming up 10s"
 sleep 10
 
 echo "==> mock MCPs (no watch)"
-npm run demo:mcp &
+# Phase 3 TASK-025a of plan/feature-agent-governance-toolkit-1.md:
+# the authority-mcp Node mock (port 4108) is no longer started by
+# default. Resolve / check are served in-process by the governance
+# kernel (governance.kernel().resolve_approver / check_authority).
+# Set BOOT_DEMO_WITH_AUTHORITY_MOCK=1 (or use `make boot-demo-with-authority-mock`)
+# to bring it up alongside for parity testing or for the engagement-POC
+# swap-in dry run.
+if [[ "${BOOT_DEMO_WITH_AUTHORITY_MOCK:-0}" == "1" ]]; then
+  echo "    (with authority-mcp on :4108 — set AUTHORITY_MCP_URL to use it)"
+  npm run demo:mcp:with-authority &
+else
+  npm run demo:mcp &
+fi
 pids+=($!)
 
 echo "==> fastapi + fleet manager (no reload)"

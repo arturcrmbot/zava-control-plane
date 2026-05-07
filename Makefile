@@ -1,4 +1,4 @@
-.PHONY: install dev mcp mcp-authority server functions funcvenv test test-e2e clean azurite-up azurite-down reset up agt-doctor agt-verify
+.PHONY: install dev mcp mcp-authority server functions funcvenv test test-e2e clean azurite-up azurite-down reset up up-with-authority-mock agt-doctor agt-verify
 
 install:
 	uv sync
@@ -46,8 +46,20 @@ dev: azurite-up
 
 # One command to boot the entire stack (azurite + mocks + func + fastapi + vite).
 # Ctrl-C stops everything.
+#
+# Phase 3 TASK-025a: the authority-mcp Node mock (port 4108) is no longer
+# part of the default boot. Authority resolve / check are served in-process
+# by the governance kernel. Use `make up-with-authority-mock` (or set
+# BOOT_DEMO_WITH_AUTHORITY_MOCK=1) to bring it up alongside for parity
+# testing or for the engagement-POC swap-in dry run.
 up:
 	bash scripts/boot-demo.sh
+
+# Bring up the full stack PLUS the authority-mcp Node mock on :4108.
+# Pair with AUTHORITY_MCP_URL=http://127.0.0.1:4108 in env to actually
+# route through the HTTP path (kernel is the default otherwise).
+up-with-authority-mock:
+	BOOT_DEMO_WITH_AUTHORITY_MOCK=1 bash scripts/boot-demo.sh
 
 test:
 	uv run pytest -q

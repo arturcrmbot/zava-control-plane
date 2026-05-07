@@ -125,6 +125,47 @@ Phase 1 is wiring-only — the kernel is constructed at FastAPI startup
 and at Functions worker module load but returns ALLOW for everything;
 real policy enforcement lands in Phase 2 onwards.
 
+### Authority resolution backend (Phase 3)
+
+Authority `resolve` / `check` calls — both from agent skills via
+`api.server.mcp_tools.delegated_authority` and from persona
+`decision_policy` blocks via the sandbox `authority_check` builtin —
+default to the **in-process governance kernel**. No HTTP hop, no Node
+mock required to boot the substrate.
+
+The Foundry-IQ engagement-POC swap-in seam (REQ-002) is preserved via
+a single env var:
+
+```bash
+# Default — in-process kernel walks data/synthetic/authority/matrix.json
+unset AUTHORITY_MCP_URL
+
+# Engagement-POC swap-in — HTTP path to a Foundry-IQ-backed MCP
+export AUTHORITY_MCP_URL=https://your-foundry-mcp.example/authority
+```
+
+The local Node mock at `mocks/authority-mcp/` (port 4108) is no longer
+started by `make up` / `scripts/boot-demo.sh` (TASK-025a). Two ways to
+bring it up alongside, when you want to either run the live parity test
+or rehearse the engagement-POC swap-in:
+
+```bash
+make up-with-authority-mock      # boots the full stack + authority-mcp on :4108
+# OR
+BOOT_DEMO_WITH_AUTHORITY_MOCK=1 bash scripts/boot-demo.sh
+# OR (mock standalone, no other services)
+make mcp-authority
+```
+
+To make the substrate actually call the mock once it's up, set
+`AUTHORITY_MCP_URL=http://127.0.0.1:4108`. To run the parity test
+suite against it:
+
+```bash
+AUTHORITY_MCP_LIVE=1 \
+  uv run pytest tests/api/server/services/governance/test_authority_parity.py -v
+```
+
 Then Ctrl-C `make up` and restart — that clears in-memory Fleet
 Manager + simulator state (not persisted).
 
