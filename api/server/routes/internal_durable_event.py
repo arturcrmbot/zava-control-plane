@@ -243,6 +243,31 @@ async def receive_durable_event(body: DurableEventBody):
             status_code=int(p.get("status_code", 0)),
             duration_ms=int(p.get("duration_ms", 0)),
         ))
+        # Phase 7 TASK-053: write a compact governance record into the
+        # AuditLogger hash chain so the EvidencePanel "decisions" chip
+        # has something to resolve. We deliberately strip the request /
+        # response blobs (they're already on the McpCall surface and
+        # would balloon the chain), keeping just the routing facts +
+        # the governance decision_id / policy_version envelope. No-op
+        # when the emitter didn't attach a `governance` block (legacy
+        # call sites).
+        gov = p.get("governance") if isinstance(p.get("governance"), dict) else None
+        if gov and isinstance(gov.get("decision_id"), str) and gov["decision_id"]:
+            app_state.audit.log("mcp.call", {
+                "workflow_id": wid,
+                "tool": p.get("tool", "?"),
+                "status_code": int(p.get("status_code", 0)),
+                "duration_ms": int(p.get("duration_ms", 0)),
+                "governance": {
+                    "decision_id": gov.get("decision_id"),
+                    "policy_version": gov.get("policy_version"),
+                    "allowed": gov.get("allowed"),
+                    "rule_id": gov.get("rule_id"),
+                    "action": gov.get("action"),
+                    "enforcement_mode": gov.get("enforcement_mode"),
+                    "actor": gov.get("actor"),
+                },
+            })
 
     elif body.kind == "tool.invoked":
         # Per-tool fan-out from the agent wrapper's TOOL_EXECUTION_*
