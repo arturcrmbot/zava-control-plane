@@ -4,7 +4,7 @@ version: 1.0
 date_created: 2026-05-06
 last_updated: 2026-05-06
 owner: Apex substrate
-status: 'Phase 7 complete; Phase 8 in progress'
+status: 'Completed (8/8 phases)'
 phase_1_completed: 2026-05-06 (TASK-001..007 all green)
 phase_2_completed: 2026-05-07 (TASK-008..019 all green; 31/31 governance tests pass; 0 regressions vs baseline)
 phase_3_completed: 2026-05-07 (TASK-020..025+025a all green; 79/79 governance+persona+authority tests pass, 25 live-mock cases skipped without AUTHORITY_MCP_LIVE; 0 regressions)
@@ -12,6 +12,7 @@ phase_4_completed: 2026-05-07 (TASK-026..033 all green; 55/55 governance+chain t
 phase_5_completed: 2026-05-07 (TASK-034..044 all green; Ed25519 identities + JWS-signed audit entries; 92/92 governance+audit+persona+chain tests pass; 0 regressions)
 phase_6_completed: 2026-05-07 (TASK-046..048+050 complete; TASK-045 superseded by registry-driven gates; TASK-049 iterative — env defaults to log-only so existing tests + autonomous loop stay green while registry expands; 112/112 governance+audit+persona+chain+delegated_authority tests pass; 0 regressions)
 phase_7_completed: 2026-05-07 (TASK-051..056 complete; TASK-057 Playwright deferred; KillSwitchStore + /api/governance/kill endpoints + KillSwitchPanel.tsx; 115/115 tests pass; 0 regressions)
+phase_8_completed: 2026-05-07 (TASK-058..064a complete; TASK-064 final autonomous-loop sweep deferred; CI ring + microsite OWASP card + POC3 adoption guide; 128/128 tests pass; agt verify ASI-01..ASI-10 all green; 0 regressions)
 tags: [feature, architecture, substrate, security, governance, policy, audit, identity, agt]
 ---
 
