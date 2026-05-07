@@ -1,13 +1,11 @@
 from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
-from dotenv import load_dotenv
 
-# load_dotenv MUST run before any module that reads os.environ at import time.
-# api.server.state constructs MagicLinkStore + EmailSender + BlobStore eagerly
-# using env vars; if .env hasn't been parsed yet, BlobStore comes back as None
-# and /api/portal/apply 503s with "AZURE_STORAGE_CONNECTION_STRING not set".
-load_dotenv()
+# .env is loaded by api.server.state at its module top before any stores
+# are constructed; importing app_state below triggers that. The Functions
+# worker also imports state directly, so keeping the load_dotenv() call
+# inside state.py is the single canonical entry point.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

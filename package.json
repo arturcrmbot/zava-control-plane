@@ -16,7 +16,7 @@
     "demo:ui": "vite preview --host 0.0.0.0 --port 5173",
     "demo:portal": "npm --prefix web/portal run preview -- --host 0.0.0.0 --port 5174",
     "demo:blueprint": "npm --prefix web/blueprint run preview -- --host 0.0.0.0 --port 5175",
-    "build": "tsc && vite build",
+    "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
@@ -24,17 +24,19 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "@rollup/rollup-win32-x64-msvc": "^4.60.1",
-    "@tailwindcss/oxide-win32-x64-msvc": "^4.2.2",
     "dotenv": "^17.4.2",
     "express": "^5.0.0",
-    "lightningcss-win32-x64-msvc": "^1.32.0",
     "lucide-react": "^0.400.0",
     "nanoid": "^5.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.0.0",
     "recharts": "^2.12.0"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.60.1",
+    "@tailwindcss/oxide-win32-x64-msvc": "^4.2.2",
+    "lightningcss-win32-x64-msvc": "^1.32.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0",
