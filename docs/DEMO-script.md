@@ -665,30 +665,114 @@ graph based on data.
 
 ---
 
-## Close — Constellation — 2 min
+## Close — the agentic loop, skills + tools, and Constellation — 3-4 min
 
-> Surface: `http://localhost:5175/?view=constellation`, full screen.
+> Surface: open `http://localhost:5175/?view=constellation` and
+> project it full-screen. The eight-domain ring lights up live as
+> workflows fire on the laptop.
 
-"Pull back.
+"OK, last bit. I want to do two things in the close. First, name
+the architectural choice that makes everything you've just seen
+work, because nobody's pointed at it explicitly yet. And second,
+show you what scale of this looks like.
 
-*(open the constellation view)*
+### The agentic loop — and why we don't write prompts
 
-Eight domains live in `main`. POC1 — finance — and POC2 — hiring —
-are the two we built by hand. The other six — travel pre-approval,
-vendor KYC, employee onboarding, IT access, contract renewal,
-performance review — were graduated end-to-end by a meta-skill we
-wrote called `compose-domain`. Over a weekend. The ring you're
-looking at is the actual list.
+So the choice that underpins this whole substrate is how we
+construct an agent. There's basically two camps in the industry on
+this right now, and they look superficially similar but they are
+not at all the same thing in production.
 
-One registry. One governance kernel. One audit story. One Foundry
-project. Eight domains.
+Camp one is the *prompt-engineered* agent. You take a big language
+model, you write a lengthy system prompt — 'you are a finance
+agent, you do this and that, here are some rules, please be
+careful' — and you plug a few tools in. It works in demos. It
+falls over the moment your auditor asks 'show me where it says
+the agent can't write to Workday'. The answer is — it doesn't say
+that anywhere. The prompt asks nicely. The model usually
+complies. There is no policy.
 
-The deliverable is the substrate. POC1 and POC2 are existence proofs.
-The kernel is what makes the OWASP-10 claim auditor-reproducible.
-What you're looking at on the ring is what scale across WPP's
-operating model actually looks like.
+Camp two is the *skills + tools* agent, which is what we've
+built on. Each agent has a tiny markdown file — we call it a SKILL
+file — that declares three things. Its name. Its description, in
+one or two sentences. And, critically, its allow-list of tools. It
+literally cannot call a tool that isn't in its allow-list, because
+the runtime won't let it. The CV-crystalliser agent has access to
+`ocr_extract` and that's it. The budget-checker has Workday
+position-read and an Adaptive Card composer and that's it. The
+classifier can read policy and structured claim data; it has no
+write tools at all, anywhere.
 
-Questions."
+So when the auditor asks 'how do I know this agent isn't doing
+something I don't expect' — the answer is the SKILL file plus the
+tool registry. Both are in version control. Both are signed.
+Neither involves trusting the model.
+
+This matters for a few reasons. It means new agents are cheap to
+add — you write a SKILL file, you declare an allow-list, you're
+done. It means the blast radius of any one agent is small by
+construction — even if the model goes off the rails, it can only
+do the things it's been allowed to do. It means review is
+tractable — your security team can read a SKILL file and a tool
+manifest in a coffee break, instead of reasoning about what a
+multi-thousand-token prompt might or might not do under
+adversarial input.
+
+And it composes with the AGT layer we just looked at. Tools
+declared in SKILL files have to be declared in the tool registry.
+The tool registry is what compiles into the policy bundle. The
+policy bundle is what the kernel evaluates against. So 'agent
+declares it can use a tool' and 'kernel allows the tool to be
+called' are two separate gates that both have to pass. Defence in
+depth, but the depth is structural, not bolted on.
+
+The agentic loop itself — the model reasons, picks a tool, the
+runtime validates, the kernel evaluates, the tool runs, the result
+goes back into the model — happens in a tight cycle inside each
+phase. And every step of that cycle emits an OTEL span you can
+trace in Foundry. So 'what did the agent do, in what order, against
+what policy' is not a forensics exercise. It's a tab in your
+observability dashboard.
+
+### Constellation — what scale looks like
+
+*(point at the projected ring)*
+
+So pulling back. POC1 — finance — and POC2 — hiring — are the two
+domains we built by hand for this engagement. The other six
+glowing on this ring — travel pre-approval, vendor KYC, employee
+onboarding, IT access requests, contract renewal, performance
+review — those were graduated end-to-end by a meta-skill we wrote
+called `compose-domain`. Over a single weekend.
+
+What that means is: we wrote a tool that takes a YAML brief
+describing a new domain and emits the registry entries, the phase
+graphs, the persona set, the seed data. It runs the existing
+substrate against that brief and produces a working domain. Six
+times in a row, no human in the loop on the substrate side. The
+ring you're looking at right now is the actual list of domains
+running on this laptop.
+
+And every domain on that ring inherits everything you've seen
+today. One Control Plane. One AGT governance kernel — same OWASP
+coverage, same kill switch, same Evidence chip, same audit chain.
+One Foundry project — same OTEL conventions, same evaluation
+pipeline, same cost ledger, same tracing tab. One agent registry,
+one tool registry, one policy bundle. Eight domains, and there is
+no per-domain governance story, because there is no per-domain
+substrate.
+
+The closing line I want to leave you with is — the deliverable
+isn't POC1, and it isn't POC2. The deliverable is the substrate
+that lets you run both, and the next six, and the ninth one
+you'll add when you decide what it should be. POC1 and POC2 are
+existence proofs. AGT is what makes the OWASP-10 claim something
+your auditor can re-derive themselves rather than something you
+have to ask them to take on faith. And Constellation is what scale
+across WPP's actual operating model looks like, on the same
+substrate, with the same governance, on day one.
+
+Happy to take questions."
 
 ---
 
