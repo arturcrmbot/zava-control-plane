@@ -45,4 +45,4 @@ async def test_returns_recommendation_payload():
     assert "amber" in kwargs["prompt"]
     assert kwargs["skill_label"] == "escalation-advisor"
     tool_names = {t.name for t in kwargs["tools"]}
-    assert tool_names == {"employee_history"}
+    assert tool_names == {"employee_history", "delegated_authority_resolve_approver"}

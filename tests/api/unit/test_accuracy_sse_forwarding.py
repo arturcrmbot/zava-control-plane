@@ -5,10 +5,28 @@ import json
 
 import pytest
 
-# Importing main wires the bus.on_any → hub.broadcast("fleet", ...) handler.
+# Side-effect import: brings the FastAPI app + routes into scope. The
+# bus.on_any -> hub.broadcast wiring used to live at module-import time
+# but was hoisted into the FastAPI lifespan so each app instance owns
+# exactly one subscription. The autouse fixture below replays that
+# wiring per test.
 import api.server.main  # noqa: F401  (side-effect import)
 from api.server.state import app_state
 from api.shared.events import FleetEvent
+
+
+@pytest.fixture(autouse=True)
+def _wire_bus_to_hub():
+    off = app_state.bus.on_any(
+        lambda e: app_state.hub.broadcast("fleet", e.model_dump())
+    )
+    try:
+        yield
+    finally:
+        try:
+            off()
+        except Exception:
+            pass
 
 
 @pytest.mark.asyncio
