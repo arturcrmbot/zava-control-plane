@@ -434,62 +434,113 @@ yourself'."
 
 ## Pillar 4 · System integration — 4 min
 
-> Surface: `/fleet` showing claims from multiple EMS, plus the
-> `api/shared/domains.py` registry if you want to flip to it.
+> Surface: stay on `/fleet`. The fact that you can see claims from
+> different EMS sources sitting next to each other in this view is
+> the demo for this pillar; you don't necessarily need to open
+> another window.
 
-"Two integration shapes. Direct to business systems via API/MCP, and
-the data-layer pattern via Databricks. We support both because real
-agencies have both.
+"OK so let's talk integration, because this is the bit that
+usually kills these projects. The brief is explicit on it — claims
+from multiple EMS, one Control Plane view, system-agnostic to the
+operator, and a path to add a third EMS without having to rewrite
+the agents. That's a tall order if you're plugging things in
+ad-hoc. So we made an early architectural call here that I want
+to walk you through, because it's worth the few minutes.
+
+There are essentially two integration shapes you'll find inside
+WPP. There's direct integration to business systems — REST APIs,
+SOAP if you're unlucky, that kind of thing. And there's the data-
+layer pattern where the source of truth has been consolidated into
+a lakehouse, typically Databricks. We support both, because every
+real customer has both, and you cannot pick one and tell people
+'sorry, you have to migrate'.
 
 ### Direct to systems — MCP everywhere
 
-Every external system — Workday, Concur, Maconomy, Greenhouse,
-ServiceNow, Graph — is behind an MCP server. The agent doesn't know
-the difference between them; it sees a tool catalogue.
+For the direct shape, every external system in this build —
+Workday, Concur, Maconomy, Greenhouse, ServiceNow, Microsoft
+Graph, the lot — sits behind an MCP server. Model Context Protocol.
+That's the open protocol Anthropic put out and Microsoft, OpenAI
+and the rest of the industry have rallied behind for how agents
+talk to tools.
 
-What that buys you:
-- One auth abstraction. APIM AI Gateway in front of every MCP, OAuth
-  / SAML / OBO handled at the gateway. Agents never see tokens.
-- One audit point. Every tool call is a span; the gateway is where
-  rate limits, kill switches and OBO gates live.
-- One extensibility shape. Adding a new EMS — Maconomy was our third
-  — is register the MCP, declare the tool in the relevant skill,
-  publish. **AC #9 — claims from two EMS appear identically right
-  now in this fleet view. AC #10 — extensibility, that three-step
-  shape.**
+What that buys you, very concretely:
 
-If the customer doesn't have an MCP server yet, APIM has a
-REST-to-MCP gateway that auto-generates the tool surface from an
-OpenAPI spec. So 'I have a REST API today' is a one-config-file step,
-not a custom build.
+The agent doesn't know the difference between Workday and Concur.
+It sees a tool catalogue — `claim_lookup`, `policy_search`,
+`employee_history` — and the MCP server underneath maps that to
+whatever the actual EMS calls are. So if you swap Workday for
+Workday vNext, or move from on-prem Concur to cloud Concur, the
+agent code doesn't change. You change the MCP server.
+
+There's one place where authentication happens. APIM AI Gateway in
+front of every MCP. OAuth, SAML, on-behalf-of — all handled at the
+gateway, with credentials in Key Vault. The agents never see a
+token. That matters because the alternative — agents holding
+credentials — is how you end up with a security incident.
+
+And there's one place where governance happens, which is the AGT
+chokepoint we just looked at. Every tool call is an MCP call, every
+MCP call goes through the kernel, every kernel decision goes into
+the audit chain. There isn't a back door. If you want a new
+integration, you have to register the tool — and the tool registry
+is what the policy bundle is compiled from.
+
+So adding a new EMS — and Maconomy was literally our third one,
+we did it during the build — is three steps. Register the MCP
+server in the gateway. Declare the tool in the relevant skill
+manifest. Publish. The agent skills don't change. The Control
+Plane doesn't change. The audit story doesn't change. That's the
+brief's extensibility criterion, and the answer to it is the
+architecture, not a roadmap commitment.
+
+One bonus property worth knowing — APIM has a REST-to-MCP
+gateway feature that auto-generates the MCP tool surface from an
+OpenAPI spec. So if your team has REST APIs already, which most
+WPP teams do, that's a config-file step rather than a custom
+build.
 
 ### Data layer — Databricks pattern
 
-Where the customer's source of truth is a lakehouse — Databricks,
-Fabric, anything Delta-shaped — we don't fight it. Two patterns:
+For the data-layer shape, where the source of truth is a lakehouse
+— Databricks, Fabric, anything Delta-format — we don't fight it.
+You don't want agents writing into your governed lake; that's not
+what lakes are for. So the pattern is:
 
-- **Read path**: an MCP tool fronts a SQL warehouse or Databricks SQL
-  endpoint. Agent issues structured queries against governed views.
-  Unity Catalog enforces row-level security; the agent identity
-  carries through. Same audit story.
-- **Write path** is rare for our agents — we write into the systems
-  of record (Workday, Concur), not the lake — but where it's needed
-  it's an ingestion job, not an agent action.
+For reads, an MCP tool fronts a SQL warehouse or a Databricks SQL
+endpoint. The agent issues structured queries against governed
+views — Unity Catalog enforces row-level security, the agent's
+identity is propagated through, the audit story carries because
+every query is still an MCP call going through the same chokepoint.
+So 'agent reads from the lake' has the same governance properties
+as 'agent reads from the EMS'.
 
-The point: data layer and direct system integration aren't an
-either/or. The same agent can pull a candidate's reference data from
-Databricks and post the offer back into Workday in the same workflow.
+For writes, our pattern is — agents write to the systems of record,
+not to the lake. Workday is the source of truth for the claim,
+Concur is the source of truth for the receipt, the lake aggregates
+*from* those. So when the workflow needs to post a decision, it
+posts to Workday. The lake catches up via the customer's existing
+ingestion pipeline. We don't get in the middle of that.
 
-### One registry — the substrate's claim
+The point is the two shapes aren't an either/or. The same workflow
+can pull a candidate's reference data from Databricks for context,
+make decisions through the Foundry-hosted agents, and post the
+offer back into Workday — all in one orchestration, all governed
+through the same kernel.
 
-*(optional: open `api/shared/domains.py`)*
+### One registry — the substrate's claim, made concrete
 
-Every per-domain integration fact — phases, EMS adapters, persona
-set, skill list — lives in one Python registry. The Control Plane,
-the Fleet Manager, the simulator, the phase ribbon all read from it
-at runtime. Adding the ninth domain is a registry entry plus a YAML
-brief. Not a refactor. We graduated six domains over a weekend that
-way."
+*(optional — flip to `api/shared/domains.py` in your editor for
+two seconds, then back)*
+
+And the reason adding a new domain is cheap — and we'll see this
+fully at the end — is that every per-domain integration fact lives
+in one Python registry file. Phases, EMS adapters, persona set,
+skill list, all in one place. The Control Plane reads from it. The
+Fleet Manager reads from it. The simulator reads from it. The
+phase ribbon reads from it. So adding the ninth domain is a
+registry entry plus a YAML brief. We graduated six domains over a
+single weekend that way."
 
 ---
 
