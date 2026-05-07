@@ -117,12 +117,16 @@ def _split_frontmatter(text: str) -> tuple[dict[str, Any], str]:
 # typo in a SKILL.md can't reach into the FastAPI process beyond computing a
 # decision against the context dict.
 #
-# `authority_check` is the substrate seam to the delegated_authority MCP —
-# personae call it when they want to confirm "am I authorised to sign this
-# off?" instead of inlining a numeric threshold. The wrapper is sync and
-# defensive: any HTTP error returns a denied result with the error text as
-# the reason, so the persona's worst-case behaviour is "leave the gate open"
-# rather than crash.
+# `authority_check` is the substrate seam to the delegated-authority matrix.
+# Personae call it from inside their `decision_policy` block to confirm
+# "am I authorised to sign this off?" instead of inlining a numeric
+# threshold. Phase 3 TASK-023: this now resolves through
+# ``governance.kernel().check_authority(...)`` directly — no HTTP round-trip
+# in the default (in-process) path. The Foundry-IQ swap-in seam is
+# preserved one layer down: ``delegated_authority.check_authority`` (which
+# the kernel does NOT call from here) still falls back to HTTP when
+# ``AUTHORITY_MCP_URL`` is set, so the engagement-POC contract is
+# unchanged for personae configured against a remote authority MCP.
 def _sandbox_authority_check(
     role: str,
     action: str,
@@ -132,19 +136,43 @@ def _sandbox_authority_check(
     geography: str | None = None,
     requester_role: str | None = None,
 ) -> dict[str, Any]:
-    """Sandbox-callable wrapper around delegated_authority.check_authority.
+    """Sandbox-callable wrapper around ``governance.kernel().check_authority``.
 
     Returns a plain dict (not a Pydantic object) so decision_policy code
     can read fields without importing types. Falls back to
     ``{allowed: False, reason: "...", governing_rule_id: None}`` on any
-    httpx error — the persona then knows to defer rather than guess.
+    kernel error — the persona then knows to defer rather than guess.
+
+    When ``AUTHORITY_MCP_URL`` is set in env, defers to the HTTP path
+    via ``api.server.mcp_tools.delegated_authority.check_authority`` so
+    a Foundry-IQ swap-in is honoured (engagement-POC seam, REQ-002).
     """
     try:
-        # Imported lazily so persona_responder doesn't pull httpx in import-time
-        # contexts where the authority MCP isn't reachable (tests, dry runs).
-        from api.server.mcp_tools.delegated_authority import check_authority
+        if os.environ.get("AUTHORITY_MCP_URL"):
+            # Engagement-POC swap-in path: keep the HTTP indirection so
+            # the same env var that flips the rest of the substrate
+            # also flips persona authority lookups.
+            from api.server.mcp_tools.delegated_authority import check_authority
 
-        result = check_authority(
+            result = check_authority(
+                role=role,
+                action=action,
+                value=value,
+                category=category,
+                business_unit=business_unit,
+                geography=geography,
+                requester_role=requester_role,
+            )
+            return {
+                "allowed": result.allowed,
+                "reason": result.reason,
+                "governing_rule_id": result.governing_rule_id,
+            }
+
+        # Default in-process path — TASK-023.
+        from api.server.services.governance import kernel
+
+        result = kernel().check_authority(
             role=role,
             action=action,
             value=value,
@@ -161,7 +189,7 @@ def _sandbox_authority_check(
     except Exception as ex:  # pragma: no cover — defensive only
         return {
             "allowed": False,
-            "reason": f"authority MCP unreachable: {ex}",
+            "reason": f"authority resolution failed: {ex}",
             "governing_rule_id": None,
         }
 
