@@ -14,11 +14,11 @@ Structured around the five pillars from the customer steer:
 |---|---|---|
 | Open + 1-claim anatomy | 3 | one workflow detail page |
 | Pillar 1 — Control Plane | 6 | `/fleet`, exception, bulk |
-| Pillar 2 — Orchestration & durability | 4 | same workflow + Functions trace |
-| Pillar 3 — Governance | 5 | Evidence chip, kill switch, audit blob |
-| Pillar 4 — Integration | 4 | EMS swap + Databricks/MCP framing |
+| Pillar 2 — Orchestration & durability | 4 | same workflow + Foundry trace |
+| Pillar 3 — Governance (AGT) | 5 | Evidence chip, kill switch, audit blob |
+| Pillar 4 — Integration (MCP + Databricks) | 4 | `/fleet` cross-EMS view |
 | Pillar 5 — POC2 advanced | 6 | portal apply → triage → voice → avatar |
-| Constellation close | 2 | `:5175/?view=constellation` |
+| Close — agentic loop + Constellation | 3 | `:5175/?view=constellation` |
 
 > **Pre-flight:** `make up`. Wait for one red claim parked at
 > Arbitrate. Tabs warm: workflow detail, `/fleet`, `/apply`,
