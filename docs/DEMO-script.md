@@ -197,47 +197,102 @@ the Foundry tracing tab."
 
 ## Pillar 2 · Multi-agent orchestration & durability — 4 min
 
-> Surface: same workflow page; optionally Foundry Tracing tab in
-> another window.
+> Surface: stay on the same workflow detail page. Optional second
+> tab: Foundry Tracing on `https://ai.azure.com` filtered to this
+> workflow, if connectivity allows.
 
-"Three-layer pattern, and the same three layers run every domain we
-have.
+"OK so under that nice clean fleet view there's actually quite a
+lot going on. I want to take you down one layer because the
+architecture choice we made here is the bit I think is genuinely
+interesting — and it's the bit that makes the difference between
+'cute agent demo' and 'thing you can actually run in production at
+scale'.
 
-**Layer one — the durable envelope.** Azure Durable Functions, one
-orchestrator per claim. Survives a process restart. Survives a region
-failover. Parks at a human gate via `wait_for_external_event` at zero
-compute — the 72-hour reviewer SLA costs nothing while it's waiting.
-**AC #11 — region failure recovery — is a property of this layer; we
-can yank the Functions host and the in-flight claims pick up from
-checkpoint.**
+There are three layers to how a workflow runs, and the same three
+layers run every domain on this laptop.
 
-**Layer two — the agent graph per phase.** Microsoft Agent Framework,
-typed Pregel graphs. Each phase is a graph. Inside the graph we mix
-three executor types deliberately:
+### Layer one — durable workflow envelope
 
-- Deterministic code where there's nothing to reason about — three-
-  way matches, schema checks, lookups.
-- Agent calls where judgement is needed — classification, arbitration
-  recommendation, notification drafting.
-- Validators after every agent call. The agent's output is a typed
-  contract; the validator either passes it or sends it back. Bad
-  agent output never reaches the ledger.
+The outer envelope is Azure Durable Functions. Microsoft's
+event-sourced orchestration runtime. One orchestrator instance per
+expense claim, per hire, per whatever the domain is. And it has
+two properties that matter enormously for an enterprise-scale
+fleet.
 
-This matters because it's the answer to 'how do I trust the agents'.
-The answer is: I don't have to trust them everywhere — I deterministic-
-gate them where I can, and I validate them where I can't.
+It survives. If the Functions host process crashes, if the region
+fails over, if someone deploys a new version mid-run — the
+orchestrator picks up from its last checkpoint and carries on. The
+state is event-sourced, so 'resume' isn't a feature you have to
+build, it's how it works. That's the answer to the brief's
+acceptance criterion about region recovery — it's not custom code,
+it's a property of the runtime we picked.
 
-**Layer three — the agent identity.** Each agent is a real Entra-bound
-session with its own skill manifest and tool allow-list. Today they
-run on the GitHub Copilot SDK; the engagement POC swaps them to
-Foundry Hosted Agents on the same shape. Same skills, same tools,
-same audit. The substrate doesn't change.
+And it parks at zero compute. When a workflow is waiting on a
+human — and these workflows wait on humans for hours or days —
+there's no process sitting idle burning money. The orchestrator
+suspends, durable storage holds the state, and when the external
+event arrives the orchestrator resumes from exactly where it left
+off. That matters at the volumes the brief talks about. 5,500
+end-of-quarter concurrent workflows isn't 5,500 processes. It's
+5,500 rows of state in storage.
 
-*(if Foundry Tracing tab is open: filter `cloud_RoleName ==
-control-plane-functions` and show the live span stream — every
-`gen_ai.generate_content` with usage, skill, tool calls. OTEL
-semantic conventions, the same ones SK and the OpenAI Agents SDK
-emit.)*"
+### Layer two — the agent graph per phase
+
+Inside the envelope, each phase tile you saw on the ribbon is a
+typed graph. We're using Microsoft Agent Framework for this — it's
+the open-source agent runtime that came out of the Semantic Kernel
+and AutoGen lines getting merged. The graph layer lets us mix
+three kinds of executor inside a single phase, and this is the bit
+I want you to take away because it's the answer to 'how do you
+trust the agents'.
+
+Some steps are deterministic code. Schema checks, three-way matches,
+amount comparisons, lookups against the EMS. Things where there's
+nothing to reason about — you just need the answer to be right
+every time. So those don't go anywhere near a model. We just write
+them as code.
+
+Some steps are agent calls. The classification verdict, the
+arbitration recommendation, the notification draft, the CV triage
+— things where you actually want judgement applied. Those are
+real LLM calls, real reasoning, real tool use.
+
+And the third kind — and this is the one most demos skip — every
+agent call has a validator behind it. The agent's output is a
+typed contract. The validator either passes it or it sends it
+back. So bad model output never reaches the ledger, never reaches
+the EMS, never gets posted into Workday. The agents are inside a
+guard rail, not in front of the steering wheel.
+
+The framing I'd give you is: we don't have to trust the agents
+everywhere. We deterministic-gate them where we can — and we
+validate them where we can't. That's how you get from 'this is
+clever' to 'I can put it in production'.
+
+### Layer three — the agent identity and the agentic loop
+
+We'll come back to this one in detail at the end when we look at
+how skills work — but the headline now: each agent is a real
+sessioned identity with its own skill manifest and its own tool
+allow-list. It's not 'one big chatbot prompt with everything
+plugged in'. The classifier agent literally cannot call a Workday
+write tool, because it's not in its allow-list. The arbitration
+agent can read precedents but can't post a decision. Each agent
+has the smallest possible surface area.
+
+Today these run on the GitHub Copilot agent SDK. At engagement-POC
+time they swap to Foundry Hosted Agents on the same shape — same
+skill files, same tool registry, same audit. The substrate doesn't
+change.
+
+> *(if Foundry tracing is open in another tab: filter
+> `cloud_RoleName == control-plane-functions` and show the live
+> span stream — every `gen_ai.generate_content` call with usage,
+> skill name, tool calls. Same OTEL semantic conventions Microsoft
+> Agent Framework, Semantic Kernel, the OpenAI Agents SDK and
+> Copilot all share. So this telemetry isn't proprietary — anyone
+> who builds an agent on the same conventions plugs straight into
+> the same Foundry view.)*"
 
 ---
 
