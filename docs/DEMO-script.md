@@ -30,26 +30,44 @@ Structured around the five pillars from the customer steer:
 
 > Surface: one workflow detail page (any in-flight `EXP-NNNN`).
 
-"Right — straight in. This is one expense claim, mid-flight, on this
-laptop. Workday data, Concur OAuth, real Document Intelligence on the
-receipt, real audit blob in Azure. Nothing here is a screenshot.
+"OK so what you're looking at here is one expense claim, mid-flight. I
+want to spend a couple of minutes walking around this one page before
+we look at the fleet, because every workflow in the system has the
+same shape — once you've seen one, the dashboard makes a lot more
+sense.
 
-Phase ribbon at the top is the workflow. Reasoning panel on the right
-is the agent's actual trace from this run. Cost and audit at the
-bottom.
+Quick word on what's real and what's mocked, because you'll ask
+and I'd rather you ask me than guess. The EMS connectors — Workday,
+Concur, Maconomy — are local mocks running on the laptop. We made
+that call deliberately so you can see the whole thing run end-to-end
+without waiting on sandbox credentials. The pieces that need to be
+real to be a credible claim are real: the OCR on the receipt is a
+live Azure Document Intelligence call, the audit ledger is being
+written to an actual Azure Storage blob with version-level
+immutability turned on, the LLM calls are real, and the telemetry is
+going to a real Foundry project. Mocked at the edges, real where it
+matters.
 
-Three things to know about the shape and then we move:
+Three things on the page itself.
 
-- The workflow is a Durable orchestrator. It survives restarts and
-  parks at human gates for hours or days at zero compute.
-- Each phase tile is a small graph — some deterministic code, some
-  agent calls with named identities, some validators that block bad
-  agent output before it lands anywhere.
-- The agent identities are real Entra-bound. Every tool call goes
-  through one chokepoint — that's where governance lives.
+*(point at phase ribbon)* The strip across the top is the workflow —
+seven phases for an expense claim. Each tile is its own small graph
+underneath, mixing deterministic code, agent calls, and validators
+that catch bad agent output before it lands anywhere.
 
-That's the anatomy. Now the five things you actually want to
-interrogate."
+*(point at reasoning panel)* On the right is the agent's trace from
+this run — which skill it loaded, which tools it called, what it
+concluded. Live data from this workflow, not an edited transcript.
+
+*(point at the bottom)* Cost tile and audit chain — we'll come back
+to both.
+
+The whole thing is being driven by a Durable orchestrator. That
+matters because it survives process restarts and parks at human
+gates for hours or days at zero compute — but I'll come back to that
+when we get to durability.
+
+Let me show you the fleet."
 
 ---
 
