@@ -491,7 +491,7 @@ async def receive_durable_event(body: DurableEventBody):
     elif body.kind == "agent.completed":
         # Cross-process bridge: agent.completed is emitted in the Functions
         # host's _wrapper.run_agent_session and arrives here as a webhook.
-        # Three downstream consumers:
+        # Four downstream consumers:
         #   1. The bus — api.server.eval.online_subscriber scores it.
         #   2. portal_orchestration — issues magic-link + email when
         #      cv_crystalliser passes the shortlist threshold.
@@ -499,8 +499,62 @@ async def receive_durable_event(body: DurableEventBody):
         #      the full trace (messages + tool_calls + extracted_json) so
         #      the admin Traces tab and any domain view can show what the
         #      AI thought, not just that it ran.
+        #   4. economics.compute() — needs a gen_ai.generate_content span
+        #      with `gen_ai.usage.*` attributes in *this* process's store.
+        #      The wrapper's own OTEL span lives in the Functions host
+        #      process, so we synthesize one here from the webhook payload.
         payload = {k: v for k, v in (body.payload or {}).items() if k != "type"}
         app_state.store.append_agent_reasoning(wid, payload)
+        usage = payload.get("usage") or {}
+        in_tok = usage.get("input_tokens")
+        out_tok = usage.get("output_tokens")
+        # Fallback: GHCP SDK frequently doesn't surface `usage` on
+        # response events. When that happens, estimate token counts so
+        # cost telemetry isn't silently zeroed out. Estimate inputs as
+        # the union of everything that crosses the model boundary:
+        #   - the skill SKILL.md (system message, 2-5k chars typically)
+        #   - the user prompt
+        #   - tool call args + results that the model sees back
+        #   - inline image attachments (~1.1k tokens/image for low-detail
+        #     gpt-4.1 vision; we use a fixed 1100 token allowance per
+        #     attachment which is closer to reality than chars/4 of zero)
+        # Conversion: ~4 chars/token (standard tiktoken English+code
+        # approximation). `gen_ai.usage.source` records provenance.
+        usage_source = "sdk"
+        if in_tok is None:
+            input_chars = len(payload.get("prompt") or "")
+            input_chars += int(payload.get("skill_chars") or 0)
+            for tc in payload.get("tool_calls") or []:
+                input_chars += len(str(tc.get("args") or ""))
+                input_chars += len(str(tc.get("result") or ""))
+            in_tok = max(1, input_chars // 4)
+            in_tok += 1100 * int(payload.get("attachment_count") or 0)
+            usage_source = "estimated_from_chars"
+        if out_tok is None:
+            out_tok = max(1, len(payload.get("response_text") or "") // 4)
+            usage_source = "estimated_from_chars"
+        latency_ms = int(payload.get("latency_ms") or 0)
+        end_ms = now * 1000
+        start_ms = end_ms - latency_ms
+        attrs: dict = {
+            "workflow.id": wid,
+            "gen_ai.system": "github_copilot",
+            "gen_ai.request.model": payload.get("model") or "gpt-4.1",
+            "gen_ai.agent.name": "finance-agent",
+            "gen_ai.usage.input_tokens": int(in_tok),
+            "gen_ai.usage.output_tokens": int(out_tok),
+            "gen_ai.usage.source": usage_source,
+        }
+        if payload.get("agent_label"):
+            attrs["wpp.skill"] = payload["agent_label"]
+        app_state.store.append_span(OtelSpan(
+            trace_id=wid,
+            span_id=uuid.uuid4().hex[:16],
+            name="gen_ai.generate_content",
+            start_ms=start_ms,
+            end_ms=end_ms,
+            attributes=attrs,
+        ))
         _emit("agent.completed", wid, **payload)
 
     elif body.kind == "workflow.completed":
@@ -544,6 +598,16 @@ async def receive_durable_event(body: DurableEventBody):
             # now wrong for hiring (Interview/Offer rejection) and the six
             # fleet-* domains (each has its own gate names). Keep
             # current_phase as whatever it was when the rejection landed.
+            #
+            # Clear the awaiting markers so the WorkflowDetail header tile
+            # shows the terminal "Rejected" status instead of a stale
+            # "Awaiting operator review" pill from when the gate was open.
+            if w.metadata:
+                w.metadata = {k: v for k, v in w.metadata.items()
+                              if k not in {"awaiting_reason", "wait_kind"}}
+            w.metadata = dict(w.metadata or {})
+            w.metadata["rejected_at_phase"] = w.current_phase
+            w.metadata["rejected_by"] = body.payload.get("by") or "operator"
         _auto_resolve_open(wid, "auto-resolved:rejected")
         pending_gates.clear(wid)
         # Drop the workflow_type cache entry + any leftover span starts

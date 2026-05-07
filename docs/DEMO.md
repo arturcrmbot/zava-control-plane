@@ -7,9 +7,22 @@ a speed-run.
 | Act | Time | What |
 |---|---|---|
 | 1 · Intro — workflow + architecture at a glance | 5 min | How a workflow actually runs · what's on the laptop · what's in Azure / Foundry |
-| 2 · POC1 — Control Plane | 15 min | Finance Controller + SSC Reviewer governing 30+ agentic expense workflows |
+| 2 · POC1 — Control Plane | 15 min | Finance Controller + SSC Reviewer governing 30+ agentic expense workflows; AGT governance evidence on every workflow |
 | 3 · POC2 — standalone end-to-end | 15 min | Candidate → recruiter → hiring manager → onboarding; the Control Plane stays closed |
 | 4 · Constellation — the substrate | 5 min | Pull back to the eight-domain view; the central claim of the bid |
+
+## Boot / teardown
+
+```bash
+make up      # boots azurite + 3 mock MCPs + FastAPI + Functions + 3 vite previews
+make down    # clean teardown (kills `func` orphans + frees ports)
+```
+
+First spawn lands ~60s after `make up`. Wait until you can see at
+least one workflow on /fleet before starting the recording. The
+`bash scripts/down-demo.sh` target frees ports 7071 / 3001 /
+5173-5175 / 10000-10002 / 4101-4103 even when the boot script's trap
+didn't catch a grandchild process — always run it between recordings.
 
 Detailed runbooks if you want to drill in:
 
@@ -19,6 +32,7 @@ Detailed runbooks if you want to drill in:
 - Substrate / blueprint pitch: [blueprint.md](blueprint.md)
 - Architecture canon: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Lab vs engagement-POC scope: [SCOPE-DELTA.md](SCOPE-DELTA.md)
+- AGT governance plan: [feature-agent-governance-toolkit-1.md](../plan/feature-agent-governance-toolkit-1.md)
 
 ---
 
@@ -111,25 +125,68 @@ the agent fleet that operates those systems. Lead here.
 **Surface:** `http://localhost:5173` · role: Agent Administrator (top
 right of the chrome).
 
+### Demo defaults
+
+The canonical demo profile (`PERSONA_AUTO_CLOSE` set in `.env`) makes
+every external-party persona auto-respond — the only gate that lands
+in the human queue is **`ssc_reviewer`** (the Arbitrate phase of a Red
+expense claim). Workflows ramp at ~1/min. Within 2-3 minutes of
+`make up` you should see the first red claim suspend at Arbitrate and
+appear in the operator review queue.
+
 ### Finance Controller (London) — `/fleet`
 
 Open on the Fleet dashboard. Take a moment to explain the framing
 before clicking: ~30 in-flight expense workflows; the green ones
 auto-process invisibly; only the exceptions surface.
 
-- **Fleet view** with exception-only surfacing (AC #1, AC #2).
-- **Drill into a flagged workflow** — phases, agent reasoning, cited
-  policy clauses, executor mix (deterministic / agent / validator)
+- **Fleet view** with exception-only surfacing (AC #1, AC #2). The
+  exception queue (`/api/exceptions`) only shows workflows currently
+  `awaiting_hitl`, deduplicated per workflow id — the queue and the
+  active workflow list are always in sync.
+- **Drill into a flagged workflow** (any EXP-NNNN with the red
+  "STALLED · Exception at Arbitrate" tile) — phases, agent
+  reasoning, cited policy clauses, executor mix (deterministic /
+  agent / validator)
   (AC #4, [`expense_claim.py`](../api/functions/workflows/expense_claim.py)).
+- **Reject a claim** — click into a workflow that's parked at
+  Arbitrate, hit Reject. Header tile flips to red **STATUS ·
+  REJECTED — "Rejected at Arbitrate"**, the phase ribbon paints
+  Arbitrate red ✖, and the action ledger gains
+  `human/finance-controller@wpp · reviewer.decision:reject` +
+  `workflow.rejected`. The workflow disappears from the exception
+  queue immediately.
 - **Bulk action** — one decision applied across a clustered exception
   set (AC #3, [`BulkHitlModal.tsx`](../web/client/components/BulkHitlModal.tsx)).
 - **Cost tile** — reads real `gen_ai.usage.*` token spans × published
   Azure rates (AC #13,
-  [`model_pricing.py`](../api/server/services/model_pricing.py)). No
-  synthetic constants. Same number Foundry shows.
+  [`model_pricing.py`](../api/server/services/model_pricing.py)). The
+  GHCP SDK rarely returns `usage` natively; `agent.completed`
+  webhook estimates from prompt + skill + tool-call args + image
+  attachments (chars/4 tokeniser approximation, +1.1k tokens per
+  inline image for vision). Provenance tagged on every span as
+  `gen_ai.usage.source = sdk | estimated_from_chars`. Same number
+  Foundry shows.
 - **Audit ledger** — `auditBlobUrl` on the workflow detail. Open the
   versioned, retention-policy-protected append blob in the browser
   (AC #12).
+- **Evidence chip + AGT panel** (sidebar on every workflow detail) —
+  the `EvidencePanel` calls `GET /api/governance/verify/{wf}` and
+  renders three sub-chips (`chain` / `signatures` / `decisions`).
+  All three green = the action ledger is a verifiable Ed25519
+  JWS-signed hash chain rooted in the AGT policy bundle that was
+  live at each timestamp. Click through and explain: the bid's
+  "OWASP Agentic Top 10 — 10/10 covered" claim is
+  auditor-reproducible from this endpoint plus
+  `agt verify --evidence <blob>`.
+- **Kill switch panel** (sidebar) — form lets the operator pause an
+  agent or block a tool fleet-wide for a TTL. Sub-second; no
+  redeploy. The kernel consults the kill table on every
+  `evaluate_tool_call`. Useful demo beat: post a 30-min kill on
+  `concur.submit_decision`, point out that the Functions worker
+  doesn't need to restart — next attempt by any agent is denied
+  with a structured `GovernanceDenied` decision_id that the
+  operator can trace through Foundry Tracing.
 - **Fleet Manager chat** (right rail) — natural-language probe of the
   fleet ("cost this week", "stalled arbitrations", "repeat
   offenders"). Watch tool calls and reasoning stream.
@@ -148,8 +205,10 @@ cited precedent (AC #8).
 ### Justification round-trip — narrated
 
 End-to-end Red workflow → employee notification → justification →
-arbitration → resolution. Walk live if time permits, narrate over a
-completed workflow if not (AC #7).
+arbitration → resolution. With the canonical demo profile the
+`claim_submitter` persona auto-supplies the justification; the
+operator only sees the **Arbitrate** gate. Walk live if time permits,
+narrate over a completed workflow if not (AC #7).
 
 ### Reserve beats (only if asked)
 
@@ -157,6 +216,11 @@ completed workflow if not (AC #7).
 - Region failure recovery — `POST /api/simulator/region-failure` (AC #11).
 - Repeat-offender progressive enforcement (AC #6).
 - Live Foundry Tracing tab on the workflow currently on screen.
+- Show `make agt-verify` in a terminal — runs `agt verify` against the
+  whole repo's audit blobs, prints the chain summary.
+- Show the AGT policy bundle hash on stdout from boot ("AGT v3.4 ·
+  bundle hash 0x…") to reinforce SEC-001 (deterministic policy
+  compilation — same matrix.json + tools.yaml = byte-identical YAML).
 
 ---
 
@@ -236,17 +300,29 @@ renders a personalised welcome avatar via real Azure AI Speech
 
 Pull back. POC1 and POC2 are two domains; the substrate runs eight.
 
-**Surface:** Control Plane sidebar → **Constellation ↗** (opens the
-blueprint microsite at `:5175/?view=constellation` full-screen).
+**Surface:** the blueprint microsite at `:5175` is split in two:
 
-Three points, briskly:
+- **`http://localhost:5175/`** — the editorial page. Scroll-driven
+  narrative of the substrate; the POC1 / POC2 / Constellation /
+  Authority / OWASP cards are stacked sections.
+- **`http://localhost:5175/?view=constellation`** — standalone
+  full-screen Constellation view. Project this. The eight-domain
+  ring lights up live as workflows fire on the laptop — same FleetEvent
+  bus, same data, just a different surface.
 
-1. **Eight domains live in `main`** — POC1 (finance) and POC2 (hiring)
+The Control Plane sidebar has a **Constellation ↗** link that opens the
+full-screen view in a new tab; click that and switch into projector
+mode for the closing.
+
+Four points, briskly, against the lit-up canvas:
+
+1. **Eight domains live in `main`.** POC1 (finance) and POC2 (hiring)
    were hand-built; six fleet-* domains (travel pre-approval, vendor
    KYC, employee onboarding, IT access, contract renewal, perf review)
    were graduated end-to-end by the
    [`compose-domain`](superpowers/skills/compose-domain/SKILL.md)
-   meta-skill over a single weekend.
+   meta-skill over a single weekend. The ring on the canvas is the
+   actual list.
 2. **One registry, no per-domain branches.** Every per-domain
    integration fact lives in
    [`api/shared/domains.py`](../api/shared/domains.py); the generic
@@ -255,14 +331,23 @@ Three points, briskly:
    ribbon) read from it at runtime. Adding the ninth domain = a
    registry entry plus a YAML brief through `compose-domain`. Not a
    refactor.
-3. **Same Foundry project across all eight.** Same OTEL semantic
+3. **One governance kernel for all eight.** The AGT policy bundle
+   compiles from the same `data/synthetic/authority/matrix.json` +
+   `data/policies/tools.yaml` regardless of domain. Every MCP tool
+   call — in any of the eight domains — routes through the same
+   `evaluate_tool_call` chokepoint with the same enforcement rules,
+   the same hash-chained ledger, the same `agt verify` story. Open
+   the editorial page's **OWASP Agentic AI Top 10** card and the
+   **Authority** card to ground this.
+4. **Same Foundry project across all eight.** Same OTEL semantic
    conventions, same evaluation pipeline, same cost ledger. The
    Foundry Tracing tab filtered by `cloud_RoleName ==
    "control-plane-functions"` shows the live cross-domain trace
    stream.
 
 Closing line: *the substrate is the deliverable; POC1 and POC2 are two
-existence proofs of it.*
+existence proofs of it, AGT is the governance core that makes the
+claim auditor-reproducible, and Constellation is what scale looks like.*
 
 ---
 
@@ -270,12 +355,19 @@ existence proofs of it.*
 
 Live stack stays running. Anticipated probe themes:
 
-- Provenance of cost numbers (real token spans, not constants).
-- Immutability of the audit ledger (live verification on the append blob).
+- Provenance of cost numbers (real token spans where the SDK reports
+  them; chars/4 tokeniser estimate when it doesn't, with provenance
+  tagged on the span as `gen_ai.usage.source`).
+- Immutability of the audit ledger (live verification on the append
+  blob via the Evidence chip + `agt verify`).
 - How a ninth domain gets added (the substrate's central claim).
 - Where Foundry (tracing, evaluation, observability) sits next to the
   agent runtime.
+- AGT — OWASP Agentic Top 10 coverage, the in-process kernel vs the
+  retained `mocks/authority-mcp/` HTTP swap-in seam, kill switch flow,
+  Ed25519 agent identities, the `decision_id` on every ledger entry.
 - Lab-build vs engagement-POC scope — what is real today, what
   Microsoft commits to deliver during the engagement
   ([SCOPE-DELTA.md](SCOPE-DELTA.md)).
 - Skills + MCP tool allow-lists vs prompt-only engineering.
+- `make down` for clean teardown between recordings.

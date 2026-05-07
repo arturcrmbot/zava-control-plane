@@ -1,4 +1,4 @@
-.PHONY: install dev mcp mcp-authority server functions funcvenv test test-e2e clean azurite-up azurite-down reset up up-with-authority-mock agt-doctor agt-verify
+.PHONY: install dev mcp mcp-authority server functions funcvenv test test-e2e clean azurite-up azurite-down reset up down up-with-authority-mock agt-doctor agt-verify
 
 install:
 	uv sync
@@ -60,6 +60,14 @@ up:
 # route through the HTTP path (kernel is the default otherwise).
 up-with-authority-mock:
 	BOOT_DEMO_WITH_AUTHORITY_MOCK=1 bash scripts/boot-demo.sh
+
+# Stop everything `make up` started, including grandchildren that
+# `boot-demo.sh`'s SIGINT trap can leak (notably `func` itself, which
+# starts in its own process group). Idempotent — safe to run when
+# nothing is up. Uses pkill -f matching on stable substrings of each
+# process command line.
+down:
+	@bash scripts/down-demo.sh
 
 test:
 	uv run pytest -q
