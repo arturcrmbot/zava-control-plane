@@ -160,6 +160,50 @@ export default function RecruiterCandidate() {
           <span className="bg-white/10 backdrop-blur rounded-full px-3 py-1.5 border border-white/20">
             <span className="opacity-70">workflow:</span> <strong className="ml-1">{w.id}</strong>
           </span>
+          {/* Email-fallback links — opens the candidate experience in a new tab
+              so the recruiter can demo it without depending on ACS Email. */}
+          {(() => {
+            const statusTok = data.active_tokens.find((t) => t.scope === "status");
+            const screenTok = data.active_tokens.find((t) => t.scope === "screen");
+            const offerTok = data.active_tokens.find((t) => t.scope === "offer");
+            return (
+              <>
+                {statusTok && (
+                  <a
+                    href={`${window.location.origin}/portal?token=${statusTok.token}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-blue-500/30 hover:bg-blue-500/50 backdrop-blur rounded-full px-3 py-1.5 border border-blue-300/40 transition"
+                    title="Open the candidate's portal in a new tab — use this if email delivery is unavailable"
+                  >
+                    🔗 View as candidate ↗
+                  </a>
+                )}
+                {screenTok && (
+                  <a
+                    href={`${window.location.origin}/screen?token=${screenTok.token}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-emerald-500/30 hover:bg-emerald-500/50 backdrop-blur rounded-full px-3 py-1.5 border border-emerald-300/40 transition"
+                    title="Open the voice screening surface as this candidate"
+                  >
+                    🎤 Open screening ↗
+                  </a>
+                )}
+                {offerTok && statusTok && (
+                  <a
+                    href={`${window.location.origin}/portal?token=${statusTok.token}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-amber-500/30 hover:bg-amber-500/50 backdrop-blur rounded-full px-3 py-1.5 border border-amber-300/40 transition"
+                    title="Open the offer surface as this candidate"
+                  >
+                    📨 Open offer ↗
+                  </a>
+                )}
+              </>
+            );
+          })()}
         </div>
       </div>
 

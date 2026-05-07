@@ -22,13 +22,17 @@ import { getScreenResolve, postCannedScreen, postTranscript } from "../lib/api";
  * the WebRTC plumbing entirely. Useful for environments without mic / Azure.
  */
 
-// Anchoring the agent with a named persona + explicit voice/tone instruction
-// stops the GPT-Realtime model from drifting between speaker timbres across
-// turns (the model otherwise treats each turn as a fresh voice sample).
-const SCREENING_PROMPT = `You are Maya Chen, a friendly recruiter at WPP doing a 60-second voice screen for a Senior Data Engineer role.
-You are a woman in your mid-thirties. Speak with a consistent, warm, natural feminine voice and tone for the entire call. Do not change your voice, accent, or speaking style between turns.
+// Anchoring the agent with an explicit voice/tone instruction stops the
+// GPT-Realtime model from drifting between speaker timbres across turns
+// (the model otherwise treats each turn as a fresh voice sample). The
+// underlying voice is `ash` (consistent masculine) per AZURE_REALTIME_VOICE
+// in .env — see api/server/routes/portal_voice.py. The prompt below
+// reinforces the masculine tone and keeps the interviewer un-named so the
+// agent never introduces a persona that contradicts the chosen voice.
+const SCREENING_PROMPT = `You are a professional recruiter at WPP conducting a 60-second voice screen for a Senior Data Engineer role.
+You are a man in your mid-forties. Speak with a consistent, warm, natural masculine voice and tone for the entire call. Do not change your voice, accent, or speaking style between turns. Do not introduce yourself by name.
 
-Open with a quick greeting ("Hi, I'm Maya from WPP — thanks for taking the time today"), then ask 4 questions in order and let the candidate answer each:
+Open with a quick greeting ("Hi, thanks for taking the time today — I'd like to ask you a few quick questions"), then ask 4 questions in order and let the candidate answer each:
   1. "Tell me about your most impactful data project in the last year."
   2. "What's one technology you're excited to learn about right now?"
   3. "Are you authorised to work in the country we're hiring for?"

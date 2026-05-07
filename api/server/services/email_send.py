@@ -19,6 +19,7 @@ import base64
 import hashlib
 import hmac
 import json
+import threading
 import time
 import uuid
 from datetime import datetime, timezone
@@ -34,6 +35,24 @@ class EmailSendError(Exception):
 
 
 _ACS_API_VERSION = "2023-03-31"
+
+# Two ACS Email failure modes were tripping up the demo:
+#   1. Duplicate emails on replay. Sync bus handlers re-fire the shortlist /
+#      offer / application-received emails for the same (candidate, scope)
+#      whenever a workflow event re-emits (durable replay, ramp restart,
+#      operator re-triggers). ACS sees the burst as identical sends back-to-
+#      back and rate-limits us with 429.
+#   2. Bursts when many workflows enter the same phase together (e.g.
+#      Constellation Mode flips PERSONA_AUTO_CLOSE on and 5+ HIRE workflows
+#      auto-resolve to the offer phase within ms of each other). One 429
+#      previously was fatal because there was no retry path.
+#
+# DEDUPE_TTL_SECONDS guards (1): if the same candidate gets the same subject
+# within the window, the second call no-ops and returns the original
+# message_id. ACS_RETRY_BACKOFF_SECONDS guards (2): on 429 we sleep and try
+# again; only after the final retry do we raise.
+DEDUPE_TTL_SECONDS = 60.0
+ACS_RETRY_BACKOFF_SECONDS = (2.0, 5.0)
 
 
 def _parse_connection_string(conn: str) -> tuple[str, str]:
@@ -104,6 +123,47 @@ class EmailSender:
         self.sender_address = sender_address
         self.outbox_dir = Path(outbox_dir)
         self.outbox_dir.mkdir(parents=True, exist_ok=True)
+        # Idempotency cache: (candidate_id, subject) -> (last_message_id, ts).
+        # Cleared opportunistically on every send by walking entries older
+        # than DEDUPE_TTL_SECONDS. Lock guards the dict because FastAPI runs
+        # sync bus handlers in a threadpool and bus subscribers can fire
+        # concurrently.
+        self._dedupe: dict[tuple[str, str], tuple[str, float]] = {}
+        self._dedupe_lock = threading.Lock()
+
+    def _dedupe_key(self, *, to: str, subject: str, candidate_id: str | None) -> tuple[str, str]:
+        # Prefer candidate_id when present (stable identity); fall back to
+        # the recipient address so non-candidate sends still dedupe.
+        ident = candidate_id or to
+        return (ident, subject)
+
+    def _check_dedupe(
+        self, *, to: str, subject: str, candidate_id: str | None
+    ) -> str | None:
+        """Return a previously-sent message_id if the same logical email
+        was sent within DEDUPE_TTL_SECONDS, else None."""
+        now = time.time()
+        key = self._dedupe_key(to=to, subject=subject, candidate_id=candidate_id)
+        with self._dedupe_lock:
+            # Cheap cleanup of expired entries.
+            stale = [k for k, (_mid, ts) in self._dedupe.items() if now - ts > DEDUPE_TTL_SECONDS]
+            for k in stale:
+                self._dedupe.pop(k, None)
+            entry = self._dedupe.get(key)
+            if entry is None:
+                return None
+            mid, ts = entry
+            if now - ts > DEDUPE_TTL_SECONDS:
+                self._dedupe.pop(key, None)
+                return None
+            return mid
+
+    def _record_dedupe(
+        self, *, to: str, subject: str, candidate_id: str | None, message_id: str
+    ) -> None:
+        key = self._dedupe_key(to=to, subject=subject, candidate_id=candidate_id)
+        with self._dedupe_lock:
+            self._dedupe[key] = (message_id, time.time())
 
     def send(
         self,
@@ -113,10 +173,20 @@ class EmailSender:
         html_body: str,
         candidate_id: str | None = None,
     ) -> str:
+        # Idempotency guard. If the same logical email was sent within the
+        # window, no-op and return the original id. This is the primary fix
+        # for the ACS 429 storms we hit on replay/restart.
+        cached_id = self._check_dedupe(to=to, subject=subject, candidate_id=candidate_id)
+        if cached_id is not None:
+            print(f"[email] dedupe hit: skip send to={to!r} subject={subject!r} "
+                  f"candidate={candidate_id!r} → {cached_id}")
+            return cached_id
+
         if self.connection_string is None:
             message_id = f"local-{uuid.uuid4().hex}"
             self._write_outbox(message_id, html_body)
             self._write_meta(message_id, to=to, subject=subject, candidate_id=candidate_id)
+            self._record_dedupe(to=to, subject=subject, candidate_id=candidate_id, message_id=message_id)
             return message_id
 
         endpoint, access_key = _parse_connection_string(self.connection_string)
@@ -130,46 +200,72 @@ class EmailSender:
         }
         body_bytes = json.dumps(body, separators=(",", ":")).encode("utf-8")
 
-        host = urlparse(endpoint).netloc
-        date = _format_rfc1123(datetime.now(timezone.utc))
-        chash = _content_hash(body_bytes)
-        string_to_sign = f"POST\n{path_and_query}\n{date};{host};{chash}"
-        signature = _sign(string_to_sign, access_key)
-        authorization = (
-            "HMAC-SHA256 SignedHeaders=x-ms-date;host;x-ms-content-sha256"
-            f"&Signature={signature}"
-        )
-
-        headers = {
-            "Content-Type": "application/json",
-            "x-ms-date": date,
-            "x-ms-content-sha256": chash,
-            "Authorization": authorization,
-            "repeatability-request-id": str(uuid.uuid4()),
-            "repeatability-first-sent": date,
-        }
-
-        try:
-            resp = httpx.post(
-                url, content=body_bytes, headers=headers, timeout=30.0
+        # Retry-with-backoff loop. Only retries on 429 (rate limit) and
+        # transient httpx transport errors; any other 4xx/5xx fails fast.
+        # Headers (date, signature, repeatability id) are recomputed on each
+        # attempt so the HMAC signature stays valid past the first try.
+        backoffs = list(ACS_RETRY_BACKOFF_SECONDS) + [None]  # final attempt has no sleep after
+        last_error: str | None = None
+        for attempt_idx, backoff in enumerate(backoffs):
+            host = urlparse(endpoint).netloc
+            date = _format_rfc1123(datetime.now(timezone.utc))
+            chash = _content_hash(body_bytes)
+            string_to_sign = f"POST\n{path_and_query}\n{date};{host};{chash}"
+            signature = _sign(string_to_sign, access_key)
+            authorization = (
+                "HMAC-SHA256 SignedHeaders=x-ms-date;host;x-ms-content-sha256"
+                f"&Signature={signature}"
             )
-        except httpx.HTTPError as exc:
-            raise EmailSendError(f"ACS Email transport error: {exc}") from exc
+            headers = {
+                "Content-Type": "application/json",
+                "x-ms-date": date,
+                "x-ms-content-sha256": chash,
+                "Authorization": authorization,
+                "repeatability-request-id": str(uuid.uuid4()),
+                "repeatability-first-sent": date,
+            }
+            try:
+                resp = httpx.post(
+                    url, content=body_bytes, headers=headers, timeout=30.0
+                )
+            except httpx.HTTPError as exc:
+                last_error = f"transport error: {exc}"
+                if backoff is not None:
+                    print(f"[email] attempt {attempt_idx + 1} transport error → sleep {backoff}s and retry")
+                    time.sleep(backoff)
+                    continue
+                raise EmailSendError(f"ACS Email transport error after retries: {exc}") from exc
 
-        if resp.status_code >= 400:
-            raise EmailSendError(
-                f"ACS Email returned {resp.status_code}: {resp.text}"
-            )
+            if resp.status_code == 429:
+                last_error = f"429 throttled: {resp.text[:200]}"
+                if backoff is not None:
+                    print(f"[email] attempt {attempt_idx + 1} got 429 → sleep {backoff}s and retry")
+                    time.sleep(backoff)
+                    continue
+                raise EmailSendError(
+                    f"ACS Email throttled (429) after {len(backoffs)} attempts: {resp.text[:200]}"
+                )
 
-        try:
-            payload = resp.json()
-        except Exception as exc:  # pragma: no cover — defensive
-            raise EmailSendError(f"ACS Email non-JSON response: {resp.text}") from exc
+            if resp.status_code >= 400:
+                # Non-retriable client/server error — fail fast.
+                raise EmailSendError(
+                    f"ACS Email returned {resp.status_code}: {resp.text}"
+                )
 
-        message_id = payload.get("id") or f"local-{uuid.uuid4().hex}"
-        self._write_outbox(message_id, html_body)
-        self._write_meta(message_id, to=to, subject=subject, candidate_id=candidate_id)
-        return message_id
+            # Success path.
+            try:
+                payload = resp.json()
+            except Exception as exc:  # pragma: no cover — defensive
+                raise EmailSendError(f"ACS Email non-JSON response: {resp.text}") from exc
+
+            message_id = payload.get("id") or f"local-{uuid.uuid4().hex}"
+            self._write_outbox(message_id, html_body)
+            self._write_meta(message_id, to=to, subject=subject, candidate_id=candidate_id)
+            self._record_dedupe(to=to, subject=subject, candidate_id=candidate_id, message_id=message_id)
+            return message_id
+
+        # Defensive — the loop above always returns or raises.
+        raise EmailSendError(f"ACS Email exhausted retries: {last_error or 'unknown'}")
 
     def _write_outbox(self, message_id: str, html_body: str) -> None:
         path = self.outbox_dir / f"{message_id}.html"

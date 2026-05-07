@@ -102,6 +102,10 @@ export type CandidateRow = {
   status?: string | null;
   awaiting_reason?: string | null;
   active_tokens?: string[];
+  // Email-fallback URLs the recruiter can click directly to step into the
+  // candidate experience without waiting on ACS Email delivery.
+  status_token_url?: string | null;
+  screen_token_url?: string | null;
 };
 
 export async function getCandidates(): Promise<CandidateRow[]> {
