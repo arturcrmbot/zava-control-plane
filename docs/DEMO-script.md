@@ -298,67 +298,137 @@ change.
 
 ## Pillar 3 · Governance, security & compliance — 5 min
 
-> Surface: Evidence chip in workflow sidebar, then Kill Switch panel,
-> then the auditBlobUrl.
+> Surface: scroll the workflow detail to the Evidence chip in the
+> sidebar. Then the Kill Switch panel. Then the auditBlobUrl link.
 
-"This is the part the CISO will care about most. Three pieces.
+"Right — this is the bit your CISO will want to spend the most time
+on, so I'm going to slow down here.
 
-### How a policy gets to a running agent
+The thing I want to put a name on first, because it underpins
+everything in this section, is a piece of Microsoft tech called the
+Agent Governance Toolkit. AGT for short. It's a relatively new
+open-source kit from Microsoft Research — it shipped to public
+preview a few weeks ago — and what it does is it gives you a single
+in-process policy kernel that mediates every tool call any agent
+makes, with a hash-chained signed audit ledger underneath. It's
+essentially the missing 'governance layer' that nobody had a clean
+answer for in the agentic stack until now.
 
-There's one governance kernel, in-process. The policy bundle compiles
-from two sources of truth: the delegated authority matrix, and the
-tool registry. Both are version-controlled, both are signed.
+We've integrated AGT into the substrate as the runtime governance
+core. And honestly this is the bit I'm most proud of in this build,
+because it took the bid response's 'OWASP Agentic Top 10 — ten of
+ten' from being a marketing claim into being a thing your auditor
+can re-derive themselves from a CLI command and the audit blob.
+Let me show you what that means in three concrete pieces.
 
-When a policy changes:
-- It's a PR against the matrix or the tool registry.
-- The bundle compiles deterministically — same inputs, byte-identical
-  output, hash printed on boot.
-- Approved bundle is published. Every agent session, on every tool
-  call, evaluates against the bundle that was live at *that*
-  timestamp.
+### Piece one — how policy gets to a running agent
 
-So 'how does a new rule reach the fleet' is — merge, publish,
-sub-second propagation. No redeploy. No agent restart. And every
-decision the kernel makes carries a `decision_id` you can trace.
+There's one place where policy lives — a delegated authority
+matrix that's already in this repo, plus a tool registry that
+declares for every MCP tool whether it's reversible, what it costs,
+who can call it. Both of those are version-controlled, both are
+signed.
 
-### Runtime kill switch
+When something changes — say a new approval threshold, or a tool
+gets locked down — it's a pull request against those two files.
+The policy bundle compiles deterministically; same inputs always
+produce the byte-identical output, with a hash printed on the
+console at boot. That determinism matters because it means the
+auditor can take the YAML out of the audit blob, recompile it from
+the source files at the timestamp on the entry, and prove they
+match. No drift, no 'who changed what when' arguments.
 
-*(point at Kill Switch panel)*
+Once it's published, every agent session, on every tool call,
+evaluates against the bundle that was live at *that* timestamp. So
+'how does a new policy reach the fleet' is — merge, publish,
+sub-second propagation. No agent restart. No deploy. The kernel
+reloads in process.
 
-Operational override for when a policy change isn't fast enough. I
-can kill an agent or a tool fleet-wide for a TTL. *(walk the form —
-e.g. `concur.submit_decision`, 30 minutes)* The next attempt by any
-agent gets a structured `GovernanceDenied` with a `decision_id`. No
-restart, no deploy. This is the fire-extinguisher.
+### Piece two — runtime kill switch
 
-### Evidence — the claim is reproducible
+*(point at the Kill Switch panel in the sidebar)*
 
-*(point at Evidence chip — chain / signatures / decisions)*
+Now the policy compile-and-publish flow is governed and slow,
+which is the right answer for the 99% case. But sometimes you need
+'stop, now'. Something's misbehaving, an agent's looping on a
+tool, a vendor's API is down and you don't want fifty agents
+hammering it. The kill switch is the runtime override.
 
-Every action in the ledger is an Ed25519-signed JWS, hash-chained to
-the previous entry, rooted in the policy bundle that was live at the
-time. The chip shows three sub-checks; all green means the chain is
-intact, signatures verify, and every decision references a real
-bundle.
+The operator fills in the form here — actor or tool, TTL, reason —
+and posts it. *(walk the form — for instance:
+`concur.submit_decision`, 30 minutes, reason 'investigating
+duplicate submissions')*. The kernel consults the kill table on
+every single tool call. So the next attempt by any agent
+anywhere in the fleet to call that tool comes back with a
+structured `GovernanceDenied` decision, with a `decision_id` the
+operator can trace through Foundry. The Functions worker doesn't
+restart. There's no deploy. It's hot.
 
-*(click through if it expands)*
+That's the operational fire-extinguisher your security team needs
+in their hand before they'll ever sign off on increasing autonomy.
 
-The bid says OWASP Agentic AI Top 10, ten of ten. That claim is
-auditor-reproducible from this endpoint plus the `agt verify` CLI
-against the audit blob. Not a slide.
+### Piece three — the Evidence chip
 
-### Immutability — enforced by Azure, not by us
+*(point at the Evidence chip in the sidebar — three sub-chips:
+chain, signatures, decisions)*
 
-*(point at auditBlobUrl)*
+This is the part where the OWASP claim gets made auditor-
+reproducible. Three sub-chips. Let me unpack each one because they
+each prove something different.
 
-Every ledger entry is dual-written to an Azure Storage append blob
-with version-level immutability on. The retention policy is enforced
-by Azure itself. If our code tried to mutate it, Azure would refuse.
-**AC #12.**
+**Chain.** Every entry in the action ledger has a hash of the
+previous entry baked into it. So the ledger is a hash chain — if
+anyone in the middle modified any entry, every subsequent entry's
+hash would no longer match. The chain check verifies the whole
+chain end to end. If it goes red, it tells you exactly which entry
+broke.
 
-So the chain answers 'has the content been tampered with', and the
-blob policy answers 'can the storage be tampered with'. Both have to
-fail for the audit to be wrong."
+**Signatures.** Every entry is signed by the actor that produced
+it — Ed25519, JWS compact serialisation. Each agent has its own
+keypair; the public keys are committed in the repo, the private
+keys are in Key Vault in production. The signature check verifies
+that every entry was signed by the actor it claims to be from. So
+nobody can forge a 'finance-controller approved this' entry — even
+the agents can't.
+
+**Decisions.** Every entry references a `decision_id` from the
+governance kernel, which references the policy bundle hash that was
+live at that moment. The decision check verifies that every
+referenced decision still resolves cleanly against a known bundle
+in the bundle history. So nobody can claim 'the policy at the time
+allowed this' if the policy never said any such thing.
+
+Three checks, all green, and you have an auditor-reproducible
+proof that every action in this workflow was taken by the actor
+the ledger says, against the policy the ledger says, in the order
+the ledger says.
+
+There's a CLI version too — `agt verify` — which you can run
+against the audit blob from your laptop, no access to the
+substrate required. So your external auditor doesn't even need
+permissions in our system; they just need read access to the blob.
+
+### Piece four — immutability is enforced by Azure, not by us
+
+*(point at the auditBlobUrl)*
+
+One last thing. The chain proves the content hasn't been tampered
+with. But you also need 'can the storage be tampered with', which
+is a different question. Every ledger entry is dual-written into
+an Azure Storage append blob with version-level immutability
+turned on. The retention policy is enforced by Azure itself — not
+by our code, not by anyone's goodwill. If we tried to mutate that
+blob, Azure would refuse. If someone with full RBAC on the storage
+account tried to delete it, Azure would refuse until the retention
+period expired. So between the chain integrity and the storage
+immutability, both have to fail for the audit to be wrong, and
+they fail through completely different mechanisms.
+
+That's the answer to 'how do I know what the agents actually did
+last quarter when the regulator asks me'. The honest answer
+today, in most agentic stacks, is 'we hope the logs survived'.
+The answer here is 'here's the blob, here's the CLI, run it
+yourself'."
 
 ---
 
