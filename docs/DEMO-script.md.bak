@@ -1,0 +1,430 @@
+# Demo narration — talk-through script
+
+Companion to [DEMO.md](DEMO.md). Same four acts, same surfaces, same
+order — but written as words you can actually say. Read it as a
+script; pause where it says *(pause)*; click where it says *(click)*.
+
+Total: ~40 minutes if you breathe between sentences.
+
+---
+
+## Act 1 · Intro — 5 minutes
+
+> **Surface:** one workflow detail page, e.g.
+> `http://localhost:5173/workflows/EXP-0001`. Don't open anything else
+> yet — this single page is your canvas for the whole act.
+
+"Before I show you any dashboards, I want to walk you through what
+*one* workflow actually looks like — because once you understand one,
+the fleet view makes sense.
+
+*(point at the page)* This is a single expense claim, mid-flight.
+Everything you see here — the phase ribbon at the top, the agent
+reasoning panel on the right, the cost and audit tiles at the bottom —
+is being driven by a real Durable Functions orchestrator running on my
+laptop right now.
+
+The shape is the same for every workflow in the system. Three layers:
+
+First — *(point at phase ribbon)* — there's a Durable orchestrator. In
+this case it's the `ExpenseClaimOrchestrator`; seven phases, fixed
+sequence, runs on the Azure Functions host on port 7071.
+
+Second — each one of those phase tiles is a typed Pregel graph from
+Microsoft Agent Framework. Inside each graph you've got a mix of
+deterministic steps, agent calls — those are real GitHub Copilot SDK
+sessions with named identities and skills — and validators that block
+bad agent output.
+
+Third — *(point at reasoning panel)* — when a workflow needs a human,
+the orchestrator parks on a `wait_for_external_event` and the FastAPI
+side picks up the slack. There's also a Fleet Manager session running
+in FastAPI that watches every workflow's event stream and surfaces it
+to the operator. That's the chat rail you'll see in a minute.
+
+Now, where does all of this *run*?
+
+Almost everything is on this laptop. *(maybe glance at terminal)*
+Azurite for Durable state, the Functions host, FastAPI, three Vite
+preview servers, and ten Node mock MCPs standing in for Workday,
+Concur, Maconomy, Greenhouse, LinkedIn, and a few others.
+
+The cloud rectangles are the production-shaped seams. Real Azure
+Document Intelligence for OCR. Real Azure GPT-Realtime for the voice
+call you'll see in act three. Real Azure Storage for the audit blob —
+versioned, retention-policy-protected, append-only. Real Azure Monitor
+feeding Foundry Tracing. And every agent identity is a real GitHub
+Copilot SDK session — at engagement-POC time those swap to Foundry
+Hosted Agents on the same shape.
+
+*(pause)*
+
+So the framing line for this whole demo: **the laptop runs the
+substrate; the cloud rectangles are the production seams the
+engagement POC inherits as-is.**
+
+OK — let me show you the fleet."
+
+---
+
+## Act 2 · POC1 — Control Plane — 15 minutes
+
+> **Surface:** `http://localhost:5173`. Open `/fleet`. Make sure the
+> role chip top-right says **Agent Administrator**. You should already
+> have ~10–20 workflows ramping; if not, wait a minute.
+
+### Frame the Control Plane
+
+"OK so this is the Finance Controller's view. London office. They
+*never* log into Workday. They *never* log into Concur. They govern
+the agent fleet that operates those systems. That's the whole premise
+of POC1 — it's a Control Plane demo.
+
+*(point at the fleet grid)* Right now there are about *(count)*
+workflows in flight. The greens are auto-processing — the agents are
+talking to Workday, pulling receipts through Document Intelligence,
+checking policy, the whole thing. Most of them never need a human.
+
+The ones that *do* need a human surface here as exceptions."
+
+### Exception queue + workflow drill
+
+"So I've configured the demo so the only persona that doesn't
+auto-respond is the SSC Reviewer in Manila — that's the operational
+reviewer. Every other external party — submitters, AP clerks, vendor
+KYC — auto-decides. So the only gate that lands in *my* queue is the
+Arbitrate phase of a flagged red claim.
+
+*(point at the exception queue / red tile)* And here's one — let me
+click in.
+
+*(click into the red EXP-NNNN — should say "STALLED · Exception at
+Arbitrate")*
+
+OK so this is what surfaces when an agent can't decide on its own.
+*(point at phase ribbon)* You can see Intake, Classify, Receipt,
+Route, Audit, Checkpoint all green — the agent did all of that
+autonomously. *(point at Arbitrate)* And it's parked here, waiting for
+a human.
+
+*(point at reasoning panel)* The agent has actually composed a draft
+recommendation — cited the specific policy clause, surfaced the prior
+similar arbitrations. I can read what it would have done. And — *(point
+at executor mix chip)* — you can see the mix of executors that ran:
+deterministic steps, agent calls, validators."
+
+### Reject — and watch the UX work
+
+"Let me reject this one. *(click Reject)*
+
+*(wait for the page to update — 1 second)*
+
+Watch the header tile — *(point)* it just flipped to red, **STATUS ·
+REJECTED — Rejected at Arbitrate**. The phase ribbon — *(point)* —
+Arbitrate is now red with an X. And the action ledger at the bottom —
+*(scroll if needed)* — has gained two entries:
+`human/finance-controller@wpp · reviewer.decision:reject`, and right
+under it, `workflow.rejected`.
+
+*(go back to /fleet)* And — it's gone from the exception queue. Done.
+
+That whole round-trip is signed and chained, which I'll come back to
+in a second."
+
+### Bulk action
+
+"For the case where I've got, say, six claims from the same vendor all
+flagged for the same reason — *(go back to fleet, click bulk action /
+checkbox)* — I can take one decision and apply it across the cluster.
+One signature, n entries in the ledger. *(close the modal — don't
+actually action it unless time)*"
+
+### Cost tile — real tokens
+
+"Now this — *(point at the economics card)* — is the Cost tile. This
+is reading real `gen_ai.usage` token spans from the agent runs,
+multiplied by published Azure rates.
+
+Here's the honest bit. The GitHub Copilot SDK doesn't always *return*
+token usage natively on every event. So when it doesn't, an
+`agent.completed` webhook on FastAPI estimates from the prompt length,
+the skill markdown, the tool call args and results, plus 1.1k tokens
+per inline image attachment for vision. Chars-divided-by-four
+tokeniser approximation.
+
+And every span is tagged with provenance — `gen_ai.usage.source`
+either says `sdk` or `estimated_from_chars`. So the auditor can always
+tell which is which. Same number Foundry shows."
+
+### Audit ledger — real Azure blob
+
+"*(scroll to / point at auditBlobUrl on workflow detail)* Audit
+ledger. This `auditBlobUrl` is a real Azure Storage append blob, in
+the `apexdemo62525` account. Version-level immutability is on; that
+means the retention policy is enforced by Azure itself, not by my
+code. *(click it if you want to show the JSON in a browser tab —
+optional)*"
+
+### Evidence chip + AGT — *the bid claim*
+
+"And *this* — *(point at the AGT panel / Evidence chip in the
+sidebar)* — this is the AGT story. Three sub-chips: chain,
+signatures, decisions. All three green means the action ledger you
+just saw is a verifiable Ed25519 JWS-signed hash chain, rooted in the
+AGT policy bundle that was live at the moment each ledger entry was
+written.
+
+*(click the Evidence chip if it expands)*
+
+The bid says *OWASP Agentic AI Top 10 — ten out of ten covered*. That
+claim is auditor-reproducible from this endpoint plus an `agt verify`
+CLI run. It's not a slide — the artifacts are in the repo. Anyone can
+re-derive it."
+
+### Kill switch
+
+"*(scroll to / point at Kill Switch panel in sidebar)* And next to
+that, the kill switch. Sub-second. No redeploy.
+
+If something's misbehaving — say I want to block `concur.submit_decision`
+across the whole fleet for thirty minutes — *(walk through the form,
+don't actually fire it unless you've got a sacrificial workflow)* — I
+fill that in, hit Kill, and the next time *any* agent tries to call
+that tool, the kernel returns a structured `GovernanceDenied` decision
+with a `decision_id` the operator can trace through Foundry Tracing.
+
+The Functions worker doesn't restart. The kernel just consults the
+kill table on every `evaluate_tool_call`."
+
+### Fleet Manager chat
+
+"*(point at right rail chat)* Right rail — Fleet Manager. This is the
+single always-on GHCP SDK session that subscribes to a triage-filtered
+event stream from every workflow. It's a natural-language probe of
+the fleet. I can ask it things like *(type or read)* 'what's the cost
+this week', or 'show me stalled arbitrations', or 'who are the repeat
+offenders'. Watch the tool calls and reasoning stream into the panel
+as it answers."
+
+### SSC Reviewer surface — the *other* operator
+
+"*(switch role, or open `/reviewer-queue` in another tab)* And just to
+make the point that this isn't one operator looking at one screen —
+the operational reviewer in Manila has their own surface. Same
+underlying queue, but pre-composed arbitration recommendation, cited
+precedent, system-agnostic — they don't see the controller's fleet
+view at all. Different role, different surface, same governance
+chain."
+
+### Justification round-trip — narrate it
+
+"*(go back to a completed red workflow)* And the full red round-trip
+looks like this — claim flagged, employee gets notified, employee
+supplies a justification, that comes back into the workflow, the
+arbitrate gate fires, the reviewer decides, the action ledger
+captures every step. With the demo profile, the employee's
+justification is auto-supplied by the `claim_submitter` persona — so
+the *only* gate I see in my queue is Arbitrate. End to end, with
+governance evidence on every hop."
+
+> *(if asked, reserve beats — EMS extensibility, region failure, repeat
+> offenders, Foundry Tracing tab live, `make agt-verify` in a terminal)*
+
+---
+
+## Act 3 · POC2 — standalone end-to-end — 15 minutes
+
+> **Surface:** the candidate portal at `:5174`. Close the Control
+> Plane tab — POC2 is *not* a Control Plane demo. Same Durable
+> orchestrator runs underneath, but the audience sees candidate,
+> recruiter, and hiring manager.
+
+"OK — pivot. POC2 is a completely different domain — hiring — and a
+completely different audience. The Control Plane stays closed. What
+you'll see is candidate, recruiter, hiring manager — three actors,
+three surfaces, one workflow underneath."
+
+### Candidate applies
+
+"*(open `:5174/apply`)* This is the public form. No login, no SSO. A
+candidate sees this on the company careers site.
+
+*(pick Senior Data Engineer · USA)*
+
+*(drop in `data/synthetic/hiring/cv-pdfs/C-SE-USA-00.pdf`)*
+
+*(submit)*
+
+*(copy the returned candidate_id)*
+
+OK — what just happened. The orchestrator spawned. A magic-link status
+URL has been emailed via real Azure Communication Services. The
+`candidate.applied` event fired. Phase 1 is Budget — that's
+auto-approved for this role — and the workflow is already running
+through to Triage."
+
+### AI triage — recruiter view
+
+"*(open `:5174/recruiter`)* Recruiter view. *(click into the candidate
+just applied)*
+
+*(wait for cv-crystalliser to finish — ~10–60s)*
+
+This panel — **What we learned** — is the live LLM trace from the
+`cv-crystalliser` agent. *(point at the `tool · ocr_extract` row)*
+That row is a real call to Azure Document Intelligence. Below that
+you've got the structured profile, token usage, latency.
+
+If extraction had failed, you'd see a red chip and *no* fabricated
+verdict. That's a deliberate choice — the system refuses to
+hallucinate."
+
+### Voice screening — real WebRTC
+
+"Next gate is the screening call. *(in recruiter view → Active magic
+links → copy the `screen` token)*
+
+*(open `/screen?token=…`, allow mic)*
+
+This is a real Azure GPT-Realtime voice call over WebRTC. *(have a
+~30s conversation — generic intro questions)*
+
+*(end call)*
+
+The transcript posts back to the workflow, which resumes
+automatically.
+
+> *(if the mic doesn't cooperate: 'I can also play a canned transcript
+> through the same callback by setting `VITE_VOICE_TRANSPORT=canned` —
+> same code path, no live mic')*"
+
+### Three interview HITL gates
+
+"There are three interview gates. They paint different decision
+panels keyed off `awaiting_reason`.
+
+*(gate 1 — Invite to interview?)* This one's an AI rec card from
+`interview-recommender` with talking points. I'd click Invite or
+Reject. *(click Invite)*
+
+*(gate 2 — candidate picks slot)* Candidate gets a `book_interview`
+magic link. *(open `/book?token=…` if you have time, pick a slot)*
+Fifteen slots, picks one, comes back.
+
+*(gate 3 — post-interview decision)* I fill in rating, decision,
+level, notes. The `offer_decision` event raises and the workflow moves
+to Offer."
+
+### Offer + onboarding avatar
+
+"*(open `/portal?token=…` for the candidate)* Candidate accepts the
+offer. Phase 10 is Onboarding — and this — *(wait for the avatar to
+render)* — is a real Azure AI Speech avatar. Personalised welcome
+video, voice synthesis, blob-cached by SHA of voice + script so you
+don't pay twice for the same render."
+
+### Differentiators — drop in if time
+
+"A few things worth dropping in if there's time. **Jurisdiction
+switching** — re-run with `C-SE-DE-00`, same code path automatically
+grows a German works-council Compliance step. **Hiring Manager
+surface** at `/hiring-manager/HIRE-NNNN` — different actor, different
+screen, same workflow. **A2A boundary** — `POST /api/a2a/inbound`
+takes structured updates from a candidate's PA, agent-to-agent.
+**Episodic memory** — `recall_similar_hires` MCP tool surfaces past
+hires in the same role family and jurisdiction, so the recommender
+isn't deciding in a vacuum."
+
+---
+
+## Act 4 · Constellation — 5 minutes
+
+> **Surface:** the blueprint microsite at `:5175`. There's also a
+> sidebar link on the Control Plane that opens it. For the closing,
+> use the full-screen view at
+> `http://localhost:5175/?view=constellation` and project it.
+
+"OK — pull back. POC1 and POC2 are two domains. The substrate runs
+eight.
+
+*(open `http://localhost:5175/?view=constellation`)*
+
+This is the Constellation view. The eight-domain ring lights up live
+as workflows fire on the laptop — same FleetEvent bus, same data, just
+a different surface.
+
+Four points, briskly.
+
+**One.** *(point at the lit ring)* Eight domains, all live in `main`.
+POC1 — finance — and POC2 — hiring — were hand-built. The other six —
+travel pre-approval, vendor KYC, employee onboarding, IT access,
+contract renewal, performance review — were graduated end-to-end by a
+meta-skill called `compose-domain` over a single weekend. The ring on
+the canvas is the actual list.
+
+**Two.** One registry, no per-domain branches. Every per-domain
+integration fact lives in `api/shared/domains.py`. The generic
+substrate layers — Fleet Manager skill text, simulator spawners,
+exception resolve route, blueprint inventory, per-domain phase ribbon
+— read from it at runtime. Adding a ninth domain is a registry entry
+plus a YAML brief through `compose-domain`. It's not a refactor.
+
+**Three.** One governance kernel for all eight. The AGT policy bundle
+compiles from the same `matrix.json` plus the same `tools.yaml`
+regardless of domain. Every MCP tool call — in any of the eight
+domains — routes through the same `evaluate_tool_call` chokepoint
+with the same enforcement rules, the same hash-chained ledger, the
+same `agt verify` story.
+
+*(open the editorial page, scroll to the OWASP Agentic AI Top 10
+card and the Authority card if asked)* And the OWASP-10 claim and
+the authority-resolver claim live here on the editorial page — same
+endpoints we just saw in act two, end-to-end across all eight
+domains.
+
+**Four.** Same Foundry project across all eight. Same OTEL semantic
+conventions, same evaluation pipeline, same cost ledger. The Foundry
+Tracing tab filtered by `cloud_RoleName == "control-plane-functions"`
+shows the live cross-domain trace stream.
+
+*(close on the lit Constellation view)*
+
+So the closing line is: **the substrate is the deliverable. POC1 and
+POC2 are two existence proofs of it. AGT is the governance core that
+makes the OWASP claim auditor-reproducible. And Constellation is what
+scale looks like.**
+
+Happy to take questions."
+
+---
+
+## Q&A — anticipated themes
+
+You know these already from DEMO.md but here are one-liners ready to
+fire:
+
+- **"Where do the cost numbers come from?"** — Real `gen_ai.usage`
+  spans where the GHCP SDK reports them; chars-over-four estimate when
+  it doesn't. Provenance tagged on every span as
+  `gen_ai.usage.source`. Same number Foundry shows.
+- **"How do we know the audit ledger is immutable?"** — The Evidence
+  chip you just saw. Plus `agt verify` CLI. Plus version-level
+  immutability is enforced by Azure Storage itself, not my code.
+- **"How do we add a ninth domain?"** — Registry entry in
+  `api/shared/domains.py` plus a YAML brief through `compose-domain`.
+  That's it. We graduated six domains in a weekend that way.
+- **"Where does Foundry sit?"** — Tracing, evaluation, observability —
+  next to the agent runtime, not in front of it. Every span is OTEL
+  semantic-convention compliant; Foundry is just the dashboard.
+- **"OWASP Agentic Top 10 coverage?"** — Ten out of ten. Every claim
+  reproducible from `agt verify` plus the audit blobs.
+- **"Lab vs engagement-POC scope?"** — See `SCOPE-DELTA.md`. Short
+  version: GHCP SDK identities swap to Foundry Hosted Agents on the
+  same shape; the substrate, the kernel, and the surfaces stay
+  identical.
+- **"Skills + MCP tool allow-lists vs prompt-only engineering?"** —
+  Allow-lists are policy. Prompts are not policy. Every tool call goes
+  through `evaluate_tool_call`; the prompt can ask for whatever it
+  wants — the kernel decides whether it happens.
+
+`make down` between recordings. Always.
