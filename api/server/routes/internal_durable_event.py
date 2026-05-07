@@ -30,6 +30,13 @@ _span_starts: dict[tuple[str, str], float] = {}
 _WORKFLOW_TYPES_MAX = 10_000
 _workflow_types: dict[str, str] = {}
 
+# Per-workflow orchestration history feeds GET /api/workflows/{id}/orchestration.
+# We retain history across the workflow lifetime (the UI renders a
+# finished workflow's timeline) but cap both axes so a long-running
+# demo or a chatty workflow can't unbounded-grow.
+_ORCH_HISTORY_WORKFLOWS_MAX = 5_000   # FIFO eviction across workflows.
+_ORCH_HISTORY_PER_WID_MAX = 500       # FIFO truncate within one workflow.
+
 
 def _bounded_set(d: dict, key, value, max_size: int) -> None:
     """Insertion-order FIFO eviction. dict in CPython 3.7+ preserves
@@ -97,9 +104,30 @@ async def receive_durable_event(body: DurableEventBody):
     if wt_in and wid not in _workflow_types:
         _bounded_set(_workflow_types, wid, wt_in, _WORKFLOW_TYPES_MAX)
 
-    app_state.orchestration_history.setdefault(wid, []).append({
-        "kind": body.kind, "payload": body.payload, "at": now
-    })
+    # orchestration_history feeds GET /api/workflows/{id}/orchestration so
+    # WorkflowDetail can render a finished workflow's timeline. We can't
+    # drop entries on workflow.completed without breaking that view, so
+    # bound (a) the per-workflow list length to keep one runaway workflow
+    # from ballooning memory, and (b) the dict cardinality to keep
+    # uvicorn --reload + long demos from leaking state across cycles.
+    hist = app_state.orchestration_history.get(wid)
+    if hist is None:
+        if len(app_state.orchestration_history) >= _ORCH_HISTORY_WORKFLOWS_MAX:
+            try:
+                app_state.orchestration_history.pop(
+                    next(iter(app_state.orchestration_history))
+                )
+            except StopIteration:
+                pass
+        hist = []
+        app_state.orchestration_history[wid] = hist
+    hist.append({"kind": body.kind, "payload": body.payload, "at": now})
+    if len(hist) > _ORCH_HISTORY_PER_WID_MAX:
+        # FIFO: keep the most recent N events. The UI shows the full
+        # history but is happy with the last 500 in practice; truncating
+        # the head loses old phase.started entries which are also in the
+        # phase table on the workflow record itself.
+        del hist[: len(hist) - _ORCH_HISTORY_PER_WID_MAX]
     app_state.hub.broadcast("orchestration", {
         "kind": body.kind, "workflow_id": wid, "payload": body.payload
     })

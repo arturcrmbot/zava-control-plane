@@ -90,6 +90,13 @@ class AppState:
                     svc.close()
                 except Exception:
                     pass
+        # AuditLogger holds a long-lived BlobServiceClient + a per-workflow
+        # cache of BlobClients (one httpx pool each). Closing here releases
+        # them on lifespan teardown so reload cycles don't leak FDs.
+        try:
+            self.audit.close()
+        except Exception:
+            pass
 
 
 app_state = AppState()

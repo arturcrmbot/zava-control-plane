@@ -32,6 +32,7 @@ import logging
 import os
 import threading
 import time as _time
+from collections import OrderedDict
 from typing import Any
 
 from pydantic import BaseModel
@@ -42,6 +43,17 @@ _AUDIT_CONTAINER = os.environ.get("AZURE_STORAGE_AUDIT_CONTAINER", "audit-ledger
 _AUDIT_ACCOUNT_ENV = "AZURE_STORAGE_AUDIT_ACCOUNT"
 _DEFAULT_WORKFLOW_KEY = "_unknown"
 _GENESIS_HASH = "0" * 64
+
+# Per-workflow caches grow with workflow cardinality. The substrate's
+# in-memory `_entries` list IS the source of truth for chain
+# reconstruction on cache miss (see _derive_tail_hash) and so cannot
+# be evicted without losing recoverability — by design, mirroring
+# StateStore. The auxiliary caches below are perf-only and bounded
+# to prevent open/close-cycle leakage under uvicorn --reload and
+# long-running demos.
+_BLOB_CLIENT_LRU_MAX = 200    # Open BlobClients hold an httpx connection.
+_TAIL_HASH_CACHE_MAX = 10_000  # Falls back to _derive_tail_hash on miss.
+_CHAIN_LOCK_CACHE_MAX = 10_000  # Lock objects are cheap; cap is a backstop.
 
 
 # ---------------------------------------------------------------------------
@@ -164,7 +176,11 @@ class AuditLogger:
     def __init__(self) -> None:
         self._entries: list[dict] = []
         self._blob_lock = threading.Lock()
-        self._append_clients: dict[str, Any] = {}  # {workflow_id: AppendBlobClient}
+        # OrderedDict so we can LRU-evict cold workflows. Each value is a
+        # BlobClient that holds an httpx connection; un-bounded growth
+        # leaks file descriptors over a long-running demo. Eviction
+        # closes the underlying client.
+        self._append_clients: "OrderedDict[str, Any]" = OrderedDict()
         # Per-workflow tail-hash cache for chain construction (TASK-028).
         # Lazy: first append on a workflow seeds from the existing blob if
         # present, otherwise from the genesis hash. The lock guarantees we
@@ -226,12 +242,18 @@ class AuditLogger:
         unavailable. In azure-storage-blob 12.x there is no separate
         `AppendBlobClient` class — the regular `BlobClient` exposes
         `create_append_blob()` and `append_block()`.
+
+        LRU-bounded at ``_BLOB_CLIENT_LRU_MAX``: when the cache is full
+        and we add a new workflow, the least-recently-used client is
+        evicted and its underlying httpx connection is closed.
         """
         if self._service_client is None:
             return None
         with self._blob_lock:
             client = self._append_clients.get(workflow_id)
             if client is not None:
+                # Bump to most-recent on access.
+                self._append_clients.move_to_end(workflow_id)
                 return client
             try:
                 blob_name = f"{workflow_id}.jsonl"
@@ -240,6 +262,13 @@ class AuditLogger:
                 )
                 if not client.exists():
                     client.create_append_blob()
+                # Evict oldest if at capacity, then insert at most-recent.
+                while len(self._append_clients) >= _BLOB_CLIENT_LRU_MAX:
+                    _evicted_wid, _evicted_client = self._append_clients.popitem(last=False)
+                    try:
+                        _evicted_client.close()
+                    except Exception:
+                        pass
                 self._append_clients[workflow_id] = client
                 return client
             except Exception as ex:
@@ -248,6 +277,28 @@ class AuditLogger:
                     workflow_id, ex,
                 )
                 return None
+
+    def close(self) -> None:
+        """Release all blob-side state. Idempotent.
+
+        Called from ``AppState.aclose()`` on lifespan teardown so the
+        BlobServiceClient's httpx pool and every per-workflow BlobClient
+        are released. Without this each uvicorn --reload leaked one pool
+        per AppState reconstruction.
+        """
+        with self._blob_lock:
+            for wid, client in list(self._append_clients.items()):
+                try:
+                    client.close()
+                except Exception:
+                    pass
+            self._append_clients.clear()
+            if self._service_client is not None:
+                try:
+                    self._service_client.close()
+                except Exception:
+                    pass
+                self._service_client = None
 
     def _append_to_blob(self, entry: dict) -> None:
         """Append one JSON line to the workflow's blob; swallow errors.
@@ -311,6 +362,14 @@ class AuditLogger:
                 if jws is not None:
                     entry["actor_jws"] = jws
             entry["entry_hash"] = _canonical_entry_hash(entry)
+            # Bounded FIFO: cache miss falls back to _derive_tail_hash
+            # which scans _entries (always intact). Eviction is a
+            # perf hit on the next append for that workflow only.
+            if wid not in self._tail_hashes and len(self._tail_hashes) >= _TAIL_HASH_CACHE_MAX:
+                try:
+                    self._tail_hashes.pop(next(iter(self._tail_hashes)))
+                except StopIteration:
+                    pass
             self._tail_hashes[wid] = entry["entry_hash"]
             self._entries.append(entry)
             self._append_to_blob(entry)
@@ -324,13 +383,22 @@ class AuditLogger:
         """Per-workflow lock so two appends on the same chain serialise.
 
         Acquired under ``self._blob_lock`` to avoid double-construction
-        of the lock object itself. Lock objects are cheap and never
-        evicted — one per workflow id is fine for the substrate's
-        cardinality (low thousands).
+        of the lock object itself. Capped at ``_CHAIN_LOCK_CACHE_MAX``
+        with FIFO eviction; an evicted lock is harmless because
+        re-entry just constructs a fresh one (race window is bounded
+        by the substrate's per-workflow append cadence — single-digit
+        writes per second per wid).
         """
         with self._blob_lock:
             lock = self._chain_locks.get(workflow_id)
             if lock is None:
+                if len(self._chain_locks) >= _CHAIN_LOCK_CACHE_MAX:
+                    # FIFO: drop oldest. dict preserves insertion order
+                    # in CPython 3.7+.
+                    try:
+                        self._chain_locks.pop(next(iter(self._chain_locks)))
+                    except StopIteration:
+                        pass
                 lock = threading.Lock()
                 self._chain_locks[workflow_id] = lock
             return lock
