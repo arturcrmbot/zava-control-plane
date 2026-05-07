@@ -315,6 +315,30 @@ class GovernanceKernel:
         action_str = getattr(result.action, "value", str(result.action))
         mode = self.enforcement_mode
 
+        # Phase 7 TASK-052: kill switch is checked FIRST so an operator
+        # pause beats every other rule. Active kills produce a deny
+        # with a kill:<kill_id> rule_id; lazy expiry happens inside
+        # is_killed() so a kill that just timed out doesn't fire.
+        from .kill_switch import kill_switch_store
+        kill = kill_switch_store.is_killed(actor or "unknown", tool)
+        if kill is not None:
+            decision = Decision(
+                allowed=False,
+                policy_version=self.policy_version,
+                rule_id=f"kill:{kill.kill_id}",
+                action="deny",
+                reason=(
+                    f"operator kill switch active: actor={kill.actor!r} "
+                    f"tool={kill.tool!r} reason={kill.reason!r} "
+                    f"expires_in={int(kill.remaining_seconds())}s"
+                ),
+                enforcement_mode=mode,
+                latency_us=int(latency_us),
+            )
+            if mode == "enforce":
+                raise GovernanceDenied(decision)
+            return decision
+
         # Phase 6 TASK-047: capability + reversibility + value gates.
         # The AGT bundle handles tool registration + matrix audits; the
         # registry-driven gates live in Python because PolicyCondition is

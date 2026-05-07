@@ -19,6 +19,7 @@ import FleetAssignment from "../components/apex/FleetAssignment";
 import AuditTrail from "../components/apex/AuditTrail";
 import AuthorityCard from "../components/apex/AuthorityCard";
 import EvidencePanel from "../features/governance/EvidencePanel";
+import KillSwitchPanel from "../features/governance/KillSwitchPanel";
 import ExecutionTimelineTab from "../components/apex/ExecutionTimelineTab";
 
 type DetailResp = {
@@ -303,6 +304,7 @@ export default function WorkflowDetail() {
       <div className="col-span-1 space-y-3">
         <AuthorityCard workflow={w} />
         <EvidencePanel workflowId={w.id} />
+        <KillSwitchPanel />
         <EconomicsPanel e={d.economics} />
         <FleetAssignment spans={d.spans} />
         <AuditTrail
