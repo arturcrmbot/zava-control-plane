@@ -289,7 +289,6 @@ async def run_agent_session(
     elapsed_s = time.monotonic() - started_at
     if workflow_id:
         from api.shared.types import OtelSpan
-        import uuid
         otel_span = OtelSpan(
             trace_id=workflow_id,  # group all spans under the workflow id
             span_id=uuid.uuid4().hex[:16],

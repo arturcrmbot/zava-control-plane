@@ -55,8 +55,13 @@ def portal_client(tmp_path, monkeypatch):
     a magic-link, seed a workflow, etc.) before driving the route.
     """
     monkeypatch.setenv("PORTAL_DATA_DIR", str(tmp_path / "portal"))
-    monkeypatch.delenv("AZURE_STORAGE_CONNECTION_STRING", raising=False)
-    monkeypatch.delenv("ACS_EMAIL_CONNECTION_STRING", raising=False)
+    # Set to empty rather than delete: the api.server.state module calls
+    # load_dotenv() at import time which would re-populate these from .env
+    # (pointing at Azurite, which isn't running in tests). load_dotenv does
+    # NOT override an existing env var — even an empty one — so this keeps
+    # _build_blob_store()'s `if not conn` check happy.
+    monkeypatch.setenv("AZURE_STORAGE_CONNECTION_STRING", "")
+    monkeypatch.setenv("ACS_EMAIL_CONNECTION_STRING", "")
     monkeypatch.setenv("PORTAL_BASE_URL", "http://localhost:5174")
 
     # Drop cached modules so AppState() picks up the new env.
@@ -230,7 +235,7 @@ def test_offer_accept_consumes_token_and_emits_event(portal_client, monkeypatch)
     body = resp.json()
     assert body["ok"] is True
     assert body["decision"] == "accept"
-    assert raised and raised[0][1] == "offer_decision"
+    assert raised and raised[0][1] == "offer_approval"
     assert events and events[0].type == "offer.decided"
 
 
