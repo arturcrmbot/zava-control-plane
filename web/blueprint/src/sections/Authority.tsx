@@ -1,5 +1,6 @@
 import { useAuthority } from "../lib/useAuthority";
 import { AuthorityTable } from "../components/AuthorityTable";
+import OwaspCoverageCard from "../features/governance/OwaspCoverageCard";
 
 export function Authority() {
   const { data, error, loading } = useAuthority();
@@ -40,6 +41,7 @@ export function Authority() {
           </div>
         )}
         {data && <AuthorityTable data={data} />}
+        <OwaspCoverageCard />
       </div>
     </section>
   );

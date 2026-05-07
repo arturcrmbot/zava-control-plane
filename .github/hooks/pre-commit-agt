@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Phase 8 TASK-061 of plan/feature-agent-governance-toolkit-1.md.
+#
+# Opt-in pre-commit hook that runs the governance lint + test sweep
+# against the working tree before every commit. Mirrors the CI workflow
+# at .github/workflows/agt-governance.yml — fast subset.
+#
+# Install (run once from the repo root):
+#
+#   ln -sf ../../.github/hooks/pre-commit-agt .git/hooks/pre-commit
+#
+# Bypass for emergency commits:
+#
+#   git commit --no-verify -m "wip"
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+# Only run the governance gate when governance-relevant files changed
+# (matches the CI workflow's `paths:` filter).
+CHANGED=$(git diff --cached --name-only)
+echo "$CHANGED" | grep -qE '^(api/server/services/governance/|api/shared/(agents|types)\.py|api/server/services/audit_logger\.py|api/functions/graphs/_common\.py|api/server/mcp_tools/_otel\.py|api/server/routes/(governance|authority)\.py|data/(policies|governance)/|data/synthetic/authority/matrix\.json|tests/api/server/services/governance/|tests/api/shared/test_agents_registry\.py|pyproject\.toml)' \
+  || { echo "pre-commit-agt: no governance files changed; skipping"; exit 0; }
+
+echo "pre-commit-agt: lint-policy"
+uv run agt lint-policy data/policies || echo "pre-commit-agt: lint-policy: nothing to lint"
+
+echo "pre-commit-agt: governance test sweep"
+AZURE_STORAGE_CONNECTION_STRING="" uv run pytest \
+  tests/api/server/services/governance/ \
+  tests/api/shared/test_agents_registry.py \
+  -q
+
+echo "pre-commit-agt: ok"

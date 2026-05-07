@@ -1,5 +1,7 @@
 # WPP Control Plane — Apex Substrate
 
+[![OWASP Agentic AI Top 10 — 10/10 covered](https://img.shields.io/badge/OWASP%20Agentic%20Top%2010-10%2F10%20covered-brightgreen)](plan/feature-agent-governance-toolkit-1.md)
+
 A composable agentic substrate (skills + MCP tools + harness + governance)
 running on a single laptop, with multiple business domains composed on
 top of it. Production-shaped — [Microsoft Agent Framework](https://learn.microsoft.com/agent-framework)
@@ -37,6 +39,12 @@ see the [contributor guide](docs/blueprint-microsite-contributor-guide.md)).
 - Python 3.11 (Functions worker) + 3.13 (FastAPI) · FastAPI · Azure Durable Functions · MAF · GHCP SDK Python
 - React 19 · Vite 6 · TailwindCSS 4 — three frontends: control plane, candidate portal, blueprint microsite
 - 10 Node mock MCP servers (3 finance + 7 HR/comms — see `mocks/`)
+- Microsoft Agent Governance Toolkit (AGT) v3.4 — in-process policy
+  kernel mediating every MCP tool call, hash-chained signed audit
+  ledger, Ed25519 per-agent identities, operator kill switches.
+  See [plan/feature-agent-governance-toolkit-1.md](plan/feature-agent-governance-toolkit-1.md)
+  for the full architecture; CI runs `agt verify` on every PR and
+  publishes an `agt-evidence.json` artefact.
 
 ## Ports
 

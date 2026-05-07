@@ -102,3 +102,8 @@ data/synthetic/hiring/cv-pdfs/C-[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]
 instruction.md
 AI-Transformation-in-Days.pptx
 .github/*
+# But DO ship governance CI artefacts (Phase 8 of plan/feature-agent-governance-toolkit-1.md).
+!.github/workflows/
+!.github/workflows/agt-governance.yml
+!.github/hooks/
+!.github/hooks/pre-commit-agt
