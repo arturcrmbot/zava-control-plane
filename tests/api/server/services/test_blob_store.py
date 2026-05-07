@@ -22,7 +22,14 @@ _AZURITE_DEFAULT = (
     "BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
 )
 
-CONN = os.environ.get("AZURE_STORAGE_CONNECTION_STRING", _AZURITE_DEFAULT)
+# Fall back to the Azurite default when the env var is unset OR empty.
+# Other tests (test_portal, test_portal_voice) deliberately set this to ""
+# to keep _build_blob_store from constructing a real BlobStore against an
+# unreachable Azurite — and pytest's monkeypatch may not have torn that
+# down by the time this module's test functions run if a prior test
+# leaked the empty value into os.environ.
+_env_conn = os.environ.get("AZURE_STORAGE_CONNECTION_STRING") or ""
+CONN = _env_conn if _env_conn else _AZURITE_DEFAULT
 
 
 def _azurite_reachable() -> bool:
@@ -37,9 +44,13 @@ def _azurite_reachable() -> bool:
         sock.close()
 
 
+def _targeting_azurite() -> bool:
+    return "127.0.0.1:10000" in CONN or "localhost:10000" in CONN
+
+
 pytestmark = pytest.mark.skipif(
-    not _azurite_reachable() and "AZURE_STORAGE_CONNECTION_STRING" not in os.environ,
-    reason="Azurite not running on :10000 and AZURE_STORAGE_CONNECTION_STRING unset",
+    _targeting_azurite() and not _azurite_reachable(),
+    reason="Azurite endpoint configured but not reachable on :10000",
 )
 
 
