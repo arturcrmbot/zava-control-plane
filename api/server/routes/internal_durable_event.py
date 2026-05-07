@@ -72,6 +72,24 @@ def _ledger(wid: str, *, kind: str, actor_id: str, action: str, details: dict, r
         revocable=revocable,
         details=details,
     ))
+    # Phase 7 TASK-053: every workflow ledger event also gets hash-chained
+    # into the AuditLogger so the EvidencePanel + GET /api/governance/verify
+    # see the same activity the workflow timeline already shows. Before this
+    # mirror the AGT chain was almost always empty (only compose_exception
+    # wrote to it), so the Evidence chip was hidden on most workflows.
+    # Stamps actor metadata onto details so _extract_agent_id picks it up
+    # for JWS signing without changing existing _ledger call sites.
+    audit_details = {
+        "workflow_id": wid,
+        "actor_kind": kind,
+        "actor_id": actor_id,
+        "revocable": revocable,
+        **(details if isinstance(details, dict) else {"value": details}),
+    }
+    try:
+        app_state.audit.log(action, audit_details)
+    except Exception:  # pragma: no cover — audit writes never break callers
+        pass
 
 
 def _auto_resolve_open(workflow_id: str, resolved_by: str) -> None:

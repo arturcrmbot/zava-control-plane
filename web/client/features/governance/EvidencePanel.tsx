@@ -90,7 +90,28 @@ export default function EvidencePanel({ workflowId }: Props) {
 
   if (error) return null;
   if (!report) return null;
-  if (report.total_entries === 0) return null;
+  // Note: previously we returned null when total_entries === 0, which
+  // meant the AGT panel disappeared entirely from any workflow whose
+  // audit chain hadn't been written to yet. After Phase 7 TASK-053
+  // every _ledger() call mirrors into the chain, so this is rarely
+  // empty in practice — but render the empty state when it is so the
+  // chip is always visible during the demo.
+  if (report.total_entries === 0) {
+    return (
+      <div className="rounded-md border border-zinc-200 bg-white p-3">
+        <div className="mb-2 flex items-baseline justify-between">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-700">
+            Evidence
+          </h3>
+          <span className="text-xs text-zinc-500">no activity yet</span>
+        </div>
+        <p className="text-xs text-zinc-500">
+          Audit chain is empty for this workflow. Entries appear as the
+          orchestrator writes ledger events.
+        </p>
+      </div>
+    );
+  }
 
   const allGreen =
     report.chain_intact && report.signatures_valid && report.decisions_resolvable;
