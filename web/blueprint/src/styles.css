@@ -1248,6 +1248,36 @@ body.constellation-page-body {
   border-bottom: 1px solid var(--rule);
 }
 
+.constellation__nav-search {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--rule);
+  color: var(--ink-dim);
+  font-family: var(--mono-family);
+  font-size: 0.65rem;
+  padding: 0.25rem 0.35rem;
+  border-radius: 2px;
+  margin-bottom: 0.4rem;
+  transition: all 150ms ease;
+  outline: none;
+}
+
+.constellation__nav-search:hover {
+  border-color: var(--link);
+  background: rgba(244, 163, 0, 0.03);
+}
+
+.constellation__nav-search:focus {
+  border-color: var(--link);
+  background: rgba(244, 163, 0, 0.08);
+  color: var(--ink);
+  box-shadow: 0 0 0 2px rgba(244, 163, 0, 0.1);
+}
+
+.constellation__nav-search::placeholder {
+  color: var(--ink-mute);
+  opacity: 0.6;
+}
+
 .constellation__nav-item {
   background: transparent;
   border: none;

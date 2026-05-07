@@ -188,6 +188,19 @@ export function Constellation({ status, fullScreen = false }: Props) {
     null,
   );
 
+  /** Domain filter — allows operator to hide unrelated domains during demo. */
+  const [domainFilter, setDomainFilter] = useState<string>("");
+
+  const filteredOrbits = useMemo(() => {
+    if (!domainFilter.trim()) return orbits;
+    const q = domainFilter.toLowerCase();
+    return orbits.filter(
+      (o) =>
+        o.displayName.toLowerCase().includes(q) ||
+        o.workflowType.toLowerCase().includes(q),
+    );
+  }, [orbits, domainFilter]);
+
   const handleClusterFocus = (clusterPos: [number, number, number]) => {
     const target = new THREE.Vector3(...clusterPos);
     // Position the camera ~7 units away so we land in MID lod (cluster
@@ -337,7 +350,7 @@ export function Constellation({ status, fullScreen = false }: Props) {
         <PhotonArcs arcsRef={arcsRef} />
 
         {/* Scattered domain clusters. */}
-        {orbits.map((d, i) => {
+        {filteredOrbits.map((d, i) => {
           const pos = positions.get(d.workflowType) ?? [0, 0, 0];
           return (
             <DomainCluster
@@ -407,12 +420,20 @@ export function Constellation({ status, fullScreen = false }: Props) {
       </div>
 
       {/* Live counts ribbon — projector-friendly running totals. */}
-      <CountsRibbon motesRef={motesRef} orbits={orbits} />
+      <CountsRibbon motesRef={motesRef} orbits={filteredOrbits} />
 
       {/* Domain navigator panel — a guaranteed way to fly to any cluster. */}
       <div className="constellation__nav">
         <div className="constellation__nav-title">domains</div>
-        {orbits.map((d, i) => {
+        <input
+          type="text"
+          className="constellation__nav-search"
+          placeholder="filter…"
+          value={domainFilter}
+          onChange={(e) => setDomainFilter(e.target.value)}
+          title="Filter domains by name or type"
+        />
+        {filteredOrbits.map((d, i) => {
           const pos = positions.get(d.workflowType) ?? [0, 0, 0];
           const tint = DOMAIN_PALETTE[i % DOMAIN_PALETTE.length];
           return (
@@ -457,7 +478,7 @@ export function Constellation({ status, fullScreen = false }: Props) {
         <WorkflowInspector
           workflowId={selectedWid}
           motesRef={motesRef}
-          orbits={orbits}
+          orbits={filteredOrbits}
           onClose={() => setSelectedWid(null)}
         />
       ) : null}
