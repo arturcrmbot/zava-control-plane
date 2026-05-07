@@ -1,490 +1,423 @@
-# Demo narration — 30-minute script (CTO + senior business audience)
+# Demo — 30 minutes, live
 
-Companion to [DEMO.md](DEMO.md). Same four acts, same surfaces — but
-written as words you can actually say to a room that includes WPP's
-CTO and senior business stakeholders. Lead with what it means for
-their operating model; the technical depth is there as proof, not as
-the headline.
+Audience: WPP CTO + CIO + senior business. Peer conversation, not a
+pitch. Companion to [DEMO.md](DEMO.md).
 
-**Total: ~30 minutes** if you breathe between sentences. Pause where
-it says *(pause)*; click where it says *(click)*; the asides in
-italics are for you, not the room.
+Structured around the five pillars from the customer steer:
+1. Control Plane — how it works, read/write, customisation
+2. Multi-agent orchestration & durability
+3. Governance, security & compliance — runtime policy
+4. System integration — Databricks data layer or direct biz systems via API/MCP
+5. Advanced capabilities — POC2
 
-| Act | Time | Audience takeaway |
+| Block | Time | Surface |
 |---|---|---|
-| 1 · Frame | 4 min | What you're about to see, and why it's not another agent demo |
-| 2 · POC1 — Control Plane | 13 min | A finance org running 30 expense workflows with one human in the loop, fully governed |
-| 3 · POC2 — end-to-end hire | 9 min | Same engine, completely different surface — proves it's a platform |
-| 4 · Constellation | 4 min | The deliverable is the substrate, not the two demos |
+| Open + 1-claim anatomy | 3 | one workflow detail page |
+| Pillar 1 — Control Plane | 6 | `/fleet`, exception, bulk |
+| Pillar 2 — Orchestration & durability | 4 | same workflow + Functions trace |
+| Pillar 3 — Governance | 5 | Evidence chip, kill switch, audit blob |
+| Pillar 4 — Integration | 4 | EMS swap + Databricks/MCP framing |
+| Pillar 5 — POC2 advanced | 6 | portal apply → triage → voice → avatar |
+| Constellation close | 2 | `:5175/?view=constellation` |
 
-> **Before you start:** `make up`, wait until at least one workflow
-> is on `/fleet` and at least one red claim has parked at Arbitrate
-> (≈ 2–3 min after boot). Have these tabs warm:
-> 1. `http://localhost:5173/workflows/<a recent EXP-NNNN>` — the canvas for Act 1
-> 2. `http://localhost:5173/fleet` — Act 2 home
-> 3. `http://localhost:5174/apply` — Act 3 entry
-> 4. `http://localhost:5175/?view=constellation` — Act 4 closer
-
----
-
-## Act 1 · Frame — 4 minutes
-
-> **Surface:** one workflow detail page. Don't open anything else
-> yet. This single page is the canvas for the framing.
-
-"Before I click anything, two sentences on what you're about to see —
-because every vendor in your evaluation will show you agents doing
-work, and that's not what's interesting here.
-
-The interesting question for an operation the size of WPP isn't
-*can an agent classify an expense claim*. It's *who is accountable
-when thirty thousand of them run every week, what happens when one
-goes wrong, and what does the auditor see at the end of the
-quarter*. That's what this build is about. We've called it a Control
-Plane on purpose — the agents do the work, but a human, with the
-right surface and the right evidence, governs the fleet.
-
-*(point at the open workflow page)*
-
-What you're looking at is one expense claim, mid-flight, on my
-laptop. The phase ribbon at the top is the workflow. The panel on
-the right is what the agent is actually reasoning about right now —
-not a transcript I edited, the live trace. The tiles at the bottom
-are cost and audit.
-
-Three things to register about how this runs, and then I'll stop
-talking and start clicking.
-
-**One** — the workflow is a Durable orchestrator. It survives
-process restarts, region failover, and 72-hour human waits at zero
-compute cost. We didn't invent that; it's how Microsoft runs
-long-running business processes.
-
-**Two** — every box you see in the phase ribbon is a small graph of
-typed steps. Some are deterministic code, some are agent calls with
-named identities and a constrained skill, and some are validators
-that block bad agent output before it ever lands in the ledger. That
-mix is deliberate — we don't let the model decide things that don't
-need a model.
-
-**Three** — almost everything you'll see runs on this laptop.
-Workday, Concur, Maconomy, Greenhouse — all stood up as local mocks
-so you can see the system end to end without waiting on integration
-tickets. The cloud pieces that *are* real are the ones the
-engagement POC inherits unchanged: real Azure Document Intelligence
-for receipts, real Azure Storage for the audit ledger with
-version-level immutability, real Azure GPT-Realtime for the voice
-call you'll see in act three, real telemetry into Foundry. Those are
-the production-shaped seams.
-
-*(pause)*
-
-OK — let me show you the fleet."
+> **Pre-flight:** `make up`. Wait for one red claim parked at
+> Arbitrate. Tabs warm: workflow detail, `/fleet`, `/apply`,
+> constellation view.
 
 ---
 
-## Act 2 · POC1 — Control Plane — 13 minutes
+## Open + 1-claim anatomy — 3 min
 
-> **Surface:** `http://localhost:5173/fleet`. Role chip top-right
-> should say **Agent Administrator**. You should already see ~10–20
-> workflows; if not, give it a beat.
+> Surface: one workflow detail page (any in-flight `EXP-NNNN`).
 
-### A · Frame the operating model — 1 min
+"Right — straight in. This is one expense claim, mid-flight, on this
+laptop. Workday data, Concur OAuth, real Document Intelligence on the
+receipt, real audit blob in Azure. Nothing here is a screenshot.
 
-"This is the Finance Controller's view. London office. Notice what
-they're *not* doing — they are not logged into Workday. They are not
-logged into Concur. They never see an individual claim form.
+Phase ribbon at the top is the workflow. Reasoning panel on the right
+is the agent's actual trace from this run. Cost and audit at the
+bottom.
 
-In the WPP target operating model, the controller governs the agent
-fleet that operates those systems. The agents do the keystrokes; the
-controller does the policy. That's the entire premise of POC1.
+Three things to know about the shape and then we move:
 
-*(point at the grid)*
+- The workflow is a Durable orchestrator. It survives restarts and
+  parks at human gates for hours or days at zero compute.
+- Each phase tile is a small graph — some deterministic code, some
+  agent calls with named identities, some validators that block bad
+  agent output before it lands anywhere.
+- The agent identities are real Entra-bound. Every tool call goes
+  through one chokepoint — that's where governance lives.
 
-Right now there are *(count)* workflows in flight. The greens are
-auto-processing — agents pulling receipts, calling Document
-Intelligence, checking the policy clause, posting back to Workday.
-Most of them no human will ever see. The ones that need a human
-surface here as exceptions. **[AC #1 — single view across 30+
-workflows. AC #2 — exception-only surfacing.]**"
-
-### B · Drill into a flagged claim — 3 min
-
-"And here's one. *(click into a red EXP-NNNN — the "STALLED ·
-Exception at Arbitrate" tile)*
-
-This is what surfaces when an agent decides it can't safely decide on
-its own.
-
-*(point at the phase ribbon)*
-
-Intake, Classify, Receipt, Route — all green. The agent did all of
-that autonomously. Notice the **Receipt** phase — under the hood
-that's a real Azure Document Intelligence call against the receipt
-PNG, the extracted total cross-checked against the structured claim,
-and a mismatch flag if they don't agree. **[AC #5 — receipt
-cross-validation.]**
-
-*(point at Arbitrate, red)*
-
-It's parked here. Why? *(point at the reasoning panel)* The agent
-has actually composed a draft recommendation — it's cited the exact
-policy clause it would invoke, surfaced two prior arbitrations that
-look similar, and laid out which way it would lean. So the human
-isn't being asked *what should we do* from a cold start. They're
-being asked *do you concur with the agent's recommendation*. That's
-the productivity unlock — the agent isn't replacing the reviewer,
-it's getting them to a decision in seconds instead of fifteen
-minutes.
-
-*(scroll to the bottom — the action ledger)*
-
-And every step the agent took is in the action ledger here. Who ran,
-what they did, what they cited. That's the substrate we'll come back
-to when we get to the audit story."
-
-### C · Take a decision — watch the round-trip — 1 min
-
-"Let me reject this one. *(click Reject)*
-
-*(wait one second)*
-
-Watch the header — it just flipped to red, **STATUS · REJECTED**.
-The phase ribbon — Arbitrate is now red. And the action ledger has
-gained two new entries: my decision, signed as
-`finance-controller@wpp`, and the workflow-rejected event right
-under it.
-
-*(go back to /fleet)*
-
-And it's gone from the exception queue. End to end, signed and
-chained, and I'll show you what 'chained' actually means in a
-moment."
-
-### D · Bulk and the long tail — 1 min
-
-"Now in the real world the controller doesn't get one exception at a
-time — they get clusters. Six claims from the same vendor, all
-flagged for the same reason, all in the same week.
-
-*(open the bulk modal — don't action it)*
-
-This lets them take one decision across the cluster. One signature,
-n entries in the ledger, all linked back to the cluster id. Same
-governance properties; one click. **[AC #3 — bulk action across 10+
-items.]**"
-
-### E · Cost — and the honesty about how it's measured — 1.5 min
-
-"This tile — *(point at the economics card)* — is cost. And I want
-to spend thirty seconds on it because it's the question every CFO
-asks first.
-
-This number is real `gen_ai.usage` token telemetry off the agent
-runs, multiplied by Microsoft's published per-million-token rates,
-sourced this week. It's not a synthetic constant. **[AC #13 —
-cost-per-task report.]**
-
-Here's the honest bit, because you'll ask. The model SDK doesn't
-always emit token counts on every call. When it doesn't, we
-estimate from prompt length plus tool-call payload, with about 1.1k
-tokens added per inline image for vision. *And* — every span in the
-trace is tagged with provenance: it either says `sdk` or
-`estimated_from_chars`. So your auditor can always tell which is
-which. The number on this tile is the same number Foundry shows."
-
-### F · Audit and the OWASP claim — 2 min
-
-"Now this is the part that matters most for the CTO and the CISO in
-the room. *(point at `auditBlobUrl`)*
-
-Every step you saw in that ledger is being dual-written into a real
-Azure Storage append blob with version-level immutability turned
-on. That means the retention policy is enforced by Azure itself —
-not by my code, not by my goodwill. If I tried to mutate that blob,
-Azure would refuse. **[AC #12 — immutable audit trail.]**
-
-But immutable storage on its own isn't enough — you also need to
-prove the *content* hasn't been tampered with between the workflow
-and the blob. So *(point at the Evidence chip in the sidebar)*
-that's what this is. Three sub-chips: chain, signatures, decisions.
-All three green means the action ledger is a verifiable Ed25519-
-signed hash chain rooted in the governance policy bundle that was
-live at the moment each entry was written. Click it and you get the
-JWS receipts, the chain head, and the policy bundle hash.
-
-*(click through if time allows)*
-
-The bid claims OWASP Agentic AI Top 10 — ten out of ten covered.
-That claim is auditor-reproducible from this endpoint plus an `agt
-verify` CLI run. It is not a slide. The artifacts are in the repo
-and anyone can re-derive it."
-
-### G · The kill switch — 1 min
-
-"And right next to that — *(point at Kill Switch)* — the operational
-control your CISO actually wants. Sub-second, no redeploy.
-
-If something is misbehaving — say there's a regression in how an
-agent is calling `concur.submit_decision` — I post a kill on that
-tool with a 30-minute TTL. The next time *any* agent in the fleet
-tries that tool, the governance kernel returns a structured denial
-with a decision id the operator can trace through Foundry. The
-Functions worker doesn't restart. There's no deploy. The kill table
-is consulted on every tool call.
-
-That's the fire-extinguisher you need before you'll ever sign off on
-turning autonomy up."
-
-### H · Fleet Manager + autonomous learning — 1.5 min
-
-"*(point at right rail)* Right rail — the Fleet Manager. Single
-always-on session that subscribes to a triage-filtered event stream
-from every workflow. Natural language probe of the fleet.
-
-*(type or read)* 'show me stalled arbitrations' or 'cost this week'
-or 'who are the repeat offenders' — watch the tool calls and the
-reasoning stream into the panel. **[AC #6 — progressive enforcement
-on repeat offenders.]**
-
-And once the controller has been making consistent decisions for a
-while, the Fleet Manager surfaces a behaviour-change proposal —
-'here's a class of claims you've rejected sixty times in a row,
-here's a tightened policy clause that would have caught fifty-eight
-of them at Classify, do you want to promote this'. That's autonomous
-learning with a human signing off the policy change, not autonomous
-learning that just changes its mind. **[AC #7 — agent recommends
-based on prior human decisions.]**"
-
-### I · The other operator — 30 sec
-
-"*(open `/reviewer-queue` in another tab, briefly)*
-
-Quick beat — the SSC Reviewer in Manila has a completely different
-surface. Same underlying queue, but pre-composed arbitration
-recommendation, cited precedent, system-agnostic. They don't see the
-controller's fleet. Different role, different surface, same
-governance chain. **[AC #8 — SSC Reviewer interface.]**"
-
-### J · System-agnostic across EMS — 30 sec
-
-"And the claims you've been seeing came from two different EMS
-systems — Workday and Concur — appearing identically in this
-controller view. **[AC #9 — system-agnostic Control Plane.]** A new
-EMS — Maconomy is the third we wired in — is a two-file shape: one
-adapter, one registry entry. The agent skills don't change. **[AC
-#10 — extensibility, walked in act 4.]**
-
-*(if time and the room is technical: mention `POST
-/api/simulator/region-failure` lets us yank the Functions host and
-watch in-flight workflows resume from checkpoint. **AC #11.**)*"
-
-### Reserve beats — only if asked
-
-- The accuracy pipeline (AC #4) — `/api/accuracy/run` and the
-  Evaluations page; the prompt + pipeline are live, the corpus-wide
-  ≥95% gate is reserved for WPP's 3,430-claim real dataset because
-  running it on synthetic claims wouldn't be a meaningful number.
-- Foundry Tracing tab live on the workflow currently on screen.
-- `make agt-verify` in a terminal — runs `agt verify` across every
-  audit blob in the repo and prints the chain summary.
+That's the anatomy. Now the five things you actually want to
+interrogate."
 
 ---
 
-## Act 3 · POC2 — end-to-end hire — 9 minutes
+## Pillar 1 · Control Plane — 6 min
 
-> **Surface:** the candidate portal at `:5174`. Close the Control
-> Plane tab. POC2 is *not* a Control Plane demo — same engine
-> underneath, but the audience here is the hire, the recruiter, and
-> the hiring manager.
+> Surface: `http://localhost:5173/fleet`. Role: Agent Administrator.
 
-### Frame the pivot — 30 sec
+"This is the Finance Controller's view. They don't log into Workday.
+They don't log into Concur. They govern the fleet that does.
 
-"Pivot. POC1 is one domain — finance. POC2 is a completely different
-domain — hiring — running on the *same* substrate underneath. I'm
-showing it to you because the headline of this whole bid is that
-this is a platform, not two purpose-built demos. Same Durable engine,
-same governance kernel, same audit story you just saw — but the
-surfaces and the actors are completely different.
+*(point at the grid)* About *(count)* workflows live right now. Greens
+auto-process — the agent talks to the EMS, validates the receipt,
+applies the policy, posts back. The ones that need a human surface
+here as exceptions. **AC #1 and AC #2 — single view across 30+,
+exception-only.**
 
-Three actors, four moments. Apply, AI triage, voice screen, offer."
+### What gets read and written
 
-### A · Candidate applies — 1 min
+Read: every workflow's state, phase, agent reasoning, cost, audit
+chain — all live off the same event bus. The Control Plane is a
+subscriber, not a poller. There's a single always-on session — we
+call it the Fleet Manager — that owns the cross-fleet view.
 
-"*(open `:5174/apply`)*
+Write: human decisions, kill switches, autonomy threshold changes,
+bulk actions. Every write is a signed event into the same chain the
+agents are writing into. There's no separate 'admin database'. The
+operator and the agents share one ledger.
 
-Public form. No login, no SSO. This is what a candidate sees on the
-careers site.
+### Drill in
 
-*(pick Senior Data Engineer · USA, drop in
-`data/synthetic/hiring/cv-pdfs/C-SE-USA-00.pdf`, submit, copy the
-candidate id)*
+*(click the red EXP-NNNN — STALLED at Arbitrate)*
 
-What just happened — a hiring orchestrator spawned, a magic-link
-status URL went out by real Azure Communication Services email, and
-the workflow is already running through Triage."
+The agent's already done Intake, Classify, Receipt, Route — all
+green, no human touched any of it. It's parked at Arbitrate because
+the policy said this one needs a human.
 
-### B · AI triage — recruiter view — 2 min
+*(point at the reasoning panel)*
 
-"*(open `:5174/recruiter`, click into the candidate)*
+It's not asking 'what should we do'. It's drafted a recommendation —
+here's the policy clause, here are two prior arbitrations that look
+similar, here's the way I'd lean. The reviewer's job is concur or
+override. **AC #5 — receipt cross-validation — happened up here at
+Receipt; the OCR total didn't match the claim line, that's why it
+went red.**
 
-This panel — *What we learned* — is the live trace from the agent
-that's reading the CV. The `ocr_extract` row you see is a real
-Document Intelligence call — same one you saw on the receipt in act
-two. Below it, structured profile, token usage, latency.
+### Decide
 
-If extraction had failed you would see a red chip and *no
-recommendation*. That's deliberate. The system refuses to fabricate
-a verdict. For HR, in the EU especially, that 'don't hallucinate
-when you don't know' property matters more than any one feature."
+*(click Reject)*
 
-### C · Real voice screen — 2 min
+Header flips. Phase ribbon paints Arbitrate red. Two new entries in
+the ledger — my decision signed as `finance-controller@wpp`, then
+`workflow.rejected`. Out of the queue. Done.
 
-"Next gate is screening. *(in recruiter view → Active magic links →
-copy the screen token)*
+### Bulk
 
-*(open `/screen?token=…`, allow mic)*
+*(open BulkHitlModal — don't fire)*
 
-Real Azure GPT-Realtime call over WebRTC. *(have a 20–30 second
-conversation — generic intro questions are fine)*
+Same controller will get clustered exceptions — six claims, same
+vendor, same week, same reason. One decision across the cluster, one
+signature, six ledger entries. **AC #3.**
 
-*(end call)*
+### Customisation — what you'd actually change
 
-The transcript posts back, the workflow resumes, and the recruiter
-sees the recommendation in their queue.
+This UI is a React app over a documented event bus and REST surface.
+Two ways customers extend it:
 
-> *(if mic is unhappy: 'I can also play a canned transcript through
-> the same callback by setting `VITE_VOICE_TRANSPORT=canned` — same
-> code path, no live mic.')*"
+- **New panels** — drop a component, subscribe to the event stream,
+  call the same REST. We did this for the SSC Reviewer queue at
+  `/reviewer-queue` — different role, different sort, same data.
+- **New actions** — register a typed event handler on the FastAPI
+  side and surface it as a button. The audit and signing are
+  inherited.
 
-### D · Offer + onboarding avatar — 2 min
+Cost tile here is real `gen_ai.usage` token telemetry × Microsoft's
+published rates. Where the SDK doesn't return token counts we estimate
+from prompt + tool payload, and every span carries a provenance tag —
+`sdk` or `estimated`. Same number Foundry shows. **AC #13.**"
 
-"Three interview gates exist between here and offer — invite, slot
-booking, post-interview decision — I'll skip them in the interest of
-time and pick up at offer.
+---
+
+## Pillar 2 · Multi-agent orchestration & durability — 4 min
+
+> Surface: same workflow page; optionally Foundry Tracing tab in
+> another window.
+
+"Three-layer pattern, and the same three layers run every domain we
+have.
+
+**Layer one — the durable envelope.** Azure Durable Functions, one
+orchestrator per claim. Survives a process restart. Survives a region
+failover. Parks at a human gate via `wait_for_external_event` at zero
+compute — the 72-hour reviewer SLA costs nothing while it's waiting.
+**AC #11 — region failure recovery — is a property of this layer; we
+can yank the Functions host and the in-flight claims pick up from
+checkpoint.**
+
+**Layer two — the agent graph per phase.** Microsoft Agent Framework,
+typed Pregel graphs. Each phase is a graph. Inside the graph we mix
+three executor types deliberately:
+
+- Deterministic code where there's nothing to reason about — three-
+  way matches, schema checks, lookups.
+- Agent calls where judgement is needed — classification, arbitration
+  recommendation, notification drafting.
+- Validators after every agent call. The agent's output is a typed
+  contract; the validator either passes it or sends it back. Bad
+  agent output never reaches the ledger.
+
+This matters because it's the answer to 'how do I trust the agents'.
+The answer is: I don't have to trust them everywhere — I deterministic-
+gate them where I can, and I validate them where I can't.
+
+**Layer three — the agent identity.** Each agent is a real Entra-bound
+session with its own skill manifest and tool allow-list. Today they
+run on the GitHub Copilot SDK; the engagement POC swaps them to
+Foundry Hosted Agents on the same shape. Same skills, same tools,
+same audit. The substrate doesn't change.
+
+*(if Foundry Tracing tab is open: filter `cloud_RoleName ==
+control-plane-functions` and show the live span stream — every
+`gen_ai.generate_content` with usage, skill, tool calls. OTEL
+semantic conventions, the same ones SK and the OpenAI Agents SDK
+emit.)*"
+
+---
+
+## Pillar 3 · Governance, security & compliance — 5 min
+
+> Surface: Evidence chip in workflow sidebar, then Kill Switch panel,
+> then the auditBlobUrl.
+
+"This is the part the CISO will care about most. Three pieces.
+
+### How a policy gets to a running agent
+
+There's one governance kernel, in-process. The policy bundle compiles
+from two sources of truth: the delegated authority matrix, and the
+tool registry. Both are version-controlled, both are signed.
+
+When a policy changes:
+- It's a PR against the matrix or the tool registry.
+- The bundle compiles deterministically — same inputs, byte-identical
+  output, hash printed on boot.
+- Approved bundle is published. Every agent session, on every tool
+  call, evaluates against the bundle that was live at *that*
+  timestamp.
+
+So 'how does a new rule reach the fleet' is — merge, publish,
+sub-second propagation. No redeploy. No agent restart. And every
+decision the kernel makes carries a `decision_id` you can trace.
+
+### Runtime kill switch
+
+*(point at Kill Switch panel)*
+
+Operational override for when a policy change isn't fast enough. I
+can kill an agent or a tool fleet-wide for a TTL. *(walk the form —
+e.g. `concur.submit_decision`, 30 minutes)* The next attempt by any
+agent gets a structured `GovernanceDenied` with a `decision_id`. No
+restart, no deploy. This is the fire-extinguisher.
+
+### Evidence — the claim is reproducible
+
+*(point at Evidence chip — chain / signatures / decisions)*
+
+Every action in the ledger is an Ed25519-signed JWS, hash-chained to
+the previous entry, rooted in the policy bundle that was live at the
+time. The chip shows three sub-checks; all green means the chain is
+intact, signatures verify, and every decision references a real
+bundle.
+
+*(click through if it expands)*
+
+The bid says OWASP Agentic AI Top 10, ten of ten. That claim is
+auditor-reproducible from this endpoint plus the `agt verify` CLI
+against the audit blob. Not a slide.
+
+### Immutability — enforced by Azure, not by us
+
+*(point at auditBlobUrl)*
+
+Every ledger entry is dual-written to an Azure Storage append blob
+with version-level immutability on. The retention policy is enforced
+by Azure itself. If our code tried to mutate it, Azure would refuse.
+**AC #12.**
+
+So the chain answers 'has the content been tampered with', and the
+blob policy answers 'can the storage be tampered with'. Both have to
+fail for the audit to be wrong."
+
+---
+
+## Pillar 4 · System integration — 4 min
+
+> Surface: `/fleet` showing claims from multiple EMS, plus the
+> `api/shared/domains.py` registry if you want to flip to it.
+
+"Two integration shapes. Direct to business systems via API/MCP, and
+the data-layer pattern via Databricks. We support both because real
+agencies have both.
+
+### Direct to systems — MCP everywhere
+
+Every external system — Workday, Concur, Maconomy, Greenhouse,
+ServiceNow, Graph — is behind an MCP server. The agent doesn't know
+the difference between them; it sees a tool catalogue.
+
+What that buys you:
+- One auth abstraction. APIM AI Gateway in front of every MCP, OAuth
+  / SAML / OBO handled at the gateway. Agents never see tokens.
+- One audit point. Every tool call is a span; the gateway is where
+  rate limits, kill switches and OBO gates live.
+- One extensibility shape. Adding a new EMS — Maconomy was our third
+  — is register the MCP, declare the tool in the relevant skill,
+  publish. **AC #9 — claims from two EMS appear identically right
+  now in this fleet view. AC #10 — extensibility, that three-step
+  shape.**
+
+If the customer doesn't have an MCP server yet, APIM has a
+REST-to-MCP gateway that auto-generates the tool surface from an
+OpenAPI spec. So 'I have a REST API today' is a one-config-file step,
+not a custom build.
+
+### Data layer — Databricks pattern
+
+Where the customer's source of truth is a lakehouse — Databricks,
+Fabric, anything Delta-shaped — we don't fight it. Two patterns:
+
+- **Read path**: an MCP tool fronts a SQL warehouse or Databricks SQL
+  endpoint. Agent issues structured queries against governed views.
+  Unity Catalog enforces row-level security; the agent identity
+  carries through. Same audit story.
+- **Write path** is rare for our agents — we write into the systems
+  of record (Workday, Concur), not the lake — but where it's needed
+  it's an ingestion job, not an agent action.
+
+The point: data layer and direct system integration aren't an
+either/or. The same agent can pull a candidate's reference data from
+Databricks and post the offer back into Workday in the same workflow.
+
+### One registry — the substrate's claim
+
+*(optional: open `api/shared/domains.py`)*
+
+Every per-domain integration fact — phases, EMS adapters, persona
+set, skill list — lives in one Python registry. The Control Plane,
+the Fleet Manager, the simulator, the phase ribbon all read from it
+at runtime. Adding the ninth domain is a registry entry plus a YAML
+brief. Not a refactor. We graduated six domains over a weekend that
+way."
+
+---
+
+## Pillar 5 · Advanced capabilities — POC2 — 6 min
+
+> Surface: candidate portal at `:5174/apply`. Close the Control Plane.
+
+"Pivot. Different domain — hiring — running on the same substrate.
+Same Durable engine, same governance kernel, same audit blob. What's
+different is the surfaces and the multimodality.
+
+### Apply
+
+*(open `/apply`, pick Senior Data Engineer USA, drop in
+`data/synthetic/hiring/cv-pdfs/C-SE-USA-00.pdf`, submit, copy id)*
+
+Public form, no login. Orchestrator spawned. Magic-link status URL
+emailed via real Azure Communication Services. Workflow already
+running into Triage.
+
+### AI triage with real OCR
+
+*(open `/recruiter`, click into the candidate)*
+
+The *What we learned* panel is the live trace from the CV agent.
+The `ocr_extract` row is a real Document Intelligence call. If
+extraction failed you'd see a red chip and no recommendation —
+deliberate; the system refuses to fabricate a verdict. For HR in the
+EU, that property matters more than any feature.
+
+### Real voice screen — WebRTC
+
+*(in recruiter view → Active magic links → copy `screen` token, open
+`/screen?token=…`, allow mic, ~20 sec conversation, end call)*
+
+Real Azure GPT-Realtime over WebRTC. Transcript posts back, workflow
+resumes, recommendation lands in the recruiter's queue.
+
+> *(if mic flakes: `VITE_VOICE_TRANSPORT=canned` plays a canned
+> transcript through the same callback. Same code path.)*
+
+### Three interview gates — skip to offer
+
+There are three HITL gates between here and offer — invite, slot
+booking, post-interview decision. Skipping for time. Pick up at
+offer.
+
+### Offer + onboarding avatar
 
 *(open `/portal?token=…` for an offered candidate)*
 
-Candidate accepts. Phase 10 is Onboarding — and *(wait for the
-avatar)* — that's a real Azure AI Speech avatar, personalised
-welcome, voice synthesis, blob-cached so we don't pay for the same
-render twice. From a candidate-experience point of view, that's the
-moment your new hire stops being a row in a spreadsheet."
+Candidate accepts. Phase 10 — Onboarding — renders a real Azure AI
+Speech avatar. Personalised welcome, voice synthesis, blob-cached
+by SHA so the second render is free.
 
-### E · The point — 1.5 min
+### What this proves
 
-"Two things to take away from this act, and we move on.
+Two things, and we move to the close:
 
-One — the engine that just ran this hire is the same engine that ran
-the expense claims. Same Durable orchestrator pattern, same Pregel
-graphs per phase, same governance kernel evaluating every tool call,
-same audit blob with version-level immutability, same Foundry
-telemetry. The only thing that's different between POC1 and POC2 is
-the *content* of the workflows — the seven phases vs the ten phases
-— and the surfaces.
+- The engine that just ran this hire is the same engine that ran the
+  expense claims. Same orchestration pattern, same governance, same
+  audit story.
+- We didn't retrofit POC1 to make POC2 work. POC2 dropped in clean
+  through the same registry. That's the substrate claim, made
+  literal.
 
-Two — and this is the harder one — we did not retrofit POC1's
-substrate to make POC2 work. POC2 is a separate domain that dropped
-in clean. Which is the bridge to the last act."
-
-> **If asked, in this act, you can drop in any of:**
-> - **Jurisdiction switching** — re-run with `C-SE-DE-00` and the
->   same code path automatically grows a German works-council
->   compliance step.
-> - **Hiring Manager surface** at `/hiring-manager/HIRE-NNNN` —
->   different actor, different screen, same workflow.
-> - **Episodic memory** — `recall_similar_hires` surfaces past hires
->   in the same role family + jurisdiction so the recommender isn't
->   deciding in a vacuum.
+> *(if asked: jurisdiction switching — re-run with `C-SE-DE-00` and
+> the same code path grows a German works-council compliance step.
+> Hiring Manager surface at `/hiring-manager/HIRE-NNNN`. Episodic
+> memory via `recall_similar_hires`.)*"
 
 ---
 
-## Act 4 · Constellation — 4 minutes
+## Close — Constellation — 2 min
 
-> **Surface:** `http://localhost:5175/?view=constellation`. Project
-> this full-screen for the closing.
+> Surface: `http://localhost:5175/?view=constellation`, full screen.
 
-"OK — pull back. POC1 and POC2 are two domains. The substrate runs
-eight.
+"Pull back.
 
 *(open the constellation view)*
 
-This is the eight-domain ring. It's lit up live as workflows fire on
-the laptop — same event bus you've been watching, just a different
-surface.
-
-Four points, briskly, and then I stop talking.
-
-**One — eight domains, all in main.** POC1 — finance — and POC2 —
-hiring — were hand-built. The other six — travel pre-approval,
+Eight domains live in `main`. POC1 — finance — and POC2 — hiring —
+are the two we built by hand. The other six — travel pre-approval,
 vendor KYC, employee onboarding, IT access, contract renewal,
 performance review — were graduated end-to-end by a meta-skill we
-built called `compose-domain`, over a single weekend. The ring you're
-looking at is the actual list. **[AC #10 — extensibility, made
-literal: this is what 'add a new domain' looks like.]**
+wrote called `compose-domain`. Over a weekend. The ring you're
+looking at is the actual list.
 
-**Two — one registry, no per-domain branches.** Every fact about a
-domain — its phases, its skills, its EMS adapters, its persona set
-— lives in a single Python registry. The substrate layers — Fleet
-Manager, simulator, exception queue, blueprint inventory, phase
-ribbon — read from it at runtime. Adding the ninth domain is a
-registry entry plus a YAML brief. It's not a refactor.
+One registry. One governance kernel. One audit story. One Foundry
+project. Eight domains.
 
-**Three — one governance kernel for all eight.** The OWASP-10
-coverage you saw on POC1 covers POC2 and the other six identically.
-Every MCP tool call in any of the eight domains routes through the
-same chokepoint, the same kill switch, the same hash-chained
-ledger, the same `agt verify` story. It is not eight different
-governance stories.
-
-**Four — one Foundry project across all eight.** Same telemetry
-schema, same evaluation pipeline, same cost ledger. When you filter
-the Foundry Tracing tab by `cloud_RoleName == "control-plane-functions"`
-you get the live cross-domain trace stream — Hiring spans next to
-Expense spans next to Vendor-KYC spans, all with the same OTEL
-semantic conventions Microsoft Agent Framework, Semantic Kernel,
-the OpenAI Agents SDK and GitHub Copilot all share.
-
-*(close on the lit ring)*
-
-So — closing line. **The substrate is the deliverable.** POC1 and
-POC2 are two existence proofs of it. The governance kernel is what
-makes the OWASP-10 claim auditor-reproducible. And what you're
-looking at here — Constellation — is what scale across WPP's
+The deliverable is the substrate. POC1 and POC2 are existence proofs.
+The kernel is what makes the OWASP-10 claim auditor-reproducible.
+What you're looking at on the ring is what scale across WPP's
 operating model actually looks like.
 
-Happy to take questions."
+Questions."
 
 ---
 
-## Q&A — anticipated themes (one-liners)
+## Q&A — one-liners
 
-- **"Where do the cost numbers come from?"** — Real `gen_ai.usage`
-  spans where the SDK reports them; chars-over-four estimate when it
-  doesn't, with provenance tagged on every span. Same number Foundry
-  shows.
-- **"How do we know the audit ledger is immutable?"** — Version-level
-  immutability is enforced by Azure Storage itself, not my code.
-  Plus the Evidence chip and `agt verify` for the chain integrity.
-- **"How do we add the ninth domain?"** — Registry entry plus a YAML
-  brief through `compose-domain`. We graduated six in a weekend that
-  way.
-- **"Where does Foundry sit?"** — Tracing, evaluation, observability
-  — *next to* the agent runtime, not in front of it. Foundry is the
-  dashboard, not the gate.
-- **"OWASP Agentic Top 10 coverage?"** — Ten out of ten. Reproducible
-  from `agt verify` plus the audit blobs. Walk-through is in the
-  AGT panel.
-- **"Lab vs engagement-POC scope?"** — See [SCOPE-DELTA.md](SCOPE-DELTA.md).
-  Short version: agent identities swap from GHCP SDK to Foundry
-  Hosted Agents on the same shape; the substrate, the kernel, the
-  surfaces stay identical.
-- **"Why not prompt-only? Why all this skill + allow-list machinery?"**
-  — Allow-lists are policy. Prompts are not policy. The prompt can
-  ask for whatever it wants — the kernel decides whether it happens.
-- **"What about the ≥95% accuracy criterion (AC #4)?"** — Pipeline
-  and prompt are live, evaluator UI in the app. The corpus-wide gate
-  is reserved for WPP's 3,430-line real dataset; running it on our
-  synthetic 300 wouldn't be a meaningful number.
+- **Cost numbers** — real `gen_ai.usage` where the SDK reports it,
+  chars-over-four estimate when it doesn't, provenance tagged.
+- **Immutability** — version-level immutability is enforced by Azure
+  Storage. Chain integrity by Ed25519 + `agt verify`.
+- **New domain** — registry entry + YAML brief through
+  `compose-domain`. Six in a weekend.
+- **Foundry's role** — telemetry, evaluation, observability. Next to
+  the runtime, not in front of it.
+- **Lab vs engagement POC** — see [SCOPE-DELTA.md](SCOPE-DELTA.md).
+  Agent identities swap GHCP SDK → Foundry Hosted Agents on the same
+  shape. Substrate, kernel, surfaces don't change.
+- **Why allow-lists not prompts** — allow-lists are policy. Prompts
+  aren't. The kernel decides whether a tool call happens, not the
+  prompt.
+- **AC #4 (≥95% accuracy)** — pipeline and prompt are live. The
+  corpus-wide gate is reserved for WPP's 3,430-line real dataset;
+  running it on synthetic 300 wouldn't be a meaningful number.
 
-`make down` between recordings. Always.
+`make down` between recordings.
