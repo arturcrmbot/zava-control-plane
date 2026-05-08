@@ -11,6 +11,7 @@ just the schema bootstrap.
 from __future__ import annotations
 
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -101,3 +102,40 @@ def test_find_by_pattern_does_not_double_append_limit(graph_with_two_persons: En
         limit=99,
     )
     assert len(rows) == 1
+
+
+def test_find_by_pattern_word_boundary_limit_detection(graph_with_two_persons: EntityGraph) -> None:
+    # Word-boundary regex: 'limited' is not 'LIMIT'. Verify pattern with
+    # 'limited' in a WHERE clause still gets LIMIT appended.
+    rows = graph_with_two_persons.find_by_pattern(
+        "MATCH (n:Person) WHERE n.name <> 'limited' RETURN n.id AS id",
+        limit=100,
+    )
+    # Should return both rows (no false LIMIT detected).
+    assert len(rows) == 2
+
+
+def test_attach_preserves_previously_set_refs(graph_with_two_persons: EntityGraph) -> None:
+    mock_bus = mock.Mock()
+    mock_audit = mock.Mock()
+    mock_other_bus = mock.Mock()
+
+    # First attach sets bus.
+    graph_with_two_persons.attach(bus=mock_bus)
+    assert graph_with_two_persons.bus is mock_bus
+    assert graph_with_two_persons.audit is None
+
+    # Second attach adds audit without clobbering bus.
+    graph_with_two_persons.attach(audit=mock_audit)
+    assert graph_with_two_persons.bus is mock_bus
+    assert graph_with_two_persons.audit is mock_audit
+
+    # Explicit non-None overrides the previous value.
+    graph_with_two_persons.attach(bus=mock_other_bus)
+    assert graph_with_two_persons.bus is mock_other_bus
+    assert graph_with_two_persons.audit is mock_audit
+
+    # All-None attach() is a no-op.
+    graph_with_two_persons.attach()
+    assert graph_with_two_persons.bus is mock_other_bus
+    assert graph_with_two_persons.audit is mock_audit

@@ -7,8 +7,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from api.server.services.entity_graph import EntityGraph
 
 
@@ -70,13 +68,20 @@ def test_constructor_creates_database_file(tmp_path: Path) -> None:
 def test_reconstructing_on_same_path_is_idempotent(tmp_path: Path) -> None:
     db_path = tmp_path / "g.kuzu"
     first = EntityGraph(db_path)
-    # Drop the connection/db handles before reopening — Kuzu permits a
+    # Close the connection/db handles before reopening — Kuzu permits a
     # single writer per database directory.
-    del first
+    first.close()
     second = EntityGraph(db_path)  # must not raise
     tables = _list_tables(second)
     assert tables["NODE"] == EXPECTED_NODE_TABLES
     assert tables["REL"] == EXPECTED_REL_TABLES
+
+
+def test_close_is_idempotent(tmp_path: Path) -> None:
+    graph = EntityGraph(tmp_path / "g.kuzu")
+    # Multiple closes should not raise.
+    graph.close()
+    graph.close()  # should be a no-op
 
 
 def test_show_tables_lists_exact_expected_tables(tmp_path: Path) -> None:

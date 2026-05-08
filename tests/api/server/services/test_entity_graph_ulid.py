@@ -37,6 +37,8 @@ def test_ulid_no_collisions_in_tight_loop() -> None:
     # in-ms counter must still keep them all distinct.
     values = [_ulid() for _ in range(5000)]
     assert len(set(values)) == 5000
+    # Verify strict monotonicity — same ms calls are lexicographically increasing.
+    assert values == sorted(values)
 
 
 def test_ulid_alphabet_constants() -> None:

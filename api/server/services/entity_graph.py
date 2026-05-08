@@ -36,6 +36,7 @@ The behavioural methods (``upsert``, ``link``, ``get``, ``by_type``,
 from __future__ import annotations
 
 import os
+import re
 import secrets
 import threading
 import time
@@ -44,8 +45,6 @@ from pathlib import Path
 from typing import Any
 
 import kuzu
-
-from api.server.state import _PORTAL_DATA_DIR  # noqa: F401  re-exported for convenience
 
 
 # ---------------------------------------------------------------------------
@@ -61,6 +60,10 @@ _CROCKFORD_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _ULID_LOCK = threading.Lock()
 _ULID_LAST_MS: int = 0
 _ULID_LAST_RANDOM: int = 0  # 80-bit integer of the random suffix
+
+# Regex for detecting LIMIT clauses (word-boundary match to avoid false positives
+# in identifiers like 'limited'). Precompiled for efficiency.
+_LIMIT_PATTERN = re.compile(r"\blimit\b", re.IGNORECASE)
 
 
 def _encode_crockford(value: int, length: int) -> str:
@@ -281,6 +284,10 @@ class EntityGraph:
     via :meth:`attach` after construction so the test harness can pass mocks
     in any order (and so unit tests can construct an :class:`EntityGraph`
     without having to stand up the rest of the substrate).
+
+    All ``Connection.execute`` calls go through ``self._conn_lock`` — Kuzu
+    0.6.1 connections are not documented as concurrent-safe, so we serialize
+    access when the bus's projection-dispatch path calls from worker threads.
     """
 
     def __init__(self, db_path: str | os.PathLike[str]) -> None:
@@ -290,10 +297,34 @@ class EntityGraph:
         Path(self._path).parent.mkdir(parents=True, exist_ok=True)
         self.db = kuzu.Database(self._path)
         self.conn = kuzu.Connection(self.db)
+        self._conn_lock = threading.Lock()
         self.bus: Any | None = None
         self.audit: Any | None = None
         self.governance: Any | None = None
         self._bootstrap_schema()
+
+    # -- lifecycle -------------------------------------------------------
+
+    def close(self) -> None:
+        """Release the Kuzu single-writer lock and clean up resources.
+
+        Safe to call multiple times (idempotent). After close(), the graph
+        is not usable; a new EntityGraph must be constructed to re-open.
+        """
+        if self.conn is not None:
+            self.conn.close()
+            self.conn = None
+        if self.db is not None:
+            self.db.close()
+            self.db = None
+
+    def __enter__(self) -> EntityGraph:
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Exit context manager, releasing resources."""
+        self.close()
 
     # -- wiring ----------------------------------------------------------
 
@@ -315,30 +346,34 @@ class EntityGraph:
     def _bootstrap_schema(self) -> None:
         """Run the eight node + ten rel ``CREATE … IF NOT EXISTS`` DDL."""
         for _, ddl in _NODE_TABLES:
-            self.conn.execute(ddl)
+            with self._conn_lock:
+                self.conn.execute(ddl)
         for _, ddl in _REL_TABLES:
-            self.conn.execute(ddl)
+            with self._conn_lock:
+                self.conn.execute(ddl)
 
     # -- Cypher passthrough (REQ-002) ------------------------------------
 
     def query(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         """Execute ``cypher`` and return every row as a column-name → value dict."""
-        result = self.conn.execute(cypher, params or {})
-        columns = result.get_column_names()
-        rows: list[dict[str, Any]] = []
-        while result.has_next():
-            row = result.get_next()
-            rows.append({col: row[idx] for idx, col in enumerate(columns)})
-        return rows
+        with self._conn_lock:
+            result = self.conn.execute(cypher, params or {})
+            columns = result.get_column_names()
+            rows: list[dict[str, Any]] = []
+            while result.has_next():
+                row = result.get_next()
+                rows.append({col: row[idx] for idx, col in enumerate(columns)})
+            return rows
 
     def query_one(self, cypher: str, params: dict[str, Any] | None = None) -> dict[str, Any] | None:
         """Execute ``cypher`` and return the first row, or None if empty."""
-        result = self.conn.execute(cypher, params or {})
-        columns = result.get_column_names()
-        if not result.has_next():
-            return None
-        row = result.get_next()
-        return {col: row[idx] for idx, col in enumerate(columns)}
+        with self._conn_lock:
+            result = self.conn.execute(cypher, params or {})
+            columns = result.get_column_names()
+            if not result.has_next():
+                return None
+            row = result.get_next()
+            return {col: row[idx] for idx, col in enumerate(columns)}
 
     def find_by_pattern(
         self,
@@ -353,9 +388,11 @@ class EntityGraph:
         (case-insensitive), ``LIMIT <limit>`` is appended. The limit is
         inlined as an integer literal because Kuzu 0.6.1 does not accept
         parameter substitution inside ``LIMIT``.
+
+        The LIMIT detection uses a word-boundary regex to avoid false positives
+        in identifiers or string literals (e.g. 'limited').
         """
-        # Cheap case-insensitive scan — good enough; projection-supplied
-        # patterns are short. Tokenising the Cypher would be overkill.
-        if "limit" not in pattern.lower():
+        # Word-boundary scan to avoid false positives on identifier substrings.
+        if _LIMIT_PATTERN.search(pattern) is None:
             pattern = f"{pattern.rstrip().rstrip(';')} LIMIT {int(limit)}"
         return self.query(pattern, params)
