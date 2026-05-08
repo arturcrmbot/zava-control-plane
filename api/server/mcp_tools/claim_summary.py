@@ -27,7 +27,7 @@ def summarise(claim_id: str) -> dict:
     """Return a terse single-line summary plus the structured fields used to
     build it. The line is composed for human consumption (no JSON syntax)."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.claim.id", claim_id)
+    span.set_attribute("zava.claim.id", claim_id)
 
     claim = get_structured(claim_id, include_gold=False)
     amount_str = _format_amount(claim["currency"], claim["amount"])
@@ -36,7 +36,7 @@ def summarise(claim_id: str) -> dict:
         f"at {claim['vendor']} ({claim['market']}, {claim['ems_source']}) — "
         f"submitted {claim.get('submitted_at', '')[:10]}"
     )
-    span.set_attribute("wpp.claim.summary_chars", len(line))
+    span.set_attribute("zava.claim.summary_chars", len(line))
     return {
         "claim_id": claim["claim_id"],
         "summary": line,

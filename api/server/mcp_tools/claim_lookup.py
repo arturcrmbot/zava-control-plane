@@ -44,9 +44,9 @@ def lookup(claim_id: str, ems_source: str | None = None) -> dict:
     it directly, Concur returns it under `_normalised` and we unwrap.
     """
     span = trace.get_current_span()
-    span.set_attribute("wpp.claim.id", claim_id)
+    span.set_attribute("zava.claim.id", claim_id)
     ems = ems_source or _resolve_ems(claim_id)
-    span.set_attribute("wpp.ems.source", ems)
+    span.set_attribute("zava.ems.source", ems)
 
     if ems == "concur":
         port = int(os.environ.get("CONCUR_MCP_PORT", "4102"))

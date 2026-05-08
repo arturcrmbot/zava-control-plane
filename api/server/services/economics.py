@@ -65,7 +65,7 @@ def _token_buckets(spans: list[OtelSpan]) -> dict[str, dict[str, int]]:
         attrs = s.attributes or {}
         model = (
             attrs.get("gen_ai.request.model")
-            or attrs.get("wpp.agent.model")
+            or attrs.get("zava.agent.model")
             or _DEFAULT_MODEL
         )
         in_tok = int(attrs.get("gen_ai.usage.input_tokens") or 0)

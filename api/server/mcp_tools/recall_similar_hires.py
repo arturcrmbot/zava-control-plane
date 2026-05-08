@@ -19,8 +19,8 @@ from api.server.state import app_state
 
 @traced_tool("recall.similar_hires")
 def recall_similar_hires(role_family: str, jurisdiction: str, limit: int = 5) -> dict:
-    trace.get_current_span().set_attribute("wpp.recall.role_family", role_family)
-    trace.get_current_span().set_attribute("wpp.recall.jurisdiction", jurisdiction)
+    trace.get_current_span().set_attribute("zava.recall.role_family", role_family)
+    trace.get_current_span().set_attribute("zava.recall.jurisdiction", jurisdiction)
 
     workflows = app_state.store.list_workflows()
     matches: list[dict[str, Any]] = []

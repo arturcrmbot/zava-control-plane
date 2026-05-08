@@ -18,7 +18,7 @@ from api.functions.webhook import emit
 
 ExecuteFn = Callable[[dict], Awaitable[dict]]
 
-_tracer = trace.get_tracer("wpp.graphs.executor")
+_tracer = trace.get_tracer("zava.graphs.executor")
 
 
 class TrackedExecutor(Executor):
@@ -41,13 +41,13 @@ class TrackedExecutor(Executor):
             "name": self._name, "type": self._executor_type, "stage": "start"
         })
         with _tracer.start_as_current_span(f"executor.{self._name}") as span:
-            span.set_attribute("wpp.workflow.id", str(wid))
+            span.set_attribute("zava.workflow.id", str(wid))
             if iid is not None:
-                span.set_attribute("wpp.workflow.instance_id", str(iid))
+                span.set_attribute("zava.workflow.instance_id", str(iid))
             if phase is not None:
-                span.set_attribute("wpp.workflow.phase", str(phase))
-            span.set_attribute("wpp.executor.type", self._executor_type)
-            span.set_attribute("wpp.executor.name", self._name)
+                span.set_attribute("zava.workflow.phase", str(phase))
+            span.set_attribute("zava.executor.type", self._executor_type)
+            span.set_attribute("zava.executor.name", self._name)
             if self._executor_type == "agent":
                 span.set_attribute("gen_ai.agent.name", "finance-agent")
 

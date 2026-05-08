@@ -25,7 +25,7 @@ _COST_CENTRES = ["CC-1001", "CC-1042", "CC-1099", "CC-2300", "CC-2401", "CC-3122
 def get_employee(employee_id: str) -> dict:
     """Read an employee's grade, cost-centre, agency and home market — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.workday_hr.employee_id", str(employee_id))
+    span.set_attribute("zava.workday_hr.employee_id", str(employee_id))
     return _synth_get_employee(employee_id)
 
 

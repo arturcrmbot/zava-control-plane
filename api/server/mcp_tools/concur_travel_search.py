@@ -29,8 +29,8 @@ def search_options(
 ) -> dict:
     """Return a deterministic shortlist of flight + hotel options — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.concur_travel.origin", str(origin))
-    span.set_attribute("wpp.concur_travel.destination", str(destination))
+    span.set_attribute("zava.concur_travel.origin", str(origin))
+    span.set_attribute("zava.concur_travel.destination", str(destination))
     return _synth_search_options(origin, destination, depart_date, return_date)
 
 

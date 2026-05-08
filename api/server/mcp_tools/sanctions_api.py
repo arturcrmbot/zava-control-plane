@@ -24,8 +24,8 @@ _SANCTIONS_LISTS = ["OFAC-SDN", "UN-CONSOLIDATED", "EU-CONSOLIDATED", "HMT-CONSO
 def screen_entity(name: str, country: str) -> dict:
     """Screen a (name, country) pair against sanctions lists — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.sanctions_api.name", str(name))
-    span.set_attribute("wpp.sanctions_api.country", str(country))
+    span.set_attribute("zava.sanctions_api.name", str(name))
+    span.set_attribute("zava.sanctions_api.country", str(country))
     return _synth_screen_entity(name, country)
 
 

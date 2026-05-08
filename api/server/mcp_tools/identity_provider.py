@@ -77,8 +77,8 @@ _SOD_CONFLICT_PAIRS: list[tuple[str, str, str]] = [
 def list_role_templates(department: str, grade: str) -> dict:
     """List candidate role templates that fit (department, grade) — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.identity_provider.department", str(department))
-    span.set_attribute("wpp.identity_provider.grade", str(grade))
+    span.set_attribute("zava.identity_provider.department", str(department))
+    span.set_attribute("zava.identity_provider.grade", str(grade))
     return _synth_list_role_templates(department, grade)
 
 
@@ -133,7 +133,7 @@ def identity_provider_list_role_templates_tool(params: _ListRoleTemplatesParams)
 def get_role_template(template_id: str) -> dict:
     """Fetch a single role template's permission list — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.identity_provider.template_id", str(template_id))
+    span.set_attribute("zava.identity_provider.template_id", str(template_id))
     return _synth_get_role_template(template_id)
 
 
@@ -186,7 +186,7 @@ def identity_provider_get_role_template_tool(params: _GetRoleTemplateParams) -> 
 def check_separation_of_duties(permissions: list[str]) -> dict:
     """Screen a permission union for SoD conflict pairs — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.identity_provider.permission_count", len(permissions))
+    span.set_attribute("zava.identity_provider.permission_count", len(permissions))
     return _synth_check_separation_of_duties(permissions)
 
 

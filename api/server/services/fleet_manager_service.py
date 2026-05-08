@@ -31,7 +31,7 @@ def _gh_token() -> str:
     return subprocess.check_output(["gh", "auth", "token"], text=True).strip()
 
 
-_tracer = trace.get_tracer("wpp.fleet_manager")
+_tracer = trace.get_tracer("zava.fleet_manager")
 
 
 def _domain_catalogue_section() -> str:
@@ -180,9 +180,9 @@ class FleetManagerService:
                     context=parent_ctx,
                 )
                 if name is not None:
-                    span.set_attribute("wpp.tool.name", str(name))
+                    span.set_attribute("zava.tool.name", str(name))
                 if call_id is not None:
-                    span.set_attribute("wpp.tool.call_id", str(call_id))
+                    span.set_attribute("zava.tool.call_id", str(call_id))
                     self._open_tool_spans[call_id] = span
                 else:
                     # Without a call_id we cannot correlate the complete event; end immediately.
@@ -278,9 +278,9 @@ class FleetManagerService:
 
         with _tracer.start_as_current_span("gen_ai.agent.run") as span:
             span.set_attribute("gen_ai.agent.name", "fleet-manager-agent")
-            span.set_attribute("wpp.fleet_manager.batch_size", len(batch))
+            span.set_attribute("zava.fleet_manager.batch_size", len(batch))
             span.set_attribute(
-                "wpp.fleet_manager.workflow_ids",
+                "zava.fleet_manager.workflow_ids",
                 [b.workflow_id for b in batch if b.workflow_id],
             )
             # Capture context so session-event tool spans attach as children.

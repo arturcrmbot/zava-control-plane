@@ -116,8 +116,8 @@ def search(query: str, k: int = 5) -> list[dict]:
     """Return top-k policy chunks ranked by cosine similarity to query."""
     import numpy as np
     span = trace.get_current_span()
-    span.set_attribute("wpp.mcp.query", query)
-    span.set_attribute("wpp.mcp.k", k)
+    span.set_attribute("zava.mcp.query", query)
+    span.set_attribute("zava.mcp.k", k)
     chunks = _ensure_index()
     model = _load_model()
     q_emb = model.encode([query], convert_to_numpy=True, normalize_embeddings=True)[0]
@@ -127,7 +127,7 @@ def search(query: str, k: int = 5) -> list[dict]:
         {"section": c.section, "text": c.text, "score": s}
         for s, c in scored[:k]
     ]
-    span.set_attribute("wpp.mcp.result_count", len(out))
+    span.set_attribute("zava.mcp.result_count", len(out))
     return out
 
 

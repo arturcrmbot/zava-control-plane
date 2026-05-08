@@ -33,7 +33,7 @@ def _section_id(clause: str) -> str | None:
 def cite(clause: str) -> dict:
     """Return {section, quote, source} for a policy clause identifier."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.policy.clause", clause)
+    span.set_attribute("zava.policy.clause", clause)
 
     section_id = _section_id(clause)
     if section_id:
@@ -41,7 +41,7 @@ def cite(clause: str) -> dict:
         prefix = f"§{section_id}"
         for chunk in _ensure_index():
             if chunk.section.startswith(prefix):
-                span.set_attribute("wpp.policy.section_matched", chunk.section)
+                span.set_attribute("zava.policy.section_matched", chunk.section)
                 return {
                     "section": chunk.section,
                     "quote": chunk.text,
@@ -52,7 +52,7 @@ def cite(clause: str) -> dict:
     results = search(clause, k=1)
     if results:
         top = results[0]
-        span.set_attribute("wpp.policy.section_matched", top["section"])
+        span.set_attribute("zava.policy.section_matched", top["section"])
         return {
             "section": top["section"],
             "quote": top["text"],

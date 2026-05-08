@@ -37,9 +37,9 @@ def get_history(employee_id: str, lookback_days: int | None = 90) -> dict:
     policy's progressive-enforcement window.
     """
     span = trace.get_current_span()
-    span.set_attribute("wpp.employee.id", employee_id)
+    span.set_attribute("zava.employee.id", employee_id)
     if lookback_days is not None:
-        span.set_attribute("wpp.employee.lookback_days", lookback_days)
+        span.set_attribute("zava.employee.lookback_days", lookback_days)
 
     employees = _load_employees()
     emp = next((e for e in employees if e["id"] == employee_id), None)
@@ -59,7 +59,7 @@ def get_history(employee_id: str, lookback_days: int | None = 90) -> dict:
                 filtered.append(entry)
         history = filtered
 
-    span.set_attribute("wpp.employee.breach_count", len(history))
+    span.set_attribute("zava.employee.breach_count", len(history))
     return {
         "employee_id": emp["id"],
         "name": emp.get("name"),

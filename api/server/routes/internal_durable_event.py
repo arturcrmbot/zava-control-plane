@@ -589,7 +589,7 @@ async def receive_durable_event(body: DurableEventBody):
             "gen_ai.usage.source": usage_source,
         }
         if payload.get("agent_label"):
-            attrs["wpp.skill"] = payload["agent_label"]
+            attrs["zava.skill"] = payload["agent_label"]
         app_state.store.append_span(OtelSpan(
             trace_id=wid,
             span_id=uuid.uuid4().hex[:16],

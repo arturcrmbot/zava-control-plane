@@ -30,7 +30,7 @@ def get_receipt(claim_id: str) -> dict:
     """Return the receipt for a claim. Zero-byte PNGs (the missing-receipt
     flavour) report `absent=True` and omit `image_b64`."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.claim.id", claim_id)
+    span.set_attribute("zava.claim.id", claim_id)
 
     # Pull receipt_filename + flavour from the claim record itself (gold fields
     # like receipt_mismatch_flavour are in there).
@@ -43,9 +43,9 @@ def get_receipt(claim_id: str) -> dict:
         raise FileNotFoundError(f"receipt {filename!r} not found at {_RECEIPTS_DIR}")
 
     size_bytes = path.stat().st_size
-    span.set_attribute("wpp.receipt.size_bytes", size_bytes)
+    span.set_attribute("zava.receipt.size_bytes", size_bytes)
     if flavour:
-        span.set_attribute("wpp.receipt.flavour", flavour)
+        span.set_attribute("zava.receipt.flavour", flavour)
 
     if size_bytes == 0:
         # missing-receipt marker — claimant submitted nothing.
