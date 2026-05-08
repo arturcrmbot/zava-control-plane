@@ -101,19 +101,23 @@ launch_func() {
   pids+=($FUNC_PID)
 }
 
-echo "==> functions host (attempt 1)"
-launch_func
-# Poll 7071 for 30s
-bound=0
-for i in $(seq 1 15); do
-  sleep 2
-  if curl -s -o /dev/null http://localhost:7071/ 2>/dev/null; then bound=1; break; fi
-done
-if [ $bound -eq 0 ]; then
-  echo "==> functions host didn't bind; restarting"
-  kill -9 $FUNC_PID 2>/dev/null || true
-  sleep 3
+if [[ "${BOOT_DEMO_SKIP_FUNC:-0}" == "1" ]]; then
+  echo "==> functions host SKIPPED (BOOT_DEMO_SKIP_FUNC=1) — no Durable orchestrators on :7071"
+else
+  echo "==> functions host (attempt 1)"
   launch_func
+  # Poll 7071 for 30s
+  bound=0
+  for i in $(seq 1 15); do
+    sleep 2
+    if curl -s -o /dev/null http://localhost:7071/ 2>/dev/null; then bound=1; break; fi
+  done
+  if [ $bound -eq 0 ]; then
+    echo "==> functions host didn't bind; restarting"
+    kill -9 $FUNC_PID 2>/dev/null || true
+    sleep 3
+    launch_func
+  fi
 fi
 
 cat <<EOF
