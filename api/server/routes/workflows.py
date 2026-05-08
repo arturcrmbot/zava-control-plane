@@ -34,8 +34,8 @@ def _synthesize_workflow(workflow_id: str) -> Workflow | None:
         current_phase="Intake",
         created_at=created_at,
         sla_due_at=created_at + 7 * 86400,
-        jurisdiction="London-WPP",
-        agency="WPP",
+        jurisdiction="London-Zava",
+        agency="Zava",
         active_exception_id=open_exc.id if open_exc else None,
     )
 

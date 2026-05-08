@@ -88,7 +88,7 @@ def send_book_interview_email_activity(payload: dict) -> dict:
         f"the <strong>{role_title}</strong> role.</p>"
         f"<p><a href=\"{portal_url}\">Pick a time that works for you</a> "
         f"— the link works once and expires after 7 days.</p>"
-        f"<p>Thanks,<br/>WPP Talent</p>"
+        f"<p>Thanks,<br/>Zava Talent</p>"
     )
     try:
         msg_id = app_state.email_sender.send(
@@ -140,7 +140,7 @@ def send_rejection_email_activity(payload: dict) -> dict:
         f"<p>Thanks for taking the time to interview with us. {bridge}</p>"
         f"<p>We'll keep your details on file and be in touch if a better "
         f"fit opens up.</p>"
-        f"<p>Best,<br/>WPP Talent</p>"
+        f"<p>Best,<br/>Zava Talent</p>"
     )
     try:
         msg_id = app_state.email_sender.send(

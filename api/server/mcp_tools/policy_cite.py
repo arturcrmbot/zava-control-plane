@@ -71,7 +71,7 @@ class _PolicyCiteParams(BaseModel):
     name="policy_cite",
     description=(
         "Resolve a policy clause identifier to its §-section label and "
-        "verbatim quote from the WPP T&E policy. Use to embed exact "
+        "verbatim quote from the Zava T&E policy. Use to embed exact "
         "policy wording in breach notifications and audit narratives."
     ),
 )

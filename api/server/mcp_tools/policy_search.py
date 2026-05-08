@@ -132,14 +132,14 @@ def search(query: str, k: int = 5) -> list[dict]:
 
 
 class _PolicySearchParams(BaseModel):
-    query: str = Field(description="Natural-language query about the WPP T&E policy")
+    query: str = Field(description="Natural-language query about the Zava T&E policy")
     k: int = Field(default=5, description="Number of top chunks to return", ge=1, le=20)
 
 
 @define_tool(
     name="policy_search",
     description=(
-        "Search the WPP T&E policy markdown by semantic similarity. Returns the "
+        "Search the Zava T&E policy markdown by semantic similarity. Returns the "
         "top-k matching chunks (each with section label and similarity score). "
         "Use to ground R/A/G classification and arbitration in policy text."
     ),

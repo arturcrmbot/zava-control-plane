@@ -23,7 +23,7 @@ class BulkResolveBody(BaseModel):
 
 class ResolveBody(BaseModel):
     resolution: Resolution
-    resolved_by: str = "reviewer@wpp"
+    resolved_by: str = "reviewer@zava"
 
 
 @router.get("")

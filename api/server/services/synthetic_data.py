@@ -105,7 +105,7 @@ def build_expense_workflow(workflow_id: str, claim_id: str | None = None) -> Wor
         created_at=now,
         sla_due_at=now + (1 + random.random() * 4) * 3600,
         claim=claim,
-        jurisdiction=f"{market}-WPP",
+        jurisdiction=f"{market}-Zava",
         agency=agency_id,
     )
 
@@ -156,8 +156,8 @@ def build_hiring_workflow(workflow_id: str, candidate_id: str | None = None) -> 
         current_phase="Budget",
         created_at=now,
         sla_due_at=now + 7 * 86400,  # 7-day SLA per BetrVG/HR BP windows
-        jurisdiction=f"{market}-WPP",
-        agency="WPP-HR",
+        jurisdiction=f"{market}-Zava",
+        agency="Zava-HR",
         metadata={
             "candidate_id": candidate_id,
             "candidate_name": raw.get("name"),
@@ -212,8 +212,8 @@ def build_fleet_travel_preapproval_workflow(
         current_phase="Employee Lookup",
         created_at=created_at,
         sla_due_at=sla,
-        jurisdiction="London-WPP",
-        agency="WPP",
+        jurisdiction="London-Zava",
+        agency="Zava",
         payload={"trip": trip, "scenario": r.get("scenario")},
     )
 
@@ -236,7 +236,7 @@ def build_fleet_vendor_kyc_workflow(
         current_phase="Vendor Intake",
         created_at=created_at,
         sla_due_at=sla,
-        jurisdiction=f"{vendor['country_of_incorporation']}-WPP",
+        jurisdiction=f"{vendor['country_of_incorporation']}-Zava",
         agency=vendor["proposing_agency"],
         payload={"vendor": vendor, "scenario": r.get("scenario")},
     )
@@ -261,8 +261,8 @@ def build_fleet_employee_onboarding_workflow(
         current_phase="Employee Lookup",
         created_at=created_at,
         sla_due_at=sla,
-        jurisdiction="London-WPP",
-        agency="WPP",
+        jurisdiction="London-Zava",
+        agency="Zava",
         payload={"joiner": joiner, "scenario": r.get("scenario")},
     )
 
@@ -290,8 +290,8 @@ def build_fleet_it_access_request_workflow(
         current_phase="Employee Lookup",
         created_at=created_at,
         sla_due_at=sla,
-        jurisdiction="London-WPP",
-        agency="WPP",
+        jurisdiction="London-Zava",
+        agency="Zava",
         payload={"request": request, "scenario": r.get("scenario")},
     )
 
@@ -315,8 +315,8 @@ def build_fleet_contract_renewal_workflow(
         current_phase="Contract Lookup",
         created_at=created_at,
         sla_due_at=sla,
-        jurisdiction="London-WPP",
-        agency="WPP",
+        jurisdiction="London-Zava",
+        agency="Zava",
         payload={"contract": contract, "scenario": r.get("scenario")},
     )
 
@@ -339,8 +339,8 @@ def build_fleet_perf_review_workflow(
         current_phase="Employee Lookup",
         created_at=created_at,
         sla_due_at=sla,
-        jurisdiction="London-WPP",
-        agency="WPP",
+        jurisdiction="London-Zava",
+        agency="Zava",
         payload={"review": review, "scenario": r.get("scenario")},
     )
 
@@ -366,8 +366,8 @@ def build_fleet_ap_invoice_workflow(
         current_phase="Invoice Lookup",
         created_at=created_at,
         sla_due_at=sla,
-        jurisdiction="London-WPP",
-        agency="WPP",
+        jurisdiction="London-Zava",
+        agency="Zava",
         payload={"invoice": invoice, "scenario": r.get("scenario")},
     )
 
@@ -391,8 +391,8 @@ def build_fleet_purchase_order_workflow(workflow_id: str, record: dict | None = 
         current_phase="PO Lookup",
         created_at=created_at,
         sla_due_at=sla,
-        jurisdiction="London-WPP",
-        agency="WPP",
+        jurisdiction="London-Zava",
+        agency="Zava",
         payload={"purchase_order": purchase_order, "scenario": r.get("scenario")},
     )
 
@@ -414,8 +414,8 @@ def build_fleet_contract_review_workflow(workflow_id: str, record: dict | None =
         current_phase="Contract Intake",
         created_at=created_at,
         sla_due_at=sla,
-        jurisdiction="London-WPP",
-        agency="WPP",
+        jurisdiction="London-Zava",
+        agency="Zava",
         payload={"contract_review": contract_review, "scenario": r.get("scenario")},
     )
 
@@ -436,8 +436,8 @@ def build_fleet_privacy_dpia_workflow(workflow_id: str, record: dict | None = No
         current_phase="DPIA Intake",
         created_at=created_at,
         sla_due_at=sla,
-        jurisdiction="London-WPP",
-        agency="WPP",
+        jurisdiction="London-Zava",
+        agency="Zava",
         payload={"dpia": dpia, "scenario": r.get("scenario")},
     )
 
@@ -458,8 +458,8 @@ def build_fleet_treasury_fx_workflow(workflow_id: str, record: dict | None = Non
         current_phase="Op Lookup",
         created_at=created_at,
         sla_due_at=sla,
-        jurisdiction="London-WPP",
-        agency="WPP",
+        jurisdiction="London-Zava",
+        agency="Zava",
         payload={"treasury_op": treasury_op, "scenario": r.get("scenario")},
     )
 
@@ -494,7 +494,7 @@ def build_creative_campaign_workflow(
         current_phase="brief_capture",
         created_at=created_at,
         sla_due_at=sla,
-        jurisdiction=brief["jurisdictions"][0] + "-WPP",
+        jurisdiction=brief["jurisdictions"][0] + "-Zava",
         agency=r.get("agency", "Ogilvy"),
         payload={"brief": brief, "scenario": r.get("scenario")},
     )

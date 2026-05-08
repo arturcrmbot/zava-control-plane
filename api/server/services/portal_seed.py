@@ -29,10 +29,10 @@ _REQS_FILE = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "hirin
 
 def _market_for_jurisdiction(jurisdiction: str) -> str:
     if jurisdiction == "DE":
-        return "Berlin-WPP"
+        return "Berlin-Zava"
     if jurisdiction == "UK":
-        return "London-WPP"
-    return "London-WPP"
+        return "London-Zava"
+    return "London-Zava"
 
 
 async def seed_demo_reqs(app_state) -> list[str]:
@@ -66,7 +66,7 @@ async def seed_demo_reqs(app_state) -> list[str]:
             created_at=now,
             sla_due_at=now + 7 * 86400,
             jurisdiction=_market_for_jurisdiction(jurisdiction),
-            agency="WPP-HR",
+            agency="Zava-HR",
             metadata={
                 "role_id": role_id,
                 "role_title": req.get("title"),

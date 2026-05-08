@@ -23,7 +23,7 @@ async def receive_finance_bp_decision(workflow_id: str, decision: str):
     w = app_state.store.get_workflow(workflow_id)
     if not w or not w.orchestration_instance_id:
         raise HTTPException(status_code=404, detail="workflow_or_instance_not_found")
-    payload = {"decision": decision, "resolved_by": "finance_bp@wpp.com"}
+    payload = {"decision": decision, "resolved_by": "finance_bp@zava.com"}
     await raise_orchestration_event(
         w.orchestration_instance_id, "budget_approval", payload,
     )

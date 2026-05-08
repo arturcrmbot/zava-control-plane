@@ -96,7 +96,7 @@ exercises both branches.
    To preserve verifiability of historical entries, retain the old
    public key as `<agent_id>-rot-<YYYYMMDD>.pub` under this directory
    and extend `verify_jws` to try the historical fallback. Out of
-   scope for the WPP review.
+   scope for the Zava review.
 
 ## Why public keys are committed
 
