@@ -52,7 +52,7 @@ def compose_finance_bp_card(
         "type": "AdaptiveCard",
         "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
         "version": "1.5",
-        "wpp": {
+        "zava": {
             "workflow_id": workflow_id,
             "card_kind": "finance_bp_budget",
             "severity": severity,

@@ -1,0 +1,5 @@
+plan/feature-agent-governance-toolkit-1.md
+plan/refactor-rebrand-zava-1.md
+plan/feature-authority-and-personae-1.md
+plan/feature-agent365-identity-bridge-1.md
+docs/rebrand-known-issues.md

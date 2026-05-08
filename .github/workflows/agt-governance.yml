@@ -16,7 +16,7 @@
 #
 # AZURE_STORAGE_CONNECTION_STRING is cleared in CI to short-circuit
 # the Azurite probe inside api.server.state during test collection
-# (see /memories/repo/wpp-pre-existing-test-failures.md).
+# (see /memories/repo/zava-pre-existing-test-failures.md).
 name: agt-governance
 
 on:

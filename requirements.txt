@@ -6,7 +6,7 @@ a2a-sdk==0.3.23
 ag-ui-protocol==0.1.15
     # via agent-framework-ag-ui
 agent-framework==1.0.1
-    # via wpp-control-plane-py
+    # via zava-control-plane-py
 agent-framework-a2a==1.0.0b260409
     # via agent-framework-core
 agent-framework-ag-ui==1.0.0b260311
@@ -20,7 +20,7 @@ agent-framework-azure-cosmos==1.0.0b260409
 agent-framework-azurefunctions==1.0.0b260409
     # via
     #   agent-framework-core
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 agent-framework-bedrock==1.0.0b260409
     # via agent-framework-core
 agent-framework-chatkit==1.0.0b260409
@@ -69,7 +69,7 @@ agent-framework-foundry-local==1.0.0b260409
 agent-framework-github-copilot==1.0.0b260409
     # via
     #   agent-framework-core
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 agent-framework-lab==1.0.0b251024
     # via agent-framework-core
 agent-framework-mem0==1.0.0b260409
@@ -88,7 +88,7 @@ agent-framework-purview==1.0.0b260409
 agent-framework-redis==1.0.0b260409
     # via agent-framework-core
 agent-governance-toolkit==3.4.0
-    # via wpp-control-plane-py
+    # via zava-control-plane-py
 agent-hypervisor==3.4.0
     # via agentmesh-runtime
 agent-os-kernel==3.4.0
@@ -140,9 +140,9 @@ attrs==26.1.0
     #   jsonschema
     #   referencing
 azure-ai-documentintelligence==1.0.2
-    # via wpp-control-plane-py
+    # via zava-control-plane-py
 azure-ai-evaluation==1.16.6
-    # via wpp-control-plane-py
+    # via zava-control-plane-py
 azure-ai-inference==1.0.0b9
     # via agent-framework-foundry
 azure-ai-projects==2.0.1
@@ -170,27 +170,27 @@ azure-functions==1.24.0
     # via
     #   agent-framework-azurefunctions
     #   azure-functions-durable
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 azure-functions-durable==1.5.0
     # via
     #   agent-framework-azurefunctions
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 azure-identity==1.25.3
     # via
     #   azure-ai-evaluation
     #   azure-ai-projects
     #   azure-monitor-opentelemetry-exporter
     #   durabletask-azuremanaged
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 azure-monitor-opentelemetry==1.8.7
-    # via wpp-control-plane-py
+    # via zava-control-plane-py
 azure-monitor-opentelemetry-exporter==1.0.0b51
     # via azure-monitor-opentelemetry
 azure-storage-blob==12.28.0
     # via
     #   azure-ai-evaluation
     #   azure-ai-projects
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 backoff==2.2.1
     # via posthog
 boto3==1.42.89
@@ -277,7 +277,7 @@ fastapi==0.135.3
     # via
     #   agent-framework-ag-ui
     #   agent-framework-devui
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 filelock==3.29.0
     # via
     #   huggingface-hub
@@ -299,7 +299,7 @@ furl==2.1.4
 github-copilot-sdk==0.2.1
     # via
     #   agent-framework-github-copilot
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 google-api-core==2.30.3
     # via a2a-sdk
 google-auth==2.49.2
@@ -341,7 +341,7 @@ httpx==0.28.1
     #   ollama
     #   openai
     #   qdrant-client
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 httpx-sse==0.4.3
     # via
     #   a2a-sdk
@@ -433,7 +433,7 @@ multidict==6.7.1
     #   aiohttp
     #   yarl
 nanoid==2.0.0
-    # via wpp-control-plane-py
+    # via zava-control-plane-py
 networkx==3.6.1
     # via torch
 nltk==3.9.4
@@ -549,11 +549,11 @@ opentelemetry-instrumentation-django==0.61b0
 opentelemetry-instrumentation-fastapi==0.61b0
     # via
     #   azure-monitor-opentelemetry
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 opentelemetry-instrumentation-flask==0.61b0
     # via azure-monitor-opentelemetry
 opentelemetry-instrumentation-httpx==0.61b0
-    # via wpp-control-plane-py
+    # via zava-control-plane-py
 opentelemetry-instrumentation-logging==0.61b0
     # via azure-monitor-opentelemetry
 opentelemetry-instrumentation-psycopg2==0.61b0
@@ -617,7 +617,7 @@ pillow==12.2.0
     # via
     #   reportlab
     #   weasyprint
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 portalocker==3.2.0
     # via qdrant-client
 posthog==7.11.0
@@ -672,7 +672,7 @@ pydantic==2.13.0
     #   pydantic-settings
     #   qdrant-client
     #   redisvl
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 pydantic-core==2.46.0
     # via pydantic
 pydantic-settings==2.13.1
@@ -707,11 +707,11 @@ python-dotenv==1.2.2
     #   microsoft-agents-hosting-core
     #   pydantic-settings
     #   uvicorn
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 python-multipart==0.0.26
     # via
     #   mcp
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 python-ulid==3.1.0
     # via redisvl
 pythonnet==3.0.5 ; python_full_version < '3.14'
@@ -734,7 +734,7 @@ pyyaml==6.0.3
     #   redisvl
     #   transformers
     #   uvicorn
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 qdrant-client==1.17.1
     # via mem0ai
 redis==7.1.1
@@ -752,7 +752,7 @@ regex==2026.4.4
     #   nltk
     #   transformers
 reportlab==4.5.0
-    # via wpp-control-plane-py
+    # via zava-control-plane-py
 requests==2.33.1
     # via
     #   azure-core
@@ -787,7 +787,7 @@ scipy==1.17.1
     #   scikit-learn
     #   sentence-transformers
 sentence-transformers==5.4.1
-    # via wpp-control-plane-py
+    # via zava-control-plane-py
 setuptools==81.0.0
     # via torch
 shellingham==1.5.4
@@ -807,7 +807,7 @@ sqlalchemy==2.0.49
 sse-starlette==3.3.4
     # via
     #   mcp
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 starlette==1.0.0
     # via
     #   fastapi
@@ -900,13 +900,13 @@ uvicorn==0.44.0
     #   agent-framework-devui
     #   mcp
     #   openai-chatkit
-    #   wpp-control-plane-py
+    #   zava-control-plane-py
 uvloop==0.22.1 ; platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32'
     # via uvicorn
 watchfiles==1.1.1
     # via uvicorn
 weasyprint==68.1
-    # via wpp-control-plane-py
+    # via zava-control-plane-py
 webencodings==0.5.1
     # via
     #   cssselect2

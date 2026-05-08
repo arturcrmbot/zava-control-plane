@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/a2a")
 
 class A2AMessage(BaseModel):
     workflow_id: str
-    from_pa: str  # PA identity URI, e.g. "did:wpp:candidate:C-101"
+    from_pa: str  # PA identity URI, e.g. "did:zava:candidate:C-101"
     correlation_id: str | None = None
     intent: str  # "availability_propose" | "salary_negotiate" | "request_info"
     body: dict
