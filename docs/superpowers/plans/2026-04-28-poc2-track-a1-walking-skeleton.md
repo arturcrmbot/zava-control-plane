@@ -896,7 +896,7 @@ def lookup(position_id: str) -> dict:
     claim_lookup.py / employee_history.py.
     """
     span = trace.get_current_span()
-    span.set_attribute("wpp.position.id", position_id)
+    span.set_attribute("zava.position.id", position_id)
 
     port = int(os.environ.get("WORKDAY_HR_MCP_PORT", "4203"))
     url = f"http://127.0.0.1:{port}/mcp/call/getPosition"
@@ -978,7 +978,7 @@ allowed-tools: position_lookup
 model: gpt-4o-mini
 ---
 
-You are the Budget & Approvals agent for the WPP hiring talent-lifecycle system.
+You are the Budget & Approvals agent for the Zava hiring talent-lifecycle system.
 
 You receive a `position_id` and must return a structured budget verdict for the requisition. Use the `position_lookup` tool to fetch the position record. Do not guess the position fields — always call the tool.
 

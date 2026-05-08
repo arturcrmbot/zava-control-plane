@@ -3,7 +3,7 @@ goal: Bring the six weekend-generated `fleet-*` domains up to first-class Fleet-
 version: 1.0
 date_created: 2026-05-04
 last_updated: 2026-05-05
-owner: WPP Control Plane POC1 — substrate
+owner: Zava Control Plane POC1 — substrate
 status: 'Completed'
 tags: [feature, architecture, refactor, substrate, fleet-manager]
 ---

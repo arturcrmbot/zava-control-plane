@@ -65,7 +65,7 @@
 <text x="1203" y="326" text-anchor="middle" font-size="10.5" fill="#6A6E78">Per-phase typed graph framework</text>
 <rect x="174" y="386" width="1212" height="62" fill="#FFE9D9" rx="6"/>
 <rect x="182" y="394" width="1196" height="46" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
-<text x="780" y="416" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">hiring-agent@wpp · 10 MAF phase graphs · Skills declare role · tool allow-list · model assignment · governance rules · A2A used at organisational boundary only</text>
+<text x="780" y="416" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">hiring-agent@zava · 10 MAF phase graphs · Skills declare role · tool allow-list · model assignment · governance rules · A2A used at organisational boundary only</text>
 <rect x="174" y="452" width="1212" height="90" fill="#FFE9D9" rx="6"/>
 <rect x="182" y="460" width="112" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
 <text x="238" y="482" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Budget</text>
@@ -191,16 +191,16 @@
 <text x="779" y="980" text-anchor="middle" font-size="10.5" fill="#6A6E78">Foundry Evaluators · Synthetic CV gym (§4.9)</text>
 <rect x="984" y="926" width="393" height="88" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
 <text x="1180" y="948" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">Entra Agent ID</text>
-<text x="1180" y="966" text-anchor="middle" font-size="10.5" fill="#6A6E78">hiring-agent@wpp first-class identity (§4.15)</text>
+<text x="1180" y="966" text-anchor="middle" font-size="10.5" fill="#6A6E78">hiring-agent@zava first-class identity (§4.15)</text>
 <text x="1180" y="980" text-anchor="middle" font-size="10.5" fill="#6A6E78">Delegated authority · Conditional Access · Purview · Defender</text>
 <rect x="14" y="1038" width="1372" height="134" rx="8" fill="#FFFFFF" stroke="#D6D9DE"/>
 <rect x="14" y="1038" width="6" height="134" rx="3" fill="#1F1F1F"/>
 <text x="36" y="1060" font-size="13" font-weight="700" fill="#1F1F1F">POC scope</text>
 <text x="36" y="1082" font-size="11" font-weight="700" fill="#1F7A45">In:</text>
-<text x="64" y="1082" font-size="11" fill="#1F1F1F">HiringOrchestrator + 10 phase graphs · hiring-agent@wpp + Fleet Manager · Multi-surface convergence (5 humans, 4 timezones)</text>
+<text x="64" y="1082" font-size="11" fill="#1F1F1F">HiringOrchestrator + 10 phase graphs · hiring-agent@zava + Fleet Manager · Multi-surface convergence (5 humans, 4 timezones)</text>
 <text x="64" y="1098" font-size="11" fill="#1F1F1F">Multi-jurisdiction (USA vs Germany) compliance + A2A at candidate boundary · Greenhouse/LinkedIn/Workday-HR/Graph/ServiceNow/ACS/HeyGen MCP servers</text>
 <text x="64" y="1114" font-size="11" fill="#1F1F1F">Voice screening (GPT-Realtime) + HeyGen avatar onboarding</text>
 <text x="36" y="1134" font-size="11" font-weight="700" fill="#A02C2C">Out:</text>
 <text x="72" y="1134" font-size="11" fill="#1F1F1F">POC1 expense compliance workflow (separate POC) · Citizen-developer Copilot Studio agents at scale · Cross-domain agent coordination</text>
-<text x="72" y="1150" font-size="11" fill="#1F1F1F">Production ATS/HRIS API connections (sandbox only) · Agent 365 GA features (May 2026) · 5,000+ concurrent workflow scale demo · Full WPP Open / GCP integration</text>
+<text x="72" y="1150" font-size="11" fill="#1F1F1F">Production ATS/HRIS API connections (sandbox only) · Agent 365 GA features (May 2026) · 5,000+ concurrent workflow scale demo · Full Zava Open / GCP integration</text>
 </svg>

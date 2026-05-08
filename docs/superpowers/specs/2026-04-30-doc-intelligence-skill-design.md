@@ -14,7 +14,7 @@
 | 4 | CV PDFs | All 50 hand-crafted by Claude via `weasyprint`. Multiple templates + salted edge cases. |
 | 5 | CV OCR architecture | Same as receipts — DI layout/general-document model + vision skill in series. |
 | 6 | Files local or in Blob | Local only. Files stay in `data/synthetic/`. No Blob in this design. |
-| 7 | MCP tool vs skill-only | MCP tool kept — code-execution capability would bypass audit-ledger, hooks, and `allowed-tools` discipline that the WPP narrative depends on. |
+| 7 | MCP tool vs skill-only | MCP tool kept — code-execution capability would bypass audit-ledger, hooks, and `allowed-tools` discipline that the Zava narrative depends on. |
 
 ## §1 — Architecture
 
@@ -54,7 +54,7 @@ def ocr_extract(params: _OcrExtractParams) -> ToolResult
 5. Trim DI's response: keep `documents[].fields` (with confidences), `tables[]`, `keyValuePairs[]`, `pages[].lines`. Drop bounding-box pixel coords.
 6. Cache trimmed result; return.
 
-**Wrap with `@traced_tool("ocr.extract")`** — span attributes `wpp.document.id`, `wpp.ocr.model`, `wpp.ocr.confidence_min`, `wpp.ocr.cache_hit`.
+**Wrap with `@traced_tool("ocr.extract")`** — span attributes `zava.document.id`, `zava.ocr.model`, `zava.ocr.confidence_min`, `zava.ocr.cache_hit`.
 
 **Error paths:**
 - File not found → `result_type="failure"`, agent recovers (existing missing-receipt path handles it).

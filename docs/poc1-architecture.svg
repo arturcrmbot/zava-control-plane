@@ -65,7 +65,7 @@
 <text x="1203" y="340" text-anchor="middle" font-size="10.5" fill="#6A6E78">Validator-as-guardrail edges</text>
 <rect x="174" y="386" width="1212" height="62" fill="#FFE9D9" rx="6"/>
 <rect x="182" y="394" width="1196" height="46" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
-<text x="780" y="416" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">finance-agent@wpp · 7 MAF phase graphs · 12 skills (allowed-tools frontmatter) · 14 MCP tools · ephemeral SDK session per phase</text>
+<text x="780" y="416" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">finance-agent@zava · 7 MAF phase graphs · 12 skills (allowed-tools frontmatter) · 14 MCP tools · ephemeral SDK session per phase</text>
 <rect x="174" y="452" width="1212" height="90" fill="#FFE9D9" rx="6"/>
 <rect x="182" y="460" width="160" height="74" rx="10" fill="#FFFFFF" stroke="#1F1F1F" stroke-width="1.4" filter="url(#sh)"/>
 <text x="262" y="482" text-anchor="middle" font-size="13" font-weight="700" fill="#1F1F1F">Intake</text>
@@ -176,16 +176,16 @@
 <text x="779" y="980" text-anchor="middle" font-size="10.5" fill="#6A6E78">Foundry Evaluators · 300-claim accuracy gym (#4)</text>
 <rect x="984" y="926" width="393" height="88" rx="10" fill="#FFFFFF" stroke="#9097A1" stroke-width="1" stroke-dasharray="4,3" opacity="0.92"/>
 <text x="1180" y="948" text-anchor="middle" font-size="13" font-weight="700" fill="#4A4F58">Entra Agent ID</text>
-<text x="1180" y="966" text-anchor="middle" font-size="10.5" fill="#6A6E78">finance-agent@wpp + fleet-manager-agent</text>
+<text x="1180" y="966" text-anchor="middle" font-size="10.5" fill="#6A6E78">finance-agent@zava + fleet-manager-agent</text>
 <text x="1180" y="980" text-anchor="middle" font-size="10.5" fill="#6A6E78">Delegated authority · Conditional Access · Purview · Defender</text>
 <rect x="14" y="1038" width="1372" height="134" rx="8" fill="#FFFFFF" stroke="#D6D9DE"/>
 <rect x="14" y="1038" width="6" height="134" rx="3" fill="#1F1F1F"/>
 <text x="36" y="1060" font-size="13" font-weight="700" fill="#1F1F1F">POC scope</text>
 <text x="36" y="1082" font-size="11" font-weight="700" fill="#1F7A45">In:</text>
-<text x="64" y="1082" font-size="11" fill="#1F1F1F">ExpenseClaimOrchestrator + 7 phase graphs · finance-agent@wpp + Fleet Manager · Custom Control Plane UI + SSC Reviewer Queue</text>
+<text x="64" y="1082" font-size="11" fill="#1F1F1F">ExpenseClaimOrchestrator + 7 phase graphs · finance-agent@zava + Fleet Manager · Custom Control Plane UI + SSC Reviewer Queue</text>
 <text x="64" y="1098" font-size="11" fill="#1F1F1F">Workday/Concur/Maconomy MCP servers (mocked) · R/A/G classification + reasoning + receipt cross-validation + arbitration</text>
 <text x="64" y="1114" font-size="11" fill="#1F1F1F">Bulk HITL · progressive enforcement · autonomy proposals · immutable audit · cost-per-task report</text>
 <text x="36" y="1134" font-size="11" font-weight="700" fill="#A02C2C">Out:</text>
 <text x="72" y="1134" font-size="11" fill="#1F1F1F">POC2 hiring lifecycle (separate POC) · Voice / avatar / A2A / multi-jurisdiction (POC2 frontier)</text>
-<text x="72" y="1150" font-size="11" fill="#1F1F1F">Production EMS sandbox limits · Live Azure region failover (recorded backup) · 5,500-EOQ scale demo · Full WPP Open / GCP integration</text>
+<text x="72" y="1150" font-size="11" fill="#1F1F1F">Production EMS sandbox limits · Live Azure region failover (recorded backup) · 5,500-EOQ scale demo · Full Zava Open / GCP integration</text>
 </svg>

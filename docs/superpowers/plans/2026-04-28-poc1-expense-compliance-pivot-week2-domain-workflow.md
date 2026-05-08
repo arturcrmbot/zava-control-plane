@@ -822,9 +822,9 @@ def _resolve_ems(claim_id: str) -> str:
 def lookup(claim_id: str, ems_source: str | None = None) -> dict:
     """Fetch a claim record from the EMS named in ems_source (or auto-detect)."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.claim.id", claim_id)
+    span.set_attribute("zava.claim.id", claim_id)
     ems = ems_source or _resolve_ems(claim_id)
-    span.set_attribute("wpp.claim.ems", ems)
+    span.set_attribute("zava.claim.ems", ems)
 
     env_var, default_port, tool_name = _DISPATCH[ems]
     port = int(os.environ.get(env_var, default_port))
@@ -858,7 +858,7 @@ feat(mcp): claim_lookup tool — Workday/Concur dispatcher
 
 Reads ems_source from the synthetic claim JSON and dispatches to the
 appropriate Node mock via httpx. Stacks @traced_tool('claim_lookup')
-on the function body; span attributes wpp.claim.id and wpp.claim.ems
+on the function body; span attributes zava.claim.id and zava.claim.ems
 land on every span. respx-mocked tests cover both dispatch arms,
 explicit ems override, unknown claim, and remote 404 propagation.
 
@@ -1475,7 +1475,7 @@ Open the file. The Week 1 fork is invoice-flavoured; spec §5.2 says one-line re
 name: field-extractor
 description: Extract structured expense-claim fields from raw EMS payload + OCR. Flag low-confidence fields for sub-agent reasoning.
 ---
-You are the Expense Claim Field Extractor for the WPP T&E compliance workflow. Given a raw parsed claim payload and structure hints, return a structured JSON object with: claim_id, amount, currency, category, market, vendor, attendees, receipt_filename. For any field you are below 0.8 confidence on, set its value to {"value": <best guess>, "confidence": <float>, "needs_subagent": true}. Be terse — return only the JSON. Do not invent fields not present in the input.
+You are the Expense Claim Field Extractor for the Zava T&E compliance workflow. Given a raw parsed claim payload and structure hints, return a structured JSON object with: claim_id, amount, currency, category, market, vendor, attendees, receipt_filename. For any field you are below 0.8 confidence on, set its value to {"value": <best guess>, "confidence": <float>, "needs_subagent": true}. Be terse — return only the JSON. Do not invent fields not present in the input.
 ```
 
 The existing `agent_field_extractor.py` still works against this — it pre-pends raw_text and structure into the prompt and the wrapper extracts JSON from the response.
@@ -2073,7 +2073,7 @@ _MAX_B64_BYTES = 1_500_000  # ~1MB raw → ~1.4MB b64; cap for prompt size sanit
 def get_receipt(claim_id: str) -> dict:
     """Return base64 image + flavour metadata. Zero-byte file → missing-receipt."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.claim.id", claim_id)
+    span.set_attribute("zava.claim.id", claim_id)
 
     claim_path = _CLAIMS_DIR / f"{claim_id}.json"
     if not claim_path.exists():
@@ -2085,8 +2085,8 @@ def get_receipt(claim_id: str) -> dict:
         raise KeyError(f"receipt file {receipt_path.name!r} not on disk")
 
     raw = receipt_path.read_bytes()
-    span.set_attribute("wpp.receipt.bytes", len(raw))
-    span.set_attribute("wpp.receipt.flavour", flavour)
+    span.set_attribute("zava.receipt.bytes", len(raw))
+    span.set_attribute("zava.receipt.flavour", flavour)
     if not raw:
         return {"claim_id": claim_id, "flavour": flavour, "bytes": 0, "image_b64": ""}
 
@@ -2119,7 +2119,7 @@ feat(mcp): claim_get_receipt tool — base64 + flavour metadata
 Returns base64-encoded receipt PNG + receipt_mismatch_flavour from the
 synthetic dataset, with zero-byte handling for missing-receipt. Caps
 b64 payload at ~1MB to keep prompt size sane. @traced_tool span
-attributes record wpp.receipt.bytes and wpp.receipt.flavour.
+attributes record zava.receipt.bytes and zava.receipt.flavour.
 
 Spec ref: §5.4 (MCP tools); §4.1 Phase 3.
 
@@ -2150,7 +2150,7 @@ name: receipt-validator
 description: Cross-validate the receipt image against the structured claim fields. Detect mismatches in amount, date, vendor, line items, or missing receipt entirely.
 ---
 
-You are the Receipt Validator for the WPP T&E compliance workflow.
+You are the Receipt Validator for the Zava T&E compliance workflow.
 
 The user prompt provides:
 - A `## Claim` section with structured fields (claim_id, amount, currency, category, vendor, attendees, submitted_at).
@@ -3185,13 +3185,13 @@ def reset_cache() -> None:
 def history(employee_id: str) -> dict:
     """Return breach_history + breach_count + employee record for employee_id."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.employee.id", employee_id)
+    span.set_attribute("zava.employee.id", employee_id)
     employees = _load()
     rec = next((e for e in employees if e.get("id") == employee_id), None)
     if rec is None:
         raise KeyError(f"employee {employee_id!r} not found")
     breaches = rec.get("breach_history", [])
-    span.set_attribute("wpp.employee.breach_count", len(breaches))
+    span.set_attribute("zava.employee.breach_count", len(breaches))
     return {
         "employee_id": employee_id,
         "name": rec.get("name"),
@@ -3220,7 +3220,7 @@ feat(mcp): employee_history tool — breach summary by employee_id
 
 Reads data/synthetic/employees.json once (in-process cache; reset_cache
 exposed for tests). Returns breach_history + breach_count + identity
-fields. @traced_tool span attribute wpp.employee.breach_count lands on
+fields. @traced_tool span attribute zava.employee.breach_count lands on
 every span for triage filtering.
 
 Spec ref: §5.4 (MCP tools); §4.1 Phase 4.
@@ -3259,10 +3259,10 @@ The skill output schema:
 ```markdown
 ---
 name: escalation-advisor
-description: Given an employee's prior breach history and the current claim's R/A/G verdict, emit a progressive-enforcement tier per WPP T&E policy §6.
+description: Given an employee's prior breach history and the current claim's R/A/G verdict, emit a progressive-enforcement tier per Zava T&E policy §6.
 ---
 
-You are the Escalation Advisor for the WPP T&E compliance workflow. Your job is to apply progressive enforcement: a first breach warrants a warning; repeat breaches escalate; sustained or material breaches reach major-violation.
+You are the Escalation Advisor for the Zava T&E compliance workflow. Your job is to apply progressive enforcement: a first breach warrants a warning; repeat breaches escalate; sustained or material breaches reach major-violation.
 
 The user prompt provides:
 - A `## Current Claim` section with the classifier verdict (`green`/`amber`/`red`), policy_clause, and amount.
@@ -3985,7 +3985,7 @@ from ._otel import traced_tool
 @traced_tool("claim_summary")
 def summarise(claim_id: str) -> dict:
     span = trace.get_current_span()
-    span.set_attribute("wpp.claim.id", claim_id)
+    span.set_attribute("zava.claim.id", claim_id)
     claim = claim_get_structured.get_structured(claim_id, include_gold=False)
     summary = (
         f"{claim_id}: {claim.get('currency','')} {claim.get('amount','?')} "
@@ -4040,7 +4040,7 @@ def cite(clause: str) -> dict:
     """Best-effort: searches policy_search for the clause and returns the top
     chunk's text. Returns empty text if no chunk matches well."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.policy.clause", clause)
+    span.set_attribute("zava.policy.clause", clause)
     results = policy_search.search(clause, k=1)
     if not results or results[0]["score"] < 0.2:
         return {"section": clause, "text": ""}
@@ -4107,7 +4107,7 @@ name: notification-composer
 description: Compose an Adaptive-Card-shaped notification body for an expense-claim breach. Tailor tone to the escalation tier (warning / escalation / major-violation).
 ---
 
-You are the Notification Composer for the WPP T&E compliance workflow.
+You are the Notification Composer for the Zava T&E compliance workflow.
 
 The user prompt provides:
 - A `## Claim summary` section: claim id, amount, currency, category, vendor, market.

@@ -123,7 +123,7 @@ Watch the header tile — *(point)* it just flipped to red, **STATUS ·
 REJECTED — Rejected at Arbitrate**. The phase ribbon — *(point)* —
 Arbitrate is now red with an X. And the action ledger at the bottom —
 *(scroll if needed)* — has gained two entries:
-`human/finance-controller@wpp · reviewer.decision:reject`, and right
+`human/finance-controller@zava · reviewer.decision:reject`, and right
 under it, `workflow.rejected`.
 
 *(go back to /fleet)* And — it's gone from the exception queue. Done.

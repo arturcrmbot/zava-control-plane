@@ -3,7 +3,7 @@ goal: Compose POC3 (creative campaign workflow for the AI-agency demo) on the ex
 version: 1.0
 date_created: 2026-05-05
 last_updated: 2026-05-05
-owner: WPP Control Plane POC1 — substrate
+owner: Zava Control Plane POC1 — substrate
 status: 'Planned'
 tags: [feature, poc3, creative-agency, figma, foundry, image-generation]
 ---
@@ -100,7 +100,7 @@ prompts pre-baked in `data/synthetic/creative-campaign/briefs.json`.
 - **CON-006**: **No Adobe integration.** Frame.io, Workfront, Firefly, GenStudio narrated only. Figma is the agency-truthful concession; no further external creative-tool integration in v1.
 - **CON-007**: Mock-first. Phase 2 ships canned image fixtures + a `gpt-image-2` MCP that returns blob URLs from `data/synthetic/creative-campaign/cached/`. Phase 3 connects to real Foundry behind a `CREATIVE_REAL_FOUNDRY=1` env flag (same pattern as POC2's `VOICE_TRANSPORT=canned`). All Phase 1 + Phase 2 work uses canned data so the substrate is end-to-end demoable before any Foundry call lands.
 - **GUD-001**: Every per-campaign artefact (concept-tile JSON, storyboard URLs, Figma file URL) lives in `Workflow.payload` — no schema change. Same blob pattern as `Workflow.metadata.attachments`.
-- **GUD-002**: All four new skills (`creative-briefer`, `brief-synthesiser`, `concept-curator`, `brand-guardian`) carry the same OTEL semantic-convention attributes as existing skills (`gen_ai.system=github_copilot`, `gen_ai.agent.name=creative-agent`, `wpp.skill=<label>`) so spans appear in Foundry Tracing without per-skill wiring. Inherits from [feature-foundry-credibility-friday-1.md](feature-foundry-credibility-friday-1.md) Phase 1.
+- **GUD-002**: All four new skills (`creative-briefer`, `brief-synthesiser`, `concept-curator`, `brand-guardian`) carry the same OTEL semantic-convention attributes as existing skills (`gen_ai.system=github_copilot`, `gen_ai.agent.name=creative-agent`, `zava.skill=<label>`) so spans appear in Foundry Tracing without per-skill wiring. Inherits from [feature-foundry-credibility-friday-1.md](feature-foundry-credibility-friday-1.md) Phase 1.
 - **PAT-001**: Voice brief reuses [voice.py](../api/functions/graphs/voice.py) graph + [voice-screener](../api/server/skills/voice-screener/SKILL.md) mechanic — magic-link issuance, ephemeral key proxy at `/api/portal/voice/{session,rtc}`, `voice_complete` external event. New skill `creative-briefer` swaps the rubric (creative brief structure vs. candidate screening). Multi-party (≥2 humans + AI on one call): gpt-realtime-1.5 already diarises; we set `participants=[strategist,brand_manager,creative_director]` on the magic link payload and the rubric prompts the AI to address each by role.
 - **PAT-002**: `gpt-image-2` MCP follows the existing sync-call pattern (no async polling — image gen is sub-30s per call). Cost ledger entry per call. Same shape as the existing `recall_similar_hires` MCP from POC2.
 - **PAT-003**: Brand-RAG MCP wraps a 30–50 doc corpus (brand guidelines, past campaign briefs, distinctiveness benchmarks) in a single Foundry-deployed `text-embedding-3-large` index. Retrieval-only; one tool, `query_brand_corpus(brand, query, k=5)`. Hosted in-process via `chromadb` or similar (already a transitive dep). Corpus seed is committed; embeddings re-built at boot time.
@@ -108,7 +108,7 @@ prompts pre-baked in `data/synthetic/creative-campaign/briefs.json`.
 
 ## 2. Implementation Steps
 
-Recommended worktree: `../wpp-control-plane-poc3-ai-agency` on a new
+Recommended worktree: `../zava-control-plane-poc3-ai-agency` on a new
 branch `feat/poc3-ai-agency` based on `origin/main` after wave-2
 hand-graduated fleet domains land. Phase 1 is fully reversible config;
 Phase 6 is recording-only and last.
@@ -258,7 +258,7 @@ Phase 6 is recording-only and last.
 - **TEST-006**: `tests/api/server/test_persona_creative_director.py` (new) — test the `decision_policy` block: `brand_fit=0.9 distinctiveness=0.8` → approve; `content_safety_flag=true` → escalate; ambiguous → leave open.
 - **TEST-007**: `tests/api/server/test_figma_push.py` (new) — record-replay against canned Figma REST responses; assert `push_asset_bundle` returns a URL and posts the traceability comment.
 - **TEST-008**: `tests/e2e/test_creative_campaign_e2e.py` (Playwright, optional) — spawn workflow via simulator, click "Creative Campaigns" filter chip, assert workflow appears, click in, assert concept tiles render.
-- **TEST-009**: Foundry Tracing manual check — after one live demo run with `CREATIVE_REAL_FOUNDRY=1`, click the workflow in https://ai.azure.com Tracing tab, assert all 5 new skill spans visible with token counts and `wpp.skill` labels; assert `tool.server.image_gen` and `tool.server.brand_rag` spans present.
+- **TEST-009**: Foundry Tracing manual check — after one live demo run with `CREATIVE_REAL_FOUNDRY=1`, click the workflow in https://ai.azure.com Tracing tab, assert all 5 new skill spans visible with token counts and `zava.skill` labels; assert `tool.server.image_gen` and `tool.server.brand_rag` spans present.
 
 ## 7. Risks & Assumptions
 

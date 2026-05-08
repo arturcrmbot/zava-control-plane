@@ -1,6 +1,6 @@
 # POC2 Talent Lifecycle — Design Spec
 
-> **Topic:** Build the WPP POC2 HR Talent Lifecycle "Frontier" demo end-to-end against the 22 capabilities in spec §4.1–4.22 — reusing the POC1 expense-compliance platform (~75% of code per [poc1-inventory.md](../../poc1-inventory.md)) and adding the genuinely new frontier capabilities (voice, avatar, A2A, jurisdiction switching, Threadlight, AG-UI).
+> **Topic:** Build the Zava POC2 HR Talent Lifecycle "Frontier" demo end-to-end against the 22 capabilities in spec §4.1–4.22 — reusing the POC1 expense-compliance platform (~75% of code per [poc1-inventory.md](../../poc1-inventory.md)) and adding the genuinely new frontier capabilities (voice, avatar, A2A, jurisdiction switching, Threadlight, AG-UI).
 > **Date:** 2026-04-28
 > **Status:** Design — Track A.1 plan ready; Tracks A.2–A.10 + B–F to be planned in sequence
 > **Source status doc:** [docs/poc2-status.md](../../poc2-status.md)
@@ -12,7 +12,7 @@
 
 ## 1. Context
 
-POC2 is the WPP "Frontier" demo: hire a Senior Data Engineer at a WPP USA agency over a 12-week sprint, end-to-end across 5 humans, 4 timezones, multiple surfaces, and two jurisdictions (USA + Germany / BetrVG). 15–20 concurrent hiring workflows on the Control Plane. Operator: HR Business Partner (London). 22 capability demos required from spec §4.1–4.22 — 7 of which are differentiating "Frontier" capabilities not in POC1: voice screening (GPT-Realtime via ACS), avatar onboarding (HeyGen), A2A boundary at the candidate edge, jurisdiction switching, crystallisation pipeline, episodic memory, AG-UI dynamic components, Threadlight SME-knowledge accelerator.
+POC2 is the Zava "Frontier" demo: hire a Senior Data Engineer at a Zava USA agency over a 12-week sprint, end-to-end across 5 humans, 4 timezones, multiple surfaces, and two jurisdictions (USA + Germany / BetrVG). 15–20 concurrent hiring workflows on the Control Plane. Operator: HR Business Partner (London). 22 capability demos required from spec §4.1–4.22 — 7 of which are differentiating "Frontier" capabilities not in POC1: voice screening (GPT-Realtime via ACS), avatar onboarding (HeyGen), A2A boundary at the candidate edge, jurisdiction switching, crystallisation pipeline, episodic memory, AG-UI dynamic components, Threadlight SME-knowledge accelerator.
 
 POC1 (expense compliance, 8-week sprint) ships first. POC2 starts from `v0.8-poc1-feature-complete` and reuses the entire platform layer: Durable Functions runtime, MAF Pregel graphs, Fleet Manager service, Apex Control Plane shell, validator-as-guardrail edge pattern, Azurite state, OTEL plumbing, audit ledger, economics service, simulator. Per the inventory ≈ 75% of POC1 source files are domain-agnostic platform code. POC2's work is the ~25% domain layer plus 7 net-new capabilities.
 
@@ -102,7 +102,7 @@ In the cloud target architecture, **APIM AI Gateway** does jurisdiction-aware mo
 
 ### 4.5 A2A boundary (new for POC2)
 
-The Candidate is **external** to WPP. Their interaction with the hiring agent crosses an organisational boundary. The architecture: an external Personal Agent (PA) talks to internal `hiring-agent@wpp` over A2A protocol; APIM AI Gateway polices the boundary (auth, rate, content). For the local demo, the candidate PA is **simulated by the `acs-mcp`** transcript path — the A2A protocol is described and the boundary is shown in the Control Plane.
+The Candidate is **external** to Zava. Their interaction with the hiring agent crosses an organisational boundary. The architecture: an external Personal Agent (PA) talks to internal `hiring-agent@zava` over A2A protocol; APIM AI Gateway polices the boundary (auth, rate, content). For the local demo, the candidate PA is **simulated by the `acs-mcp`** transcript path — the A2A protocol is described and the boundary is shown in the Control Plane.
 
 ## 5. Components
 

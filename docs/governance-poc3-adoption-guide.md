@@ -2,7 +2,7 @@
 
 > Per CON-007 of [feature-agent-governance-toolkit-1.md](../plan/feature-agent-governance-toolkit-1.md).
 > Land the AGT governance core into the POC3 worktree
-> (`wpp-control-plane-poc3-ai-agency`) without re-deriving the design
+> (`zava-control-plane-poc3-ai-agency`) without re-deriving the design
 > from this plan. A separate developer should be able to land
 > governance in POC3 from this doc alone.
 

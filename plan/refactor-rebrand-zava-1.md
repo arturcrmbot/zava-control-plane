@@ -1,9 +1,9 @@
 ---
-goal: Rebrand the project end-to-end from "WPP Control Plane" to "Contoso Control Plane" — full scrub of every literal "WPP" / "wpp" string across code, configuration, documentation, plans, demo data, OTEL telemetry namespace, GitHub repository name, local folder name, and Azure resource group / ACR — leaving only the historical narrative reference inside the agency-pitch story untouched if and only if it appears inside an existing immutable demo recording (which it does not, since Phase 5 rewrites those too).
+goal: Rebrand the project end-to-end from "Zava Control Plane" to "Zava Control Plane" — full scrub of every literal "WPP" / "wpp" string across code, configuration, documentation, plans, demo data, OTEL telemetry namespace, GitHub repository name, local folder name, and Azure resource group / ACR — leaving only the historical narrative reference inside the agency-pitch story untouched if and only if it appears inside an existing immutable demo recording (which it does not, since Phase 5 rewrites those too).
 version: 1.0
 date_created: 2026-05-07
 last_updated: 2026-05-07
-owner: Contoso Control Plane — substrate
+owner: Zava Control Plane — substrate
 status: 'Planned'
 tags: [refactor, rebrand, infrastructure, process]
 ---
@@ -12,25 +12,25 @@ tags: [refactor, rebrand, infrastructure, process]
 
 ![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
 
-Strip every appearance of the literal token `WPP` (and `wpp` lowercase) from the repository, the deployed Azure resources, the GitHub remote, and the local working directory. Replace with the neutral codename **Contoso** (Microsoft's standard fictitious-company placeholder). Scheduled to execute starting **Monday 2026-05-11**, after the Friday 2026-05-08 demo.
+Strip every appearance of the literal token `WPP` (and `wpp` lowercase) from the repository, the deployed Azure resources, the GitHub remote, and the local working directory. Replace with the neutral codename **Zava** (Microsoft's standard fictitious-company placeholder). Scheduled to execute starting **Monday 2026-05-11**, after the Friday 2026-05-08 demo.
 
 **Codename mapping (literal — used as find/replace targets throughout):**
 
 | Old token | New token | Where it appears |
 |---|---|---|
-| `WPP Control Plane` | `Contoso Control Plane` | titles, READMEs, FastAPI app title |
-| `wpp-control-plane` | `contoso-control-plane` | npm name, GitHub repo, folder name |
-| `wpp-control-plane-py` | `contoso-control-plane-py` | `pyproject.toml` |
-| `wpp-control-plane-poc1` | `contoso-control-plane-poc1` | folder, GitHub repo, `.azure/cloud-init.yaml` |
-| `wpp-control-plane-poc3-ai-agency` | `contoso-control-plane-poc3-ai-agency` | scratch scripts, plan refs |
-| `wpp.skill`, `wpp.tool.*`, `wpp.fleet_manager.*`, `wpp.tool.name`, `wpp.tool.call_id` | `contoso.skill`, `contoso.tool.*`, `contoso.fleet_manager.*`, `contoso.tool.name`, `contoso.tool.call_id` | OTEL span attributes (99 hits / 31 files) |
-| `WPP-HR` | `Contoso-HR` | test fixtures, demo recordings |
-| `London-WPP`, `UK-WPP` | `London-Contoso`, `UK-Contoso` | test fixtures |
-| `WPP careers feed` | `Contoso careers feed` | mock MCP servers |
-| `WPP Code of Conduct` | `Contoso Code of Conduct` | demo recordings, policies |
-| `WPP Talent` | `Contoso Talent` | CV PDF generator |
-| `WPP review` | `Contoso review` | plan/status doc historical refs |
-| `WPP-supplied`, `WPP's 3,430-claim` | `Contoso-supplied`, `Contoso's 3,430-claim` | poc1-status.md |
+| `Zava Control Plane` | `Zava Control Plane` | titles, READMEs, FastAPI app title |
+| `wpp-control-plane` | `zava-control-plane` | npm name, GitHub repo, folder name |
+| `wpp-control-plane-py` | `zava-control-plane-py` | `pyproject.toml` |
+| `zava-control-plane-poc1` | `zava-control-plane-poc1` | folder, GitHub repo, `.azure/cloud-init.yaml` |
+| `zava-control-plane-poc3-ai-agency` | `zava-control-plane-poc3-ai-agency` | scratch scripts, plan refs |
+| `wpp.skill`, `wpp.tool.*`, `wpp.fleet_manager.*`, `wpp.tool.name`, `wpp.tool.call_id` | `zava.skill`, `zava.tool.*`, `zava.fleet_manager.*`, `zava.tool.name`, `zava.tool.call_id` | OTEL span attributes (99 hits / 31 files) |
+| `Zava-HR` | `Zava-HR` | test fixtures, demo recordings |
+| `London-WPP`, `UK-WPP` | `London-Zava`, `UK-Zava` | test fixtures |
+| `Zava careers feed` | `Zava careers feed` | mock MCP servers |
+| `Zava Code of Conduct` | `Zava Code of Conduct` | demo recordings, policies |
+| `Zava Talent` | `Zava Talent` | CV PDF generator |
+| `Zava review` | `Zava review` | plan/status doc historical refs |
+| `Zava-supplied`, `Zava's 3,430-claim` | `Zava-supplied`, `Zava's 3,430-claim` | poc1-status.md |
 | `azureai_swedencentral_arzielinski` | (unchanged) | Foundry project name — already neutral |
 
 **Codename mapping NOT in scope (intentionally preserved):**
@@ -46,13 +46,13 @@ Strip every appearance of the literal token `WPP` (and `wpp` lowercase) from the
 - **REQ-002**: All existing tests must remain green (`make test` passes with same pass count as pre-rebrand baseline captured in TASK-001).
 - **REQ-003**: The deployed blueprint container app must serve a fresh bundle whose hash differs from the pre-rebrand bundle, verifiable via the curl-grep recipe in `/memories/deploy-lessons.md` ("Verifying a deploy is live").
 - **REQ-004**: GitHub repository must be renamed using the GitHub-native rename (which auto-redirects old clone URLs indefinitely); the local origin remote must be updated to the new URL.
-- **REQ-005**: All OTEL spans emitted by the rebranded build must carry `contoso.*`-prefixed custom attributes; no `wpp.*` attribute may appear in any new trace.
+- **REQ-005**: All OTEL spans emitted by the rebranded build must carry `zava.*`-prefixed custom attributes; no `wpp.*` attribute may appear in any new trace.
 - **SEC-001**: No new secrets, keys, or credentials are introduced. Azure resource rename uses the same managed identity and ACR admin credentials.
 - **CON-001**: Execution window opens **Monday 2026-05-11 09:00 local**. Friday 2026-05-08 demo must complete before any rename touches main branch.
 - **CON-002**: Single feature branch, single squash-merge PR. Repo is not in a half-renamed state for any wall-clock period longer than the PR review.
 - **CON-003**: Demo data corpora (`data/blueprint-recordings/*.jsonl`, `data/portal/**/*.json`, `data/synthetic/**/*.json`) are scrubbed via deterministic text replacement only. No regeneration of MP4 avatar videos or PNG receipts in this plan; if a stray "WPP" appears as pixels in a video frame or receipt image, it is logged as a known issue and deferred to a follow-up plan.
 - **CON-004**: SQLite databases (`data/.eval/store.sqlite`, `data/portal/magic_links.sqlite`) are deleted and regenerated by their normal seed paths rather than rewritten in-place.
-- **CON-005**: Azure resource rename creates new resources in a new resource group `contoso-control-plane-demo`. The old `project-apex-demo` resource group is **not** deleted in this plan — left for a follow-up cleanup after a 7-day soak. This avoids a destructive blast radius mid-rebrand.
+- **CON-005**: Azure resource rename creates new resources in a new resource group `zava-control-plane-demo`. The old `project-apex-demo` resource group is **not** deleted in this plan — left for a follow-up cleanup after a 7-day soak. This avoids a destructive blast radius mid-rebrand.
 - **GUD-001**: All replacements use literal text matching, not regex with backrefs. Each phase's diff must be reviewable as a pure substitution.
 - **GUD-002**: Each TASK below is a single grep-able command or a numbered file list; no task requires interpretation.
 - **PAT-001**: Use ripgrep (`rg`) for inventory; use `sed -i ''` (BSD/macOS) for in-place edits; verify each phase with a re-grep before marking complete.
@@ -65,7 +65,7 @@ Strip every appearance of the literal token `WPP` (and `wpp` lowercase) from the
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-001 | From `main` at HEAD post-Friday-demo, create branch `refactor/rebrand-contoso`. Run `make test 2>&1 \| tee .rebrand-baseline-tests.txt` and store the trailing `passed` line in `.rebrand-baseline.md`. |  |  |
+| TASK-001 | From `main` at HEAD post-Friday-demo, create branch `refactor/rebrand-zava`. Run `make test 2>&1 \| tee .rebrand-baseline-tests.txt` and store the trailing `passed` line in `.rebrand-baseline.md`. |  |  |
 | TASK-002 | Capture deployed bundle hash: `curl -s https://blueprint.jollystone-c036938d.swedencentral.azurecontainerapps.io/ \| grep -oE 'index-[A-Za-z0-9_-]+\.js' \| head -1` → write to `.rebrand-baseline.md` as `pre_bundle=…`. |  |  |
 | TASK-003 | Generate full inventory: `rg -l -iE '\bwpp\b' --hidden --no-ignore-vcs -g '!.git' -g '!.venv' -g '!node_modules' -g '!dist' -g '!.playwright-cli' -g '!azurite-data' > .rebrand-inventory.txt`. Commit `.rebrand-baseline.md` + `.rebrand-inventory.txt` as the first commit on the branch. |  |  |
 | TASK-004 | Confirm Azure CLI is logged in to the same subscription that owns `project-apex-demo` resource group: `az account show --query name -o tsv` and record in `.rebrand-baseline.md`. |  |  |
@@ -76,12 +76,12 @@ Strip every appearance of the literal token `WPP` (and `wpp` lowercase) from the
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-005 | `sed -i '' 's/"name": "wpp-control-plane"/"name": "contoso-control-plane"/' [package.json](package.json)`. Run `npm install --package-lock-only` to refresh `package-lock.json`. |  |  |
-| TASK-006 | `sed -i '' 's/name = "wpp-control-plane-py"/name = "contoso-control-plane-py"/' [pyproject.toml](pyproject.toml)`. Run `pip install -e . --quiet --no-deps` to refresh egg-info. |  |  |
-| TASK-007 | `sed -i '' 's|<title>WPP Control Plane</title>|<title>Contoso Control Plane</title>|' [index.html](index.html)`. |  |  |
-| TASK-008 | `sed -i '' 's/# WPP Control Plane — Apex Substrate/# Contoso Control Plane — Apex Substrate/' [README.md](README.md)`. (Keeps the "Apex Substrate" subtitle per CON-NOT-IN-SCOPE.) |  |  |
-| TASK-009 | `sed -i '' 's/title="WPP Control Plane (Python POC1)"/title="Contoso Control Plane (Python POC1)"/' [api/server/main.py](api/server/main.py). |  |  |
-| TASK-010 | Update [.azure/cloud-init.yaml](.azure/cloud-init.yaml) lines 31–34: `=== WPP Control Plane POC1 quick start ===` → `=== Contoso Control Plane POC1 quick start ===`; clone URL `crmbotos/wpp-control-plane-poc1.git` → `arturcrmbot/contoso-control-plane-poc1.git`; `cd wpp-control-plane-poc1/control-plane-py` → `cd contoso-control-plane-poc1/control-plane-py`. |  |  |
+| TASK-005 | `sed -i '' 's/"name": "wpp-control-plane"/"name": "zava-control-plane"/' [package.json](package.json)`. Run `npm install --package-lock-only` to refresh `package-lock.json`. |  |  |
+| TASK-006 | `sed -i '' 's/name = "wpp-control-plane-py"/name = "zava-control-plane-py"/' [pyproject.toml](pyproject.toml)`. Run `pip install -e . --quiet --no-deps` to refresh egg-info. |  |  |
+| TASK-007 | `sed -i '' 's|<title>Zava Control Plane</title>|<title>Zava Control Plane</title>|' [index.html](index.html)`. |  |  |
+| TASK-008 | `sed -i '' 's/# Zava Control Plane — Apex Substrate/# Zava Control Plane — Apex Substrate/' [README.md](README.md)`. (Keeps the "Apex Substrate" subtitle per CON-NOT-IN-SCOPE.) |  |  |
+| TASK-009 | `sed -i '' 's/title="Zava Control Plane (Python POC1)"/title="Zava Control Plane (Python POC1)"/' [api/server/main.py](api/server/main.py). |  |  |
+| TASK-010 | Update [.azure/cloud-init.yaml](.azure/cloud-init.yaml) lines 31–34: `=== Zava Control Plane POC1 quick start ===` → `=== Zava Control Plane POC1 quick start ===`; clone URL `crmbotos/zava-control-plane-poc1.git` → `arturcrmbot/zava-control-plane-poc1.git`; `cd zava-control-plane-poc1/control-plane-py` → `cd zava-control-plane-poc1/control-plane-py`. |  |  |
 
 ### Implementation Phase 3 — Plan, doc, and superpower references
 
@@ -89,20 +89,20 @@ Strip every appearance of the literal token `WPP` (and `wpp` lowercase) from the
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-011 | Run mass substitution across docs: `find plan docs instruction.md -name '*.md' -type f -exec sed -i '' -e 's/WPP Control Plane/Contoso Control Plane/g' -e 's/wpp-control-plane-poc1/contoso-control-plane-poc1/g' -e 's/wpp-control-plane-poc3-ai-agency/contoso-control-plane-poc3-ai-agency/g' -e 's/WPP-supplied/Contoso-supplied/g' -e "s/WPP's 3,430/Contoso's 3,430/g" -e 's/WPP review/Contoso review/g' -e 's/WPP-HR/Contoso-HR/g' -e 's/WPP Code of Conduct/Contoso Code of Conduct/g' -e 's/WPP Talent/Contoso Talent/g' -e 's/WPP careers feed/Contoso careers feed/g' {} +`. |  |  |
+| TASK-011 | Run mass substitution across docs: `find plan docs instruction.md -name '*.md' -type f -exec sed -i '' -e 's/Zava Control Plane/Zava Control Plane/g' -e 's/zava-control-plane-poc1/zava-control-plane-poc1/g' -e 's/zava-control-plane-poc3-ai-agency/zava-control-plane-poc3-ai-agency/g' -e 's/Zava-supplied/Zava-supplied/g' -e "s/Zava's 3,430/Zava's 3,430/g" -e 's/Zava review/Zava review/g' -e 's/Zava-HR/Zava-HR/g' -e 's/Zava Code of Conduct/Zava Code of Conduct/g' -e 's/Zava Talent/Zava Talent/g' -e 's/Zava careers feed/Zava careers feed/g' {} +`. |  |  |
 | TASK-012 | Manually review the SEC-005 grep clause inside [plan/feature-agent-governance-toolkit-1.md](plan/feature-agent-governance-toolkit-1.md) line 51 and [plan/feature-authority-and-personae-1.md](plan/feature-authority-and-personae-1.md) line 64. The literal pattern `wpp\|vml\|ogilvy\|wunderman\|groupm\|hogarth\|kantar` is a *grep regex inside a security requirement* — it must remain as-is (it's the CHECK that no such tokens leak); only the surrounding prose needs to read coherently after rebrand. |  |  |
 | TASK-013 | Re-run inventory: `rg -l -iE '\bwpp\b' plan docs instruction.md`. Expected: only the two SEC-grep-pattern lines from TASK-012 remain. Anything else → fix and re-run. |  |  |
 
 ### Implementation Phase 4 — Test fixtures, mock servers, frontend test data
 
-- GOAL-004: Replace `WPP-HR` / `London-WPP` / `UK-WPP` / `WPP careers feed` literals across all `tests/**` and `mocks/**` files. Update React component test fixtures and Playwright smoke sentinel.
+- GOAL-004: Replace `Zava-HR` / `London-WPP` / `UK-WPP` / `Zava careers feed` literals across all `tests/**` and `mocks/**` files. Update React component test fixtures and Playwright smoke sentinel.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-014 | `find tests mocks -type f \( -name '*.py' -o -name '*.ts' -o -name '*.tsx' -o -name '*.json' \) -exec sed -i '' -e 's/WPP-HR/Contoso-HR/g' -e 's/London-WPP/London-Contoso/g' -e 's/UK-WPP/UK-Contoso/g' -e 's/WPP careers feed/Contoso careers feed/g' {} +`. |  |  |
-| TASK-015 | Update [tests/e2e/smoke.spec.ts](tests/e2e/smoke.spec.ts) line 7: sentinel regex `/WPP Control Plane\|in_progress\|Fleet\|exceptions\|workflows/i` → `/Contoso Control Plane\|in_progress\|Fleet\|exceptions\|workflows/i`. |  |  |
-| TASK-016 | Update web client component literal-string references: `find web -type f \( -name '*.ts' -o -name '*.tsx' \) -exec sed -i '' -e 's/WPP/Contoso/g' {} +`. Then `git diff web/` — confirm only string literals changed, not class names or imports. (`web/client/components/apex/` directory name preserved.) |  |  |
-| TASK-017 | Update [scripts/generate_cv_pdfs.py](scripts/generate_cv_pdfs.py) line 156: `author="WPP Talent"` → `author="Contoso Talent"`. |  |  |
+| TASK-014 | `find tests mocks -type f \( -name '*.py' -o -name '*.ts' -o -name '*.tsx' -o -name '*.json' \) -exec sed -i '' -e 's/Zava-HR/Zava-HR/g' -e 's/London-WPP/London-Zava/g' -e 's/UK-WPP/UK-Zava/g' -e 's/Zava careers feed/Zava careers feed/g' {} +`. |  |  |
+| TASK-015 | Update [tests/e2e/smoke.spec.ts](tests/e2e/smoke.spec.ts) line 7: sentinel regex `/Zava Control Plane\|in_progress\|Fleet\|exceptions\|workflows/i` → `/Zava Control Plane\|in_progress\|Fleet\|exceptions\|workflows/i`. |  |  |
+| TASK-016 | Update web client component literal-string references: `find web -type f \( -name '*.ts' -o -name '*.tsx' \) -exec sed -i '' -e 's/WPP/Zava/g' {} +`. Then `git diff web/` — confirm only string literals changed, not class names or imports. (`web/client/components/apex/` directory name preserved.) |  |  |
+| TASK-017 | Update [scripts/generate_cv_pdfs.py](scripts/generate_cv_pdfs.py) line 156: `author="Zava Talent"` → `author="Zava Talent"`. |  |  |
 | TASK-018 | Run `make test` and confirm pass count matches `.rebrand-baseline.md`. Any new failures → diagnose and fix before proceeding. |  |  |
 
 ### Implementation Phase 5 — Demo data corpora (text-only scrub)
@@ -111,24 +111,24 @@ Strip every appearance of the literal token `WPP` (and `wpp` lowercase) from the
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-019 | Bulk JSONL substitution: `find data/blueprint-recordings -name '*.jsonl' -exec sed -i '' -e 's/WPP-HR/Contoso-HR/g' -e 's/WPP Code of Conduct/Contoso Code of Conduct/g' -e 's/WPP careers feed/Contoso careers feed/g' -e 's/WPP T&E/Contoso T&E/g' -e 's/the WPP /the Contoso /g' {} +`. |  |  |
+| TASK-019 | Bulk JSONL substitution: `find data/blueprint-recordings -name '*.jsonl' -exec sed -i '' -e 's/Zava-HR/Zava-HR/g' -e 's/Zava Code of Conduct/Zava Code of Conduct/g' -e 's/Zava careers feed/Zava careers feed/g' -e 's/WPP T&E/Zava T&E/g' -e 's/the WPP /the Zava /g' {} +`. |  |  |
 | TASK-020 | Bulk JSON substitution under `data/portal` and `data/synthetic`: same sed expressions as TASK-019 plus `-name '*.json'` glob. Manually grep for any remaining `WPP` after sed: `rg -i '\bwpp\b' data/portal data/synthetic --type json`. |  |  |
-| TASK-021 | Update [api/shared/policies.yaml](api/shared/policies.yaml) and any other `*.yaml` under `api/`: `find api -name '*.yaml' -o -name '*.yml' \| xargs sed -i '' -e 's/WPP/Contoso/g'`. |  |  |
+| TASK-021 | Update [api/shared/policies.yaml](api/shared/policies.yaml) and any other `*.yaml` under `api/`: `find api -name '*.yaml' -o -name '*.yml' \| xargs sed -i '' -e 's/WPP/Zava/g'`. |  |  |
 | TASK-022 | Delete + regenerate SQLite stores: `rm data/.eval/store.sqlite data/portal/magic_links.sqlite`. Confirm the seed paths recreate them on next server start (or run the dedicated seed script if one exists — check [scripts/](scripts/) for `seed_*.py`). Document the regeneration command in `.rebrand-baseline.md`. |  |  |
 | TASK-023 | Inventory remaining binary `WPP` matches: `rg -l '\bWPP\b' data/portal/welcome-videos data/synthetic/receipts --binary`. For each match, append a `KNOWN-ISSUE-WPP-PIXEL-LEAK` row to a new file `docs/rebrand-known-issues.md` listing the file path. **Do not regenerate** in this plan (CON-003). |  |  |
 | TASK-024 | Re-run `rg -i '\bwpp\b' data/ --type json --type yaml --type yml --type-add 'jsonl:*.jsonl' --type jsonl`. Expected: zero text hits. |  |  |
 
 ### Implementation Phase 6 — OTEL telemetry namespace rename
 
-- GOAL-006: Rename all 99 `wpp.*` OTEL custom span attributes to `contoso.*` across 31 Python files. This is the largest blast-radius change and breaks any saved Foundry queries / dashboards keyed on `wpp.*`.
+- GOAL-006: Rename all 99 `wpp.*` OTEL custom span attributes to `zava.*` across 31 Python files. This is the largest blast-radius change and breaks any saved Foundry queries / dashboards keyed on `wpp.*`.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
 | TASK-025 | Inventory: `rg -n 'wpp\.' --type py api/ scripts/ > .rebrand-otel-inventory.txt`. Confirm count is 99 (matches plan baseline). If different, investigate before proceeding. |  |  |
-| TASK-026 | Bulk attribute rename: `rg -l 'wpp\.' --type py api/ scripts/ \| xargs sed -i '' -e 's/wpp\.skill/contoso.skill/g' -e 's/wpp\.tool\./contoso.tool./g' -e 's/wpp\.fleet_manager\./contoso.fleet_manager./g'`. |  |  |
-| TASK-027 | Update tracer name in [api/server/services/fleet_manager_service.py](api/server/services/fleet_manager_service.py) line 34: `trace.get_tracer("wpp.fleet_manager")` → `trace.get_tracer("contoso.fleet_manager")`. |  |  |
+| TASK-026 | Bulk attribute rename: `rg -l 'wpp\.' --type py api/ scripts/ \| xargs sed -i '' -e 's/wpp\.skill/zava.skill/g' -e 's/wpp\.tool\./zava.tool./g' -e 's/wpp\.fleet_manager\./zava.fleet_manager./g'`. |  |  |
+| TASK-027 | Update tracer name in [api/server/services/fleet_manager_service.py](api/server/services/fleet_manager_service.py) line 34: `trace.get_tracer("wpp.fleet_manager")` → `trace.get_tracer("zava.fleet_manager")`. |  |  |
 | TASK-028 | Re-run inventory: `rg 'wpp\.' --type py api/ scripts/`. Expected: zero hits. Any remaining → manual fix. |  |  |
-| TASK-029 | Update plan-doc references to old attribute names: `find plan docs -name '*.md' -exec sed -i '' -e 's/`wpp\.skill`/`contoso.skill`/g' -e 's/`wpp\.tool/`contoso.tool/g' {} +`. |  |  |
+| TASK-029 | Update plan-doc references to old attribute names: `find plan docs -name '*.md' -exec sed -i '' -e 's/`wpp\.skill`/`zava.skill`/g' -e 's/`wpp\.tool/`zava.tool/g' {} +`. |  |  |
 | TASK-030 | Run all telemetry-touching tests: `pytest tests/api/server/services/test_state_store.py tests/api/server/test_economics_real_tokens.py -v`. All must pass. |  |  |
 
 ### Implementation Phase 7 — Scratch scripts + tools/ directory
@@ -137,8 +137,8 @@ Strip every appearance of the literal token `WPP` (and `wpp` lowercase) from the
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-031 | Update [tools/scratch/smoke_image_gen.sh](tools/scratch/smoke_image_gen.sh) lines 6 and 8: replace `wpp-control-plane-poc3-ai-agency` → `contoso-control-plane-poc3-ai-agency` and `wpp-control-plane-poc1` → `contoso-control-plane-poc1`. |  |  |
-| TASK-032 | Bulk substitution across `tools/scratch/compose-domain/**/*.py`: `find tools/scratch -name '*.py' -exec sed -i '' -e 's/WPP/Contoso/g' {} +`. |  |  |
+| TASK-031 | Update [tools/scratch/smoke_image_gen.sh](tools/scratch/smoke_image_gen.sh) lines 6 and 8: replace `zava-control-plane-poc3-ai-agency` → `zava-control-plane-poc3-ai-agency` and `zava-control-plane-poc1` → `zava-control-plane-poc1`. |  |  |
+| TASK-032 | Bulk substitution across `tools/scratch/compose-domain/**/*.py`: `find tools/scratch -name '*.py' -exec sed -i '' -e 's/WPP/Zava/g' {} +`. |  |  |
 | TASK-033 | Re-run full repo inventory: `rg -l -iE '\bwpp\b' --hidden --no-ignore-vcs -g '!.git' -g '!.venv' -g '!node_modules' -g '!dist' -g '!.playwright-cli' -g '!azurite-data' > .rebrand-inventory-after.txt`. Diff against `.rebrand-inventory.txt` from TASK-003. Expected: empty output. |  |  |
 
 ### Implementation Phase 8 — Local working tree + GitHub remote rename
@@ -147,22 +147,22 @@ Strip every appearance of the literal token `WPP` (and `wpp` lowercase) from the
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-034 | Squash all phase commits on `refactor/rebrand-contoso` into one commit `refactor: rebrand WPP → Contoso (full scrub)`. Push branch. Open PR against `main`. |  |  |
+| TASK-034 | Squash all phase commits on `refactor/rebrand-zava` into one commit `refactor: rebrand WPP → Zava (full scrub)`. Push branch. Open PR against `main`. |  |  |
 | TASK-035 | After PR review approval, merge with squash. Pull `main` locally. Run `make test` once more on the merged tip — must still match baseline pass count. |  |  |
-| TASK-036 | **Close VS Code.** From the *parent* directory: `mv ~/dev/github-repos/wpp-control-plane-poc1 ~/dev/github-repos/contoso-control-plane-poc1`. |  |  |
-| TASK-037 | Recreate venv (its bin shebangs hard-code `/Users/arturzielinski/dev/github-repos/wpp-control-plane-poc1/.venv/bin/python`): `cd ~/dev/github-repos/contoso-control-plane-poc1 && rm -rf .venv && python3 -m venv .venv && source .venv/bin/activate && pip install -e . && pip install -r requirements.txt`. |  |  |
-| TASK-038 | Rename GitHub repo: `gh repo rename contoso-control-plane-poc1 --repo arturcrmbot/wpp-control-plane-poc1`. (GitHub auto-creates a redirect from the old URL — old `git clone` commands continue to work.) |  |  |
-| TASK-039 | Update local origin remote: `git remote set-url origin https://github.com/arturcrmbot/contoso-control-plane-poc1.git`. Verify: `git remote -v`. |  |  |
-| TASK-040 | Reopen VS Code at the new path: `code ~/dev/github-repos/contoso-control-plane-poc1`. Confirm Python interpreter, pytest discovery, and Vite all resolve. |  |  |
+| TASK-036 | **Close VS Code.** From the *parent* directory: `mv ~/dev/github-repos/zava-control-plane-poc1 ~/dev/github-repos/zava-control-plane-poc1`. |  |  |
+| TASK-037 | Recreate venv (its bin shebangs hard-code `/Users/arturzielinski/dev/github-repos/zava-control-plane-poc1/.venv/bin/python`): `cd ~/dev/github-repos/zava-control-plane-poc1 && rm -rf .venv && python3 -m venv .venv && source .venv/bin/activate && pip install -e . && pip install -r requirements.txt`. |  |  |
+| TASK-038 | Rename GitHub repo: `gh repo rename zava-control-plane-poc1 --repo arturcrmbot/zava-control-plane-poc1`. (GitHub auto-creates a redirect from the old URL — old `git clone` commands continue to work.) |  |  |
+| TASK-039 | Update local origin remote: `git remote set-url origin https://github.com/arturcrmbot/zava-control-plane-poc1.git`. Verify: `git remote -v`. |  |  |
+| TASK-040 | Reopen VS Code at the new path: `code ~/dev/github-repos/zava-control-plane-poc1`. Confirm Python interpreter, pytest discovery, and Vite all resolve. |  |  |
 
 ### Implementation Phase 9 — Azure resource rename + redeploy
 
-- GOAL-009: Provision new Azure resource group `contoso-control-plane-demo` with a new ACR `blueprintacrcontosodemo`. Redeploy the blueprint container app there. Verify live bundle hash differs from baseline. Old resources stay live for 7-day soak per CON-005.
+- GOAL-009: Provision new Azure resource group `zava-control-plane-demo` with a new ACR `blueprintacrzavademo`. Redeploy the blueprint container app there. Verify live bundle hash differs from baseline. Old resources stay live for 7-day soak per CON-005.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-041 | Update [scripts/deploy-blueprint.sh](scripts/deploy-blueprint.sh) defaults (lines 19, 25): `RG="${RG:-contoso-control-plane-demo}"`, `ACR_NAME="${ACR_NAME:-blueprintacrcontosodemo}"`. Update [scripts/build-blueprint-image.sh](scripts/build-blueprint-image.sh) line 12: `REGISTRY="${REGISTRY:-blueprintacrcontosodemo}"`. |  |  |
-| TASK-042 | Provision new resource group: `az group create -n contoso-control-plane-demo -l swedencentral`. |  |  |
+| TASK-041 | Update [scripts/deploy-blueprint.sh](scripts/deploy-blueprint.sh) defaults (lines 19, 25): `RG="${RG:-zava-control-plane-demo}"`, `ACR_NAME="${ACR_NAME:-blueprintacrzavademo}"`. Update [scripts/build-blueprint-image.sh](scripts/build-blueprint-image.sh) line 12: `REGISTRY="${REGISTRY:-blueprintacrzavademo}"`. |  |  |
+| TASK-042 | Provision new resource group: `az group create -n zava-control-plane-demo -l swedencentral`. |  |  |
 | TASK-043 | Run `bash scripts/deploy-blueprint.sh`. Script is idempotent — first run creates ACR + Container Apps environment + container app in the new RG. |  |  |
 | TASK-044 | Capture new bundle hash: `curl -s https://blueprint.<new-domain>.swedencentral.azurecontainerapps.io/ \| grep -oE 'index-[A-Za-z0-9_-]+\.js' \| head -1`. Append to `.rebrand-baseline.md` as `post_bundle=…`. **REQ-003 verification:** `post_bundle != pre_bundle`. |  |  |
 | TASK-045 | Update the deployed-URL reference in [scripts/build-blueprint-image.sh](scripts/build-blueprint-image.sh) line 40 (and any docs that hardcode the old `blueprint.jollystone-c036938d.swedencentral` URL) to the new container app FQDN. |  |  |
@@ -215,9 +215,9 @@ This plan touches the following file groups. Total file count is approximate; ex
 ## 7. Risks & Assumptions
 
 - **RISK-001**: Stray `WPP` pixels in MP4 welcome videos or PNG receipts (CON-003). Mitigation: TASK-023 inventories the surface; if non-empty, log as `docs/rebrand-known-issues.md` and treat as known cosmetic issue. No data loss; can be remediated by a follow-up plan that re-runs `scripts/prewarm_avatar.py` and the receipt generators.
-- **RISK-002**: Foundry tracing dashboards / saved queries keyed on `wpp.*` attributes break silently when the rebranded build emits `contoso.*`. Mitigation: there are no documented saved Foundry queries at time of plan-write (verify by opening https://ai.azure.com → project `azureai_swedencentral_arzielinski` → Tracing tab → check Saved Queries before TASK-026). If any exist, recreate them after Phase 6.
+- **RISK-002**: Foundry tracing dashboards / saved queries keyed on `wpp.*` attributes break silently when the rebranded build emits `zava.*`. Mitigation: there are no documented saved Foundry queries at time of plan-write (verify by opening https://ai.azure.com → project `azureai_swedencentral_arzielinski` → Tracing tab → check Saved Queries before TASK-026). If any exist, recreate them after Phase 6.
 - **RISK-003**: Local virtualenv recreation (TASK-037) fails because `requirements.txt` has changed since last install or a wheel is missing. Mitigation: keep the old `.venv` directory aside (`mv .venv .venv.old`) until the new one passes `make test`, then delete `.venv.old`.
-- **RISK-004**: Azure deploy fails on first run in the new resource group due to a quota or naming-collision issue with the new ACR name. Mitigation: ACR name `blueprintacrcontosodemo` is 26 chars (within 5-50 limit) and lowercase alphanumeric. If collision occurs (unlikely — globally unique check), append `2` suffix and re-run.
+- **RISK-004**: Azure deploy fails on first run in the new resource group due to a quota or naming-collision issue with the new ACR name. Mitigation: ACR name `blueprintacrzavademo` is 26 chars (within 5-50 limit) and lowercase alphanumeric. If collision occurs (unlikely — globally unique check), append `2` suffix and re-run.
 - **RISK-005**: GitHub redirect from old URL to new URL is documented as "indefinite" but Microsoft has historically broken such guarantees once per decade. Mitigation: TASK-039 updates the local remote immediately; any external links (CI webhooks, README badges in other repos pointing here) are out of scope.
 - **ASSUMPTION-001**: The user is the sole committer on this repo; no collaborators are mid-PR against `main` during the rebrand window. (Verified by `git log --since='1 week ago' --pretty='%an' \| sort -u` returning a single name.)
 - **ASSUMPTION-002**: Friday 2026-05-08 demo runs against the **pre-rebrand** `main` branch and the **pre-rebrand** Azure deploy. This plan does not touch either until Monday.

@@ -19,7 +19,7 @@ canonical truth lives for any topic. Read top-down: each section answers
 | To make a new domain show up on the blueprint page | [blueprint-microsite-contributor-guide.md](blueprint-microsite-contributor-guide.md) |
 | To compose a new domain end-to-end | [superpowers/skills/compose-domain/SKILL.md](superpowers/skills/compose-domain/SKILL.md) |
 | Local dev setup | [DEVELOPMENT.md](DEVELOPMENT.md) |
-| Verbatim WPP brief | [poc1-brief.md](poc1-brief.md) |
+| Verbatim Zava brief | [poc1-brief.md](poc1-brief.md) |
 
 ## Doc taxonomy
 
@@ -32,8 +32,8 @@ Never edited. Referenced as authoritative ground truth.
 
 | File | Purpose |
 |---|---|
-| [poc1-brief.md](poc1-brief.md) | The WPP POC1 brief, verbatim. The 13 acceptance criteria live here. |
-| [poc1-prd-submitted.md](poc1-prd-submitted.md) | What we sent WPP on 2026-04-16. **Archived** — pre-pivot Procure-to-Pay framing; kept as audit artefact only. |
+| [poc1-brief.md](poc1-brief.md) | The Zava POC1 brief, verbatim. The 13 acceptance criteria live here. |
+| [poc1-prd-submitted.md](poc1-prd-submitted.md) | What we sent Zava on 2026-04-16. **Archived** — pre-pivot Procure-to-Pay framing; kept as audit artefact only. |
 | [poc1-accuracy-baseline.json](poc1-accuracy-baseline.json) | Output of the 300-claim accuracy harness. Data, not prose. |
 
 ### 2. Living truth (canonical state of the build)
@@ -73,7 +73,7 @@ Carry banner notes saying so. **Do not read as current state.**
 
 | File | Why kept |
 |---|---|
-| [poc1-prd-submitted.md](poc1-prd-submitted.md) | Sent to WPP pre-pivot — submission record |
+| [poc1-prd-submitted.md](poc1-prd-submitted.md) | Sent to Zava pre-pivot — submission record |
 | [poc1-inventory.md](poc1-inventory.md) | The pivot-moment grading of every artefact (R / A / D). Useful as decision audit. |
 
 ### 5. Active plans + skills (`superpowers/`)

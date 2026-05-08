@@ -82,7 +82,7 @@
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at INR 17096.00 for 4 attendees (INR 4273.92/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
       "predicted_reasoning": "The claim is for INR 17,096 with 4 attendees, which is INR 4,274/head. The per-attendee cap for IN is INR 4,000 (\u00a77.1 Meals examples: 'Within IN per-attendee cap of INR 4,000 \u2192 Green'). The narrative is >20 characters, receipt is attached, and all requirements in \u00a73.4 are met.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
       "correct": true,
       "confidence": 0.85
     },
@@ -136,7 +136,7 @@
       "gold_category": "entertainment",
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at GBP 114.75/head is above the per-head cap (GBP 110) but at or below 110% of cap \u2014 Amber per \u00a73.4, reviewer attention required.",
-      "predicted_reasoning": "\"London client lunch, 1 WPP + 2 clients, GBP 320 total = GBP 106.67/head, alcohol present, all named. Within GBP 110 per-head cap \u2192 Green.\" This claim is GBP 459 for 4 attendees = GBP 114.75/head, but the cap is GBP 110 and 110% is GBP 121, so it is within the Amber threshold but not over.",
+      "predicted_reasoning": "\"London client lunch, 1 Zava + 2 clients, GBP 320 total = GBP 106.67/head, alcohol present, all named. Within GBP 110 per-head cap \u2192 Green.\" This claim is GBP 459 for 4 attendees = GBP 114.75/head, but the cap is GBP 110 and 110% is GBP 121, so it is within the Amber threshold but not over.",
       "policy_clause": "\u00a77.4 Entertainment examples \u2014 GBP 110 per-head cap",
       "correct": false,
       "confidence": 0.8
@@ -191,7 +191,7 @@
       "gold_category": "entertainment",
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at USD 385.88 for 4 attendees (USD 96.47/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
-      "predicted_reasoning": "\"Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.\" The claim is $385.88 for 4 attendees ($96.47/head), but \u00a77.1 Meals examples show NYC client dinner at $72.50/head as green. However, the entertainment cap is not explicitly stated, but no breach is indicated for US entertainment at this amount.",
+      "predicted_reasoning": "\"Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.\" The claim is $385.88 for 4 attendees ($96.47/head), but \u00a77.1 Meals examples show NYC client dinner at $72.50/head as green. However, the entertainment cap is not explicitly stated, but no breach is indicated for US entertainment at this amount.",
       "policy_clause": "\u00a73.4 Entertainment \u2014 within per-head cap, all attendees named with org, business purpose annotated, itemised receipt attached",
       "correct": true,
       "confidence": 0.8
@@ -258,7 +258,7 @@
       "predicted_label": "red",
       "gold_reasoning": "Conference fee of INR 100144.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach \u2014 Red per \u00a73.5.",
       "predicted_reasoning": "The claim is for 'miscellaneous' (conference registration) but the closest policy is \u00a73.4 Entertainment. The narrative does not name all attendees with their organisation, as required: 'all attendees named, with their organisation, in the claim narrative.' This is a red breach.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); WPP:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); Zava:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
       "correct": true,
       "confidence": 0.95
     },
@@ -302,7 +302,7 @@
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at INR 7072.00 for 2 attendees (INR 3535.91/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
       "predicted_reasoning": "Claim is for INR 7072.0 for 2 attendees (INR 3536/head), which is within the INR 4,000 per-attendee cap (\u00a77.1 Meals examples: 'Within IN per-attendee cap of INR 4,000 \u2192 Green'). Narrative provides business purpose and attendee count. Receipt is attached.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
       "correct": true,
       "confidence": 0.95
     },
@@ -357,7 +357,7 @@
       "predicted_label": "amber",
       "gold_reasoning": "Client entertainment at GBP 110.98/head is above the per-head cap (GBP 110) but at or below 110% of cap \u2014 Amber per \u00a73.4, reviewer attention required.",
       "predicted_reasoning": "The claim is for 4 attendees at \u00a3443.92, or \u00a3110.98/head. The per-head cap is not explicitly stated in the excerpts, but \u00a77.1 Meals examples suggest a UK per-head cap of GBP 75. This claim is above 110% of that (GBP 82.50), but since the entertainment cap is not directly quoted, and all other requirements (itemised receipt, business purpose, attendees) appear met, this is a boundary case.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
       "correct": true,
       "confidence": 0.6
     },
@@ -522,7 +522,7 @@
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at INR 7515.00 for 2 attendees (INR 3757.74/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
       "predicted_reasoning": "The claim is for INR 7,515 with 2 attendees, making it INR 3,757.5/head, which is within the INR 4,000 per-attendee cap (see \u00a77.1 Meals examples: 'Within IN per-attendee cap of INR 4,000 \u2192 Green'). The narrative provides a business purpose, and a receipt is attached.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
       "correct": true,
       "confidence": 0.98
     },
@@ -632,7 +632,7 @@
       "predicted_label": "amber",
       "gold_reasoning": "Client entertainment at USD 173.79 for 2 attendees (USD 86.89/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
       "predicted_reasoning": "The claim narrative does not specify the organisations of the attendees, as required: 'all attendees named, with their organisation, in the claim narrative.' The business purpose is present and >20 characters, and an itemised receipt is attached. All other requirements appear met.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
       "correct": false,
       "confidence": 0.7
     },
@@ -698,7 +698,7 @@
       "predicted_label": "red",
       "gold_reasoning": "Conference fee of INR 94439.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach \u2014 Red per \u00a73.5.",
       "predicted_reasoning": "\u00a73.4 Entertainment states: 'any guest unnamed or org missing' is a Red breach. The claim narrative does not name all attendees with their organisation, as required.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); WPP:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); Zava:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
       "correct": true,
       "confidence": 0.95
     },
@@ -741,8 +741,8 @@
       "gold_category": "entertainment",
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at INR 8838.00 for 2 attendees (INR 4419.04/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
-      "predicted_reasoning": "The claim is for INR 8,838 for 2 attendees (INR 4,419/head), which is just above the INR 4,000 cap but no evidence of alcohol or other breach. All attendees are named, business purpose is annotated, and itemised receipt is attached. The WPP:guest ratio is 1:1.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
+      "predicted_reasoning": "The claim is for INR 8,838 for 2 attendees (INR 4,419/head), which is just above the INR 4,000 cap but no evidence of alcohol or other breach. All attendees are named, business purpose is annotated, and itemised receipt is attached. The Zava:guest ratio is 1:1.",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
       "correct": true,
       "confidence": 0.85
     },
@@ -962,7 +962,7 @@
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at INR 7095.00 for 2 attendees (INR 3547.67/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
       "predicted_reasoning": "The claim is for entertainment in IN, with 2 attendees, a business-purpose narrative, and an itemised receipt. The per-head amount is INR 3547.5, which is within the INR 4,000 per-attendee cap (see \u00a77.1 Meals examples: 'Within IN per-attendee cap of INR 4,000 \u2192 Green'). All requirements in \u00a73.4 are met.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
       "correct": true,
       "confidence": 0.98
     },
@@ -1182,7 +1182,7 @@
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at INR 7404.00 for 2 attendees (INR 3701.77/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
       "predicted_reasoning": "The claim is for INR 7,404 for 2 attendees (INR 3,702/head), which is within the INR 4,000 per-attendee cap (see \u00a77.1 Meals examples: 'Mumbai team lunch, INR 18,000 for 6 attendees = INR 3,000/head, no alcohol. Within IN per-attendee cap of INR 4,000 \u2192 Green'). The narrative is >20 characters, and a receipt is attached.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
       "correct": true,
       "confidence": 0.95
     },
@@ -1291,7 +1291,7 @@
       "gold_category": "entertainment",
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at USD 471.17 for 4 attendees (USD 117.79/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
-      "predicted_reasoning": "\"Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.\" The claim is for 4 attendees, with a business purpose and itemised receipt, matching the NYC client dinner example in \u00a77.1.",
+      "predicted_reasoning": "\"Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.\" The claim is for 4 attendees, with a business purpose and itemised receipt, matching the NYC client dinner example in \u00a77.1.",
       "policy_clause": "\u00a73.4 Entertainment \u2014 within per-head cap, all attendees named, business purpose annotated, itemised receipt attached",
       "correct": true,
       "confidence": 0.98
@@ -1347,7 +1347,7 @@
       "predicted_label": "amber",
       "gold_reasoning": "Client entertainment at EUR 104.53/head is above the per-head cap (EUR 100) but at or below 110% of cap \u2014 Amber per \u00a73.4, reviewer attention required.",
       "predicted_reasoning": "The per-attendee cap for DE entertainment is EUR 70 (\u00a73.1 Meals). 418.13 EUR / 4 = 104.53 EUR per attendee, which is above the cap but below 110% (77 EUR). Alcohol presence is not specified. All required narrative elements appear present.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); WPP:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); Zava:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
       "correct": true,
       "confidence": 0.7
     },
@@ -1402,7 +1402,7 @@
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at INR 13697.00 for 4 attendees (INR 3424.13/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
       "predicted_reasoning": "The claim is for INR 13,697 with 4 attendees, which is INR 3,424.25/head, within the INR 4,000 per-attendee cap (see \u00a77.1 Meals examples: 'Mumbai team lunch, INR 18,000 for 6 attendees = INR 3,000/head, no alcohol. Within IN per-attendee cap of INR 4,000 \u2192 Green'). The narrative is >20 characters, and a receipt is attached.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
       "correct": true,
       "confidence": 0.98
     },
@@ -1457,7 +1457,7 @@
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at GBP 119.10/head is above the per-head cap (GBP 110) but at or below 110% of cap \u2014 Amber per \u00a73.4, reviewer attention required.",
       "predicted_reasoning": "The claim is for a UK client dinner with 4 attendees, total GBP 476.41 = GBP 119.10/head. No UK per-attendee cap is stated for entertainment, but \u00a73.4 does not prohibit alcohol in the UK, and all required narrative and receipt elements are present. No breach conditions are met.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); WPP:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); Zava:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
       "correct": false,
       "confidence": 0.95
     },
@@ -1731,8 +1731,8 @@
       "gold_category": "entertainment",
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at USD 191.08 for 2 attendees (USD 95.54/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
-      "predicted_reasoning": "The claim is for a client dinner (business-development discussion) with 2 attendees, itemised receipt attached, and a narrative over 20 characters. \u00a73.4 states: 'Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.'",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
+      "predicted_reasoning": "The claim is for a client dinner (business-development discussion) with 2 attendees, itemised receipt attached, and a narrative over 20 characters. \u00a73.4 states: 'Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.'",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
       "correct": true,
       "confidence": 0.95
     },
@@ -1786,8 +1786,8 @@
       "gold_category": "entertainment",
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at EUR 101.06/head is above the per-head cap (EUR 100) but at or below 110% of cap \u2014 Amber per \u00a73.4, reviewer attention required.",
-      "predicted_reasoning": "The claim is for DE entertainment, with 2 attendees (WPP:guest ratio 1:1), a business-purpose narrative over 20 characters, and an itemised receipt. No evidence of alcohol. \"Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.\"",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
+      "predicted_reasoning": "The claim is for DE entertainment, with 2 attendees (Zava:guest ratio 1:1), a business-purpose narrative over 20 characters, and an itemised receipt. No evidence of alcohol. \"Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.\"",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
       "correct": false,
       "confidence": 0.95
     },
@@ -1842,7 +1842,7 @@
       "predicted_label": "red",
       "gold_reasoning": "Client entertainment at INR 17682.00 for 4 attendees (INR 4420.43/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
       "predicted_reasoning": "The claim is for entertainment in IN. \u00a73.4 states 'Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN)'. The amount is INR 17,682 for 4 attendees = INR 4,420.5/head, which is above the INR 4,000 cap and above 110% (INR 4,400).",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); WPP:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); Zava:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
       "correct": false,
       "confidence": 0.98
     },
@@ -2018,7 +2018,7 @@
       "predicted_label": "red",
       "gold_reasoning": "Conference fee of INR 108536.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach \u2014 Red per \u00a73.5.",
       "predicted_reasoning": "The claim is for 'miscellaneous' but describes a conference registration, which falls under entertainment. The narrative does not name all attendees with their organisation as required ('all attendees named, with their organisation, in the claim narrative'), and the business-purpose line is under 20 characters. Both are explicit breaches per \u00a73.4 Entertainment.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); WPP:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); Zava:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters",
       "correct": true,
       "confidence": 0.95
     },
@@ -2062,7 +2062,7 @@
       "predicted_label": "red",
       "gold_reasoning": "Client entertainment at INR 17778.00 for 4 attendees (INR 4444.41/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
       "predicted_reasoning": "The claim is missing an itemised receipt, which is required at any amount for entertainment claims: 'Itemised receipt at any amount (\u00a72 receipt thresholds do not apply \u2014 entertainment is always above threshold).' This is a clear breach.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); WPP:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); Zava:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
       "correct": false,
       "confidence": 1.0
     },
@@ -2117,7 +2117,7 @@
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at GBP 110.53/head is above the per-head cap (GBP 110) but at or below 110% of cap \u2014 Amber per \u00a73.4, reviewer attention required.",
       "predicted_reasoning": "The claim is for a UK client dinner with 2 attendees, amounting to GBP 221.07. No evidence of alcohol or policy breach is present. The narrative provides a business-purpose line exceeding 20 characters, and the receipt is present. None of the Red triggers in \u00a73.4 apply.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); WPP:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); Zava:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
       "correct": false,
       "confidence": 0.95
     },
@@ -2281,8 +2281,8 @@
       "gold_category": "entertainment",
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at INR 13501.00 for 4 attendees (INR 3375.24/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
-      "predicted_reasoning": "\"Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.\" Amount per head is INR 3,375.25 (13,501/4), which is within the INR 4,000 per-attendee cap (see \u00a77.1 Meals examples). Receipt is attached, narrative is sufficient.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached",
+      "predicted_reasoning": "\"Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.\" Amount per head is INR 3,375.25 (13,501/4), which is within the INR 4,000 per-attendee cap (see \u00a77.1 Meals examples). Receipt is attached, narrative is sufficient.",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached",
       "correct": true,
       "confidence": 0.98
     },
@@ -2392,7 +2392,7 @@
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at USD 273.58 for 3 attendees (USD 91.19/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
       "predicted_reasoning": "The claim is for 3 attendees at $273.58 total ($91.19/head), but \u00a77.1 Meals examples show NYC client dinner at $72.50/head is green. However, the entertainment per-head cap is not explicitly stated, but the claim narrative is detailed, receipt is attached, and all requirements in \u00a73.4 are met.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
       "correct": true,
       "confidence": 0.85
     },
@@ -2458,7 +2458,7 @@
       "predicted_label": "red",
       "gold_reasoning": "Conference fee of INR 96486.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach \u2014 Red per \u00a73.5.",
       "predicted_reasoning": "The claim is for 'miscellaneous' but describes 'Conference registration', which falls under entertainment. In \u00a73.4 Entertainment, 'any guest unnamed or org missing' is a red breach. The narrative does not name all attendees with their organisation as required.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); WPP:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); Zava:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
       "correct": true,
       "confidence": 0.95
     },
@@ -2611,8 +2611,8 @@
       "gold_category": "entertainment",
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at USD 325.83 for 3 attendees (USD 108.61/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
-      "predicted_reasoning": "The claim is for a client dinner with 3 attendees, a business-purpose narrative, and an itemised receipt. \u00a73.4 Entertainment states: 'Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.' All requirements are met.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
+      "predicted_reasoning": "The claim is for a client dinner with 3 attendees, a business-purpose narrative, and an itemised receipt. \u00a73.4 Entertainment states: 'Green (auto-approve): within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.' All requirements are met.",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
       "correct": true,
       "confidence": 0.95
     },
@@ -2722,7 +2722,7 @@
       "predicted_label": "red",
       "gold_reasoning": "Client entertainment at INR 13484.00 for 3 attendees (INR 4494.51/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
       "predicted_reasoning": "Alcohol is prohibited on IN entertainment claims per 'alcohol where prohibited (DE/IN)'. The policy excerpt for \u00a73.4 Entertainment explicitly lists this as a Red (breach) condition.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); WPP:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); Zava:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
       "correct": false,
       "confidence": 0.95
     },
@@ -2898,7 +2898,7 @@
       "predicted_label": "red",
       "gold_reasoning": "Conference fee of INR 109055.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach \u2014 Red per \u00a73.5.",
       "predicted_reasoning": "\u00a73.4 Entertainment requires all attendees named, with their organisation, in the claim narrative. The narrative does not name the attendee or their organisation, breaching 'any guest unnamed or org missing'.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); WPP:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); Zava:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
       "correct": true,
       "confidence": 0.95
     },
@@ -2942,7 +2942,7 @@
       "predicted_label": "amber",
       "gold_reasoning": "Client entertainment at INR 16222.00 for 4 attendees (INR 4055.44/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
       "predicted_reasoning": "The per-attendee amount is INR 4,055.5 (INR 16,222 / 4), which is just above the INR 4,000 per-head cap referenced in \u00a77.1 Meals examples. \u00a73.4 Entertainment states Red for 'above 110% of per-head cap', but this is only 101.4%. All other requirements (receipt, narrative, attendees) appear met.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); WPP:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); Zava:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
       "correct": false,
       "confidence": 0.8
     },
@@ -2997,7 +2997,7 @@
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at GBP 111.96/head is above the per-head cap (GBP 110) but at or below 110% of cap \u2014 Amber per \u00a73.4, reviewer attention required.",
       "predicted_reasoning": "The claim is for 4 attendees at GBP 447.86, which is GBP 111.97 per head. No UK per-head cap is specified in the excerpts, but there is no evidence of breach: all attendees are named, the business-purpose line is present and >20 characters, and the venue is a business restaurant. No alcohol or spouse/partner issues are noted.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); WPP:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); Zava:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
       "correct": false,
       "confidence": 0.85
     },
@@ -3162,7 +3162,7 @@
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at INR 7780.00 for 2 attendees (INR 3890.22/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated \u2014 Green per \u00a73.4.",
       "predicted_reasoning": "The claim is for INR 7,780 for 2 attendees, which is INR 3,890/head. \u00a77.1 Meals examples state 'Mumbai team lunch, INR 18,000 for 6 attendees = INR 3,000/head, no alcohol. Within IN per-attendee cap of INR 4,000 \u2192 Green.' All \u00a73.4 requirements are met.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 within per-head cap, alcohol rules respected, all attendees named with org, WPP:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 within per-head cap, alcohol rules respected, all attendees named with org, Zava:guest ratio <=2:1, business purpose annotated, itemised receipt attached.",
       "correct": true,
       "confidence": 0.98
     },
@@ -3216,7 +3216,7 @@
       "gold_category": "entertainment",
       "predicted_label": "green",
       "gold_reasoning": "Client entertainment at GBP 113.60/head is above the per-head cap (GBP 110) but at or below 110% of cap \u2014 Amber per \u00a73.4, reviewer attention required.",
-      "predicted_reasoning": "The claim is for GBP 227.2 with 2 attendees, which is GBP 113.60/head. The closest example is 'London client lunch, 1 WPP + 2 clients, GBP 320 total = GBP 106.67/head, alcohol present, all named. Within GBP 110 per-head cap \u2192 Green.' This claim is just above the cap but below 110% (GBP 121), so it is within the Amber boundary but the policy example marks similar cases as Green.",
+      "predicted_reasoning": "The claim is for GBP 227.2 with 2 attendees, which is GBP 113.60/head. The closest example is 'London client lunch, 1 Zava + 2 clients, GBP 320 total = GBP 106.67/head, alcohol present, all named. Within GBP 110 per-head cap \u2192 Green.' This claim is just above the cap but below 110% (GBP 121), so it is within the Amber boundary but the policy example marks similar cases as Green.",
       "policy_clause": "\u00a77.4 Entertainment examples \u2014 London client lunch, GBP 110 per-head cap",
       "correct": false,
       "confidence": 0.85
@@ -3338,7 +3338,7 @@
       "predicted_label": "red",
       "gold_reasoning": "Conference fee of INR 111433.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach \u2014 Red per \u00a73.5.",
       "predicted_reasoning": "\u00a73.4 Entertainment requires all attendees named, with their organisation, in the claim narrative. The narrative does not name the attendee or their organisation, breaching 'any guest unnamed or org missing'.",
-      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); WPP:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
+      "policy_clause": "\u00a73.4 Entertainment \u2014 Red (breach): above 110% of per-head cap; alcohol where prohibited (DE/IN); Zava:guest ratio >3:1; any guest unnamed or org missing; business-purpose line absent or under 10 characters; spouse/partner attendance without qualifying role; venue is a non-business establishment (e.g. nightclub).",
       "correct": true,
       "confidence": 0.95
     }

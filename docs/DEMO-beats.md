@@ -84,7 +84,7 @@ Improvise everything between Launch and Hand off in your own words.
 - **Show** —
   1. Click Reject. Wait one beat. Header tile flips red, ribbon
      paints Arbitrate red, two new ledger entries appear (your
-     decision signed `finance-controller@wpp`, then the
+     decision signed `finance-controller@zava`, then the
      workflow-rejected event).
   2. Click `/fleet` — claim is gone from the exception queue.
   3. Open the bulk modal (don't submit): "real-world they get
@@ -209,7 +209,7 @@ Improvise everything between Launch and Hand off in your own words.
 - **Screen** — back to `/fleet`. The audience can see Workday,
   Concur, Maconomy claims sitting next to each other in one grid —
   that *is* the demo for this pillar.
-- **Launch** — "Two integration shapes inside WPP — direct to
+- **Launch** — "Two integration shapes inside Zava — direct to
   systems via API, and data layer via Databricks. We support both."
 - **Point** — the answer to the brief's extensibility criterion is
   the architecture, not a roadmap commitment.
@@ -410,7 +410,7 @@ Improvise everything between Launch and Hand off in your own words.
   3. Closing line — "POC1 and POC2 are existence proofs. AGT is
      what makes the OWASP-10 claim something your auditor can
      re-derive themselves. Constellation is what scale across
-     WPP's actual operating model looks like, on the same
+     Zava's actual operating model looks like, on the same
      substrate, with the same governance, on day one."
 - **Hand off** — "Happy to take questions."
 
@@ -450,5 +450,5 @@ If the audience asks something off-script:
 - **Why allow-lists not prompts** — allow-lists are policy.
   Prompts aren't. Kernel decides, not the prompt.
 - **AC #4 (≥95% accuracy)** — pipeline + prompt are live;
-  corpus-wide gate is reserved for WPP's 3,430-line real dataset.
+  corpus-wide gate is reserved for Zava's 3,430-line real dataset.
   Synthetic 300 wouldn't be a meaningful number.

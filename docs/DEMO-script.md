@@ -1,6 +1,6 @@
 # Demo — 30 minutes, live
 
-Audience: WPP CTO + CIO + senior business. Peer conversation, not a
+Audience: Zava CTO + CIO + senior business. Peer conversation, not a
 pitch. Companion to [DEMO.md](DEMO.md).
 
 Structured around the five pillars from the customer steer:
@@ -136,7 +136,7 @@ them.
 Watch what happens. *(wait one beat)* Header tile flips to red.
 Phase ribbon paints Arbitrate red. Two new entries appear in the
 ledger at the bottom — my decision, signed as
-`finance-controller@wpp`, and right after it the workflow-rejected
+`finance-controller@zava`, and right after it the workflow-rejected
 event. Go back to the fleet — *(click /fleet)* — and it's gone from
 the exception queue.
 
@@ -448,7 +448,7 @@ ad-hoc. So we made an early architectural call here that I want
 to walk you through, because it's worth the few minutes.
 
 There are essentially two integration shapes you'll find inside
-WPP. There's direct integration to business systems — REST APIs,
+Zava. There's direct integration to business systems — REST APIs,
 SOAP if you're unlucky, that kind of thing. And there's the data-
 layer pattern where the source of truth has been consolidated into
 a lakehouse, typically Databricks. We support both, because every
@@ -497,7 +497,7 @@ architecture, not a roadmap commitment.
 One bonus property worth knowing — APIM has a REST-to-MCP
 gateway feature that auto-generates the MCP tool surface from an
 OpenAPI spec. So if your team has REST APIs already, which most
-WPP teams do, that's a config-file step rather than a custom
+Zava teams do, that's a config-file step rather than a custom
 build.
 
 ### Data layer — Databricks pattern
@@ -873,7 +873,7 @@ you'll add when you decide what it should be. POC1 and POC2 are
 existence proofs. AGT is what makes the OWASP-10 claim something
 your auditor can re-derive themselves rather than something you
 have to ask them to take on faith. And Constellation is what scale
-across WPP's actual operating model looks like, on the same
+across Zava's actual operating model looks like, on the same
 substrate, with the same governance, on day one.
 
 Happy to take questions."
@@ -897,7 +897,7 @@ Happy to take questions."
   aren't. The kernel decides whether a tool call happens, not the
   prompt.
 - **AC #4 (≥95% accuracy)** — pipeline and prompt are live. The
-  corpus-wide gate is reserved for WPP's 3,430-line real dataset;
+  corpus-wide gate is reserved for Zava's 3,430-line real dataset;
   running it on synthetic 300 wouldn't be a meaningful number.
 
 `make down` between recordings.

@@ -287,5 +287,5 @@ simulator inject → Durable phase → validator blocks → EventBus
 | Make a new domain show up on the blueprint page | [blueprint-microsite-contributor-guide.md](blueprint-microsite-contributor-guide.md) |
 | Compose a new domain end-to-end | [superpowers/skills/compose-domain/SKILL.md](superpowers/skills/compose-domain/SKILL.md) |
 | Local dev setup | [DEVELOPMENT.md](DEVELOPMENT.md) |
-| Verbatim WPP brief | [poc1-brief.md](poc1-brief.md) |
+| Verbatim Zava brief | [poc1-brief.md](poc1-brief.md) |
 | What every doc in `docs/` is for | [README.md](README.md) (this directory) |

@@ -17,7 +17,7 @@
 - **A — Adapt.** Same shape, swap domain guts (rename, replace prompts, add fields, new mock endpoints).
 - **D — Discard.** Invoice-specific with no expense-compliance analogue. Don't carry forward.
 
-The brief is **expense compliance**, not invoice P2P. The PRD we submitted to WPP is also written as expense compliance (despite the title saying "Procure-to-Pay"). The code we built is **invoice P2P**. That mismatch is the central finding here.
+The brief is **expense compliance**, not invoice P2P. The PRD we submitted to Zava is also written as expense compliance (despite the title saying "Procure-to-Pay"). The code we built is **invoice P2P**. That mismatch is the central finding here.
 
 ---
 
@@ -30,7 +30,7 @@ The brief is **expense compliance**, not invoice P2P. The PRD we submitted to WP
 | [function_app.py](../function_app.py) (root) | Durable Functions Python entrypoint | **R** | Untouched. |
 | [host.json](../host.json), [local.settings.json](../local.settings.json) | Functions host config | **R** | Untouched. |
 
-**Takeaway.** The Durable Functions runtime, HITL-via-external-event pattern, timer-with-task_any race, and lifecycle event emission (`workflow.started`, `suspended`, `resumed`, `workflow.completed`, `workflow.rejected`) is all directly reusable. WPP §4.3 (HITL without restart) and §4.11 (region-down recovery, no data loss) ride on this layer.
+**Takeaway.** The Durable Functions runtime, HITL-via-external-event pattern, timer-with-task_any race, and lifecycle event emission (`workflow.started`, `suspended`, `resumed`, `workflow.completed`, `workflow.rejected`) is all directly reusable. Zava §4.3 (HITL without restart) and §4.11 (region-down recovery, no data loss) ride on this layer.
 
 ## 2. MAF Pregel graphs (per-phase)
 
@@ -220,8 +220,8 @@ These are demanded by the brief and have **no analogue** in the current code. Ne
 - **Arbitration skill** — captures justifications, surfaces autonomy-change proposals.
 - **Escalation skill** — repeat-offender progressive enforcement across time windows (warning → escalation → major violation).
 - **Audit reporter skill** — narrative summary over the immutable ledger.
-- **Foundry IQ corpus** with the WPP T&E policy document so classification is policy-driven (acceptance: policy update changes behaviour, no code change).
-- **Synthetic 3,430-claim dataset** with receipt images and ground-truth R/A/G labels (WPP supplies; we ingest).
+- **Foundry IQ corpus** with the Zava T&E policy document so classification is policy-driven (acceptance: policy update changes behaviour, no code change).
+- **Synthetic 3,430-claim dataset** with receipt images and ground-truth R/A/G labels (Zava supplies; we ingest).
 
 ### Operator surfaces
 - **SSC Reviewer queue UI** — separate route, sorted by severity / value / SLA urgency; processing-time-per-item visible (§3.1 + acceptance #8).
@@ -234,13 +234,13 @@ These are demanded by the brief and have **no analogue** in the current code. Ne
 - **Workday claim API** added to existing mock — replaces vendor/cost-centre endpoints.
 
 ### Demo evidence
-- **Accuracy benchmark report** vs WPP labels — ≥ 95% floor, target 97.6%+ (40% of POC1 score).
+- **Accuracy benchmark report** vs Zava labels — ≥ 95% floor, target 97.6%+ (40% of POC1 score).
 - **Region-failover dry run** — 500 in-flight claims, recovery within RTO, no data loss (acceptance #11).
 - **Learning-curve demo** — initial state (all-Amber-to-reviewer) vs. steady state (agent recommends, human spot-checks) (acceptance #7).
 
 ### Architecture artifacts (not code)
 - **Integration architecture diagram** — auth abstraction, three-step EMS onboarding walkthrough (acceptance #10).
-- **Cost model** — pilot vs. full WPP rollout economics (15% of score).
+- **Cost model** — pilot vs. full Zava rollout economics (15% of score).
 
 ---
 

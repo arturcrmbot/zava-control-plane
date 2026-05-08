@@ -1,6 +1,6 @@
 # Index — Demo-ready by 2026-05-08
 
-Five parallelisable streams to land both POCs end-to-end live to WPP next Friday. Each plan below is independently dispatchable (subagent-driven-development pattern) and produces working software on its own.
+Five parallelisable streams to land both POCs end-to-end live to Zava next Friday. Each plan below is independently dispatchable (subagent-driven-development pattern) and produces working software on its own.
 
 **Master spec:** [../specs/2026-04-30-poc1-poc2-demo-ready-design.md](../specs/2026-04-30-poc1-poc2-demo-ready-design.md)
 

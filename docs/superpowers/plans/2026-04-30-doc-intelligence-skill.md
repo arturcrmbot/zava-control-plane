@@ -1463,7 +1463,7 @@ for e in ledger:
 "
 ```
 
-Expected: at least one `ocr.extract` entry in the action ledger with attributes `wpp.ocr.model='prebuilt-receipt'` and a numeric `wpp.ocr.confidence_min`.
+Expected: at least one `ocr.extract` entry in the action ledger with attributes `zava.ocr.model='prebuilt-receipt'` and a numeric `zava.ocr.confidence_min`.
 
 - [ ] **Step 5: Verify field_confidences in receipt validation output**
 

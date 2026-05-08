@@ -18,9 +18,9 @@
 
 - [ ] **Step 1: Provision Azure AI Foundry project** in the existing tenant.
 
-  - Resource group: `rg-wpp-poc-demo`
+  - Resource group: `rg-zava-poc-demo`
   - Region: pick one with gpt-4.1 availability (eastus2, swedencentral)
-  - Name: `aifp-wpp-poc1-eval`
+  - Name: `aifp-zava-poc1-eval`
 
 - [ ] **Step 2: Deploy the judge model** (Azure OpenAI gpt-4.1 or gpt-4.1-mini) inside the Foundry project.
 

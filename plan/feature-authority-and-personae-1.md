@@ -46,7 +46,7 @@ This plan lands the two primitives that collapse that cost:
 
 To demonstrate the curve (the "breathing" claim), Phase 6 graduates ≥12 new personae across functions we don't yet have domains for (AP clerk, controller, FP&A analyst, sourcing lead, category manager, contracts counsel, DPO, account director, project manager, change manager, comp & ben analyst, mobility specialist). They sit in the registry as available cast — visible on the blueprint microsite — even before their domains land. Phase 7 (optional, last) surfaces the authority matrix and persona library to the operator UI.
 
-No org-specific copy in any new artefact. Existing per-customer language (e.g. `finance-agent@wpp` agent IDs) is left untouched; new code uses neutral nouns (`finance-agent`, `the operator`, `the requester`).
+No org-specific copy in any new artefact. Existing per-customer language (e.g. `finance-agent@zava` agent IDs) is left untouched; new code uses neutral nouns (`finance-agent`, `the operator`, `the requester`).
 
 ## 1. Requirements & Constraints
 

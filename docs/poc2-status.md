@@ -80,7 +80,7 @@ Three sections: capability map against the 22 demos, architecture (with the loca
 | 4.11 | Tiered model usage (cheap screen / frontier reasoning) | ✅ | Skill `model:` frontmatter drives gpt-4.1-mini for `auto-shortlister`, gpt-4.1 for `cv-crystalliser`. |
 | 4.12 | Skill library + APIOps gate | 🟡 | All hiring skills under `api/server/skills/`; APIM/API-Center governance + CI gate is engagement-POC, narrated only. |
 | 4.13 | Hooks (`onPreToolUse` / `onPostToolUse`) for non-revocable sends | ✅ | POC1 hook pattern reused for offer-letter send (Phase 9) + ServiceNow JML provisioning (Phase 10). |
-| 4.15 | Entra Agent ID for `hiring-agent@wpp` | 🟡 | Local demo uses `gh` CLI token; cloud-target Entra Agent ID narrated. `ocr_extract` does demonstrate Entra-ID auth in the lab today. |
+| 4.15 | Entra Agent ID for `hiring-agent@zava` | 🟡 | Local demo uses `gh` CLI token; cloud-target Entra Agent ID narrated. `ocr_extract` does demonstrate Entra-ID auth in the lab today. |
 | 4.16 | Audit trail + jurisdiction-partitioned reporting | ✅ | POC1 ledger + `audit_query` reused; partition extends to `(jurisdiction, hire_id)`. |
 | 4.17 | Cost-per-hire report | ✅ | `economics.py` is workflow-type-aware; FM rail reads "per hire" automatically for hiring workflows. |
 | 4.18 | Process evolution proposals | ✅ | POC1 `propose_skill_amp` MCP tool reused; surfaces in policy panel. |
@@ -279,7 +279,7 @@ These need no new code; just demo scripts and rebound labels.
 | Element | Notes |
 |---|---|
 | `docs/poc2-DEMO.md` | 30-minute walkthrough script across all 22 capabilities; identifies which are live vs narrated. |
-| 30-minute end-to-end dry run | Walk all 22 demos with someone playing the WPP evaluator. Bug fixes. |
+| 30-minute end-to-end dry run | Walk all 22 demos with someone playing the Zava evaluator. Bug fixes. |
 | `v1.0-poc2-frontier` tag | Final recording. |
 
 ---
@@ -288,7 +288,7 @@ These need no new code; just demo scripts and rebound labels.
 
 | Topic | File |
 |---|---|
-| POC2 brief (verbatim) | TBD — equivalent of [poc1-brief.md](poc1-brief.md), pending the WPP HR addendum doc |
+| POC2 brief (verbatim) | TBD — equivalent of [poc1-brief.md](poc1-brief.md), pending the Zava HR addendum doc |
 | Capability spec | [spec.md](../spec.md) §4.1–4.22 |
 | Architecture (cloud target) | [poc2-architecture.svg](poc2-architecture.svg) |
 | POC1 inventory (what reuses) | [poc1-inventory.md](poc1-inventory.md) |
@@ -305,7 +305,7 @@ These need no new code; just demo scripts and rebound labels.
 Tracks A through F all landed. Lab-build is feature complete on every demo-ready stream. Remaining work is **operational** — three concrete items:
 
 1. **One clean end-to-end stack boot through to onboarding-video render.** All avatar fixes are committed (V1/V2 prompt rules, custom-subdomain Azure Speech endpoint, per-role character/style tuple, mp4-download-without-bearer-token). Just needs a stable Functions-host startup to confirm `onboarding_video_url` lands on workflow metadata. Use [`scripts/run-func.bat`](../scripts/run-func.bat) for the env-pinned boot.
-2. **30-min demo dry run** against [poc2-DEMO.md](poc2-DEMO.md) — walk all 22 capability beats with someone playing the WPP evaluator. Capture and fix anything that flakes.
+2. **30-min demo dry run** against [poc2-DEMO.md](poc2-DEMO.md) — walk all 22 capability beats with someone playing the Zava evaluator. Capture and fix anything that flakes.
 3. **Final recording + screenshots** + tag `v1.0-poc2-frontier`.
 
 ### Reserved for the engagement POC (intentionally not lab work)
@@ -314,7 +314,7 @@ Per [SCOPE-DELTA.md](SCOPE-DELTA.md) §POC2:
 
 - §4.9 — 200-CV corpus expansion (50 is enough for the demo)
 - §4.12 — APIOps governance gate (narrated against architecture)
-- §4.15 — Entra Agent ID for `hiring-agent@wpp` (lab uses `gh` CLI; Entra-ID auth IS already demonstrated by `ocr_extract` + `avatar_render`)
+- §4.15 — Entra Agent ID for `hiring-agent@zava` (lab uses `gh` CLI; Entra-ID auth IS already demonstrated by `ocr_extract` + `avatar_render`)
 - §4.20 — drift-detection live beat (narrated)
 - §4.22 — APIM jurisdiction-aware routing (narrated)
 - Real Greenhouse / LinkedIn Recruiter / Microsoft Graph / ServiceNow / ACS phone number — MCP contracts identical, backends swap-in at engagement kickoff

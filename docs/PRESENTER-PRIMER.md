@@ -201,7 +201,7 @@ At engagement time, those identities swap to Foundry Hosted Agents —
 Azure's managed agent runtime. The skill manifest doesn't change, the
 tool registry doesn't change, the audit chain doesn't change. **This is
 deliberate**: the SDK is the swap-in seam, by design, so the lab build
-is a credible proxy for what runs in WPP's cloud.
+is a credible proxy for what runs in Zava's cloud.
 
 If anyone challenges "but the lab uses GHCP, not Azure" — your answer
 is that the runtime is the only thing that swaps; the substrate
@@ -255,7 +255,7 @@ That's the architecture-as-extensibility-answer claim.
 
 The bonus property worth knowing: APIM has a REST-to-MCP gateway
 feature that auto-generates the MCP tool surface from an OpenAPI spec.
-Most WPP teams have REST APIs already, so this is a config-file step,
+Most Zava teams have REST APIs already, so this is a config-file step,
 not a custom build.
 
 ### 4.5 Why Skills (markdown + allow-lists), not prompts
@@ -388,7 +388,7 @@ blob, here's the CLI, run it yourself."
 App Insights connection string is wired into both processes. The
 Foundry portal's *Tracing* tab at https://ai.azure.com surfaces every
 `gen_ai.generate_content` span with `gen_ai.agent.name`,
-`gen_ai.request.model`, `wpp.skill`, `gen_ai.usage.input_tokens` /
+`gen_ai.request.model`, `zava.skill`, `gen_ai.usage.input_tokens` /
 `output_tokens`, plus tool-call children. **Same OTEL conventions
 Microsoft Agent Framework, Semantic Kernel, the OpenAI Agents SDK, and
 GHCP all share.** This is not proprietary telemetry; anyone who builds
@@ -593,7 +593,7 @@ the registry.
 
 **Close — agentic loop + Constellation.** The architectural choice that
 makes everything work is *skills + tools, not prompts*. Allow-lists are
-policy. Prompts aren't. Constellation is what scale across WPP's
+policy. Prompts aren't. Constellation is what scale across Zava's
 operating model looks like, on the same substrate, with the same
 governance, on day one.
 
@@ -818,10 +818,10 @@ prompt under adversarial input.
 
 **"You claim ≥95% accuracy on POC1. Where's the number?"**
 The pipeline and prompt are live and demonstrable. The corpus-wide
-gate is reserved for WPP's 3,430-line real dataset; running it on the
+gate is reserved for Zava's 3,430-line real dataset; running it on the
 synthetic 300 wouldn't be a meaningful number. The bid response is
-explicit: ≥95% on the WPP dataset, 40% of the POC1 score, run after
-engagement kickoff when WPP supplies the data.
+explicit: ≥95% on the Zava dataset, 40% of the POC1 score, run after
+engagement kickoff when Zava supplies the data.
 
 **"How does this scale beyond a laptop?"**
 Each tier has a clear scale-up path. Durable Functions runs on Azure
@@ -861,14 +861,14 @@ and the telemetry is OTEL (so any observability vendor reads it). The
 governance kernel (AGT) is itself open-source. There is no proprietary
 low-code studio in the way.
 
-**"How does this handle multi-tenancy at WPP scale?"**
+**"How does this handle multi-tenancy at Zava scale?"**
 Two answers. At the data layer, Unity Catalog enforces row-level
 security on the Databricks read path; identity is propagated through
 the MCP call. At the agent layer, identities are per-domain (and could
 be per-business-unit at engagement scale); the kernel evaluates
 authority per-call against the matrix, and the matrix has business-unit
 and geography as resolution axes. The 80-rule matrix in the lab build
-is a small example; the production matrix is whatever WPP's delegated
+is a small example; the production matrix is whatever Zava's delegated
 authority schedule actually is.
 
 ---
@@ -906,7 +906,7 @@ gets technical:
 These are the gotchas that destroy credibility if you overreach:
 
 - **Don't claim the synthetic accuracy run is a meaningful number.**
-  AC #4 is explicitly punted to engagement-POC scope on WPP's
+  AC #4 is explicitly punted to engagement-POC scope on Zava's
   3,430-line dataset.
 - **Don't claim the lab build has Entra Agent ID.** That's the
   engagement-POC posture. Lab runs on a single `gh auth token`.
@@ -959,7 +959,7 @@ Memorise this verbatim. It's the line that does the work:
 > POC2 are existence proofs. AGT is what makes the OWASP-10 claim
 > something your auditor can re-derive themselves rather than
 > something you have to ask them to take on faith. And Constellation
-> is what scale across WPP's actual operating model looks like, on
+> is what scale across Zava's actual operating model looks like, on
 > the same substrate, with the same governance, on day one.
 >
 > Happy to take questions."

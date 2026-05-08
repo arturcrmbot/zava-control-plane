@@ -1,4 +1,4 @@
-# Demo flow — Microsoft Apex / WPP
+# Demo flow — Microsoft Apex / Zava
 
 Four acts, **40 minutes total**, live against the running stack — no
 slides, no recordings. Take time to **explain** as you go; this is not
@@ -100,7 +100,7 @@ tiles.
   magic links; falls back to local outbox if offline.
 - **Azure Monitor / App Insights → Foundry Tracing tab**
   (`https://ai.azure.com`) — every `gen_ai.generate_content` span with
-  `gen_ai.usage.*`, `gen_ai.agent.name`, `wpp.skill`, plus tool-call
+  `gen_ai.usage.*`, `gen_ai.agent.name`, `zava.skill`, plus tool-call
   children. Same OTEL semantic conventions Microsoft Agent Framework /
   Semantic Kernel / OpenAI Agents SDK / GHCP SDK all share.
 - **Foundry `evaluate()` SDK** — the AC #4 batch + online evaluation
@@ -153,7 +153,7 @@ auto-process invisibly; only the exceptions surface.
   Arbitrate, hit Reject. Header tile flips to red **STATUS ·
   REJECTED — "Rejected at Arbitrate"**, the phase ribbon paints
   Arbitrate red ✖, and the action ledger gains
-  `human/finance-controller@wpp · reviewer.decision:reject` +
+  `human/finance-controller@zava · reviewer.decision:reject` +
   `workflow.rejected`. The workflow disappears from the exception
   queue immediately.
 - **Bulk action** — one decision applied across a clustered exception

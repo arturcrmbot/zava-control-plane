@@ -3,7 +3,7 @@ goal: Lift the Friday demo's credibility on three axes — (1) prove telemetry e
 version: 1.0
 date_created: 2026-05-05
 last_updated: 2026-05-05
-owner: WPP Control Plane POC1 — substrate
+owner: Zava Control Plane POC1 — substrate
 status: 'In progress'
 tags: [feature, observability, evaluation, demo, foundry]
 ---
@@ -30,7 +30,7 @@ Two plan-file corrections from the original draft:
 - Foundry AI Services lives in **`rg-arzielinskiai`**, storage in `project-apex-demo` — different RGs, both Sweden Central.
 
 Today the substrate emits Foundry-shaped OTEL spans (`gen_ai.generate_content`,
-`gen_ai.usage.input_tokens`, `gen_ai.agent.name`, `wpp.skill`, `tool.server.{name}`,
+`gen_ai.usage.input_tokens`, `gen_ai.agent.name`, `zava.skill`, `tool.server.{name}`,
 `executor.{name}`) but the App Insights connection string is empty in `.env`,
 so nothing leaves the box. The cost number on `WorkflowDetail` comes from
 two literal constants in
@@ -56,7 +56,7 @@ Fabric IQ swap-ins.
 
 ## 1. Requirements & Constraints
 
-- **REQ-001**: After Phase 1 ships, every workflow run by the substrate must produce a trace visible in the Microsoft Foundry portal's *Tracing* tab (https://ai.azure.com → existing project `azureai_swedencentral_arzielinski`), with at minimum the following spans per workflow: `executor.{phase_name}` per phase, `gen_ai.generate_content` per agent invocation (carrying `gen_ai.system=github_copilot`, `gen_ai.request.model`, `gen_ai.agent.name`, `wpp.skill=<label>`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`), and `tool.server.{tool_name}` per MCP call. Verifiable by clicking one workflow in the Foundry Tracing UI and seeing the full span tree.
+- **REQ-001**: After Phase 1 ships, every workflow run by the substrate must produce a trace visible in the Microsoft Foundry portal's *Tracing* tab (https://ai.azure.com → existing project `azureai_swedencentral_arzielinski`), with at minimum the following spans per workflow: `executor.{phase_name}` per phase, `gen_ai.generate_content` per agent invocation (carrying `gen_ai.system=github_copilot`, `gen_ai.request.model`, `gen_ai.agent.name`, `zava.skill=<label>`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`), and `tool.server.{tool_name}` per MCP call. Verifiable by clicking one workflow in the Foundry Tracing UI and seeing the full span tree.
 - **REQ-002**: After Phase 2 ships, the `costPerTaskUsd` returned by `economics.compute()` for any workflow with at least one completed agent invocation must be derived from `gen_ai.usage.input_tokens` + `gen_ai.usage.output_tokens` attributes on real OTEL spans (read either locally from the in-process `app_state.spans` cache OR via Application Insights Kusto), multiplied by the published per-million-token rate for the model (constant table, sourced from https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/ for `gpt-4.1` and `gpt-4.1-mini`). The two synthetic constants `MODEL_CALL_RATE` and `COMPUTE_RATE_PER_SECOND` must be deleted.
 - **REQ-003**: After Phase 3 ships, [api/server/eval/evaluator_set.py](../api/server/eval/evaluator_set.py) `_PER_AGENT` must contain entries for every hiring skill executor that emits an `agent.completed` event: `cv-crystalliser`, `auto-shortlister`, `jurisdiction-router`, `betrvg-checker`, `voice-screener`, `interview-recommender`, `offer-personaliser`. The Evaluations UI (`web/client/routes/Evaluations.tsx`) must show non-zero score tiles for at least `cv-crystalliser`, `auto-shortlister`, and `jurisdiction-router` after running 5 hiring workflows.
 - **REQ-004**: After Phase 4 ships, every `audit_logger.log(...)` call must append-write to an Azure Storage append blob in container `audit-ledger` on storage account `apexdemo62525` (already provisioned, see [docs/poc1-status.md §5](../docs/poc1-status.md#5-status-as-of-2026-04-30-evening)) with a time-based immutability policy of ≥1 day. The audit drawer in `WorkflowDetail` must surface the live blob URL for the workflow.
@@ -84,7 +84,7 @@ Fabric IQ swap-ins.
 | TASK-002 | Add the connection string to `.env` (replace the empty `APPLICATIONINSIGHTS_CONNECTION_STRING=` line, file already gitignored) AND to `api/functions/local.settings.json` (also gitignored). Leave `.env.example` with an empty placeholder + an inline comment pointing at this plan. | ✅ | 2026-05-05 |
 | TASK-003 | Set `AZURE_TRACING_GEN_AI_CONTENT_RECORDING_ENABLED=true` and `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true` in both `.env` and `local.settings.json`. Document the choice in [docs/poc1-status.md §5](../docs/poc1-status.md#5-status-as-of-2026-04-30-evening) (synthetic data only, no real PII). | ✅ (env files; status doc note pending) | 2026-05-05 |
 | TASK-004 | Restart `make up` and confirm `init_otel("control-plane-server")` (in [api/server/main.py L33](../api/server/main.py#L33)) and `init_otel("control-plane-functions")` (in [function_app.py L45](../function_app.py#L45)) both resolve without raising. Tail logs for any `azure.monitor.opentelemetry` exporter errors. | ✅ verified via direct invocation; one trace `phase-1-smoke-test` flushed | 2026-05-05 |
-| TASK-005 | Run a POC1 expense workflow end-to-end (`curl -X POST http://localhost:3001/api/simulator/inject -d '{"scenario":"baseline-amber"}'`). Wait 2 min for App Insights ingestion. Open https://ai.azure.com → project → *Tracing*. Verify (a) the trace appears, (b) the span tree contains `executor.Classify` → `gen_ai.generate_content` (with `gen_ai.agent.name=finance-agent`, `gen_ai.request.model=gpt-4.1`, `wpp.skill=rag-classifier`) → `tool.server.policy_search`, (c) the `gen_ai.response` event carries the model output, (d) `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens` are non-zero. | scheduled for Thu dry-run | |
+| TASK-005 | Run a POC1 expense workflow end-to-end (`curl -X POST http://localhost:3001/api/simulator/inject -d '{"scenario":"baseline-amber"}'`). Wait 2 min for App Insights ingestion. Open https://ai.azure.com → project → *Tracing*. Verify (a) the trace appears, (b) the span tree contains `executor.Classify` → `gen_ai.generate_content` (with `gen_ai.agent.name=finance-agent`, `gen_ai.request.model=gpt-4.1`, `zava.skill=rag-classifier`) → `tool.server.policy_search`, (c) the `gen_ai.response` event carries the model output, (d) `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens` are non-zero. | scheduled for Thu dry-run | |
 | TASK-006 | Run a POC2 hiring workflow end-to-end (`curl -X POST http://localhost:3001/api/portal/apply -d '{...}'`). Verify in Foundry Tracing that the hiring spans appear under the same App Insights resource, distinguishable by `cloud_RoleName == "control-plane-functions"` (Functions-hosted hiring orchestrator) vs `cloud_RoleName == "control-plane-server"` (FastAPI-side Fleet Manager). | scheduled for Thu dry-run | |
 | TASK-007 | Capture two screenshots — one trace tree per POC — and save under `docs/screenshots/foundry-tracing-poc1.png` and `docs/screenshots/foundry-tracing-poc2.png` for the demo recording. | scheduled for Thu dry-run | |
 
