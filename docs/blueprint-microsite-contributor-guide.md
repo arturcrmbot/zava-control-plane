@@ -384,7 +384,7 @@ minutes (rebuilds the image with caches, updates the running container).
 - **ACR**: `blueprintacrapexdemo`
 - **Container Apps env**: `blueprint-env`
 - **Container app**: `blueprint`
-- **URL**: <https://blueprint.jollystone-c036938d.swedencentral.azurecontainerapps.io>
+- **URL**: <https://blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io>
 
 The auto-generated URL won't change between deploys (it's tied to the
 container app name + env, not the image).
@@ -458,13 +458,13 @@ git commit -m "record: <domain> walks for blueprint trickle"
 
 ```bash
 # Health
-curl https://blueprint.jollystone-c036938d.swedencentral.azurecontainerapps.io/api/health
+curl https://blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io/api/health
 
 # Composition tree (sanity check the manifest)
-curl https://blueprint.jollystone-c036938d.swedencentral.azurecontainerapps.io/api/blueprint/composition
+curl https://blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io/api/blueprint/composition
 
 # Stream status (should be {"running":true} after autostart)
-curl https://blueprint.jollystone-c036938d.swedencentral.azurecontainerapps.io/api/blueprint/_demo_stream/status
+curl https://blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io/api/blueprint/_demo_stream/status
 
 # Container revisions
 az containerapp revision list -n blueprint -g project-apex-demo \
@@ -477,14 +477,14 @@ az containerapp logs show -n blueprint -g project-apex-demo --type console --tai
 ### To stop the demo trickle in production
 
 ```bash
-curl -X POST https://blueprint.jollystone-c036938d.swedencentral.azurecontainerapps.io/api/blueprint/_demo_stream/stop
+curl -X POST https://blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io/api/blueprint/_demo_stream/stop
 ```
 
 The page goes calm. Real bus events would still appear if any arrived
 (none do — see above). To restart:
 
 ```bash
-curl -X POST https://blueprint.jollystone-c036938d.swedencentral.azurecontainerapps.io/api/blueprint/_demo_stream/start
+curl -X POST https://blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io/api/blueprint/_demo_stream/start
 ```
 
 ### To tear it all down
