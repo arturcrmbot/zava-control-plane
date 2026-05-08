@@ -25,7 +25,7 @@ def _wf(wid: str, status: str = "in_progress") -> Workflow:
     )
 
 
-def test_fleet_economics_endpoint_rolls_up_active_only() -> None:
+def test_fleet_economics_endpoint_rolls_up_session_total() -> None:
     app_state.store.upsert_workflow(_wf("F-1"))
     app_state.store.upsert_workflow(_wf("F-2", status="awaiting_hitl"))
     app_state.store.upsert_workflow(_wf("F-3", status="completed"))
@@ -48,9 +48,11 @@ def test_fleet_economics_endpoint_rolls_up_active_only() -> None:
     r = TestClient(app).get("/api/fleet/economics")
     assert r.status_code == 200
     body = r.json()
-    # active workflows contribute (F-1 + F-2); completed (F-3) excluded
+    # Session-wide rollup: all workflows contribute (incl. completed F-3),
+    # and `activeWorkflowCount` still surfaces the in-flight subset.
+    assert body["totalWorkflowCount"] == 3
     assert body["activeWorkflowCount"] == 2
-    assert body["totalModelCalls"] == 2
+    assert body["totalModelCalls"] == 3
     assert body["totalComputeCostUsd"] > 0.0
     assert body["averageCostPerWorkflow"] == \
-        round(body["totalComputeCostUsd"] / 2, 2)
+        round(body["totalComputeCostUsd"] / 3, 4)
