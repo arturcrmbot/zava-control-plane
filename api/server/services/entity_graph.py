@@ -46,6 +46,8 @@ from typing import Any
 
 import kuzu
 
+from api.shared.events import FleetEvent
+
 
 # ---------------------------------------------------------------------------
 # ULID helper (PAT-001)
@@ -65,11 +67,15 @@ _ULID_LAST_RANDOM: int = 0  # 80-bit integer of the random suffix
 # in identifiers like 'limited'). Precompiled for efficiency.
 _LIMIT_PATTERN = re.compile(r"\blimit\b", re.IGNORECASE)
 
+# Regex for validating entity attribute keys. Keys must be valid identifiers
+# (alphanumeric + underscore, not starting with a digit).
+_VALID_ATTR_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 # Attribute keys reserved for projection metadata (PAT-002): callers may
 # stash these in ``EntityWrite.attrs`` so the ``entity.upserted`` event +
 # audit entry can carry workflow provenance, but they are NOT columns on
-# any Plane 1 node table and must be excluded from the Cypher SET clause.
+# any Plane 1 node table (except Decision, where workflow_id and source_event
+# are real columns) and must be excluded from the Cypher SET clause.
 _ATTR_METADATA_KEYS: frozenset[str] = frozenset({"workflow_id", "source_event"})
 
 
@@ -276,6 +282,10 @@ _REL_TABLES: tuple[tuple[str, str], ...] = (
     ("SUB_WORKFLOW_OF", "CREATE REL TABLE IF NOT EXISTS SUB_WORKFLOW_OF (FROM Workflow TO Workflow, spawned_at TIMESTAMP)"),
 )
 
+# Valid entity kinds extracted from _NODE_TABLES schema (defense-in-depth +
+# better error messages than opaque Kuzu parser exceptions).
+_VALID_KINDS = frozenset(name for name, _ in _NODE_TABLES)
+
 
 # ---------------------------------------------------------------------------
 # EntityGraph
@@ -295,6 +305,14 @@ class EntityGraph:
     All ``Connection.execute`` calls go through ``self._conn_lock`` — Kuzu
     0.6.1 connections are not documented as concurrent-safe, so we serialize
     access when the bus's projection-dispatch path calls from worker threads.
+
+    Atomicity contract: one ``EntityGraph`` instance per ``.kuzu`` file.
+    The ``_conn_lock`` serialises read-modify-write within a single instance,
+    but two instances pointing at the same file would race. Kuzu 0.6.1
+    enforces a single-writer file lock at the OS level, but tests that create
+    short-lived instances against the same path must call ``close()`` between
+    them (see
+    ``test_entity_graph_schema.test_reconstructing_on_same_path_is_idempotent``).
     """
 
     def __init__(self, db_path: str | os.PathLike[str]) -> None:
@@ -403,28 +421,47 @@ class EntityGraph:
         called — when wiring is None this is a pure write with no
         downstream side effects (lets unit tests construct a bare graph).
         """
-        with self._conn_lock:
-            existing_result = self.conn.execute(
-                f"MATCH (n:{entity.kind}) WHERE n.id = $id "
-                "RETURN n.source_workflows AS sw",
-                {"id": entity.id},
+        # Validate entity kind against known schema.
+        if entity.kind not in _VALID_KINDS:
+            raise ValueError(
+                f"unknown entity kind: {entity.kind!r} "
+                f"(expected one of {sorted(_VALID_KINDS)})"
             )
-            existing_sw: list[str] = []
-            if existing_result.has_next():
-                row = existing_result.get_next()
-                if row[0] is not None:
-                    existing_sw = list(row[0])
 
-            merged_sw = list(existing_sw)
-            for sw in entity.source_workflows:
-                if sw not in merged_sw:
-                    merged_sw.append(sw)
+        with self._conn_lock:
+            # Only attempt to read/merge source_workflows for kinds that have it.
+            has_source_workflows = entity.kind in {
+                "Person", "Organisation", "Asset", "Money"
+            }
 
             params: dict[str, Any] = {
                 "id": entity.id,
-                "sw": merged_sw,
             }
-            set_clauses = ["n.source_workflows = $sw"]
+            set_clauses: list[str] = []
+
+            if has_source_workflows:
+                existing_result = self.conn.execute(
+                    f"MATCH (n:{entity.kind}) WHERE n.id = $id "
+                    "RETURN n.source_workflows AS sw",
+                    {"id": entity.id},
+                )
+                existing_sw: list[str] = []
+                if existing_result.has_next():
+                    row = existing_result.get_next()
+                    if row[0] is not None:
+                        existing_sw = list(row[0])
+
+                merged_sw = list(existing_sw)
+                # O(n*m) — both n (existing) and m (incoming) stay small (<~50 workflows
+                # per entity at demo scale); upgrade to OrderedDict if a hot entity ever
+                # accumulates hundreds of source_workflows.
+                for sw in entity.source_workflows:
+                    if sw not in merged_sw:
+                        merged_sw.append(sw)
+
+                params["sw"] = merged_sw
+                set_clauses.append("n.source_workflows = $sw")
+
             # Kuzu 0.6.1 does NOT support the ``SET n += $map`` map-merge
             # form (parser rejects it). Bind each attr to its own
             # ``$attr_<i>`` placeholder and emit one ``n.<key> = $attr_<i>``
@@ -433,12 +470,20 @@ class EntityGraph:
             # / ``ends`` on the ``Period`` schema).
             #
             # ``workflow_id`` and ``source_event`` are projection-level
-            # metadata: callers stash them in ``attrs`` so the
+            # metadata for most kinds: callers stash them in ``attrs`` so the
             # ``entity.upserted`` FleetEvent + audit entry can carry the
-            # provenance, but neither is a column on any Plane 1 node
-            # table — skip them when building the SET clause.
+            # provenance, but for Decision nodes they are real columns and
+            # must be written through.
             for idx, (key, value) in enumerate(entity.attrs.items()):
-                if key in _ATTR_METADATA_KEYS:
+                # Validate attr key is a valid identifier.
+                if not _VALID_ATTR_KEY.match(key):
+                    raise ValueError(
+                        f"invalid attr key: {key!r} "
+                        f"(must match {_VALID_ATTR_KEY.pattern})"
+                    )
+                # Skip metadata-only keys, unless this is a Decision entity
+                # where they are real columns.
+                if entity.kind != "Decision" and key in _ATTR_METADATA_KEYS:
                     continue
                 placeholder = f"attr_{idx}"
                 params[placeholder] = value
@@ -453,8 +498,6 @@ class EntityGraph:
         # Side-effects outside the conn lock: the bus / audit have their
         # own locks and we don't want to invert the lock order.
         if self.bus is not None:
-            from api.shared.events import FleetEvent
-
             self.bus.emit(
                 FleetEvent(
                     type="entity.upserted",

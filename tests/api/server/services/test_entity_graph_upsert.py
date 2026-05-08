@@ -201,3 +201,61 @@ def test_upsert_with_empty_attrs_and_no_source_workflows(graph: EntityGraph) -> 
     node = _read_person(graph, "PERSON-EMP-0099")
     assert node["id"] == "PERSON-EMP-0099"
     assert list(node["source_workflows"]) == []
+
+
+def test_upsert_decision_writes_workflow_id_and_source_event(tmp_path: Path) -> None:
+    """workflow_id and source_event are REAL columns on Decision; they must
+    be written through, NOT swallowed by _ATTR_METADATA_KEYS. Locks the
+    fix for the critical issue raised in code review of e63823b6."""
+    g = EntityGraph(tmp_path / "g.kuzu")
+    g.upsert(
+        EntityWrite(
+            kind="Decision",
+            id="DEC-01HZQK1",
+            attrs={
+                "workflow_id": "WF-1",
+                "phase": "approve",
+                "persona_role": "cfo",
+                "verdict": "approved",
+                "reason": "within budget",
+                "source_event": "workflow.hitl.resolved",
+            },
+            source_workflows=("WF-1",),
+        )
+    )
+    row = g.query_one(
+        "MATCH (d:Decision) WHERE d.id = $id RETURN d.workflow_id AS wf, d.source_event AS se",
+        {"id": "DEC-01HZQK1"},
+    )
+    assert row is not None
+    assert row["wf"] == "WF-1", "workflow_id was swallowed by metadata filter"
+    assert row["se"] == "workflow.hitl.resolved", "source_event was swallowed"
+    g.close()
+
+
+def test_upsert_unknown_kind_raises_valueerror(tmp_path: Path) -> None:
+    g = EntityGraph(tmp_path / "g.kuzu")
+    with pytest.raises(ValueError, match="unknown entity kind"):
+        g.upsert(
+            EntityWrite(
+                kind="Spaceship",  # not in schema
+                id="SHIP-1",
+                attrs={"name": "Enterprise"},
+                source_workflows=(),
+            )
+        )
+    g.close()
+
+
+def test_upsert_invalid_attr_key_raises_valueerror(tmp_path: Path) -> None:
+    g = EntityGraph(tmp_path / "g.kuzu")
+    with pytest.raises(ValueError, match="invalid attr key"):
+        g.upsert(
+            EntityWrite(
+                kind="Person",
+                id="EMP-X",
+                attrs={"name; DROP TABLE Person": "bad"},
+                source_workflows=(),
+            )
+        )
+    g.close()
