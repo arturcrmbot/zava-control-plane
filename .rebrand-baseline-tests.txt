@@ -1,0 +1,55 @@
+uv run pytest -q
+........................................................................ [  9%]
+........................................................................ [ 19%]
+........................sssssssssssssssss............................... [ 29%]
+........................................................................ [ 38%]
+.F.ss......................................................s............ [ 48%]
+........................................................................ [ 58%]
+........................................................................ [ 67%]
+................................................................ssssssss [ 77%]
+........................................................................ [ 87%]
+........................................................................ [ 96%]
+........................                                                 [100%]
+=================================== FAILURES ===================================
+_________________ test_verify_route_reflects_real_chain_state __________________
+
+client = <starlette.testclient.TestClient object at 0x12297db10>
+
+    def test_verify_route_reflects_real_chain_state(client) -> None:
+        """Logging via the AppState audit logger should be visible to the
+        route on the same process. Uses a unique workflow id so the test
+        is order-independent."""
+        from api.server.state import app_state
+    
+        wid = f"WF-ROUTE-{threading.get_ident()}"
+        for i in range(4):
+            app_state.audit.log("act", {"workflow_id": wid, "i": i})
+    
+        r = client.get(f"/api/governance/verify/{wid}")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["workflow_id"] == wid
+        assert body["chain_intact"] is True
+>       assert body["total_entries"] == 4
+E       assert 0 == 4
+
+tests/api/server/services/test_audit_chain.py:172: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  api.server.services.audit_logger:audit_logger.py:328 audit_logger: append-blob client for WF-ROUTE-8382306496 failed: Operation returned an invalid status 'This request is not authorized to perform this operation.'
+ErrorCode:AuthorizationFailure
+WARNING  api.server.services.audit_logger:audit_logger.py:328 audit_logger: append-blob client for WF-ROUTE-8382306496 failed: Operation returned an invalid status 'This request is not authorized to perform this operation.'
+ErrorCode:AuthorizationFailure
+WARNING  api.server.services.audit_logger:audit_logger.py:328 audit_logger: append-blob client for WF-ROUTE-8382306496 failed: Operation returned an invalid status 'This request is not authorized to perform this operation.'
+ErrorCode:AuthorizationFailure
+WARNING  api.server.services.audit_logger:audit_logger.py:328 audit_logger: append-blob client for WF-ROUTE-8382306496 failed: Operation returned an invalid status 'This request is not authorized to perform this operation.'
+ErrorCode:AuthorizationFailure
+=============================== warnings summary ===============================
+.venv/lib/python3.11/site-packages/pydantic/_internal/_generate_schema.py:325
+  /Users/arturzielinski/dev/github-repos/wpp-control-plane-poc1/.venv/lib/python3.11/site-packages/pydantic/_internal/_generate_schema.py:325: PydanticDeprecatedSince20: `json_encoders` is deprecated. See https://docs.pydantic.dev/2.13/concepts/serialization/#custom-serializers for alternatives. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/api/server/services/test_audit_chain.py::test_verify_route_reflects_real_chain_state
+1 failed, 715 passed, 28 skipped, 5 deselected, 1 warning in 96.74s (0:01:36)
+make: *** [test] Error 1
