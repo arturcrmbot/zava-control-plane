@@ -4,8 +4,8 @@
 > **Date:** 2026-04-27
 > **Status:** Design — awaiting implementation plan
 > **Source brief:** [docs/poc1-brief.md](../../poc1-brief.md)
-> **Submitted PRD:** [docs/poc1-prd-submitted.md](../../poc1-prd-submitted.md)
-> **Inventory of current code:** [docs/poc1-inventory.md](../../poc1-inventory.md)
+> **Submitted PRD:** [docs/archive/poc1-prd-submitted.md](../../archive/poc1-prd-submitted.md)
+> **Inventory of current code:** [docs/archive/poc1-inventory.md](../../archive/poc1-inventory.md)
 
 ---
 
@@ -69,7 +69,7 @@ Escalate is **not** a per-claim phase. It is cross-workflow state: `escalation_a
 
 ## 5. Components
 
-Working from [poc1-inventory.md](../../poc1-inventory.md) grading. The platform layer (≈50 files) is untouched. Domain layer is the work.
+Working from [archive/poc1-inventory.md](../../archive/poc1-inventory.md) grading. The platform layer (≈50 files) is untouched. Domain layer is the work.
 
 ### 5.1 Delete
 

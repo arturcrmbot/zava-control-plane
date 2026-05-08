@@ -20,7 +20,7 @@ GET /api/blueprint/composition
 ```
 
 That endpoint (`api/server/routes/blueprint.py`) returns a JSON tree
-built by [`api/server/services/blueprint_inventory.py`](../../api/server/services/blueprint_inventory.py).
+built by [`api/server/services/blueprint_inventory.py`](../api/server/services/blueprint_inventory.py).
 The tree is rebuilt at request time by:
 
 1. Walking `api/server/skills/*/SKILL.md` for every skill on disk.
@@ -107,7 +107,7 @@ That's it. The page reads the SKILL.md frontmatter every request.
 This is the only place the contract genuinely matters.
 
 Edit the `DOMAINS` list in
-[`api/server/services/blueprint_inventory.py`](../../api/server/services/blueprint_inventory.py).
+[`api/server/services/blueprint_inventory.py`](../api/server/services/blueprint_inventory.py).
 Each entry is a single dict with this shape:
 
 ```python
@@ -218,7 +218,7 @@ in-flight copies don't collide.
 
 What gets captured: only the events the observatory cares about (the
 `RECORDED_TYPES` set in
-[`api/server/services/blueprint_recorder.py`](../../api/server/services/blueprint_recorder.py)),
+[`api/server/services/blueprint_recorder.py`](../api/server/services/blueprint_recorder.py)),
 and only events that carry a `workflow_id`. Everything else is dropped at
 capture time so you don't accumulate noise.
 
@@ -236,7 +236,7 @@ check whether a session is currently running.
 
 If there are no recordings for a domain yet, the trickle falls back to
 hand-coded templates in `_STREAM_TEMPLATES` in
-[`api/server/routes/blueprint.py`](../../api/server/routes/blueprint.py).
+[`api/server/routes/blueprint.py`](../api/server/routes/blueprint.py).
 These are the events the page emitted before the recorder existed; they
 cover hiring, expense-claim, and onboarding.
 
@@ -392,12 +392,12 @@ container app name + env, not the image).
 ### What runs in the deployed container
 
 - The lean FastAPI entry point at
-  [`api/server/blueprint_app.py`](../../api/server/blueprint_app.py).
+  [`api/server/blueprint_app.py`](../api/server/blueprint_app.py).
   Only the blueprint route + recorder + static mount. Does NOT import
   the fleet manager, GHCP SDK, MAF, or any of the heavy domain code —
   the deployed image stays small and fast to start.
 - The built React bundle from `web/blueprint/dist/`, served by FastAPI
-  at `/` via [`api/server/static_blueprint.py`](../../api/server/static_blueprint.py).
+  at `/` via [`api/server/static_blueprint.py`](../api/server/static_blueprint.py).
 - The always-on demo trickle, started automatically because the
   container's env carries `BLUEPRINT_AUTOSTART_STREAM=1`. The page is
   alive the moment the container is up, no need to click anything.
@@ -531,14 +531,14 @@ docs — adds a CNAME and a managed cert. No redeploy needed.
 
 ## Reference
 
-- **Spec**: [`docs/superpowers/specs/2026-05-03-blueprint-microsite-design.md`](../superpowers/specs/2026-05-03-blueprint-microsite-design.md)
-- **Inventory module**: [`api/server/services/blueprint_inventory.py`](../../api/server/services/blueprint_inventory.py)
-- **Recorder module**: [`api/server/services/blueprint_recorder.py`](../../api/server/services/blueprint_recorder.py)
-- **Routes**: [`api/server/routes/blueprint.py`](../../api/server/routes/blueprint.py)
-- **Lean entry point**: [`api/server/blueprint_app.py`](../../api/server/blueprint_app.py)
-- **Static mount**: [`api/server/static_blueprint.py`](../../api/server/static_blueprint.py)
-- **Recordings**: [`data/blueprint-recordings/README.md`](../../data/blueprint-recordings/README.md)
-- **Frontend types**: [`web/blueprint/src/lib/types.ts`](../../web/blueprint/src/lib/types.ts)
-- **Dockerfile**: [`web/blueprint/Dockerfile`](../../web/blueprint/Dockerfile)
-- **Deploy script**: [`scripts/deploy-blueprint.sh`](../../scripts/deploy-blueprint.sh)
+- **Spec**: [`docs/superpowers/specs/2026-05-03-blueprint-microsite-design.md`](superpowers/specs/2026-05-03-blueprint-microsite-design.md)
+- **Inventory module**: [`api/server/services/blueprint_inventory.py`](../api/server/services/blueprint_inventory.py)
+- **Recorder module**: [`api/server/services/blueprint_recorder.py`](../api/server/services/blueprint_recorder.py)
+- **Routes**: [`api/server/routes/blueprint.py`](../api/server/routes/blueprint.py)
+- **Lean entry point**: [`api/server/blueprint_app.py`](../api/server/blueprint_app.py)
+- **Static mount**: [`api/server/static_blueprint.py`](../api/server/static_blueprint.py)
+- **Recordings**: [`data/blueprint-recordings/README.md`](../data/blueprint-recordings/README.md)
+- **Frontend types**: [`web/blueprint/src/lib/types.ts`](../web/blueprint/src/lib/types.ts)
+- **Dockerfile**: [`web/blueprint/Dockerfile`](../web/blueprint/Dockerfile)
+- **Deploy script**: [`scripts/deploy-blueprint.sh`](../scripts/deploy-blueprint.sh)
 

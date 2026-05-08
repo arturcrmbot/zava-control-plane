@@ -282,8 +282,8 @@ simulator inject → Durable phase → validator blocks → EventBus
 | POC1 acceptance criteria + remaining work | [poc1-status.md](poc1-status.md) |
 | POC2 capability matrix + status | [poc2-status.md](poc2-status.md) |
 | Code-anchored architecture reference | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| How to run POC1 | [DEMO.md](DEMO.md) |
-| How to run POC2 | [poc2-DEMO.md](poc2-DEMO.md) (full) · [poc2-quick-demo.md](poc2-quick-demo.md) (5–8 min) |
+| How to run POC1 | Root [README.md](../README.md) Quickstart (`make up`) |
+| How to run POC2 | [poc2-quick-demo.md](poc2-quick-demo.md) (5–8 min walkthrough) |
 | Make a new domain show up on the blueprint page | [blueprint-microsite-contributor-guide.md](blueprint-microsite-contributor-guide.md) |
 | Compose a new domain end-to-end | [superpowers/skills/compose-domain/SKILL.md](superpowers/skills/compose-domain/SKILL.md) |
 | Local dev setup | [DEVELOPMENT.md](DEVELOPMENT.md) |

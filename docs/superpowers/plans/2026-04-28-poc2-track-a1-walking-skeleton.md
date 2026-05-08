@@ -12,7 +12,7 @@
 
 - POC2 design spec: [docs/superpowers/specs/2026-04-28-poc2-talent-lifecycle-design.md](../specs/2026-04-28-poc2-talent-lifecycle-design.md) (`§4.1` orchestrator phases; `§5.3` new components; `§9.1` track plan)
 - POC2 status doc: [docs/poc2-status.md](../../poc2-status.md) (architecture diagrams, capability matrix)
-- POC1 inventory (the reuse boundary): [docs/poc1-inventory.md](../../poc1-inventory.md)
+- POC1 inventory (the reuse boundary): [docs/archive/poc1-inventory.md](../../archive/poc1-inventory.md)
 - POC1 patterns to follow:
   - Wrapper: [api/functions/graphs/executors/agents/_wrapper.py](../../../api/functions/graphs/executors/agents/_wrapper.py)
   - Agent executor template: [api/functions/graphs/executors/agents/agent_escalation.py](../../../api/functions/graphs/executors/agents/agent_escalation.py)

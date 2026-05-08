@@ -4,9 +4,9 @@
 > framed around invoice procure-to-pay. POC1 was subsequently re-scoped to
 > **expense compliance** (the brief that followed). Kept as audit artefact.
 >
-> **Canonical current truth:** [poc1-brief.md](poc1-brief.md) (the addendum
-> that drove the pivot) and [poc1-status.md](poc1-status.md) (build state).
-> Pivot rationale: [superpowers/specs/2026-04-27-poc1-expense-compliance-pivot-design.md](superpowers/specs/2026-04-27-poc1-expense-compliance-pivot-design.md).
+> **Canonical current truth:** [poc1-brief.md](../poc1-brief.md) (the addendum
+> that drove the pivot) and [poc1-status.md](../poc1-status.md) (build state).
+> Pivot rationale: [superpowers/specs/2026-04-27-poc1-expense-compliance-pivot-design.md](../superpowers/specs/2026-04-27-poc1-expense-compliance-pivot-design.md).
 
 **Owner:** Microsoft (delivery); Zava AI CoE (acceptance)
 **Status:** Submitted to Zava (superseded by expense-compliance pivot)

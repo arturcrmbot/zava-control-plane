@@ -19,7 +19,7 @@ Handover doc for the technical team. Three sections: where we are against the br
 | 7 | Autonomous learning | ✅ | Phase 5 HITL justification round-trip + FM `fleet.tick` behaviour-change loop. [fleet-manager/SKILL.md](../api/server/skills/fleet-manager/SKILL.md), [query_reviewer_decisions.py](../api/server/mcp_tools/query_reviewer_decisions.py) |
 | 8 | SSC Reviewer interface | ✅ | [arbitration/SKILL.md](../api/server/skills/arbitration/SKILL.md), [arbitrate.py](../api/functions/graphs/arbitrate.py), [ReviewerQueue.tsx](../web/client/routes/ReviewerQueue.tsx) |
 | 9 | Multi-EMS Control Plane | ✅ | [concur-mcp/](../mocks/concur-mcp/), [maconomy-mcp/](../mocks/maconomy-mcp/), [claim_lookup.py](../api/server/mcp_tools/claim_lookup.py) |
-| 10 | EMS extensibility narration | ✅ | Maconomy rebound to expense surface + 2-file diff property. [demo-ems-extensibility.md](demo-ems-extensibility.md) |
+| 10 | EMS extensibility narration | ✅ | Maconomy rebound to expense surface + 2-file diff property. |
 | 11 | Region failure recovery | ✅ | [simulator_orchestrator.py::simulate_region_failure](../api/server/services/simulator_orchestrator.py); `/api/simulator/region-failure` route. |
 | 12 | Immutable audit + reporting | ✅ + real | [audit-summariser/SKILL.md](../api/server/skills/audit-summariser/SKILL.md), [audit.py](../api/functions/graphs/audit.py), [audit_query.py](../api/server/mcp_tools/audit_query.py). **2026-05-05:** rewrote [audit_logger.py](../api/server/services/audit_logger.py) to dual-write every entry to an Azure Storage append blob (`apexdemo62525/audit-ledger/<workflow_id>.jsonl`) with version-level immutability enabled. The blob URL surfaces on the workflow detail response (`auditBlobUrl`). The bid claim is now literal, not narrated. See [`plan/feature-foundry-credibility-friday-1.md`](../plan/feature-foundry-credibility-friday-1.md) Phase 4. |
 | 13 | Cost-per-task report | ✅ + real | [query_economics.py](../api/server/mcp_tools/query_economics.py) + FM `report.cost_per_task` skill section. **2026-05-05:** [`economics.py`](../api/server/services/economics.py) rewritten to derive cost from real `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` span attributes × published Azure per-million-token rates ([`model_pricing.py`](../api/server/services/model_pricing.py), `gpt-4.1` $2/$8, `gpt-4.1-mini` $0.40/$1.60, sourced 2026-05-05). The two synthetic constants `MODEL_CALL_RATE` and `COMPUTE_RATE_PER_SECOND` deleted. Numbers on screen are now Microsoft's numbers. |
@@ -129,7 +129,7 @@ to first-class FM parity per
 work. Three concrete items:
 
 1. **One clean end-to-end stack boot through to onboarding-video render.** All avatar-render fixes are committed (V1/V2 prompt rules; custom-subdomain endpoint; per-role character/style; mp4-download auth). Just needs a stable Functions-host startup to confirm `onboarding_video_url` lands on workflow metadata. Use [`scripts/run-func.bat`](../scripts/run-func.bat) for the env-pinned boot.
-2. **30-min demo dry run** — walk all 22 POC2 capability beats per [poc2-DEMO.md](poc2-DEMO.md). Walk all 13 POC1 ACs per [DEMO.md](DEMO.md). Capture bugs as we go.
+2. **30-min demo dry run** — walk all 22 POC2 capability beats and all 13 POC1 ACs. Capture bugs as we go.
 3. **Demo recording + screenshots** — final artefact for evaluator review or live-demo support. Record `docs/demo-failover.mp4` as the AC #11 backup.
 
 ### Reserved for engagement POC (not lab work)
@@ -164,10 +164,9 @@ work. Three concrete items:
 | Brief verbatim | [poc1-brief.md](poc1-brief.md) |
 | Pivot design spec | [superpowers/specs/2026-04-27-...-design.md](superpowers/specs/2026-04-27-poc1-expense-compliance-pivot-design.md) |
 | Accuracy run-book | [poc1-accuracy-runbook.md](poc1-accuracy-runbook.md) |
-| First baseline (64.3%) | [poc1-accuracy-baseline.json](poc1-accuracy-baseline.json) |
 | GHCP SDK skill conventions (global) | `~/.claude/skills/ghcp-sdk-python/SKILL.md` |
 | Local dev | [DEVELOPMENT.md](DEVELOPMENT.md) |
-| Demo script | [DEMO.md](DEMO.md) |
+| Demo runbook | Root [README.md](../README.md) Quickstart + [poc2-quick-demo.md](poc2-quick-demo.md) for the POC2 walkthrough |
 
 **Current tag target:** `v0.8-poc1-platform-complete` (POC1 lab-build feature complete; remaining work is one operational dry run + demo recording). The substrate now hosts eight domains — see [SCOPE-DELTA.md](SCOPE-DELTA.md) for what's reused vs swapped at engagement-POC time, and [`plan/feature-fleet-domain-substrate-1.md`](../plan/feature-fleet-domain-substrate-1.md) for the substrate-parity work that landed. AC #4 corpus-wide gate is engagement-POC scope (real Zava data).
 

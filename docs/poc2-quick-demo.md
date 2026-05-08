@@ -2,7 +2,7 @@
 
 End-to-end walkthrough of the **recruiter HITL hiring flow**. Apply → triage → screening call → recruiter invite → candidate books → recruiter post-interview decision → candidate accepts offer. ~5–8 minutes once you know it.
 
-> Full 30-min runbook lives in [poc2-DEMO.md](poc2-DEMO.md). This file is the **short version** — what to click, in what order, to prove the stack works.
+This file is the **short version** — what to click, in what order, to prove the stack works.
 
 The hiring orchestrator runs 10 phases. **Phase 7 (Interview)** is the new bit — three sequential HITL waits:
 

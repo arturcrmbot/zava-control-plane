@@ -206,7 +206,7 @@ POC2 in the lab landed on `main` 2026-04-30 — the spine merge brought the 10-p
 **Outstanding lab-build polish before `v1.0-poc2-frontier` tag (priority order):**
 
 1. **One clean end-to-end stack boot through to onboarding-video render.** Avatar fixes are committed (V1/V2 in rag-classifier prompt; custom-subdomain endpoint; per-role character/style; mp4-download auth). Just needs a stable Functions-host startup to confirm `onboarding_video_url` lands on workflow metadata. **Operational, not feature work.** Use `scripts/run-func.bat` for the env-pinned boot.
-2. **30-min demo dry run** with someone playing the Zava evaluator — walk all 22 capability beats per [poc2-DEMO.md](poc2-DEMO.md). Bug fixes captured as we go.
+2. **30-min demo dry run** with someone playing the Zava evaluator — walk all 22 capability beats per [poc2-quick-demo.md](poc2-quick-demo.md). Bug fixes captured as we go.
 3. **Demo recording + screenshots** — final artefact for evaluator review (or live demo prep).
 
 **Punted to engagement POC** (these were always engagement-POC scope per master spec; not lab-build blockers):
@@ -233,7 +233,7 @@ The bid response sections (§10.1, §11, §B.4, §B.5) describe **the engagement
 
 When recording / demoing for Zava evaluation:
 
-- **If we record from the lab build**, frame it as *"the architecture proven on a laptop; same code runs on Azure; here's the swap-in seam"*. Honest, derisks the technical claim, but is not the engagement POC. The current vendor-day flow is the 4-act, 40-minute structure in [DEMO.md](DEMO.md).
+- **If we record from the lab build**, frame it as *"the architecture proven on a laptop; same code runs on Azure; here's the swap-in seam"*. Honest, derisks the technical claim, but is not the engagement POC. The current vendor-day flow is the 4-act, 40-minute structure boot via `make up` (see the root [README.md](../README.md) Quickstart).
 - **If we record from the engagement POC**, that lands after kickoff with Zava's data and sandbox credentials. Higher fidelity but on the engagement timeline.
 
 Both are valid; pick consciously.

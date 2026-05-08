@@ -1,6 +1,6 @@
 # POC2 Talent Lifecycle — Status & Plan
 
-Sister doc to [poc1-status.md](poc1-status.md) — same shape, applied to POC2 (HR Talent Lifecycle, 12-week sprint, the "Frontier POC"). The thesis is **reuse the POC1 platform; swap the domain.** Per [poc1-inventory.md](poc1-inventory.md) ≈ 75% of POC1 source artifacts are domain-agnostic platform; POC2 keeps that and replaces skills, MCP mocks, UI labels, and the per-phase graph set, then adds four genuinely new capabilities (voice, avatar, A2A, jurisdiction switching).
+Sister doc to [poc1-status.md](poc1-status.md) — same shape, applied to POC2 (HR Talent Lifecycle, 12-week sprint, the "Frontier POC"). The thesis is **reuse the POC1 platform; swap the domain.** Per [archive/poc1-inventory.md](archive/poc1-inventory.md) ≈ 75% of POC1 source artifacts are domain-agnostic platform; POC2 keeps that and replaces skills, MCP mocks, UI labels, and the per-phase graph set, then adds four genuinely new capabilities (voice, avatar, A2A, jurisdiction switching).
 
 **Status snapshot (2026-04-30):** the POC2 spine merged into `main` 2026-04-30 — 10-phase `HiringOrchestrator`, all ten phase graphs, ten hiring skills, seven MCP mocks (4201–4207), 50-CV synthetic corpus across 5 roles × 2 jurisdictions, and Tracks B (multi-surface), D (jurisdiction), E (frontier) and F (reuse) at first-runnable.
 
@@ -51,7 +51,7 @@ Visible state from the demo-ready streams:
 - **Foundry-backed AC #4 pipeline** — `preclassify_corpus.py` + `/api/accuracy/run` against Foundry `evaluate()`; full corpus run pending env-var-driven exec
 - **Per-domain phase ribbon** — `web/client/components/apex/PhaseRibbon.tsx` reads the registered phase tuple from `api.shared.domains` so hiring workflows render the 10-phase shape and fleet-* workflows render their own (3–5 phases) without hard-coded literals
 
-POC2 demo runbook lives in [poc2-DEMO.md](poc2-DEMO.md).
+POC2 demo runbook lives in [poc2-quick-demo.md](poc2-quick-demo.md).
 
 Three sections: capability map against the 22 demos, architecture (with the local-vs-cloud split + what's reused from POC1), and the build plan.
 
@@ -61,7 +61,7 @@ Three sections: capability map against the 22 demos, architecture (with the loca
 
 22 demos required from [spec.md](../spec.md) §4.1–4.22. Updated 2026-04-30 to reflect what's actually wired in `main` after the spine merge. Status legend:
 
-- ✅ — wired in `main` and demoable against the local stack (per [poc2-DEMO.md](poc2-DEMO.md)).
+- ✅ — wired in `main` and demoable against the local stack (per [poc2-quick-demo.md](poc2-quick-demo.md)).
 - 🟡 — code path exists; needs polish, fixtures, or end-to-end verification before it lights up cleanly.
 - ❌ — net-new and not yet implemented.
 
@@ -95,7 +95,7 @@ Three sections: capability map against the 22 demos, architecture (with the loca
 
 ## 2. Architecture
 
-Same dev-box-plus-cloud split as POC1. Cloud-target architecture (APIM AI Gateway, Foundry Hosted Agents, Cosmos partitions, ACS, HeyGen) is in [poc2-architecture.svg](poc2-architecture.svg); the demo runs locally with mocks.
+Same dev-box-plus-cloud split as POC1. Cloud-target architecture (APIM AI Gateway, Foundry Hosted Agents, Cosmos partitions, ACS, HeyGen) is narrated in the prose below; the demo runs locally with mocks.
 
 ```mermaid
 flowchart TB
@@ -278,7 +278,7 @@ These need no new code; just demo scripts and rebound labels.
 
 | Element | Notes |
 |---|---|
-| `docs/poc2-DEMO.md` | 30-minute walkthrough script across all 22 capabilities; identifies which are live vs narrated. |
+| `docs/poc2-quick-demo.md` | 5–8 min walkthrough script identifying which capabilities are live vs narrated. |
 | 30-minute end-to-end dry run | Walk all 22 demos with someone playing the Zava evaluator. Bug fixes. |
 | `v1.0-poc2-frontier` tag | Final recording. |
 
@@ -290,8 +290,7 @@ These need no new code; just demo scripts and rebound labels.
 |---|---|
 | POC2 brief (verbatim) | TBD — equivalent of [poc1-brief.md](poc1-brief.md), pending the Zava HR addendum doc |
 | Capability spec | [spec.md](../spec.md) §4.1–4.22 |
-| Architecture (cloud target) | [poc2-architecture.svg](poc2-architecture.svg) |
-| POC1 inventory (what reuses) | [poc1-inventory.md](poc1-inventory.md) |
+| POC1 inventory (what reuses) | [archive/poc1-inventory.md](archive/poc1-inventory.md) |
 | POC1 status (model for this doc) | [poc1-status.md](poc1-status.md) |
 | GHCP SDK skill conventions (global) | `~/.claude/skills/ghcp-sdk-python/SKILL.md` |
 | Local dev | [DEVELOPMENT.md](DEVELOPMENT.md) |
@@ -305,7 +304,7 @@ These need no new code; just demo scripts and rebound labels.
 Tracks A through F all landed. Lab-build is feature complete on every demo-ready stream. Remaining work is **operational** — three concrete items:
 
 1. **One clean end-to-end stack boot through to onboarding-video render.** All avatar fixes are committed (V1/V2 prompt rules, custom-subdomain Azure Speech endpoint, per-role character/style tuple, mp4-download-without-bearer-token). Just needs a stable Functions-host startup to confirm `onboarding_video_url` lands on workflow metadata. Use [`scripts/run-func.bat`](../scripts/run-func.bat) for the env-pinned boot.
-2. **30-min demo dry run** against [poc2-DEMO.md](poc2-DEMO.md) — walk all 22 capability beats with someone playing the Zava evaluator. Capture and fix anything that flakes.
+2. **30-min demo dry run** against [poc2-quick-demo.md](poc2-quick-demo.md) — walk the capability beats with someone playing the Zava evaluator. Capture and fix anything that flakes.
 3. **Final recording + screenshots** + tag `v1.0-poc2-frontier`.
 
 ### Reserved for the engagement POC (intentionally not lab work)

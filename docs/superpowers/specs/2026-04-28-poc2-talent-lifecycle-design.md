@@ -1,12 +1,12 @@
 # POC2 Talent Lifecycle — Design Spec
 
-> **Topic:** Build the Zava POC2 HR Talent Lifecycle "Frontier" demo end-to-end against the 22 capabilities in spec §4.1–4.22 — reusing the POC1 expense-compliance platform (~75% of code per [poc1-inventory.md](../../poc1-inventory.md)) and adding the genuinely new frontier capabilities (voice, avatar, A2A, jurisdiction switching, Threadlight, AG-UI).
+> **Topic:** Build the Zava POC2 HR Talent Lifecycle "Frontier" demo end-to-end against the 22 capabilities in spec §4.1–4.22 — reusing the POC1 expense-compliance platform (~75% of code per [archive/poc1-inventory.md](../../archive/poc1-inventory.md)) and adding the genuinely new frontier capabilities (voice, avatar, A2A, jurisdiction switching, Threadlight, AG-UI).
 > **Date:** 2026-04-28
 > **Status:** Design — Track A.1 plan ready; Tracks A.2–A.10 + B–F to be planned in sequence
 > **Source status doc:** [docs/poc2-status.md](../../poc2-status.md)
 > **Architecture diagram (cloud target):** [docs/poc2-architecture.svg](../../poc2-architecture.svg)
 > **Capability spec:** `spec.md` §4.1–4.22 (parent doc; not in this repo)
-> **POC1 reuse inventory:** [docs/poc1-inventory.md](../../poc1-inventory.md)
+> **POC1 reuse inventory:** [docs/archive/poc1-inventory.md](../../archive/poc1-inventory.md)
 
 ---
 

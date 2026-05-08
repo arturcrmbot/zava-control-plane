@@ -208,8 +208,9 @@ Manager + simulator state (not persisted).
 - **OTEL spans** — set `APPLICATIONINSIGHTS_CONNECTION_STRING` in
   `.env` and spans export to Foundry Tracing (App Insights). Leave
   unset locally to keep `init_otel` a no-op.
-- **Inject to trigger flow** — `POST /api/simulator/inject` (see
-  [DEMO.md](DEMO.md)).
+- **Inject to trigger flow** — `POST /api/simulator/inject` (the
+  simulator's domain-aware ramp loop also trickles workflows in
+  automatically when the substrate is up).
 
 ## Common issues
 

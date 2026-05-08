@@ -115,7 +115,7 @@ Strip every appearance of the literal token `WPP` (and `wpp` lowercase) from the
 | TASK-020 | Bulk JSON substitution under `data/portal` and `data/synthetic`: same sed expressions as TASK-019 plus `-name '*.json'` glob. Manually grep for any remaining `WPP` after sed: `rg -i '\bwpp\b' data/portal data/synthetic --type json`. | ✅ | 2026-05-08 |
 | TASK-021 | Update [api/shared/policies.yaml](api/shared/policies.yaml) and any other `*.yaml` under `api/`: `find api -name '*.yaml' -o -name '*.yml' \| xargs sed -i '' -e 's/WPP/Zava/g'`. | ✅ | 2026-05-08 |
 | TASK-022 | Delete + regenerate SQLite stores: `rm data/.eval/store.sqlite data/portal/magic_links.sqlite`. Confirm the seed paths recreate them on next server start (or run the dedicated seed script if one exists — check [scripts/](scripts/) for `seed_*.py`). Document the regeneration command in `.rebrand-baseline.md`. | ✅ | 2026-05-08 |
-| TASK-023 | Inventory remaining binary `WPP` matches: `rg -l '\bWPP\b' data/portal/welcome-videos data/synthetic/receipts --binary`. For each match, append a `KNOWN-ISSUE-WPP-PIXEL-LEAK` row to a new file `docs/rebrand-known-issues.md` listing the file path. **Do not regenerate** in this plan (CON-003). | ✅ | 2026-05-08 |
+| TASK-023 | Inventory remaining binary `WPP` matches: `rg -l '\bWPP\b' data/portal/welcome-videos data/synthetic/receipts --binary`. For each match, append a `KNOWN-ISSUE-WPP-PIXEL-LEAK` row to a new file `docs/archive/rebrand-known-issues.md` listing the file path. **Do not regenerate** in this plan (CON-003). | ✅ | 2026-05-08 |
 | TASK-024 | Re-run `rg -i '\bwpp\b' data/ --type json --type yaml --type yml --type-add 'jsonl:*.jsonl' --type jsonl`. Expected: zero text hits. | ✅ | 2026-05-08 |
 
 ### Implementation Phase 6 — OTEL telemetry namespace rename
@@ -200,7 +200,7 @@ This plan touches the following file groups. Total file count is approximate; ex
 - **FILE-009**: OTEL telemetry — 31 Python files listed in [api/server/mcp_tools/](api/server/mcp_tools/), [api/server/services/](api/server/services/), [api/server/routes/](api/server/routes/), [api/functions/graphs/](api/functions/graphs/). Bulk-substituted in TASK-026.
 - **FILE-010**: Scratch tools — [tools/scratch/smoke_image_gen.sh](tools/scratch/smoke_image_gen.sh) and every `*.py` under [tools/scratch/compose-domain/](tools/scratch/compose-domain/).
 - **FILE-011**: Deploy scripts — [scripts/deploy-blueprint.sh](scripts/deploy-blueprint.sh), [scripts/build-blueprint-image.sh](scripts/build-blueprint-image.sh), [scripts/generate_cv_pdfs.py](scripts/generate_cv_pdfs.py).
-- **FILE-012**: New tracking files created by this plan — `.rebrand-baseline.md`, `.rebrand-inventory.txt`, `.rebrand-otel-inventory.txt`, `.rebrand-inventory-after.txt`, `docs/rebrand-known-issues.md` (only if TASK-023 finds binary leaks).
+- **FILE-012**: New tracking files created by this plan — `.rebrand-baseline.md`, `.rebrand-inventory.txt`, `.rebrand-otel-inventory.txt`, `.rebrand-inventory-after.txt`, `docs/archive/rebrand-known-issues.md` (only if TASK-023 finds binary leaks).
 
 ## 6. Testing
 
@@ -214,7 +214,7 @@ This plan touches the following file groups. Total file count is approximate; ex
 
 ## 7. Risks & Assumptions
 
-- **RISK-001**: Stray `WPP` pixels in MP4 welcome videos or PNG receipts (CON-003). Mitigation: TASK-023 inventories the surface; if non-empty, log as `docs/rebrand-known-issues.md` and treat as known cosmetic issue. No data loss; can be remediated by a follow-up plan that re-runs `scripts/prewarm_avatar.py` and the receipt generators.
+- **RISK-001**: Stray `WPP` pixels in MP4 welcome videos or PNG receipts (CON-003). Mitigation: TASK-023 inventories the surface; if non-empty, log as `docs/archive/rebrand-known-issues.md` and treat as known cosmetic issue. No data loss; can be remediated by a follow-up plan that re-runs `scripts/prewarm_avatar.py` and the receipt generators.
 - **RISK-002**: Foundry tracing dashboards / saved queries keyed on `wpp.*` attributes break silently when the rebranded build emits `zava.*`. Mitigation: there are no documented saved Foundry queries at time of plan-write (verify by opening https://ai.azure.com → project `azureai_swedencentral_arzielinski` → Tracing tab → check Saved Queries before TASK-026). If any exist, recreate them after Phase 6.
 - **RISK-003**: Local virtualenv recreation (TASK-037) fails because `requirements.txt` has changed since last install or a wheel is missing. Mitigation: keep the old `.venv` directory aside (`mv .venv .venv.old`) until the new one passes `make test`, then delete `.venv.old`.
 - **RISK-004**: Azure deploy fails on first run in the new resource group due to a quota or naming-collision issue with the new ACR name. Mitigation: ACR name `blueprintacrzavademo` is 26 chars (within 5-50 limit) and lowercase alphanumeric. If collision occurs (unlikely — globally unique check), append `2` suffix and re-run.

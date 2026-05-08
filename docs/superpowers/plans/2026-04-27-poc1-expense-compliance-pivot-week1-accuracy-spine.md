@@ -10,7 +10,7 @@
 
 **Reference docs (read before starting):**
 - Spec: [docs/superpowers/specs/2026-04-27-poc1-expense-compliance-pivot-design.md](../specs/2026-04-27-poc1-expense-compliance-pivot-design.md)
-- Inventory grading: [docs/poc1-inventory.md](../../poc1-inventory.md) — defines what's R / A / D
+- Inventory grading: [docs/archive/poc1-inventory.md](../../archive/poc1-inventory.md) — defines what's R / A / D
 - Brief: [docs/poc1-brief.md](../../poc1-brief.md) — §4.5 (accuracy = 40%), §7 acceptance criteria
 
 **Out of scope for this plan (covered in later plans):**
@@ -56,7 +56,7 @@
 - `api/server/main.py` — register the `accuracy` router
 - `tests/api/unit/test_invoice_p2p_rejection.py` — delete or rename (invoice-only); decision in Task 2
 
-**Deleted (Day 1 cleanup — D-grade per [poc1-inventory.md](../../poc1-inventory.md)):**
+**Deleted (Day 1 cleanup — D-grade per [archive/poc1-inventory.md](../../archive/poc1-inventory.md)):**
 - `mocks/d365-mcp/`, `mocks/payment-mcp/`
 - `api/functions/graphs/validation.py`, `payment.py`, `reconciliation.py`
 - `api/functions/graphs/executors/deterministic/three_way_match.py`, `generate_payment_file.py`, `submit_payment.py`, `bank_statement_match.py`, `lookup_active_gls.py`, `lookup_cost_centre_policy.py`, `lookup_vendor_context.py`

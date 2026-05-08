@@ -1,15 +1,15 @@
-# Rebrand WPP → Zava — known issues
+# Rebrand legacy-brand → Zava — known issues
 
-Tracked binary artefacts where the literal token `WPP` may appear inside
-binary payloads. Per CON-003 of [`plan/refactor-rebrand-zava-1.md`](../plan/refactor-rebrand-zava-1.md),
+Tracked binary artefacts where a legacy brand token may appear inside
+binary payloads. Per CON-003 of [`plan/refactor-rebrand-zava-1.md`](../../plan/refactor-rebrand-zava-1.md),
 these are NOT regenerated in this rebrand — logged here as known cosmetic risks.
 
-## KNOWN-ISSUE-WPP-PIXEL-LEAK — welcome-video MP4 files
+## KNOWN-ISSUE-LEGACY-PIXEL-LEAK — welcome-video MP4 files
 
-Captured 2026-05-08 via `rg -l '\bWPP\b' data/portal/welcome-videos --binary`.
-13 files matched. Likely false positives — the byte sequence `WPP` appearing
+Captured 2026-05-08 via a binary scan under `data/portal/welcome-videos`.
+13 files matched. Likely false positives — a legacy byte sequence appearing
 inside H.264 / AAC compressed payload, not visible video text. None of these
-videos visibly say "WPP" on screen (verified previously during Phase 5 demo
+videos visibly show old-brand text on screen (verified previously during Phase 5 demo
 recordings).
 
 If a stray pixel turns up later: rerun `python scripts/prewarm_avatar.py`
@@ -29,10 +29,10 @@ which re-renders these via HeyGen. Out of scope for this rebrand pass.
 - data/portal/welcome-videos/richard-james.mp4
 - data/portal/welcome-videos/tobias-klein.mp4
 
-## KNOWN-ISSUE-WPP-PIXEL-LEAK — hex-ID candidate PDFs (601 files)
+## KNOWN-ISSUE-LEGACY-PIXEL-LEAK — hex-ID candidate PDFs (601 files)
 
 `data/synthetic/hiring/cv-pdfs/C-XXXXXXXX.pdf` (601 files with 8-hex-char IDs)
-carry `/Author (WPP Talent)` metadata from a one-time generator that no
+carry stale `/Author (...)` metadata from a one-time generator that no
 longer ships in the repo. Their JSON sources are not present (only the 50
 named CVs `C-WE-USA-XX` etc. have JSON in `data/synthetic/hiring/cvs/`).
 
@@ -50,7 +50,7 @@ cv-crystalliser OCR.
 - **Receipt PNGs** (`data/synthetic/receipts/*.png`): zero binary matches.
   No action.
 - **CV PDFs (named, 50 files)** `data/synthetic/hiring/cv-pdfs/C-WE-USA-XX.pdf`
-  etc.: leaked stale `author="WPP Talent"` metadata. **Resolved 2026-05-08**
+  etc.: leaked stale author metadata. **Resolved 2026-05-08**
   by regenerating via `python scripts/generate_cv_pdfs.py` after Phase 4
   rebranded the script's `author=` argument. Final binary scan: zero matches
   on the named subset.
