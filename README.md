@@ -1,4 +1,4 @@
-# WPP Control Plane — Apex Substrate
+# Zava Control Plane — Apex Substrate
 
 [![OWASP Agentic AI Top 10 — 10/10 covered](https://img.shields.io/badge/OWASP%20Agentic%20Top%2010-10%2F10%20covered-brightgreen)](plan/feature-agent-governance-toolkit-1.md)
 

@@ -136,7 +136,7 @@ async def lifespan(app: FastAPI):
         await lifespan_shutdown(app)
 
 
-app = FastAPI(title="WPP Control Plane (Python POC1)", lifespan=lifespan)
+app = FastAPI(title="Zava Control Plane (Python POC1)", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], allow_credentials=True,
