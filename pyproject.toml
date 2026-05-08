@@ -46,6 +46,12 @@ dependencies = [
   # AGT is in Public Preview; breaking changes possible before GA so we
   # bump deliberately, narrowly, and through one file.
   "agent-governance-toolkit[full]>=3.4,<3.5",
+  # KuzuDB — embedded property graph (Plane 1 of the Agentic Org Blueprint).
+  # Local-first: file-backed at data/portal/entity_graph.kuzu. MIT, Cypher 9,
+  # ACID. See docs/agentic-org-blueprint.md §2 Plane 1 + plan/feature-
+  # agentic-org-phase-1-entity-graph.md (REQ-001/CON-003: kuzu via Python
+  # wheel only, no external server). Pinned to 0.6.x — current stable.
+  "kuzu>=0.6,<0.7",
 ]
 
 [dependency-groups]
