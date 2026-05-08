@@ -66,6 +66,13 @@ _ULID_LAST_RANDOM: int = 0  # 80-bit integer of the random suffix
 _LIMIT_PATTERN = re.compile(r"\blimit\b", re.IGNORECASE)
 
 
+# Attribute keys reserved for projection metadata (PAT-002): callers may
+# stash these in ``EntityWrite.attrs`` so the ``entity.upserted`` event +
+# audit entry can carry workflow provenance, but they are NOT columns on
+# any Plane 1 node table and must be excluded from the Cypher SET clause.
+_ATTR_METADATA_KEYS: frozenset[str] = frozenset({"workflow_id", "source_event"})
+
+
 def _encode_crockford(value: int, length: int) -> str:
     """Encode ``value`` as exactly ``length`` Crockford-base32 characters."""
     chars = []
@@ -374,6 +381,98 @@ class EntityGraph:
                 return None
             row = result.get_next()
             return {col: row[idx] for idx, col in enumerate(columns)}
+
+    # -- writes (PAT-002) ------------------------------------------------
+
+    def upsert(self, entity: EntityWrite) -> None:
+        """Idempotently upsert ``entity`` and emit ``entity.upserted``.
+
+        Cypher MERGE creates the node if it doesn't exist and matches it
+        otherwise; the SET clause then assigns attrs + the deduped union
+        of ``source_workflows`` (PAT-004 — insertion order preserved,
+        existing workflows kept on subsequent upserts so we accumulate
+        provenance over an entity's lifetime).
+
+        We compute the union in Python under ``self._conn_lock`` rather
+        than in Cypher so the merge semantics stay obvious and easy to
+        unit-test. The whole read-then-write cycle holds the single
+        connection lock, so two threads upserting the same id can't
+        clobber each other's source_workflows additions.
+
+        Bus + audit emissions are guarded by :meth:`attach` having been
+        called — when wiring is None this is a pure write with no
+        downstream side effects (lets unit tests construct a bare graph).
+        """
+        with self._conn_lock:
+            existing_result = self.conn.execute(
+                f"MATCH (n:{entity.kind}) WHERE n.id = $id "
+                "RETURN n.source_workflows AS sw",
+                {"id": entity.id},
+            )
+            existing_sw: list[str] = []
+            if existing_result.has_next():
+                row = existing_result.get_next()
+                if row[0] is not None:
+                    existing_sw = list(row[0])
+
+            merged_sw = list(existing_sw)
+            for sw in entity.source_workflows:
+                if sw not in merged_sw:
+                    merged_sw.append(sw)
+
+            params: dict[str, Any] = {
+                "id": entity.id,
+                "sw": merged_sw,
+            }
+            set_clauses = ["n.source_workflows = $sw"]
+            # Kuzu 0.6.1 does NOT support the ``SET n += $map`` map-merge
+            # form (parser rejects it). Bind each attr to its own
+            # ``$attr_<i>`` placeholder and emit one ``n.<key> = $attr_<i>``
+            # clause per entry. Property keys are backtick-quoted because
+            # Kuzu reserves a handful of common identifiers (e.g. ``starts``
+            # / ``ends`` on the ``Period`` schema).
+            #
+            # ``workflow_id`` and ``source_event`` are projection-level
+            # metadata: callers stash them in ``attrs`` so the
+            # ``entity.upserted`` FleetEvent + audit entry can carry the
+            # provenance, but neither is a column on any Plane 1 node
+            # table — skip them when building the SET clause.
+            for idx, (key, value) in enumerate(entity.attrs.items()):
+                if key in _ATTR_METADATA_KEYS:
+                    continue
+                placeholder = f"attr_{idx}"
+                params[placeholder] = value
+                set_clauses.append(f"n.`{key}` = ${placeholder}")
+
+            self.conn.execute(
+                f"MERGE (n:{entity.kind} {{id: $id}}) SET "
+                + ", ".join(set_clauses),
+                params,
+            )
+
+        # Side-effects outside the conn lock: the bus / audit have their
+        # own locks and we don't want to invert the lock order.
+        if self.bus is not None:
+            from api.shared.events import FleetEvent
+
+            self.bus.emit(
+                FleetEvent(
+                    type="entity.upserted",
+                    workflow_id=entity.attrs.get("workflow_id"),
+                    entity_id=entity.id,
+                    kind=entity.kind,
+                )
+            )
+        if self.audit is not None:
+            self.audit.log(
+                "entity.upserted",
+                {
+                    "id": entity.id,
+                    "kind": entity.kind,
+                    "workflow_id": entity.attrs.get("workflow_id"),
+                    "source_workflows": list(entity.source_workflows),
+                },
+            )
 
     def find_by_pattern(
         self,
