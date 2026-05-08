@@ -16,7 +16,7 @@ export default function WhatIfPanel({ policyId }: { policyId: string }) {
   const propose = async () => {
     await fetch("/api/policy/propose-change", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ policyId, proposedValue: Number(value), rationale: "Dry-run accepted", proposedBy: "finance-controller@wpp" })
+      body: JSON.stringify({ policyId, proposedValue: Number(value), rationale: "Dry-run accepted", proposedBy: "finance-controller@zava" })
     });
     alert("Change proposed. A PR has been opened for governance review.");
   };

@@ -71,7 +71,7 @@ def _make_reviewer_entry(
     decision: str = "accept-justification",
     policy_clause: str = "§3.1 Meals — UK per-attendee cap GBP 75",
     category: str = "meals",
-    actor_id: str = "reviewer@wpp.com",
+    actor_id: str = "reviewer@zava.com",
     timestamp: float | None = None,
 ) -> ActionLedgerEntry:
     return ActionLedgerEntry(

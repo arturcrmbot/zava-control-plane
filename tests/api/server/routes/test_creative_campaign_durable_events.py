@@ -46,7 +46,7 @@ def _seed_workflow(wid: str = "CMP-T1", *, awaiting_hitl: bool = False) -> Workf
         current_phase="brief_capture",
         created_at=now,
         sla_due_at=now + 86400,
-        jurisdiction="UK-WPP",
+        jurisdiction="UK-Zava",
         agency="Ogilvy",
         payload={"brief": {"id": "BRF-001", "client_brand": "Solene"}},
         orchestration_instance_id=f"INST-{wid}",

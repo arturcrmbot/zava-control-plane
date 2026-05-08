@@ -19,7 +19,7 @@ import os
 
 # Short-circuit Azurite probe at import time so the kernel constructor
 # (which also constructs api.server.state via late imports) stays clean
-# under pytest. See /memories/repo/wpp-pre-existing-test-failures.md.
+# under pytest. See /memories/repo/zava-pre-existing-test-failures.md.
 os.environ.setdefault("AZURE_STORAGE_CONNECTION_STRING", "")
 
 import httpx

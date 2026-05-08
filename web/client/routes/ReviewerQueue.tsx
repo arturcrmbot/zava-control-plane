@@ -98,7 +98,7 @@ export default function ReviewerQueue() {
       const r = await fetch(`/api/exceptions/${exceptionId}/resolve`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ resolution: action, resolvedBy: "reviewer@wpp" }),
+        body: JSON.stringify({ resolution: action, resolvedBy: "reviewer@zava" }),
       });
       if (!r.ok) {
         console.error("resolve failed", await r.text());

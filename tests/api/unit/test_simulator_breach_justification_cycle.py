@@ -28,7 +28,7 @@ def _make_workflow_in_store(workflow_id: str = "EXP-9001") -> Workflow:
         current_phase="Notify",
         created_at=0,
         sla_due_at=0,
-        jurisdiction="UK-WPP",
+        jurisdiction="UK-Zava",
         agency="Mindshare",
         orchestration_instance_id=f"durable-{workflow_id}",
         claim=ClaimData(
@@ -92,7 +92,7 @@ async def test_simulate_justification_missing_orchestration_instance_raises():
     refuses to send the event rather than guessing."""
     w = Workflow(
         id="EXP-NO-DURABLE", type="expense-claim", current_phase="Notify",
-        created_at=0, sla_due_at=0, jurisdiction="UK-WPP", agency="x",
+        created_at=0, sla_due_at=0, jurisdiction="UK-Zava", agency="x",
         orchestration_instance_id=None,
         claim=ClaimData(
             claim_id="CLM-X", employee_id="EMP-X", submitted_at="2026-04-01T00:00:00",

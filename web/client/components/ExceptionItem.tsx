@@ -18,7 +18,7 @@ export default function ExceptionItem({ e, selected, onToggle, onResolved }: {
         body: JSON.stringify({
           exceptionIds: [e.id],
           resolution: action,
-          resolvedBy: "finance-controller@wpp",
+          resolvedBy: "finance-controller@zava",
         }),
       });
       onResolved?.();

@@ -153,7 +153,7 @@ def _render(profile: dict, out_path: Path) -> None:
         leftMargin=22 * mm, rightMargin=22 * mm,
         topMargin=22 * mm, bottomMargin=22 * mm,
         title=f"CV — {profile.get('name', 'candidate')}",
-        author="WPP Talent",
+        author="Zava Talent",
     )
 
     story: list = []

@@ -18,7 +18,7 @@ export default function ExceptionQueue() {
   const confirm = async (resolution: string) => {
     await fetch("/api/exceptions/bulk-resolve", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ exceptionIds: [...selected], resolution, resolvedBy: "finance-controller@wpp" })
+      body: JSON.stringify({ exceptionIds: [...selected], resolution, resolvedBy: "finance-controller@zava" })
     });
     setSelected(new Set());
     setModal(false);

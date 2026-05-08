@@ -4,7 +4,7 @@ const API = "http://localhost:3001";
 
 // Routes that must render SOMETHING without JS errors.
 const ROUTES = [
-  { path: "/fleet", sentinel: /WPP Control Plane|in_progress|Fleet|exceptions|workflows/i },
+  { path: "/fleet", sentinel: /Zava Control Plane|in_progress|Fleet|exceptions|workflows/i },
   { path: "/exceptions", sentinel: /exceptions|Exception Queue|empty|no exceptions/i },
   { path: "/policy", sentinel: /Policy|autonomy|policies/i },
   { path: "/analytics", sentinel: /Analytics|total|completed/i },

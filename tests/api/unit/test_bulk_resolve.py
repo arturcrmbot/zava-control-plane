@@ -31,7 +31,7 @@ def test_bulk_resolve_accepts_reroute_gl_action() -> None:
     r = client.post("/api/exceptions/bulk-resolve", json={
         "exceptionIds": ["EXC-R1"],
         "resolution": "reroute-gl",
-        "resolvedBy": "controller@wpp",
+        "resolvedBy": "controller@zava",
     })
     assert r.status_code == 200, r.text
     assert r.json()["resolved"] == 1
@@ -51,7 +51,7 @@ def test_bulk_resolve_accepts_request_info_action() -> None:
     r = client.post("/api/exceptions/bulk-resolve", json={
         "exceptionIds": ["EXC-R2"],
         "resolution": "request-info",
-        "resolvedBy": "controller@wpp",
+        "resolvedBy": "controller@zava",
     })
     assert r.status_code == 200, r.text
     assert app_state.store.get_exception("EXC-R2").resolved_at is not None

@@ -18,7 +18,7 @@ app.use(express.json());
 app.get("/mcp/tools", (_req, res) => {
   res.json({
     tools: [
-      { name: "greenhouse_post", description: "Publish a JD on the WPP careers feed", parameters: { jd: "object", market: "string" } },
+      { name: "greenhouse_post", description: "Publish a JD on the Zava careers feed", parameters: { jd: "object", market: "string" } },
       { name: "greenhouse_applicants", description: "List applicants for a posting", parameters: { posting_id: "string" } },
       { name: "greenhouse_status", description: "Lookup posting status", parameters: { posting_id: "string" } },
     ],
