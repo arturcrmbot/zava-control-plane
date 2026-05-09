@@ -286,6 +286,11 @@ _REL_TABLES: tuple[tuple[str, str], ...] = (
 # better error messages than opaque Kuzu parser exceptions).
 _VALID_KINDS = frozenset(name for name, _ in _NODE_TABLES)
 
+# Valid relationship type names extracted from _REL_TABLES (uppercase, schema
+# canonical form). Mirrors _VALID_KINDS — used by ``link`` to reject unknown
+# rels with a clean ValueError before Cypher parsing.
+_VALID_RELS = frozenset(name for name, _ in _REL_TABLES)
+
 
 # ---------------------------------------------------------------------------
 # EntityGraph
@@ -514,6 +519,90 @@ class EntityGraph:
                     "kind": entity.kind,
                     "workflow_id": entity.attrs.get("workflow_id"),
                     "source_workflows": list(entity.source_workflows),
+                },
+            )
+
+    def link(self, src_id: str, rel: str, dst_id: str, **attrs: Any) -> None:
+        """Idempotently MERGE a relationship ``(src_id)-[rel]->(dst_id)``.
+
+        ``rel`` may be passed in either case — it is normalised to the
+        uppercase schema form (``"employed_by"`` and ``"EMPLOYED_BY"`` both
+        resolve to the ``EMPLOYED_BY`` rel table) and validated against
+        :data:`_VALID_RELS` before any Cypher is built. Unknown rels raise
+        a clean :class:`ValueError` mirroring the ``upsert`` kind whitelist.
+
+        ``**attrs`` lands as named properties on the rel record, with the
+        same key validation as :meth:`upsert` (each key must match
+        :data:`_VALID_ATTR_KEY`). Kuzu 0.6.1 does NOT support the
+        ``SET r += $map`` map-merge form (parser rejects it) so each attr
+        is bound to its own ``$attr_<i>`` placeholder and emitted as a
+        per-key ``r.`<key>` = $attr_<i>`` clause.
+
+        The MATCH→MERGE pattern uses untyped node patterns
+        (``MATCH (a), (b) WHERE a.id = $src AND b.id = $dst``) — the rel
+        type on the MERGE side constrains acceptable (a, b) pairs through
+        the schema's ``FROM …  TO …`` declaration. If either id is missing
+        the MATCH returns no rows and MERGE silently no-ops; we treat that
+        as caller responsibility (PAT-002 projections always upsert nodes
+        before they link them, so a missing-id link would mask a projection
+        bug somewhere upstream — but raising here would force every test
+        to seed both endpoints first, which the bus-emission tests don't
+        need to). Re-running the same ``(src_id, rel, dst_id)`` triple is
+        idempotent: MERGE matches the existing rel and SET updates attrs.
+
+        Bus + audit emissions are guarded by :meth:`attach` having been
+        called and run OUTSIDE the connection lock, mirroring
+        :meth:`upsert`. The emitted FleetEvent and audit details carry the
+        normalised uppercase ``rel`` so downstream consumers see a single
+        canonical form regardless of how the caller spelled it.
+        """
+        rel_upper = rel.upper()
+        if rel_upper not in _VALID_RELS:
+            raise ValueError(
+                f"unknown rel: {rel!r} "
+                f"(expected one of {sorted(_VALID_RELS)})"
+            )
+
+        params: dict[str, Any] = {"src": src_id, "dst": dst_id}
+        set_clauses: list[str] = []
+        for idx, (key, value) in enumerate(attrs.items()):
+            if not _VALID_ATTR_KEY.match(key):
+                raise ValueError(
+                    f"invalid attr key: {key!r} "
+                    f"(must match {_VALID_ATTR_KEY.pattern})"
+                )
+            placeholder = f"attr_{idx}"
+            params[placeholder] = value
+            set_clauses.append(f"r.`{key}` = ${placeholder}")
+
+        cypher = (
+            f"MATCH (a), (b) WHERE a.id = $src AND b.id = $dst "
+            f"MERGE (a)-[r:{rel_upper}]->(b)"
+        )
+        if set_clauses:
+            cypher += " SET " + ", ".join(set_clauses)
+
+        with self._conn_lock:
+            self.conn.execute(cypher, params)
+
+        # Side-effects outside the conn lock: the bus / audit have their
+        # own locks and we don't want to invert the lock order.
+        if self.bus is not None:
+            self.bus.emit(
+                FleetEvent(
+                    type="entity.linked",
+                    src_id=src_id,
+                    dst_id=dst_id,
+                    rel=rel_upper,
+                )
+            )
+        if self.audit is not None:
+            self.audit.log(
+                "entity.linked",
+                {
+                    "src_id": src_id,
+                    "dst_id": dst_id,
+                    "rel": rel_upper,
                 },
             )
 
