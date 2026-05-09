@@ -24,6 +24,12 @@ app_state.fm = FleetManagerService(
     bus=app_state.bus, store=app_state.store, audit=app_state.audit,
     on_live=_on_live,
 )
+# Phase 3 (TASK-028) — instantiate per-non-legacy-function FMs once
+# ``app_state`` is module-bound. Done here (not in AppState.__init__)
+# because the mcp_tools package eagerly imports submodules that
+# themselves do ``from api.server.state import app_state``; populating
+# function_fms inside __init__ would race the binding.
+app_state.init_function_fms()
 
 
 @asynccontextmanager

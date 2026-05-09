@@ -97,6 +97,15 @@ class AppState:
         self.entity_reflector.start()
 
         self.hub = SSEHub()
+
+        # Phase 3 (TASK-028) — per-non-legacy-function Fleet Managers.
+        # Container only; populated by ``_init_function_fms()`` below
+        # AFTER the module-level ``app_state`` binding lands. The
+        # mcp_tools package eagerly imports modules that themselves do
+        # ``from api.server.state import app_state`` at top level, so
+        # constructing function FMs here would race the binding.
+        self.function_fms: dict = {}
+
         self.orchestration_history: dict[str, list[dict]] = {}
         # ----------------------------------------------------- candidate portal
         # MagicLinkStore: sqlite-backed, single-use offer tokens + repeatable
@@ -138,6 +147,55 @@ class AppState:
             self.entity_reflector.aclose()
         if hasattr(self, "entities"):
             self.entities.close()
+
+
+    def init_function_fms(self) -> None:
+        """Instantiate one FunctionFleetManager per non-legacy function.
+
+        Phase 3 (TASK-028). Called at module bottom AFTER the module-level
+        ``app_state`` binding so the mcp_tools package's eager submodule
+        imports (``query_reviewer_decisions``, ``query_economics`` —
+        each `from api.server.state import app_state`) resolve cleanly
+        without a half-built singleton.
+
+        Each FM gets:
+          - its own bound MCP tool surface (5 tools via
+            ``build_function_fm_tools``);
+          - its own SSE topic ``fleet-manager.<fn_name>`` registered on
+            the shared SSEHub so a function-specific UI can subscribe;
+          - the function-scoped SKILL prompt assembled at session-start
+            (see ``FleetManagerService._build_skill_text``).
+
+        Construction is cheap — the GHCP subprocess is not spawned until
+        ``start()`` runs. Today only the fleet-wide singleton is
+        ``start()``-ed by main.py; per-function start-up lands with the
+        function-specific UIs.
+
+        Idempotent: re-calling is a no-op once ``function_fms`` is
+        populated.
+        """
+        if self.function_fms:
+            return
+        from api.shared.functions import FUNCTIONS
+        from api.server.mcp_tools import build_function_fm_tools
+        from api.server.services.fleet_manager_service import FunctionFleetManager
+        for fn_name in FUNCTIONS:
+            if fn_name == "legacy":
+                continue
+            topic = f"fleet-manager.{fn_name}"
+            self.hub.register(topic)
+            tools = build_function_fm_tools(
+                self.store, self.audit, self.entities, fn_name
+            )
+            self.function_fms[fn_name] = FunctionFleetManager(
+                bus=self.bus,
+                store=self.store,
+                audit=self.audit,
+                hub=self.hub,
+                function=fn_name,
+                tools=tools,
+                on_live=lambda ev, _t=topic: self.hub.broadcast(_t, ev),
+            )
 
 
 app_state = AppState()
