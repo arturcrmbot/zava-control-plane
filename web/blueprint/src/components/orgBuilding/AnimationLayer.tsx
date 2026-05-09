@@ -23,11 +23,23 @@ import { ANIM_COLORS } from "../../lib/useOrgData";
 import { floorFrontCentre } from "../../lib/floorLayout";
 
 const MOTE_CAP = 200;
+// Chunk-4 LOD (TASK-052): at zoom-3 (org / wing) the camera is far
+// enough that individual motes blur into pixels; we render only every
+// Nth mote and dim the material so the floor reads as "busy" without
+// burning fragment-shader time on hundreds of sub-pixel sprites.
+const LOD_FAR_STRIDE = 3;
+const LOD_FAR_OPACITY = 0.55;
+const LOD_NEAR_OPACITY = 0.9;
 
 interface Props {
   entries: AnimEntry[];
   beams: CrossFunctionBeam[];
   onTick: (dt: number) => void;
+  /** Spec zoom level (3=org … 0=workflow). Drives mote LOD: at 3 we
+   *  stride the mote pool and dim it; at ≤2 we render every entry full
+   *  brightness. Defaults to 3 so consumers without zoom plumbing get
+   *  the cheaper render. */
+  zoomLevel?: 0 | 1 | 2 | 3;
 }
 
 /** Quadratic bezier midpoint with a small upward arch — used by the
@@ -43,11 +55,13 @@ function bezier(from: THREE.Vector3, to: THREE.Vector3, t: number, dst: THREE.Ve
   );
 }
 
-export function AnimationLayer({ entries, beams, onTick }: Props) {
+export function AnimationLayer({ entries, beams, onTick, zoomLevel = 3 }: Props) {
   const motesRef = useRef<THREE.InstancedMesh>(null);
+  const motesMaterialRef = useRef<THREE.MeshBasicMaterial>(null);
   const sparksGroupRef = useRef<THREE.Group>(null);
   const pulsesGroupRef = useRef<THREE.Group>(null);
   const filamentsGroupRef = useRef<THREE.Group>(null);
+  const farLod = zoomLevel >= 3;
 
   // Per-frame: advance queue + push positions/scales/opacities to refs.
   // We keep three reusable Object3D / Vector3 / Color helpers to avoid
@@ -68,7 +82,21 @@ export function AnimationLayer({ entries, beams, onTick }: Props) {
 
     // Motes — instanced. We pack the first N mote entries into the mesh
     // and zero-scale the rest so the cap acts as a circular buffer.
-    const motes = entries.filter((e) => e.kind === "mote").slice(0, MOTE_CAP);
+    // LOD: at far zoom we stride the source list (every Nth mote)
+    // because individual sub-pixel sprites just add fragment cost
+    // without visible signal.
+    const stride = farLod ? LOD_FAR_STRIDE : 1;
+    const allMotes = entries.filter((e) => e.kind === "mote");
+    const motes: AnimEntry[] = [];
+    for (let i = 0; i < allMotes.length && motes.length < MOTE_CAP; i += stride) {
+      motes.push(allMotes[i]);
+    }
+    const motesMat = motesMaterialRef.current;
+    if (motesMat) {
+      const target = farLod ? LOD_FAR_OPACITY : LOD_NEAR_OPACITY;
+      // Cheap one-step lerp avoids opacity popping when zoom changes.
+      motesMat.opacity += (target - motesMat.opacity) * Math.min(1, dt * 6);
+    }
     const mesh = motesRef.current;
     if (mesh) {
       for (let i = 0; i < MOTE_CAP; i += 1) {
@@ -166,7 +194,8 @@ export function AnimationLayer({ entries, beams, onTick }: Props) {
   return (
     <group>
       {/* Mote pool — single InstancedMesh. Material is white-emissive +
-          per-instance colour override. */}
+          per-instance colour override. Material opacity is animated by
+          useFrame for zoom LOD (chunk-4 TASK-052). */}
       <instancedMesh
         ref={motesRef}
         args={[undefined, undefined, MOTE_CAP]}
@@ -174,9 +203,10 @@ export function AnimationLayer({ entries, beams, onTick }: Props) {
       >
         <sphereGeometry args={[1, 8, 8]} />
         <meshBasicMaterial
+          ref={motesMaterialRef}
           color="#ffffff"
           transparent
-          opacity={0.9}
+          opacity={LOD_NEAR_OPACITY}
           toneMapped={false}
         />
       </instancedMesh>

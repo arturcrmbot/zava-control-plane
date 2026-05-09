@@ -142,13 +142,15 @@ function Floor({ fn, y, isPenthouse = false, dimmed = false, boosted = false, on
       position={[0, y, 0]}
       onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
     >
-      {/* Translucent floor slab */}
+      {/* Translucent floor slab. Emissive intensity follows TASK-054:
+          gentle 0.15 at rest, brighter 0.6 when boosted (active wing).
+          Penthouse continues to pulse 0.6 ± 0.25 via useFrame above. */}
       <mesh ref={slabRef}>
         <boxGeometry args={[width, FLOOR_HEIGHT * 0.92, FLOOR_DEPTH]} />
         <meshStandardMaterial
           color={"#16181c"}
           emissive={color}
-          emissiveIntensity={isPenthouse ? 0.6 : boosted ? 0.42 : 0.18}
+          emissiveIntensity={isPenthouse ? 0.6 : boosted ? 0.6 : 0.15}
           transparent
           opacity={dimmed ? 0.28 : 0.78}
           metalness={0.1}
@@ -162,10 +164,12 @@ function Floor({ fn, y, isPenthouse = false, dimmed = false, boosted = false, on
         <meshBasicMaterial color={color} transparent opacity={dimmed ? 0.12 : boosted ? 0.45 : 0.32} />
       </mesh>
 
-      {/* Function label on the front facade. */}
+      {/* Function label on the front facade. Bumped 0.16 → 0.18 in
+          chunk-4 self-audit so labels are legible from the default
+          orbit distance without leaning in. */}
       <Text
         position={[-width / 2 + 0.12, FLOOR_HEIGHT * 0.28, FLOOR_DEPTH / 2 + 0.03]}
-        fontSize={boosted ? 0.2 : 0.16}
+        fontSize={boosted ? 0.22 : 0.18}
         color={dimmed ? "#6b7077" : "#f5f5f7"}
         anchorX="left"
         anchorY="middle"
@@ -186,10 +190,12 @@ function Floor({ fn, y, isPenthouse = false, dimmed = false, boosted = false, on
         {fn.kpis.length} KPI{fn.kpis.length === 1 ? "" : "s"}
       </Text>
 
-      {/* Marquee KPI ticker — re-renders on each poll tick. */}
+      {/* Marquee KPI ticker — re-renders on each poll tick. Bumped to
+          0.09 (was 0.075) in chunk-4 self-audit so the ticker is
+          readable at default zoom-3 framing without zooming in. */}
       <Text
         position={[0, -FLOOR_HEIGHT * 0.28, FLOOR_DEPTH / 2 + 0.03]}
-        fontSize={boosted ? 0.11 : 0.075}
+        fontSize={boosted ? 0.13 : 0.09}
         maxWidth={width * 0.95}
         color={dimmed ? "#6b7077" : color}
         anchorX="center"

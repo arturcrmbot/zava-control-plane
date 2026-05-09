@@ -11,11 +11,12 @@
  * `<WorkflowZoom>`. ESC zooms back out one level.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CosmicConstellation } from "../components/CosmicConstellation";
 import { OrgBuilding } from "../components/OrgBuilding";
 import { DepartmentInterior } from "../components/orgBuilding/DepartmentInterior";
 import { EventFeed } from "../components/orgBuilding/EventFeed";
+import { PerfHud, isPerfEnabled } from "../components/orgBuilding/PerfHud";
 import { WorkflowZoom } from "../components/orgBuilding/WorkflowZoom";
 import { useObservatory } from "../lib/useObservatory";
 import { useOrgZoom } from "../lib/orgZoom";
@@ -26,6 +27,7 @@ export function ConstellationPage() {
   const { status } = useObservatory({ bufferSize: 1 });
   const zoom = useOrgZoom();
   const [lens, setLens] = useState<Lens>("building");
+  const perfEnabled = useMemo(() => isPerfEnabled(), []);
 
   const embed =
     new URLSearchParams(window.location.search).get("embed") === "1";
@@ -55,6 +57,9 @@ export function ConstellationPage() {
       ) : (
         <CosmicConstellation status={status} fullScreen />
       )}
+
+      {/* Perf HUD — only on ?perf=1. Survives lens swaps. */}
+      {perfEnabled && <PerfHud />}
 
       {/* Department interior — zoom-1 overlay (chunk-3 IP7). */}
       {lens === "building" && zoom.target.kind === "department" && zoom.target.id && (
@@ -87,31 +92,45 @@ export function ConstellationPage() {
         )}
       </div>
 
-      {/* Bottom-right lens toggle. */}
+      {/* Bottom-right lens toggle (TASK-050). Subtle border + uppercase
+          mono label so it reads as part of the HUD without competing
+          with the building. */}
       <button
         type="button"
         onClick={() =>
           setLens((cur) => (cur === "building" ? "cosmic" : "building"))
         }
         className="org-building__lens-toggle"
+        aria-label={
+          lens === "building"
+            ? "Switch to cosmic-lens view"
+            : "Switch to org-building view"
+        }
+        title={
+          lens === "building"
+            ? "Switch to cosmic-lens view"
+            : "Switch to org-building view"
+        }
         style={{
           position: "absolute",
           bottom: 16,
           right: 16,
-          padding: "8px 14px",
-          background: "rgba(10,10,12,0.7)",
-          border: "1px solid rgba(207,210,214,0.3)",
+          padding: "8px 16px",
+          background: "rgba(10,10,12,0.78)",
+          border: "1px solid rgba(207,210,214,0.45)",
           borderRadius: 999,
-          color: "#cfd2d6",
+          color: "#f5f5f7",
           fontFamily: "var(--mono-family, monospace)",
           fontSize: 11,
-          letterSpacing: "0.1em",
+          letterSpacing: "0.12em",
           textTransform: "uppercase",
           cursor: "pointer",
-          zIndex: 7,
+          zIndex: 9,
+          backdropFilter: "blur(6px)",
+          boxShadow: "0 2px 12px rgba(0,0,0,0.35)",
         }}
       >
-        {lens === "building" ? "Cosmic lens" : "Building lens"}
+        {lens === "building" ? "◌ Cosmic lens" : "▣ Building lens"}
       </button>
     </div>
   );

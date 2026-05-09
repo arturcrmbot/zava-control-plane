@@ -68,7 +68,25 @@ export function Observatory() {
         </header>
 
         <p className="body observatory__note">
-          <a href="?view=entities">Live entity graph →</a>
+          <a href="?view=constellation">Live entity graph →</a>{" "}
+          <span
+            style={{
+              display: "inline-block",
+              marginLeft: 6,
+              padding: "1px 8px",
+              fontFamily: "var(--mono-family, monospace)",
+              fontSize: 10,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              border: "1px solid rgba(127,174,212,0.5)",
+              color: "#7faed4",
+              borderRadius: 999,
+              verticalAlign: "middle",
+            }}
+            title="The constellation view now hosts The Org Building — entity graph rendered as the building lobby."
+          >
+            now: The Org Building
+          </span>
         </p>
 
         <p className="body observatory__note">

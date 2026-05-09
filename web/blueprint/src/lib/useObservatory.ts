@@ -18,6 +18,19 @@ interface UseObservatoryOptions {
  *   - status: "connecting" | "watching" | "offline"
  *
  * Reconnects on transport error after a short delay.
+ *
+ * TODO(chunk-5 / ralph-loop): consolidate to a single shared
+ * EventSource via React Context. Today every consumer
+ * (ConstellationPage status, EventFeed, OrgBuilding animations,
+ * DepartmentInterior, WorkflowZoom) opens its own connection — three
+ * concurrent SSE streams on the building page even before zooming in.
+ * Backend SSE hub already broadcasts identically to all subscribers,
+ * so the saving is purely network/CPU. Surgery: lift the
+ * EventSource into a top-level <ObservatoryProvider>; useObservatory
+ * becomes a thin context reader that maintains its own bufferSize
+ * window over the shared event firehose. Deferred from chunk-4
+ * because the per-consumer `bufferSize` + `onEvent` shapes need a
+ * deliberate refactor to keep behaviour identical.
  */
 export function useObservatory(opts: UseObservatoryOptions = {}) {
   const bufferSize = opts.bufferSize ?? 80;

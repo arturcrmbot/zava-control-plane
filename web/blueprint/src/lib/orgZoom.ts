@@ -20,7 +20,7 @@
  * triggers `zoomTo()` from anywhere in the app (EventFeed deep-links,
  * tests, etc.). Detail shape: `{kind, id?}` — same as `ZoomTarget`.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { floorY } from "./floorLayout";
 import { WINGS } from "./orgWings";
 import type { WingKey } from "./orgWings";
@@ -118,15 +118,34 @@ function floorToWingKey(fn: string): WingKey | null {
 
 export function useOrgZoom(): OrgZoomState {
   const [target, setTarget] = useState<ZoomTarget>({ kind: "org" });
+  // Breadcrumb stack so ESC can chain 0→1→2→3 (chunk 4). Each
+  // `zoomTo` pushes the previous target; `zoomOut` pops to the most
+  // recent ancestor. Falls back to legacy parent inference when the
+  // stack is empty (e.g. a fresh page landed at workflow via deep-link).
+  const historyRef = useRef<ZoomTarget[]>([]);
 
   const zoomTo = useCallback((next: ZoomTarget) => {
-    setTarget(next);
+    setTarget((cur) => {
+      if (cur.kind !== next.kind || cur.id !== next.id) {
+        historyRef.current.push(cur);
+        if (historyRef.current.length > 8) historyRef.current.shift();
+      }
+      return next;
+    });
   }, []);
 
   const zoomOut = useCallback(() => {
     setTarget((cur) => {
+      const prev = historyRef.current.pop();
+      if (prev && levelForKind(prev.kind) > levelForKind(cur.kind)) {
+        return prev;
+      }
+      // Fallback inference when history is empty / stale. Each step
+      // climbs one level so repeat-ESC chains 0 → 1 → 2 → 3.
       switch (cur.kind) {
         case "workflow":
+          // No tracked parent department; land in org-view rather than
+          // jumping randomly. Subsequent ESC presses are no-ops at org.
           return { kind: "org" };
         case "department": {
           const wing = cur.id ? floorToWingKey(cur.id) : null;
@@ -150,7 +169,13 @@ export function useOrgZoom(): OrgZoomState {
     function handler(e: Event) {
       const detail = (e as CustomEvent<ZoomTarget>).detail;
       if (!detail || !detail.kind) return;
-      setTarget(detail);
+      setTarget((cur) => {
+        if (cur.kind !== detail.kind || cur.id !== detail.id) {
+          historyRef.current.push(cur);
+          if (historyRef.current.length > 8) historyRef.current.shift();
+        }
+        return detail;
+      });
     }
     window.addEventListener("org-building:zoom-to", handler as EventListener);
     return () =>

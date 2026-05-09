@@ -22,6 +22,7 @@ import { useOrgAnimations, useOrgData } from "../lib/useOrgData";
 import { useLayerToggles } from "../lib/layerToggles";
 import { FLOOR_TO_WING, WINGS } from "../lib/orgWings";
 import type { ZoomTarget } from "../lib/orgZoom";
+import { levelForKind } from "../lib/orgZoom";
 import { AnimationLayer } from "./orgBuilding/AnimationLayer";
 import { Building } from "./orgBuilding/Building";
 import { CadenceClock } from "./orgBuilding/CadenceClock";
@@ -49,6 +50,8 @@ export function OrgBuilding({ status, fullScreen = false, zoomTarget }: Props) {
     }
     return null;
   }, [zoomTarget]);
+
+  const zoomLevel = zoomTarget ? levelForKind(zoomTarget.kind) : 3;
 
   const wrapperStyle: React.CSSProperties = fullScreen
     ? { position: "absolute", inset: 0 }
@@ -89,12 +92,14 @@ export function OrgBuilding({ status, fullScreen = false, zoomTarget }: Props) {
           target={[0, 5, 0]}
         />
 
-        <ambientLight intensity={0.35} />
-        <directionalLight position={[8, 14, 12]} intensity={0.45} />
-        <pointLight position={[-10, 8, -8]} intensity={0.25} color="#7faed4" />
+        <ambientLight intensity={0.2} />
+        <directionalLight position={[8, 14, 12]} intensity={0.55} />
+        <pointLight position={[-10, 8, -8]} intensity={0.22} color="#7faed4" />
 
-        {/* Cosmic backdrop — matches CosmicConstellation aesthetic. */}
-        <Stars radius={120} depth={60} count={3500} factor={4} fade speed={0.4} />
+        {/* Cosmic backdrop — low-density / low-brightness so the
+            building reads as the figure and the stars stay ground.
+            Tuned in chunk-4 TASK-054 (was 3500@factor4). */}
+        <Stars radius={140} depth={70} count={1800} factor={2.5} fade speed={0.25} />
 
         <Building
           functions={functions}
@@ -105,11 +110,13 @@ export function OrgBuilding({ status, fullScreen = false, zoomTarget }: Props) {
 
         <CadenceClock cadences={cadences} />
 
-        {/* Live event animation overlay (chunk 2). */}
+        {/* Live event animation overlay (chunk 2). zoomLevel drives
+            mote LOD (chunk-4 TASK-052). */}
         <AnimationLayer
           entries={entries}
           beams={beams}
           onTick={(dt) => dispatch({ type: "tick", dt })}
+          zoomLevel={zoomLevel}
         />
 
         <EffectComposer>

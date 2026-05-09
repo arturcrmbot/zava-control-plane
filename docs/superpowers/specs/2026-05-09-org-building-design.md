@@ -169,8 +169,8 @@ A new visualisation, addressed at the existing `?view=constellation` URL (replac
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-050 | Bottom-right toggle button "Cosmic lens" in `ConstellationPage.tsx` → swaps the centre area from `<OrgBuilding />` to `<CosmicConstellation />` (the renamed legacy scene from TASK-005). Toggle off = back to building. State held in `useState(false)`. | | |
-| TASK-051 | Smoke: confirm the cosmic lens still renders the existing scene with all its photon arcs, status pill, counts ribbon. Toggle off, confirm building view returns. | | |
+| TASK-050 | Bottom-right toggle button "Cosmic lens" in `ConstellationPage.tsx` → swaps the centre area from `<OrgBuilding />` to `<CosmicConstellation />` (the renamed legacy scene from TASK-005). Toggle off = back to building. State held in `useState(false)`. | ✓ | 2026-05-09 |
+| TASK-051 | Smoke: confirm the cosmic lens still renders the existing scene with all its photon arcs, status pill, counts ribbon. Toggle off, confirm building view returns. | pending ralph-loop | |
 
 ### Implementation Phase 10 — Performance + polish + smoke
 
@@ -178,12 +178,12 @@ A new visualisation, addressed at the existing `?view=constellation` URL (replac
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-052 | Profile the building scene at zoom-3 with 1000+ motes in flight + 50 events/sec via the simulator ramp. Record fps. If <60fps: add LOD on motes (zoom-out → cloud render; zoom-in → individual). Use `InstancedMesh` for window panels + entity motes. | | |
-| TASK-053 | Profile zoom-1 (department interior) with the same load. Target ≥45fps. If <45fps: reduce per-tile shader cost (replace fancy materials with flat-shaded glow). | | |
-| TASK-054 | Lighting + material polish — tune the building's emissive material so floors glow gently at rest + brightly during activity. Background backdrop (cosmic stars, low contrast) so the building doesn't float in pure black. | | |
-| TASK-055 | Run an end-to-end smoke: `make up` + 11 simulator injects (one per fleet domain) + full PERSONA_AUTO_CLOSE list. Record a 60s screen capture showing: (a) zoom-3 with window lights + cadence clock + KPI tickers; (b) cross-function beam appearing as a vendor is touched by 2 functions; (c) decision spark + filament from sub-spawn; (d) zoom into Finance interior (zoom-1); (e) zoom into one ap-invoice workflow (zoom-0). Save to `docs/superpowers/specs/2026-05-09-org-building-design.smoke.mp4` (or .webm). | | |
-| TASK-056 | Update `web/blueprint/src/sections/Observatory.tsx` to point the existing "Live entity graph" link at the new `?view=constellation` building view (was pointing at `?view=entities`). Old `?view=entities` and `?view=org-clone` pages stay alive for now — separate retirement decision. | | |
-| TASK-057 | Final commit + plan-status bump + screenshot in PR description. | | |
+| TASK-052 | Profile the building scene at zoom-3 with 1000+ motes in flight + 50 events/sec via the simulator ramp. Record fps. If <60fps: add LOD on motes (zoom-out → cloud render; zoom-in → individual). Use `InstancedMesh` for window panels + entity motes. | ✓ | 2026-05-09 |
+| TASK-053 | Profile zoom-1 (department interior) with the same load. Target ≥45fps. If <45fps: reduce per-tile shader cost (replace fancy materials with flat-shaded glow). | ✓ | 2026-05-09 |
+| TASK-054 | Lighting + material polish — tune the building's emissive material so floors glow gently at rest + brightly during activity. Background backdrop (cosmic stars, low contrast) so the building doesn't float in pure black. | ✓ | 2026-05-09 |
+| TASK-055 | Run an end-to-end smoke: `make up` + 11 simulator injects (one per fleet domain) + full PERSONA_AUTO_CLOSE list. Record a 60s screen capture showing: (a) zoom-3 with window lights + cadence clock + KPI tickers; (b) cross-function beam appearing as a vendor is touched by 2 functions; (c) decision spark + filament from sub-spawn; (d) zoom into Finance interior (zoom-1); (e) zoom into one ap-invoice workflow (zoom-0). Save to `docs/superpowers/specs/2026-05-09-org-building-design.smoke.mp4` (or .webm). | pending ralph-loop | |
+| TASK-056 | Update `web/blueprint/src/sections/Observatory.tsx` to point the existing "Live entity graph" link at the new `?view=constellation` building view (was pointing at `?view=entities`). Old `?view=entities` and `?view=org-clone` pages stay alive for now — separate retirement decision. | ✓ | 2026-05-09 |
+| TASK-057 | Final commit + plan-status bump + screenshot in PR description. | pending ralph-loop | |
 
 ## 3. Done means
 
