@@ -13,7 +13,7 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera, Stars, Text } from "@react-three/drei";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
-import { useMemo, useRef } from "react";
+import { useMemo, useState } from "react";
 import * as THREE from "three";
 
 import { useLiveOrg } from "../../lib/useLiveOrg";
@@ -31,6 +31,8 @@ import { ElevatorShaft } from "./ElevatorShaft";
 import { VitalSignsBar } from "./VitalSignsBar";
 import { PersonaStrip } from "./PersonaStrip";
 import { LiveActivityRail } from "./LiveActivityRail";
+import { WorkflowDrawer } from "./WorkflowDrawer";
+import type { DrawerTarget } from "./WorkflowDrawer";
 
 const FLOOR_ORDER_BOTTOM_UP: string[] = [
   // Lobby is rendered separately at y=0
@@ -53,6 +55,7 @@ interface Props {
 export function GlassTower({ status }: Props) {
   const live = useLiveOrg();
   const { functionByName, inFlight, personas, recentDecisions, vital, flashesRef } = live;
+  const [drawer, setDrawer] = useState<DrawerTarget | null>(null);
 
   // Y-position per function (lobby = 0; floors stack upward, height 1.2 each).
   const floorY = useMemo(() => {
@@ -128,6 +131,9 @@ export function GlassTower({ status }: Props) {
               inFlight={fnInFlight}
               personaByRole={personaByRole}
               flashesRef={flashesRef}
+              onClick={() =>
+                setDrawer({ mode: "function", key: fnName, display: fn.display })
+              }
             />
           );
         })}
@@ -162,6 +168,12 @@ export function GlassTower({ status }: Props) {
       <VitalSignsBar status={status} vital={vital} />
       <PersonaStrip personas={personas} />
       <LiveActivityRail />
+      <WorkflowDrawer
+        target={drawer}
+        inFlight={inFlight}
+        onClose={() => setDrawer(null)}
+        onPickWorkflow={(id) => setDrawer({ mode: "workflow", key: id })}
+      />
     </div>
   );
 }

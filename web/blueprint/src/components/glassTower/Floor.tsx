@@ -40,6 +40,7 @@ interface Props {
   inFlight: InFlightWorkflow[];
   personaByRole: Map<string, PersonaRow>;
   flashesRef: React.MutableRefObject<FlashSet>;
+  onClick?: () => void;
 }
 
 function flattenPersonas(node: { role: string; manages: unknown[] }, max = 6): string[] {
@@ -56,7 +57,7 @@ function flattenPersonas(node: { role: string; manages: unknown[] }, max = 6): s
   return out;
 }
 
-export function Floor({ fn, y, isPenthouse = false, inFlight, personaByRole, flashesRef }: Props) {
+export function Floor({ fn, y, isPenthouse = false, inFlight, personaByRole, flashesRef, onClick }: Props) {
   const slabRef = useRef<THREE.Mesh>(null);
   const color = FUNCTION_COLORS[fn.name] ?? "#cccccc";
   const width = isPenthouse ? PENTHOUSE_WIDTH : FLOOR_WIDTH;
@@ -89,15 +90,32 @@ export function Floor({ fn, y, isPenthouse = false, inFlight, personaByRole, fla
 
   // Floor heat — emissive ramp based on count of in-flight workflows on
   // this floor. Real signal: 0 in-flight = dim, many in-flight = bright.
+  // Plus per-workflow flash on workflow.completed for any wf on this floor.
   useFrame(() => {
     if (!slabRef.current) return;
     const m = slabRef.current.material as THREE.MeshStandardMaterial;
-    const target = 0.08 + Math.min(0.55, inFlight.length * 0.07);
-    m.emissiveIntensity += (target - m.emissiveIntensity) * 0.08;
+    let flashBoost = 0;
+    const now = performance.now();
+    const flashes = flashesRef.current.workflowFlash;
+    // Walk inFlight ids that map to this floor + check workflowFlash.
+    for (const w of inFlight) {
+      const f = flashes.get(w.id);
+      if (f && f.until > now && (f.kind === "completed" || f.kind === "exception")) {
+        const remaining = (f.until - now) / 2500;
+        flashBoost = Math.max(flashBoost, remaining * (f.kind === "exception" ? 1.0 : 0.7));
+      }
+    }
+    const target = 0.08 + Math.min(0.55, inFlight.length * 0.07) + flashBoost;
+    m.emissiveIntensity += (target - m.emissiveIntensity) * 0.16;
   });
 
   return (
-    <group position={[0, y, 0]}>
+    <group
+      position={[0, y, 0]}
+      onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
+      onPointerOver={onClick ? () => (document.body.style.cursor = "pointer") : undefined}
+      onPointerOut={onClick ? () => (document.body.style.cursor = "auto") : undefined}
+    >
       {/* Glass slab — the floor surface. */}
       <mesh ref={slabRef} position={[0, -FLOOR_HEIGHT * 0.45, 0]}>
         <boxGeometry args={[width, FLOOR_HEIGHT * 0.08, FLOOR_DEPTH]} />
