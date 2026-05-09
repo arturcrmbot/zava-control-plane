@@ -30,6 +30,13 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
     asset_id = f"ASSET-access-{workflow.id}"
     sw = (workflow.id,)
 
+    asset_extra = {
+        # Kuzu node attr columns are scalar STRING; serialise the
+        # template list as JSON so the projection round-trips.
+        "requested_role_templates": templates,
+        "business_justification": justification,
+    }
+
     ops: list[EntityWrite | RelWrite | DecisionWrite] = [
         EntityWrite(
             kind="Person",
@@ -42,10 +49,7 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
             id=asset_id,
             attrs={
                 "kind": "access-grant",
-                # Kuzu node attr columns are scalar STRING; serialise the
-                # template list as JSON so the projection round-trips.
-                "requested_role_templates": json.dumps(templates),
-                "business_justification": justification,
+                "attributes": json.dumps(asset_extra, sort_keys=True, default=str),
             },
             source_workflows=sw,
         ),

@@ -19,8 +19,8 @@ def test_vendor_kyc_projection_emits_two_orgs_and_proposed_by_rel():
     org_kinds = sorted(e.attrs.get("kind") for e in entities if e.kind == "Organisation")
     assert org_kinds == ["agency", "vendor"]
 
-    rel = next(r for r in rels if r.rel == "TRANSACTS")
-    assert rel.attrs.get("role") == "proposed-by"
+    # Org->TRANSACTS->Org dropped in Phase 1 hardening (schema-invalid).
+    assert rels == []
     assert decisions == []  # no payload decisions in fixture
 
 

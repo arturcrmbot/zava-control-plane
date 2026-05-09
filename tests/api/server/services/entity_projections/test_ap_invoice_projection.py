@@ -1,6 +1,8 @@
 """Test the AP-invoice projection (TASK-015)."""
 from __future__ import annotations
 
+import json
+
 from api.server.services.entity_graph import EntityWrite, RelWrite
 from api.server.services.entity_projections.ap_invoice import project, WORKFLOW_TYPE
 
@@ -25,6 +27,13 @@ def test_ap_invoice_projection_emits_core_entities():
     assert money.attrs["amount"] == float(payload["amount_gbp"])
     assert money.attrs["currency"] == payload["currency"]
 
-    rel_kinds = {(r.src_id.split("-")[0], r.rel) for r in rels}
-    assert ("MONEY", "TRANSACTS") in rel_kinds
-    assert ("MONEY", "OWNS") in rel_kinds
+    # ``category`` is not a Money schema column — must live in the
+    # ``attributes`` JSON blob (Phase 1 hardening).
+    extra = json.loads(money.attrs["attributes"])
+    assert extra["category"] == payload["category"]
+    assert extra["vendor_id"].startswith("ORG-vendor-")
+    assert extra["po_id"] == f"ASSET-po-{payload['po_id']}"
+
+    # No rels — Money->TRANSACTS->Org and Money->OWNS->Asset are dropped
+    # because the schema types those rels Person→Money / Person→Asset.
+    assert rels == []

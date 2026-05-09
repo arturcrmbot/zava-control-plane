@@ -1,11 +1,16 @@
 """Projection: contract-renewal (TASK-021).
 
+Rels emitted: ``Money -[:BELONGS_TO]-> Period``. Vendor↔contract linkage
+is preserved in the Asset's ``attributes`` JSON blob (Asset->TRANSACTS->Org
+is schema-invalid; TRANSACTS is Person→Money).
+
 Payload keys (``data/synthetic/contract-renewal/contracts.json``)::
 
     contract_id, vendor_name, current_annual_value, proposed_annual_value, scenario
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 from api.server.services.entity_projections import (
@@ -40,6 +45,8 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
     period_id = _annual_period_id(workflow.created_at)
     sw = (workflow.id,)
 
+    money_extra = {"prior_value": float(current_value), "vendor_id": vendor_id}
+
     ops: list[EntityWrite | RelWrite | DecisionWrite] = [
         EntityWrite(
             kind="Organisation",
@@ -54,6 +61,7 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
                 "kind": "contract",
                 "identifier": contract_id,
                 "status": "renewing",
+                "attributes": json.dumps({"vendor_id": vendor_id}, sort_keys=True, default=str),
             },
             source_workflows=sw,
         ),
@@ -65,7 +73,7 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
                 "amount": float(proposed_value),
                 "currency": "GBP",
                 "period": period_id,
-                "prior_value": float(current_value),
+                "attributes": json.dumps(money_extra, sort_keys=True, default=str),
             },
             source_workflows=sw,
         ),
@@ -74,7 +82,9 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
             id=period_id,
             attrs={"kind": "annual", "label": period_id.removeprefix("PERIOD-")},
         ),
-        RelWrite(src_id=asset_id, rel="TRANSACTS", dst_id=vendor_id),
+        # NOTE: Asset->TRANSACTS->Organisation dropped in Phase 1 hardening
+        # (TRANSACTS is schema-typed Person→Money). Vendor↔contract linkage
+        # lives in Asset's ``attributes`` blob until Phase 2.
         RelWrite(src_id=money_id, rel="BELONGS_TO", dst_id=period_id),
     ]
 

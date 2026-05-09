@@ -5,10 +5,12 @@ Executable proxy for the live TASK-039 profile-autonomous run. Constructs
 ``workflow.completed`` event on the bus, and asserts that the entity-graph
 plane received the projected entity nodes.
 
-Per the documented sub-phase 3 caveats, some rel writes (e.g. vendor-kyc's
-Org→Org TRANSACTS) fail at write time and are exception-isolated by the
-reflector. Entity-node writes still land — these assertions only check
-nodes via :meth:`EntityGraph.touched_by` and :meth:`EntityGraph.by_type`.
+Per the documented sub-phase 3 caveats (resolved in Phase 1 hardening),
+projections used to emit non-schema attrs and schema-invalid rels — both
+of which were exception-isolated by the reflector's per-op try/except.
+After hardening, the projections are schema-aligned (non-column attrs
+land in the ``attributes`` JSON blob; impossible rels are dropped) and
+the smoke now lands the Asset + Decision for creative-campaign too.
 
 Judgment call (documented for reviewers)
 ----------------------------------------
@@ -152,23 +154,20 @@ def test_creative_campaign_smoke_projects_entities_and_decision(tmp_path: Path, 
         _wait_for_bus(state)
 
         touched = state.entities.touched_by(wf_id)
-        # customer Org + agency Org. The Asset write currently raises a
-        # Kuzu Binder exception ("Cannot find property category for n.")
-        # because the projection passes columns (category/audience/...)
-        # that aren't part of the Asset node-table schema. The reflector's
-        # try/except wraps the WHOLE projection-op loop, so the Asset
-        # failure aborts every subsequent op — including the Decision.
-        # We therefore assert only the two Org nodes that DO land (they
-        # are emitted before the failing Asset op). Tracking this as a
-        # follow-up in sub-phase 3 hardening; the smoke still proxies the
-        # bus → reflector → projection → graph wiring end-to-end.
+        # customer Org + agency Org + the campaign Asset (now lands cleanly
+        # after the Phase 1 hardening fix: the Asset's non-schema attrs
+        # were rerouted into the ``attributes`` JSON blob, and the Asset
+        # op no longer aborts the loop).
         assert len(touched) >= 2, f"expected ≥2 entities touched by {wf_id}, got {len(touched)}: {touched}"
 
-        # Decisions cannot land for creative-campaign today (see comment
-        # above) — assert no regression in that direction without
-        # demanding success, and skip a stronger assertion. The vendor-kyc
-        # smoke above already pins the by_type("Decision", …) contract.
+        # Phase 1 hardening: the Decision op used to be skipped because
+        # the Asset op (earlier in the loop) raised a Binder exception
+        # that aborted every subsequent op via the reflector's outer
+        # try/except. With per-op isolation + schema-aligned attrs, the
+        # Decision now lands.
         decisions = state.entities.by_type("Decision", workflow_id=wf_id)
-        assert isinstance(decisions, list)
+        assert len(decisions) >= 1, (
+            f"expected ≥1 Decision for {wf_id} after Phase 1 hardening, got {len(decisions)}"
+        )
     finally:
         asyncio.run(state.aclose())

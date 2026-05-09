@@ -1,6 +1,8 @@
 """Test the privacy-dpia projection (TASK-024)."""
 from __future__ import annotations
 
+import json
+
 from api.server.services.entity_graph import DecisionWrite, EntityWrite
 from api.server.services.entity_projections.privacy_dpia import (
     project, WORKFLOW_TYPE,
@@ -19,7 +21,9 @@ def test_privacy_dpia_projection_emits_dpia_asset_and_region_place():
     assert {"Asset", "Place"} <= kinds
     asset = next(e for e in entities if e.kind == "Asset")
     assert asset.attrs["kind"] == "dpia"
-    assert asset.attrs["risk_tier"] == payload["risk_tier"]
+    # ``risk_tier`` is not an Asset schema column — lives in attributes JSON.
+    asset_extra = json.loads(asset.attrs["attributes"])
+    assert asset_extra["risk_tier"] == payload["risk_tier"]
 
 
 def test_privacy_dpia_projection_emits_cpo_decision_only_for_high_risk():

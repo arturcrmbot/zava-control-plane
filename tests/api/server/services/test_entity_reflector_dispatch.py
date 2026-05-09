@@ -180,3 +180,81 @@ def test_reflector_silently_skips_unknown_workflow_type(
         )
     finally:
         reflector_with_audit.aclose()
+
+
+def test_reflector_isolates_per_op_failures(
+    bus: EventBus,
+    store: StateStore,
+    graph: EntityGraph,
+) -> None:
+    """A single failing op must not poison sibling ops in the same projection.
+
+    Locks the per-op isolation contract added in Phase 1 hardening: the
+    reflector wraps every dispatch in its own try/except + audit
+    (``entity.write.failed``) and continues the loop instead of aborting.
+    """
+
+    def fake_projection(_wf: Workflow) -> list:
+        return [
+            EntityWrite(
+                kind="Person",
+                id="PERSON-OK1",
+                attrs={"name": "Good One"},
+                source_workflows=("WF-ISO",),
+            ),
+            # This op will fail at upsert time: ``not_a_real_column`` is
+            # not in the Person node-table schema, so Kuzu's Binder rejects
+            # it. Per the contract, the loop must still dispatch the next
+            # op — which is why PERSON-OK2 below has to land.
+            EntityWrite(
+                kind="Person",
+                id="PERSON-BAD",
+                attrs={"name": "Bad One", "not_a_real_column": "boom"},
+                source_workflows=("WF-ISO",),
+            ),
+            EntityWrite(
+                kind="Person",
+                id="PERSON-OK2",
+                attrs={"name": "Good Two"},
+                source_workflows=("WF-ISO",),
+            ),
+        ]
+
+    audit_calls: list[tuple[str, dict]] = []
+
+    class _RecordingAudit:
+        def log(self, action: str, details: dict) -> None:
+            audit_calls.append((action, details))
+
+    PROJECTIONS["test-isolation-domain"] = fake_projection
+    reflector_iso = EntityReflector(bus, store, graph, audit=_RecordingAudit())
+    reflector_iso.start()
+    try:
+        store.upsert_workflow(_make_workflow("WF-ISO", "test-isolation-domain"))
+        # Should not raise even though one op fails.
+        bus.emit(FleetEvent(type="workflow.completed", workflow_id="WF-ISO"))
+
+        # Both good ops must have landed.
+        assert graph.get("PERSON-OK1") is not None, (
+            "first good op must land regardless of later failure"
+        )
+        assert graph.get("PERSON-OK2") is not None, (
+            "post-failure op must land — single bad op cannot poison the loop"
+        )
+        # Bad op did NOT land.
+        assert graph.get("PERSON-BAD") is None
+
+        # Exactly one entity.write.failed audit emission, naming the bad op.
+        failures = [d for a, d in audit_calls if a == "entity.write.failed"]
+        assert len(failures) == 1, (
+            f"expected one entity.write.failed audit, got {audit_calls!r}"
+        )
+        d = failures[0]
+        assert d["kind"] == "Person"
+        assert d["id"] == "PERSON-BAD"
+        assert d["op_index"] == 1
+        assert d["workflow_id"] == "WF-ISO"
+        assert "error_type" in d and "error_msg" in d
+    finally:
+        reflector_iso.aclose()
+        del PROJECTIONS["test-isolation-domain"]

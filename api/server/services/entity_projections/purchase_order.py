@@ -1,5 +1,9 @@
 """Projection: purchase-order (TASK-016).
 
+Rels emitted: ``Money -[:BELONGS_TO]-> Period``. Asset->TRANSACTS->Org
+was dropped in Phase 1 hardening (TRANSACTS is schema-typed Person→Money);
+vendor↔PO linkage is preserved in Asset's ``attributes`` blob.
+
 Payload keys (``data/synthetic/purchase-order/pos.json``)::
 
     po_id, vendor_name, amount_gbp, category, supplier_on_approved_list, scenario
@@ -10,6 +14,7 @@ seconds) and fall back to ``"PERIOD-2026-Q2"`` when unavailable.
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 from api.server.services.entity_projections import (
@@ -46,6 +51,12 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
     period_id = _period_id(workflow.created_at)
     sw = (workflow.id,)
 
+    asset_extra = {
+        "category": category,
+        "approved_supplier": approved,
+        "vendor_id": vendor_id,
+    }
+
     ops: list[EntityWrite | RelWrite | DecisionWrite] = [
         EntityWrite(
             kind="Organisation",
@@ -59,8 +70,7 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
             attrs={
                 "kind": "purchase-order",
                 "identifier": po_id,
-                "category": category,
-                "approved_supplier": approved,
+                "attributes": json.dumps(asset_extra, sort_keys=True, default=str),
             },
             source_workflows=sw,
         ),
@@ -80,7 +90,7 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
             id=period_id,
             attrs={"kind": "quarter", "label": period_id.removeprefix("PERIOD-")},
         ),
-        RelWrite(src_id=asset_id, rel="TRANSACTS", dst_id=vendor_id),
+        # NOTE: Asset->TRANSACTS->Organisation dropped in Phase 1 hardening.
         RelWrite(src_id=money_id, rel="BELONGS_TO", dst_id=period_id),
     ]
 

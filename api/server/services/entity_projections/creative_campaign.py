@@ -1,5 +1,12 @@
 """Projection: creative-campaign (TASK-026).
 
+Rels emitted: none. The Asset->TRANSACTS->Org (customer + agency) edges
+were dropped in Phase 1 hardening because TRANSACTS is schema-typed
+Person→Money. Customer / agency / jurisdictions are preserved via the
+Asset's ``attributes`` blob and via the workflow's ``source_workflows``
+arrays on every entity. Phase 2's compose-domain v4 will widen the schema
+if richer rel directions are needed for FM queries.
+
 Payload keys (``data/synthetic/creative-campaign/briefs.json``)::
 
     client_brand, category, audience, mandatory_messages, channels,
@@ -37,6 +44,17 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
     asset_id = f"ASSET-campaign-{workflow.id}"
     sw = (workflow.id,)
 
+    asset_extra = {
+        "category": category,
+        "audience": audience,
+        "channels": channels,
+        "kpis": kpis,
+        "constraints": constraints,
+        "jurisdictions": jurisdictions,
+        "customer_id": customer_id,
+        "agency_id": agency_id,
+    }
+
     ops: list[EntityWrite | RelWrite | DecisionWrite] = [
         EntityWrite(
             kind="Organisation", id=customer_id,
@@ -52,16 +70,12 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
             kind="Asset", id=asset_id,
             attrs={
                 "kind": "campaign",
-                "category": category,
-                "audience": audience,
-                "channels": json.dumps(channels),
-                "kpis": json.dumps(kpis),
-                "constraints": json.dumps(constraints),
+                "attributes": json.dumps(asset_extra, sort_keys=True, default=str),
             },
             source_workflows=sw,
         ),
-        RelWrite(src_id=asset_id, rel="TRANSACTS", dst_id=customer_id),
-        RelWrite(src_id=asset_id, rel="TRANSACTS", dst_id=agency_id, attrs={"role": "produced-by"}),
+        # NOTE: Asset->TRANSACTS->Organisation (×2) dropped in Phase 1
+        # hardening. TRANSACTS is schema-typed Person→Money.
     ]
 
     for jur in jurisdictions:
@@ -70,8 +84,8 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
             kind="Place", id=place_id,
             attrs={"kind": "market", "name": str(jur)},
         ))
-        # See note in privacy_dpia: LOCATED_IN today is Person->Place only;
-        # the Asset->Place edge is deferred to a Phase 2 schema extension.
+        # Asset->LOCATED_IN->Place is also schema-invalid (LOCATED_IN is
+        # Person→Place); leave the Place node as provenance only.
 
     # The five HITL gates use ``creative_director`` for every persona today;
     # the spec calls out ``creative_strategy_director`` as a future-proof

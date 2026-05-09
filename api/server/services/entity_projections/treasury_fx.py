@@ -1,10 +1,14 @@
 """Projection: treasury-fx (TASK-025).
 
+Rels emitted: none.
+
 Payload keys (``data/synthetic/treasury-fx/ops.json``)::
 
     op_id, op_kind, currency_pair, notional_gbp, scenario
 """
 from __future__ import annotations
+
+import json
 
 from api.server.services.entity_projections import (
     DecisionWrite,
@@ -26,6 +30,8 @@ def project(workflow: Workflow) -> list[EntityWrite | DecisionWrite]:
     money_id = f"MONEY-FX-{op_id}"
     sw = (workflow.id,)
 
+    money_extra = {"op_kind": op_kind, "currency_pair": pair}
+
     ops: list[EntityWrite | DecisionWrite] = [
         EntityWrite(
             kind="Money",
@@ -34,8 +40,7 @@ def project(workflow: Workflow) -> list[EntityWrite | DecisionWrite]:
                 "kind": "fx",
                 "amount": float(notional),
                 "currency": "GBP",
-                "op_kind": op_kind,
-                "currency_pair": pair,
+                "attributes": json.dumps(money_extra, sort_keys=True, default=str),
             },
             source_workflows=sw,
         ),

@@ -1,11 +1,16 @@
 """Projection: contract-review (TASK-022).
 
+Rels emitted: none. Vendor↔contract linkage lives in the Asset's
+``attributes`` blob (Asset->TRANSACTS->Org is schema-invalid).
+
 Payload keys (``data/synthetic/contract-review/contracts.json``)::
 
     contract_id, vendor_name, contract_type, amount_gbp,
     deviates_from_template, scenario
 """
 from __future__ import annotations
+
+import json
 
 from api.server.services.entity_projections import (
     DecisionWrite,
@@ -31,6 +36,13 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
     asset_id = f"ASSET-contract-{contract_id}"
     sw = (workflow.id,)
 
+    asset_extra = {
+        "contract_type": contract_type,
+        "deviates_from_template": deviates,
+        "amount_gbp": float(amount),
+        "vendor_id": vendor_id,
+    }
+
     ops: list[EntityWrite | RelWrite | DecisionWrite] = [
         EntityWrite(
             kind="Organisation",
@@ -44,13 +56,11 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
             attrs={
                 "kind": "contract",
                 "identifier": contract_id,
-                "contract_type": contract_type,
-                "deviates_from_template": deviates,
-                "amount_gbp": float(amount),
+                "attributes": json.dumps(asset_extra, sort_keys=True, default=str),
             },
             source_workflows=sw,
         ),
-        RelWrite(src_id=asset_id, rel="TRANSACTS", dst_id=vendor_id),
+        # NOTE: Asset->TRANSACTS->Organisation dropped in Phase 1 hardening.
     ]
 
     d = build_decision(

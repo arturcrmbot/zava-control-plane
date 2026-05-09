@@ -5,17 +5,25 @@ Maps an ``ap-invoice`` workflow's payload to:
 * :class:`Organisation` ``vendor`` — payee.
 * :class:`Asset` ``purchase-order`` — matched-to-PO.
 * :class:`Money` ``invoice`` — amount + currency.
-* :class:`RelWrite` ``Money -[:TRANSACTS {role="payee"}]-> Organisation``,
-  ``Money -[:OWNS]-> Asset``.
 * :class:`DecisionWrite` for the ``ap_clerk_signoff`` and
   ``controller_signoff`` HITL gates when the workflow payload carries
   matching decision entries (else skipped).
+
+Rels emitted: none. The semantic Money↔Org (payee) and Money↔Asset
+(matched-PO) links are typed in the schema as Person→Money / Person→Asset
+respectively, so they cannot be expressed today; the cross-cutting context
+is preserved via the workflow's ``source_workflows`` array on every
+entity, and via ``vendor_id`` / ``po_id`` stashed in Money's ``attributes``
+JSON blob. Phase 2's compose-domain v4 will widen the schema if richer
+rel directions are needed for FM queries.
 
 Payload keys consumed (verbatim from ``data/synthetic/ap-invoice/invoices.json``)::
 
     invoice_id, vendor_name, po_id, amount_gbp, currency, category, scenario
 """
 from __future__ import annotations
+
+import json
 
 from api.server.services.entity_projections import (
     DecisionWrite,
@@ -43,6 +51,13 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
     money_id = f"MONEY-INV-{invoice_id}"
     sw = (workflow.id,)
 
+    money_extra = {
+        "category": category,
+        "vendor_id": vendor_id,
+        "po_id": asset_id,
+        "invoice_id": invoice_id,
+    }
+
     ops: list[EntityWrite | RelWrite | DecisionWrite] = [
         EntityWrite(
             kind="Organisation",
@@ -63,12 +78,15 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
                 "kind": "invoice",
                 "amount": float(amount),
                 "currency": currency,
-                "category": category,
+                "attributes": json.dumps(money_extra, sort_keys=True, default=str),
             },
             source_workflows=sw,
         ),
-        RelWrite(src_id=money_id, rel="TRANSACTS", dst_id=vendor_id, attrs={"role": "payee"}),
-        RelWrite(src_id=money_id, rel="OWNS", dst_id=asset_id),
+        # NOTE: Money->TRANSACTS->Organisation and Money->OWNS->Asset were
+        # removed in Phase 1 hardening. TRANSACTS is schema-typed Person→Money
+        # and OWNS is Person→Asset, so writing those edges would raise at
+        # link-time. The vendor + PO linkage lives in Money's ``attributes``
+        # blob instead until Phase 2 widens the schema.
     ]
 
     for gate_phase, persona in (

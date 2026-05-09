@@ -1,6 +1,8 @@
 """Test the creative-campaign projection (TASK-026)."""
 from __future__ import annotations
 
+import json
+
 from api.server.services.entity_graph import EntityWrite, RelWrite
 from api.server.services.entity_projections.creative_campaign import (
     project, WORKFLOW_TYPE,
@@ -24,8 +26,14 @@ def test_creative_campaign_projection_emits_customer_agency_and_campaign_asset()
     assert asset.attrs["kind"] == "campaign"
     assert asset.id == f"ASSET-campaign-{wf.id}"
 
+    # Non-schema fields routed into Asset.attributes JSON blob.
+    asset_extra = json.loads(asset.attrs["attributes"])
+    assert asset_extra["category"] == payload["category"]
+    assert asset_extra["audience"] == payload["audience"]
+    assert asset_extra["channels"] == list(payload["channels"])
+
     places = [e for e in entities if e.kind == "Place"]
     assert {p.id for p in places} == {f"PLACE-{j}" for j in payload["jurisdictions"]}
 
-    transacts = [r for r in rels if r.rel == "TRANSACTS"]
-    assert any(r.attrs.get("role") == "produced-by" for r in transacts)
+    # Asset->TRANSACTS->Org dropped — they were schema-invalid.
+    assert rels == []

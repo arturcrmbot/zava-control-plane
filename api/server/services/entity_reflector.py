@@ -13,7 +13,13 @@ Design notes
   caller's thread (see ``api/server/services/event_bus.py``); the bus
   also wraps each call in ``try/except: pass`` so an exception inside
   ``_on_event`` cannot kill the bus. We still log exceptions to audit as
-  ``reflector.error`` so they're visible.
+  ``reflector.error`` (projection-level failures) or
+  ``entity.write.failed`` (per-op failures) so they're visible.
+* **Per-op isolation.** Each projection op (EntityWrite / RelWrite /
+  DecisionWrite) is dispatched inside its own try/except. One failing
+  op (e.g. a schema-mismatched rel) does NOT abort the rest of the
+  projection's writes — the loop always continues, audit-logging
+  ``entity.write.failed`` for each casualty.
 * **No new lock.** Every write goes through ``EntityGraph.upsert`` /
   ``link`` / ``record_decision``, all of which are already lock-protected.
   The reflector itself is stateless beyond the ``off`` callback stash.
@@ -52,6 +58,17 @@ log = logging.getLogger(__name__)
 
 _REFLECTOR_ACTOR = "reflector.entity_reflector"
 _REFLECTOR_TOOL = "entity.write"
+
+
+def _describe_op(op: Any) -> tuple[str, str]:
+    """Return ``(kind, id)`` for an op for audit logging — best-effort."""
+    if isinstance(op, EntityWrite):
+        return op.kind, op.id
+    if isinstance(op, RelWrite):
+        return f"rel:{op.rel}", f"{op.src_id}->{op.dst_id}"
+    if isinstance(op, DecisionWrite):
+        return "Decision", f"{op.workflow_id}:{op.phase}"
+    return type(op).__name__, ""
 
 
 class EntityReflector:
@@ -131,11 +148,9 @@ class EntityReflector:
                     return
 
             ops = projection(workflow)
-            for op in ops:
-                self._dispatch_op(op)
         except Exception as exc:
-            # Bus already swallows, but make the failure visible.
-            log.exception("entity_reflector: dispatch failed")
+            # Projection itself raised — nothing to dispatch. Make it visible.
+            log.exception("entity_reflector: projection raised")
             self._audit_log(
                 "reflector.error",
                 {
@@ -144,6 +159,31 @@ class EntityReflector:
                     "error": repr(exc),
                 },
             )
+            return
+
+        # Per-op isolation: a single failing op (e.g. schema mismatch on one
+        # entity kind) must NOT skip the rest of the projection's writes.
+        # Each op gets its own try/except + audit; the loop always continues.
+        for op_index, op in enumerate(ops):
+            try:
+                self._dispatch_op(op)
+            except Exception as exc:
+                kind, ent_id = _describe_op(op)
+                log.exception(
+                    "entity_reflector: op %d (%s id=%s) failed",
+                    op_index, kind, ent_id,
+                )
+                self._audit_log(
+                    "entity.write.failed",
+                    {
+                        "kind": kind,
+                        "id": ent_id,
+                        "op_index": op_index,
+                        "error_type": type(exc).__name__,
+                        "error_msg": str(exc),
+                        "workflow_id": getattr(event, "workflow_id", None),
+                    },
+                )
 
     def _dispatch_op(self, op: EntityWrite | RelWrite | DecisionWrite) -> None:
         if isinstance(op, EntityWrite):

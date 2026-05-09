@@ -22,5 +22,6 @@ def test_purchase_order_projection_emits_core_entities():
     assert money.attrs["kind"] == "budget-line"
 
     rel_pairs = {(r.src_id.split("-")[0], r.rel) for r in rels}
-    assert ("ASSET", "TRANSACTS") in rel_pairs
+    # Asset->TRANSACTS->Org dropped in Phase 1 hardening; only BELONGS_TO remains.
     assert ("MONEY", "BELONGS_TO") in rel_pairs
+    assert not any(rel == "TRANSACTS" for _, rel in rel_pairs)

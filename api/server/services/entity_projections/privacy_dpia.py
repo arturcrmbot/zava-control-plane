@@ -1,5 +1,8 @@
 """Projection: privacy-dpia (TASK-024).
 
+Rels emitted: none. Asset->LOCATED_IN->Place is schema-invalid
+(LOCATED_IN is Person→Place); the Place node remains as provenance.
+
 Payload keys (``data/synthetic/privacy-dpia/dpias.json``)::
 
     dpia_id, system_name, risk_tier, geography, scenario
@@ -15,6 +18,8 @@ projection nonetheless looks for ``privacy_dpo_review`` and
 for the upcoming Authority-Resolve unwind.
 """
 from __future__ import annotations
+
+import json
 
 from api.server.services.entity_projections import (
     DecisionWrite,
@@ -42,6 +47,12 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
     place_id = f"PLACE-{geography}" if geography else None
     sw = (workflow.id,)
 
+    asset_extra = {
+        "system_name": system_name,
+        "risk_tier": risk_tier,
+        "geography": geography,
+    }
+
     ops: list[EntityWrite | RelWrite | DecisionWrite] = [
         EntityWrite(
             kind="Asset",
@@ -49,9 +60,7 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
             attrs={
                 "kind": "dpia",
                 "identifier": dpia_id,
-                "system_name": system_name,
-                "risk_tier": risk_tier,
-                "geography": geography,
+                "attributes": json.dumps(asset_extra, sort_keys=True, default=str),
             },
             source_workflows=sw,
         ),
@@ -63,10 +72,10 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
             id=place_id,
             attrs={"kind": "region", "name": geography},
         ))
-        # Schema's LOCATED_IN is FROM Person TO Place; emitting the rel
-        # here would be rejected at write-time. Leave the Place node as
-        # provenance and defer the Asset->Place rel to Phase 2 once the
-        # schema gains an Asset-LOCATED_IN-Place edge.
+        # Schema's LOCATED_IN is FROM Person TO Place; emitting an
+        # Asset->Place rel here would be rejected at write-time. The Place
+        # node is left as provenance and the geography is also stashed in
+        # the Asset's ``attributes`` blob.
 
     gates: list[tuple[str, str]] = [("privacy_dpo_review", "privacy_dpo")]
     if _is_high_risk(risk_tier):

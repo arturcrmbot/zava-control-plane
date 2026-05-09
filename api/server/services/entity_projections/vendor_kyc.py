@@ -1,5 +1,10 @@
 """Projection: vendor-kyc (TASK-017).
 
+Rels emitted: none. Org->TRANSACTS->Org (proposed-by) was dropped in
+Phase 1 hardening (TRANSACTS is schema-typed Person→Money). The
+proposing-agency linkage is preserved via the workflow's
+``source_workflows`` array on both Org nodes.
+
 Payload keys (``data/synthetic/vendor-kyc/vendors.json``)::
 
     vendor_name, country_of_incorporation, proposing_agency, scenario
@@ -56,12 +61,7 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
             attrs={"name": agency, "kind": "agency"},
             source_workflows=sw,
         ),
-        RelWrite(
-            src_id=vendor_id,
-            rel="TRANSACTS",
-            dst_id=agency_id,
-            attrs={"role": "proposed-by"},
-        ),
+        # NOTE: Org->TRANSACTS->Org dropped in Phase 1 hardening.
     ]
 
     d = build_decision(
