@@ -109,9 +109,12 @@ export function AnimationLayer({ entries, beams, onTick, zoomLevel = 3 }: Props)
           helpers.to.set(...e.to);
           helpers.vec.copy(helpers.from).lerp(helpers.to, e.t);
           helpers.dummy.position.copy(helpers.vec);
-          // Mote shrinks slightly as it lands, so the lobby vault feels
-          // like it absorbs the entity rather than just collecting motes.
-          const s = 0.05 + 0.02 * (1 - e.t);
+          // Mote shrinks slightly as it lands. Bumped 0.05+0.02 →
+          // 0.10+0.04 in ralph-loop pass — at zoom-3 the original size
+          // resolved to ~3px so motes were invisible against the
+          // emissive floors. The bigger size + the LOD opacity ramp
+          // keeps the visual signal without crushing fps.
+          const s = 0.10 + 0.04 * (1 - e.t);
           helpers.dummy.scale.setScalar(s);
         }
         helpers.dummy.updateMatrix();
@@ -146,7 +149,7 @@ export function AnimationLayer({ entries, beams, onTick, zoomLevel = 3 }: Props)
         const m = child.material as THREE.MeshBasicMaterial;
         m.color.set(e.color);
         m.opacity = Math.max(0.05, 1 - e.t);
-        const s = 0.06 + 0.05 * Math.sin(e.t * Math.PI);
+        const s = 0.12 + 0.10 * Math.sin(e.t * Math.PI);
         child.scale.setScalar(s);
       }
     }

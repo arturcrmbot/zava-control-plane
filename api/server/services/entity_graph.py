@@ -487,8 +487,14 @@ class EntityGraph:
 
     # -- writes (PAT-002) ------------------------------------------------
 
-    def upsert(self, entity: EntityWrite) -> None:
+    def upsert(self, entity: EntityWrite, *, caller_workflow_id: str | None = None) -> None:
         """Idempotently upsert ``entity`` and emit ``entity.upserted``.
+
+        ``caller_workflow_id`` is an optional kwarg the reflector passes
+        when it knows which workflow's projection produced this op.
+        It's threaded into the bus event (so the org-building
+        animation overlay can address the firing window) but is NOT
+        persisted onto the node.
 
         Cypher MERGE creates the node if it doesn't exist and matches it
         otherwise; the SET clause then assigns attrs + the deduped union
@@ -572,7 +578,7 @@ class EntityGraph:
             self.bus.emit(
                 FleetEvent(
                     type="entity.upserted",
-                    workflow_id=entity.attrs.get("workflow_id"),
+                    workflow_id=caller_workflow_id or entity.attrs.get("workflow_id"),
                     entity_id=entity.id,
                     kind=entity.kind,
                 )

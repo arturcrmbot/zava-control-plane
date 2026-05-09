@@ -42,10 +42,46 @@ export interface EventCtx {
   layers: LayerFlags;
 }
 
+/** workflow_id prefix → workflow_type. Mirrors the per-domain
+ *  `workflow_id_prefix` in api/shared/domains.py. Used as a fallback
+ *  when the SSE event doesn't carry workflow_type explicitly (most
+ *  durable / entity events don't). */
+export const PREFIX_TO_WORKFLOW_TYPE: Record<string, string> = {
+  EXP: "expense-claim",
+  HIRE: "hiring",
+  TRV: "travel-preapproval",
+  TRVL: "travel-preapproval",
+  VKY: "vendor-kyc",
+  ONB: "employee-onboarding",
+  ITAR: "it-access-request",
+  CRN: "contract-renewal",
+  PRR: "perf-review",
+  API: "ap-invoice",
+  POW: "purchase-order",
+  CRW: "contract-review",
+  DPI: "privacy-dpia",
+  TFX: "treasury-fx",
+  CMP: "creative-campaign",
+  H2P: "hire-to-productive",
+  VRP: "vendor-risk-to-pay",
+  L2C: "lead-to-cash",
+  FYC: "fy-close",
+  BRD: "board-prep",
+};
+
+/** Extract the {prefix} from an "{prefix}-NNNN" workflow id. */
+function prefixOf(workflowId: string | null | undefined): string | null {
+  if (!workflowId) return null;
+  const m = workflowId.match(/^([A-Z]+)-/);
+  return m ? m[1] : null;
+}
+
 /** Resolve which function "fired" the event. Falls back through:
  *  1. explicit event.function
  *  2. workflow_type lookup
  *  3. domain lookup (owns_domains may include the raw domain name)
+ *  4. workflow_id prefix → workflow_type → function (entity / durable
+ *     events don't carry workflow_type but always carry workflow_id)
  */
 export function resolveFunction(
   event: ObservatoryEvent,
@@ -58,6 +94,13 @@ export function resolveFunction(
   }
   if (event.domain && ctx.functionByWorkflowType.has(event.domain)) {
     return ctx.functionByWorkflowType.get(event.domain)!;
+  }
+  const prefix = prefixOf(event.workflow_id);
+  if (prefix) {
+    const inferredWt = PREFIX_TO_WORKFLOW_TYPE[prefix];
+    if (inferredWt && ctx.functionByWorkflowType.has(inferredWt)) {
+      return ctx.functionByWorkflowType.get(inferredWt)!;
+    }
   }
   return null;
 }

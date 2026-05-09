@@ -107,9 +107,34 @@ class EntityReflector:
 
     # -- dispatch --------------------------------------------------------
 
+    # Event types that meaningfully advance a workflow's state and so
+    # warrant re-projection. Anything else (including the reflector's
+    # own ``entity.upserted`` / ``entity.linked`` / ``decision.recorded``
+    # emissions, plus chatty ``durable.executor.invoked`` / ``ts`` /
+    # ``kpi.published`` traffic) is ignored to avoid the infinite-loop
+    # the bus would otherwise hit when our own writes fire it back.
+    _PROJECT_TRIGGER_TYPES = frozenset({
+        "workflow.started",
+        "durable.workflow.started",
+        "durable.workflow.completed",
+        "workflow.resolved",
+        "workflow.completed",
+        "durable.step.completed",
+        "workflow.hitl.requested",
+        "workflow.hitl.escalated",
+        "durable.suspended",
+        "durable.resumed",
+    })
+
     def _on_event(self, event: FleetEvent) -> None:
         """Resolve workflow → projection → graph ops. See module docstring."""
         try:
+            event_type = getattr(event, "type", None)
+            if event_type not in self._PROJECT_TRIGGER_TYPES:
+                # Critical: ignore our own entity.* / decision.* / chatty
+                # durable.* emissions or the reflector recurses on every
+                # write it just made.
+                return
             workflow_id = getattr(event, "workflow_id", None)
             if not workflow_id:
                 return
@@ -166,7 +191,7 @@ class EntityReflector:
         # Each op gets its own try/except + audit; the loop always continues.
         for op_index, op in enumerate(ops):
             try:
-                self._dispatch_op(op)
+                self._dispatch_op(op, caller_workflow_id=workflow_id)
             except Exception as exc:
                 kind, ent_id = _describe_op(op)
                 log.exception(
@@ -185,9 +210,14 @@ class EntityReflector:
                     },
                 )
 
-    def _dispatch_op(self, op: EntityWrite | RelWrite | DecisionWrite) -> None:
+    def _dispatch_op(
+        self,
+        op: EntityWrite | RelWrite | DecisionWrite,
+        *,
+        caller_workflow_id: str | None = None,
+    ) -> None:
         if isinstance(op, EntityWrite):
-            self._graph.upsert(op)
+            self._graph.upsert(op, caller_workflow_id=caller_workflow_id)
         elif isinstance(op, RelWrite):
             self._graph.link(op.src_id, op.rel, op.dst_id, **op.attrs)
         elif isinstance(op, DecisionWrite):

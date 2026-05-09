@@ -143,6 +143,7 @@ def _normalise_event(event: FleetEvent) -> dict[str, Any] | None:
         "tool": tool,
         "domain": domain,
         "workflow_id": workflow_id,
+        "workflow_type": workflow_type,
         "executor_type": data.get("executor_type"),
         "stage": data.get("stage"),
         # HITL / suspended events carry the persona that was asked plus a
@@ -150,6 +151,21 @@ def _normalise_event(event: FleetEvent) -> dict[str, Any] | None:
         # the Constellation can render a satellite next to awaiting motes.
         "persona": data.get("persona"),
         "reason": data.get("reason"),
+        # Org Building entity / function-plane fields. Only set on the
+        # entity.* / decision.* / ambient.* / cadence.* / sub_spawned
+        # event types — the org-building animation overlay uses these
+        # to address the firing window / floor / vault. Other event
+        # types leave them None and the frontend ignores them.
+        "entity_id": data.get("entity_id"),
+        "entity_kind": data.get("entity_kind") or data.get("kind"),
+        "function": data.get("function"),
+        "agent_name": data.get("agent_name") or data.get("ambient_agent"),
+        "cadence": data.get("cadence") or data.get("cadence_name"),
+        "decision_id": data.get("decision_id"),
+        "parent_workflow_id": data.get("parent_workflow_id")
+            or data.get("parent_id"),
+        "child_workflow_id": data.get("child_workflow_id")
+            or data.get("child_id"),
         "ts": data.get("ts") or time.time(),
     }
 

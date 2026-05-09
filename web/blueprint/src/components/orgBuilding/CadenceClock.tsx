@@ -53,10 +53,12 @@ export function CadenceClock({ cadences }: Props) {
   const secY = CENTER + Math.sin(secAngle) * RADIUS * 0.85;
 
   // Position the widget below the lobby on the building's right side.
+  // Pushed out to X=5.0 so it sits clear of the Customer Success
+  // floor's facade (was overlapping at X=3.0).
   return (
     <Html
       transform={false}
-      position={[3.0, 0.4, 0]}
+      position={[5.0, 0.4, 0]}
       style={{
         pointerEvents: "none",
         transform: "translate(-50%, -50%)",

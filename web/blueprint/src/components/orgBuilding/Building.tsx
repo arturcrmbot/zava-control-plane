@@ -168,7 +168,7 @@ function Floor({ fn, y, isPenthouse = false, dimmed = false, boosted = false, on
           chunk-4 self-audit so labels are legible from the default
           orbit distance without leaning in. */}
       <Text
-        position={[-width / 2 + 0.12, FLOOR_HEIGHT * 0.28, FLOOR_DEPTH / 2 + 0.03]}
+        position={[-width / 2 + 0.12, FLOOR_HEIGHT * 0.32, FLOOR_DEPTH / 2 + 0.03]}
         fontSize={boosted ? 0.22 : 0.18}
         color={dimmed ? "#6b7077" : "#f5f5f7"}
         anchorX="left"
@@ -179,28 +179,17 @@ function Floor({ fn, y, isPenthouse = false, dimmed = false, boosted = false, on
         {fn.display}
       </Text>
 
-      {/* KPI count badge tucked under the label. */}
-      <Text
-        position={[-width / 2 + 0.12, FLOOR_HEIGHT * 0.08, FLOOR_DEPTH / 2 + 0.03]}
-        fontSize={0.07}
-        color="#9aa0a6"
-        anchorX="left"
-        anchorY="middle"
-      >
-        {fn.kpis.length} KPI{fn.kpis.length === 1 ? "" : "s"}
-      </Text>
-
       {/* Marquee KPI ticker — re-renders on each poll tick. Bumped to
-          0.09 (was 0.075) in chunk-4 self-audit so the ticker is
-          readable at default zoom-3 framing without zooming in. */}
+          0.13 (was 0.09) in ralph-loop pass — at default zoom-3 framing
+          0.09 was rendering as ~3px tall and totally illegible. */}
       <Text
-        position={[0, -FLOOR_HEIGHT * 0.28, FLOOR_DEPTH / 2 + 0.03]}
-        fontSize={boosted ? 0.13 : 0.09}
+        position={[0, -FLOOR_HEIGHT * 0.32, FLOOR_DEPTH / 2 + 0.03]}
+        fontSize={boosted ? 0.16 : 0.13}
         maxWidth={width * 0.95}
         color={dimmed ? "#6b7077" : color}
         anchorX="center"
         anchorY="middle"
-        outlineWidth={0.003}
+        outlineWidth={0.005}
         outlineColor="#000"
       >
         {tickerText || "—"}

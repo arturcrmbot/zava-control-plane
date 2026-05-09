@@ -81,15 +81,15 @@ export function OrgBuilding({ status, fullScreen = false, zoomTarget }: Props) {
     <div className="org-building" style={wrapperStyle}>
       <Canvas dpr={[1, 2]} gl={{ antialias: true, alpha: false }}>
         <color attach="background" args={["#06070a"]} />
-        <PerspectiveCamera makeDefault position={[0, 8, 26]} fov={45} />
+        <PerspectiveCamera makeDefault position={[14, 8, 16]} fov={45} />
         <OrbitControls
           enableDamping
           dampingFactor={0.08}
-          autoRotate={zoomTarget?.kind !== "wing"}
-          autoRotateSpeed={0.35}
+          autoRotate={false}
+          autoRotateSpeed={0.12}
           minDistance={6}
           maxDistance={60}
-          target={[0, 5, 0]}
+          target={[0, 5.5, 0]}
         />
 
         <ambientLight intensity={0.2} />

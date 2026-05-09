@@ -480,3 +480,39 @@ async def constellation_start():
         "failed": failed,
     }
 # === END constellation-mode ===
+
+
+# Ralph-loop helper — seed every function FM's KPIs with synthetic
+# values so the building's KPI tickers read as populated for the
+# demo / smoke. Idempotent. Safe to call repeatedly.
+@router.post("/seed-kpis")
+async def seed_kpis():
+    import random as _rnd
+    from api.shared.functions import FUNCTIONS
+
+    fm_registry = getattr(app_state, "function_fms", None)
+    if not fm_registry:
+        return {"ok": False, "reason": "function_fms not initialised"}
+
+    period = _time.strftime("%Y-%m")
+    seeded: list[dict] = []
+    for fn_key, fn_spec in FUNCTIONS.items():
+        if fn_key == "legacy" or not fn_spec.kpis:
+            continue
+        fm = fm_registry.get(fn_key)
+        if fm is None:
+            continue
+        for metric in fn_spec.kpis:
+            # Pseudo-random but deterministic per (fn, metric) so reseeds
+            # don't churn the building's KPI tickers wildly.
+            rng = _rnd.Random(f"{fn_key}:{metric}")
+            base = rng.uniform(10, 95)
+            value = round(base + rng.uniform(-2.0, 2.0), 1)
+            try:
+                fm.publish_kpi(metric, value, period)
+                seeded.append({"function": fn_key, "metric": metric,
+                               "value": value, "period": period})
+            except Exception as exc:  # noqa: BLE001
+                seeded.append({"function": fn_key, "metric": metric,
+                               "error": str(exc)})
+    return {"ok": True, "count": len(seeded), "seeded": seeded[:20]}
