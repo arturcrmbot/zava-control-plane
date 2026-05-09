@@ -18,13 +18,37 @@ function key(fn: string, role: string): string {
   return `${fn}::${role}`;
 }
 
+/** Stable djb2 hash for distributing workflows across desks. */
+function djb2(s: string): number {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return h >>> 0;
+}
+
+const desksByFunction: Map<string, Vec3[]> = new Map();
+
 export function registerDeskPositions(fn: string, role: string, position: Vec3): void {
   desks.set(key(fn, role), position);
-  // First registered desk per function becomes the function's fallback
-  // (used when a workflow's persona role doesn't match any known desk).
   if (!fallbackByFunction.has(fn)) {
     fallbackByFunction.set(fn, position);
   }
+  // Build per-function ordered desk list (used to distribute workflow
+  // motes across desks deterministically by workflow_id hash).
+  const list = desksByFunction.get(fn) ?? [];
+  if (!list.some((p) => p[0] === position[0] && p[1] === position[1] && p[2] === position[2])) {
+    list.push(position);
+    desksByFunction.set(fn, list);
+  }
+}
+
+/** Pick a deterministic desk position for a workflow_id within a function.
+ *  Used when we don't know which persona owns the gate — spreads motes
+ *  across the floor's desks so they don't pile on one spot. */
+export function deskPositionForWorkflow(fn: string, workflowId: string): Vec3 | null {
+  const list = desksByFunction.get(fn);
+  if (!list || list.length === 0) return fallbackByFunction.get(fn) ?? null;
+  const idx = djb2(workflowId) % list.length;
+  return list[idx];
 }
 
 export function deskPosition(fn: string, role: string | null | undefined): Vec3 | null {

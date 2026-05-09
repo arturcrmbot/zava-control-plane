@@ -11,7 +11,10 @@ import { useRef } from "react";
 import * as THREE from "three";
 
 import type { FlashSet } from "../../lib/useLiveOrg";
-import { deskPosition, lobbyDecisionPoolPosition } from "./tower-registry";
+import {
+  deskPositionForWorkflow,
+  lobbyDecisionPoolPosition,
+} from "./tower-registry";
 
 const FLY_MS = 1400;
 const POOL_DECAY_MS = 30000;
@@ -59,7 +62,7 @@ export function DecisionPool({ flashesRef, floorY }: Props) {
     while (queue.length > 0 && flyingRef.current.size < MAX_FLYING) {
       const dec = queue.shift()!;
       const fnKey = dec.function ?? "ops";
-      const desk = deskPosition(fnKey, dec.persona ?? null);
+      const desk = deskPositionForWorkflow(fnKey, dec.workflow_id);
       const fy = floorY.get(fnKey) ?? 1;
       const from = desk
         ? new THREE.Vector3(desk[0], desk[1] + 0.32, desk[2])

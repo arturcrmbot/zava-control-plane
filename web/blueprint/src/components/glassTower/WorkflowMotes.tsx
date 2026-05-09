@@ -13,7 +13,7 @@ import * as THREE from "three";
 
 import type { FlashSet, InFlightWorkflow } from "../../lib/useLiveOrg";
 import {
-  deskPosition,
+  deskPositionForWorkflow,
   lobbyDecisionPoolPosition,
   lobbyEntryPosition,
 } from "./tower-registry";
@@ -33,8 +33,8 @@ interface MoteState {
   awaitingPersona: boolean;
 }
 
-const LIFT_MS = 1500;
-const FALL_MS = 1500;
+const LIFT_MS = 3000;
+const FALL_MS = 2500;
 
 interface Props {
   inFlight: InFlightWorkflow[];
@@ -103,7 +103,7 @@ export function WorkflowMotes({ inFlight, floorY, flashesRef }: Props) {
     map.forEach((mote) => {
       if (i >= MAX_INSTANCES) return;
       const fn = mote.fn;
-      const desk = deskPosition(fn, null);
+      const desk = deskPositionForWorkflow(fn, mote.id);
       const fy = floorY.get(fn) ?? 1;
 
       const lobbyEntry = lobbyEntryPosition();
@@ -117,25 +117,45 @@ export function WorkflowMotes({ inFlight, floorY, flashesRef }: Props) {
       let opacityProxy = 1.0;
 
       if (mote.endsAt != null) {
-        // Falling phase — desk → decision pool.
+        // Falling phase — desk → decision pool. Route through shaft so the
+        // motion reads as "back down the elevator and out".
         const t = Math.min(1, (now - mote.endsAt) / FALL_MS);
         const pool = lobbyDecisionPoolPosition();
         const fallFrom = desk
           ? new THREE.Vector3(desk[0], desk[1] + 0.18, desk[2])
           : new THREE.Vector3(0, fy, 0);
         const fallTo = new THREE.Vector3(pool[0], pool[1] + 0.1, pool[2]);
-        pos = fallFrom.clone().lerp(fallTo, t);
+        // Mid waypoint at the elevator shaft (back of building, x=0, z=-2.2).
+        const shaftWaypoint = new THREE.Vector3(0, fallFrom.y * 0.55, -2.2);
+        if (t < 0.45) {
+          // First leg: desk → shaft.
+          const u = t / 0.45;
+          pos = fallFrom.clone().lerp(shaftWaypoint, u);
+        } else {
+          // Second leg: shaft → pool.
+          const u = (t - 0.45) / 0.55;
+          pos = shaftWaypoint.clone().lerp(fallTo, u);
+        }
         color = COLOR_COMPLETED;
         scale = 0.05 * (1 - t * 0.5);
         opacityProxy = 1 - t;
       } else {
-        // Lift / dwell phase.
+        // Lift / dwell phase. Workflows enter at the lobby's right side,
+        // ride UP the elevator shaft (x=0, z=-2.2), then slide OUT to the
+        // floor's desk. Two-leg path so the motion visibly hugs the shaft.
         const elapsed = now - mote.bornAt;
         if (elapsed < LIFT_MS) {
           const t = elapsed / LIFT_MS;
-          // Ease-out with a slight upward curve through the elevator shaft.
           const easeT = 1 - Math.pow(1 - t, 2);
-          pos = tmpFrom.clone().lerp(tmpTo, easeT);
+          // Mid waypoint inside the shaft at desk's height.
+          const shaftWaypoint = new THREE.Vector3(0, tmpTo.y, -2.2);
+          if (easeT < 0.55) {
+            const u = easeT / 0.55;
+            pos = tmpFrom.clone().lerp(shaftWaypoint, u);
+          } else {
+            const u = (easeT - 0.55) / 0.45;
+            pos = shaftWaypoint.clone().lerp(tmpTo, u);
+          }
           color = COLOR_RUNNING;
           scale = 0.06 + 0.03 * (1 - easeT);
         } else {
