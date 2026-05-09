@@ -78,6 +78,13 @@ class Domain:
     # immutable thereafter. The dataclass is non-frozen *only* to
     # accommodate this single boot-time back-ref write.
     function: str | None = None
+    # Phase 4 IP5+6 (TASK-027/028). When True, this Domain is a stub
+    # for a meta-workflow / strategic CEO domain whose orchestrator is
+    # codegen'd from a brief at docs/superpowers/specs/<wt>-brief.yaml
+    # but is NOT yet registered in function_app.py. The orphan
+    # validator and FM-skill catalog still see the entry; orchestrator-
+    # name resolution tests skip it.
+    stub: bool = False
 
 
 # --------------------------------------------------------------------------
@@ -471,6 +478,73 @@ DOMAINS: dict[str, Domain] = {
             WakeHint("creative.brand.distinctiveness_low",
                      "Concept route scored below distinctiveness threshold"),
         ),
+    ),
+    # --------------------------------------------------------------
+    # Phase 4 IP5+6 — meta-workflow + CEO strategic stubs (TASK-027,
+    # TASK-028). These are graduated via compose-domain v4 from briefs
+    # under docs/superpowers/specs/. Their orchestrators live as
+    # rendered-string codegen output (validated by ast.parse, NOT
+    # written to api/functions/workflows/ in this phase). The stubs
+    # below exist purely to satisfy the orphan validator in
+    # api.shared.functions: every domain a function claims must be in
+    # DOMAINS, and every domain in DOMAINS must be claimed.
+    # --------------------------------------------------------------
+    "hire-to-productive": Domain(
+        workflow_type="hire-to-productive",
+        display_name="Hire to Productive",
+        workflow_id_prefix="H2P",
+        orchestrator_name="HireToProductiveOrchestrator",
+        operator_surface="hr-bp",
+        phases=(),
+        hitl_gates=(HitlGate("manager_signoff", "manager_onboarding_plan_decision",
+                             "hr_bp"),),
+        skills=(),
+        stub=True,
+    ),
+    "vendor-risk-to-pay": Domain(
+        workflow_type="vendor-risk-to-pay",
+        display_name="Vendor Risk to Pay",
+        workflow_id_prefix="VRP",
+        orchestrator_name="VendorRiskToPayOrchestrator",
+        operator_surface="finance-controller",
+        phases=(),
+        hitl_gates=(HitlGate("payment_release", "payment_release_decision", "cfo"),),
+        skills=(),
+        stub=True,
+    ),
+    "lead-to-cash": Domain(
+        workflow_type="lead-to-cash",
+        display_name="Lead to Cash",
+        workflow_id_prefix="L2C",
+        orchestrator_name="LeadToCashOrchestrator",
+        operator_surface="account-director",
+        phases=(),
+        hitl_gates=(HitlGate("revenue_recognition", "revenue_recognition_decision",
+                             "account_director"),),
+        skills=(),
+        stub=True,
+    ),
+    "fy-close": Domain(
+        workflow_type="fy-close",
+        display_name="Fiscal-Year Close",
+        workflow_id_prefix="FYC",
+        orchestrator_name="FyCloseOrchestrator",
+        operator_surface="ceo",
+        phases=(),
+        hitl_gates=(HitlGate("ceo_signoff", "fy_close_decision", "cfo"),),
+        skills=(),
+        stub=True,
+    ),
+    "board-prep": Domain(
+        workflow_type="board-prep",
+        display_name="Board Pack Preparation",
+        workflow_id_prefix="BRD",
+        orchestrator_name="BoardPrepOrchestrator",
+        operator_surface="ceo",
+        phases=(),
+        hitl_gates=(HitlGate("board_signoff", "board_pack_decision", "cfo"),),
+        skills=(),
+        stub=True,
     ),
 }
 

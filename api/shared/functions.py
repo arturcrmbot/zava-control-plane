@@ -70,7 +70,7 @@ FUNCTIONS: dict[str, Function] = {
         display="Finance",
         operator_surface="finance-controller",
         owns_domains=("ap-invoice", "contract-renewal", "purchase-order",
-                      "treasury-fx", "vendor-kyc"),
+                      "treasury-fx", "vendor-kyc", "vendor-risk-to-pay"),
         # Phase 6 (TASK-035 / TASK-036) plants these instances; the names
         # are listed here so the discovery cross-validation has a target.
         # Phase 4 IP1 (TASK-006b) adds ``period-close`` (cadence-fired).
@@ -93,7 +93,8 @@ FUNCTIONS: dict[str, Function] = {
         name="hr",
         display="People & HR",
         operator_surface="hr-bp",
-        owns_domains=("employee-onboarding", "perf-review", "travel-preapproval"),
+        owns_domains=("employee-onboarding", "perf-review", "travel-preapproval",
+                      "hire-to-productive"),
         # Phase 4 IP1 (TASK-006b) adds ``morning-sweep`` (cadence-fired).
         ambient_agents=("morning-sweep",),
         kpis=("time-to-hire", "regrettable-attrition-pct",
@@ -113,9 +114,8 @@ FUNCTIONS: dict[str, Function] = {
         name="revenue",
         display="Revenue",
         operator_surface="account-director",
-        # Phase 4 graduates the synthetic ``lead-to-cash`` meta-workflow;
-        # for now no domains are owned.
-        owns_domains=(),
+        # Phase 4 IP5 graduates the synthetic ``lead-to-cash`` meta-workflow.
+        owns_domains=("lead-to-cash",),
         ambient_agents=(),
         kpis=("pipeline-coverage", "win-rate", "arr-growth-pct", "nrr"),
         persona_hierarchy=PersonaTree(
@@ -219,10 +219,12 @@ FUNCTIONS: dict[str, Function] = {
         name="ceo",
         display="CEO Office",
         operator_surface="ceo",
-        # CEO-FM owns no synthetic-journey domains today; strategic
-        # domains (``fy-close``, ``board-prep``) graduate later in
-        # Phase 4 IP6/IP7 via compose-domain v4.
-        owns_domains=(),
+        # CEO-FM owns two strategic domains (Phase 4 IP6 TASK-028).
+        # Their orchestrators are codegen'd from briefs at
+        # docs/superpowers/specs/{fy-close,board-prep}-brief.yaml; the
+        # DOMAINS entries are stubs (phases=()) so the orphan validator
+        # passes — full graduation lands in a later phase.
+        owns_domains=("fy-close", "board-prep"),
         # Phase 4 IP1 (TASK-006b) plants ``quarterly-okr``.
         ambient_agents=("quarterly-okr",),
         kpis=("revenue-growth", "ebitda-margin", "cash-runway"),

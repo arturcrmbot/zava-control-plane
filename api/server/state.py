@@ -199,6 +199,7 @@ class AppState:
             return
         from api.shared.functions import FUNCTIONS
         from api.server.mcp_tools import build_function_fm_tools
+        from api.server.mcp_tools.query_function_fm import make_query_function_fm_tool
         from api.server.services.fleet_manager_service import FunctionFleetManager
         for fn_name in FUNCTIONS:
             if fn_name == "legacy":
@@ -209,6 +210,11 @@ class AppState:
                 self.store, self.audit, self.entities, fn_name,
                 kpi_store=self.kpi_store,
             )
+            # Phase 4 IP6 (TASK-030/031, DEC-OQ2) — only the CEO-FM gets
+            # the query_function_fm delegation tool. The other 9 FMs
+            # never delegate sideways through this surface.
+            if fn_name == "ceo":
+                tools = [*tools, make_query_function_fm_tool(self)]
             self.function_fms[fn_name] = FunctionFleetManager(
                 bus=self.bus,
                 store=self.store,

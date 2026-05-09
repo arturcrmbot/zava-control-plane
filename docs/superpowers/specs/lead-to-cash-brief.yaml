@@ -1,0 +1,34 @@
+# Lead-to-cash meta-workflow brief (Phase 4 IP5 TASK-025).
+#
+# Composes marketing + legal + finance domains into one end-to-end
+# revenue journey for a single opportunity.
+domain:
+  workflow_type: lead-to-cash
+  prefix: fleet
+  display_name: "Lead to Cash"
+  description: "Opportunity through invoice issuance: campaign + sales contract + invoice + revenue-recognition signoff."
+phases:
+  - name: fetch_opportunity
+    kind: agent
+    agent_skill_name: opportunity-fetcher
+    intent: "Fetch the opportunity + account record from the entity graph."
+  - name: creative_campaign
+    kind: sub_orchestrator
+    target_workflow_type: creative-campaign
+    target_orchestrator: CreativeCampaignOrchestrator
+    payload_from: "python:{'opportunity_id': input_dict['opportunity_id']}"
+  - name: sales_contract
+    kind: sub_orchestrator
+    target_workflow_type: contract-review
+    target_orchestrator: FleetContractReviewOrchestrator
+    payload_from: "python:{'opportunity_id': input_dict['opportunity_id'], 'contract_kind': 'sales'}"
+  - name: issue_invoice
+    kind: sub_orchestrator
+    target_workflow_type: ap-invoice
+    target_orchestrator: FleetApInvoiceOrchestrator
+    payload_from: "python:{'opportunity_id': input_dict['opportunity_id']}"
+  - name: revenue_recognition
+    kind: hitl
+    persona: account_director
+    external_event: revenue_recognition_decision
+function: revenue

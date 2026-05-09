@@ -56,12 +56,35 @@ properties:
       additionalProperties: true
       properties:
         name: { type: string, pattern: "^[a-z][a-z0-9_]*$" }
-        kind: { enum: [deterministic, agent, hitl] }
+        # Phase 4 IP4 (TASK-019): `sub_orchestrator` joins the original
+        # three. Sub-orchestrator phases compose existing fleet domains
+        # into a meta-workflow via Durable's `call_sub_orchestrator`.
+        kind: { enum: [deterministic, agent, hitl, sub_orchestrator] }
         persona: { type: string }
         external_event: { type: string }
         intent: { type: string }
         agent_skill_name: { type: string }
         external_systems: { type: array, items: { type: string } }
+        # ---- sub_orchestrator-specific fields (TASK-019) ----
+        # Required when kind == sub_orchestrator. Names the workflow_type
+        # of the child workflow being spawned. The codegen derives the
+        # PascalCase orchestrator class name from this (e.g.
+        # `vendor-kyc` -> `FleetVendorKycOrchestrator` when prefix is
+        # `fleet`); the brief may override via `target_orchestrator`.
+        target_workflow_type: { type: string, pattern: "^[a-z][a-z0-9-]*$" }
+        # Override for the auto-derived orchestrator class name. Useful
+        # when the child domain's orchestrator does not follow the
+        # `<Prefix><WorkflowType>Orchestrator` PascalCase convention.
+        target_orchestrator: { type: string, pattern: "^[A-Z][A-Za-z0-9_]*$" }
+        # Either a Cypher snippet (string) or a Python dict-builder
+        # expression. The codegen embeds it as the `payload_expr` arg
+        # to `context.call_sub_orchestrator`. If a literal dict-builder
+        # is desired, prefix with `python:`; anything else is treated
+        # as a Cypher template string the codegen will quote.
+        payload_from: { type: string }
+        # Optional grouping label. Sub-orchestrator phases sharing the
+        # same `parallel_group` are emitted into one `context.task_all`.
+        parallel_group: { type: string, pattern: "^[a-z][a-z0-9_]*$" }
 
   # ---------------------------------------------------------------- v1
   entities:

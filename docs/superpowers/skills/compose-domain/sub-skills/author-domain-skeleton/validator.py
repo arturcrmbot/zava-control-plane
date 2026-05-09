@@ -18,7 +18,7 @@ from _shared.brief_validator import SchemaError, validate_brief
 
 __all__ = ["SchemaError", "validate"]
 
-_VALID_KINDS = {"deterministic", "agent", "hitl"}
+_VALID_KINDS = {"deterministic", "agent", "hitl", "sub_orchestrator"}
 
 
 def validate(brief: dict) -> None:
@@ -68,12 +68,34 @@ def validate(brief: dict) -> None:
                     path=f"phases[{i}].external_event",
                     reason=f"HITL phase '{name}' must declare external_event",
                 )
+        if kind == "sub_orchestrator":
+            if not phase.get("target_workflow_type"):
+                raise SchemaError(
+                    path=f"phases[{i}].target_workflow_type",
+                    reason=(
+                        f"sub_orchestrator phase '{name}' must declare "
+                        f"target_workflow_type"
+                    ),
+                )
+            if not phase.get("payload_from"):
+                raise SchemaError(
+                    path=f"phases[{i}].payload_from",
+                    reason=(
+                        f"sub_orchestrator phase '{name}' must declare "
+                        f"payload_from (Cypher snippet or python:<expr>)"
+                    ),
+                )
 
     if not has_deterministic:
-        raise SchemaError(
-            path="phases",
-            reason="at least one phase must be kind: deterministic (the intake)",
-        )
+        # Phase 4 IP4 (TASK-019): meta-workflows compose existing fleet
+        # domains via `sub_orchestrator` phases — their intake gate is
+        # the first sub-orchestrator's own intake. Relax the
+        # deterministic requirement when sub_orchestrator is present.
+        if not any(p.get("kind") == "sub_orchestrator" for p in phases):
+            raise SchemaError(
+                path="phases",
+                reason="at least one phase must be kind: deterministic (the intake)",
+            )
     if not has_hitl:
         raise SchemaError(
             path="phases",

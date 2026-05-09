@@ -47,9 +47,16 @@ def test_every_persona_has_skill_md():
 def test_orchestrator_names_resolve():
     """Every Domain.orchestrator_name must be a decorated orchestrator
     in function_app.py. Parsed via simple text scan to avoid importing
-    the Functions worker module (which depends on Azure runtime)."""
+    the Functions worker module (which depends on Azure runtime).
+
+    Stub Domains (Phase 4 IP5+6 — meta-workflow/strategic shells whose
+    orchestrators are codegen'd but not yet registered in
+    function_app.py) are skipped.
+    """
     fa = (REPO_ROOT / "function_app.py").read_text(encoding="utf-8")
     for wt, d in registry.DOMAINS.items():
+        if getattr(d, "stub", False):
+            continue
         # Match the decorator pattern `def <orchestrator_name>(`
         token = f"def {d.orchestrator_name}("
         assert token in fa, (
