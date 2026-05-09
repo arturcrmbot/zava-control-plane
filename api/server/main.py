@@ -185,6 +185,8 @@ from api.server.routes.personas import router as personas_router
 from api.server.routes.authority import router as authority_router
 # Governance kernel surface (Phase 4 of feature-agent-governance-toolkit-1).
 from api.server.routes.governance import router as governance_router
+# Entity-graph plane read API (Phase 1 TASK-030..-035).
+from api.server.routes.entities import router as entities_router
 
 for r in (stream_router, workflows_router, exceptions_router, policy_router,
           simulator_router, audit_router, evals_router, orchestration_router,
@@ -197,6 +199,7 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           blueprint_router,
           personas_router, authority_router,
           governance_router,
+          entities_router,
           foundry_router):
     app.include_router(r)
 
