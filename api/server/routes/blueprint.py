@@ -93,6 +93,15 @@ _OBSERVATORY_TYPES: set[str] = {
     "entity.write.killed",
     "governance.find_entities",
     "governance.find_entities.denied",
+    # Org Ops v2 — persona-thinking telemetry so the live activity stream
+    # / conversations channel / river gate-pulse can show personas at work
+    # rather than instant flips.
+    "persona.thinking",
+    "persona.decided",
+    # Tool-call traces — agents like rag-classifier call tools like
+    # policy_search; we want every step visible in the operator view.
+    "tool.invoked",
+    "tool.completed",
 }
 
 
@@ -166,6 +175,14 @@ def _normalise_event(event: FleetEvent) -> dict[str, Any] | None:
             or data.get("parent_id"),
         "child_workflow_id": data.get("child_workflow_id")
             or data.get("child_id"),
+        # Org Ops v2 — verdict + phase + reason fields so the live stream /
+        # conversations / river can render persona decisions in plain English
+        # ("ap_clerk approved API-0023 — within policy"). All optional;
+        # present on persona.thinking / persona.decided / decision.recorded
+        # / workflow.hitl.* events.
+        "verdict": data.get("verdict"),
+        "phase_name": data.get("phase"),
+        "decision_reason": data.get("reason") or data.get("decision_reason"),
         "ts": data.get("ts") or time.time(),
     }
 

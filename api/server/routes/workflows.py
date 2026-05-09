@@ -132,3 +132,146 @@ async def get_workflow_tree(id: str, max_depth: int = 16):
         return node
 
     return _walk(id, 0)
+
+
+# ---------------------------------------------------------------------------
+# Org Ops v2 — endpoints used by the live operator views (Control Room,
+# Conversations, Workflow River). All three views share these.
+# ---------------------------------------------------------------------------
+
+def _function_for_workflow_type(workflow_type: str) -> str | None:
+    """workflow_type -> function key (e.g. 'vendor-kyc' -> 'finance')."""
+    try:
+        from api.shared.functions import FUNCTIONS
+    except Exception:
+        return None
+    for fn_key, fn_spec in FUNCTIONS.items():
+        if workflow_type in (fn_spec.owns_domains or ()):
+            return fn_key
+    return None
+
+
+def _last_actor(workflow) -> dict | None:
+    """Best-effort summary of who/what last touched the workflow.
+
+    Walks action_ledger tail (most recent first) and surfaces a small dict
+    {kind: 'agent'|'tool'|'persona'|'system', name: str, at: float} so the
+    operator views can show 'currently: ap_clerk thinking 4s' in the rail.
+    """
+    ledger = list(getattr(workflow, "action_ledger", None) or [])
+    if not ledger:
+        return None
+    tail = ledger[-1]
+    actor_id = getattr(tail, "actor_id", None) or "?"
+    actor_kind = getattr(tail, "actor_kind", None) or "system"
+    return {
+        "kind": str(actor_kind),
+        "name": str(actor_id),
+        "at": float(getattr(tail, "timestamp", 0.0)),
+    }
+
+
+@router.get("/index/in-flight")
+async def list_in_flight():
+    """Every non-terminal workflow with phase, age, current actor, SLA position.
+
+    Used by Approach A's left rail, Approach B's channel list, and Approach C's
+    chip pool. Terminal statuses excluded: ``completed`` and ``failed``.
+    """
+    now = time.time()
+    items = []
+    for w in app_state.store.list_workflows():
+        if w.status in {"completed", "failed"}:
+            continue
+        age_s = now - float(w.created_at or now)
+        sla_due = float(w.sla_due_at or w.created_at + 7 * 86400)
+        sla_total = max(1.0, sla_due - float(w.created_at or now))
+        sla_pct = max(0.0, min(1.0, (now - float(w.created_at or now)) / sla_total))
+        items.append({
+            "id": w.id,
+            "workflow_type": w.type,
+            "function": _function_for_workflow_type(w.type),
+            "status": w.status,
+            "phase": w.current_phase,
+            "created_at": w.created_at,
+            "age_s": round(age_s, 2),
+            "sla_pct": round(sla_pct, 3),
+            "active_exception_id": w.active_exception_id,
+            "last_actor": _last_actor(w),
+        })
+    items.sort(key=lambda r: (
+        # awaiting_hitl first, then by age descending so the oldest unattended
+        # workflow tops the list
+        0 if r["status"] == "awaiting_hitl" else 1,
+        -r["age_s"],
+    ))
+    return items
+
+
+@router.get("/index/timeline/{id}")
+async def workflow_timeline(id: str):
+    """Chronological list of every event for a workflow with full payloads.
+
+    Composed from: phases (deterministic per-phase rows), spans (skill/agent
+    activity), mcp_calls (tool invocations), action_ledger (persona + system
+    interventions), and decisions stashed on payload. Returns one flat list
+    sorted by timestamp ascending so the operator drawer can render it as a
+    transcript.
+    """
+    w = app_state.store.get_workflow(id)
+    if not w:
+        raise HTTPException(404)
+    rows: list[dict] = []
+    for p in app_state.store.get_phases(id):
+        rows.append({
+            "ts": float(getattr(p, "started_at", None) or w.created_at),
+            "kind": "phase",
+            "label": getattr(p, "name", "?"),
+            "status": getattr(p, "status", "?"),
+            "completed_at": getattr(p, "completed_at", None),
+        })
+    for s in app_state.store.get_spans(id):
+        rows.append({
+            "ts": float(getattr(s, "started_at", None) or w.created_at),
+            "kind": "agent",
+            "label": getattr(s, "skill", None) or getattr(s, "name", "?"),
+            "status": getattr(s, "status", "ok"),
+            "tokens": getattr(s, "tokens", None),
+            "completed_at": getattr(s, "completed_at", None),
+        })
+    for c in app_state.store.get_mcp_calls(id):
+        rows.append({
+            "ts": float(getattr(c, "started_at", None) or w.created_at),
+            "kind": "tool",
+            "label": getattr(c, "tool", None) or "?",
+            "status": getattr(c, "status", "ok"),
+            "result_summary": getattr(c, "result_summary", None),
+        })
+    for entry in (w.action_ledger or []):
+        rows.append({
+            "ts": float(getattr(entry, "timestamp", None) or w.created_at),
+            "kind": getattr(entry, "actor_kind", "system"),
+            "label": getattr(entry, "action", "?"),
+            "actor": getattr(entry, "actor_id", "?"),
+            "details": getattr(entry, "details", None),
+        })
+    for d in (w.payload.get("decisions") if isinstance(w.payload, dict) else []) or []:
+        ts = d.get("decided_at")
+        try:
+            import datetime as _dt
+            ts_val = _dt.datetime.fromisoformat(ts).timestamp() if isinstance(ts, str) else float(ts or w.created_at)
+        except Exception:
+            ts_val = float(w.created_at)
+        rows.append({
+            "ts": ts_val,
+            "kind": "decision",
+            "label": d.get("phase"),
+            "actor": d.get("persona_role"),
+            "verdict": d.get("verdict"),
+            "reason": d.get("reason"),
+        })
+    rows.sort(key=lambda r: r["ts"])
+    return {
+        "workflow": w.model_dump(by_alias=True),
+        "timeline": rows,
+    }

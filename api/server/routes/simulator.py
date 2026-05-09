@@ -516,3 +516,56 @@ async def seed_kpis():
                 seeded.append({"function": fn_key, "metric": metric,
                                "error": str(exc)})
     return {"ok": True, "count": len(seeded), "seeded": seeded[:20]}
+
+
+# ---------------------------------------------------------------------------
+# Org Ops v2 — burst injector for the operator views' "spawn 5" button.
+# Picks a varied selection of workflows so the live stream / conversations /
+# river immediately show activity across multiple functions, not just one.
+# ---------------------------------------------------------------------------
+@router.post("/inject-burst")
+async def inject_burst(n: int = 5):
+    """Spawn ~n varied workflows across multiple domains.
+
+    Used by the Org Ops v2 page top-right "burst" button so an operator can
+    pump activity at will. Distributes across finance / hr / ops / legal /
+    marketing so all three views get cross-function content. Returns a list
+    of spawned workflow_ids.
+    """
+    import asyncio
+    from api.server.services.simulator_orchestrator import (  # noqa: E402
+        spawn_fleet_vendor_kyc_workflow,
+        spawn_fleet_ap_invoice_workflow,
+        spawn_fleet_perf_review_workflow,
+        spawn_fleet_treasury_fx_workflow,
+        spawn_fleet_contract_renewal_workflow,
+        spawn_fleet_employee_onboarding_workflow,
+        spawn_fleet_it_access_request_workflow,
+        spawn_fleet_purchase_order_workflow,
+        spawn_creative_campaign_workflow,
+        spawn_hiring_workflow,
+    )
+    n = max(1, min(int(n or 5), 20))
+    spawners = [
+        ("vendor-kyc", spawn_fleet_vendor_kyc_workflow()),
+        ("ap-invoice", spawn_fleet_ap_invoice_workflow()),
+        ("perf-review", spawn_fleet_perf_review_workflow()),
+        ("hiring", spawn_hiring_workflow()),
+        ("treasury-fx", spawn_fleet_treasury_fx_workflow()),
+        ("creative-campaign", spawn_creative_campaign_workflow()),
+        ("contract-renewal", spawn_fleet_contract_renewal_workflow()),
+        ("employee-onboarding", spawn_fleet_employee_onboarding_workflow()),
+        ("it-access-request", spawn_fleet_it_access_request_workflow()),
+        ("purchase-order", spawn_fleet_purchase_order_workflow()),
+    ]
+    selected = spawners[:n]
+    results = await asyncio.gather(
+        *[coro for _, coro in selected], return_exceptions=True,
+    )
+    spawned: list[dict] = []
+    for (domain, _), result in zip(selected, results):
+        if isinstance(result, Exception):
+            spawned.append({"domain": domain, "error": str(result)})
+        else:
+            spawned.append({"domain": domain, "workflow_id": result})
+    return {"ok": True, "count": len(spawned), "spawned": spawned}
