@@ -66,4 +66,21 @@ export interface ObservatoryEvent {
   /** Short slug describing why the workflow paused / errored. */
   reason?: string | null;
   ts: number;
+  /** Function key (e.g. "finance") when the event references a function. */
+  function?: string | null;
+  /** Workflow_type the workflow_id belongs to (e.g. "vendor_kyc"). */
+  workflow_type?: string | null;
+  /** Entity events: target entity id and kind. */
+  entity_id?: string | null;
+  entity_kind?: string | null;
+  /** Decision-specific payload. */
+  decision_id?: string | null;
+  gate?: string | null;
+  /** Sub-spawn lineage. */
+  parent_workflow_id?: string | null;
+  child_workflow_id?: string | null;
+  /** Cadence-tick payload. */
+  cadence_name?: string | null;
+  /** Ambient agent slug for ambient.decided. */
+  ambient_agent?: string | null;
 }

@@ -14,6 +14,7 @@
 import { useEffect, useState } from "react";
 import { CosmicConstellation } from "../components/CosmicConstellation";
 import { OrgBuilding } from "../components/OrgBuilding";
+import { EventFeed } from "../components/orgBuilding/EventFeed";
 import { useObservatory } from "../lib/useObservatory";
 import { useOrgZoom } from "../lib/orgZoom";
 
@@ -53,6 +54,11 @@ export function ConstellationPage() {
       ) : (
         <CosmicConstellation status={status} fullScreen />
       )}
+
+      {/* Right-rail event feed — sticky across lens swaps so the
+          observatory stream stays visible whenever the org-building
+          scene is active. */}
+      {lens === "building" && <EventFeed />}
 
       <div className="constellation-page__title">
         <div className="constellation-page__eyebrow">the substrate, running</div>

@@ -1,5 +1,6 @@
 /**
- * The Org Building (IP3, TASK-012) — steady-state data poller.
+ * The Org Building (IP3, TASK-012; IP4, TASK-018+TASK-025) — steady-state
+ * data poller + animation queue + cross-function beam tracker.
  *
  * Polls the three REST surfaces the static backbone needs every 5s:
  *   GET /api/functions          — function registry + KPI declarations
@@ -9,8 +10,24 @@
  * Returns the latest snapshot alongside a coarse status flag so the
  * page-level status pill can degrade gracefully when the backend goes
  * away mid-session.
+ *
+ * In addition (chunk 2): exposes `useOrgAnimations` which subscribes to
+ * the SSE stream, dispatches translated entries into a useReducer-managed
+ * queue, and polls /api/entities/_stats every 15s to keep cross-function
+ * beams alive.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import type { Dispatch } from "react";
+
+import {
+  animReducer,
+  initialAnimState,
+} from "./animationQueue";
+import type { AnimEntry } from "./animationQueue";
+import { COLORS, translateEvent } from "./orgEvents";
+import type { LayerFlags } from "./layerToggles";
+import { useObservatory } from "./useObservatory";
+import type { ObservatoryEvent } from "./types";
 
 export interface OrgFunction {
   name: string;
@@ -24,8 +41,17 @@ export interface OrgFunction {
 
 export interface EntityStats {
   counts: Record<string, number>;
-  hot?: unknown[];
+  hot?: HotEntity[];
   recentLinks?: unknown[];
+}
+
+/** Hot-entity summary returned by /api/entities/_stats.hot. */
+export interface HotEntity {
+  entity_id: string;
+  kind: string;
+  source_workflows: string[]; // workflow_type values
+  upserts?: number;
+  updated_at?: number;
 }
 
 export interface Cadence {
@@ -42,6 +68,12 @@ export interface OrgDataSnapshot {
   entityCounts: Record<string, number>;
   cadences: Cadence[];
   status: OrgDataStatus;
+  /** Hot entities (last poll) — used for cross-function beam computation. */
+  hotEntities: HotEntity[];
+  /** workflow_type → function key (e.g. "vendor_kyc" → "finance"). */
+  functionByWorkflowType: Map<string, string>;
+  /** function name → OrgFunction (memoised for handlers). */
+  functionByName: Map<string, OrgFunction>;
 }
 
 const POLL_MS = 5000;
@@ -53,11 +85,18 @@ async function fetchJson<T>(url: string): Promise<T> {
 }
 
 export function useOrgData(): OrgDataSnapshot {
-  const [snap, setSnap] = useState<OrgDataSnapshot>({
+  const [raw, setRaw] = useState<{
+    functions: OrgFunction[];
+    entityCounts: Record<string, number>;
+    cadences: Cadence[];
+    status: OrgDataStatus;
+    hotEntities: HotEntity[];
+  }>({
     functions: [],
     entityCounts: {},
     cadences: [],
     status: "loading",
+    hotEntities: [],
   });
 
   useEffect(() => {
@@ -77,15 +116,16 @@ export function useOrgData(): OrgDataSnapshot {
           fetchJson<Cadence[]>("/api/cadences").catch(() => [] as Cadence[]),
         ]);
         if (cancelled) return;
-        setSnap({
+        setRaw({
           functions,
           entityCounts: stats.counts ?? {},
           cadences,
           status: "ready",
+          hotEntities: (stats.hot ?? []) as HotEntity[],
         });
       } catch {
         if (!cancelled) {
-          setSnap((cur) => ({ ...cur, status: "error" }));
+          setRaw((cur) => ({ ...cur, status: "error" }));
         }
       } finally {
         if (!cancelled) {
@@ -101,7 +141,38 @@ export function useOrgData(): OrgDataSnapshot {
     };
   }, []);
 
-  return snap;
+  // Memoised lookup maps. Built once per functions[] change so animation
+  // handlers don't pay the cost on every event tick.
+  const functionByWorkflowType = useMemo(
+    () => buildWorkflowTypeIndex(raw.functions),
+    [raw.functions],
+  );
+  const functionByName = useMemo(
+    () => new Map(raw.functions.map((f) => [f.name, f])),
+    [raw.functions],
+  );
+
+  return {
+    ...raw,
+    functionByWorkflowType,
+    functionByName,
+  };
+}
+
+/** Build the workflow_type → function lookup from functions[].owns_domains[].
+ *  owns_domains entries may be either domain names or workflow_type
+ *  slugs depending on the upstream registry; we index on the raw
+ *  string and let resolveFunction() try multiple fallbacks. */
+export function buildWorkflowTypeIndex(
+  functions: OrgFunction[],
+): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const fn of functions) {
+    for (const wt of fn.ownsDomains) {
+      if (!m.has(wt)) m.set(wt, fn.name);
+    }
+  }
+  return m;
 }
 
 /**
@@ -144,3 +215,121 @@ export function useFunctionKpis(name: string): KpiLatest {
 
   return data;
 }
+
+/**
+ * Cross-function beam description (TASK-025).
+ *
+ * Computed by joining hot entities' source_workflows with the
+ * functionByWorkflowType lookup. Two-or-more distinct functions
+ * touching a single entity create a beam between every pair.
+ *
+ * The beam fades after `staleAfterMs` of no fresh upserts (default 30s).
+ */
+export interface CrossFunctionBeam {
+  fromFn: string;
+  toFn: string;
+  /** Number of cross-cutting hot entities driving this beam. */
+  weight: number;
+  /** Last upsert timestamp seen for any of the contributing entities. */
+  lastSeen: number;
+}
+
+export function computeCrossFunctionBeams(
+  hot: HotEntity[],
+  functionByWorkflowType: Map<string, string>,
+  now = Date.now(),
+  staleAfterMs = 30_000,
+): CrossFunctionBeam[] {
+  const pairs = new Map<string, CrossFunctionBeam>();
+  for (const ent of hot) {
+    const fns = new Set<string>();
+    for (const wt of ent.source_workflows ?? []) {
+      const fn = functionByWorkflowType.get(wt);
+      if (fn) fns.add(fn);
+    }
+    if (fns.size < 2) continue;
+    const ts = (ent.updated_at ?? 0) * 1000;
+    if (ts && now - ts > staleAfterMs) continue;
+    const sorted = [...fns].sort();
+    for (let i = 0; i < sorted.length; i += 1) {
+      for (let j = i + 1; j < sorted.length; j += 1) {
+        const key = `${sorted[i]}::${sorted[j]}`;
+        const cur = pairs.get(key);
+        if (cur) {
+          cur.weight += 1;
+          cur.lastSeen = Math.max(cur.lastSeen, ts || cur.lastSeen);
+        } else {
+          pairs.set(key, {
+            fromFn: sorted[i],
+            toFn: sorted[j],
+            weight: 1,
+            lastSeen: ts || now,
+          });
+        }
+      }
+    }
+  }
+  return [...pairs.values()];
+}
+
+/**
+ * Animation orchestration hook (TASK-018..-024).
+ *
+ * Owns the AnimEntry queue. Subscribes to the shared SSE stream via
+ * useObservatory, translates each event into an AnimEntry, and
+ * dispatches it into the reducer.
+ *
+ * The visual layer ticks the queue forward every frame (consumer holds
+ * a ref to the dispatch + state via the returned tuple).
+ */
+export function useOrgAnimations(
+  snap: OrgDataSnapshot,
+  layers: LayerFlags,
+): {
+  entries: AnimEntry[];
+  dispatch: Dispatch<{ type: "tick"; dt: number }>;
+  beams: CrossFunctionBeam[];
+} {
+  const [state, dispatch] = useReducer(animReducer, initialAnimState);
+  const layersRef = useRef(layers);
+  layersRef.current = layers;
+  const ctxRef = useRef({
+    functionByWorkflowType: snap.functionByWorkflowType,
+    functionByName: snap.functionByName,
+  });
+  ctxRef.current = {
+    functionByWorkflowType: snap.functionByWorkflowType,
+    functionByName: snap.functionByName,
+  };
+
+  // SSE handler. Translation is layer-aware so a disabled layer never
+  // accumulates queue entries that get dropped at render time.
+  useObservatory({
+    bufferSize: 1,
+    onEvent: (event: ObservatoryEvent) => {
+      const entry = translateEvent(event, {
+        ...ctxRef.current,
+        layers: layersRef.current,
+      });
+      if (entry) dispatch({ type: "enqueue", entry } as never);
+    },
+  });
+
+  // Cross-function beams: derive from the latest poll. Re-emitted when
+  // hot entities or the function index change. Conceptually persistent
+  // (no time advancement needed) so we surface them as a separate list
+  // rather than dropping them through the AnimEntry pool.
+  const beams = useMemo(() => {
+    if (!layers.crossFunctionBeams) return [];
+    return computeCrossFunctionBeams(snap.hotEntities, snap.functionByWorkflowType);
+  }, [snap.hotEntities, snap.functionByWorkflowType, layers.crossFunctionBeams]);
+
+  return {
+    entries: state.entries,
+    dispatch: dispatch as Dispatch<{ type: "tick"; dt: number }>,
+    beams,
+  };
+}
+
+// Re-export so consumers can grab palette without a second import.
+export { COLORS as ANIM_COLORS };

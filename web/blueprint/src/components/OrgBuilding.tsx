@@ -14,9 +14,12 @@ import { Canvas } from "@react-three/fiber";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 
 import { useObservatory } from "../lib/useObservatory";
-import { useOrgData } from "../lib/useOrgData";
+import { useOrgAnimations, useOrgData } from "../lib/useOrgData";
+import { useLayerToggles } from "../lib/layerToggles";
+import { AnimationLayer } from "./orgBuilding/AnimationLayer";
 import { Building } from "./orgBuilding/Building";
 import { CadenceClock } from "./orgBuilding/CadenceClock";
+import { LayerToggles } from "./orgBuilding/LayerToggles";
 
 interface Props {
   /** Reflected on the top-left status pill. */
@@ -25,7 +28,10 @@ interface Props {
 }
 
 export function OrgBuilding({ status, fullScreen = false }: Props) {
-  const { functions, entityCounts, cadences } = useOrgData();
+  const snap = useOrgData();
+  const { functions, entityCounts, cadences } = snap;
+  const { layers, setLayer } = useLayerToggles();
+  const { entries, dispatch, beams } = useOrgAnimations(snap, layers);
 
   const wrapperStyle: React.CSSProperties = fullScreen
     ? { position: "absolute", inset: 0 }
@@ -56,6 +62,13 @@ export function OrgBuilding({ status, fullScreen = false }: Props) {
         <Building functions={functions} entityCounts={entityCounts} />
 
         <CadenceClock cadences={cadences} />
+
+        {/* Live event animation overlay (chunk 2). */}
+        <AnimationLayer
+          entries={entries}
+          beams={beams}
+          onTick={(dt) => dispatch({ type: "tick", dt })}
+        />
 
         <EffectComposer>
           <Bloom
@@ -98,6 +111,9 @@ export function OrgBuilding({ status, fullScreen = false }: Props) {
           ? "○ connecting"
           : "× offline"}
       </div>
+
+      {/* Bottom-strip layer toggles (chunk 2). */}
+      <LayerToggles layers={layers} setLayer={setLayer} />
     </div>
   );
 }

@@ -102,16 +102,16 @@ A new visualisation, addressed at the existing `?view=constellation` URL (replac
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-018 | Extend `useOrgData.ts` to subscribe to the `useObservatory` SSE stream + dispatch incoming events to a `useReducer`-managed animation queue. Queue holds `{kind: 'spark' \| 'beam' \| 'pulse' \| 'filament', target: ..., t: number}` entries. Animation loop in `OrgBuilding.tsx` consumes from queue per-frame + advances existing entries. | | |
-| TASK-019 | `entity.upserted` event handler — drift a small mote from the firing workflow's window down to the lobby's entity vault (the kind-coded icon stack). Brief brighten of the destination icon + count tick. Use `InstancedMesh` for the mote pool. | | |
-| TASK-020 | `decision.recorded` event handler — bright spark at the firing workflow's window + photon trail down to the lobby's Decision vault (violet trail). Decision count tick visible at the lobby. | | |
-| TASK-021 | `ambient.decided` event handler — flash of the floor's ambient agent indicator (small sensor-icon mounted on the floor's facade, one per ambient agent). Optional small spawn-arc outward from the firing floor. | | |
-| TASK-022 | `cadence.tick` event handler — pulse the cadence clock + flash the firing function's ambient sensor icon. | | |
-| TASK-023 | `workflow.completed` event handler — gentle pulse of the corresponding window (no spark, just brightness ticking up briefly then fading). | | |
-| TASK-024 | `workflow.sub_spawned` event handler — bright filament from the parent workflow's window to the child workflow's window. If the child is on a different floor, the filament traces between floors (this is the meta-workflow visual). | | |
-| TASK-025 | Cross-function entity reuse — persistent inter-floor light beam between two floors when an entity has source_workflows spanning both. Beam thickness = number of cross-cutting entities. Computed client-side by joining `/api/entities/_stats.hot` (hot entities + their source_workflows) with `/api/functions[].owns_domains` (workflow_type → function lookup). Beams fade after 30s of no new cross-cutting upserts. | | |
-| TASK-026 | Bottom-strip layer-toggle controls — checkboxes to enable/disable: activity heat, entity flows, decision sparks, ambient flashes, cadence pulses, cross-function beams, cosmic-lens. State persisted to localStorage so the user's preferences survive reloads. | | |
-| TASK-027 | Smoke test live with `make up` + simulator inject of 5 fleet workflows + auto-close personae list — confirm: window lights tick on, cadence clock ticks, decision sparks appear, cross-function beams appear when a vendor is touched by ≥2 functions. Capture a video / screen recording for the spec. | | |
+| TASK-018 | Extend `useOrgData.ts` to subscribe to the `useObservatory` SSE stream + dispatch incoming events to a `useReducer`-managed animation queue. Queue holds `{kind: 'spark' \| 'beam' \| 'pulse' \| 'filament', target: ..., t: number}` entries. Animation loop in `OrgBuilding.tsx` consumes from queue per-frame + advances existing entries. | ✓ | 2026-05-09 |
+| TASK-019 | `entity.upserted` event handler — drift a small mote from the firing workflow's window down to the lobby's entity vault (the kind-coded icon stack). Brief brighten of the destination icon + count tick. Use `InstancedMesh` for the mote pool. | ✓ | 2026-05-09 |
+| TASK-020 | `decision.recorded` event handler — bright spark at the firing workflow's window + photon trail down to the lobby's Decision vault (violet trail). Decision count tick visible at the lobby. | ✓ | 2026-05-09 |
+| TASK-021 | `ambient.decided` event handler — flash of the floor's ambient agent indicator (small sensor-icon mounted on the floor's facade, one per ambient agent). Optional small spawn-arc outward from the firing floor. | ✓ | 2026-05-09 |
+| TASK-022 | `cadence.tick` event handler — pulse the cadence clock + flash the firing function's ambient sensor icon. | ✓ | 2026-05-09 |
+| TASK-023 | `workflow.completed` event handler — gentle pulse of the corresponding window (no spark, just brightness ticking up briefly then fading). | ✓ | 2026-05-09 |
+| TASK-024 | `workflow.sub_spawned` event handler — bright filament from the parent workflow's window to the child workflow's window. If the child is on a different floor, the filament traces between floors (this is the meta-workflow visual). | ✓ | 2026-05-09 |
+| TASK-025 | Cross-function entity reuse — persistent inter-floor light beam between two floors when an entity has source_workflows spanning both. Beam thickness = number of cross-cutting entities. Computed client-side by joining `/api/entities/_stats.hot` (hot entities + their source_workflows) with `/api/functions[].owns_domains` (workflow_type → function lookup). Beams fade after 30s of no new cross-cutting upserts. | ✓ | 2026-05-09 |
+| TASK-026 | Bottom-strip layer-toggle controls — checkboxes to enable/disable: activity heat, entity flows, decision sparks, ambient flashes, cadence pulses, cross-function beams, cosmic-lens. State persisted to localStorage so the user's preferences survive reloads. | ✓ | 2026-05-09 |
+| TASK-027 | Smoke test live with `make up` + simulator inject of 5 fleet workflows + auto-close personae list — confirm: window lights tick on, cadence clock ticks, decision sparks appear, cross-function beams appear when a vendor is touched by ≥2 functions. Capture a video / screen recording for the spec. | deferred | 2026-05-09 |
 
 ### Implementation Phase 5 — Right-rail event feed (all zoom levels)
 
@@ -119,9 +119,9 @@ A new visualisation, addressed at the existing `?view=constellation` URL (replac
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-028 | Create `web/blueprint/src/components/orgBuilding/EventFeed.tsx` — fixed-position right-rail panel (~280px wide). Subscribes to `useObservatory`. Renders the last 50 events as one-line entries (`14:01:33 ⚖ decision.recorded VKY-0001 finance_signoff (cfo)`). Auto-scrolls to top on new events; pauses auto-scroll if user has scrolled away. | | |
-| TASK-029 | Each entry deep-links to its source: decision → `/api/entities/{decision_id}` opens the entity card; workflow event → existing workflow detail page; entity event → entity card slide-in. | | |
-| TASK-030 | Filter chips at the top of the feed — toggle to show only decisions / only ambient / only cadence / only meta-workflow. Filter state persists to localStorage. | | |
+| TASK-028 | Create `web/blueprint/src/components/orgBuilding/EventFeed.tsx` — fixed-position right-rail panel (~280px wide). Subscribes to `useObservatory`. Renders the last 50 events as one-line entries (`14:01:33 ⚖ decision.recorded VKY-0001 finance_signoff (cfo)`). Auto-scrolls to top on new events; pauses auto-scroll if user has scrolled away. | ✓ | 2026-05-09 |
+| TASK-029 | Each entry deep-links to its source: decision → `/api/entities/{decision_id}` opens the entity card; workflow event → existing workflow detail page; entity event → entity card slide-in. | ✓ | 2026-05-09 |
+| TASK-030 | Filter chips at the top of the feed — toggle to show only decisions / only ambient / only cadence / only meta-workflow. Filter state persists to localStorage. | ✓ | 2026-05-09 |
 
 ### Implementation Phase 6 — Zoom level 2: a wing (3-4 adjacent floors)
 
