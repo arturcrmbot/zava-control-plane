@@ -89,12 +89,12 @@ launch_func() {
     MINGW*|MSYS*|CYGWIN*)
       NPM_BIN="$(cygpath -u "$APPDATA")/npm"
       source .funcvenv/Scripts/activate
-      PATH="$NPM_BIN:$PATH" PYTHONUTF8=1 PYTHONIOENCODING=utf-8 PYTHONPATH="$(pwd)" \
+      ENTITY_PLANE_ENABLED=0 PATH="$NPM_BIN:$PATH" PYTHONUTF8=1 PYTHONIOENCODING=utf-8 PYTHONPATH="$(pwd)" \
         func start --port 7071 &
       ;;
     *)
       source .venv/bin/activate
-      PYTHONPATH="$(pwd)" func start --port 7071 &
+      ENTITY_PLANE_ENABLED=0 PYTHONPATH="$(pwd)" func start --port 7071 &
       ;;
   esac
   FUNC_PID=$!
