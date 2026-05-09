@@ -36,6 +36,20 @@ export function Lobby({ y, inFlightCount, recentDecisions }: Props) {
         />
       </mesh>
 
+      {/* Base halo ring — thin glowing band around the lobby's perimeter
+          at floor level. Brightens with overall org activity (in-flight
+          count). Visual anchor + sense of grounding. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -LOBBY_HEIGHT / 2 + 0.005, 0]}>
+        <ringGeometry args={[3.8, 4.2, 64]} />
+        <meshBasicMaterial
+          color={inFlightCount > 50 ? "#5fd49d" : "#06b6d4"}
+          transparent
+          opacity={Math.min(0.8, 0.25 + inFlightCount * 0.005)}
+          toneMapped={false}
+          side={2 as unknown as THREE.Side}
+        />
+      </mesh>
+
       {/* Lobby front-edge glow strip — the "ticker" base. */}
       <mesh position={[0, -LOBBY_HEIGHT * 0.45, LOBBY_DEPTH / 2 + 0.01]}>
         <planeGeometry args={[LOBBY_WIDTH * 0.96, 0.06]} />
