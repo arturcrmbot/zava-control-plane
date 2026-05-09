@@ -17,7 +17,12 @@
 #   6. Patch api/server/routes/simulator.py (POST /api/simulator/{{DOMAIN_NAME}}).
 #   7. Patch api/server/services/blueprint_inventory.py (DOMAINS entry).
 #   8. Patch api/shared/constants.py (lift PHASE_TIMEOUT constants).
-#   9. Print smoke commands + expected event sequence.
+#   9. Patch api/shared/functions.py — append `{{WORKFLOW_TYPE}}` to
+#      FUNCTIONS["{{FUNCTION_KEY}}"].owns_domains (idempotent via
+#      sentinel `# compose-domain:owns_domains:{{FUNCTION_KEY}}`). Skipped
+#      with a warn log if api/shared/functions.py does not yet exist
+#      (Phase 3 will land that registry).
+#  10. Print smoke commands + expected event sequence.
 #
 # Rollback if any step fails:
 #   git checkout -- function_app.py api/functions/graphs/__init__.py \
@@ -47,7 +52,7 @@ echo ""
 # --------------------------------------------------------------------------
 # 1. Validate prereqs.
 # --------------------------------------------------------------------------
-echo "==> [1/9] Validating prereqs ..."
+echo "==> [1/10] Validating prereqs ..."
 test -d api/server/skills || { echo "ERR: not a repo root (api/server/skills missing)"; exit 1; }
 test -d "$SBX/api" || { echo "ERR: sandbox layout missing"; exit 1; }
 echo "    ok"
@@ -56,7 +61,7 @@ echo ""
 # --------------------------------------------------------------------------
 # 2. Copy sandbox files (idempotent).
 # --------------------------------------------------------------------------
-echo "==> [2/9] Copying sandbox files ..."
+echo "==> [2/10] Copying sandbox files ..."
 {{COPY_FILES_BLOCK}}
 echo "    copied"
 echo ""
@@ -66,7 +71,7 @@ echo ""
 #    Append imports + orchestrator decorator + activity decorators between
 #    `# === BEGIN compose-domain {{DOMAIN_NAME}} ===` and matching END marker.
 # --------------------------------------------------------------------------
-echo "==> [3/9] Patching function_app.py ..."
+echo "==> [3/10] Patching function_app.py ..."
 if grep -q "BEGIN compose-domain {{DOMAIN_NAME}}" function_app.py; then
     echo "    already patched (skip)"
 else
@@ -91,7 +96,7 @@ echo ""
 # --------------------------------------------------------------------------
 # 4. Patch api/functions/graphs/__init__.py (idempotent imports).
 # --------------------------------------------------------------------------
-echo "==> [4/9] Patching api/functions/graphs/__init__.py ..."
+echo "==> [4/10] Patching api/functions/graphs/__init__.py ..."
 if grep -q "build_{{DOMAIN_NAME_SNAKE}}_" api/functions/graphs/__init__.py; then
     echo "    already patched (skip)"
 else
@@ -109,7 +114,7 @@ echo ""
 #    Append the spawn helper. Add the new domain to ramp_loop's spawners
 #    dict (idempotent: skip if already in the dict literal).
 # --------------------------------------------------------------------------
-echo "==> [5/9] Patching simulator_orchestrator.py ..."
+echo "==> [5/10] Patching simulator_orchestrator.py ..."
 SIM_PATH="api/server/services/simulator_orchestrator.py"
 if grep -q "spawn_{{DOMAIN_NAME_SNAKE}}_workflow" "$SIM_PATH"; then
     echo "    spawn helper already present (skip)"
@@ -180,7 +185,7 @@ echo ""
 # --------------------------------------------------------------------------
 # 6. Patch api/server/routes/simulator.py.
 # --------------------------------------------------------------------------
-echo "==> [6/9] Patching api/server/routes/simulator.py ..."
+echo "==> [6/10] Patching api/server/routes/simulator.py ..."
 ROUTE_PATH="api/server/routes/simulator.py"
 if grep -q '"/{{DOMAIN_NAME}}"' "$ROUTE_PATH" || grep -q "spawn_{{DOMAIN_NAME_SNAKE}}_workflow" "$ROUTE_PATH"; then
     echo "    already patched (skip)"
@@ -215,7 +220,7 @@ echo ""
 # --------------------------------------------------------------------------
 # 7. Patch api/server/services/blueprint_inventory.py.
 # --------------------------------------------------------------------------
-echo "==> [7/9] Patching blueprint_inventory.py ..."
+echo "==> [7/10] Patching blueprint_inventory.py ..."
 INV_PATH="api/server/services/blueprint_inventory.py"
 if grep -q '"name": "{{DOMAIN_DISPLAY_NAME}}"' "$INV_PATH"; then
     echo "    already patched (skip)"
@@ -252,7 +257,7 @@ echo ""
 # --------------------------------------------------------------------------
 # 8. Patch api/shared/constants.py — lift PHASE_TIMEOUT constants.
 # --------------------------------------------------------------------------
-echo "==> [8/9] Patching api/shared/constants.py ..."
+echo "==> [8/10] Patching api/shared/constants.py ..."
 CONST_PATH="api/shared/constants.py"
 if grep -q "{{FIRST_TIMEOUT_NAME}}" "$CONST_PATH"; then
     echo "    already patched (skip)"
@@ -294,9 +299,77 @@ fi
 echo ""
 
 # --------------------------------------------------------------------------
-# 9. Print smoke commands + expected event sequence.
+# 9. Patch api/shared/functions.py — claim {{WORKFLOW_TYPE}} for
+#    FUNCTIONS["{{FUNCTION_KEY}}"].owns_domains. Idempotent via the
+#    sentinel `# compose-domain:owns_domains:{{FUNCTION_KEY}}`.
+#
+#    Guarded skip: if api/shared/functions.py is absent (Phase 3 not
+#    yet merged), this step is a logged no-op and graduate.sh
+#    continues. Phase 3's compose-domain integration will own the
+#    file.
 # --------------------------------------------------------------------------
-echo "==> [9/9] Done."
+echo "==> [9/10] Patching api/shared/functions.py ..."
+FN_PATH="api/shared/functions.py"
+FN_SENTINEL="# compose-domain:owns_domains:{{FUNCTION_KEY}}"
+if [ ! -f "$FN_PATH" ]; then
+    echo "    warn: $FN_PATH absent — skipping FUNCTIONS patch (Phase 3 will own this)"
+elif grep -q "$FN_SENTINEL" "$FN_PATH" && grep -q "\"{{WORKFLOW_TYPE}}\"" "$FN_PATH"; then
+    echo "    already patched ({{WORKFLOW_TYPE}} ∈ FUNCTIONS[\"{{FUNCTION_KEY}}\"].owns_domains)"
+else
+    python3 - <<EOF_PY_FN
+import re, sys
+path = "$FN_PATH"
+with open(path) as f:
+    src = f.read()
+sentinel = "$FN_SENTINEL"
+fn_key = "{{FUNCTION_KEY}}"
+wt = "{{WORKFLOW_TYPE}}"
+
+# Find FUNCTIONS["<fn_key>"].owns_domains list literal and append the
+# workflow_type if not already present, marked with the sentinel.
+# Tolerates either FUNCTIONS["x"] = X(owns_domains=["..."]) or
+# FUNCTIONS["x"].owns_domains = [...] declaration shapes.
+patterns = [
+    re.compile(
+        r'(FUNCTIONS\[' + re.escape(repr(fn_key)) + r'\][^\n]*owns_domains\s*=\s*\[)([^\]]*)(\])',
+        re.DOTALL,
+    ),
+    re.compile(
+        r'(FUNCTIONS\[' + re.escape(repr(fn_key)) + r'\]\s*=\s*[A-Za-z_][A-Za-z0-9_]*\([^)]*owns_domains\s*=\s*\[)([^\]]*)(\])',
+        re.DOTALL,
+    ),
+]
+m = None
+for pat in patterns:
+    m = pat.search(src)
+    if m:
+        break
+if not m:
+    print(f"    warn: could not locate FUNCTIONS[{fn_key!r}].owns_domains list literal — manual patch required")
+    sys.exit(0)
+
+inner = m.group(2)
+if repr(wt) in inner or f'"{wt}"' in inner or f"'{wt}'" in inner:
+    print("    already includes workflow_type (skip)")
+    sys.exit(0)
+
+inserted = (
+    inner.rstrip().rstrip(",")
+    + (",\n        " if inner.strip() else "        ")
+    + repr(wt) + f",  {sentinel}\n    "
+)
+patched = src[:m.start(2)] + inserted + src[m.end(2):]
+with open(path, "w") as f:
+    f.write(patched)
+print(f"    appended {wt!r} to FUNCTIONS[{fn_key!r}].owns_domains")
+EOF_PY_FN
+fi
+echo ""
+
+# --------------------------------------------------------------------------
+# 10. Print smoke commands + expected event sequence.
+# --------------------------------------------------------------------------
+echo "==> [10/10] Done."
 echo ""
 echo "Smoke test (run after Functions host + FastAPI restart):"
 echo ""

@@ -44,6 +44,40 @@ You are invoked one of two ways:
 2. **With a free-text idea.** "Compose a new domain for X." Run step 1 to
    produce the brief, then continue.
 
+## How v4 works (sequential enrichment pipeline)
+
+v4 reshapes the meta-skill into a **sequential enrichment pipeline**:
+a shared YAML brief grows through five new authoring sub-skills, each
+adding one new top-level section, validating, and handing off to the
+next. The four existing v3 generators run last, unchanged, and are
+joined by two new codegens for entity-projections and decision Cypher.
+
+```mermaid
+flowchart LR
+    A[free-text idea<br/>or brief path] --> B[author-domain-skeleton]
+    B -->|+domain<br/>+phases| C[author-entity-projection]
+    C -->|+entities| D[author-decision-mapping]
+    D -->|+decisions| E[author-function-membership]
+    E -->|+function| F[author-ambient-trigger?]
+    F -->|+ambient| G[v3 generators<br/>orchestrator/graphs/<br/>personae/MCP]
+    G --> H[graduate.sh]
+```
+
+The five enrichment sub-skills live under
+`docs/superpowers/skills/compose-domain/sub-skills/<name>/` and each
+package contains:
+
+* `SKILL.md` — the prompt the sub-skill is invoked with
+* `validator.py` — pure function `validate(brief, ...) -> None` raising
+  `SchemaError(path, reason)` on failure
+* `codegen.py` (when applicable) — pure function returning the
+  rendered file body / append block
+
+The brief schema is authoritative at
+`docs/superpowers/skills/compose-domain/brief.schema.yaml`. The
+sandbox layout is documented at
+`docs/superpowers/skills/compose-domain/SANDBOX.md`.
+
 ## The five steps
 
 ### Step 1 — Brief intake (only if no YAML brief was supplied)
