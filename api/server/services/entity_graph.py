@@ -944,3 +944,113 @@ class EntityGraph:
         if _LIMIT_PATTERN.search(pattern) is None:
             pattern = f"{pattern.rstrip().rstrip(';')} LIMIT {int(limit)}"
         return self.query(pattern, params)
+
+    # -- bootstrap (TASK-008) -------------------------------------------
+
+    def bootstrap_from_fixtures(
+        self,
+        employees_path: Path,
+        vendors_path: Path,
+        agencies_path: Path,
+    ) -> dict[str, int]:
+        """One-shot population of Persons + Organisations from JSON fixtures.
+
+        Reads each file, maps every record to an :class:`EntityWrite`, and
+        feeds it through :meth:`upsert` with ``source_workflows=("bootstrap",)``.
+        Employees become ``Person`` nodes; vendors and agencies become
+        ``Organisation`` nodes with ``kind="vendor"`` / ``kind="agency"``
+        respectively (per blueprint §2 schema).
+
+        Per-row id-prefix convention: bare fixture ids (``"EMP-0001"``,
+        ``"V-001"``, ``"Ogilvy-US"``) are namespaced with ``PERSON-`` /
+        ``ORG-`` to keep ids globally unique across kinds. Already-prefixed
+        ids are passed through as-is.
+
+        Schema fidelity: only fields that match a column on the target
+        node table land as top-level ``attrs`` keys; the rest are
+        JSON-encoded into the ``attributes`` STRING column so no fixture
+        information is dropped on the floor.
+
+        Returns ``{"persons": N, "organisations": M}`` where N and M count
+        every ``upsert`` call (not "new writes only") — the method is
+        idempotent because :meth:`upsert` MERGE-s and dedupes
+        ``source_workflows``, so re-running it returns the same counts and
+        leaves the graph unchanged.
+
+        A single ``audit.log("entity.bootstrap.completed", {"counts": ...})``
+        is emitted at the end (not per-record) to keep the audit log
+        readable; ``upsert`` still emits its own ``entity.upserted`` event
+        per row, which is the right granularity for downstream subscribers.
+
+        Raises:
+            FileNotFoundError: if any of the three fixture paths is missing.
+        """
+        # Columns on the Person / Organisation node tables. Anything not in
+        # these sets gets JSON-encoded into the ``attributes`` blob below.
+        person_columns = {
+            "name", "email", "role", "market", "department",
+            "employed_from", "employed_to",
+        }
+        org_columns = {"name", "country", "jurisdiction", "risk_band"}
+
+        employees = json.loads(Path(employees_path).read_text())
+        vendors = json.loads(Path(vendors_path).read_text())
+        agencies = json.loads(Path(agencies_path).read_text())
+
+        persons_count = 0
+        for row in employees:
+            raw_id = row["id"]
+            eid = raw_id if raw_id.startswith("PERSON-") else f"PERSON-{raw_id}"
+            attrs: dict[str, Any] = {}
+            extra: dict[str, Any] = {}
+            for k, v in row.items():
+                if k == "id":
+                    continue
+                if k in person_columns:
+                    attrs[k] = v
+                else:
+                    extra[k] = v
+            if extra:
+                attrs["attributes"] = json.dumps(extra, sort_keys=True)
+            self.upsert(EntityWrite(
+                kind="Person", id=eid, attrs=attrs,
+                source_workflows=("bootstrap",),
+            ))
+            persons_count += 1
+
+        organisations_count = 0
+        for row in vendors:
+            organisations_count += self._bootstrap_org(row, "vendor", org_columns)
+        for row in agencies:
+            organisations_count += self._bootstrap_org(row, "agency", org_columns)
+
+        counts = {"persons": persons_count, "organisations": organisations_count}
+        if self.audit is not None:
+            self.audit.log("entity.bootstrap.completed", {"counts": counts})
+        return counts
+
+    def _bootstrap_org(
+        self,
+        row: dict[str, Any],
+        org_kind: str,
+        org_columns: set[str],
+    ) -> int:
+        """Helper: upsert one Organisation row and return 1 (for count tally)."""
+        raw_id = row["id"]
+        eid = raw_id if raw_id.startswith("ORG-") else f"ORG-{raw_id}"
+        attrs: dict[str, Any] = {"kind": org_kind}
+        extra: dict[str, Any] = {}
+        for k, v in row.items():
+            if k == "id":
+                continue
+            if k in org_columns:
+                attrs[k] = v
+            else:
+                extra[k] = v
+        if extra:
+            attrs["attributes"] = json.dumps(extra, sort_keys=True)
+        self.upsert(EntityWrite(
+            kind="Organisation", id=eid, attrs=attrs,
+            source_workflows=("bootstrap",),
+        ))
+        return 1
