@@ -62,54 +62,69 @@ class AppState:
         self.store = StateStore()
         self.audit = AuditLogger()
 
-        # Phase 4 IP2 (TASK-010) — KPI snapshot store. File lives at
-        # data/portal/kpis.sqlite. Constructed early so per-function
-        # FMs built later can reference it via app_state.kpi_store.
-        self.kpi_store = KpiStore(_PORTAL_DATA_DIR / "kpis.sqlite")
+        # Phase 1 sub-phase 4 + Phase 4 IP2 — the agentic-org entity plane
+        # (KuzuDB graph + reflectors + KPI store) is single-writer per file.
+        # In multi-process boot (FastAPI on :3001 + Azure Functions host on
+        # :7071, started by scripts/boot-demo.sh / `make up`) BOTH processes
+        # import this module and would race for the kuzu file lock. Gate the
+        # plane behind ENTITY_PLANE_ENABLED — default "1" preserves
+        # existing single-process behaviour (uvicorn standalone, every
+        # test, every CI run); boot-demo.sh sets "0" for the func launch
+        # so only the FastAPI worker owns the entity graph + reflector.
+        # Cross-process workflow events still flow via Durable Task storage
+        # (Azurite) → FastAPI's simulator/durable client → in-process bus.
+        self._entity_plane_enabled = os.getenv("ENTITY_PLANE_ENABLED", "1") == "1"
 
-        # ----------------------------------------------------- entity graph plane
-        # (a) Governance kernel singleton — canonical entry-point for every
-        #     later actor (reflector here, ambient dispatcher in Phase 3,
-        #     cadence loop in Phase 4). Set BEFORE any consumer of self.bus.
+        # Governance kernel singleton — canonical entry-point for every
+        # later actor (reflector, ambient dispatcher, cadence loop). Cheap
+        # to construct; always enabled so non-entity-plane code paths
+        # (persona auto-close, MCP tool gating, etc.) keep working.
         from api.server.services.governance.kernel import kernel as _governance_kernel
         self.governance = _governance_kernel()
 
-        # (b) Embedded property graph for the entity-graph plane. Imports
-        #     are local to delay the kuzu import until AppState is actually
-        #     constructed (preserves the existing module-import shape).
-        from api.server.services.entity_graph import EntityGraph
-        self.entities = EntityGraph(_PORTAL_DATA_DIR / "entity_graph.kuzu")
+        if self._entity_plane_enabled:
+            # Phase 4 IP2 (TASK-010) — KPI snapshot store. File lives at
+            # data/portal/kpis.sqlite. Constructed early so per-function
+            # FMs built later can reference it via app_state.kpi_store.
+            self.kpi_store = KpiStore(_PORTAL_DATA_DIR / "kpis.sqlite")
 
-        # (c) Wire bus/audit/governance into the graph for event + audit emission.
-        self.entities.attach(bus=self.bus, audit=self.audit, governance=self.governance)
+            # ----------------------------------------------------- entity graph plane
+            # (a) Embedded property graph for the entity-graph plane. Imports
+            #     are local to delay the kuzu import until AppState is actually
+            #     constructed (preserves the existing module-import shape).
+            from api.server.services.entity_graph import EntityGraph
+            self.entities = EntityGraph(_PORTAL_DATA_DIR / "entity_graph.kuzu")
 
-        # (d) One-shot bootstrap from the existing fixtures into Person /
-        #     Organisation entities. Repo-rooted so it works regardless of cwd.
-        self.entities.bootstrap_from_fixtures(
-            employees_path=_REPO_ROOT / "data/synthetic/employees.json",
-            vendors_path=_REPO_ROOT / "api/server/fixtures/vendors.json",
-            agencies_path=_REPO_ROOT / "api/server/fixtures/agencies.json",
-        )
+            # (b) Wire bus/audit/governance into the graph for event + audit emission.
+            self.entities.attach(bus=self.bus, audit=self.audit, governance=self.governance)
 
-        # (e) Reflector subscribes AFTER bootstrap so the very first workflow
-        #     event does not race against an unfinished bootstrap.
-        from api.server.services.entity_reflector import EntityReflector
-        # Trigger projection registration by importing the package.
-        import api.server.services.entity_projections  # noqa: F401
-        self.entity_reflector = EntityReflector(
-            self.bus, self.store, self.entities,
-            governance=self.governance, audit=self.audit,
-        )
-        self.entity_reflector.start()
+            # (c) One-shot bootstrap from the existing fixtures into Person /
+            #     Organisation entities. Repo-rooted so it works regardless of cwd.
+            self.entities.bootstrap_from_fixtures(
+                employees_path=_REPO_ROOT / "data/synthetic/employees.json",
+                vendors_path=_REPO_ROOT / "api/server/fixtures/vendors.json",
+                agencies_path=_REPO_ROOT / "api/server/fixtures/agencies.json",
+            )
 
-        # Phase 4 IP7 (TASK-033b) — meta-workflow reflector mirrors
-        # workflow.sub_spawned events into the Workflow self-relation
-        # so /api/workflows/{id}/tree can render meta-workflow trees.
-        from api.server.services.meta_workflow_reflector import MetaWorkflowReflector
-        self.meta_workflow_reflector = MetaWorkflowReflector(
-            bus=self.bus, audit=self.audit, graph=self.entities,
-        )
-        self.meta_workflow_reflector.start()
+            # (d) Reflector subscribes AFTER bootstrap so the very first workflow
+            #     event does not race against an unfinished bootstrap.
+            from api.server.services.entity_reflector import EntityReflector
+            # Trigger projection registration by importing the package.
+            import api.server.services.entity_projections  # noqa: F401
+            self.entity_reflector = EntityReflector(
+                self.bus, self.store, self.entities,
+                governance=self.governance, audit=self.audit,
+            )
+            self.entity_reflector.start()
+
+            # Phase 4 IP7 (TASK-033b) — meta-workflow reflector mirrors
+            # workflow.sub_spawned events into the Workflow self-relation
+            # so /api/workflows/{id}/tree can render meta-workflow trees.
+            from api.server.services.meta_workflow_reflector import MetaWorkflowReflector
+            self.meta_workflow_reflector = MetaWorkflowReflector(
+                bus=self.bus, audit=self.audit, graph=self.entities,
+            )
+            self.meta_workflow_reflector.start()
 
         self.hub = SSEHub()
 
@@ -204,9 +219,18 @@ class AppState:
         function-specific UIs.
 
         Idempotent: re-calling is a no-op once ``function_fms`` is
-        populated.
+        populated. Skipped entirely when ENTITY_PLANE_ENABLED=0
+        (Functions host process — no entity graph, no per-function FMs,
+        no ambient dispatcher).
         """
         if self.function_fms:
+            return
+        if not getattr(self, "_entity_plane_enabled", True):
+            # Functions host process: per-function FMs depend on EntityGraph
+            # for tools (query_entity, find_entities, query_recent_decisions),
+            # the kpi_store for query_kpi, and AmbientDispatcher (which sweeps
+            # cypher patterns against the graph). All gated together; the
+            # FastAPI process owns the whole agentic-org plane.
             return
         from api.shared.functions import FUNCTIONS
         from api.server.mcp_tools import build_function_fm_tools
