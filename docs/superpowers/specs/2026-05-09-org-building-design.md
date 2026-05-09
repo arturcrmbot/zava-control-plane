@@ -129,10 +129,10 @@ A new visualisation, addressed at the existing `?view=constellation` URL (replac
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-031 | Define wing groupings in `web/blueprint/src/lib/orgWings.ts`: `Money` (finance + revenue), `People` (hr), `Operations` (ops + tech + data), `Front-office` (marketing + legal + customer-success), `C-suite` (ceo). Constant exported as `WINGS`. | | |
-| TASK-032 | Extend `useOrgZoom()` to support `target.kind === 'wing'`. Camera position computed to frame all floors of the named wing (each wing has 1-3 floors). Smooth tween from zoom-3 position. | | |
-| TASK-033 | Wing-level UI: when zoomed in, the inactive floors fade to ~30% opacity + the active wing's floors brighten + KPI tickers grow legible (font scales up). | | |
-| TASK-034 | Smoke: click a floor at zoom-3, confirm camera flies to its wing. ESC zooms back to zoom-3. | | |
+| TASK-031 | Define wing groupings in `web/blueprint/src/lib/orgWings.ts`: `Money` (finance + revenue), `People` (hr), `Operations` (ops + tech + data), `Front-office` (marketing + legal + customer-success), `C-suite` (ceo). Constant exported as `WINGS`. | ✓ | 2026-05-09 |
+| TASK-032 | Extend `useOrgZoom()` to support `target.kind === 'wing'`. Camera position computed to frame all floors of the named wing (each wing has 1-3 floors). Smooth tween from zoom-3 position. | ✓ | 2026-05-09 |
+| TASK-033 | Wing-level UI: when zoomed in, the inactive floors fade to ~30% opacity + the active wing's floors brighten + KPI tickers grow legible (font scales up). | ✓ | 2026-05-09 |
+| TASK-034 | Smoke: click a floor at zoom-3, confirm camera flies to its wing. ESC zooms back to zoom-3. | ✓ | 2026-05-09 |
 
 ### Implementation Phase 7 — Zoom level 1: one department (one function's floor, interior)
 
@@ -140,13 +140,13 @@ A new visualisation, addressed at the existing `?view=constellation` URL (replac
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-035 | Create `web/blueprint/src/components/orgBuilding/DepartmentInterior.tsx` — interior-cutaway 3D scene for one function. Reads `/api/functions/{name}` for persona hierarchy + owned-domains + ambient agents. Renders: a corner-office tile for the function FM (pulses on session activity), a desk-cluster per persona-hierarchy node (one tile per role, indented to show reporting), a workstation tile per owned-domain (small monitor glyph), an ambient-sensor tile per ambient agent (camera glyph mounted on a wall). | | |
-| TASK-036 | Entity vault rendering at zoom-1: a row of 7 vault icons (one per kind) along one wall, each showing the count of entities the function "touches" (joined client-side: entities whose source_workflows include any workflow_type in `FUNCTIONS[name].owns_domains`). Click any vault icon → opens entity-list panel filtered to that kind + this function. Click any entity in the list → entity card slide-in. | | |
-| TASK-037 | KPI wall at zoom-1: 4-6 clipboard tiles, one per KPI in `FUNCTIONS[name].kpis`. Each clipboard shows: metric name, latest value, sparkline of last 30 snapshots (from `/api/functions/{name}/kpis-latest` extended to return history). | | |
-| TASK-038 | Cadence calendar at zoom-1: small wall-calendar tile showing this function's relevant cadences (e.g. CFO floor shows period-close + quarterly-okr; HR shows morning-sweep). Pip-marks on day cells where cadences fire next. | | |
-| TASK-039 | Live event animations at zoom-1 — the same SSE-driven animations as zoom-3, but rendered on the interior tiles (decision spark on the persona desk who decided; entity mote drifts to the entity vault; ambient flash on the sensor; meta-workflow filament from workstation to workstation). | | |
-| TASK-040 | Click handlers — clicking a workstation zooms to zoom-0 (workflow detail) for the most recent in-flight workflow on that domain (or opens a list if multiple in-flight). Clicking a persona opens a sidebar with their pending HITL gates + recent decisions (read from `/api/persona/{role}/recent` — small new endpoint, or computed client-side from event tail). | | |
-| TASK-041 | Smoke: from zoom-3 click on Finance floor → flies to Finance interior → confirm CFO-FM tile present, persona desks render in hierarchy order, 6 workstations visible, 3 ambient sensors visible, 7 entity vault icons with counts, 4 KPI clipboards, cadence calendar. ESC zooms back to zoom-3. | | |
+| TASK-035 | Create `web/blueprint/src/components/orgBuilding/DepartmentInterior.tsx` — interior-cutaway 3D scene for one function. Reads `/api/functions/{name}` for persona hierarchy + owned-domains + ambient agents. Renders: a corner-office tile for the function FM (pulses on session activity), a desk-cluster per persona-hierarchy node (one tile per role, indented to show reporting), a workstation tile per owned-domain (small monitor glyph), an ambient-sensor tile per ambient agent (camera glyph mounted on a wall). | ✓ | 2026-05-09 |
+| TASK-036 | Entity vault rendering at zoom-1: a row of 7 vault icons (one per kind) along one wall, each showing the count of entities the function "touches" (joined client-side: entities whose source_workflows include any workflow_type in `FUNCTIONS[name].owns_domains`). Click any vault icon → opens entity-list panel filtered to that kind + this function. Click any entity in the list → entity card slide-in. | ✓ | 2026-05-09 |
+| TASK-037 | KPI wall at zoom-1: 4-6 clipboard tiles, one per KPI in `FUNCTIONS[name].kpis`. Each clipboard shows: metric name, latest value, sparkline of last 30 snapshots (from `/api/functions/{name}/kpis-latest` extended to return history). | ✓ | 2026-05-09 |
+| TASK-038 | Cadence calendar at zoom-1: small wall-calendar tile showing this function's relevant cadences (e.g. CFO floor shows period-close + quarterly-okr; HR shows morning-sweep). Pip-marks on day cells where cadences fire next. | ✓ | 2026-05-09 |
+| TASK-039 | Live event animations at zoom-1 — the same SSE-driven animations as zoom-3, but rendered on the interior tiles (decision spark on the persona desk who decided; entity mote drifts to the entity vault; ambient flash on the sensor; meta-workflow filament from workstation to workstation). | ✓ | 2026-05-09 |
+| TASK-040 | Click handlers — clicking a workstation zooms to zoom-0 (workflow detail) for the most recent in-flight workflow on that domain (or opens a list if multiple in-flight). Clicking a persona opens a sidebar with their pending HITL gates + recent decisions (read from `/api/persona/{role}/recent` — small new endpoint, or computed client-side from event tail). | ✓ | 2026-05-09 |
+| TASK-041 | Smoke: from zoom-3 click on Finance floor → flies to Finance interior → confirm CFO-FM tile present, persona desks render in hierarchy order, 6 workstations visible, 3 ambient sensors visible, 7 entity vault icons with counts, 4 KPI clipboards, cadence calendar. ESC zooms back to zoom-3. | ✓ | 2026-05-09 |
 
 ### Implementation Phase 8 — Zoom level 0: one workflow (full detail)
 
@@ -154,14 +154,14 @@ A new visualisation, addressed at the existing `?view=constellation` URL (replac
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-042 | Create `web/blueprint/src/components/orgBuilding/WorkflowZoom.tsx` — full-screen-ish detail panel for one workflow. Reads `/api/workflows/{id}` (existing) for workflow shape + phase + status. Reads `/api/entities/touched-by/{wf_id}` (existing) for entities. | | |
-| TASK-043 | Phase timeline at zoom-0: a horizontal strip of phase tiles (intake → classify → route → audit etc.), each showing kind (deterministic / agent / hitl), current state (queued / running / done / awaiting). Photon arcs (skill/tool/validator) fire local to the running tile (preserve today's visual primitive). | | |
-| TASK-044 | MCP calls panel at zoom-0: list of currently-firing tool calls (from `tool.invoked` events that haven't completed yet). Updates live from SSE. | | |
-| TASK-045 | HITL gate panel at zoom-0: when the workflow is awaiting a HITL decision, show the gate's persona + the auto-close status + any pending decision payload preview. | | |
-| TASK-046 | Entities-touched panel at zoom-0: list (or grid) of entities currently in this workflow's source_workflows. Each entity is clickable → opens its entity card. Cross-function entity badge appears when an entity is also touched by other-function workflows. | | |
-| TASK-047 | Decisions-so-far panel at zoom-0: list of decisions emitted by the projection from this workflow's payload. Each decision shows ULID, persona, verdict, reason, decided_at. | | |
-| TASK-048 | Audit-tail panel at zoom-0: chronological tail of all events for this workflow_id, scrollable. | | |
-| TASK-049 | Smoke: from zoom-1 (Finance floor) click on the ap-invoice workstation → flies to one in-flight ap-invoice workflow's WorkflowZoom view → confirm phase timeline, MCP calls, HITL gate, entities touched, decisions, audit tail all populate. ESC zooms back to zoom-1. | | |
+| TASK-042 | Create `web/blueprint/src/components/orgBuilding/WorkflowZoom.tsx` — full-screen-ish detail panel for one workflow. Reads `/api/workflows/{id}` (existing) for workflow shape + phase + status. Reads `/api/entities/touched-by/{wf_id}` (existing) for entities. | ✓ | 2026-05-09 |
+| TASK-043 | Phase timeline at zoom-0: a horizontal strip of phase tiles (intake → classify → route → audit etc.), each showing kind (deterministic / agent / hitl), current state (queued / running / done / awaiting). Photon arcs (skill/tool/validator) fire local to the running tile (preserve today's visual primitive). | ✓ | 2026-05-09 |
+| TASK-044 | MCP calls panel at zoom-0: list of currently-firing tool calls (from `tool.invoked` events that haven't completed yet). Updates live from SSE. | ✓ | 2026-05-09 |
+| TASK-045 | HITL gate panel at zoom-0: when the workflow is awaiting a HITL decision, show the gate's persona + the auto-close status + any pending decision payload preview. | ✓ | 2026-05-09 |
+| TASK-046 | Entities-touched panel at zoom-0: list (or grid) of entities currently in this workflow's source_workflows. Each entity is clickable → opens its entity card. Cross-function entity badge appears when an entity is also touched by other-function workflows. | ✓ | 2026-05-09 |
+| TASK-047 | Decisions-so-far panel at zoom-0: list of decisions emitted by the projection from this workflow's payload. Each decision shows ULID, persona, verdict, reason, decided_at. | ✓ | 2026-05-09 |
+| TASK-048 | Audit-tail panel at zoom-0: chronological tail of all events for this workflow_id, scrollable. | ✓ | 2026-05-09 |
+| TASK-049 | Smoke: from zoom-1 (Finance floor) click on the ap-invoice workstation → flies to one in-flight ap-invoice workflow's WorkflowZoom view → confirm phase timeline, MCP calls, HITL gate, entities touched, decisions, audit tail all populate. ESC zooms back to zoom-1. | ✓ | 2026-05-09 |
 
 ### Implementation Phase 9 — Cosmic lens preservation
 

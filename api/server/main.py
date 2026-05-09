@@ -203,6 +203,7 @@ from api.server.routes.entities import router as entities_router
 from api.server.routes.functions import router as functions_router
 from api.server.routes.functions_ambient import router as functions_ambient_router
 from api.server.routes.cadences import router as cadences_router
+from api.server.routes.persona_recent import router as persona_recent_router
 
 for r in (stream_router, workflows_router, exceptions_router, policy_router,
           simulator_router, audit_router, evals_router, orchestration_router,
@@ -219,6 +220,7 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           functions_router,
           functions_ambient_router,
           cadences_router,
+          persona_recent_router,
           foundry_router):
     app.include_router(r)
 

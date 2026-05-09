@@ -132,12 +132,19 @@ export function emitDeepLink(event: ObservatoryEvent): void {
     return;
   }
   if (event.workflow_id) {
-    // TODO(chunk-4): wire to a real workflow detail page.
+    // Workflow link → fire programmatic zoom to the workflow detail
+    // overlay. Also keep the legacy `org-building:workflow-selected`
+    // event for any non-zoom listeners.
     // eslint-disable-next-line no-console
-    console.info("[org-building] open workflow", event.workflow_id);
+    console.info("[org-building] zoom to workflow", event.workflow_id);
     window.dispatchEvent(
       new CustomEvent("org-building:workflow-selected", {
         detail: { workflowId: event.workflow_id },
+      }),
+    );
+    window.dispatchEvent(
+      new CustomEvent("org-building:zoom-to", {
+        detail: { kind: "workflow", id: event.workflow_id },
       }),
     );
   }

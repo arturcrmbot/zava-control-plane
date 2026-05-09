@@ -1,25 +1,35 @@
 /**
- * The Org Building zoom-state machine (IP2, TASK-007).
+ * The Org Building zoom-state machine.
  *
- * Four zoom levels:
- *   0 — org view (the whole campus). Stub in chunk 1; falls back to org-level.
- *   1 — wing view (a function's wing). Stub.
- *   2 — department view. Stub.
- *   3 — building view (the 10-floor skyscraper). The only level fully
- *       implemented in chunk 1.
+ * Adopts the spec's level numbering (`PAT-002`):
  *
- * Chunks 2-4 of the Org Building rollout will fill in the lower-zoom
- * camera framings + transitions; for now ``zoomTo`` clamps to level 3
- * because that's the only level with art behind it.
+ *   3 — org view (default; whole 10-floor building, slow auto-orbit)
+ *   2 — wing view (a related-function group of 1-3 floors)
+ *   1 — department view (one function floor; interior cutaway)
+ *   0 — workflow view (one workflow's lifecycle)
+ *
+ * `zoomOut` increases level (camera pulls back), clamped at 3.
+ * `zoomIn`  decreases level (camera dives further in), clamped at 0.
+ *
+ * Wing framing is computed from the spec floor layout — `floorY()` from
+ * `floorLayout.ts` gives Y for each floor; the camera is parked off-axis
+ * to that wing's centroid Y at a fixed standoff so the framing is
+ * deterministic.
+ *
+ * Programmatic zoom: a `org-building:zoom-to` window CustomEvent
+ * triggers `zoomTo()` from anywhere in the app (EventFeed deep-links,
+ * tests, etc.). Detail shape: `{kind, id?}` — same as `ZoomTarget`.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { floorY } from "./floorLayout";
+import { WINGS } from "./orgWings";
+import type { WingKey } from "./orgWings";
 
 export type ZoomLevel = 0 | 1 | 2 | 3;
 export type ZoomKind = "org" | "wing" | "department" | "workflow";
 
 export interface ZoomTarget {
   kind: ZoomKind;
-  /** Function name, department slug, or workflow id depending on `kind`. */
   id?: string;
 }
 
@@ -29,17 +39,39 @@ export interface CameraFraming {
   fov: number;
 }
 
-/**
- * Default framings per zoom level. Only LEVEL_FRAMINGS[3] is shipped art
- * in this chunk — the others are sensible placeholders that all reduce
- * to the same org-level framing so a stray ``zoomTo({kind:'wing'})``
- * doesn't strand the camera.
- */
-export const LEVEL_FRAMINGS: Record<ZoomLevel, CameraFraming> = {
-  0: { position: [0, 8, 26], lookAt: [0, 4, 0], fov: 45 },
-  1: { position: [0, 8, 26], lookAt: [0, 4, 0], fov: 45 },
-  2: { position: [0, 8, 26], lookAt: [0, 4, 0], fov: 45 },
-  3: { position: [0, 8, 26], lookAt: [0, 4, 0], fov: 45 },
+export const ORG_FRAMING: CameraFraming = {
+  position: [0, 8, 26],
+  lookAt: [0, 5, 0],
+  fov: 45,
+};
+
+export function wingFraming(wing: string): CameraFraming {
+  const floors = (WINGS as Record<string, string[]>)[wing] ?? [];
+  if (floors.length === 0) return ORG_FRAMING;
+  const ys: number[] = [];
+  for (const fn of floors) {
+    const y = floorY(fn);
+    if (y != null) ys.push(y);
+  }
+  if (ys.length === 0) return ORG_FRAMING;
+  const meanY = ys.reduce((a, b) => a + b, 0) / ys.length;
+  return {
+    position: [4, meanY + 1.6, 14],
+    lookAt: [0, meanY, 0],
+    fov: 38,
+  };
+}
+
+export const DEPARTMENT_FRAMING: CameraFraming = {
+  position: [0, 6, 8],
+  lookAt: [0, 5, 0],
+  fov: 32,
+};
+
+export const WORKFLOW_FRAMING: CameraFraming = {
+  position: [0, 5, 5],
+  lookAt: [0, 5, 0],
+  fov: 28,
 };
 
 export interface OrgZoomState {
@@ -51,48 +83,88 @@ export interface OrgZoomState {
   zoomIn: () => void;
 }
 
-function levelForKind(kind: ZoomKind): ZoomLevel {
+export function levelForKind(kind: ZoomKind): ZoomLevel {
   switch (kind) {
     case "org":
-      return 0;
-    case "wing":
-      return 1;
-    case "department":
-      return 2;
-    case "workflow":
       return 3;
+    case "wing":
+      return 2;
+    case "department":
+      return 1;
+    case "workflow":
+      return 0;
   }
 }
 
+export function framingFor(target: ZoomTarget): CameraFraming {
+  switch (target.kind) {
+    case "org":
+      return ORG_FRAMING;
+    case "wing":
+      return wingFraming(target.id ?? "");
+    case "department":
+      return DEPARTMENT_FRAMING;
+    case "workflow":
+      return WORKFLOW_FRAMING;
+  }
+}
+
+function floorToWingKey(fn: string): WingKey | null {
+  for (const [wing, floors] of Object.entries(WINGS) as [WingKey, string[]][]) {
+    if (floors.includes(fn)) return wing;
+  }
+  return null;
+}
+
 export function useOrgZoom(): OrgZoomState {
-  // Chunk 1 ships zoom-3 only; the spec wants ESC at zoom-3 to be a
-  // no-op when the cosmic lens is off. The page-level handler enforces
-  // that — the hook itself just decrements the level, clamping at 3.
-  const [level, setLevel] = useState<ZoomLevel>(3);
-  const [target, setTarget] = useState<ZoomTarget>({ kind: "workflow" });
+  const [target, setTarget] = useState<ZoomTarget>({ kind: "org" });
 
   const zoomTo = useCallback((next: ZoomTarget) => {
     setTarget(next);
-    setLevel(levelForKind(next.kind));
   }, []);
 
   const zoomOut = useCallback(() => {
-    setLevel((cur) => {
-      // Clamp at 3 in chunk 1: lower zoom levels have no scene yet, so
-      // bouncing the camera there would just leave a blank screen.
-      if (cur >= 3) return 3;
-      return (cur + 1) as ZoomLevel;
+    setTarget((cur) => {
+      switch (cur.kind) {
+        case "workflow":
+          return { kind: "org" };
+        case "department": {
+          const wing = cur.id ? floorToWingKey(cur.id) : null;
+          return wing ? { kind: "wing", id: wing } : { kind: "org" };
+        }
+        case "wing":
+          return { kind: "org" };
+        case "org":
+          return cur;
+      }
     });
   }, []);
 
   const zoomIn = useCallback(() => {
-    setLevel((cur) => (cur <= 0 ? 0 : ((cur - 1) as ZoomLevel)));
+    // Drilling without a chosen child is ambiguous; click-to-drill from
+    // the scene supplies a concrete next target.
+    setTarget((cur) => cur);
   }, []);
 
+  useEffect(() => {
+    function handler(e: Event) {
+      const detail = (e as CustomEvent<ZoomTarget>).detail;
+      if (!detail || !detail.kind) return;
+      setTarget(detail);
+    }
+    window.addEventListener("org-building:zoom-to", handler as EventListener);
+    return () =>
+      window.removeEventListener(
+        "org-building:zoom-to",
+        handler as EventListener,
+      );
+  }, []);
+
+  const level = levelForKind(target.kind);
   return {
     level,
     target,
-    framing: LEVEL_FRAMINGS[level],
+    framing: framingFor(target),
     zoomTo,
     zoomOut,
     zoomIn,

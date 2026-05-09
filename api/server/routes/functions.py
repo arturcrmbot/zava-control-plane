@@ -57,8 +57,9 @@ async def function_sse(name: str, request: Request):
 
 
 @router.get("/{name}/kpis-latest")
-def function_kpis_latest(name: str) -> dict:
-    """The Org Building (IP1, TASK-003) — latest KPI snapshot per metric.
+def function_kpis_latest(name: str, history: int = 0) -> dict:
+    """The Org Building (IP1, TASK-003 + IP7, TASK-037) — latest KPI snapshot
+    per metric, with optional ``?history=N`` recent-snapshots tail.
 
     Returns ``{metrics: {<metric>: {value, period, captured_at}}, since}``
     for every metric declared on ``FUNCTIONS[name].kpis``. Reduces the raw
@@ -66,6 +67,13 @@ def function_kpis_latest(name: str) -> dict:
     single most recent row per metric (max ``captured_at``). Metrics with
     no published snapshot are omitted; the front-end renders ``"—"`` in
     their place.
+
+    When ``history > 0`` the response also carries ``history`` — a
+    ``{<metric>: [{value, period, captured_at}, ...]}`` map keyed by
+    declared metric. Each list is the ``history`` most recent snapshots
+    for that metric (oldest → newest, ascending captured_at). Metrics
+    with no published snapshots map to an empty list (frontend draws a
+    flat sparkline).
 
     404 for ``legacy`` / unknown function. Returns an empty ``metrics``
     dict — not 404 — when the kpi store is disabled (entity plane off) or
@@ -77,10 +85,19 @@ def function_kpis_latest(name: str) -> dict:
     declared = set(FUNCTIONS[name].kpis)
     store = getattr(app_state, "kpi_store", None)
     if store is None or not declared:
+        if history > 0:
+            return {
+                "metrics": {},
+                "since": None,
+                "history": {m: [] for m in declared},
+            }
         return {"metrics": {}, "since": None}
 
     rows = store.query(function=name)
     latest_per_metric: dict[str, dict] = {}
+    history_per_metric: dict[str, list[dict]] = (
+        {m: [] for m in declared} if history > 0 else {}
+    )
     for row in rows:
         metric = row["metric"]
         if metric not in declared:
@@ -92,10 +109,31 @@ def function_kpis_latest(name: str) -> dict:
                 "period": row["period"],
                 "captured_at": row["captured_at"],
             }
+        if history > 0:
+            history_per_metric[metric].append(
+                {
+                    "value": row["value"],
+                    "period": row["period"],
+                    "captured_at": row["captured_at"],
+                }
+            )
 
     since = (
         min(v["captured_at"] for v in latest_per_metric.values())
         if latest_per_metric
         else None
     )
+
+    if history > 0:
+        # Truncate each metric's tail to the most recent ``history`` rows;
+        # store.query() already returns ascending captured_at, so slicing
+        # from the end keeps oldest → newest order intact.
+        trimmed: dict[str, list[dict]] = {}
+        for metric, lst in history_per_metric.items():
+            trimmed[metric] = lst[-history:] if history > 0 else lst
+        return {
+            "metrics": latest_per_metric,
+            "since": since,
+            "history": trimmed,
+        }
     return {"metrics": latest_per_metric, "since": since}

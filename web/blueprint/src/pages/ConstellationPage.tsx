@@ -5,16 +5,18 @@
  * toggle swaps to the legacy Cosmic Constellation lens, preserved as
  * an always-available alternate view per the spec.
  *
- * Routing: addressable at /?view=constellation (the URL is unchanged
- * for back-compat — the page itself is what evolved). With
- * `?view=constellation&embed=1` the "← return to the page" link is
- * suppressed.
+ * Chunk 3 (IP6/7/8): wires the four-level zoom — at zoom-2 the
+ * underlying OrgBuilding renders the wing LOD treatment; at zoom-1 we
+ * mount `<DepartmentInterior>` over it; at zoom-0 we mount
+ * `<WorkflowZoom>`. ESC zooms back out one level.
  */
 
 import { useEffect, useState } from "react";
 import { CosmicConstellation } from "../components/CosmicConstellation";
 import { OrgBuilding } from "../components/OrgBuilding";
+import { DepartmentInterior } from "../components/orgBuilding/DepartmentInterior";
 import { EventFeed } from "../components/orgBuilding/EventFeed";
+import { WorkflowZoom } from "../components/orgBuilding/WorkflowZoom";
 import { useObservatory } from "../lib/useObservatory";
 import { useOrgZoom } from "../lib/orgZoom";
 
@@ -35,10 +37,9 @@ export function ConstellationPage() {
     };
   }, []);
 
-  // ESC zooms out. At zoom-3 with the cosmic lens off, useOrgZoom.zoomOut
-  // clamps at level 3 (no lower scenes are shipped yet) — the keyboard
-  // shortcut is still wired so chunks 2-4 can drop the lower zooms in
-  // without revisiting this handler.
+  // ESC zooms out one level (chunk-3 wire-up). At zoom-3 the hook is a
+  // no-op; lower levels bubble back up — workflow → org, department →
+  // wing, wing → org.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") zoom.zoomOut();
@@ -50,15 +51,32 @@ export function ConstellationPage() {
   return (
     <div className="constellation-page">
       {lens === "building" ? (
-        <OrgBuilding status={status} fullScreen />
+        <OrgBuilding status={status} fullScreen zoomTarget={zoom.target} />
       ) : (
         <CosmicConstellation status={status} fullScreen />
       )}
 
+      {/* Department interior — zoom-1 overlay (chunk-3 IP7). */}
+      {lens === "building" && zoom.target.kind === "department" && zoom.target.id && (
+        <DepartmentInterior
+          name={zoom.target.id}
+          onClose={() => zoom.zoomOut()}
+        />
+      )}
+
+      {/* Workflow detail — zoom-0 overlay (chunk-3 IP8). */}
+      {lens === "building" && zoom.target.kind === "workflow" && zoom.target.id && (
+        <WorkflowZoom
+          id={zoom.target.id}
+          onClose={() => zoom.zoomOut()}
+        />
+      )}
+
       {/* Right-rail event feed — sticky across lens swaps so the
           observatory stream stays visible whenever the org-building
-          scene is active. */}
-      {lens === "building" && <EventFeed />}
+          scene is active. Hidden at zoom-0 (workflow) where the
+          WorkflowZoom panel owns the right side. */}
+      {lens === "building" && zoom.target.kind !== "workflow" && <EventFeed />}
 
       <div className="constellation-page__title">
         <div className="constellation-page__eyebrow">the substrate, running</div>

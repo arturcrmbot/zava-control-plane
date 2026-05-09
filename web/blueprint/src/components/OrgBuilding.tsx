@@ -1,21 +1,27 @@
 /**
- * The Org Building (IP2, TASK-006 + IP3, TASK-013-016) — zoom-3 scene root.
+ * The Org Building (IP2, TASK-006 + IP3, TASK-013-016) — zoom-aware scene root.
  *
  * Mounts the R3F Canvas, the cosmic backdrop (matched to
  * CosmicConstellation for visual continuity), the 11-floor Building,
  * the cadence clock + status pill overlays, and an OrbitControls rig
  * with slow auto-orbit.
  *
- * Future zoom levels (0..2) are spec'd in chunks 2-4; this component
- * currently renders the zoom-3 view exclusively.
+ * Chunk 3 (IP6 TASK-031..034): when the operator zooms to a wing, the
+ * non-active floors fade to ~30% opacity and the active wing's floors
+ * brighten + KPI font scales up. The bottom strip gains a wing
+ * indicator. Floor click → emits `org-building:zoom-to` with the
+ * floor's wing target.
  */
 import { OrbitControls, PerspectiveCamera, Stars } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
+import { useMemo } from "react";
 
 import { useObservatory } from "../lib/useObservatory";
 import { useOrgAnimations, useOrgData } from "../lib/useOrgData";
 import { useLayerToggles } from "../lib/layerToggles";
+import { FLOOR_TO_WING, WINGS } from "../lib/orgWings";
+import type { ZoomTarget } from "../lib/orgZoom";
 import { AnimationLayer } from "./orgBuilding/AnimationLayer";
 import { Building } from "./orgBuilding/Building";
 import { CadenceClock } from "./orgBuilding/CadenceClock";
@@ -25,17 +31,48 @@ interface Props {
   /** Reflected on the top-left status pill. */
   status: "watching" | "connecting" | "offline";
   fullScreen?: boolean;
+  /** Current zoom target (chunk-3). When `kind === 'wing'` the active
+   *  wing's floors brighten and the rest dim. */
+  zoomTarget?: ZoomTarget;
 }
 
-export function OrgBuilding({ status, fullScreen = false }: Props) {
+export function OrgBuilding({ status, fullScreen = false, zoomTarget }: Props) {
   const snap = useOrgData();
   const { functions, entityCounts, cadences } = snap;
   const { layers, setLayer } = useLayerToggles();
   const { entries, dispatch, beams } = useOrgAnimations(snap, layers);
 
+  const activeWing = useMemo(() => {
+    if (!zoomTarget) return null;
+    if (zoomTarget.kind === "wing" && zoomTarget.id) {
+      return (WINGS as Record<string, string[]>)[zoomTarget.id] ?? null;
+    }
+    return null;
+  }, [zoomTarget]);
+
   const wrapperStyle: React.CSSProperties = fullScreen
     ? { position: "absolute", inset: 0 }
     : { position: "relative", width: "100%", height: "100%", minHeight: 640 };
+
+  function handleFloorClick(fnName: string) {
+    // At zoom-3 floor click → wing zoom (TASK-034).
+    // At zoom-2 floor click → department zoom (TASK-035 entry).
+    if (zoomTarget?.kind === "wing") {
+      window.dispatchEvent(
+        new CustomEvent("org-building:zoom-to", {
+          detail: { kind: "department", id: fnName },
+        }),
+      );
+    } else {
+      const wing = FLOOR_TO_WING[fnName];
+      if (!wing) return;
+      window.dispatchEvent(
+        new CustomEvent("org-building:zoom-to", {
+          detail: { kind: "wing", id: wing },
+        }),
+      );
+    }
+  }
 
   return (
     <div className="org-building" style={wrapperStyle}>
@@ -45,9 +82,9 @@ export function OrgBuilding({ status, fullScreen = false }: Props) {
         <OrbitControls
           enableDamping
           dampingFactor={0.08}
-          autoRotate
+          autoRotate={zoomTarget?.kind !== "wing"}
           autoRotateSpeed={0.35}
-          minDistance={12}
+          minDistance={6}
           maxDistance={60}
           target={[0, 5, 0]}
         />
@@ -59,7 +96,12 @@ export function OrgBuilding({ status, fullScreen = false }: Props) {
         {/* Cosmic backdrop — matches CosmicConstellation aesthetic. */}
         <Stars radius={120} depth={60} count={3500} factor={4} fade speed={0.4} />
 
-        <Building functions={functions} entityCounts={entityCounts} />
+        <Building
+          functions={functions}
+          entityCounts={entityCounts}
+          activeWing={activeWing}
+          onFloorClick={handleFloorClick}
+        />
 
         <CadenceClock cadences={cadences} />
 
@@ -111,6 +153,31 @@ export function OrgBuilding({ status, fullScreen = false }: Props) {
           ? "○ connecting"
           : "× offline"}
       </div>
+
+      {/* Wing indicator — bottom strip (TASK-033). Only visible at zoom-2. */}
+      {zoomTarget?.kind === "wing" && zoomTarget.id && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 16,
+            left: "50%",
+            transform: "translateX(-50%)",
+            padding: "6px 14px",
+            background: "rgba(10,10,12,0.75)",
+            border: "1px solid rgba(207,210,214,0.3)",
+            borderRadius: 999,
+            color: "#cfd2d6",
+            fontFamily: "var(--mono-family, monospace)",
+            fontSize: 11,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            zIndex: 7,
+            pointerEvents: "none",
+          }}
+        >
+          Wing · <strong style={{ color: "#f5f5f7" }}>{zoomTarget.id}</strong>
+        </div>
+      )}
 
       {/* Bottom-strip layer toggles (chunk 2). */}
       <LayerToggles layers={layers} setLayer={setLayer} />

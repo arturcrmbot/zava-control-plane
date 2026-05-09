@@ -85,9 +85,14 @@ interface FloorProps {
   fn: OrgFunction;
   y: number;
   isPenthouse?: boolean;
+  /** Renders at ~30% opacity (TASK-033 — wing-level fade-out). */
+  dimmed?: boolean;
+  /** Slightly brighter emissive accent for floors in the active wing. */
+  boosted?: boolean;
+  onClick?: () => void;
 }
 
-function Floor({ fn, y, isPenthouse = false }: FloorProps) {
+function Floor({ fn, y, isPenthouse = false, dimmed = false, boosted = false, onClick }: FloorProps) {
   const color = FUNCTION_COLORS[fn.name] ?? "#cccccc";
   const width = isPenthouse ? PENTHOUSE_WIDTH : FLOOR_WIDTH;
   const kpis = useFunctionKpis(fn.name);
@@ -133,16 +138,19 @@ function Floor({ fn, y, isPenthouse = false }: FloorProps) {
   })();
 
   return (
-    <group position={[0, y, 0]}>
+    <group
+      position={[0, y, 0]}
+      onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
+    >
       {/* Translucent floor slab */}
       <mesh ref={slabRef}>
         <boxGeometry args={[width, FLOOR_HEIGHT * 0.92, FLOOR_DEPTH]} />
         <meshStandardMaterial
           color={"#16181c"}
           emissive={color}
-          emissiveIntensity={isPenthouse ? 0.6 : 0.18}
+          emissiveIntensity={isPenthouse ? 0.6 : boosted ? 0.42 : 0.18}
           transparent
-          opacity={0.78}
+          opacity={dimmed ? 0.28 : 0.78}
           metalness={0.1}
           roughness={0.65}
         />
@@ -151,14 +159,14 @@ function Floor({ fn, y, isPenthouse = false }: FloorProps) {
       {/* Coloured backdrop accent — a thin emissive plane behind the slab. */}
       <mesh position={[0, 0, -FLOOR_DEPTH / 2 - 0.02]}>
         <planeGeometry args={[width * 1.04, FLOOR_HEIGHT * 0.92]} />
-        <meshBasicMaterial color={color} transparent opacity={0.32} />
+        <meshBasicMaterial color={color} transparent opacity={dimmed ? 0.12 : boosted ? 0.45 : 0.32} />
       </mesh>
 
       {/* Function label on the front facade. */}
       <Text
         position={[-width / 2 + 0.12, FLOOR_HEIGHT * 0.28, FLOOR_DEPTH / 2 + 0.03]}
-        fontSize={0.16}
-        color="#f5f5f7"
+        fontSize={boosted ? 0.2 : 0.16}
+        color={dimmed ? "#6b7077" : "#f5f5f7"}
         anchorX="left"
         anchorY="middle"
         outlineWidth={0.005}
@@ -181,9 +189,9 @@ function Floor({ fn, y, isPenthouse = false }: FloorProps) {
       {/* Marquee KPI ticker — re-renders on each poll tick. */}
       <Text
         position={[0, -FLOOR_HEIGHT * 0.28, FLOOR_DEPTH / 2 + 0.03]}
-        fontSize={0.075}
+        fontSize={boosted ? 0.11 : 0.075}
         maxWidth={width * 0.95}
-        color={color}
+        color={dimmed ? "#6b7077" : color}
         anchorX="center"
         anchorY="middle"
         outlineWidth={0.003}
@@ -274,24 +282,41 @@ function Lobby({ y, entityCounts }: LobbyProps) {
 interface BuildingProps {
   functions: OrgFunction[];
   entityCounts: Record<string, number>;
+  /** When set, floors NOT in this wing render at ~30% opacity so the
+   *  named wing stands out at zoom-2. Floors in the wing also tick a
+   *  brighter material accent. */
+  activeWing?: string[] | null;
+  /** Click-to-zoom callback — fires when the operator clicks a floor.
+   *  At zoom-3 the page wires this to "zoom to the wing of this floor". */
+  onFloorClick?: (fnName: string) => void;
 }
 
-export function Building({ functions, entityCounts }: BuildingProps) {
-  // Index the function registry once for ordered lookup.
+export function Building({
+  functions,
+  entityCounts,
+  activeWing = null,
+  onFloorClick,
+}: BuildingProps) {
   const byName = new Map(functions.map((f) => [f.name, f]));
 
-  // Bottom-up Y positions: lobby at y=0, then the 10 function floors
-  // above it. CEO sits at the very top (penthouse, slightly smaller).
   const renderedFloors: ReactElement[] = [];
-  const reversed = [...FLOOR_ORDER_TOP_DOWN].reverse(); // bottom-up
-  // Lobby anchors at y = 0 with the rest stacked upward.
+  const reversed = [...FLOOR_ORDER_TOP_DOWN].reverse();
   let cursorY = FLOOR_HEIGHT;
   reversed.forEach((name) => {
     const fn = byName.get(name);
     if (!fn) return;
     const isPenthouse = name === "ceo";
+    const dimmed = activeWing != null && !activeWing.includes(name);
     renderedFloors.push(
-      <Floor key={name} fn={fn} y={cursorY} isPenthouse={isPenthouse} />,
+      <Floor
+        key={name}
+        fn={fn}
+        y={cursorY}
+        isPenthouse={isPenthouse}
+        dimmed={dimmed}
+        boosted={activeWing != null && activeWing.includes(name)}
+        onClick={onFloorClick ? () => onFloorClick(name) : undefined}
+      />,
     );
     cursorY += FLOOR_HEIGHT;
   });
