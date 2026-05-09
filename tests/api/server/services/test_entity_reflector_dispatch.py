@@ -1,0 +1,182 @@
+"""Dispatch tests for :class:`EntityReflector` (TASK-011).
+
+Covers the happy-path bus → projection → graph wiring:
+
+* ``test_reflector_dispatches_entity_write_to_upsert`` — a fake projection
+  returns one :class:`EntityWrite`; the reflector calls
+  :meth:`EntityGraph.upsert` and the node is readable via :meth:`get`.
+* ``test_reflector_dispatches_rel_write_to_link`` — a fake projection
+  emits two ``EntityWrite``s + one ``RelWrite``; the rel lands.
+* ``test_reflector_silently_skips_unknown_workflow_type`` — for an
+  unregistered ``workflow.type`` the reflector is a no-op (no exception,
+  no graph writes, no audit). Locks part of the TASK-014 contract.
+"""
+from __future__ import annotations
+
+import time
+from pathlib import Path
+
+import pytest
+
+from api.server.services.entity_graph import EntityGraph, EntityWrite, RelWrite
+from api.server.services.entity_projections import PROJECTIONS
+from api.server.services.entity_reflector import EntityReflector
+from api.server.services.event_bus import EventBus
+from api.server.services.state_store import StateStore
+from api.shared.events import FleetEvent
+from api.shared.types import Workflow
+
+
+def _make_workflow(workflow_id: str, workflow_type: str) -> Workflow:
+    now = time.time()
+    return Workflow(
+        id=workflow_id,
+        type=workflow_type,
+        current_phase="Intake",
+        created_at=now,
+        sla_due_at=now + 86400,
+        jurisdiction="London-Zava",
+        agency="Zava-Test",
+    )
+
+
+@pytest.fixture
+def graph(tmp_path: Path) -> EntityGraph:
+    return EntityGraph(tmp_path / "g.kuzu")
+
+
+@pytest.fixture
+def bus() -> EventBus:
+    return EventBus()
+
+
+@pytest.fixture
+def store() -> StateStore:
+    return StateStore()
+
+
+@pytest.fixture
+def reflector(bus: EventBus, store: StateStore, graph: EntityGraph):
+    r = EntityReflector(bus, store, graph)
+    r.start()
+    try:
+        yield r
+    finally:
+        r.aclose()
+
+
+def test_reflector_dispatches_entity_write_to_upsert(
+    bus: EventBus,
+    store: StateStore,
+    graph: EntityGraph,
+    reflector: EntityReflector,
+) -> None:
+    """A projection that returns one EntityWrite lands one node in the graph."""
+
+    def fake_projection(_wf: Workflow) -> list:
+        return [
+            EntityWrite(
+                kind="Person",
+                id="PERSON-T1",
+                attrs={"name": "Test", "email": "test@example.com"},
+                source_workflows=("WF-1",),
+            )
+        ]
+
+    PROJECTIONS["test-domain"] = fake_projection
+    try:
+        store.upsert_workflow(_make_workflow("WF-1", "test-domain"))
+        bus.emit(FleetEvent(type="workflow.completed", workflow_id="WF-1"))
+
+        node = graph.get("PERSON-T1")
+        assert node is not None
+        assert node["name"] == "Test"
+        assert node["email"] == "test@example.com"
+    finally:
+        del PROJECTIONS["test-domain"]
+
+
+def test_reflector_dispatches_rel_write_to_link(
+    bus: EventBus,
+    store: StateStore,
+    graph: EntityGraph,
+    reflector: EntityReflector,
+) -> None:
+    """A projection emitting two endpoints + one RelWrite lands the rel."""
+
+    def fake_projection(_wf: Workflow) -> list:
+        return [
+            EntityWrite(
+                kind="Person",
+                id="PERSON-T2",
+                attrs={"name": "Alice"},
+                source_workflows=("WF-2",),
+            ),
+            EntityWrite(
+                kind="Organisation",
+                id="ORG-T2",
+                attrs={"name": "Acme"},
+                source_workflows=("WF-2",),
+            ),
+            RelWrite(
+                src_id="PERSON-T2",
+                rel="EMPLOYED_BY",
+                dst_id="ORG-T2",
+                attrs={"role": "engineer"},
+            ),
+        ]
+
+    PROJECTIONS["test-rel-domain"] = fake_projection
+    try:
+        store.upsert_workflow(_make_workflow("WF-2", "test-rel-domain"))
+        bus.emit(FleetEvent(type="workflow.completed", workflow_id="WF-2"))
+
+        # Verify both nodes landed.
+        assert graph.get("PERSON-T2") is not None
+        assert graph.get("ORG-T2") is not None
+
+        # Verify the rel landed via the linked() helper.
+        neighbours = graph.linked("PERSON-T2", rel="EMPLOYED_BY")
+        assert any(n["node"]["id"] == "ORG-T2" for n in neighbours), (
+            f"expected EMPLOYED_BY edge to ORG-T2, got {neighbours!r}"
+        )
+    finally:
+        del PROJECTIONS["test-rel-domain"]
+
+
+def test_reflector_silently_skips_unknown_workflow_type(
+    bus: EventBus,
+    store: StateStore,
+    graph: EntityGraph,
+    reflector: EntityReflector,
+) -> None:
+    """Unregistered workflow_type is a silent no-op (CON-001 / TASK-014)."""
+    assert "not-registered" not in PROJECTIONS
+
+    store.upsert_workflow(_make_workflow("WF-3", "not-registered"))
+
+    audit_calls: list[tuple[str, dict]] = []
+
+    class _RecordingAudit:
+        def log(self, action: str, details: dict) -> None:
+            audit_calls.append((action, details))
+
+    # Re-wire the reflector with an audit recorder so we can assert silence.
+    reflector.aclose()
+    reflector_with_audit = EntityReflector(
+        bus, store, graph, audit=_RecordingAudit()
+    )
+    reflector_with_audit.start()
+    try:
+        # Should not raise.
+        bus.emit(FleetEvent(type="workflow.completed", workflow_id="WF-3"))
+
+        # No graph writes.
+        assert graph.get("PERSON-WF-3") is None
+        # No audit emissions from the reflector.
+        reflector_actions = [a for a, _ in audit_calls]
+        assert reflector_actions == [], (
+            f"expected zero audit emissions, got {reflector_actions!r}"
+        )
+    finally:
+        reflector_with_audit.aclose()
