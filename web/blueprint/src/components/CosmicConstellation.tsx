@@ -81,7 +81,7 @@ function clusterPositions(
   return out;
 }
 
-export function Constellation({ status, fullScreen = false }: Props) {
+export function CosmicConstellation({ status, fullScreen = false }: Props) {
   const { data: composition } = useComposition();
   const orbits = useMemo(() => describeDomainOrbits(composition), [composition]);
   const positions = useMemo(

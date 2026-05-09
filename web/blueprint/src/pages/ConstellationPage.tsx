@@ -1,30 +1,29 @@
 /**
- * Standalone full-screen Constellation page.
+ * Standalone full-screen Org-Building / Cosmic-Constellation page.
  *
- * No editorial chrome — just the visual + a minimal HUD strip. Addressable
- * at /?view=constellation. Designed to be projected, recorded, or shown
- * full-bleed during a pitch.
+ * Default lens: the Org Building (zoom-3 backbone). A bottom-right
+ * toggle swaps to the legacy Cosmic Constellation lens, preserved as
+ * an always-available alternate view per the spec.
  *
- * When loaded with `?view=constellation&embed=1` the "← return to the page"
- * link is suppressed — used when the control plane iframes this view, so
- * the link doesn't navigate the iframe back to the editorial blueprint.
+ * Routing: addressable at /?view=constellation (the URL is unchanged
+ * for back-compat — the page itself is what evolved). With
+ * `?view=constellation&embed=1` the "← return to the page" link is
+ * suppressed.
  */
 
-import { useEffect } from "react";
-import { Constellation } from "../components/Constellation";
+import { useEffect, useState } from "react";
+import { CosmicConstellation } from "../components/CosmicConstellation";
+import { OrgBuilding } from "../components/OrgBuilding";
 import { useObservatory } from "../lib/useObservatory";
+import { useOrgZoom } from "../lib/orgZoom";
+
+type Lens = "building" | "cosmic";
 
 export function ConstellationPage() {
-  // We just need the connection status + a no-op subscription so the EventSource
-  // is open and feeding the Constellation's onEvent stream — the canvas itself
-  // does its own subscription internally too, but exposing the status here keeps
-  // the HUD honest.
   const { status } = useObservatory({ bufferSize: 1 });
+  const zoom = useOrgZoom();
+  const [lens, setLens] = useState<Lens>("building");
 
-  // The blueprint is a pure client-side Vite app (no SSR), so reading
-  // window.location.search synchronously on render is safe. Avoid wrapping
-  // in `typeof window !== "undefined"` — esbuild folds that branch to
-  // false and the conditional below collapses, defeating the embed flag.
   const embed =
     new URLSearchParams(window.location.search).get("embed") === "1";
 
@@ -35,9 +34,26 @@ export function ConstellationPage() {
     };
   }, []);
 
+  // ESC zooms out. At zoom-3 with the cosmic lens off, useOrgZoom.zoomOut
+  // clamps at level 3 (no lower scenes are shipped yet) — the keyboard
+  // shortcut is still wired so chunks 2-4 can drop the lower zooms in
+  // without revisiting this handler.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") zoom.zoomOut();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoom]);
+
   return (
     <div className="constellation-page">
-      <Constellation status={status} fullScreen />
+      {lens === "building" ? (
+        <OrgBuilding status={status} fullScreen />
+      ) : (
+        <CosmicConstellation status={status} fullScreen />
+      )}
+
       <div className="constellation-page__title">
         <div className="constellation-page__eyebrow">the substrate, running</div>
         {!embed && (
@@ -46,6 +62,33 @@ export function ConstellationPage() {
           </div>
         )}
       </div>
+
+      {/* Bottom-right lens toggle. */}
+      <button
+        type="button"
+        onClick={() =>
+          setLens((cur) => (cur === "building" ? "cosmic" : "building"))
+        }
+        className="org-building__lens-toggle"
+        style={{
+          position: "absolute",
+          bottom: 16,
+          right: 16,
+          padding: "8px 14px",
+          background: "rgba(10,10,12,0.7)",
+          border: "1px solid rgba(207,210,214,0.3)",
+          borderRadius: 999,
+          color: "#cfd2d6",
+          fontFamily: "var(--mono-family, monospace)",
+          fontSize: 11,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          cursor: "pointer",
+          zIndex: 7,
+        }}
+      >
+        {lens === "building" ? "Cosmic lens" : "Building lens"}
+      </button>
     </div>
   );
 }

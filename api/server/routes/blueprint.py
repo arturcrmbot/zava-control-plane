@@ -78,6 +78,21 @@ _OBSERVATORY_TYPES: set[str] = {
     "durable.resumed",
     "durable.workflow.completed",
     "workflow.resolved",
+    # The Org Building (IP1, TASK-002) widens the relay so the zoom-3
+    # backbone can react to entity-graph activity, ambient-agent decisions,
+    # cadence ticks, sub-workflow spawns, governance write attempts, and
+    # write enforcement outcomes without each surface needing its own SSE
+    # route.
+    "entity.upserted",
+    "entity.linked",
+    "decision.recorded",
+    "ambient.decided",
+    "cadence.tick",
+    "workflow.sub_spawned",
+    "entity.write.failed",
+    "entity.write.killed",
+    "governance.find_entities",
+    "governance.find_entities.denied",
 }
 
 
