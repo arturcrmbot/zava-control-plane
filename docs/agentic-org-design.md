@@ -1,5 +1,9 @@
 # The Agentic Org — design sketch
 
+> **Status:** ⚠️ **superseded** by [`docs/agentic-org-blueprint.md`](agentic-org-blueprint.md) (v3, locked 2026-05-08).
+> Plane 1 implementation tracked in [`plan/feature-agentic-org-phase-1-entity-graph.md`](../plan/feature-agentic-org-phase-1-entity-graph.md) and shipped on branch `feature/agentic-org-phase-1-entity-graph` (2026-05-09).
+> The sqlite-based design below is preserved for historical context only — the live implementation uses **KuzuDB** (embedded property graph, MIT, Cypher 9, file-backed at `data/portal/entity_graph.kuzu`). `Decision` is a first-class graph node with ULID id and dedupe on `(workflow_id, phase, persona_role)`. Per-domain projections cover the eleven `fleet-*` synthetic-journey domains plus `creative-campaign` (POC1/POC2 explicitly excluded). The reflector + read API + blueprint observatory `/entities` page are live.
+
 > **Status:** design v0. First-slice MVP only. Everything past the MVP is a
 > reasoned bet, not a commitment.
 >

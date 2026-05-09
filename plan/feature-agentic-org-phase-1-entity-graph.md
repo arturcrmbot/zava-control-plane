@@ -2,15 +2,17 @@
 goal: Stand up Plane 1 of the Agentic Org Blueprint — an embedded KuzuDB entity graph populated by an event-bus reflector, with per-domain projection functions for the eleven synthetic-journey `fleet-*` domains and `creative-campaign`, plus first-class `Decision` nodes (ULID id, deduped on `(workflow_id, phase, persona_role)`), bootstrapped from existing fixtures, exposed via `/api/entities` read API and a blueprint observatory `/entities` page. POC1 (`expense-claim`) and POC2 (`hiring`) are explicitly out of scope for entity projection.
 version: 1.0
 date_created: 2026-05-08
-last_updated: 2026-05-08
+last_updated: 2026-05-09
 owner: Zava Control Plane — substrate
-status: 'Not Started'
+status: 'In Progress'
 tags: [feature, architecture, agentic-org, plane-1, entity-graph, kuzu]
 ---
 
 # Introduction
 
-![Status: Not Started](https://img.shields.io/badge/status-Not%20Started-lightgrey)
+![Status: In Progress](https://img.shields.io/badge/status-In%20Progress-yellow)
+
+**Update 2026-05-09:** Sub-phases 1–6 shipped on branch `feature/agentic-org-phase-1-entity-graph` across commits `3208f2c0..b85de819`. Sub-phase 1 (`EntityGraph` foundation, 13 commits) → sub-phase 2 (`EntityReflector` + projection registry) → sub-phase 3 (12 per-domain projections) → sub-phase 4 (`AppState` wiring) → sub-phase 5 (`/api/entities` read API) → sub-phase 6 (blueprint observatory `/entities` page). Plus sub-phase 7 (executable smoke test as TASK-039 CI proxy + this doc). Test count: 154 baseline → 820+ passing across the entity-graph plane (Python) plus a clean Vite + TypeScript build of the blueprint microsite. Schema rel-direction caveats from sub-phase 3 (the projections' `Money→OWNS→Asset`, `Money→TRANSACTS→Organisation`, `Organisation→TRANSACTS→Organisation`, `Asset→LOCATED_IN→Place` writes that fail at write-time per Kuzu's typed REL TABLE FROM/TO constraints) are exception-isolated by the reflector's outer try/except — entity nodes land cleanly; the impossible rels are silently dropped (audit-logged but workflows do not crash). Phase 2's compose-domain v4 will widen the schema or rewrite the projections to use schema-compatible rel directions.
 
 The control-plane substrate runs **14 registered domains** end-to-end, but they live as disconnected `Workflow.payload` blobs. Hiring writes a Person inside its payload; IT-access reads the same Person out of a fresh payload; Onboarding gives that Person Assets — and none of these workflows know about each other. The blueprint at [`docs/agentic-org-blueprint.md`](../docs/agentic-org-blueprint.md) calls this "a bag of workflows, not an organisation" and lays out a five-plane fix. This plan delivers **Plane 1 — the entity graph** — the persistent, queryable, related layer of the org's nouns (Person, Organisation, Asset, Money, Decision, Place, Period) that every later plane (Function FMs, ambient agents, CEO-FM, cadences) is sand without.
 
