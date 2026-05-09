@@ -1,0 +1,53 @@
+# Contract-review — compose-domain v4 brief.
+#
+# Mirrors api/server/services/entity_projections/contract_review.py (TASK-022).
+# Payload at data/synthetic/contract-review/contracts.json. Asset's
+# JSON-blob attributes (contract_type, deviates_from_template,
+# amount_gbp, vendor_id) are helper logic — the brief lists the scalar
+# attributes the codegen can synthesise.
+
+domain:
+  workflow_type: contract-review
+  prefix: fleet
+  display_name: Contract review
+  description: |
+    Legal review of a draft contract. Counsel signs off; deviations from
+    the standard template are surfaced in the asset attributes.
+
+phases:
+  - name: contract_intake
+    kind: deterministic
+    intent: Capture contract header + vendor + value + deviation flag.
+  - name: clause_review
+    kind: agent
+    agent_skill_name: clause-reviewer
+    intent: Highlight clauses that deviate from the standard template.
+  - name: approver_signoff
+    kind: hitl
+    persona: contracts_counsel
+    external_event: approver_signoff_decision
+
+entities:
+  - kind: Organisation
+    source: vendor
+    ref_field: payload.vendor_name
+    attributes:
+      name: payload.vendor_name
+  - kind: Asset
+    source: contract
+    ref_field: payload.contract_id
+    attributes:
+      identifier: payload.contract_id
+      contract_type: payload.contract_type
+
+decisions:
+  - phase: approver_signoff
+    persona: contracts_counsel
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.contract_id]
+    attributes_from_context:
+      contract_id: payload.contract_id
+      contract_type: payload.contract_type
+      deviates_from_template: payload.deviates_from_template
+
+function: legal

@@ -427,6 +427,43 @@ git commit -m "record(blueprint): real walks for <domain.display_name>"
 With this step, the new domain becomes visible on the deployed page
 within minutes of graduation. No synthetic templates needed.
 
+## How to author a new domain brief (v4 worked example)
+
+The 13 briefs at `docs/superpowers/specs/*-brief.yaml` are the
+authoritative spec for every generated domain. To author a new one:
+
+1. **Pick a workflow_type** — kebab-case, lowercase, e.g.
+   `purchase-card`. This name is stamped on every payload, every
+   FleetEvent, and every Cypher file the codegens emit.
+2. **Copy the worked example.** The freshest brief —
+   `docs/superpowers/specs/fleet-purchase-card-brief.yaml` — was
+   authored top-down without a hand-written projection module. It
+   exercises every section the v4 schema cares about (domain,
+   phases, entities, decisions, function, ambient) at the smallest
+   plausible size. Use it as the template.
+3. **Fill in the entity/decision shape.** Each `entities[]` entry
+   declares one node the projection will write per workflow; each
+   `decisions[]` entry declares one Decision node per HITL gate. The
+   codegens at `sub-skills/author-entity-projection/codegen.py` and
+   `sub-skills/author-decision-mapping/codegen.py` consume these.
+4. **Validate.** Run the brief through
+   `_shared.brief_validator.validate_brief(...)` (the smoke test at
+   `tests/docs/superpowers/skills/compose_domain/test_fleet_purchase_card_smoke.py`
+   shows the import path). The validator surfaces schema errors with
+   stable `path` field for assertions.
+5. **Hand off to graduate.** The compose-domain orchestrator above
+   handles the rest — the brief is the only operator-authored file.
+
+The 12 backfill briefs (everything matching `docs/superpowers/specs/*-brief.yaml`
+that is NOT `fleet-purchase-card`) document the entity/decision shape
+of the corresponding hand-written Phase 1 projection module at
+`api/server/services/entity_projections/<wt_snake>.py`. The
+hand-written modules carry domain-specific helper logic (period
+derivation, conditional asset emission, JSON-blob attribute
+serialisation, risk-band heuristics) that no schema-driven codegen
+can synthesise from a brief alone — the briefs are documentation of
+intent, not a regenerable source for those modules.
+
 ## Anti-patterns (things you must not do)
 
 - Inventing fields not present in the brief.

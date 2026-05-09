@@ -7,6 +7,10 @@
 # market_pricing). Domain-scoped personae auto-close.
 
 domain:
+  # v4 fields (TASK-032 backfill).
+  workflow_type: contract-renewal
+  prefix: fleet
+  # v3 fields (back-compat).
   name: fleet-contract-renewal
   display_name: Contract renewal
   owner_role: contract_finance_bp
@@ -122,3 +126,38 @@ external_systems:
     mcp_tool: policy_cite
     operations:
       - policy_cite
+
+# --------------------------------------------------------------------
+# v4 enrichment (TASK-032 backfill). Mirrors
+# api/server/services/entity_projections/contract_renewal.py. The live
+# module derives an annual Period from workflow.created_at and emits
+# Money -[:BELONGS_TO]-> Period; the period derivation is helper logic
+# the codegen does not synthesise.
+# --------------------------------------------------------------------
+entities:
+  - kind: Organisation
+    source: vendor
+    ref_field: payload.vendor_name
+    attributes:
+      name: payload.vendor_name
+  - kind: Asset
+    source: contract
+    ref_field: payload.contract_id
+    attributes:
+      identifier: payload.contract_id
+      status: payload.status
+  - kind: Money
+    source: budget-line
+    ref_field: payload.contract_id
+
+decisions:
+  - phase: finance_signoff
+    persona: contract_finance_bp
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.contract_id]
+    attributes_from_context:
+      contract_id: payload.contract_id
+      current_annual_value: payload.current_annual_value
+      proposed_annual_value: payload.proposed_annual_value
+
+function: finance

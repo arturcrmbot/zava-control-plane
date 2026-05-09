@@ -1,0 +1,72 @@
+# AP-invoice — compose-domain v4 brief.
+#
+# Mirrors the Phase 1 hand-written projection at
+# api/server/services/entity_projections/ap_invoice.py (TASK-015).
+# Authoritative payload keys live at data/synthetic/ap-invoice/invoices.json.
+#
+# v4 backfill (TASK-026): the live projection module is canonical and
+# carries bespoke logic the codegen cannot synthesise (JSON-blob
+# attributes for Money's vendor/po cross-link). This brief documents
+# the entity/decision shape only — graduate.sh would NOT overwrite the
+# hand-written module.
+
+domain:
+  workflow_type: ap-invoice
+  prefix: fleet
+  display_name: Accounts-payable invoice
+  description: |
+    A vendor invoice arrives, must be matched to a PO, and routed
+    through the AP clerk + financial controller for sign-off.
+
+phases:
+  - name: invoice_intake
+    kind: deterministic
+    intent: Capture invoice header + amount + currency; resolve vendor by name.
+  - name: po_match
+    kind: agent
+    agent_skill_name: po-matcher
+    intent: Match invoice line items to the referenced PO; flag variances.
+  - name: ap_clerk_signoff
+    kind: hitl
+    persona: ap_clerk
+    external_event: ap_clerk_signoff_decision
+  - name: controller_signoff
+    kind: hitl
+    persona: controller
+    external_event: controller_signoff_decision
+
+entities:
+  - kind: Organisation
+    source: vendor
+    ref_field: payload.vendor_name
+    attributes:
+      name: payload.vendor_name
+  - kind: Asset
+    source: purchase-order
+    ref_field: payload.po_id
+    attributes:
+      identifier: payload.po_id
+  - kind: Money
+    source: invoice
+    ref_field: payload.invoice_id
+    attributes:
+      currency: payload.currency
+      category: payload.category
+
+decisions:
+  - phase: ap_clerk_signoff
+    persona: ap_clerk
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.invoice_id]
+    attributes_from_context:
+      invoice_id: payload.invoice_id
+      amount_gbp: payload.amount_gbp
+  - phase: controller_signoff
+    persona: controller
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.invoice_id]
+    attributes_from_context:
+      invoice_id: payload.invoice_id
+      amount_gbp: payload.amount_gbp
+
+function: finance

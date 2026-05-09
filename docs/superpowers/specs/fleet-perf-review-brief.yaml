@@ -7,6 +7,10 @@
 # delivers). Domain-scoped personae auto-close.
 
 domain:
+  # v4 fields (TASK-029 backfill).
+  workflow_type: perf-review
+  prefix: fleet
+  # v3 fields (back-compat).
   name: fleet-perf-review
   display_name: Performance review
   owner_role: perf_review_hr_bp
@@ -123,3 +127,35 @@ external_systems:
     operations:
       - get_grade_distribution
       - get_calibration_history
+
+# --------------------------------------------------------------------
+# v4 enrichment (TASK-029 backfill). Mirrors
+# api/server/services/entity_projections/perf_review.py.
+# --------------------------------------------------------------------
+entities:
+  - kind: Person
+    source: reviewee
+    ref_field: payload.employee_id
+  - kind: Period
+    source: review-cycle
+    ref_field: payload.cycle
+    attributes:
+      label: payload.cycle
+
+decisions:
+  - phase: hr_calibration
+    persona: perf_review_hr_bp
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.employee_id]
+    attributes_from_context:
+      cycle: payload.cycle
+      prior_rating: payload.prior_rating
+  - phase: line_manager_delivery
+    persona: perf_review_line_manager
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.employee_id]
+    attributes_from_context:
+      cycle: payload.cycle
+      prior_rating: payload.prior_rating
+
+function: hr
