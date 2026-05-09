@@ -1,36 +1,20 @@
 /**
- * Standalone full-screen Org-Building / Cosmic-Constellation page.
+ * Glass Tower page — the agentic org as a living building.
  *
- * Default lens: the Org Building (zoom-3 backbone). A bottom-right
- * toggle swaps to the legacy Cosmic Constellation lens, preserved as
- * an always-available alternate view per the spec.
- *
- * Chunk 3 (IP6/7/8): wires the four-level zoom — at zoom-2 the
- * underlying OrgBuilding renders the wing LOD treatment; at zoom-1 we
- * mount `<DepartmentInterior>` over it; at zoom-0 we mount
- * `<WorkflowZoom>`. ESC zooms back out one level.
+ * Default lens: <GlassTower />. Bottom-right toggle swaps in the legacy
+ * <CosmicConstellation /> lens for the original pitch aesthetic.
  */
-
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { CosmicConstellation } from "../components/CosmicConstellation";
-import { OrgBuilding } from "../components/OrgBuilding";
-import { DepartmentInterior } from "../components/orgBuilding/DepartmentInterior";
-import { EventFeed } from "../components/orgBuilding/EventFeed";
-import { PerfHud, isPerfEnabled } from "../components/orgBuilding/PerfHud";
-import { WorkflowZoom } from "../components/orgBuilding/WorkflowZoom";
+import { GlassTower } from "../components/glassTower/GlassTower";
 import { useObservatory } from "../lib/useObservatory";
-import { useOrgZoom } from "../lib/orgZoom";
 
-type Lens = "building" | "cosmic";
+type Lens = "tower" | "cosmic";
 
 export function ConstellationPage() {
   const { status } = useObservatory({ bufferSize: 1 });
-  const zoom = useOrgZoom();
-  const [lens, setLens] = useState<Lens>("building");
-  const perfEnabled = useMemo(() => isPerfEnabled(), []);
-
-  const embed =
-    new URLSearchParams(window.location.search).get("embed") === "1";
+  const [lens, setLens] = useState<Lens>("tower");
+  const embed = new URLSearchParams(window.location.search).get("embed") === "1";
 
   useEffect(() => {
     document.body.classList.add("constellation-page-body");
@@ -39,49 +23,13 @@ export function ConstellationPage() {
     };
   }, []);
 
-  // ESC zooms out one level (chunk-3 wire-up). At zoom-3 the hook is a
-  // no-op; lower levels bubble back up — workflow → org, department →
-  // wing, wing → org.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") zoom.zoomOut();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [zoom]);
-
   return (
     <div className="constellation-page">
-      {lens === "building" ? (
-        <OrgBuilding status={status} fullScreen zoomTarget={zoom.target} />
+      {lens === "tower" ? (
+        <GlassTower status={status} />
       ) : (
         <CosmicConstellation status={status} fullScreen />
       )}
-
-      {/* Perf HUD — only on ?perf=1. Survives lens swaps. */}
-      {perfEnabled && <PerfHud />}
-
-      {/* Department interior — zoom-1 overlay (chunk-3 IP7). */}
-      {lens === "building" && zoom.target.kind === "department" && zoom.target.id && (
-        <DepartmentInterior
-          name={zoom.target.id}
-          onClose={() => zoom.zoomOut()}
-        />
-      )}
-
-      {/* Workflow detail — zoom-0 overlay (chunk-3 IP8). */}
-      {lens === "building" && zoom.target.kind === "workflow" && zoom.target.id && (
-        <WorkflowZoom
-          id={zoom.target.id}
-          onClose={() => zoom.zoomOut()}
-        />
-      )}
-
-      {/* Right-rail event feed — sticky across lens swaps so the
-          observatory stream stays visible whenever the org-building
-          scene is active. Hidden at zoom-0 (workflow) where the
-          WorkflowZoom panel owns the right side. */}
-      {lens === "building" && zoom.target.kind !== "workflow" && <EventFeed />}
 
       <div className="constellation-page__title">
         <div className="constellation-page__eyebrow">the substrate, running</div>
@@ -92,25 +40,11 @@ export function ConstellationPage() {
         )}
       </div>
 
-      {/* Bottom-right lens toggle (TASK-050). Subtle border + uppercase
-          mono label so it reads as part of the HUD without competing
-          with the building. */}
       <button
         type="button"
-        onClick={() =>
-          setLens((cur) => (cur === "building" ? "cosmic" : "building"))
-        }
-        className="org-building__lens-toggle"
-        aria-label={
-          lens === "building"
-            ? "Switch to cosmic-lens view"
-            : "Switch to org-building view"
-        }
-        title={
-          lens === "building"
-            ? "Switch to cosmic-lens view"
-            : "Switch to org-building view"
-        }
+        onClick={() => setLens((cur) => (cur === "tower" ? "cosmic" : "tower"))}
+        aria-label={lens === "tower" ? "Switch to cosmic-lens view" : "Switch to glass-tower view"}
+        title={lens === "tower" ? "Switch to cosmic-lens view" : "Switch to glass-tower view"}
         style={{
           position: "absolute",
           bottom: 16,
@@ -130,7 +64,7 @@ export function ConstellationPage() {
           boxShadow: "0 2px 12px rgba(0,0,0,0.35)",
         }}
       >
-        {lens === "building" ? "◌ Cosmic lens" : "▣ Building lens"}
+        {lens === "tower" ? "◌ Cosmic lens" : "▣ Tower lens"}
       </button>
     </div>
   );

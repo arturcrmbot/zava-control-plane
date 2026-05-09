@@ -105,6 +105,36 @@ async def personas_state():
     pending_by_role: dict[str, list[dict]] = _defaultdict(list)
     last_decision_by_role: dict[str, dict] = {}
 
+    # Build phase → persona_role lookup per workflow_type from DOMAINS so
+    # we can resolve "who is supposed to decide" for an awaiting_hitl
+    # workflow even when the parked context isn't on payload.
+    #
+    # HitlGate fields are .gate_phase (e.g. "ap_clerk_signoff") and .persona
+    # (e.g. "ap_clerk"). The workflow's current_phase is the pipeline phase
+    # (e.g. "Three-Way Match") which doesn't match gate_phase, so we fall
+    # back to "first persona of the domain" when an exact gate match misses.
+    try:
+        from api.shared import domains as _domains
+        gates_by_type: dict[str, dict[str, str]] = {}
+        first_persona_by_type: dict[str, str] = {}
+        for wt, dom in _domains.DOMAINS.items():
+            mapping: dict[str, str] = {}
+            personas_in_order: list[str] = []
+            for gate in (getattr(dom, "hitl_gates", None) or ()):
+                gate_phase = getattr(gate, "gate_phase", None) or getattr(gate, "phase", None)
+                role = getattr(gate, "persona", None) or getattr(gate, "persona_role", None)
+                if gate_phase and role:
+                    mapping[str(gate_phase).lower()] = role
+                    if role not in personas_in_order:
+                        personas_in_order.append(role)
+            if mapping:
+                gates_by_type[wt] = mapping
+            if personas_in_order:
+                first_persona_by_type[wt] = personas_in_order[0]
+    except Exception:
+        gates_by_type = {}
+        first_persona_by_type = {}
+
     for w in _app_state.store.list_workflows():
         if w.status == "awaiting_hitl":
             ctx = (w.payload or {}).get("hitl_context") or {}
@@ -113,6 +143,14 @@ async def personas_state():
                 or (w.payload or {}).get("persona")
                 or None
             )
+            if not persona_role:
+                phase_key = str(getattr(w, "current_phase", "") or "").lower()
+                persona_role = gates_by_type.get(w.type, {}).get(phase_key)
+            if not persona_role:
+                # Fall back to the workflow_type's first persona — a
+                # reasonable guess when the gate-phase string doesn't
+                # match the workflow's pipeline phase (the common case).
+                persona_role = first_persona_by_type.get(w.type)
             if persona_role:
                 pending_by_role[persona_role].append({
                     "workflow_id": w.id,
