@@ -34,6 +34,7 @@ The remaining behavioural method (``record_decision``) lands in TASK-007.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import secrets
@@ -41,6 +42,7 @@ import threading
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -386,6 +388,14 @@ class EntityGraph:
         self.bus: Any | None = None
         self.audit: Any | None = None
         self.governance: Any | None = None
+        # Per-(workflow_id, phase) locks for record_decision dedupe race
+        # protection (PAT-001). The outer map_lock is held only briefly to
+        # mutate the dict; the per-key lock is held across the
+        # check-then-mint sequence inside record_decision.
+        # NOTE: this map grows monotonically — a future Phase 4 cadence
+        # (workflow-completed → evict its locks) is the planned cleanup.
+        self._decision_lock_map: dict[tuple[str, str], threading.Lock] = {}
+        self._decision_lock_map_lock = threading.Lock()
         self._bootstrap_schema()
 
     # -- lifecycle -------------------------------------------------------
@@ -638,6 +648,136 @@ class EntityGraph:
                     "rel": rel_upper,
                 },
             )
+
+    # -- decisions (TASK-007 / PAT-001) ----------------------------------
+
+    def record_decision(
+        self,
+        workflow_id: str,
+        phase: str,
+        persona_role: str,
+        verdict: str,
+        reason: str,
+        decided_at: datetime | str,
+        source_event: str,
+        attributes: dict[str, Any],
+        decided_on: tuple[str, ...] = (),
+    ) -> str:
+        """Mint (or dedupe) a Decision node, returning its canonical ULID.
+
+        PAT-001 contract: the natural triple ``(workflow_id, phase,
+        persona_role)`` is the dedupe key. Two calls with the same triple
+        return the SAME ULID; the second call is a silent no-op on the
+        graph (first writer wins, no overwrite of attrs) and emits only a
+        ``decision.deduped`` audit entry — the bus already saw the
+        original ``decision.recorded`` event when the row was first
+        minted, so emitting a second bus event would be misleading.
+
+        Race protection: a per-``(workflow_id, phase)`` :class:`threading.Lock`
+        serialises the check-then-mint window so two threads racing on the
+        same triple converge on a single ULID. The lock map is mutated
+        under a separate ``_decision_lock_map_lock`` (held only briefly).
+        Lock order is always: per-key decision lock FIRST, then
+        ``self._conn_lock`` SECOND inside the Cypher calls.
+
+        On mint: writes the Decision node with a CREATE (we just confirmed
+        no row exists, so MERGE's match arm is dead weight), then for each
+        ``did`` in ``decided_on`` writes a ``DECIDED_ON`` rel via
+        :meth:`link` (which silently no-ops if the target id is missing —
+        consistent with the upsert/link contract that callers seed nodes
+        first). Both the bus ``decision.recorded`` event and the audit
+        entry are emitted OUTSIDE both locks.
+
+        ``attributes`` is JSON-encoded into the ``Decision.attributes``
+        STRING column (it's the "everything else" blob; the fixed columns
+        — ``workflow_id``, ``phase``, ``persona_role``, ``verdict``,
+        ``reason``, ``decided_at``, ``source_event`` — are written
+        explicitly).
+        """
+        key = (workflow_id, phase)
+        with self._decision_lock_map_lock:
+            decision_lock = self._decision_lock_map.setdefault(key, threading.Lock())
+
+        with decision_lock:
+            existing = self.query_one(
+                "MATCH (d:Decision) WHERE d.workflow_id = $wf "
+                "AND d.phase = $ph AND d.persona_role = $pr "
+                "RETURN d.id AS id",
+                {"wf": workflow_id, "ph": phase, "pr": persona_role},
+            )
+
+            if existing is not None:
+                decision_id = existing["id"]
+                minted = False
+            else:
+                decision_id = _ulid()
+                minted = True
+                with self._conn_lock:
+                    self.conn.execute(
+                        "CREATE (d:Decision {"
+                        "id: $id, workflow_id: $wf, phase: $ph, "
+                        "persona_role: $pr, verdict: $verdict, reason: $reason, "
+                        "decided_at: $decided_at, source_event: $source_event, "
+                        "attributes: $attributes"
+                        "})",
+                        {
+                            "id": decision_id,
+                            "wf": workflow_id,
+                            "ph": phase,
+                            "pr": persona_role,
+                            "verdict": verdict,
+                            "reason": reason,
+                            "decided_at": decided_at,
+                            "source_event": source_event,
+                            "attributes": json.dumps(attributes or {}),
+                        },
+                    )
+
+        # Side-effects outside both locks (mirrors upsert/link).
+        if minted:
+            for did in decided_on:
+                # link() handles validation, locking, and silent no-op on
+                # missing endpoints; it also emits its own entity.linked
+                # bus + audit pair, which is consistent with the standard
+                # rel-write contract.
+                self.link(decision_id, "DECIDED_ON", did)
+
+            if self.bus is not None:
+                self.bus.emit(
+                    FleetEvent(
+                        type="decision.recorded",
+                        workflow_id=workflow_id,
+                        decision_id=decision_id,
+                        phase=phase,
+                        persona_role=persona_role,
+                    )
+                )
+            if self.audit is not None:
+                self.audit.log(
+                    "decision.recorded",
+                    {
+                        "decision_id": decision_id,
+                        "workflow_id": workflow_id,
+                        "phase": phase,
+                        "persona_role": persona_role,
+                        "verdict": verdict,
+                    },
+                )
+        else:
+            # Dedupe hit: audit only, no bus emission (bus already saw
+            # the original mint).
+            if self.audit is not None:
+                self.audit.log(
+                    "decision.deduped",
+                    {
+                        "decision_id": decision_id,
+                        "workflow_id": workflow_id,
+                        "phase": phase,
+                        "persona_role": persona_role,
+                    },
+                )
+
+        return decision_id
 
     # -- reads (TASK-006) ------------------------------------------------
 
