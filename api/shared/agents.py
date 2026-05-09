@@ -143,6 +143,24 @@ AGENTS: dict[str, AgentRegistryEntry] = {
             "extracts structured candidate fields, recalls similar hires."
         ),
     ),
+    # ---------------- System actors (Phase 1 entity-graph plane) ----------------
+    # The entity-graph reflector dispatches projection ops (Person /
+    # Organisation upserts + Decision writes) under a fixed actor id so
+    # the governance gate can audit + kill-switch it. Listed as a system
+    # actor so AppState's `governance=self.governance` wiring doesn't
+    # auto-deny under the unknown-agent rule in
+    # api/server/services/governance/kernel.py:_registry_gate.
+    "reflector.entity_reflector": AgentRegistryEntry(
+        agent_id="reflector.entity_reflector",
+        allowed_tools=("entity.write",),
+        max_value_gbp=None,
+        reversible_only=False,
+        scope_function="shared",
+        description=(
+            "System actor for EntityReflector — turns FleetEvents into "
+            "EntityGraph upserts via the per-domain projection registry."
+        ),
+    ),
 }
 
 

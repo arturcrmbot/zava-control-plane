@@ -27,6 +27,12 @@ from api.server.services.email_send import EmailSender
 _PORTAL_DATA_DIR = Path(os.getenv("PORTAL_DATA_DIR", "data/portal"))
 _PORTAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
+# Repo root resolved from this file's location so the entity-graph bootstrap
+# fixtures load regardless of the cwd that AppState is constructed from
+# (pytest from "/", uvicorn from the api/ dir, the Functions worker, etc.).
+# api/server/state.py → parents[2] is the repo root.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
 
 def _build_blob_store():
     """Lazy: only construct BlobStore if a connection string is configured.
@@ -54,6 +60,42 @@ class AppState:
         self.bus = EventBus()
         self.store = StateStore()
         self.audit = AuditLogger()
+
+        # ----------------------------------------------------- entity graph plane
+        # (a) Governance kernel singleton — canonical entry-point for every
+        #     later actor (reflector here, ambient dispatcher in Phase 3,
+        #     cadence loop in Phase 4). Set BEFORE any consumer of self.bus.
+        from api.server.services.governance.kernel import kernel as _governance_kernel
+        self.governance = _governance_kernel()
+
+        # (b) Embedded property graph for the entity-graph plane. Imports
+        #     are local to delay the kuzu import until AppState is actually
+        #     constructed (preserves the existing module-import shape).
+        from api.server.services.entity_graph import EntityGraph
+        self.entities = EntityGraph(_PORTAL_DATA_DIR / "entity_graph.kuzu")
+
+        # (c) Wire bus/audit/governance into the graph for event + audit emission.
+        self.entities.attach(bus=self.bus, audit=self.audit, governance=self.governance)
+
+        # (d) One-shot bootstrap from the existing fixtures into Person /
+        #     Organisation entities. Repo-rooted so it works regardless of cwd.
+        self.entities.bootstrap_from_fixtures(
+            employees_path=_REPO_ROOT / "data/synthetic/employees.json",
+            vendors_path=_REPO_ROOT / "api/server/fixtures/vendors.json",
+            agencies_path=_REPO_ROOT / "api/server/fixtures/agencies.json",
+        )
+
+        # (e) Reflector subscribes AFTER bootstrap so the very first workflow
+        #     event does not race against an unfinished bootstrap.
+        from api.server.services.entity_reflector import EntityReflector
+        # Trigger projection registration by importing the package.
+        import api.server.services.entity_projections  # noqa: F401
+        self.entity_reflector = EntityReflector(
+            self.bus, self.store, self.entities,
+            governance=self.governance, audit=self.audit,
+        )
+        self.entity_reflector.start()
+
         self.hub = SSEHub()
         self.orchestration_history: dict[str, list[dict]] = {}
         # ----------------------------------------------------- candidate portal
@@ -90,6 +132,12 @@ class AppState:
                     svc.close()
                 except Exception:
                     pass
+        # Entity-graph plane teardown — sync calls; hasattr guards make
+        # aclose idempotent and safe even if __init__ raised mid-way.
+        if hasattr(self, "entity_reflector"):
+            self.entity_reflector.aclose()
+        if hasattr(self, "entities"):
+            self.entities.close()
 
 
 app_state = AppState()

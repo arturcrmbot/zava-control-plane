@@ -202,6 +202,15 @@ policy:
     condition:
       field: tool
       operator: eq
+      value: entity.write
+    message: tool entity.write (reversible=False, requires_authority=False, scope=shared)
+    name: tool:entity.write
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
       value: feedback_collector.get_okr_results
     message: tool feedback_collector.get_okr_results (reversible=True, requires_authority=False, scope=hiring)
     name: tool:feedback_collector.get_okr_results

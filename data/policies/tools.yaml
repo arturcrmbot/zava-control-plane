@@ -532,3 +532,17 @@ tools:
     value_field: amount_gbp
     scope_function: finance
     description: Submit a justification on a held claim. Non-reversible.
+
+  # -------------------------------------------------------------------------
+  # Phase 1 entity-graph plane (system actor)
+  # -------------------------------------------------------------------------
+  - id: entity.write
+    reversible: false
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: >-
+      System tool used by EntityReflector to upsert nodes / links / decisions
+      into the embedded KuzuDB entity graph. Mutates local state only;
+      governed via the kill switch (actor=reflector.entity_reflector).
