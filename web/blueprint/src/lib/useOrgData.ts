@@ -306,6 +306,10 @@ export function useOrgAnimations(
   entries: AnimEntry[];
   dispatch: Dispatch<{ type: "tick"; dt: number }>;
   beams: CrossFunctionBeam[];
+  /** Per-function "activity heat" 0..1 (recent event rate, decays with
+   *  half-life ~3s). Drives floor emissive ramp so busy floors visibly
+   *  glow vs idle ones. */
+  heatByFunction: Record<string, number>;
 } {
   const [state, dispatch] = useReducer(animReducer, initialAnimState);
   const layersRef = useRef(layers);
@@ -319,6 +323,13 @@ export function useOrgAnimations(
     functionByName: snap.functionByName,
   };
 
+  // Heat tracker — exponential decay per second. Each event for a
+  // function bumps heat by 0.25 (cap 1.0). Re-rendered every tick of
+  // the snap poll so the building's emissive intensity stays smooth.
+  const heatRef = useRef<Record<string, number>>({});
+  const [heatTick, setHeatTick] = useState(0);
+  const lastDecayRef = useRef<number>(performance.now());
+
   // SSE handler. Translation is layer-aware so a disabled layer never
   // accumulates queue entries that get dropped at render time.
   useObservatory({
@@ -329,8 +340,48 @@ export function useOrgAnimations(
         layers: layersRef.current,
       });
       if (entry) dispatch({ type: "enqueue", entry } as never);
+
+      // Heat: resolve the firing function (same fallback chain as
+      // translateEvent uses). Fall through silently when unknown.
+      let fn = event.function ?? null;
+      if (!fn && event.workflow_type) {
+        fn = ctxRef.current.functionByWorkflowType.get(event.workflow_type) ?? null;
+      }
+      if (!fn && event.workflow_id) {
+        const m = event.workflow_id.match(/^([A-Z]+)-/);
+        const wt = m ? PREFIX_TO_WORKFLOW_TYPE[m[1]] : null;
+        if (wt) fn = ctxRef.current.functionByWorkflowType.get(wt) ?? null;
+      }
+      if (fn) {
+        const cur = heatRef.current[fn] ?? 0;
+        heatRef.current[fn] = Math.min(1, cur + 0.25);
+      }
     },
   });
+
+  // Decay loop — runs every 250ms regardless of event traffic.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const now = performance.now();
+      const dt = (now - lastDecayRef.current) / 1000;
+      lastDecayRef.current = now;
+      const decay = Math.exp(-dt / 3.0); // half-life ~2s
+      const next: Record<string, number> = {};
+      let changed = false;
+      for (const [k, v] of Object.entries(heatRef.current)) {
+        const newV = v * decay;
+        if (newV > 0.005) {
+          next[k] = newV;
+        } else {
+          changed = true;
+        }
+        if (Math.abs(newV - v) > 0.005) changed = true;
+      }
+      heatRef.current = next;
+      if (changed) setHeatTick((t) => (t + 1) | 0);
+    }, 250);
+    return () => window.clearInterval(id);
+  }, []);
 
   // Cross-function beams: derive from the latest poll. Re-emitted when
   // hot entities or the function index change. Conceptually persistent
@@ -341,10 +392,18 @@ export function useOrgAnimations(
     return computeCrossFunctionBeams(snap.hotEntities, snap.functionByWorkflowType);
   }, [snap.hotEntities, snap.functionByWorkflowType, layers.crossFunctionBeams]);
 
+  // Snapshot the heat ref for the consumer. Bumped by `heatTick`.
+  const heatByFunction = useMemo(
+    () => ({ ...heatRef.current }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [heatTick],
+  );
+
   return {
     entries: state.entries,
     dispatch: dispatch as Dispatch<{ type: "tick"; dt: number }>,
     beams,
+    heatByFunction,
   };
 }
 

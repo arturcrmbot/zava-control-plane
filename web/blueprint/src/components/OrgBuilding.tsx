@@ -41,7 +41,7 @@ export function OrgBuilding({ status, fullScreen = false, zoomTarget }: Props) {
   const snap = useOrgData();
   const { functions, entityCounts, cadences } = snap;
   const { layers, setLayer } = useLayerToggles();
-  const { entries, dispatch, beams } = useOrgAnimations(snap, layers);
+  const { entries, dispatch, beams, heatByFunction } = useOrgAnimations(snap, layers);
 
   const activeWing = useMemo(() => {
     if (!zoomTarget) return null;
@@ -105,6 +105,7 @@ export function OrgBuilding({ status, fullScreen = false, zoomTarget }: Props) {
           functions={functions}
           entityCounts={entityCounts}
           activeWing={activeWing}
+          heatByFunction={layers.activityHeat ? heatByFunction : {}}
           onFloorClick={handleFloorClick}
         />
 

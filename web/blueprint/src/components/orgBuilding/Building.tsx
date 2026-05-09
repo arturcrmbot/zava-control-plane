@@ -89,21 +89,31 @@ interface FloorProps {
   dimmed?: boolean;
   /** Slightly brighter emissive accent for floors in the active wing. */
   boosted?: boolean;
+  /** Sliding-window event-rate heat 0..1; ramps emissiveIntensity so
+   *  busy floors visibly glow above idle ones. */
+  heat?: number;
   onClick?: () => void;
 }
 
-function Floor({ fn, y, isPenthouse = false, dimmed = false, boosted = false, onClick }: FloorProps) {
+function Floor({ fn, y, isPenthouse = false, dimmed = false, boosted = false, heat = 0, onClick }: FloorProps) {
   const color = FUNCTION_COLORS[fn.name] ?? "#cccccc";
   const width = isPenthouse ? PENTHOUSE_WIDTH : FLOOR_WIDTH;
   const kpis = useFunctionKpis(fn.name);
   const slabRef = useRef<THREE.Mesh>(null);
 
-  // CEO penthouse pulses gently (spec callout #5).
+  // CEO penthouse pulses gently (spec callout #5). Other floors glow
+  // proportional to recent event traffic via `heat` (ralph-loop add).
   useFrame((state) => {
-    if (!slabRef.current || !isPenthouse) return;
-    const t = state.clock.getElapsedTime();
+    if (!slabRef.current) return;
     const m = slabRef.current.material as THREE.MeshStandardMaterial;
-    m.emissiveIntensity = 0.6 + 0.25 * Math.sin(t * 1.4);
+    if (isPenthouse) {
+      const t = state.clock.getElapsedTime();
+      m.emissiveIntensity = 0.6 + 0.25 * Math.sin(t * 1.4);
+      return;
+    }
+    // Smoothed lerp toward target so heat changes glide rather than jump.
+    const target = (boosted ? 0.6 : 0.18) + heat * 0.85;
+    m.emissiveIntensity += (target - m.emissiveIntensity) * 0.12;
   });
 
   // Pre-compute the marquee text. Empty store → "—" placeholder per spec.
@@ -281,6 +291,10 @@ interface BuildingProps {
    *  named wing stands out at zoom-2. Floors in the wing also tick a
    *  brighter material accent. */
   activeWing?: string[] | null;
+  /** Per-function activity heat 0..1 (event rate, decays with ~3s
+   *  half-life). Drives floor emissive ramp so live activity reads
+   *  visually. Empty object disables the effect. */
+  heatByFunction?: Record<string, number>;
   /** Click-to-zoom callback — fires when the operator clicks a floor.
    *  At zoom-3 the page wires this to "zoom to the wing of this floor". */
   onFloorClick?: (fnName: string) => void;
@@ -290,6 +304,7 @@ export function Building({
   functions,
   entityCounts,
   activeWing = null,
+  heatByFunction = {},
   onFloorClick,
 }: BuildingProps) {
   const byName = new Map(functions.map((f) => [f.name, f]));
@@ -310,6 +325,7 @@ export function Building({
         isPenthouse={isPenthouse}
         dimmed={dimmed}
         boosted={activeWing != null && activeWing.includes(name)}
+        heat={heatByFunction[name] ?? 0}
         onClick={onFloorClick ? () => onFloorClick(name) : undefined}
       />,
     );
