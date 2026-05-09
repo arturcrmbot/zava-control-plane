@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -176,13 +177,24 @@ def test_decided_on_materialises_rels(graph: EntityGraph) -> None:
 def test_concurrent_callers_dedupe_on_same_triple(tmp_path: Path) -> None:
     """Two threads racing on the same (wf, phase, persona_role) must both
     return the same ULID — the per-(wf, phase) lock serialises the
-    check-then-mint window."""
+    check-then-mint window.
+
+    Uses ``threading.Barrier(2)`` to force both threads into the
+    check-then-mint window at the same instant — without it, Kuzu's
+    sub-ms in-memory ops let the threads serialise and the test would
+    pass even if the per-key lock didn't exist.
+    """
     graph = EntityGraph(tmp_path / "g.kuzu")
     bus = mock.Mock()
     audit = mock.Mock()
     graph.attach(bus=bus, audit=audit)
 
+    barrier = threading.Barrier(2)
+
     def call() -> str:
+        # Both threads release simultaneously and enter record_decision
+        # in lockstep, actually exercising the per-(wf, phase) lock.
+        barrier.wait()
         return graph.record_decision(
             workflow_id="wf-race",
             phase="triage",
@@ -210,6 +222,68 @@ def test_concurrent_callers_dedupe_on_same_triple(tmp_path: Path) -> None:
     # Audit saw one .recorded + one .deduped.
     actions = sorted(call.args[0] for call in audit.log.call_args_list)
     assert actions == ["decision.deduped", "decision.recorded"]
+
+
+def test_record_decision_handles_datetime_in_attributes(graph: EntityGraph) -> None:
+    """``attributes`` payload may contain non-JSON-native values
+    (``datetime`` is the common case for fleet projections);
+    ``json.dumps(..., default=str)`` coerces them to ISO-style strings
+    rather than raising ``TypeError``."""
+    decision_id = _record(
+        graph,
+        workflow_id="WF-DT",
+        phase="approve",
+        persona_role="cfo",
+        verdict="approved",
+        reason="ts in attrs",
+        decided_at=datetime(2026, 5, 9, 10, 0),
+        source_event="workflow.hitl.resolved",
+        attributes={"reviewed_at": datetime(2026, 5, 9, 9, 30)},
+    )
+    row = graph.query_one(
+        "MATCH (d:Decision) WHERE d.id = $id RETURN d.attributes AS attrs",
+        {"id": decision_id},
+    )
+    assert row is not None
+    parsed = json.loads(row["attrs"])
+    # The datetime was coerced to a string via default=str; precise format
+    # depends on str(datetime) — just assert the year is present.
+    assert "2026" in parsed["reviewed_at"]
+
+
+def test_decided_on_writes_multiple_rels(graph: EntityGraph) -> None:
+    """``decided_on`` accepts a tuple of any length; one DECIDED_ON rel
+    per id (locks the loop semantics — the existing test only covers a
+    1-tuple)."""
+    for emp_id in ("PERSON-EMP-1", "PERSON-EMP-2", "PERSON-EMP-3"):
+        graph.upsert(
+            EntityWrite(
+                kind="Person",
+                id=emp_id,
+                attrs={"name": emp_id},
+            )
+        )
+
+    decision_id = _record(
+        graph,
+        workflow_id="WF-MULTI",
+        phase="approve",
+        persona_role="cfo",
+        verdict="approved",
+        reason="multiple owners",
+        decided_at=datetime(2026, 5, 9, 10, 0),
+        source_event="workflow.hitl.resolved",
+        attributes={},
+        decided_on=("PERSON-EMP-1", "PERSON-EMP-2", "PERSON-EMP-3"),
+    )
+
+    rels = graph.linked(decision_id, "decided_on")
+    assert len(rels) == 3
+    assert {r["node"]["id"] for r in rels} == {
+        "PERSON-EMP-1",
+        "PERSON-EMP-2",
+        "PERSON-EMP-3",
+    }
 
 
 def test_record_decision_without_attach_writes_silently(graph: EntityGraph) -> None:

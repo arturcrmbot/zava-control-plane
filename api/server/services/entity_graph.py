@@ -392,8 +392,13 @@ class EntityGraph:
         # protection (PAT-001). The outer map_lock is held only briefly to
         # mutate the dict; the per-key lock is held across the
         # check-then-mint sequence inside record_decision.
-        # NOTE: this map grows monotonically — a future Phase 4 cadence
-        # (workflow-completed → evict its locks) is the planned cleanup.
+        # TODO(Phase 4): on `workflow.completed` events, evict
+        # `_decision_lock_map` entries keyed `(workflow_id, _)` — once a
+        # workflow is closed, no more decisions can be recorded against
+        # it, so the per-`(wf, phase)` locks for that workflow are no
+        # longer needed. Until then, the map grows monotonically
+        # (negligible at fleet scale: 1000 workflows × 5 phases = 5k
+        # Locks ≈ ~600 KB).
         self._decision_lock_map: dict[tuple[str, str], threading.Lock] = {}
         self._decision_lock_map_lock = threading.Lock()
         self._bootstrap_schema()
@@ -658,7 +663,7 @@ class EntityGraph:
         persona_role: str,
         verdict: str,
         reason: str,
-        decided_at: datetime | str,
+        decided_at: datetime,
         source_event: str,
         attributes: dict[str, Any],
         decided_on: tuple[str, ...] = (),
@@ -688,11 +693,24 @@ class EntityGraph:
         first). Both the bus ``decision.recorded`` event and the audit
         entry are emitted OUTSIDE both locks.
 
+        Event ordering: ``decision.recorded`` is emitted IMMEDIATELY after
+        the Decision node CREATE succeeds, BEFORE any ``decided_on`` rels
+        are written. If a subsequent :meth:`link` call raises (e.g. for an
+        unknown ``decided_on`` id), the Decision row + the
+        ``decision.recorded`` event are still consistent — consumers can
+        re-query the graph to discover which rels landed. This ordering
+        avoids the failure mode where a partial-link failure permanently
+        masks the mint event from the bus (since a retry would hit the
+        dedupe path which is bus-silent).
+
         ``attributes`` is JSON-encoded into the ``Decision.attributes``
         STRING column (it's the "everything else" blob; the fixed columns
         — ``workflow_id``, ``phase``, ``persona_role``, ``verdict``,
         ``reason``, ``decided_at``, ``source_event`` — are written
-        explicitly).
+        explicitly). ``json.dumps`` is called with ``default=str`` so
+        non-JSON-native values (notably ``datetime``) are coerced to a
+        string rather than raising ``TypeError`` — fleet domain
+        projections will routinely carry timestamps in ``attributes``.
         """
         key = (workflow_id, phase)
         with self._decision_lock_map_lock:
@@ -729,19 +747,18 @@ class EntityGraph:
                             "reason": reason,
                             "decided_at": decided_at,
                             "source_event": source_event,
-                            "attributes": json.dumps(attributes or {}),
+                            "attributes": json.dumps(attributes or {}, default=str),
                         },
                     )
 
         # Side-effects outside both locks (mirrors upsert/link).
         if minted:
-            for did in decided_on:
-                # link() handles validation, locking, and silent no-op on
-                # missing endpoints; it also emits its own entity.linked
-                # bus + audit pair, which is consistent with the standard
-                # rel-write contract.
-                self.link(decision_id, "DECIDED_ON", did)
-
+            # Emit decision.recorded BEFORE writing decided_on rels: if a
+            # link() call raises, the Decision row is already committed
+            # but a retry would hit the bus-silent dedupe path and the
+            # mint event would be permanently lost. Emitting first means
+            # consumers can re-query the graph to reconcile any missing
+            # rels.
             if self.bus is not None:
                 self.bus.emit(
                     FleetEvent(
@@ -750,6 +767,8 @@ class EntityGraph:
                         decision_id=decision_id,
                         phase=phase,
                         persona_role=persona_role,
+                        verdict=verdict,
+                        decided_at=str(decided_at),
                     )
                 )
             if self.audit is not None:
@@ -763,9 +782,19 @@ class EntityGraph:
                         "verdict": verdict,
                     },
                 )
+
+            for did in decided_on:
+                # link() handles validation, locking, and silent no-op on
+                # missing endpoints; it also emits its own entity.linked
+                # bus + audit pair, which is consistent with the standard
+                # rel-write contract.
+                self.link(decision_id, "DECIDED_ON", did)
         else:
             # Dedupe hit: audit only, no bus emission (bus already saw
-            # the original mint).
+            # the original mint). Include the attempted-but-rejected
+            # verdict/reason/source_event so an operator debugging "why
+            # didn't my second submission stick?" can see the diff
+            # against the existing decision.
             if self.audit is not None:
                 self.audit.log(
                     "decision.deduped",
@@ -774,6 +803,9 @@ class EntityGraph:
                         "workflow_id": workflow_id,
                         "phase": phase,
                         "persona_role": persona_role,
+                        "attempted_verdict": verdict,
+                        "attempted_reason": reason,
+                        "attempted_source_event": source_event,
                     },
                 )
 
