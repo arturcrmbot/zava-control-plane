@@ -201,6 +201,8 @@ from api.server.routes.governance import router as governance_router
 # Entity-graph plane read API (Phase 1 TASK-030..-035).
 from api.server.routes.entities import router as entities_router
 from api.server.routes.functions import router as functions_router
+from api.server.routes.functions_ambient import router as functions_ambient_router
+from api.server.routes.cadences import router as cadences_router
 
 for r in (stream_router, workflows_router, exceptions_router, policy_router,
           simulator_router, audit_router, evals_router, orchestration_router,
@@ -215,6 +217,8 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           governance_router,
           entities_router,
           functions_router,
+          functions_ambient_router,
+          cadences_router,
           foundry_router):
     app.include_router(r)
 

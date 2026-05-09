@@ -102,6 +102,15 @@ class AppState:
         )
         self.entity_reflector.start()
 
+        # Phase 4 IP7 (TASK-033b) — meta-workflow reflector mirrors
+        # workflow.sub_spawned events into the Workflow self-relation
+        # so /api/workflows/{id}/tree can render meta-workflow trees.
+        from api.server.services.meta_workflow_reflector import MetaWorkflowReflector
+        self.meta_workflow_reflector = MetaWorkflowReflector(
+            bus=self.bus, audit=self.audit, graph=self.entities,
+        )
+        self.meta_workflow_reflector.start()
+
         self.hub = SSEHub()
 
         # Phase 3 (TASK-028) — per-non-legacy-function Fleet Managers.
@@ -166,6 +175,8 @@ class AppState:
         # aclose idempotent and safe even if __init__ raised mid-way.
         if hasattr(self, "entity_reflector"):
             self.entity_reflector.aclose()
+        if hasattr(self, "meta_workflow_reflector"):
+            self.meta_workflow_reflector.aclose()
         if hasattr(self, "entities"):
             self.entities.close()
 

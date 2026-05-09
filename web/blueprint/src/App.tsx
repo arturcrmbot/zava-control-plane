@@ -10,6 +10,7 @@ import { Closing } from "./sections/Closing";
 import { ConstellationPage } from "./pages/ConstellationPage";
 import { EntitiesPage } from "./pages/EntitiesPage";
 import { FunctionsPage } from "./pages/FunctionsPage";
+import { OrgClonePage } from "./pages/OrgClonePage";
 
 export default function App() {
   // Standalone full-screen constellation view, addressable via
@@ -26,6 +27,9 @@ export default function App() {
     }
     if (params.get("view") === "functions") {
       return <FunctionsPage />;
+    }
+    if (params.get("view") === "org-clone") {
+      return <OrgClonePage />;
     }
   }
 

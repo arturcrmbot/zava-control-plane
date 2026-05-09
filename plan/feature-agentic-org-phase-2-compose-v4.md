@@ -4,7 +4,7 @@ version: 1.0
 date_created: 2026-05-08
 last_updated: 2026-05-08
 owner: Zava Control Plane — substrate
-status: 'Not Started'
+status: 'Shipped'
 tags: [feature, design-time, agentic-org, compose-domain, skill]
 ---
 

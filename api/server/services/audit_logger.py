@@ -45,6 +45,46 @@ _GENESIS_HASH = "0" * 64
 
 
 # ---------------------------------------------------------------------------
+# Event registry (Phase 4 IP8 — TASK-038)
+# ---------------------------------------------------------------------------
+#
+# This module deliberately keeps :meth:`AuditLogger.log` schema-free —
+# any (action, details) pair lands on the chain. The dictionary below
+# is documentation only: it enumerates the event types that the
+# substrate's hot-path code emits, and the ``details`` keys downstream
+# consumers (verify_chain, the /admin/org-clone observatory page,
+# precedent queries) expect to find.
+#
+# Adding an event type here is non-binding but contributors should keep
+# this list up to date — it is the single grep-target for "what events
+# can land on the audit ledger?".
+
+AUDIT_EVENT_REGISTRY: dict[str, tuple[str, ...]] = {
+    # Phase 1 — entity graph plane
+    "entity.upserted": ("kind", "id", "workflow_id"),
+    "entity.linked": ("src_id", "rel", "dst_id"),
+    "entity.write.failed": ("subscriber", "event_type", "error"),
+    "decision.recorded": ("decision_id", "workflow_id", "phase", "persona_role"),
+    # Phase 3 — ambient agents
+    "ambient.decided": (
+        "ambient_agent", "function", "trigger_kind",
+        "trigger_payload", "spawn_outcome", "timestamp",
+    ),
+    # Phase 3 — governance kernel surfaces
+    "governance.find_entities": ("agent_id", "pattern"),
+    "governance.find_entities.denied": ("agent_id", "pattern", "reason"),
+    # Phase 4 IP1 — cadence loop
+    "cadence.tick": (
+        "cadence_name", "scheduled_for", "fired_at", "ambient_agent",
+    ),
+    # Phase 4 IP4 — meta-workflow codegen
+    "workflow.sub_spawned": (
+        "parent_workflow_id", "child_workflow_id", "child_workflow_type",
+    ),
+}
+
+
+# ---------------------------------------------------------------------------
 # Public records
 # ---------------------------------------------------------------------------
 

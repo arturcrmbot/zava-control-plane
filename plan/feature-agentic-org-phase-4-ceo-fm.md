@@ -4,13 +4,15 @@ version: 1.0
 date_created: 2026-05-08
 last_updated: 2026-05-08
 owner: Zava Control Plane — substrate
-status: 'Not Started'
+status: 'Shipped'
 tags: [feature, architecture, agentic-org, plane-4, ceo-fm, cadences, meta-workflows, precedent]
 ---
 
 # Introduction
 
-![Status: Not Started](https://img.shields.io/badge/status-Not%20Started-lightgrey)
+![Status: Shipped](https://img.shields.io/badge/status-Shipped-green)
+
+**Update 2026-05-09:** Implementation Phases 1–9 shipped on branch `feature/agentic-org-phase-1-entity-graph` across four dispatch commits. IP1+2+3 (cadence loader + cron loop in `AppState`, `KpiStore` at `data/portal/kpis.sqlite`, `precedent_query` Cypher + persona wiring) landed in `a7fe7570`. IP4+5+6 (compose-domain v4 sub-orchestrator phase generator, three meta-workflows `hire-to-productive` / `vendor-risk-to-pay` / `lead-to-cash`, CEO-FM as `function: ceo` plus `fy-close` + `board-prep`) landed in `68b20f1b`. IP7+8+9 (this commit) ships `/api/workflows/{id}/tree` + `MetaWorkflowReflector`, `/api/functions/{name}/ambient` + `/api/cadences`, the `/admin/org-clone` blueprint observatory page, audit-event registry doc, ambient-reasoning economics ledger, and end-to-end smoke. Test count: 1002 → 1018 passing (+16 across tree, ambient route, cadence route, ambient_economics, and org-clone smoke). All five blueprint §12 open questions resolved per `DEC-OQ1..-OQ5` in §1 above. **Phase 4 status: Shipped — Phases 1-4 of the Agentic Org Blueprint v3 rollout are complete on this branch.**
 
 Phase 4 is the final movement of the Agentic Org Blueprint v3 rollout. Phases 1–3 give us the substrate this plan plugs into: Phase 1's Kuzu-backed `EntityGraph` with `Decision` nodes and the projection registry; Phase 2's `compose-domain v4` skill (whose "domains" include the per-function FMs themselves); Phase 3's `FunctionFleetManager`, `AmbientAgent` (with `CadenceTrigger` declared but not yet fired), the five MCP tools (incl. a `query_kpi` stub), and per-function SSE topics.
 

@@ -115,3 +115,57 @@ def compute(workflow: Workflow, *, spans: list[OtelSpan],
             for m, b in sorted(buckets.items())
         ],
     }
+
+
+# ---------------------------------------------------------------------------
+# Ambient-reasoning ledger (Phase 4 IP8 — TASK-040, DEC-OQ4)
+# ---------------------------------------------------------------------------
+
+# Lightweight in-process append log for ambient-agent reasoning costs.
+# Cleared by tests via ``reset_ambient_ledger``. Distinct from the OTEL-
+# derived per-workflow ``compute(...)`` shape because ambient reasoning
+# is not workflow-scoped — it's agent-scoped.
+_AMBIENT_LEDGER: list[dict] = []
+
+
+def record_ambient_cost(
+    *,
+    agent_name: str,
+    tokens_in: int = 0,
+    tokens_out: int = 0,
+    model: str = _DEFAULT_MODEL,
+    cost_kind: str = "ambient_reasoning",
+    extra: dict | None = None,
+) -> dict:
+    """Append one ambient-reasoning ledger row.
+
+    Returned dict is also stored in the in-memory ledger so tests + the
+    per-function FM economics tool can read it back. ``actor`` is
+    ``f"ambient.{agent_name}"`` per DEC-OQ4.
+    """
+    cost_usd = float(model_pricing.cost_for(model, tokens_in, tokens_out))
+    row = {
+        "cost_kind": cost_kind,
+        "actor": f"ambient.{agent_name}",
+        "agent_name": agent_name,
+        "model": model,
+        "input_tokens": int(tokens_in),
+        "output_tokens": int(tokens_out),
+        "cost_usd": round(cost_usd, 6),
+        "ts": time.time(),
+    }
+    if extra:
+        row["extra"] = dict(extra)
+    _AMBIENT_LEDGER.append(row)
+    return row
+
+
+def list_ambient_costs(agent_name: str | None = None) -> list[dict]:
+    """Return ambient ledger rows, optionally filtered by agent."""
+    if agent_name is None:
+        return list(_AMBIENT_LEDGER)
+    return [r for r in _AMBIENT_LEDGER if r["agent_name"] == agent_name]
+
+
+def reset_ambient_ledger() -> None:
+    _AMBIENT_LEDGER.clear()

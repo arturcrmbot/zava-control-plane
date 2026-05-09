@@ -79,3 +79,56 @@ async def get_workflow(id: str):
         # cloud audit path isn't configured (CI / unit tests).
         "auditBlobUrl": app_state.audit.blob_url_for(id),
     }
+
+
+@router.get("/{id}/tree")
+async def get_workflow_tree(id: str, max_depth: int = 16):
+    """Recursive sub-orchestrator tree (Phase 4 IP7 TASK-033, DEC-OQ5).
+
+    Walks the ``Workflow -> Workflow`` self-relation
+    (``SUB_WORKFLOW_OF`` rel table) starting from ``id`` and returns
+    a JSON tree of ``{workflow_id, workflow_type, status, children: [...]}``.
+
+    Leaf workflows (no SUB_WORKFLOW_OF rels) and ids unknown to the
+    entity graph both surface a single-node tree with ``status="unknown"``
+    — this is intentional: the entity graph only sees workflows that
+    have been spawned via the meta-workflow path or otherwise written
+    to the Workflow node table. Cycle protection short-circuits at
+    ``max_depth`` and on any id revisit (defensive — graph should not
+    contain cycles).
+    """
+    seen: set[str] = set()
+
+    def _node(node_dict: dict | None, wid: str) -> dict:
+        if node_dict is None:
+            return {
+                "workflow_id": wid,
+                "workflow_type": None,
+                "status": "unknown",
+                "children": [],
+            }
+        return {
+            "workflow_id": node_dict.get("id", wid),
+            "workflow_type": node_dict.get("workflow_type"),
+            "status": node_dict.get("status") or "unknown",
+            "children": [],
+        }
+
+    def _walk(wid: str, depth: int) -> dict:
+        if wid in seen or depth >= max_depth:
+            return _node(app_state.entities.get(wid), wid)
+        seen.add(wid)
+        node = _node(app_state.entities.get(wid), wid)
+        try:
+            children = app_state.entities.linked(wid, rel="SUB_WORKFLOW_OF")
+        except Exception:
+            children = []
+        for row in children:
+            child = row.get("node") if isinstance(row, dict) else None
+            child_id = child.get("id") if isinstance(child, dict) else None
+            if not child_id:
+                continue
+            node["children"].append(_walk(child_id, depth + 1))
+        return node
+
+    return _walk(id, 0)

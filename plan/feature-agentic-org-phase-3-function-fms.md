@@ -4,7 +4,7 @@ version: 1.0
 date_created: 2026-05-08
 last_updated: 2026-05-09
 owner: Zava Control Plane — substrate
-status: 'In Progress'
+status: 'Shipped'
 tags: [feature, architecture, agentic-org, plane-2, function-fms, ambient-agents]
 ---
 

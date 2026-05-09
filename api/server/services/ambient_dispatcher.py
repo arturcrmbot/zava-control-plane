@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time as _time
 from collections import defaultdict, deque
 from functools import partial
 from typing import Any, Awaitable, Callable
@@ -49,6 +50,10 @@ log = logging.getLogger(__name__)
 # --------------------------------------------------------------------------
 # Safe-eval helper (TASK-015 / TASK-017)
 # --------------------------------------------------------------------------
+
+
+def _now_ts() -> float:
+    return _time.time()
 
 
 def _eval_filter(expr: str, ctx: dict[str, Any]) -> bool:
@@ -192,6 +197,27 @@ class AmbientDispatcher:
         spawned = await self._spawn_for_agent(agent, base_payload={
             "trigger": kind, "ctx": trigger_ctx,
         })
+        # Phase 4 IP8 (TASK-040, DEC-OQ4) — when the agent declares a
+        # reasoning_skill, charge an ambient_reasoning ledger row. The
+        # token counts here are a placeholder until the LLM call lands;
+        # we still want the actor/cost_kind row so downstream consumers
+        # (per-function FM economics tool) see the agent firing.
+        if agent.reasoning_skill is not None:
+            try:
+                from api.server.services import economics as _econ
+                _econ.record_ambient_cost(
+                    agent_name=agent.name,
+                    tokens_in=0, tokens_out=0,
+                    extra={
+                        "reasoning_skill": agent.reasoning_skill,
+                        "trigger_kind": kind,
+                    },
+                )
+            except Exception as ex:  # pragma: no cover
+                log.warning(
+                    "ambient_dispatcher: economics ledger write failed for %s: %s",
+                    agent.name, ex,
+                )
         self._audit_decided(agent, kind, trigger_ctx, spawn_outcome={
             "spawned": True, "workflow_ids": spawned,
         })
@@ -310,6 +336,7 @@ class AmbientDispatcher:
             "trigger_kind": trigger_kind,
             "trigger_payload": trigger_payload,
             "spawn_outcome": spawn_outcome,
+            "timestamp": _now_ts(),
         }
         try:
             self._audit.log("ambient.decided", details)
