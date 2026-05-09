@@ -30,6 +30,7 @@ import { DecisionPool } from "./DecisionPool";
 import { ElevatorShaft } from "./ElevatorShaft";
 import { VitalSignsBar } from "./VitalSignsBar";
 import { PersonaStrip } from "./PersonaStrip";
+import { LiveActivityRail } from "./LiveActivityRail";
 
 const FLOOR_ORDER_BOTTOM_UP: string[] = [
   // Lobby is rendered separately at y=0
@@ -160,6 +161,7 @@ export function GlassTower({ status }: Props) {
       {/* HUDs. */}
       <VitalSignsBar status={status} vital={vital} />
       <PersonaStrip personas={personas} />
+      <LiveActivityRail />
     </div>
   );
 }
