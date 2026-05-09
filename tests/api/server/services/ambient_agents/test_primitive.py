@@ -34,12 +34,20 @@ def test_ambient_agent_accepts_heterogeneous_triggers():
     assert agent.triggers[1].kind == "cypher"
 
 
-def test_discovery_empty_before_phase_6():
-    """Before TASK-035..-037 plant concrete declarations, discovery
-    returns an empty dict (the per-function modules are stubs)."""
+def test_discovery_finds_phase_6_concrete_agents():
+    """After TASK-030..-032 plant concrete declarations, discovery
+    returns the three Phase 6 agents."""
     found = _discover_ambient_agents()
-    assert found == {}
-    assert AMBIENT_AGENTS == {}
+    assert set(found.keys()) >= {
+        "budget-variance-watcher",
+        "vendor-risk-watcher",
+        "access-anomaly-watcher",
+    }
+    assert set(AMBIENT_AGENTS.keys()) >= {
+        "budget-variance-watcher",
+        "vendor-risk-watcher",
+        "access-anomaly-watcher",
+    }
 
 
 def test_unknown_function_loud_failure(monkeypatch):

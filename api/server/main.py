@@ -45,6 +45,13 @@ async def lifespan(app: FastAPI):
         await app_state.fm.start()
     except Exception as ex:
         print(f"[server] Fleet Manager failed to start: {ex}")
+    # Phase 3 IP6 — start the ambient dispatcher inside the lifespan so
+    # cypher sweep loops are scheduled on the running event loop.
+    try:
+        if hasattr(app_state, "ambient_dispatcher"):
+            app_state.ambient_dispatcher.start()
+    except Exception as ex:
+        print(f"[server] Ambient dispatcher failed to start: {ex}")
     # Start the simulator ramp loop (spawns workflows via the AF Durable host)
     ramp_task = asyncio.create_task(simulator_orchestrator.ramp_loop())
     from api.server.eval.online_subscriber import lifespan_register, lifespan_shutdown
@@ -193,6 +200,7 @@ from api.server.routes.authority import router as authority_router
 from api.server.routes.governance import router as governance_router
 # Entity-graph plane read API (Phase 1 TASK-030..-035).
 from api.server.routes.entities import router as entities_router
+from api.server.routes.functions import router as functions_router
 
 for r in (stream_router, workflows_router, exceptions_router, policy_router,
           simulator_router, audit_router, evals_router, orchestration_router,
@@ -206,6 +214,7 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           personas_router, authority_router,
           governance_router,
           entities_router,
+          functions_router,
           foundry_router):
     app.include_router(r)
 

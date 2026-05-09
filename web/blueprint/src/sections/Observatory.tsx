@@ -72,6 +72,10 @@ export function Observatory() {
         </p>
 
         <p className="body observatory__note">
+          <a href="?view=functions">Function FMs →</a>
+        </p>
+
+        <p className="body observatory__note">
           What you&apos;re watching is a replay of real workflow walks
           captured from the running system &mdash; the same orchestrator,
           skills and MCP tools described above, recorded on the laptop they

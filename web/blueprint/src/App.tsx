@@ -9,6 +9,7 @@ import { Observatory } from "./sections/Observatory";
 import { Closing } from "./sections/Closing";
 import { ConstellationPage } from "./pages/ConstellationPage";
 import { EntitiesPage } from "./pages/EntitiesPage";
+import { FunctionsPage } from "./pages/FunctionsPage";
 
 export default function App() {
   // Standalone full-screen constellation view, addressable via
@@ -22,6 +23,9 @@ export default function App() {
     }
     if (params.get("view") === "entities") {
       return <EntitiesPage />;
+    }
+    if (params.get("view") === "functions") {
+      return <FunctionsPage />;
     }
   }
 

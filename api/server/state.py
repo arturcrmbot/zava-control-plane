@@ -141,6 +141,14 @@ class AppState:
                     svc.close()
                 except Exception:
                     pass
+        # Ambient dispatcher teardown — MUST run BEFORE the entity
+        # reflector so no in-flight cypher sweep tries to spawn through
+        # a half-torn graph. ``aclose`` is async (cancels asyncio tasks).
+        if hasattr(self, "ambient_dispatcher"):
+            try:
+                await self.ambient_dispatcher.aclose()
+            except Exception:
+                pass
         # Entity-graph plane teardown — sync calls; hasattr guards make
         # aclose idempotent and safe even if __init__ raised mid-way.
         if hasattr(self, "entity_reflector"):
@@ -196,6 +204,62 @@ class AppState:
                 tools=tools,
                 on_live=lambda ev, _t=topic: self.hub.broadcast(_t, ev),
             )
+
+        # Phase 3 IP6 (TASK-030..-032) — wire the AmbientDispatcher AFTER
+        # ambient_agents discovery has run (it ran at import of the package
+        # above when ambient_agents.__init__ was first loaded). The
+        # dispatcher snapshots AMBIENT_AGENTS at construction so importing
+        # it here picks up all three concrete declarations.
+        from api.server.services.ambient_dispatcher import AmbientDispatcher
+
+        def _spawn_workflow(workflow_type: str, payload: dict):
+            # Forward-declared workflow_types (variance-investigation,
+            # access-review) are not yet registered DOMAINS. Until they
+            # land we log + skip rather than crash the dispatcher.
+            try:
+                from api.shared.domains import DOMAINS
+            except Exception:
+                DOMAINS = {}
+            if workflow_type not in DOMAINS:
+                import logging
+                logging.getLogger(__name__).info(
+                    "ambient_dispatcher: skipping spawn of unknown workflow_type=%s",
+                    workflow_type,
+                )
+                return None
+            # Real spawn integration lands with the per-domain UIs in
+            # Phase 4. For now the simulator orchestrator's spawn helper
+            # is the closest concrete entry-point — wire it lazily so a
+            # missing dependency at boot doesn't break the dispatcher.
+            try:
+                from api.server.services import simulator_orchestrator
+                spawn = getattr(simulator_orchestrator, "spawn_workflow", None)
+                if callable(spawn):
+                    return spawn(workflow_type)
+            except Exception as ex:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "ambient_dispatcher: spawn failed for %s: %s",
+                    workflow_type, ex,
+                )
+            return None
+
+        self.ambient_dispatcher = AmbientDispatcher(
+            bus=self.bus,
+            graph=self.entities,
+            audit=self.audit,
+            spawn_workflow=_spawn_workflow,
+        )
+        # ``start()`` schedules cypher sweep loops via asyncio.create_task,
+        # so it requires a running event loop. Guard the call so unit
+        # tests that construct AppState without a loop still work; the
+        # FastAPI lifespan will re-call start() under uvicorn.
+        try:
+            import asyncio as _asyncio
+            _asyncio.get_running_loop()
+            self.ambient_dispatcher.start()
+        except RuntimeError:
+            pass
 
 
 app_state = AppState()
