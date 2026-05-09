@@ -2,15 +2,17 @@
 goal: Stand up Plane 2 of the Agentic Org Blueprint — a `FUNCTIONS` registry as single source of truth for departments (Finance, HR, Revenue, Ops, Legal, Marketing, Tech, Data, Customer-Success), with `Domain.function` as a boot-derived back-ref guarded by an orphan-validator; one `FunctionFleetManager` runtime per function with hybrid context (templated identity + on-demand tools); an `AmbientAgent` primitive supporting three trigger shapes (BusTrigger / CypherTrigger / CadenceTrigger) as a discriminated union; the five in-process MCP tools (`query_fleet_state`, `query_kpi`, `query_recent_decisions`, `query_entity`, `find_entities`); first three concrete ambient agents (BudgetVarianceWatcher, VendorRiskWatcher, AccessAnomalyWatcher); per-function FM session SSE topics; and a blueprint observatory `/functions` page. POC1/POC2 domains assigned `function="legacy"` so the boot validator passes.
 version: 1.0
 date_created: 2026-05-08
-last_updated: 2026-05-08
+last_updated: 2026-05-09
 owner: Zava Control Plane — substrate
-status: 'Not Started'
+status: 'In Progress'
 tags: [feature, architecture, agentic-org, plane-2, function-fms, ambient-agents]
 ---
 
 # Introduction
 
-![Status: Not Started](https://img.shields.io/badge/status-Not%20Started-lightgrey)
+![Status: In Progress](https://img.shields.io/badge/status-In%20Progress-yellow)
+
+**Update 2026-05-09:** Implementation Phases 1–8 shipped on branch `feature/agentic-org-phase-1-entity-graph`. IP1–3 (FUNCTIONS registry + `AmbientAgent` primitive + dispatcher) landed in `c2708b7b`. IP4–5 (5 in-process MCP tools + `FunctionFleetManager` runtime + per-function FM boot) landed in `26020bb9`. IP6–7 (3 concrete ambient agents — `BudgetVarianceWatcher`, `VendorRiskWatcher`, `AccessAnomalyWatcher` — plus `/api/functions` route + blueprint `/functions` observatory page) landed in `d711a9fd`. IP8 (this commit) ships the executable in-process smoke at `tests/api/server/test_function_fms_smoke.py` proving the substrate has 9 non-legacy FMs alive, the `AmbientDispatcher` subscribed, the three concrete agents discovered, the BusTrigger path firing on an `it-access-request` approved-completion event, and the CypherTrigger path firing on a high-risk vendor seeded into the entity graph. Test count: 951 baseline → 955 passing (+4 new smoke tests). Two ambient-spawn workflow types — `variance-investigation` and `access-review` — are forward-declared by the Phase 3 ambient agents but are NOT yet registered domains; the dispatcher's `_spawn_workflow` shim logs + skips unknown workflow_types so the loop is harmless until Phase 4 of the OVERALL plan lands them alongside the cadence loop, KPI store, precedent queries, the three meta-workflows (`hire-to-productive`, `vendor-risk-to-pay`, `lead-to-cash`), the CEO-FM, and `/admin/org-clone`. The plan's TASK-044 live `./scripts/profile-autonomous.sh` smoke is intentionally NOT run in CI — it requires a long-running uvicorn + autonomous profiler against a Phase 4 spawn surface; the in-process smoke is the executable proxy and remains a developer-local sign-off step.
 
 Phase 3 builds **Plane 2** of the Agentic Org Blueprint
 ([docs/agentic-org-blueprint.md §2](../docs/agentic-org-blueprint.md), §5,
