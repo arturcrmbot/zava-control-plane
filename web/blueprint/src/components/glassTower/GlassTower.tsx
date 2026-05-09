@@ -28,6 +28,7 @@ import { Lobby } from "./Lobby";
 import { WorkflowMotes } from "./WorkflowMotes";
 import { DecisionPool } from "./DecisionPool";
 import { ElevatorShaft } from "./ElevatorShaft";
+import { SubSpawnArcs } from "./SubSpawnArcs";
 import { VitalSignsBar } from "./VitalSignsBar";
 import { PersonaStrip } from "./PersonaStrip";
 import { LiveActivityRail } from "./LiveActivityRail";
@@ -147,6 +148,9 @@ export function GlassTower({ status }: Props) {
 
         {/* Glowing back-shaft. Visual hint that workflows travel up. */}
         <ElevatorShaft flashesRef={flashesRef} />
+
+        {/* Cross-function spawn arcs (meta-workflow visual). */}
+        <SubSpawnArcs floorY={floorY} flashesRef={flashesRef} />
 
         {/* Decision pool — receipts flying down from desks. */}
         <DecisionPool
