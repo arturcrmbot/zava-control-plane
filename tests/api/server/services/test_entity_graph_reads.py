@@ -180,6 +180,24 @@ def test_linked_unknown_rel_raises_valueerror(graph: EntityGraph) -> None:
         graph.linked("EMP-1", rel="DOES_NOT_EXIST")
 
 
+def test_linked_is_outgoing_only(graph: EntityGraph) -> None:
+    """linked(id) returns OUTGOING rels only.
+
+    Locks the direction semantic — accidental change to undirected
+    ``-[r]-`` or reverse ``<-[r]-`` patterns would silently break this
+    contract.
+    """
+    _seed_links(graph)
+
+    # From the source: 1 outgoing EMPLOYED_BY rel.
+    assert len(graph.linked("EMP-1", rel="EMPLOYED_BY")) == 1
+
+    # From the target: 0 outgoing rels (the EMPLOYED_BY edge is incoming
+    # from ORG-1's perspective, not outgoing).
+    assert graph.linked("ORG-1", rel="EMPLOYED_BY") == []
+    assert graph.linked("ORG-1") == []
+
+
 # ---------------------------------------------------------------------------
 # touched_by
 # ---------------------------------------------------------------------------

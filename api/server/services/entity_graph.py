@@ -39,6 +39,7 @@ import re
 import secrets
 import threading
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -292,6 +293,61 @@ _VALID_RELS = frozenset(name for name, _ in _REL_TABLES)
 
 
 # ---------------------------------------------------------------------------
+# SET-clause builder (shared by upsert / link / record_decision)
+# ---------------------------------------------------------------------------
+
+
+def _build_set_clauses(
+    attrs: Mapping[str, Any],
+    *,
+    prefix: str,
+    kind: str | None = None,
+) -> tuple[list[str], dict[str, Any]]:
+    """Build per-attr SET-clause fragments and parameter dict for Cypher.
+
+    - Validates every key against :data:`_VALID_ATTR_KEY` (raises
+      :class:`ValueError` on failure).
+    - When ``kind != "Decision"``, skips :data:`_ATTR_METADATA_KEYS` —
+      ``workflow_id`` and ``source_event`` are real columns on
+      :class:`Decision` but not on the other 7 node tables; this filter
+      prevents Binder exceptions on Person/Organisation/etc.
+    - Returns ``(clauses, params)`` tuple. Caller composes
+      ``f"SET {', '.join(clauses)}"`` and merges ``params`` into the
+      ``execute()`` parameter dict.
+
+    Args:
+        attrs: Map of attribute name → value.
+        prefix: Cypher node/rel alias to qualify each key (e.g. ``"n"``,
+            ``"r"``).
+        kind: Optional kind for the Decision-aware metadata filter. Pass
+            ``None`` for relationships (rel attrs never carry workflow
+            metadata).
+
+    Returns:
+        ``(set_clause_fragments, params_dict)`` — both empty if ``attrs``
+        is empty (or every key was filtered out as Decision metadata on a
+        non-Decision kind).
+
+    Raises:
+        ValueError: if any key fails the :data:`_VALID_ATTR_KEY` regex.
+    """
+    clauses: list[str] = []
+    params: dict[str, Any] = {}
+    for i, (key, value) in enumerate(attrs.items()):
+        if kind != "Decision" and key in _ATTR_METADATA_KEYS:
+            continue
+        if not _VALID_ATTR_KEY.match(key):
+            raise ValueError(
+                f"invalid attr key: {key!r} "
+                f"(must match {_VALID_ATTR_KEY.pattern})"
+            )
+        placeholder = f"attr_{i}"
+        clauses.append(f"{prefix}.`{key}` = ${placeholder}")
+        params[placeholder] = value
+    return clauses, params
+
+
+# ---------------------------------------------------------------------------
 # EntityGraph
 # ---------------------------------------------------------------------------
 
@@ -467,31 +523,17 @@ class EntityGraph:
                 set_clauses.append("n.source_workflows = $sw")
 
             # Kuzu 0.6.1 does NOT support the ``SET n += $map`` map-merge
-            # form (parser rejects it). Bind each attr to its own
-            # ``$attr_<i>`` placeholder and emit one ``n.<key> = $attr_<i>``
-            # clause per entry. Property keys are backtick-quoted because
-            # Kuzu reserves a handful of common identifiers (e.g. ``starts``
-            # / ``ends`` on the ``Period`` schema).
-            #
-            # ``workflow_id`` and ``source_event`` are projection-level
-            # metadata for most kinds: callers stash them in ``attrs`` so the
-            # ``entity.upserted`` FleetEvent + audit entry can carry the
-            # provenance, but for Decision nodes they are real columns and
-            # must be written through.
-            for idx, (key, value) in enumerate(entity.attrs.items()):
-                # Validate attr key is a valid identifier.
-                if not _VALID_ATTR_KEY.match(key):
-                    raise ValueError(
-                        f"invalid attr key: {key!r} "
-                        f"(must match {_VALID_ATTR_KEY.pattern})"
-                    )
-                # Skip metadata-only keys, unless this is a Decision entity
-                # where they are real columns.
-                if entity.kind != "Decision" and key in _ATTR_METADATA_KEYS:
-                    continue
-                placeholder = f"attr_{idx}"
-                params[placeholder] = value
-                set_clauses.append(f"n.`{key}` = ${placeholder}")
+            # form (parser rejects it). The shared :func:`_build_set_clauses`
+            # helper binds each attr to its own ``$attr_<i>`` placeholder
+            # and emits one ``n.`<key>` = $attr_<i>`` clause per entry,
+            # while skipping the ``workflow_id`` / ``source_event``
+            # projection-metadata keys for non-Decision kinds (where they
+            # aren't real columns).
+            attr_clauses, attr_params = _build_set_clauses(
+                entity.attrs, prefix="n", kind=entity.kind
+            )
+            set_clauses.extend(attr_clauses)
+            params.update(attr_params)
 
             self.conn.execute(
                 f"MERGE (n:{entity.kind} {{id: $id}}) SET "
@@ -563,16 +605,8 @@ class EntityGraph:
             )
 
         params: dict[str, Any] = {"src": src_id, "dst": dst_id}
-        set_clauses: list[str] = []
-        for idx, (key, value) in enumerate(attrs.items()):
-            if not _VALID_ATTR_KEY.match(key):
-                raise ValueError(
-                    f"invalid attr key: {key!r} "
-                    f"(must match {_VALID_ATTR_KEY.pattern})"
-                )
-            placeholder = f"attr_{idx}"
-            params[placeholder] = value
-            set_clauses.append(f"r.`{key}` = ${placeholder}")
+        set_clauses, attr_params = _build_set_clauses(attrs, prefix="r", kind=None)
+        params.update(attr_params)
 
         cypher = (
             f"MATCH (a), (b) WHERE a.id = $src AND b.id = $dst "
@@ -613,6 +647,11 @@ class EntityGraph:
         Kuzu 0.6.1 supports label-less ``MATCH ({id: $id})`` so a single
         query suffices — the returned node dict carries a ``_label`` field
         indicating its kind. Returns ``None`` if no node has that id.
+
+        If id collisions across kinds occur (a contract violation — ids are
+        per-kind prefixed by convention, e.g. ``PERSON-EMP-0001``,
+        ``ORG-vendor-acme``), returns whichever row Kuzu picks first; this
+        method does not detect or warn.
         """
         row = self.query_one(
             "MATCH (n {id: $id}) RETURN n LIMIT 1",
@@ -668,6 +707,10 @@ class EntityGraph:
         validated against :data:`_VALID_RELS` when given. ``rel=None``
         returns rels of any type via Kuzu's label-less rel pattern, which
         the smoke tests at the top of TASK-006 confirmed works in 0.6.1.
+
+        Returns only OUTGOING edges from ``id``. The reverse direction
+        (incoming edges) is not exposed by this method; use :meth:`query`
+        with an explicit ``<-[r]-`` pattern when needed.
         """
         params: dict[str, Any] = {"id": id}
         if rel is None:
@@ -696,6 +739,11 @@ class EntityGraph:
         don't declare a ``source_workflows`` column (Place/Period/Workflow/
         Decision), so this single query covers all eight kinds without
         having to UNION them by hand.
+
+        Decisions are intentionally excluded — their workflow provenance
+        lives on ``Decision.workflow_id`` (a scalar column), not on a
+        ``source_workflows`` array. To find decisions related to a
+        workflow, use ``by_type('Decision', workflow_id=...)``.
         """
         rows = self.query(
             "MATCH (n) WHERE $wid IN n.source_workflows RETURN n",
