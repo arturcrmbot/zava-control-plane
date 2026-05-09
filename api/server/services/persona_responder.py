@@ -430,6 +430,46 @@ async def _handle_hitl(event: FleetEvent) -> None:
         f"({data.get('reason')}); raising {event_name!r}"
     )
 
+    # Phase 1 sub-phase 3 follow-up — stash the decision into
+    # workflow.payload['decisions'] so the entity-graph projection's
+    # ``find_decision`` helper can pick it up when ``workflow.completed``
+    # fires. The Durable external event we raise below carries the verdict
+    # to the orchestrator but doesn't write it back to the Workflow record;
+    # without this stash, projections see no decisions and Decision nodes
+    # never materialise. Gate the write so it's a silent no-op when the
+    # workflow isn't in the store (e.g. tests, half-torn-down state).
+    workflow_id = data.get("workflow_id")
+    gate_phase = data.get("phase") or context.get("phase")
+    if workflow_id and gate_phase:
+        try:
+            from api.server.state import app_state
+            import datetime as _dt
+            w = app_state.store.get_workflow(workflow_id)
+            if w is not None:
+                if not isinstance(w.payload, dict):
+                    w.payload = {}
+                decisions = list(w.payload.get("decisions") or [])
+                # Idempotent on the natural key (phase, persona_role) — re-emits
+                # of the same gate update in place rather than appending dupes.
+                key = (str(gate_phase).lower(), str(persona_role).lower())
+                decisions = [
+                    d for d in decisions
+                    if (str(d.get("phase", "")).lower(),
+                        str(d.get("persona_role", "")).lower()) != key
+                ]
+                decisions.append({
+                    "phase": gate_phase,
+                    "persona_role": persona_role,
+                    "verdict": decision_str,
+                    "reason": decision_payload.get("reason"),
+                    "decided_at": _dt.datetime.now(tz=_dt.timezone.utc).isoformat(),
+                    "source_event": event_name,
+                })
+                w.payload["decisions"] = decisions
+                app_state.store.upsert_workflow(w)
+        except Exception as ex:
+            print(f"[persona_responder] failed to stash decision: {ex}")
+
     try:
         await raise_orchestration_event(instance_id, event_name, decision_payload)
     except Exception as ex:
