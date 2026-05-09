@@ -187,3 +187,125 @@ def test_bootstrap_missing_file_raises(graph: EntityGraph, tmp_path: Path) -> No
             vendors_path=VENDORS,
             agencies_path=AGENCIES,
         )
+
+
+def test_bootstrap_agencies_have_non_null_name(graph: EntityGraph) -> None:
+    """Agencies in the fixture lack a name field; bootstrap must default
+    name to the bare id (Option A repair) — never NULL.
+
+    Locks the silent-NULL-name regression flagged in code review: any
+    downstream code reading ``org["name"]`` on an agency row would have
+    received None before this fix.
+    """
+    graph.bootstrap_from_fixtures(
+        employees_path=EMPLOYEES,
+        vendors_path=VENDORS,
+        agencies_path=AGENCIES,
+    )
+    orgs = [o for o in graph.by_type("Organisation") if o.get("kind") == "agency"]
+    assert len(orgs) > 0, "no agency rows after bootstrap"
+    for o in orgs:
+        assert o.get("name") is not None, f"Agency {o['id']} has NULL name"
+        assert o["name"] != ""
+    # Spot-check: the canonical id-as-name mapping landed.
+    ids_to_names = {o["id"]: o["name"] for o in orgs}
+    assert ids_to_names.get("ORG-Ogilvy-US") == "Ogilvy-US"
+
+
+def test_bootstrap_vendor_names_preserved(graph: EntityGraph) -> None:
+    """Vendor fixture rows DO carry a ``name`` field — the agency-name
+    repair must not clobber them with their bare ids."""
+    graph.bootstrap_from_fixtures(
+        employees_path=EMPLOYEES,
+        vendors_path=VENDORS,
+        agencies_path=AGENCIES,
+    )
+    vendors = [o for o in graph.by_type("Organisation") if o.get("kind") == "vendor"]
+    assert len(vendors) > 0
+    # Pull the canonical name from the fixture file and compare round-trip.
+    raw_vendors = {v["id"]: v["name"] for v in json.loads(VENDORS.read_text())}
+    for v in vendors:
+        bare_id = v["id"].removeprefix("ORG-")
+        expected = raw_vendors[bare_id]
+        assert v["name"] == expected, (
+            f"vendor {v['id']} name clobbered: got {v['name']!r}, "
+            f"expected {expected!r}"
+        )
+        assert v["name"] != bare_id  # extra paranoia: not silently reassigned
+
+
+def test_bootstrap_serialises_non_json_native_residuals(graph: EntityGraph) -> None:
+    """``json.dumps`` inside bootstrap must use ``default=str`` — consistent
+    with :meth:`record_decision` — so future fixtures containing a
+    ``date`` / ``datetime`` / ``Decimal`` value won't crash bootstrap with
+    a TypeError. Locks the fix at the call-site source level.
+    """
+    import inspect
+
+    import api.server.services.entity_graph as eg
+
+    src = (
+        inspect.getsource(eg.EntityGraph.bootstrap_from_fixtures)
+        + inspect.getsource(eg.EntityGraph._bootstrap_entity)
+    )
+    # Every json.dumps inside bootstrap must carry default=str.
+    dumps_calls = src.count("json.dumps(")
+    default_str_calls = src.count("default=str")
+    assert dumps_calls > 0, "expected at least one json.dumps in bootstrap"
+    assert default_str_calls >= dumps_calls, (
+        f"json.dumps must use default=str (consistent with record_decision): "
+        f"{dumps_calls} json.dumps calls but only {default_str_calls} default=str"
+    )
+
+
+def test_bootstrap_with_duplicate_ids_does_not_overcount(
+    tmp_path: Path, graph: EntityGraph,
+) -> None:
+    """Counts reflect upsert calls, NOT unique entities. A fixture with
+    duplicate ids inflates the returned count while ``by_type`` returns
+    fewer rows. This is the documented contract — locked here so it's
+    explicit, not silent."""
+    employees = tmp_path / "employees.json"
+    employees.write_text(json.dumps([
+        {"id": "EMP-DUP", "name": "Alice"},
+        {"id": "EMP-DUP", "name": "Bob"},
+        {"id": "EMP-OK", "name": "Carol"},
+    ]))
+    vendors = tmp_path / "vendors.json"
+    vendors.write_text("[]")
+    agencies = tmp_path / "agencies.json"
+    agencies.write_text("[]")
+
+    counts = graph.bootstrap_from_fixtures(employees, vendors, agencies)
+    persons = graph.by_type("Person")
+
+    assert counts["persons"] == 3, "counts is per-upsert-call (documented)"
+    assert len(persons) == 2, "graph stores unique entities (MERGE on id)"
+
+    dup = next(p for p in persons if p["id"] == "PERSON-EMP-DUP")
+    assert dup["name"] == "Bob", "second upsert overwrote first (last-write-wins)"
+
+
+def test_bootstrap_raises_on_missing_id(
+    tmp_path: Path, graph: EntityGraph,
+) -> None:
+    """A fixture row missing 'id' raises KeyError. Documented contract:
+    bootstrap halts loud rather than skipping silently. Re-run after
+    fixing the fixture is safe (upsert is idempotent)."""
+    employees = tmp_path / "employees.json"
+    employees.write_text(json.dumps([
+        {"id": "EMP-OK", "name": "Alice"},
+        {"name": "Bob"},  # missing id
+    ]))
+    vendors = tmp_path / "vendors.json"
+    vendors.write_text("[]")
+    agencies = tmp_path / "agencies.json"
+    agencies.write_text("[]")
+
+    with pytest.raises(KeyError):
+        graph.bootstrap_from_fixtures(employees, vendors, agencies)
+
+    # The first row landed before the second raised — confirms partial state.
+    persons = graph.by_type("Person")
+    assert len(persons) == 1
+    assert persons[0]["id"] == "PERSON-EMP-OK"

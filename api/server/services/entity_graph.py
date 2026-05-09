@@ -293,6 +293,16 @@ _VALID_KINDS = frozenset(name for name, _ in _NODE_TABLES)
 # rels with a clean ValueError before Cypher parsing.
 _VALID_RELS = frozenset(name for name, _ in _REL_TABLES)
 
+# Bootstrap whitelists: fixture fields matching these column names land as
+# top-level node attributes; everything else is JSON-encoded into the
+# ``attributes`` blob. Promoted to module-level constants because they are
+# the schema contract (mirror of _NODE_TABLES Person / Organisation columns).
+_PERSON_COLUMNS = frozenset({
+    "name", "email", "role", "market", "department",
+    "employed_from", "employed_to",
+})
+_ORG_COLUMNS = frozenset({"name", "kind", "country", "jurisdiction", "risk_band"})
+
 
 # ---------------------------------------------------------------------------
 # SET-clause builder (shared by upsert / link / record_decision)
@@ -968,89 +978,114 @@ class EntityGraph:
 
         Schema fidelity: only fields that match a column on the target
         node table land as top-level ``attrs`` keys; the rest are
-        JSON-encoded into the ``attributes`` STRING column so no fixture
-        information is dropped on the floor.
+        JSON-encoded (``sort_keys=True, default=str`` — consistent with
+        :meth:`record_decision`, so future fixtures with ``date`` /
+        ``datetime`` / ``Decimal`` values won't crash bootstrap) into the
+        ``attributes`` STRING column so no fixture information is dropped.
+
+        Agency name repair (Option A): ``agencies.json`` rows ship without
+        a ``name`` field — only ``{id, market, region}``. To prevent silent
+        ``name=NULL`` fidelity loss, the bare fixture id is used as the
+        default ``name`` whenever no explicit ``name`` is supplied. The bare
+        id (e.g. ``"Ogilvy-US"``) is the human-readable identifier in the
+        agency fixture's case.
 
         Returns ``{"persons": N, "organisations": M}`` where N and M count
-        every ``upsert`` call (not "new writes only") — the method is
+        every ``upsert`` call (not "unique entities"). The method is
         idempotent because :meth:`upsert` MERGE-s and dedupes
         ``source_workflows``, so re-running it returns the same counts and
-        leaves the graph unchanged.
+        leaves the graph unchanged. Documented consequence: a fixture
+        containing duplicate ids inflates the returned count while
+        ``by_type`` reports only the unique entities (last write wins).
 
         A single ``audit.log("entity.bootstrap.completed", {"counts": ...})``
         is emitted at the end (not per-record) to keep the audit log
         readable; ``upsert`` still emits its own ``entity.upserted`` event
         per row, which is the right granularity for downstream subscribers.
 
+        Malformed fixture rows (missing required ``id`` field) raise
+        ``KeyError``, halting the bootstrap mid-iteration. The graph is
+        left in a partial state; re-running bootstrap from the corrected
+        fixture is safe (upsert is idempotent).
+
         Raises:
             FileNotFoundError: if any of the three fixture paths is missing.
+            KeyError: if any fixture row is missing the required ``id`` key.
         """
-        # Columns on the Person / Organisation node tables. Anything not in
-        # these sets gets JSON-encoded into the ``attributes`` blob below.
-        person_columns = {
-            "name", "email", "role", "market", "department",
-            "employed_from", "employed_to",
-        }
-        org_columns = {"name", "country", "jurisdiction", "risk_band"}
-
         employees = json.loads(Path(employees_path).read_text())
         vendors = json.loads(Path(vendors_path).read_text())
         agencies = json.loads(Path(agencies_path).read_text())
 
         persons_count = 0
         for row in employees:
-            raw_id = row["id"]
-            eid = raw_id if raw_id.startswith("PERSON-") else f"PERSON-{raw_id}"
-            attrs: dict[str, Any] = {}
-            extra: dict[str, Any] = {}
-            for k, v in row.items():
-                if k == "id":
-                    continue
-                if k in person_columns:
-                    attrs[k] = v
-                else:
-                    extra[k] = v
-            if extra:
-                attrs["attributes"] = json.dumps(extra, sort_keys=True)
-            self.upsert(EntityWrite(
-                kind="Person", id=eid, attrs=attrs,
-                source_workflows=("bootstrap",),
+            self.upsert(self._bootstrap_entity(
+                row, kind="Person", prefix="PERSON-", columns=_PERSON_COLUMNS,
             ))
             persons_count += 1
 
         organisations_count = 0
         for row in vendors:
-            organisations_count += self._bootstrap_org(row, "vendor", org_columns)
+            self.upsert(self._bootstrap_entity(
+                row, kind="Organisation", prefix="ORG-",
+                columns=_ORG_COLUMNS, extra_attrs={"kind": "vendor"},
+            ))
+            organisations_count += 1
         for row in agencies:
-            organisations_count += self._bootstrap_org(row, "agency", org_columns)
+            self.upsert(self._bootstrap_entity(
+                row, kind="Organisation", prefix="ORG-",
+                columns=_ORG_COLUMNS, extra_attrs={"kind": "agency"},
+            ))
+            organisations_count += 1
 
         counts = {"persons": persons_count, "organisations": organisations_count}
         if self.audit is not None:
             self.audit.log("entity.bootstrap.completed", {"counts": counts})
         return counts
 
-    def _bootstrap_org(
+    def _bootstrap_entity(
         self,
         row: dict[str, Any],
-        org_kind: str,
-        org_columns: set[str],
-    ) -> int:
-        """Helper: upsert one Organisation row and return 1 (for count tally)."""
+        *,
+        kind: str,
+        prefix: str,
+        columns: frozenset[str],
+        extra_attrs: dict[str, Any] | None = None,
+    ) -> EntityWrite:
+        """Build an :class:`EntityWrite` from a fixture row.
+
+        - Whitelisted ``columns`` map to top-level ``attrs`` keys.
+        - Residual fields are JSON-encoded into ``attrs["attributes"]``
+          (``sort_keys=True, default=str``).
+        - ``id`` gets ``prefix`` if not already prefixed.
+        - ``extra_attrs`` are merged into ``attrs`` after column extraction
+          (used by Org rows to inject ``{"kind": "vendor"|"agency"}``);
+          they take precedence over any same-named fixture field.
+        - If no ``name`` field is supplied (or it is falsy) and ``"name"``
+          is in ``columns``, the bare fixture id is used as the default —
+          locks the agency-name fidelity contract (agencies.json has no
+          name field).
+
+        Raises:
+            KeyError: if ``row`` is missing the required ``"id"`` key.
+        """
         raw_id = row["id"]
-        eid = raw_id if raw_id.startswith("ORG-") else f"ORG-{raw_id}"
-        attrs: dict[str, Any] = {"kind": org_kind}
+        eid = raw_id if raw_id.startswith(prefix) else f"{prefix}{raw_id}"
+        attrs: dict[str, Any] = {}
         extra: dict[str, Any] = {}
         for k, v in row.items():
             if k == "id":
                 continue
-            if k in org_columns:
+            if k in columns:
                 attrs[k] = v
             else:
                 extra[k] = v
+        if extra_attrs:
+            attrs.update(extra_attrs)
+        if "name" in columns and not attrs.get("name"):
+            attrs["name"] = raw_id
         if extra:
-            attrs["attributes"] = json.dumps(extra, sort_keys=True)
-        self.upsert(EntityWrite(
-            kind="Organisation", id=eid, attrs=attrs,
+            attrs["attributes"] = json.dumps(extra, sort_keys=True, default=str)
+        return EntityWrite(
+            kind=kind, id=eid, attrs=attrs,
             source_workflows=("bootstrap",),
-        ))
-        return 1
+        )
