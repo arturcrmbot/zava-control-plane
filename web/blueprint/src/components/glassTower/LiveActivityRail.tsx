@@ -117,8 +117,29 @@ function formatRow(event: ObservatoryEvent, idx: number): Row | null {
 
 const MAX_ROWS = 80;
 
+const KIND_LABEL: Record<Row["kind"], string> = {
+  decision: "decisions",
+  completed: "done",
+  exception: "exceptions",
+  thinking: "thinking",
+  started: "started",
+  spawned: "spawned",
+  tool: "tools",
+};
+
+const ALL_KINDS: Row["kind"][] = ["decision", "thinking", "completed", "exception", "started", "spawned", "tool"];
+const DEFAULT_ENABLED: Set<Row["kind"]> = new Set([
+  "decision",
+  "thinking",
+  "completed",
+  "exception",
+  "started",
+  "spawned",
+]);
+
 export function LiveActivityRail() {
   const [rows, setRows] = useState<Row[]>([]);
+  const [enabledKinds, setEnabledKinds] = useState<Set<Row["kind"]>>(DEFAULT_ENABLED);
   const counterRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToTopRef = useRef(true);
@@ -148,6 +169,17 @@ export function LiveActivityRail() {
     if (!el) return;
     stickToTopRef.current = el.scrollTop < 8;
   }
+
+  function toggleKind(kind: Row["kind"]) {
+    setEnabledKinds((cur) => {
+      const next = new Set(cur);
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
+      return next;
+    });
+  }
+
+  const filtered = rows.filter((r) => enabledKinds.has(r.kind));
 
   return (
     <div
@@ -191,8 +223,45 @@ export function LiveActivityRail() {
             display: "inline-block",
           }}
         />
-        Live activity · {rows.length}
+        Live activity · {filtered.length} / {rows.length}
       </div>
+
+      {/* Filter chips. */}
+      <div
+        style={{
+          padding: "6px 10px 8px",
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 4,
+        }}
+      >
+        {ALL_KINDS.map((k) => {
+          const enabled = enabledKinds.has(k);
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => toggleKind(k)}
+              style={{
+                background: enabled ? `${KIND_COLOR[k]}26` : "rgba(20,22,28,0.4)",
+                border: `1px solid ${enabled ? KIND_COLOR[k] : "rgba(255,255,255,0.07)"}80`,
+                borderRadius: 999,
+                padding: "2px 8px",
+                fontFamily: "var(--mono-family, monospace)",
+                fontSize: 9,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: enabled ? KIND_COLOR[k] : "#6b7077",
+                cursor: "pointer",
+              }}
+            >
+              {KIND_ICON[k]} {KIND_LABEL[k]}
+            </button>
+          );
+        })}
+      </div>
+
       <div
         ref={scrollRef}
         onScroll={onScroll}
@@ -206,12 +275,12 @@ export function LiveActivityRail() {
           lineHeight: 1.5,
         }}
       >
-        {rows.length === 0 ? (
+        {filtered.length === 0 ? (
           <div style={{ padding: 14, color: "#6b7077", fontSize: 11 }}>
             waiting for events…
           </div>
         ) : (
-          rows.map((r) => (
+          filtered.map((r) => (
             <div
               key={r.id}
               style={{
