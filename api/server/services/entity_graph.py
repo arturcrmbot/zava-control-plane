@@ -30,8 +30,7 @@ This file lands the *shell* (TASK-002 in
   schema DDL idempotently, and exposes three Cypher passthrough helpers
   (REQ-002).
 
-The behavioural methods (``upsert``, ``link``, ``get``, ``by_type``,
-``linked``, ``touched_by``, ``record_decision``) land in TASK-004 and beyond.
+The remaining behavioural method (``record_decision``) lands in TASK-007.
 """
 from __future__ import annotations
 
@@ -605,6 +604,104 @@ class EntityGraph:
                     "rel": rel_upper,
                 },
             )
+
+    # -- reads (TASK-006) ------------------------------------------------
+
+    def get(self, id: str) -> dict[str, Any] | None:
+        """Fetch a single node by ``id`` across all node kinds.
+
+        Kuzu 0.6.1 supports label-less ``MATCH ({id: $id})`` so a single
+        query suffices — the returned node dict carries a ``_label`` field
+        indicating its kind. Returns ``None`` if no node has that id.
+        """
+        row = self.query_one(
+            "MATCH (n {id: $id}) RETURN n LIMIT 1",
+            {"id": id},
+        )
+        if row is None:
+            return None
+        return row["n"]
+
+    def by_type(self, kind: str, **filters: Any) -> list[dict[str, Any]]:
+        """Return every node of ``kind``, optionally narrowed by ``**filters``.
+
+        Each filter key is validated against :data:`_VALID_ATTR_KEY` so the
+        WHERE clause built by string interpolation can never carry an
+        attacker-controlled identifier (defense-in-depth — projection
+        callers already build EntityWrites with safe keys, but this method
+        is also called from MCP tools where the key origin is less obvious).
+        """
+        if kind not in _VALID_KINDS:
+            raise ValueError(
+                f"unknown entity kind: {kind!r} "
+                f"(expected one of {sorted(_VALID_KINDS)})"
+            )
+
+        where_clauses: list[str] = []
+        params: dict[str, Any] = {}
+        for idx, (key, value) in enumerate(filters.items()):
+            if not _VALID_ATTR_KEY.match(key):
+                raise ValueError(
+                    f"invalid filter key: {key!r} "
+                    f"(must match {_VALID_ATTR_KEY.pattern})"
+                )
+            placeholder = f"f_{idx}"
+            where_clauses.append(f"n.`{key}` = ${placeholder}")
+            params[placeholder] = value
+
+        cypher = f"MATCH (n:{kind})"
+        if where_clauses:
+            cypher += " WHERE " + " AND ".join(where_clauses)
+        cypher += " RETURN n"
+        return [row["n"] for row in self.query(cypher, params)]
+
+    def linked(self, id: str, rel: str | None = None) -> list[dict[str, Any]]:
+        """Return outgoing neighbours of ``id``, optionally filtered by ``rel``.
+
+        Each result row is a dict ``{"node": <neighbour-dict>, "rel":
+        "<REL_TYPE>"}`` — ``rel`` is the canonical uppercase rel-table name
+        as reported by Kuzu's ``label(r)`` function (Kuzu 0.6.1 does not
+        provide a ``type(r)``; ``label(r)`` is the documented equivalent
+        for rel records).
+
+        ``rel`` is normalised to uppercase (mirroring :meth:`link`) and
+        validated against :data:`_VALID_RELS` when given. ``rel=None``
+        returns rels of any type via Kuzu's label-less rel pattern, which
+        the smoke tests at the top of TASK-006 confirmed works in 0.6.1.
+        """
+        params: dict[str, Any] = {"id": id}
+        if rel is None:
+            cypher = (
+                "MATCH ({id: $id})-[r]->(n) "
+                "RETURN n, label(r) AS rel"
+            )
+        else:
+            rel_upper = rel.upper()
+            if rel_upper not in _VALID_RELS:
+                raise ValueError(
+                    f"unknown rel: {rel!r} "
+                    f"(expected one of {sorted(_VALID_RELS)})"
+                )
+            cypher = (
+                f"MATCH ({{id: $id}})-[r:{rel_upper}]->(n) "
+                "RETURN n, label(r) AS rel"
+            )
+        return [{"node": row["n"], "rel": row["rel"]} for row in self.query(cypher, params)]
+
+    def touched_by(self, workflow_id: str) -> list[dict[str, Any]]:
+        """Return every entity whose ``source_workflows`` contains ``workflow_id``.
+
+        Uses Kuzu's label-less ``MATCH (n)`` plus ``$wid IN n.source_workflows``
+        — the smoke tests confirmed Kuzu 0.6.1 silently skips kinds that
+        don't declare a ``source_workflows`` column (Place/Period/Workflow/
+        Decision), so this single query covers all eight kinds without
+        having to UNION them by hand.
+        """
+        rows = self.query(
+            "MATCH (n) WHERE $wid IN n.source_workflows RETURN n",
+            {"wid": workflow_id},
+        )
+        return [row["n"] for row in rows]
 
     def find_by_pattern(
         self,
