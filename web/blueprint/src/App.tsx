@@ -8,6 +8,9 @@ import { MetaSkill } from "./sections/MetaSkill";
 import { Observatory } from "./sections/Observatory";
 import { Closing } from "./sections/Closing";
 import { ConstellationPage } from "./pages/ConstellationPage";
+import { EntitiesPage } from "./pages/EntitiesPage";
+import { FunctionsPage } from "./pages/FunctionsPage";
+import { OrgClonePage } from "./pages/OrgClonePage";
 
 export default function App() {
   // Standalone full-screen constellation view, addressable via
@@ -18,6 +21,15 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("view") === "constellation") {
       return <ConstellationPage />;
+    }
+    if (params.get("view") === "entities") {
+      return <EntitiesPage />;
+    }
+    if (params.get("view") === "functions") {
+      return <FunctionsPage />;
+    }
+    if (params.get("view") === "org-clone") {
+      return <OrgClonePage />;
     }
   }
 

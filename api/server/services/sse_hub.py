@@ -3,7 +3,7 @@ import asyncio
 import json
 from typing import Any, AsyncIterator, Literal
 
-Topic = Literal["fleet", "fleet-manager", "orchestration"]
+Topic = str
 
 
 class SSEHub:
@@ -13,6 +13,8 @@ class SSEHub:
         }
 
     def subscribe(self, topic: Topic) -> asyncio.Queue:
+        if topic not in self._queues:
+            self._queues[topic] = set()
         q: asyncio.Queue = asyncio.Queue(maxsize=200)
         self._queues[topic].add(q)
         return q
@@ -20,7 +22,19 @@ class SSEHub:
     def unsubscribe(self, topic: Topic, q: asyncio.Queue) -> None:
         self._queues[topic].discard(q)
 
+    def register(self, topic: Topic) -> None:
+        """Register a dynamic topic so subscribers can attach later.
+
+        Phase 3 (TASK-028) registers one ``fleet-manager.<function>``
+        topic per non-legacy function FM. Idempotent — re-registering an
+        existing topic is a no-op.
+        """
+        if topic not in self._queues:
+            self._queues[topic] = set()
+
     def broadcast(self, topic: Topic, data: Any) -> None:
+        if topic not in self._queues:
+            return
         payload = json.dumps(data, default=str)
         for q in list(self._queues[topic]):
             try:

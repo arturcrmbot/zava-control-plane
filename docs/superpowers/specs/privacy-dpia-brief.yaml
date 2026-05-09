@@ -1,0 +1,64 @@
+# Privacy DPIA — compose-domain v4 brief.
+#
+# Mirrors api/server/services/entity_projections/privacy_dpia.py (TASK-024).
+# Payload at data/synthetic/privacy-dpia/dpias.json. The CPO sign-off
+# gate is conditional on risk_tier == "high"; the brief lists both
+# decisions but the live projection emits CPO only on high-risk DPIAs
+# (helper logic).
+
+domain:
+  workflow_type: privacy-dpia
+  prefix: fleet
+  display_name: Privacy DPIA review
+  description: |
+    Data Protection Impact Assessment for a new system or processing
+    activity. DPO reviews; CPO signs off on high-risk cases.
+
+phases:
+  - name: dpia_intake
+    kind: deterministic
+    intent: Capture DPIA header (system, risk tier, geography).
+  - name: risk_screen
+    kind: agent
+    agent_skill_name: dpia-risk-screener
+    intent: Surface processing risks and applicable data-protection regimes.
+  - name: privacy_dpo_review
+    kind: hitl
+    persona: privacy_dpo
+    external_event: privacy_dpo_review_decision
+  - name: privacy_cpo_signoff
+    kind: hitl
+    persona: privacy_cpo
+    external_event: privacy_cpo_signoff_decision
+
+entities:
+  - kind: Asset
+    source: dpia
+    ref_field: payload.dpia_id
+    attributes:
+      identifier: payload.dpia_id
+      system_name: payload.system_name
+      risk_tier: payload.risk_tier
+  - kind: Place
+    source: region
+    ref_field: payload.geography
+    attributes:
+      name: payload.geography
+
+decisions:
+  - phase: privacy_dpo_review
+    persona: privacy_dpo
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.dpia_id]
+    attributes_from_context:
+      dpia_id: payload.dpia_id
+      risk_tier: payload.risk_tier
+  - phase: privacy_cpo_signoff
+    persona: privacy_cpo
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.dpia_id]
+    attributes_from_context:
+      dpia_id: payload.dpia_id
+      risk_tier: payload.risk_tier
+
+function: legal

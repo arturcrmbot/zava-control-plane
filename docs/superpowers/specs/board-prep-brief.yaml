@@ -1,0 +1,38 @@
+# Board-pack preparation strategic brief (Phase 4 IP6 TASK-028).
+#
+# CEO-FM owned. Assembles the quarterly board pack by composing
+# revenue + finance + HR data via sub-workflows, ending in a board
+# signoff gate.
+domain:
+  workflow_type: board-prep
+  prefix: fleet
+  display_name: "Board Pack Preparation"
+  description: "Quarterly board pack: opportunity pipeline + AP/treasury actuals + perf-review summary + board signoff."
+phases:
+  - name: assemble_inputs
+    kind: agent
+    agent_skill_name: board-pack-assembler
+    intent: "Pull KPIs + open meta-workflow trees from the entity graph for the period."
+  - name: pipeline_view
+    kind: sub_orchestrator
+    target_workflow_type: lead-to-cash
+    target_orchestrator: LeadToCashOrchestrator
+    parallel_group: board
+    payload_from: "python:{'period': input_dict['period'], 'mode': 'snapshot'}"
+  - name: vendor_pay_view
+    kind: sub_orchestrator
+    target_workflow_type: vendor-risk-to-pay
+    target_orchestrator: VendorRiskToPayOrchestrator
+    parallel_group: board
+    payload_from: "python:{'period': input_dict['period'], 'mode': 'snapshot'}"
+  - name: people_view
+    kind: sub_orchestrator
+    target_workflow_type: hire-to-productive
+    target_orchestrator: HireToProductiveOrchestrator
+    parallel_group: board
+    payload_from: "python:{'period': input_dict['period'], 'mode': 'snapshot'}"
+  - name: board_signoff
+    kind: hitl
+    persona: cfo
+    external_event: board_pack_decision
+function: ceo

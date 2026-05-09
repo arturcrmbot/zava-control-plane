@@ -1,0 +1,3 @@
+name: morning-sweep
+schedule: "0 9 * * 1-5"
+fires_ambient_agent: morning-sweep

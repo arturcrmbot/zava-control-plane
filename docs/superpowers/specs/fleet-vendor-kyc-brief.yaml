@@ -7,6 +7,10 @@
 # persona (vendor_kyc_finance_bp) auto-closes via decision_code.
 
 domain:
+  # v4 fields (TASK-027 backfill).
+  workflow_type: vendor-kyc
+  prefix: fleet
+  # v3 fields (back-compat — v3 generators still consume `name`).
   name: fleet-vendor-kyc
   display_name: Vendor onboarding & KYC
   owner_role: vendor_kyc_finance_bp
@@ -107,3 +111,35 @@ external_systems:
     mcp_tool: adverse_media
     operations:
       - search
+
+# --------------------------------------------------------------------
+# v4 enrichment (TASK-027 backfill).
+# Mirrors api/server/services/entity_projections/vendor_kyc.py. The
+# live module additionally derives a `risk_band` attribute from the
+# scenario string via _risk_band() — that helper is not synthesisable
+# from the brief and is not regenerated.
+# --------------------------------------------------------------------
+entities:
+  - kind: Organisation
+    source: vendor
+    ref_field: payload.vendor_name
+    attributes:
+      name: payload.vendor_name
+      country: payload.country_of_incorporation
+  - kind: Organisation
+    source: agency
+    ref_field: payload.proposing_agency
+    attributes:
+      name: payload.proposing_agency
+
+decisions:
+  - phase: finance_signoff
+    persona: vendor_kyc_finance_bp
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.vendor_name]
+    attributes_from_context:
+      vendor_name: payload.vendor_name
+      country: payload.country_of_incorporation
+      scenario: payload.scenario
+
+function: finance

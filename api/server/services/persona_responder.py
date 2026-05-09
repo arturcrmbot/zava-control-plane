@@ -194,6 +194,37 @@ def _sandbox_authority_check(
         }
 
 
+def _sandbox_query_precedents(
+    persona_role: str,
+    entity_id: str,
+    limit: int = 10,
+    *,
+    workflow_type: str | None = None,
+    phase: str | None = None,
+) -> list[dict[str, Any]]:
+    """Sandbox-safe wrapper around the query_precedents MCP tool.
+
+    Phase 4 IP3 (TASK-016, DEC-OQ1). Persona ``decision_policy`` blocks
+    may call ``precedents = query_precedents(persona_role, entity_id,
+    limit=10)`` to fetch recent ``Decision`` nodes for the entity. Lazy
+    imports keep persona_responder import-light at boot.
+    """
+    try:
+        from api.server.state import app_state
+        from api.server.mcp_tools.query_precedents import make_query_precedents_tool
+
+        tool = make_query_precedents_tool(app_state.entities)
+        return tool(
+            persona_role,
+            entity_id,
+            limit,
+            workflow_type=workflow_type,
+            phase=phase,
+        )
+    except Exception:  # pragma: no cover — degrade to "no precedent"
+        return []
+
+
 _DECISION_BUILTINS: dict[str, Any] = {
     "isinstance": isinstance, "len": len,
     "str": str, "int": int, "float": float, "bool": bool,
@@ -202,6 +233,7 @@ _DECISION_BUILTINS: dict[str, Any] = {
     "any": any, "all": all, "sum": sum,
     "True": True, "False": False, "None": None,
     "authority_check": _sandbox_authority_check,
+    "query_precedents": _sandbox_query_precedents,
 }
 
 

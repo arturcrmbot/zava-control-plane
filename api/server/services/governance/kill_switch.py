@@ -21,6 +21,7 @@ restarting the FastAPI process clears every kill (intentional —
 """
 from __future__ import annotations
 
+import fnmatch
 import threading
 import time
 import uuid
@@ -30,6 +31,22 @@ from pydantic import BaseModel, Field
 
 
 WILDCARD = "*"
+
+
+def _pattern_matches(pattern: str, value: str) -> bool:
+    """Match a stored kill pattern against a runtime actor/tool value.
+
+    The literal ``"*"`` matches anything (legacy semantics). Patterns
+    containing ``*`` or ``?`` are treated as ``fnmatch`` globs, so
+    ``ambient.*`` matches ``ambient.budget-variance-watcher``,
+    ``cadence.*`` matches ``cadence.morning-sweep``, etc. Everything
+    else is an exact-string match.
+    """
+    if pattern == WILDCARD:
+        return True
+    if "*" in pattern or "?" in pattern:
+        return fnmatch.fnmatchcase(value, pattern)
+    return pattern == value
 
 
 class KillSwitch(BaseModel):
@@ -46,9 +63,7 @@ class KillSwitch(BaseModel):
     created_by: str = "operator"
 
     def matches(self, actor: str, tool: str) -> bool:
-        actor_ok = self.actor == WILDCARD or self.actor == actor
-        tool_ok = self.tool == WILDCARD or self.tool == tool
-        return actor_ok and tool_ok
+        return _pattern_matches(self.actor, actor) and _pattern_matches(self.tool, tool)
 
     def is_expired(self, now: float | None = None) -> bool:
         return (now or time.time()) >= self.expires_at
@@ -121,10 +136,14 @@ class KillSwitchStore:
         if not candidates:
             return None
 
+        def _is_wild(p: str) -> bool:
+            return p == WILDCARD or "*" in p or "?" in p
+
         def _specificity(k: KillSwitch) -> tuple[int, float]:
-            # Higher specificity = denser match. (3,t) beats (2,t)
+            # Higher specificity = denser match. Literal (no glob meta)
+            # beats wildcard/glob in either component. (3,t) beats (2,t)
             # beats (1,t). t = recency.
-            score = (0 if k.actor == WILDCARD else 2) + (0 if k.tool == WILDCARD else 1)
+            score = (0 if _is_wild(k.actor) else 2) + (0 if _is_wild(k.tool) else 1)
             return (score, k.created_at)
 
         return max(candidates, key=_specificity)
