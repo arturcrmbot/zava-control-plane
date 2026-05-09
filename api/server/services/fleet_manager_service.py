@@ -408,6 +408,38 @@ class FleetManagerService:
             await self._client.stop()
         self._started = False
 
+    # ----------------------------------------------------------------------
+    # Phase 4 IP2 (TASK-011) — KPI publish API
+    # ----------------------------------------------------------------------
+    def publish_kpi(self, metric: str, value: float, period: str) -> None:
+        """Publish one KPI snapshot for this FM's function.
+
+        Writes via :class:`api.server.services.kpi_store.KpiStore` and
+        emits an SSE event on the FM's per-function topic. No-op for the
+        fleet-wide singleton (``self._function is None``) since fleet-
+        wide KPIs aren't a thing in the schema.
+        """
+        if self._function is None:
+            return
+        from api.server.state import app_state
+        from api.shared.functions import FUNCTIONS
+
+        schema_version = FUNCTIONS[self._function].kpi_schema_version
+        app_state.kpi_store.publish(
+            self._function, metric, value, period, schema_version,
+        )
+        try:
+            self._on_live({
+                "type": "kpi.published",
+                "function": self._function,
+                "metric": metric,
+                "value": value,
+                "period": period,
+                "schema_version": schema_version,
+            })
+        except Exception:  # pragma: no cover — SSE broadcast is best-effort
+            pass
+
 
 # Phase 3 blueprint primitive name (TASK-025). The ``Function`` Fleet
 # Manager is implementation-identical to ``FleetManagerService`` — only

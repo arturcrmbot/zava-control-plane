@@ -48,10 +48,10 @@ def test_missing_function_raises(validator, brief):
     assert exc.value.path == "function"
 
 
-def test_placeholder_has_ten_canonical_keys(validator):
+def test_placeholder_has_eleven_canonical_keys(validator):
     assert validator.FUNCTIONS_PLACEHOLDER == {
         "finance", "hr", "revenue", "ops", "legal",
-        "marketing", "tech", "data", "customer-success", "legacy",
+        "marketing", "tech", "data", "customer-success", "ceo", "legacy",
     }
 
 
@@ -72,6 +72,7 @@ def test_dup_claim_in_other_function_raises(validator, brief):
         "tech": _Entry(),
         "data": _Entry(),
         "customer-success": _Entry(),
+        "ceo": _Entry(),
         "legacy": _Entry(),
     }
     with pytest.raises(validator.SchemaError) as exc:

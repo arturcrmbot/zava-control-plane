@@ -19,6 +19,7 @@ from api.server.services.state_store import StateStore
 from api.server.services.audit_logger import AuditLogger
 from api.server.services.sse_hub import SSEHub
 from api.server.services.magic_link import MagicLinkStore
+from api.server.services.kpi_store import KpiStore
 from api.server.services.email_send import EmailSender
 
 
@@ -60,6 +61,11 @@ class AppState:
         self.bus = EventBus()
         self.store = StateStore()
         self.audit = AuditLogger()
+
+        # Phase 4 IP2 (TASK-010) — KPI snapshot store. File lives at
+        # data/portal/kpis.sqlite. Constructed early so per-function
+        # FMs built later can reference it via app_state.kpi_store.
+        self.kpi_store = KpiStore(_PORTAL_DATA_DIR / "kpis.sqlite")
 
         # ----------------------------------------------------- entity graph plane
         # (a) Governance kernel singleton — canonical entry-point for every
@@ -141,6 +147,13 @@ class AppState:
                     svc.close()
                 except Exception:
                     pass
+        # Phase 4 IP1 — cancel cadence tasks BEFORE the ambient
+        # dispatcher tears down, so no in-flight tick races teardown.
+        for t in getattr(self, "_cadence_tasks", []):
+            try:
+                t.cancel()
+            except Exception:
+                pass
         # Ambient dispatcher teardown — MUST run BEFORE the entity
         # reflector so no in-flight cypher sweep tries to spawn through
         # a half-torn graph. ``aclose`` is async (cancels asyncio tasks).
@@ -193,7 +206,8 @@ class AppState:
             topic = f"fleet-manager.{fn_name}"
             self.hub.register(topic)
             tools = build_function_fm_tools(
-                self.store, self.audit, self.entities, fn_name
+                self.store, self.audit, self.entities, fn_name,
+                kpi_store=self.kpi_store,
             )
             self.function_fms[fn_name] = FunctionFleetManager(
                 bus=self.bus,
@@ -260,6 +274,79 @@ class AppState:
             self.ambient_dispatcher.start()
         except RuntimeError:
             pass
+
+        # Phase 4 IP1 (TASK-004) — cadence loop. Loads cadence YAMLs
+        # once at startup and starts one asyncio task per cadence. The
+        # tasks only run under a live event loop; without one we leave
+        # the cadences declared but unfired (smoke tests, sync ctors).
+        from api.server.services.cadence_loader import load_cadences
+        cadences_dir = _REPO_ROOT / "data" / "governance" / "cadences"
+        try:
+            self.cadences = load_cadences(cadences_dir)
+        except Exception as ex:
+            import logging
+            logging.getLogger(__name__).warning(
+                "cadence loader failed (%s); cadences disabled", ex,
+            )
+            self.cadences = []
+        self._cadence_tasks: list = []
+        try:
+            import asyncio as _asyncio
+            _asyncio.get_running_loop()
+            for cad in self.cadences:
+                self._cadence_tasks.append(
+                    _asyncio.create_task(self._run_cadence(cad))
+                )
+        except RuntimeError:
+            pass
+
+    async def _run_cadence(self, cadence) -> None:
+        """One asyncio task per cadence — sleeps until next cron tick,
+        dispatches to the named ambient agent, emits ``cadence.tick``
+        audit, repeats. Cancelled by ``aclose``.
+
+        Phase 4 IP1 (TASK-004). The croniter-driven sleep keeps the loop
+        body small (<60 LoC); the trigger_ctx contract matches what
+        ``AmbientDispatcher.dispatch`` already accepts (P3 TASK-018b).
+        """
+        import asyncio as _asyncio
+        import datetime as _dt
+        import logging as _logging
+        from croniter import croniter as _croniter
+
+        log = _logging.getLogger(__name__)
+        while True:
+            try:
+                now = _dt.datetime.now()
+                nxt = _croniter(cadence.schedule, now).get_next(_dt.datetime)
+                wait_s = max(0.0, (nxt - now).total_seconds())
+                await _asyncio.sleep(wait_s)
+                scheduled_for = nxt.isoformat()
+                self.audit.log("cadence.tick", {
+                    "cadence_name": cadence.name,
+                    "scheduled_for": scheduled_for,
+                    "fired_at": _dt.datetime.now().isoformat(),
+                    "ambient_agent": cadence.fires_ambient_agent,
+                })
+                try:
+                    await self.ambient_dispatcher.dispatch(
+                        cadence.fires_ambient_agent,
+                        trigger_ctx={
+                            "kind": "cadence",
+                            "cadence_name": cadence.name,
+                            "scheduled_for": scheduled_for,
+                        },
+                    )
+                except Exception as ex:
+                    log.warning(
+                        "cadence %s: dispatch to %s failed: %s",
+                        cadence.name, cadence.fires_ambient_agent, ex,
+                    )
+            except _asyncio.CancelledError:
+                raise
+            except Exception as ex:  # pragma: no cover — defensive
+                log.warning("cadence %s loop error: %s", cadence.name, ex)
+                await _asyncio.sleep(1.0)
 
 
 app_state = AppState()

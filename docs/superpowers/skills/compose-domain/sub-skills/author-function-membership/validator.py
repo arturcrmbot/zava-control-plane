@@ -19,7 +19,7 @@ __all__ = ["SchemaError", "FUNCTIONS_PLACEHOLDER", "validate"]
 
 FUNCTIONS_PLACEHOLDER: frozenset[str] = frozenset({
     "finance", "hr", "revenue", "ops", "legal",
-    "marketing", "tech", "data", "customer-success", "legacy",
+    "marketing", "tech", "data", "customer-success", "ceo", "legacy",
 })
 
 

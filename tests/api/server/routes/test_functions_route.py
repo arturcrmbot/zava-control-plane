@@ -12,14 +12,15 @@ def client():
         yield c
 
 
-def test_list_functions_returns_nine_non_legacy_entries(client):
+def test_list_functions_returns_ten_non_legacy_entries(client):
     r = client.get("/api/functions")
     assert r.status_code == 200
     body = r.json()
     assert isinstance(body, list)
-    assert len(body) == 9
+    assert len(body) == 10
     names = {entry["name"] for entry in body}
     assert "legacy" not in names
+    assert "ceo" in names
     # Every entry has the documented shape.
     for entry in body:
         assert {

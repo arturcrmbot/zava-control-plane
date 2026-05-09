@@ -49,6 +49,12 @@ class Function:
     ambient_agents: tuple[str, ...]
     kpis: tuple[str, ...]
     persona_hierarchy: PersonaTree
+    # Phase 4 IP2 (TASK-013, DEC-OQ3). Per-snapshot KPI schema version
+    # stamped onto every row published via ``KpiStore.publish``. Bump in
+    # lock-step with breaking changes to a function's KPI shape; readers
+    # tolerate the union of versions seen and project missing keys as
+    # null.
+    kpi_schema_version: int = 1
 
 
 # --------------------------------------------------------------------------
@@ -67,7 +73,9 @@ FUNCTIONS: dict[str, Function] = {
                       "treasury-fx", "vendor-kyc"),
         # Phase 6 (TASK-035 / TASK-036) plants these instances; the names
         # are listed here so the discovery cross-validation has a target.
-        ambient_agents=("budget-variance-watcher", "vendor-risk-watcher"),
+        # Phase 4 IP1 (TASK-006b) adds ``period-close`` (cadence-fired).
+        ambient_agents=("budget-variance-watcher", "vendor-risk-watcher",
+                        "period-close"),
         kpis=("dso", "dpo", "budget-variance-pct", "fraud-rate"),
         persona_hierarchy=PersonaTree(
             role="cfo",
@@ -86,7 +94,8 @@ FUNCTIONS: dict[str, Function] = {
         display="People & HR",
         operator_surface="hr-bp",
         owns_domains=("employee-onboarding", "perf-review", "travel-preapproval"),
-        ambient_agents=(),
+        # Phase 4 IP1 (TASK-006b) adds ``morning-sweep`` (cadence-fired).
+        ambient_agents=("morning-sweep",),
         kpis=("time-to-hire", "regrettable-attrition-pct",
               "engagement-score", "comp-ratio"),
         persona_hierarchy=PersonaTree(
@@ -205,6 +214,21 @@ FUNCTIONS: dict[str, Function] = {
                 PersonaTree(role="recruiter"),  # placeholder until CS personae land
             ),
         ),
+    ),
+    "ceo": Function(
+        name="ceo",
+        display="CEO Office",
+        operator_surface="ceo",
+        # CEO-FM owns no synthetic-journey domains today; strategic
+        # domains (``fy-close``, ``board-prep``) graduate later in
+        # Phase 4 IP6/IP7 via compose-domain v4.
+        owns_domains=(),
+        # Phase 4 IP1 (TASK-006b) plants ``quarterly-okr``.
+        ambient_agents=("quarterly-okr",),
+        kpis=("revenue-growth", "ebitda-margin", "cash-runway"),
+        # CEO has no dedicated SKILL.md persona today; reuse ``cfo`` as
+        # the closest existing role until a CEO persona graduates.
+        persona_hierarchy=PersonaTree(role="cfo"),
     ),
     "legacy": Function(
         name="legacy",

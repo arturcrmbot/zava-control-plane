@@ -49,3 +49,19 @@ VendorRiskWatcher = AmbientAgent(
     reasoning_skill=None,
     spawnable_workflow_types=("vendor-kyc",),
 )
+
+
+# --------------------------------------------------------------------------
+# Phase 4 IP1 (TASK-006b) — PeriodClose
+# --------------------------------------------------------------------------
+# Monthly month-close sweep, fired on the 1st at 06:00 by the cadence
+# loop. Deterministic (no reasoning skill) — spawns AP-invoice + FX
+# workflows for outstanding period-close work.
+# --------------------------------------------------------------------------
+PeriodClose = AmbientAgent(
+    name="period-close",
+    function="finance",
+    triggers=(CadenceTrigger(cron="0 6 1 * *"),),
+    reasoning_skill=None,
+    spawnable_workflow_types=("ap-invoice", "treasury-fx"),
+)

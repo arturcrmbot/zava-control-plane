@@ -33,7 +33,7 @@ def build_fleet_manager_tools(store, audit):
     ]
 
 
-def build_function_fm_tools(store, audit, graph, function_name: str):
+def build_function_fm_tools(store, audit, graph, function_name: str, *, kpi_store=None):
     """Build the five in-process MCP tools scoped to a single function.
 
     Returns the list of tools a per-function FleetManagerService session
@@ -41,11 +41,16 @@ def build_function_fm_tools(store, audit, graph, function_name: str):
     constructing them for ``finance`` and ``hr`` produces two distinct
     sets, each carrying its own bound ``function_name`` closure.
 
-    Plan: plan/feature-agentic-org-phase-3-function-fms.md TASK-024.
+    ``kpi_store`` (Phase 4 IP2 TASK-012) is the live
+    :class:`api.server.services.kpi_store.KpiStore`; ``None`` keeps the
+    Phase 3 stub contract for backward-compat.
+
+    Plan: plan/feature-agentic-org-phase-3-function-fms.md TASK-024 +
+    plan/feature-agentic-org-phase-4-ceo-fm.md TASK-012.
     """
     return [
         make_query_fleet_state_tool(store, function_name=function_name),
-        make_query_kpi_tool(kpi_store=None, function_name=function_name),
+        make_query_kpi_tool(kpi_store=kpi_store, function_name=function_name),
         make_query_recent_decisions_tool(graph, function_name=function_name),
         make_query_entity_tool(graph),
         make_find_entities_tool(graph, audit),
