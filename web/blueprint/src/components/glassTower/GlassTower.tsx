@@ -11,7 +11,7 @@
  *   - HUD: top vital-signs bar + bottom strip with persona snapshot
  */
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, PerspectiveCamera, Stars, Text } from "@react-three/drei";
+import { OrbitControls, PerspectiveCamera, Stars, ContactShadows, Environment } from "@react-three/drei";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import { useMemo, useState } from "react";
 import * as THREE from "three";
@@ -109,6 +109,27 @@ export function GlassTower({ status }: Props) {
         <pointLight position={[0, 14, 0]} intensity={0.4} color="#ffd76a" distance={40} />
 
         <Stars radius={140} depth={70} count={2000} factor={2.2} fade speed={0.2} />
+
+        {/* Ground plane — dark, faintly reflective; building sits ON it
+            instead of floating in space. */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.6, 0]}>
+          <planeGeometry args={[80, 80]} />
+          <meshStandardMaterial
+            color="#0a0c12"
+            metalness={0.85}
+            roughness={0.35}
+            transparent
+            opacity={0.92}
+          />
+        </mesh>
+        {/* Soft contact shadow under the building gives weight/grounding. */}
+        <ContactShadows
+          position={[0, -0.55, 0]}
+          opacity={0.55}
+          scale={20}
+          blur={2.8}
+          far={6}
+        />
 
         {/* Lobby base. */}
         <Lobby
