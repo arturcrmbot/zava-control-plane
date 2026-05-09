@@ -435,7 +435,8 @@ function Empty({ children }: { children: React.ReactNode }) {
 const overlayStyle: React.CSSProperties = {
   position: "absolute",
   inset: 0,
-  background: "rgba(6,7,10,0.92)",
+  background: "rgba(6,7,10,0.97)",
+  backdropFilter: "blur(8px)",
   zIndex: 10,
   padding: 18,
   color: "#cfd2d6",

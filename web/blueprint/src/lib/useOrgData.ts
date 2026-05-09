@@ -24,7 +24,7 @@ import {
   initialAnimState,
 } from "./animationQueue";
 import type { AnimEntry } from "./animationQueue";
-import { COLORS, translateEvent } from "./orgEvents";
+import { COLORS, PREFIX_TO_WORKFLOW_TYPE, translateEvent } from "./orgEvents";
 import type { LayerFlags } from "./layerToggles";
 import { useObservatory } from "./useObservatory";
 import type { ObservatoryEvent } from "./types";
@@ -116,12 +116,21 @@ export function useOrgData(): OrgDataSnapshot {
           fetchJson<Cadence[]>("/api/cadences").catch(() => [] as Cadence[]),
         ]);
         if (cancelled) return;
+        // Normalise hot entities: the Kuzu node label lives at
+        // `_label`, while the `kind` attribute is a free-form vendor /
+        // employee / etc. discriminator. The frontend's vault + beam
+        // logic key on the schema kind, so prefer `_label` when present.
+        const rawHot = (stats.hot ?? []) as Array<HotEntity & { _label?: string }>;
+        const normalisedHot: HotEntity[] = rawHot.map((e) => ({
+          ...e,
+          kind: e._label ?? e.kind,
+        }));
         setRaw({
           functions,
           entityCounts: stats.counts ?? {},
           cadences,
           status: "ready",
-          hotEntities: (stats.hot ?? []) as HotEntity[],
+          hotEntities: normalisedHot,
         });
       } catch {
         if (!cancelled) {
@@ -243,8 +252,16 @@ export function computeCrossFunctionBeams(
   const pairs = new Map<string, CrossFunctionBeam>();
   for (const ent of hot) {
     const fns = new Set<string>();
-    for (const wt of ent.source_workflows ?? []) {
-      const fn = functionByWorkflowType.get(wt);
+    for (const wid of ent.source_workflows ?? []) {
+      // source_workflows holds workflow_IDs (e.g. "VKY-0001"). Map the
+      // prefix to a workflow_type then to a function. Falls back to the
+      // raw value in case future projections store workflow_type strings.
+      let fn = functionByWorkflowType.get(wid);
+      if (!fn) {
+        const m = wid.match(/^([A-Z]+)-/);
+        const wt = m ? PREFIX_TO_WORKFLOW_TYPE[m[1]] : null;
+        if (wt) fn = functionByWorkflowType.get(wt) ?? undefined;
+      }
       if (fn) fns.add(fn);
     }
     if (fns.size < 2) continue;

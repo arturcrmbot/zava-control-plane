@@ -33,7 +33,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useObservatory } from "../../lib/useObservatory";
 import { useOrgData } from "../../lib/useOrgData";
 import { cadencesFor } from "../../lib/cadenceMapping";
-import { COLORS } from "../../lib/orgEvents";
+import { COLORS, PREFIX_TO_WORKFLOW_TYPE } from "../../lib/orgEvents";
 import type { OrgFunction, Cadence } from "../../lib/useOrgData";
 import type { ObservatoryEvent } from "../../lib/types";
 
@@ -121,7 +121,15 @@ export function countTouchedByFunction(
   const out: Record<string, number> = {};
   for (const k of VAULT_KINDS) out[k] = 0;
   for (const ent of hot) {
-    if (!ent.source_workflows?.some((wt) => owned.has(wt))) continue;
+    // source_workflows entries are workflow_IDs (e.g. "VKY-0004"), not
+    // workflow_types. Extract the prefix and map to the workflow_type
+    // before checking against the function's owned-domains set.
+    const matches = (ent.source_workflows ?? []).some((wid) => {
+      const m = wid.match(/^([A-Z]+)-/);
+      const wt = m ? PREFIX_TO_WORKFLOW_TYPE[m[1]] : null;
+      return wt != null && owned.has(wt);
+    });
+    if (!matches) continue;
     const k = ent.kind as VaultKind;
     if (k in out) out[k] += 1;
   }
@@ -708,7 +716,8 @@ function PersonaSidebar({
 const overlayStyle: React.CSSProperties = {
   position: "absolute",
   inset: 0,
-  background: "rgba(6,7,10,0.9)",
+  background: "rgba(6,7,10,0.97)",
+  backdropFilter: "blur(8px)",
   zIndex: 10,
   padding: 18,
   color: "#cfd2d6",

@@ -107,3 +107,8 @@ AI-Transformation-in-Days.pptx
 !.github/workflows/agt-governance.yml
 !.github/hooks/
 !.github/hooks/pre-commit-agt
+# Worktree-local symlinks (added during ralph-loop dev)
+/.venv
+/node_modules
+/web/portal/node_modules
+/web/blueprint/node_modules
