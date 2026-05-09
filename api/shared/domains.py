@@ -12,6 +12,7 @@ Consumers:
 - api.server.routes.exceptions              — current_phase → external_event fallback
 - api.server.services.triage                — wake-event allow-list extension
 - api.server.services.fleet_manager_service — domain catalogue inside FM skill
+- api.shared.functions — derives Domain.function back-ref at import; orphan validator runs at boot.
 """
 from __future__ import annotations
 
@@ -61,7 +62,7 @@ class WakeHint:
     reason: str
 
 
-@dataclass(frozen=True)
+@dataclass
 class Domain:
     workflow_type: str
     display_name: str
@@ -72,6 +73,11 @@ class Domain:
     hitl_gates: tuple[HitlGate, ...]
     skills: tuple[str, ...]
     wake_hints: tuple[WakeHint, ...] = ()
+    # `function` is mutated exactly once at import time by
+    # api.shared.functions._wire_function_back_refs(); treat as
+    # immutable thereafter. The dataclass is non-frozen *only* to
+    # accommodate this single boot-time back-ref write.
+    function: str | None = None
 
 
 # --------------------------------------------------------------------------
