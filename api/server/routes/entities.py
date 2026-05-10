@@ -104,6 +104,79 @@ async def entities_touched_by(wf_id: str):
     return app_state.entities.touched_by(wf_id)
 
 
+@router.get("/by-function/{function_key}")
+async def entities_by_function(function_key: str, kind: str | None = None):
+    """Org Ops v2 — entities whose source_workflows include any workflow_type
+    owned by ``function_key``.
+
+    Replaces the broken hot-list filter the building used at zoom-1: the hot
+    list is capped at 10 and dominated by repeatedly-touched ``*-unknown``
+    placeholders, so Decisions / Money rows (created once and never re-touched)
+    were always counted as 0.
+
+    Returns ``{counts: {kind: count}, sample: [entity, ...]}``. ``sample``
+    holds up to 20 entities for the requested ``kind`` (or the first 20 across
+    all kinds when no ``kind`` is given) so the frontend can list real
+    entities, not just the count.
+    """
+    try:
+        from api.shared.functions import FUNCTIONS
+    except Exception:
+        raise HTTPException(status_code=500, detail="functions registry unavailable")
+    spec = FUNCTIONS.get(function_key)
+    if spec is None:
+        raise HTTPException(status_code=404, detail=f"unknown function {function_key!r}")
+    owned = set(spec.owns_domains or ())
+    if not owned:
+        return {"counts": {k: 0 for k in _KINDS}, "sample": []}
+
+    # workflow_id prefix → workflow_type lookup so we can filter
+    # source_workflows entries (which are workflow_IDs like "VKY-0001") to
+    # the owned domains (which are workflow_types like "vendor-kyc").
+    try:
+        from api.shared import domains as _domains
+    except Exception:
+        _domains = None
+
+    def _matches_function(source_workflows: list[str]) -> bool:
+        for wid in source_workflows or ():
+            if not isinstance(wid, str) or "-" not in wid:
+                continue
+            prefix = wid.split("-", 1)[0]
+            if _domains is None:
+                continue
+            d = _domains.by_prefix(prefix) if hasattr(_domains, "by_prefix") else None
+            if d is None:
+                # Fallback: try mapping via DOMAINS list scan
+                try:
+                    for cand in _domains.DOMAINS.values():
+                        if cand.workflow_id_prefix == prefix:
+                            d = cand
+                            break
+                except Exception:
+                    d = None
+            if d is not None and d.workflow_type in owned:
+                return True
+        return False
+
+    counts: dict[str, int] = {k: 0 for k in _KINDS}
+    sample: list[dict] = []
+    kinds_to_scan = (kind,) if kind in _KINDS else _KINDS
+    for k in kinds_to_scan:
+        try:
+            rows = app_state.entities.by_type(k)
+        except ValueError:
+            continue
+        for n in rows:
+            sw = n.get("source_workflows") or []
+            if not _matches_function(sw):
+                continue
+            counts[k] += 1
+            if len(sample) < 20:
+                sample.append(n)
+    return {"counts": counts, "sample": sample, "function": function_key, "owns": list(owned)}
+
+
 @router.get("/{id}")
 async def get_entity(id: str):
     """Single entity by id; 404 if not found."""

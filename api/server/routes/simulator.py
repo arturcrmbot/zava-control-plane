@@ -480,3 +480,92 @@ async def constellation_start():
         "failed": failed,
     }
 # === END constellation-mode ===
+
+
+# Ralph-loop helper — seed every function FM's KPIs with synthetic
+# values so the building's KPI tickers read as populated for the
+# demo / smoke. Idempotent. Safe to call repeatedly.
+@router.post("/seed-kpis")
+async def seed_kpis():
+    import random as _rnd
+    from api.shared.functions import FUNCTIONS
+
+    fm_registry = getattr(app_state, "function_fms", None)
+    if not fm_registry:
+        return {"ok": False, "reason": "function_fms not initialised"}
+
+    period = _time.strftime("%Y-%m")
+    seeded: list[dict] = []
+    for fn_key, fn_spec in FUNCTIONS.items():
+        if fn_key == "legacy" or not fn_spec.kpis:
+            continue
+        fm = fm_registry.get(fn_key)
+        if fm is None:
+            continue
+        for metric in fn_spec.kpis:
+            # Pseudo-random but deterministic per (fn, metric) so reseeds
+            # don't churn the building's KPI tickers wildly.
+            rng = _rnd.Random(f"{fn_key}:{metric}")
+            base = rng.uniform(10, 95)
+            value = round(base + rng.uniform(-2.0, 2.0), 1)
+            try:
+                fm.publish_kpi(metric, value, period)
+                seeded.append({"function": fn_key, "metric": metric,
+                               "value": value, "period": period})
+            except Exception as exc:  # noqa: BLE001
+                seeded.append({"function": fn_key, "metric": metric,
+                               "error": str(exc)})
+    return {"ok": True, "count": len(seeded), "seeded": seeded[:20]}
+
+
+# ---------------------------------------------------------------------------
+# Org Ops v2 — burst injector for the operator views' "spawn 5" button.
+# Picks a varied selection of workflows so the live stream / conversations /
+# river immediately show activity across multiple functions, not just one.
+# ---------------------------------------------------------------------------
+@router.post("/inject-burst")
+async def inject_burst(n: int = 5):
+    """Spawn ~n varied workflows across multiple domains.
+
+    Used by the Org Ops v2 page top-right "burst" button so an operator can
+    pump activity at will. Distributes across finance / hr / ops / legal /
+    marketing so all three views get cross-function content. Returns a list
+    of spawned workflow_ids.
+    """
+    import asyncio
+    from api.server.services.simulator_orchestrator import (  # noqa: E402
+        spawn_fleet_vendor_kyc_workflow,
+        spawn_fleet_ap_invoice_workflow,
+        spawn_fleet_perf_review_workflow,
+        spawn_fleet_treasury_fx_workflow,
+        spawn_fleet_contract_renewal_workflow,
+        spawn_fleet_employee_onboarding_workflow,
+        spawn_fleet_it_access_request_workflow,
+        spawn_fleet_purchase_order_workflow,
+        spawn_creative_campaign_workflow,
+        spawn_hiring_workflow,
+    )
+    n = max(1, min(int(n or 5), 20))
+    spawners = [
+        ("vendor-kyc", spawn_fleet_vendor_kyc_workflow()),
+        ("ap-invoice", spawn_fleet_ap_invoice_workflow()),
+        ("perf-review", spawn_fleet_perf_review_workflow()),
+        ("hiring", spawn_hiring_workflow()),
+        ("treasury-fx", spawn_fleet_treasury_fx_workflow()),
+        ("creative-campaign", spawn_creative_campaign_workflow()),
+        ("contract-renewal", spawn_fleet_contract_renewal_workflow()),
+        ("employee-onboarding", spawn_fleet_employee_onboarding_workflow()),
+        ("it-access-request", spawn_fleet_it_access_request_workflow()),
+        ("purchase-order", spawn_fleet_purchase_order_workflow()),
+    ]
+    selected = spawners[:n]
+    results = await asyncio.gather(
+        *[coro for _, coro in selected], return_exceptions=True,
+    )
+    spawned: list[dict] = []
+    for (domain, _), result in zip(selected, results):
+        if isinstance(result, Exception):
+            spawned.append({"domain": domain, "error": str(result)})
+        else:
+            spawned.append({"domain": domain, "workflow_id": result})
+    return {"ok": True, "count": len(spawned), "spawned": spawned}

@@ -368,12 +368,22 @@ async def _handle_hitl(event: FleetEvent) -> None:
 
     Skipped silently for any persona NOT in PERSONA_AUTO_CLOSE, so real
     humans can drive the gate via the existing portal/UI flows.
+
+    v2 (Org Ops view): emits ``persona.thinking`` BEFORE deciding so the live
+    activity stream can show the gate is open and the persona is reasoning;
+    then emits ``persona.decided`` AFTER deciding. When ``DEMO_LOUD=1`` the
+    responder waits a random 2-8s between thinking and deciding so the
+    visualisation actually shows time passing rather than instant flips.
     """
+    import random as _rand
+
     data = event.model_dump()
     persona_role = data.get("persona")
     external_event_override = data.get("external_event")
     instance_id = data.get("instance_id")
     context = data.get("context") or {}
+    workflow_id = data.get("workflow_id")
+    gate_phase = data.get("phase") or context.get("phase")
 
     # No persona contract on this gate (UI-driven legacy path) → nothing to do.
     if not (persona_role and instance_id):
@@ -389,6 +399,28 @@ async def _handle_hitl(event: FleetEvent) -> None:
         print(f"[persona_responder] AUTO_CLOSE includes {persona_role!r} but no "
               f"SKILL.md defines that persona; gate stays open")
         return
+
+    # v2: announce that the persona is thinking. The ops view reads this to
+    # show a "thinking..." pill in the persona strip + a typing indicator in
+    # the conversations view + a slow-pulse on the river's gate chip.
+    try:
+        from api.server.state import app_state
+        app_state.bus.emit(FleetEvent(
+            type="persona.thinking",
+            workflow_id=workflow_id,
+            persona=persona_role,
+            phase=gate_phase,
+            instance_id=instance_id,
+            external_event=external_event_override or persona.external_event,
+        ))
+    except Exception as ex:  # pragma: no cover — bus emit is best-effort
+        print(f"[persona_responder] failed to emit persona.thinking: {ex}")
+
+    # v2: simulate human reaction time so the demo isn't a blur. Off by
+    # default in tests / production-honest mode; on when DEMO_LOUD=1.
+    if os.environ.get("DEMO_LOUD", "0") == "1":
+        delay = _rand.uniform(2.0, 8.0)
+        await asyncio.sleep(delay)
 
     try:
         decision_payload = persona.decide(context)
@@ -438,8 +470,6 @@ async def _handle_hitl(event: FleetEvent) -> None:
     # without this stash, projections see no decisions and Decision nodes
     # never materialise. Gate the write so it's a silent no-op when the
     # workflow isn't in the store (e.g. tests, half-torn-down state).
-    workflow_id = data.get("workflow_id")
-    gate_phase = data.get("phase") or context.get("phase")
     if workflow_id and gate_phase:
         try:
             from api.server.state import app_state
@@ -469,6 +499,24 @@ async def _handle_hitl(event: FleetEvent) -> None:
                 app_state.store.upsert_workflow(w)
         except Exception as ex:
             print(f"[persona_responder] failed to stash decision: {ex}")
+
+    # v2: announce the decision. Ops live stream renders a green/red row;
+    # conversations view shows the message as @persona; river highlights the
+    # gate chip and slides the workflow forward.
+    try:
+        from api.server.state import app_state
+        app_state.bus.emit(FleetEvent(
+            type="persona.decided",
+            workflow_id=workflow_id,
+            persona=persona_role,
+            phase=gate_phase,
+            verdict=decision_str,
+            reason=decision_payload.get("reason"),
+            instance_id=instance_id,
+            external_event=event_name,
+        ))
+    except Exception as ex:
+        print(f"[persona_responder] failed to emit persona.decided: {ex}")
 
     try:
         await raise_orchestration_event(instance_id, event_name, decision_payload)
