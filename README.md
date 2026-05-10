@@ -111,6 +111,7 @@ serve the whole repo.
 - [docs/README.md](docs/README.md) — index of every doc in this repo + what each is for
 - [docs/CODEBASE-TOUR.md](docs/CODEBASE-TOUR.md) — narrative walkthrough for first-time visitors
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — three tiers + how events flow + the multi-domain pattern
+- [docs/visualisation.md](docs/visualisation.md) — what you'll see (`?view=constellation` / `entities` / `functions` / `org-clone`), the visual vocabulary, and where the observatory is going
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — local dev, terminals, debugging
 - [docs/poc2-quick-demo.md](docs/poc2-quick-demo.md) — 5–8 min POC2 hiring walkthrough
 - [docs/blueprint.md](docs/blueprint.md) — the pitch this whole substrate carries

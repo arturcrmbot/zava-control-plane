@@ -12,6 +12,17 @@ tags: [feature, frontend, blueprint, observatory, agentic-org, visualisation]
 
 ![Status: Draft](https://img.shields.io/badge/status-Draft-lightgrey)
 
+> **Where this spec sits in the doc graph.** This is the forward design
+> that replaces today's `?view=constellation` page. For what is wired
+> *today* across all visualisation surfaces, the visual vocabulary, and
+> the SSE event → visual mapping, see [the visualisation reference](../../visualisation.md).
+> For how to add a new visualisation layer (event, function, entity
+> kind, cadence pip), see [the visualisation contributor guide](../../visualisation-contributor-guide.md).
+> To prepare to demo the Org Building before the implementation lands,
+> see the companion [simulator-expansion spec](2026-05-10-simulator-expansion-design.md)
+> — that spec adds simulator endpoints that drive each Org Building
+> primitive on demand.
+
 ## Problem
 
 Phases 1-4 of the agentic-org rollout shipped 1018 passing tests + a fully working substrate (entity graph, function FMs, ambient dispatcher, cadence loop, KPI store, precedent queries, meta-workflows, three observatory pages). When the operator opens `?view=constellation` (the existing 3D scene) **or** the Fleet Manager session UI, **none of the agentic-org work is visible**. The Constellation shows workflow-centric activity but knows nothing about entities, functions, decisions, ambient agents, cadences, or cross-department flows. The new pages (`?view=entities`, `?view=functions`, `?view=org-clone`) are isolated and discoverable only by URL. The substrate is alive but invisible.
