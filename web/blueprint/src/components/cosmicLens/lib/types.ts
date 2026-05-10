@@ -88,7 +88,7 @@ export interface TrailSample {
 
 /** Endpoints we hit. */
 export const ENDPOINTS = {
-  inFlight: "/api/workflows/index/inflight".replace("inflight", "in-flight"),
+  inFlight: "/api/workflows/index/in-flight",
   personas: "/api/personas/index/state",
   functions: "/api/functions",
   cities: "/api/cities",
@@ -96,5 +96,5 @@ export const ENDPOINTS = {
   workflowTimeline: (id: string) => `/api/workflows/index/timeline/${id}`,
   injectBurst: (n: number) => `/api/simulator/inject-burst?n=${n}`,
   seedKpis: "/api/simulator/seed-kpis",
-  observatorySse: "/api/blueprint/observatory/stream",
+  observatorySse: "/api/blueprint/stream",
 } as const;
