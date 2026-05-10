@@ -181,7 +181,13 @@ export function CosmicLens({ embed: _embed }: CosmicLensProps) {
         throughputPerMin={throughputPerMin}
       />
 
-      <ActivityRail flashesRef={live.flashesRef} mode={live.mode} />
+      <ActivityRail
+        flashesRef={live.flashesRef}
+        mode={live.mode}
+        inFlight={live.inFlight}
+        functions={live.functions}
+        onFunctionClick={(key, label) => setDrawer({ type: "function", id: key, label })}
+      />
 
       <WorkflowDrawer
         view={drawer}

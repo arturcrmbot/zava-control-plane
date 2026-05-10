@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import type { CosmicFlash } from "../lib/types";
+import type { CosmicFlash, FunctionMeta, WorkflowMoonData } from "../lib/types";
 import { labelForCapability, labelForEntity } from "../lib/labels";
+import { HotFunctions } from "./HotFunctions";
 
 interface ActivityRailProps {
   flashesRef: React.MutableRefObject<{ buffer: CosmicFlash[]; version: number }>;
   mode: "capabilities" | "entities";
+  inFlight?: WorkflowMoonData[];
+  functions?: FunctionMeta[];
+  onFunctionClick?: (key: string, label: string) => void;
 }
 
 interface RailEntry {
@@ -28,7 +32,13 @@ const FILTERS = [
 ] as const;
 
 /** Right-edge live event feed with filter chips. */
-export function ActivityRail({ flashesRef, mode }: ActivityRailProps) {
+export function ActivityRail({
+  flashesRef,
+  mode,
+  inFlight,
+  functions,
+  onFunctionClick,
+}: ActivityRailProps) {
   const [entries, setEntries] = useState<RailEntry[]>([]);
   const [enabled, setEnabled] = useState<Set<string>>(
     () => new Set(FILTERS.filter((f) => f.default).map((f) => f.key)),
@@ -227,6 +237,13 @@ export function ActivityRail({ flashesRef, mode }: ActivityRailProps) {
           </div>
         ))}
       </div>
+      {inFlight && functions && (
+        <HotFunctions
+          inFlight={inFlight}
+          functions={functions}
+          onFunctionClick={onFunctionClick}
+        />
+      )}
     </div>
   );
 }
