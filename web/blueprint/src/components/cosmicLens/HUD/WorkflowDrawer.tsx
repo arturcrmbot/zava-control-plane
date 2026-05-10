@@ -162,12 +162,30 @@ function FunctionView({
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch(ENDPOINTS.inFlight);
-        const data = await res.json();
-        const all = (Array.isArray(data) ? data : data.workflows ?? []) as WorkflowSummary[];
-        const filtered = all.filter((wf: any) => {
-          // Match either explicit fn or by workflow_type → function (best-effort)
-          return wf.function === functionKey || wf.workflow_type === functionKey;
+        const [wfRes, fnRes] = await Promise.all([
+          fetch(ENDPOINTS.inFlight).then((r) => r.json()),
+          fetch(ENDPOINTS.functions).then((r) => r.json()),
+        ]);
+        const allWfs = (Array.isArray(wfRes) ? wfRes : wfRes.workflows ?? []) as WorkflowSummary[];
+        const allFns = (Array.isArray(fnRes) ? fnRes : fnRes.functions ?? []) as Array<{
+          name?: string; key?: string; ownsDomains?: string[]; domains?: string[];
+        }>;
+        // Build workflow_type -> function map
+        const wfTypeMap = new Map<string, string>();
+        for (const fn of allFns) {
+          const fnK = fn.name ?? fn.key;
+          if (!fnK) continue;
+          for (const d of fn.ownsDomains ?? fn.domains ?? []) wfTypeMap.set(d, fnK);
+        }
+        // Filter workflows whose owning function == functionKey
+        const filtered = allWfs.filter((wf: any) => {
+          if (wf.function && wf.function !== "legacy" && wf.function !== "unknown") {
+            return wf.function === functionKey;
+          }
+          const wfType = wf.workflow_type;
+          if (!wfType) return false;
+          const owner = wfTypeMap.get(wfType);
+          return owner === functionKey;
         });
         if (!cancelled) setWorkflows(filtered);
       } catch (err) {
