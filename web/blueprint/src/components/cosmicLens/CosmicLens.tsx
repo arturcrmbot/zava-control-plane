@@ -97,6 +97,7 @@ export function CosmicLens({ embed: _embed }: CosmicLensProps) {
           <Cities
             cities={live.cities}
             mode={live.mode}
+            personas={live.personas}
             onCityClick={(id, label) => setDrawer({ type: "city", id, label })}
           />
           <EntityEdges cities={live.cities} visible={live.mode === "entities"} />

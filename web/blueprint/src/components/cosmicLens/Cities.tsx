@@ -1,10 +1,12 @@
 import { useMemo } from "react";
-import type { CityMeta, CosmicMode } from "./lib/types";
+import { Html } from "@react-three/drei";
+import type { CityMeta, CosmicMode, PersonaState } from "./lib/types";
 import { colorForKind, colorForEntityType } from "./lib/colors";
 
 interface CitiesProps {
   cities: CityMeta[];
   mode: CosmicMode;
+  personas?: PersonaState[];
   onCityClick?: (id: string, label: string) => void;
 }
 
@@ -36,15 +38,28 @@ export function cityPosition(id: string): [number, number, number] {
  * isn't supported by InstancedMesh standard materials, and 110 cities
  * is well within budget for individual meshes.
  */
-export function Cities({ cities, mode, onCityClick }: CitiesProps) {
+export function Cities({ cities, mode, personas, onCityClick }: CitiesProps) {
+  const pendingByPersona = useMemo(() => {
+    const m = new Map<string, number>();
+    if (personas) {
+      for (const p of personas) {
+        if ((p.pending_count ?? 0) > 0) m.set(p.role, p.pending_count);
+      }
+    }
+    return m;
+  }, [personas]);
+
   const positioned = useMemo(() => {
     return cities.map((city) => {
       const [x, y, z] = cityPosition(city.id);
       const color =
         mode === "entities" ? colorForEntityType(city.kind) : colorForKind(city.kind);
-      return { ...city, x, y, z, color };
+      const pending = city.kind === "persona" ? pendingByPersona.get(city.id) ?? 0 : 0;
+      // Hot personas pulse with a brighter halo + bigger size
+      const sizeBoost = pending > 0 ? Math.min(2.0, 1 + pending * 0.2) : 1;
+      return { ...city, x, y, z, color, pending, sizeBoost };
     });
-  }, [cities, mode]);
+  }, [cities, mode, pendingByPersona]);
 
   if (positioned.length === 0) return <PlaceholderRing />;
 
@@ -54,6 +69,7 @@ export function Cities({ cities, mode, onCityClick }: CitiesProps) {
         <group key={c.id} position={[c.x, c.y, c.z]}>
           {/* The city itself — emissive sphere */}
           <mesh
+            scale={c.sizeBoost}
             onClick={(e) => {
               e.stopPropagation();
               onCityClick?.(c.id, c.label);
@@ -70,16 +86,42 @@ export function Cities({ cities, mode, onCityClick }: CitiesProps) {
             <meshStandardMaterial
               color={c.color}
               emissive={c.color}
-              emissiveIntensity={1.0}
+              emissiveIntensity={c.pending > 0 ? 1.6 : 1.0}
               metalness={0.2}
               roughness={0.4}
             />
           </mesh>
           {/* Halo */}
-          <mesh>
+          <mesh scale={c.sizeBoost}>
             <sphereGeometry args={[CITY_RADIUS * 1.8, 10, 10]} />
-            <meshBasicMaterial color={c.color} transparent opacity={0.18} />
+            <meshBasicMaterial
+              color={c.color}
+              transparent
+              opacity={c.pending > 0 ? 0.35 : 0.18}
+            />
           </mesh>
+          {/* Pending count badge above HITL persona cities */}
+          {c.pending > 0 && (
+            <Html
+              position={[0, CITY_RADIUS * 2 + 0.15, 0]}
+              center
+              style={{
+                pointerEvents: "none",
+                color: "#fff",
+                fontSize: 10,
+                fontWeight: 700,
+                background: c.color,
+                borderRadius: 999,
+                padding: "1px 6px",
+                whiteSpace: "nowrap",
+                fontFamily: "ui-sans-serif, system-ui",
+                boxShadow: `0 0 8px ${c.color}`,
+                textShadow: "0 0 2px rgba(0,0,0,0.5)",
+              }}
+            >
+              {c.pending}
+            </Html>
+          )}
         </group>
       ))}
     </group>
