@@ -28,6 +28,7 @@ const quaternion = new THREE.Quaternion();
  */
 export function WorkflowMoons({ inFlight, functions, onMoonClick }: WorkflowMoonsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
+  const haloRef = useRef<THREE.InstancedMesh>(null);
   const registry = useMemo(() => new MoonRegistry(), []);
 
   // Resolve each workflow to its owning function via the ownsDomains map
@@ -49,6 +50,7 @@ export function WorkflowMoons({ inFlight, functions, onMoonClick }: WorkflowMoon
     if (!meshRef.current) return;
     const t = state.clock.getElapsedTime();
     const mesh = meshRef.current;
+    const halo = haloRef.current;
     moons.forEach((moon, i) => {
       const planet = planetPosition(moon.fn, functions, t);
       // Per-moon orbit around the planet
@@ -59,47 +61,60 @@ export function WorkflowMoons({ inFlight, functions, onMoonClick }: WorkflowMoon
       position.set(px, py, pz);
       matrix.compose(position, quaternion, scale);
       mesh.setMatrixAt(i, matrix);
+      if (halo) halo.setMatrixAt(i, matrix);
     });
     // Park unused instances at y=-100
     for (let i = moons.length; i < MAX_MOONS; i++) {
       position.set(0, -100, 0);
       matrix.compose(position, quaternion, scale);
       mesh.setMatrixAt(i, matrix);
+      if (halo) halo.setMatrixAt(i, matrix);
     }
     mesh.instanceMatrix.needsUpdate = true;
     mesh.count = MAX_MOONS;
+    if (halo) {
+      halo.instanceMatrix.needsUpdate = true;
+      halo.count = MAX_MOONS;
+    }
   });
 
   return (
-    <instancedMesh
-      ref={meshRef}
-      args={[undefined, undefined, MAX_MOONS]}
-      castShadow
-      onClick={(e) => {
-        if (typeof e.instanceId === "number" && e.instanceId < moons.length) {
-          e.stopPropagation();
-          onMoonClick?.(moons[e.instanceId].id);
-        }
-      }}
-      onPointerOver={(e) => {
-        if (typeof e.instanceId === "number" && e.instanceId < moons.length) {
-          e.stopPropagation();
-          document.body.style.cursor = "pointer";
-        }
-      }}
-      onPointerOut={() => {
-        document.body.style.cursor = "default";
-      }}
-    >
-      <sphereGeometry args={[MOON_RADIUS, 12, 12]} />
-      <meshStandardMaterial
-        color="#f1f5f9"
-        emissive="#cbd5e1"
-        emissiveIntensity={1.1}
-        metalness={0.1}
-        roughness={0.4}
-      />
-    </instancedMesh>
+    <>
+      <instancedMesh
+        ref={meshRef}
+        args={[undefined, undefined, MAX_MOONS]}
+        castShadow
+        onClick={(e) => {
+          if (typeof e.instanceId === "number" && e.instanceId < moons.length) {
+            e.stopPropagation();
+            onMoonClick?.(moons[e.instanceId].id);
+          }
+        }}
+        onPointerOver={(e) => {
+          if (typeof e.instanceId === "number" && e.instanceId < moons.length) {
+            e.stopPropagation();
+            document.body.style.cursor = "pointer";
+          }
+        }}
+        onPointerOut={() => {
+          document.body.style.cursor = "default";
+        }}
+      >
+        <sphereGeometry args={[MOON_RADIUS, 12, 12]} />
+        <meshStandardMaterial
+          color="#f1f5f9"
+          emissive="#cbd5e1"
+          emissiveIntensity={1.1}
+          metalness={0.1}
+          roughness={0.4}
+        />
+      </instancedMesh>
+      {/* Faint halo per moon — comet-like glow */}
+      <instancedMesh ref={haloRef} args={[undefined, undefined, MAX_MOONS]}>
+        <sphereGeometry args={[MOON_RADIUS * 1.6, 8, 8]} />
+        <meshBasicMaterial color="#cbd5e1" transparent opacity={0.18} />
+      </instancedMesh>
+    </>
   );
 }
 
