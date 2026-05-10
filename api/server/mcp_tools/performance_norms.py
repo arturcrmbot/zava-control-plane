@@ -34,8 +34,8 @@ _RATINGS = [
 def get_grade_distribution(grade: str, cycle: str) -> dict:
     """Return the rating distribution norm for (grade, cycle) — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.performance_norms.grade", str(grade))
-    span.set_attribute("wpp.performance_norms.cycle", str(cycle))
+    span.set_attribute("zava.performance_norms.grade", str(grade))
+    span.set_attribute("zava.performance_norms.cycle", str(cycle))
     return _synth_get_grade_distribution(grade, cycle)
 
 
@@ -109,7 +109,7 @@ def performance_norms_get_grade_distribution_tool(params: _GetGradeDistributionP
 def get_calibration_history(employee_id: str) -> dict:
     """Return the prior calibration history for an employee — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.performance_norms.employee_id", str(employee_id))
+    span.set_attribute("zava.performance_norms.employee_id", str(employee_id))
     return _synth_get_calibration_history(employee_id)
 
 

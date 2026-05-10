@@ -41,8 +41,8 @@ _PEER_NAMES = [
 def list_360(employee_id: str, cycle: str) -> dict:
     """List 360-degree peer reviews for (employee_id, cycle) — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.feedback_collector.employee_id", str(employee_id))
-    span.set_attribute("wpp.feedback_collector.cycle", str(cycle))
+    span.set_attribute("zava.feedback_collector.employee_id", str(employee_id))
+    span.set_attribute("zava.feedback_collector.cycle", str(cycle))
     return _synth_list_360(employee_id, cycle)
 
 
@@ -105,8 +105,8 @@ def feedback_collector_list_360_tool(params: _List360Params) -> ToolResult:
 def get_okr_results(employee_id: str, cycle: str) -> dict:
     """Return OKR results for (employee_id, cycle) — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.feedback_collector.employee_id", str(employee_id))
-    span.set_attribute("wpp.feedback_collector.cycle", str(cycle))
+    span.set_attribute("zava.feedback_collector.employee_id", str(employee_id))
+    span.set_attribute("zava.feedback_collector.cycle", str(cycle))
     return _synth_get_okr_results(employee_id, cycle)
 
 

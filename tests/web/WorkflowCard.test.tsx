@@ -19,7 +19,7 @@ function makeWorkflow(overrides: Partial<Workflow> = {}): Workflow {
     currentPhase: "Classify",
     createdAt: 0,
     slaDueAt: 0,
-    jurisdiction: "UK-WPP",
+    jurisdiction: "UK-Zava",
     agency: "Mindshare",
     actionLedger: [],
     tokensSpent: 0,

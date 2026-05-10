@@ -46,20 +46,35 @@ const WAIT_KIND_LABEL: Record<string, string> = {
 
 export default function WorkflowHeaderTiles({ workflow }: { workflow: Workflow }) {
   const risk = riskFactor(workflow);
-  const meta = (workflow.metadata as { wait_kind?: string } | undefined) ?? {};
+  const meta = (workflow.metadata as { wait_kind?: string; rejected_at_phase?: string; rejected_by?: string } | undefined) ?? {};
   const waitLabel = meta.wait_kind && WAIT_KIND_LABEL[meta.wait_kind];
   const isExternalWait = meta.wait_kind === "external_party";
+  // Terminal states win over everything: a rejected/completed workflow
+  // shouldn't paint a stale "Awaiting…" or "STALLED" pill from when the
+  // gate was still open. Backend clears wait_kind on rejection (see
+  // internal_durable_event.workflow.rejected) so the second branch only
+  // catches the residual race; this guard is the final word.
+  const isTerminal = workflow.status === "failed" || workflow.status === "completed";
   // External-party waits never paint the dashboard red — they're not on the
   // operator's plate. Operator-review waits + validator blocks DO show as
   // STALLED so they get the operator's attention.
-  const stalled = !isExternalWait && !!workflow.activeExceptionId;
-  const statusTile = stalled
-    ? { label: "STATUS · STALLED", value: `Exception at ${workflow.currentPhase}`, cls: "text-red-700 bg-red-50 border-red-200" }
-    : waitLabel
-      ? { label: "STATUS", value: waitLabel,
-          cls: isExternalWait ? "text-blue-700 bg-blue-50 border-blue-200"
-                              : "text-amber-700 bg-amber-50 border-amber-200" }
-      : { label: "STATUS", value: STATUS_HUMAN[workflow.status], cls: STATUS_COLOR[workflow.status] };
+  const stalled = !isTerminal && !isExternalWait && !!workflow.activeExceptionId;
+  const statusTile = isTerminal
+    ? workflow.status === "failed"
+      ? { label: "STATUS · REJECTED",
+          value: meta.rejected_at_phase
+            ? `Rejected at ${meta.rejected_at_phase}`
+            : "Rejected",
+          cls: "text-red-700 bg-red-50 border-red-200" }
+      : { label: "STATUS", value: "Completed",
+          cls: "text-emerald-700 bg-emerald-50 border-emerald-200" }
+    : stalled
+      ? { label: "STATUS · STALLED", value: `Exception at ${workflow.currentPhase}`, cls: "text-red-700 bg-red-50 border-red-200" }
+      : waitLabel
+        ? { label: "STATUS", value: waitLabel,
+            cls: isExternalWait ? "text-blue-700 bg-blue-50 border-blue-200"
+                                : "text-amber-700 bg-amber-50 border-amber-200" }
+        : { label: "STATUS", value: STATUS_HUMAN[workflow.status], cls: STATUS_COLOR[workflow.status] };
   return (
     <div className="grid grid-cols-3 gap-3" data-testid="workflow-header-tiles">
       {[

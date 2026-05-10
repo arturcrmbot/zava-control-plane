@@ -9,8 +9,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-REGISTRY="${REGISTRY:-blueprintacrapexdemo}"
-RG="${RG:-project-apex-demo}"
+REGISTRY="${REGISTRY:-blueprintacrzavademo}"
+RG="${RG:-zava-control-plane-demo}"
 APP_NAME="${APP_NAME:-blueprint}"
 TAG="$(date -u +%Y%m%d-%H%M%S)"
 
@@ -37,4 +37,4 @@ az containerapp update \
     --image "$IMAGE_REF" >/dev/null
 
 echo "==> Done. New revision is live."
-echo "    https://blueprint.jollystone-c036938d.swedencentral.azurecontainerapps.io/"
+echo "    https://blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io/"

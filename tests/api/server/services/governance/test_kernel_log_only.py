@@ -22,7 +22,7 @@ import os
 # 60-second retries) when the local emulator isn't running. The
 # governance test suite does not need blob storage; clearing the conn
 # string short-circuits ``_build_blob_store`` to ``None``. See
-# /memories/repo/wpp-pre-existing-test-failures.md.
+# /memories/repo/zava-pre-existing-test-failures.md.
 os.environ["AZURE_STORAGE_CONNECTION_STRING"] = ""
 
 from unittest.mock import patch

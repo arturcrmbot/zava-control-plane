@@ -14,7 +14,7 @@ export default function InterventionProtocols({ exception, onResolved }: {
         body: JSON.stringify({
           exceptionIds: [exception.id],
           resolution: action,
-          resolvedBy: "finance-controller@wpp",
+          resolvedBy: "finance-controller@zava",
         }),
       });
       onResolved?.();

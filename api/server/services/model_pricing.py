@@ -6,7 +6,7 @@ Captured: 2026-05-05 by feature-foundry-credibility-friday-1.md TASK-008.
 Per-million-token rates in USD for Azure OpenAI standard deployments. When
 pricing changes, edit the table and bump `PRICING_SOURCE_DATE`. Unknown model
 ids fall back to `gpt-4.1` rates with a structured warning attribute on the
-returned span (callers should set `wpp.cost.fallback_model = true` if they
+returned span (callers should set `zava.cost.fallback_model = true` if they
 care to surface this).
 
 Cost is `(input_tokens / 1e6) * input_per_million_usd

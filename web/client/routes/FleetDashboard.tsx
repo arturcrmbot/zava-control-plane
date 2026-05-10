@@ -4,6 +4,7 @@ import { useWorkflows } from "../hooks/useWorkflows";
 import { useExceptions } from "../hooks/useExceptions";
 import WorkflowCard from "../components/WorkflowCard";
 import DevPanel from "../components/DevPanel";
+import ConstellationModeButton from "../components/ConstellationModeButton";
 import KpiTileRow from "../components/apex/KpiTileRow";
 import ExceptionCardCompact from "../components/apex/ExceptionCardCompact";
 import FleetEconomicsPanel from "../components/apex/FleetEconomicsPanel";
@@ -43,7 +44,10 @@ export default function FleetDashboard() {
               Operational status across all domains
             </div>
           </div>
-          <div className="ml-auto"><DevPanel /></div>
+          <div className="ml-auto flex items-center gap-3">
+            <ConstellationModeButton />
+            <DevPanel />
+          </div>
         </div>
         <KpiTileRow workflows={allWorkflows} exceptionsCount={exceptions.length} />
         <div className="panel">

@@ -2,11 +2,11 @@
 
 **Date:** 2026-04-30
 **Target:** Friday 2026-05-08 (with weekend buffer)
-**Audience:** WPP evaluators, live, ~60+ minutes, open format
+**Audience:** Zava evaluators, live, ~60+ minutes, open format
 
 ## 1. Goal + constraints
 
-Both POC1 (Finance Expense Compliance) and POC2 (HR Talent Lifecycle) must be demonstrable end-to-end against WPP evaluators next Friday. Open format — we drive — so the through-line is ours to choose, but every published capability claim must back to something live (or knowingly narrated) on screen.
+Both POC1 (Finance Expense Compliance) and POC2 (HR Talent Lifecycle) must be demonstrable end-to-end against Zava evaluators next Friday. Open format — we drive — so the through-line is ours to choose, but every published capability claim must back to something live (or knowingly narrated) on screen.
 
 Constraints:
 
@@ -14,7 +14,7 @@ Constraints:
 - **Azure *services* are fair game** — ACS, ACS Email, Storage, Foundry, Document Intelligence (already wired). The user has authorised standing up new resources where needed; Microsoft tenant.
 - **Avatar render: Azure AI Speech batch avatar synthesis** (was HeyGen, swapped 2026-04-30 for the all-Microsoft narrative). Auth via DefaultAzureCredential; no third-party API key.
 - **Voice s2s accelerator** — exists already on the user's laptop, will be reused as a black box in the candidate portal's `/screen` route. Path/contract TBD when the per-feature spec is drafted.
-- **Demo timing:** ~60+ minutes live, open format, no WPP-named must-haves.
+- **Demo timing:** ~60+ minutes live, open format, no Zava-named must-haves.
 
 ## 2. Scope
 
@@ -33,7 +33,7 @@ Constraints:
 - Full Azure deployment of the app.
 - §4.9 — 50→200 CV corpus expansion (only if eval variance demands it).
 - §4.12 — APIOps governance gate (engagement POC, narrated).
-- §4.15 — Entra Agent ID demonstration for `hiring-agent@wpp` (engagement POC; lab uses `gh` token + DefaultAzureCredential where Entra-ID auth happens to land — `ocr_extract` already does).
+- §4.15 — Entra Agent ID demonstration for `hiring-agent@zava` (engagement POC; lab uses `gh` token + DefaultAzureCredential where Entra-ID auth happens to land — `ocr_extract` already does).
 - §4.20 — drift-detection live beat (narrated against Fleet Manager skill paragraph).
 - §4.22 — APIM jurisdiction-aware routing (engagement POC).
 
@@ -178,7 +178,7 @@ Phase 10 Onboarding entry
 
 ### Why Azure Speech (vs HeyGen)
 
-- All-Microsoft narrative for the WPP demo
+- All-Microsoft narrative for the Zava demo
 - Single Azure subscription, single auth model (DefaultAzureCredential), no third-party API key
 - Same Azure Storage account hosts the mp4 cache as the candidate-portal CV uploads
 - Tradeoff: ~14 prebuilt avatars (lisa, harry, lori, max, jeff, meg with style variants) instead of HeyGen's 200+; absolute polish slightly behind. More than enough for a 30-second onboarding welcome.

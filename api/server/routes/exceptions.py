@@ -23,13 +23,49 @@ class BulkResolveBody(BaseModel):
 
 class ResolveBody(BaseModel):
     resolution: Resolution
-    resolved_by: str = "reviewer@wpp"
+    resolved_by: str = "reviewer@zava"
 
 
 @router.get("")
 @router.get("/", include_in_schema=False)
 async def list_exceptions(include_resolved: bool = False):
-    return [e.model_dump(by_alias=True) for e in app_state.store.list_exceptions(include_resolved=include_resolved)]
+    """Operator queue. Returns one row per workflow that's currently
+    awaiting human review, deduplicated on workflow_id.
+
+    Two issues this filter solves:
+    1. fleet_manager_service augments exceptions asynchronously and
+       creates a NEW exception entry (composedBy=fleet-manager,
+       fleet-manager-augmented) instead of updating the existing
+       deterministic one. Without dedup, the queue shows 2-3 rows for
+       a single suspend.
+    2. Async-created exceptions can land AFTER the workflow has already
+       resumed past the HITL gate (race: persona-responder closes the
+       gate before fleet-manager augments the exception). _auto_resolve_open
+       only catches exceptions that exist at resume time, so post-resume
+       additions stay open. Filtering by workflow.status='awaiting_hitl'
+       hides them so the queue only ever shows actionable items.
+
+    `include_resolved=true` bypasses both filters and returns the raw
+    list — useful for admin / audit views.
+    """
+    raw = app_state.store.list_exceptions(include_resolved=include_resolved)
+    if include_resolved:
+        return [e.model_dump(by_alias=True) for e in raw]
+
+    # Build a workflow_id -> status map so we can drop exceptions whose
+    # workflow has already moved on.
+    status_by_wid = {w.id: w.status for w in app_state.store.list_workflows()}
+    visible = [e for e in raw if status_by_wid.get(e.workflow_id) == "awaiting_hitl"]
+
+    # Dedup per workflow: prefer fleet-manager-augmented (richest summary
+    # + recommendation), then fleet-manager, then deterministic.
+    rank = {"fleet-manager-augmented": 0, "fleet-manager": 1, "deterministic": 2}
+    by_wid: dict[str, object] = {}
+    for e in visible:
+        prev = by_wid.get(e.workflow_id)
+        if prev is None or rank.get(e.composed_by, 99) < rank.get(prev.composed_by, 99):
+            by_wid[e.workflow_id] = e
+    return [e.model_dump(by_alias=True) for e in by_wid.values()]
 
 
 async def _resolve_one(exception_id: str, resolution: Resolution, resolved_by: str) -> bool:

@@ -89,31 +89,35 @@ launch_func() {
     MINGW*|MSYS*|CYGWIN*)
       NPM_BIN="$(cygpath -u "$APPDATA")/npm"
       source .funcvenv/Scripts/activate
-      PATH="$NPM_BIN:$PATH" PYTHONUTF8=1 PYTHONIOENCODING=utf-8 PYTHONPATH="$(pwd)" \
+      ENTITY_PLANE_ENABLED=0 PATH="$NPM_BIN:$PATH" PYTHONUTF8=1 PYTHONIOENCODING=utf-8 PYTHONPATH="$(pwd)" \
         func start --port 7071 &
       ;;
     *)
       source .venv/bin/activate
-      PYTHONPATH="$(pwd)" func start --port 7071 &
+      ENTITY_PLANE_ENABLED=0 PYTHONPATH="$(pwd)" func start --port 7071 &
       ;;
   esac
   FUNC_PID=$!
   pids+=($FUNC_PID)
 }
 
-echo "==> functions host (attempt 1)"
-launch_func
-# Poll 7071 for 30s
-bound=0
-for i in $(seq 1 15); do
-  sleep 2
-  if curl -s -o /dev/null http://localhost:7071/ 2>/dev/null; then bound=1; break; fi
-done
-if [ $bound -eq 0 ]; then
-  echo "==> functions host didn't bind; restarting"
-  kill -9 $FUNC_PID 2>/dev/null || true
-  sleep 3
+if [[ "${BOOT_DEMO_SKIP_FUNC:-0}" == "1" ]]; then
+  echo "==> functions host SKIPPED (BOOT_DEMO_SKIP_FUNC=1) — no Durable orchestrators on :7071"
+else
+  echo "==> functions host (attempt 1)"
   launch_func
+  # Poll 7071 for 30s
+  bound=0
+  for i in $(seq 1 15); do
+    sleep 2
+    if curl -s -o /dev/null http://localhost:7071/ 2>/dev/null; then bound=1; break; fi
+  done
+  if [ $bound -eq 0 ]; then
+    echo "==> functions host didn't bind; restarting"
+    kill -9 $FUNC_PID 2>/dev/null || true
+    sleep 3
+    launch_func
+  fi
 fi
 
 cat <<EOF

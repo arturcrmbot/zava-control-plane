@@ -26,6 +26,7 @@ import os
 import threading
 import time
 import uuid
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Literal, Mapping, Optional
 
@@ -231,6 +232,25 @@ class GovernanceKernel:
         from api.shared.agents import all_agent_ids
         self._identity = AgentIdentityStore(all_agent_ids())
 
+        # Phase 7 TASK-053: in-process decision registry. Every Decision
+        # returned by :meth:`evaluate_tool_call` is recorded here keyed
+        # by its ``decision_id`` so :class:`AuditLogger.verify_chain`
+        # (and the Evidence chip) can prove that every decision_id in
+        # the audit chain corresponds to a real evaluation against the
+        # live policy bundle. FIFO eviction — the registry is a
+        # bounded LRU-ish cap; entries beyond ``AGT_DECISION_REGISTRY_MAX``
+        # (default 50_000) are dropped in insertion order. The cap
+        # exists so a long-running process can't grow the registry
+        # without bound; for a fresh demo (a few thousand workflows
+        # at most) every decision stays resolvable end-to-end.
+        try:
+            cap = int(os.environ.get("AGT_DECISION_REGISTRY_MAX", "50000"))
+        except ValueError:
+            cap = 50000
+        self._decision_registry_cap = max(1, cap)
+        self._decisions: "OrderedDict[str, Decision]" = OrderedDict()
+        self._decisions_lock = threading.Lock()
+
     # --- Public properties ---------------------------------------------------
 
     @property
@@ -335,6 +355,7 @@ class GovernanceKernel:
                 enforcement_mode=mode,
                 latency_us=int(latency_us),
             )
+            self._register_decision(decision)
             if mode == "enforce":
                 raise GovernanceDenied(decision)
             return decision
@@ -360,6 +381,7 @@ class GovernanceKernel:
                 enforcement_mode=mode,
                 latency_us=int(latency_us),
             )
+            self._register_decision(decision)
             if mode == "enforce":
                 raise GovernanceDenied(decision)
             return decision
@@ -373,9 +395,55 @@ class GovernanceKernel:
             enforcement_mode=mode,
             latency_us=int(latency_us),
         )
+        self._register_decision(decision)
         if mode == "enforce" and not decision.allowed:
             raise GovernanceDenied(decision)
         return decision
+
+    # --- Decision registry (Phase 7 TASK-053) -------------------------------
+
+    def _register_decision(self, decision: Decision) -> None:
+        """Record one Decision in the in-process registry.
+
+        FIFO eviction at ``_decision_registry_cap``. Cheap (one OrderedDict
+        insert + maybe one popitem under a small lock); never raises into
+        the caller — registry failures degrade to "decision not
+        resolvable later" rather than breaking the tool call.
+        """
+        try:
+            with self._decisions_lock:
+                self._decisions[decision.decision_id] = decision
+                self._decisions.move_to_end(decision.decision_id)
+                while len(self._decisions) > self._decision_registry_cap:
+                    self._decisions.popitem(last=False)
+        except Exception:  # pragma: no cover — defensive
+            log.warning(
+                "governance: _register_decision failed for %s",
+                decision.decision_id,
+            )
+
+    def resolve_decision(self, decision_id: str) -> Decision | None:
+        """Return the recorded :class:`Decision` for ``decision_id``, or
+        ``None`` when the registry has no record (process restart, cap
+        eviction, or unknown id).
+
+        :class:`AuditLogger.verify_chain` calls this for every
+        ``decision_id`` it finds inside an entry's details — when a
+        decision resolves AND the recorded ``policy_version`` matches
+        what's stored on the entry, the chain's ``decisions_resolvable``
+        chip stays green.
+        """
+        if not isinstance(decision_id, str) or not decision_id:
+            return None
+        with self._decisions_lock:
+            return self._decisions.get(decision_id)
+
+    @property
+    def decision_registry_size(self) -> int:
+        """Current number of decisions retained in the registry. Useful
+        for tests + a future ``/api/governance/health`` route."""
+        with self._decisions_lock:
+            return len(self._decisions)
 
     def _registry_gate(
         self,

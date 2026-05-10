@@ -42,8 +42,8 @@ _MAX_HOTEL_USD_BY_MARKET: dict[str, int] = {
 def get_policy(grade: str, market: str) -> dict:
     """Return the travel-policy slice that applies to (grade, market) — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.concur_travel.grade", str(grade))
-    span.set_attribute("wpp.concur_travel.market", str(market))
+    span.set_attribute("zava.concur_travel.grade", str(grade))
+    span.set_attribute("zava.concur_travel.market", str(market))
     return _synth_get_policy(grade, market)
 
 

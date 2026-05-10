@@ -40,7 +40,7 @@ from api.shared.events import FleetEvent
 
 _SKILLS_DIR = Path(__file__).resolve().parents[4] / "server" / "skills"
 SKILLS_DIR = _SKILLS_DIR
-_tracer = trace.get_tracer("wpp.agents.finance")
+_tracer = trace.get_tracer("zava.agents.finance")
 _MAX_RESPONSE_EVENT_BYTES = 4096
 
 
@@ -124,9 +124,9 @@ def _install_session_otel_bridge(
                     except Exception:
                         args = str(args)
                 span = _tracer.start_span(f"tool.{name}", context=parent_ctx)
-                span.set_attribute("wpp.tool.name", str(name))
+                span.set_attribute("zava.tool.name", str(name))
                 if call_id:
-                    span.set_attribute("wpp.tool.call_id", str(call_id))
+                    span.set_attribute("zava.tool.call_id", str(call_id))
                     open_spans[call_id] = span
                     open_meta[call_id] = {
                         "name": str(name), "args": args, "started_at": time.monotonic(),
@@ -221,13 +221,13 @@ async def run_agent_session(
         span.set_attribute("gen_ai.request.model", model)
         span.set_attribute("gen_ai.agent.name", "finance-agent")
         if skill_label:
-            span.set_attribute("wpp.skill", skill_label)
+            span.set_attribute("zava.skill", skill_label)
         # 2026-05-05: workflow_id stamped so Foundry Tracing can filter
         # spans by workflow. Span attribute → App Insights customDimensions.
         if workflow_id:
             span.set_attribute("workflow.id", workflow_id)
-            span.set_attribute("wpp.workflow.id", workflow_id)
-        span.set_attribute("wpp.tools.count", len(tools))
+            span.set_attribute("zava.workflow.id", workflow_id)
+        span.set_attribute("zava.tools.count", len(tools))
         if attachments:
             span.set_attribute("gen_ai.attachments.count", len(attachments))
 
@@ -284,29 +284,12 @@ async def run_agent_session(
             if out_tok is not None:
                 span.set_attribute("gen_ai.usage.output_tokens", int(out_tok))
 
-    # Persist the span to the store so economics.compute() can access it.
-    # The span carries workflow.id in attributes, so append_span keys it correctly.
+    # Note: the OTEL span above is recorded in this (Functions host) process.
+    # The FastAPI process — which serves /api/fleet/economics — receives the
+    # token usage via the `agent.completed` webhook below and persists its own
+    # gen_ai.generate_content span there. Don't `app_state.store.append_span`
+    # here: it would write to the wrong process's store.
     elapsed_s = time.monotonic() - started_at
-    if workflow_id:
-        from api.shared.types import OtelSpan
-        otel_span = OtelSpan(
-            trace_id=workflow_id,  # group all spans under the workflow id
-            span_id=uuid.uuid4().hex[:16],
-            name="gen_ai.generate_content",
-            start_ms=started_at * 1000,
-            end_ms=(started_at + elapsed_s) * 1000,
-            attributes={
-                "workflow.id": workflow_id,
-                "gen_ai.system": "github_copilot",
-                "gen_ai.request.model": model,
-                "gen_ai.agent.name": "finance-agent",
-                "gen_ai.usage.input_tokens": int(in_tok) if in_tok is not None else 0,
-                "gen_ai.usage.output_tokens": int(out_tok) if out_tok is not None else 0,
-                **({"wpp.skill": skill_label} if skill_label else {}),
-            },
-        )
-        app_state.store.append_span(otel_span)
-
     parsed = _extract_json(text)
     elapsed_ms = int(elapsed_s * 1000)
 
@@ -320,6 +303,12 @@ async def run_agent_session(
     # host process, while the online_subscriber lives in the FastAPI process.
     # Sending via the existing webhook bridge ensures the subscriber sees it.
     # `webhook.emit` is best-effort and swallows errors.
+    #
+    # Stamp realistic input-side context for the FastAPI-side token estimator:
+    # - skill_chars: the SKILL.md system message (often 2-5k chars)
+    # - attachment_count: each inline image counts ~1.1k input tokens for
+    #   gpt-4.1 vision (low-detail). Without this, estimated_from_chars
+    #   underreports multimodal calls by 10x.
     payload = {
         "agent_label": skill_label or "unknown",
         "agent_run_id": f"ar-{uuid.uuid4().hex[:8]}",
@@ -328,6 +317,9 @@ async def run_agent_session(
         "extracted_json": parsed,
         "tool_calls": tool_calls_collected,
         "context": context,
+        "model": model,
+        "skill_chars": len(skill_text) if skill_text else 0,
+        "attachment_count": len(attachments) if attachments else 0,
         "usage": {
             "input_tokens": int(in_tok) if in_tok is not None else None,
             "output_tokens": int(out_tok) if out_tok is not None else None,

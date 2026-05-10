@@ -18,7 +18,7 @@ from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 
 
-_tracer = trace.get_tracer("wpp.mcp_tools")
+_tracer = trace.get_tracer("zava.mcp_tools")
 
 
 def _resolve_actor(span) -> str:
@@ -69,7 +69,7 @@ def traced_tool(name: str):
         @functools.wraps(fn)
         def _wrapped(*args, **kwargs):
             with _tracer.start_as_current_span(f"tool.server.{name}") as span:
-                span.set_attribute("wpp.tool.name", name)
+                span.set_attribute("zava.tool.name", name)
 
                 # Governance guard — TASK-017. Local import keeps the
                 # kernel a soft dep at decorator-application time so a

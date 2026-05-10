@@ -1,0 +1,44 @@
+# Fiscal-Year Close strategic brief (Phase 4 IP6 TASK-028).
+#
+# CEO-FM owned. Composes existing finance + HR domains via month-end
+# batches into one fiscal-year-close orchestration with a final CEO/CFO
+# signoff gate.
+domain:
+  workflow_type: fy-close
+  prefix: fleet
+  display_name: "Fiscal-Year Close"
+  description: "End-of-fiscal-year close: AP sweep + treasury FX + contract renewals + perf-review month-end + CEO signoff."
+phases:
+  - name: kick_off
+    kind: agent
+    agent_skill_name: fy-close-kickoff
+    intent: "Identify the fiscal year boundary and assemble the period batch."
+  - name: ap_sweep
+    kind: sub_orchestrator
+    target_workflow_type: ap-invoice
+    target_orchestrator: FleetApInvoiceOrchestrator
+    parallel_group: month_end
+    payload_from: "python:{'period': input_dict['period'], 'mode': 'batch'}"
+  - name: fx_close
+    kind: sub_orchestrator
+    target_workflow_type: treasury-fx
+    target_orchestrator: FleetTreasuryFxOrchestrator
+    parallel_group: month_end
+    payload_from: "python:{'period': input_dict['period'], 'mode': 'batch'}"
+  - name: contract_renewals
+    kind: sub_orchestrator
+    target_workflow_type: contract-renewal
+    target_orchestrator: FleetContractRenewalOrchestrator
+    parallel_group: month_end
+    payload_from: "python:{'period': input_dict['period']}"
+  - name: perf_review_close
+    kind: sub_orchestrator
+    target_workflow_type: perf-review
+    target_orchestrator: FleetPerfReviewOrchestrator
+    parallel_group: month_end
+    payload_from: "python:{'period': input_dict['period'], 'cycle': 'fy-close'}"
+  - name: ceo_signoff
+    kind: hitl
+    persona: cfo
+    external_event: fy_close_decision
+function: ceo

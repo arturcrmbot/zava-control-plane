@@ -58,7 +58,7 @@ def query(window_hours: int = 24 * 7) -> dict:
     `gen_ai.usage.*` attributes recorded by the agent wrapper.
     """
     span = trace.get_current_span()
-    span.set_attribute("wpp.economics.window_hours", window_hours)
+    span.set_attribute("zava.economics.window_hours", window_hours)
 
     cutoff = time.time() - window_hours * 3600
     items: list[dict] = []
@@ -81,8 +81,8 @@ def query(window_hours: int = 24 * 7) -> dict:
 
     n = len(items)
     total_cost = sum(i["cost_usd"] for i in items)
-    span.set_attribute("wpp.economics.n", n)
-    span.set_attribute("wpp.economics.total_cost_usd", float(total_cost))
+    span.set_attribute("zava.economics.n", n)
+    span.set_attribute("zava.economics.total_cost_usd", float(total_cost))
 
     return {
         "window_hours": window_hours,

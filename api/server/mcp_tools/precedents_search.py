@@ -36,8 +36,8 @@ def _tokenise(text: str) -> set[str]:
 def search(query: str, k: int = 5) -> list[dict]:
     """Return top-k precedents ranked by token-overlap with the query."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.mcp.query", query)
-    span.set_attribute("wpp.mcp.k", k)
+    span.set_attribute("zava.mcp.query", query)
+    span.set_attribute("zava.mcp.k", k)
     qt = _tokenise(query)
     if not qt:
         return []
@@ -59,7 +59,7 @@ def search(query: str, k: int = 5) -> list[dict]:
         scored.append((score, rec))
     scored.sort(key=lambda t: t[0], reverse=True)
     out = [{**rec, "score": float(s)} for s, rec in scored[:k]]
-    span.set_attribute("wpp.mcp.result_count", len(out))
+    span.set_attribute("zava.mcp.result_count", len(out))
     return out
 
 

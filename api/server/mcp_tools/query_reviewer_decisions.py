@@ -23,8 +23,8 @@ def query(category: Optional[str] = None, limit: int = 100) -> dict:
     """Return reviewer decisions and a per-policy-clause cluster summary."""
     span = trace.get_current_span()
     if category:
-        span.set_attribute("wpp.query.category", category)
-    span.set_attribute("wpp.query.limit", limit)
+        span.set_attribute("zava.query.category", category)
+    span.set_attribute("zava.query.limit", limit)
 
     decisions: list[dict] = []
     for w in app_state.store.list_workflows():
@@ -57,7 +57,7 @@ def query(category: Optional[str] = None, limit: int = 100) -> dict:
         for (pc, dec), c in clusters.most_common(10)
     ]
 
-    span.set_attribute("wpp.query.result_count", len(decisions))
+    span.set_attribute("zava.query.result_count", len(decisions))
     return {"decisions": decisions, "clusters": top_clusters, "n": len(decisions)}
 
 

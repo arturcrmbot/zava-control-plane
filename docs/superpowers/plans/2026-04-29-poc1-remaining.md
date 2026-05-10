@@ -29,7 +29,7 @@
 - **Simulator pattern:** `spawn_expense_workflow(scenario, claim_id?)` plus deterministic corpus indices `_corpus_by_employee` and `_corpus_by_flavour`. Reference: [api/server/services/simulator_orchestrator.py](../../../api/server/services/simulator_orchestrator.py).
 - **Test conventions:** `pytest tests/api -q` via `./.venv/Scripts/pytest.exe`; `npm run test` for Vitest. UI tests use `// @vitest-environment jsdom`. Simulator tests need autouse fixtures that clear `app_state.store` (pattern in `test_simulator_repeat_offender.py`).
 
-**Out of scope:** APIM AI Gateway deployment, Foundry IQ binding, real Workday/Concur sandbox credentials, full 3,430-claim WPP benchmark, production hardening.
+**Out of scope:** APIM AI Gateway deployment, Foundry IQ binding, real Workday/Concur sandbox credentials, full 3,430-claim Zava benchmark, production hardening.
 
 **Definition of done:**
 
@@ -209,8 +209,8 @@ def _tokenise(text: str) -> set[str]:
 def search(query: str, k: int = 5) -> list[dict]:
     """Return top-k precedents ranked by token-overlap with the query."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.mcp.query", query)
-    span.set_attribute("wpp.mcp.k", k)
+    span.set_attribute("zava.mcp.query", query)
+    span.set_attribute("zava.mcp.k", k)
     qt = _tokenise(query)
     if not qt:
         return []
@@ -232,7 +232,7 @@ def search(query: str, k: int = 5) -> list[dict]:
         scored.append((score, rec))
     scored.sort(key=lambda t: t[0], reverse=True)
     out = [{**rec, "score": float(s)} for s, rec in scored[:k]]
-    span.set_attribute("wpp.mcp.result_count", len(out))
+    span.set_attribute("zava.mcp.result_count", len(out))
     return out
 
 
@@ -393,7 +393,7 @@ from api.functions.graphs.executors.agents import agent_arbitration
 async def test_returns_recommendation_payload():
     fake = {
         "recommendation": "accept-justification",
-        "rationale": "Named senior client at WPP NA; PREC-0017 supports.",
+        "rationale": "Named senior client at Zava NA; PREC-0017 supports.",
         "cited_precedent_id": "PREC-0017",
         "policy_clause": "§3.1 Meals — UK per-attendee cap GBP 75",
         "confidence": 0.86,
@@ -933,8 +933,8 @@ def query(category: Optional[str] = None, limit: int = 100) -> dict:
     """Return reviewer decisions and a per-policy-clause cluster summary."""
     span = trace.get_current_span()
     if category:
-        span.set_attribute("wpp.query.category", category)
-    span.set_attribute("wpp.query.limit", limit)
+        span.set_attribute("zava.query.category", category)
+    span.set_attribute("zava.query.limit", limit)
 
     decisions = []
     for w in app_state.store.list_workflows():
@@ -1261,7 +1261,7 @@ The existing `DEMO.md` is pre-pivot. Rewrite it as a 30-minute walkthrough:
 
 Each beat = ~2 minutes. Total ~30 minutes including transitions.
 
-- [ ] **Run the dry run** with someone playing WPP evaluator. Capture and fix bugs.
+- [ ] **Run the dry run** with someone playing Zava evaluator. Capture and fix bugs.
 
 - [ ] **Commit** the updated DEMO.md.
 

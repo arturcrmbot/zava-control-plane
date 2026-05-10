@@ -126,3 +126,35 @@ If the smoke fails, the bug is in the SKILL.md (compose-domain or one
 of the sub-skills), not in the graduated files. Run the rollback
 command from GRADUATION.md §Rollback, fix the SKILL, delete the
 sandbox, re-invoke. Re-graduate.
+
+## §8 — Entity projection (v4)
+
+- [ ] §8.1  `<run-id>/api/server/services/entity_projections/<workflow_type_snake>.py` exists.
+- [ ] §8.2  Module imports compile (no SyntaxError).
+- [ ] §8.3  Exposes module-level `WORKFLOW_TYPE = "<workflow_type>"` and a bare `def project(workflow)` callable (Phase 1 PAT-005).
+- [ ] §8.4  Imports limited to `api.server.services.entity_projections` (DecisionWrite/EntityWrite/RelWrite/build_decision/slug) + `api.shared.types` (Workflow).
+- [ ] §8.5  Every entity `kind` is in `_VALID_KINDS` (Phase 1 schema source-of-truth).
+- [ ] §8.6  Every relation `kind` is in `_VALID_RELS`.
+
+## §9 — Decision mapping (v4)
+
+- [ ] §9.1  One `<run-id>/api/server/services/precedent_queries/<workflow_type>_<phase>.cypher` per HITL phase listed under `decisions:`.
+- [ ] §9.2  Each Cypher MATCHes on the dedupe triple via persona_role + workflow_type, ORDERed by `decided_at DESC`, LIMITed by `$limit`.
+- [ ] §9.3  Persona names referenced under `decisions[].persona` resolve to a folder in `api/server/personae/`.
+- [ ] §9.4  No two decisions name the same phase (one decision per HITL phase).
+
+## §10 — Function membership (v4)
+
+- [ ] §10.1 `brief.function` is one of the 10 canonical keys (`finance`, `hr`, `revenue`, `ops`, `legal`, `marketing`, `tech`, `data`, `customer-success`, `legacy`).
+- [ ] §10.2 graduate.sh §9 patches `api/shared/functions.py` appending the `workflow_type` to `FUNCTIONS["<fn>"].owns_domains` (idempotent via `# compose-domain:owns_domains:<fn>` sentinel).
+- [ ] §10.3 If `api/shared/functions.py` is absent (Phase 3 not merged), graduate.sh §9 logs `warn: api/shared/functions.py absent — skipping FUNCTIONS patch (Phase 3 will own this)` and exits 0 for that step. Remaining steps still run.
+- [ ] §10.4 The workflow_type is not also claimed by a *different* function in the registry (orphan/dup check by author-function-membership validator).
+
+## §11 — Ambient trigger (v4, optional)
+
+- [ ] §11.1 If `ambient:` block is present, `<run-id>/api/server/services/ambient_agents/<function>.py` is appended (or created) with the rendered `AmbientAgent(...)` constructor.
+- [ ] §11.2 The constructor block is wrapped in sentinel comments `# compose-domain:ambient:<workflow_type> BEGIN/END` so re-runs are idempotent.
+- [ ] §11.3 The constructor is guarded by `if hasattr(_module, "AmbientAgent"):` so the file imports cleanly before Phase 3 lands the primitive.
+- [ ] §11.4 `ambient.function` matches `brief.function`.
+- [ ] §11.5 Each trigger entry sets exactly one of `bus | cypher | cadence` and supplies the kind-specific keys.
+- [ ] §11.6 Every `spawnable_workflow_types` entry is in `api.shared.domains.DOMAINS` OR equals the brief's own `workflow_type` (self-spawn forward-declaration).

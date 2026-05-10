@@ -1,4 +1,4 @@
-# WPP Control Plane — Apex Substrate
+# Zava Control Plane — Apex Substrate
 
 [![OWASP Agentic AI Top 10 — 10/10 covered](https://img.shields.io/badge/OWASP%20Agentic%20Top%2010-10%2F10%20covered-brightgreen)](plan/feature-agent-governance-toolkit-1.md)
 
@@ -22,7 +22,7 @@ instead of switching on hard-coded literals.
 | Domain | Where it lives | Status |
 |---|---|---|
 | **POC1** — Finance expense compliance | [`api/functions/workflows/expense_claim.py`](api/functions/workflows/expense_claim.py) — 7 phases | Live · 13 ACs, brief in [docs/poc1-brief.md](docs/poc1-brief.md), status in [docs/poc1-status.md](docs/poc1-status.md) |
-| **POC2** — HR talent lifecycle | [`api/functions/workflows/hiring.py`](api/functions/workflows/hiring.py) — 10 phases | Live · 22 capabilities, status in [docs/poc2-status.md](docs/poc2-status.md), demo in [docs/poc2-DEMO.md](docs/poc2-DEMO.md) |
+| **POC2** — HR talent lifecycle | [`api/functions/workflows/hiring.py`](api/functions/workflows/hiring.py) — 10 phases | Live · 22 capabilities, status in [docs/poc2-status.md](docs/poc2-status.md), demo in [docs/poc2-quick-demo.md](docs/poc2-quick-demo.md) |
 | **Fleet travel pre-approval** | [`api/functions/workflows/fleet_travel_preapproval.py`](api/functions/workflows/fleet_travel_preapproval.py) — 3 phases | Composed · `compose-domain` v1; first existence proof |
 | **Fleet vendor onboarding & KYC** | [`api/functions/workflows/fleet_vendor_kyc.py`](api/functions/workflows/fleet_vendor_kyc.py) — 4 phases | Composed · `compose-domain` v3 |
 | **Fleet employee onboarding** | [`api/functions/workflows/fleet_employee_onboarding.py`](api/functions/workflows/fleet_employee_onboarding.py) — 4 phases | Composed · `compose-domain` v3 |
@@ -111,8 +111,9 @@ serve the whole repo.
 - [docs/README.md](docs/README.md) — index of every doc in this repo + what each is for
 - [docs/CODEBASE-TOUR.md](docs/CODEBASE-TOUR.md) — narrative walkthrough for first-time visitors
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — three tiers + how events flow + the multi-domain pattern
+- [docs/visualisation.md](docs/visualisation.md) — what you'll see (`?view=constellation` / `entities` / `functions` / `org-clone`), the visual vocabulary, and where the observatory is going
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — local dev, terminals, debugging
-- [docs/DEMO.md](docs/DEMO.md) — POC1 demo (also points at POC2 + blueprint runbooks)
+- [docs/poc2-quick-demo.md](docs/poc2-quick-demo.md) — 5–8 min POC2 hiring walkthrough
 - [docs/blueprint.md](docs/blueprint.md) — the pitch this whole substrate carries
 - [docs/blueprint-microsite-contributor-guide.md](docs/blueprint-microsite-contributor-guide.md) — making new domains light up on the page + the Azure Container Apps deploy
 - [docs/superpowers/skills/compose-domain/SKILL.md](docs/superpowers/skills/compose-domain/SKILL.md) — meta-skill that graduates new domains

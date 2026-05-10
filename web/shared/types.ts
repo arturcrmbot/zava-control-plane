@@ -310,6 +310,7 @@ export interface Narrative {
 
 export interface FleetEconomics {
   activeWorkflowCount: number;
+  totalWorkflowCount: number;
   totalComputeCostUsd: number;
   totalModelCalls: number;
   totalToolCalls: number;

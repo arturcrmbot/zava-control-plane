@@ -12,7 +12,7 @@ council notification) on DE without touching code.
 
 ## §EEOC.1 — Equal Employment Opportunity statement
 
-Every JD must include the WPP EEO statement: "WPP is an equal opportunity
+Every JD must include the Zava EEO statement: "Zava is an equal opportunity
 employer. All qualified applicants receive consideration for employment
 without regard to race, color, religion, sex, sexual orientation, gender
 identity, national origin, disability, or veteran status."

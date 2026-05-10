@@ -41,10 +41,10 @@ def find_availability(
     """Find a time slot of `duration_minutes` across all attendees within
     [window_start, window_start + window_days] — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.calendar_service.attendee_count", len(attendees))
-    span.set_attribute("wpp.calendar_service.duration_minutes", int(duration_minutes))
-    span.set_attribute("wpp.calendar_service.window_start", str(window_start))
-    span.set_attribute("wpp.calendar_service.window_days", int(window_days))
+    span.set_attribute("zava.calendar_service.attendee_count", len(attendees))
+    span.set_attribute("zava.calendar_service.duration_minutes", int(duration_minutes))
+    span.set_attribute("zava.calendar_service.window_start", str(window_start))
+    span.set_attribute("zava.calendar_service.window_days", int(window_days))
     return _synth_find_availability(attendees, duration_minutes, window_start, window_days)
 
 
@@ -124,8 +124,8 @@ def calendar_service_find_availability_tool(params: _FindAvailabilityParams) -> 
 def get_room_options(market: str, capacity: int) -> dict:
     """List room candidates in `market` with at least `capacity` seats — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.calendar_service.market", str(market))
-    span.set_attribute("wpp.calendar_service.capacity", int(capacity))
+    span.set_attribute("zava.calendar_service.market", str(market))
+    span.set_attribute("zava.calendar_service.capacity", int(capacity))
     return _synth_get_room_options(market, capacity)
 
 
@@ -174,9 +174,9 @@ def calendar_service_get_room_options_tool(params: _GetRoomOptionsParams) -> Too
 def book_event(slot: dict, room_id: str, attendees: list[str], subject: str) -> dict:
     """Book a calendar event at `slot` in `room_id` with `attendees` — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.calendar_service.room_id", str(room_id))
-    span.set_attribute("wpp.calendar_service.attendee_count", len(attendees or []))
-    span.set_attribute("wpp.calendar_service.subject", str(subject))
+    span.set_attribute("zava.calendar_service.room_id", str(room_id))
+    span.set_attribute("zava.calendar_service.attendee_count", len(attendees or []))
+    span.set_attribute("zava.calendar_service.subject", str(subject))
     return _synth_book_event(slot, room_id, attendees, subject)
 
 

@@ -29,14 +29,14 @@ def test_interview_invite_invite_decision_raises_event():
     ) as mock_raise:
         resp = client.post(
             "/api/portal/admin/candidate/C-1/interview-invite",
-            json={"decision": "invite", "resolved_by": "recruiter@wpp"},
+            json={"decision": "invite", "resolved_by": "recruiter@zava"},
         )
     assert resp.status_code == 200
     args = mock_raise.await_args.args
     assert args[0] == "DF-1"
     assert args[1] == "interview_invite"
     assert args[2]["decision"] == "invite"
-    assert args[2]["resolved_by"] == "recruiter@wpp"
+    assert args[2]["resolved_by"] == "recruiter@zava"
 
 
 def test_interview_invite_reject_decision_raises_event():
@@ -97,7 +97,7 @@ def test_post_interview_offer_with_level_raises_event():
             json={
                 "decision": "offer", "level": "Senior",
                 "notes": "strong on Spark", "rating": 5,
-                "resolved_by": "recruiter@wpp",
+                "resolved_by": "recruiter@zava",
             },
         )
     assert resp.status_code == 200

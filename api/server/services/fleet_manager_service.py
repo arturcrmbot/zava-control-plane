@@ -31,7 +31,7 @@ def _gh_token() -> str:
     return subprocess.check_output(["gh", "auth", "token"], text=True).strip()
 
 
-_tracer = trace.get_tracer("wpp.fleet_manager")
+_tracer = trace.get_tracer("zava.fleet_manager")
 
 
 def _domain_catalogue_section() -> str:
@@ -59,14 +59,85 @@ def _domain_catalogue_section() -> str:
     return "\n".join(lines)
 
 
+def _function_identity_section(function_name: str) -> str:
+    """Render the per-function identity block prepended to the FM skill text.
+
+    Reads ``api.shared.functions.FUNCTIONS[function_name]`` at session-start
+    time and renders five markdown blocks: header (``## You are the
+    <Display> Function FM``), KPIs you own, domains you cover, persona
+    hierarchy (indented bullet tree), and ambient watchers active for you.
+
+    Plan: plan/feature-agentic-org-phase-3-function-fms.md TASK-026.
+    """
+    from api.shared.functions import FUNCTIONS, PersonaTree
+
+    if function_name not in FUNCTIONS:
+        raise ValueError(f"unknown function: {function_name!r}")
+    fn = FUNCTIONS[function_name]
+
+    def _render_tree(node: "PersonaTree", depth: int) -> list[str]:
+        out = ["  " * depth + f"- {node.role}"]
+        for child in node.manages:
+            out.extend(_render_tree(child, depth + 1))
+        return out
+
+    kpis = ", ".join(fn.kpis) if fn.kpis else "(none)"
+    domains = ", ".join(fn.owns_domains) if fn.owns_domains else "(none)"
+    watchers = ", ".join(fn.ambient_agents) if fn.ambient_agents else "(none)"
+
+    lines = [
+        f"## You are the {fn.display} Function FM",
+        "",
+        f"You operate as the function-scoped Fleet Manager for **{fn.display}** "
+        f"(operator surface: `{fn.operator_surface}`). Your tools, decisions, "
+        "and KPIs are constrained to the domains your function owns.",
+        "",
+        "## KPIs you own",
+        "",
+        f"{kpis}",
+        "",
+        "## Domains you cover",
+        "",
+        f"{domains}",
+        "",
+        "## Persona hierarchy",
+        "",
+    ]
+    lines.extend(_render_tree(fn.persona_hierarchy, 0))
+    lines.extend(
+        [
+            "",
+            "## Ambient watchers active for you",
+            "",
+            f"{watchers}",
+        ]
+    )
+    return "\n".join(lines)
+
+
 class FleetManagerService:
-    def __init__(self, *, bus: EventBus, store: StateStore, audit: AuditLogger,
-                 model: str = "gpt-4.1", on_live: Callable[[dict], None] | None = None):
+    def __init__(self, *, bus: EventBus | None = None, store: StateStore,
+                 audit: AuditLogger,
+                 model: str = "gpt-4.1", on_live: Callable[[dict], None] | None = None,
+                 function: str | None = None,
+                 tools: list | None = None,
+                 hub=None):
         self._bus = bus
         self._store = store
         self._audit = audit
         self._model = model
         self._on_live = on_live or (lambda e: None)
+        # Phase 3 (TASK-025) — per-function identity. ``None`` keeps the
+        # existing fleet-wide singleton behaviour unchanged.
+        self._function = function
+        # Per-function FMs ship their own pre-built tool list via the
+        # build_function_fm_tools factory; the fleet-wide singleton
+        # leaves this None and lets start() build the default surface.
+        self._tools_override = tools
+        # Optional SSEHub reference — held for symmetry with TASK-028's
+        # AppState wiring (per-function FMs can broadcast over their own
+        # ``fleet-manager.<name>`` topic). Not required by start().
+        self._hub = hub
 
         self._client: CopilotClient | None = None
         self._session = None
@@ -80,6 +151,26 @@ class FleetManagerService:
         self._queue = FleetManagerQueue(self._process_batch, debounce_ms=2000)
         self._tick_task: asyncio.Task | None = None
         self._started = False
+
+    def _build_skill_text(self) -> str:
+        """Compose the SKILL prompt for this FM session.
+
+        - Fleet-wide (``self._function is None``): SKILL.md + the
+          domain-catalogue auto-template (existing behaviour).
+        - Function-scoped: the per-function identity block is prepended
+          to the same fleet-wide skill body so the function FM still
+          inherits all triage / batching / autonomy guidance.
+
+        Extracted as a method so tests can introspect the templated
+        prompt without driving the full ``start()`` pathway (which
+        requires a live Copilot subprocess).
+        """
+        skill_path = Path(__file__).resolve().parents[1] / "skills" / "fleet-manager" / "SKILL.md"
+        skill_text = skill_path.read_text(encoding="utf-8")
+        skill_text += "\n\n" + _domain_catalogue_section()
+        if self._function is not None:
+            skill_text = _function_identity_section(self._function) + "\n\n" + skill_text
+        return skill_text
 
     async def start(self) -> None:
         if self._started:
@@ -99,10 +190,8 @@ class FleetManagerService:
         try:
             await self._client.start()  # explicit start (alternative to async-with for long-lived)
 
-            skill_path = Path(__file__).resolve().parents[1] / "skills" / "fleet-manager" / "SKILL.md"
-            skill_text = skill_path.read_text(encoding="utf-8")
-            skill_text += "\n\n" + _domain_catalogue_section()
-            tools = build_fleet_manager_tools(self._store, self._audit)
+            skill_text = self._build_skill_text()
+            tools = self._tools_override if self._tools_override is not None else build_fleet_manager_tools(self._store, self._audit)
 
             self._session = await self._client.create_session(
                 on_permission_request=PermissionHandler.approve_all,
@@ -180,9 +269,9 @@ class FleetManagerService:
                     context=parent_ctx,
                 )
                 if name is not None:
-                    span.set_attribute("wpp.tool.name", str(name))
+                    span.set_attribute("zava.tool.name", str(name))
                 if call_id is not None:
-                    span.set_attribute("wpp.tool.call_id", str(call_id))
+                    span.set_attribute("zava.tool.call_id", str(call_id))
                     self._open_tool_spans[call_id] = span
                 else:
                     # Without a call_id we cannot correlate the complete event; end immediately.
@@ -278,9 +367,9 @@ class FleetManagerService:
 
         with _tracer.start_as_current_span("gen_ai.agent.run") as span:
             span.set_attribute("gen_ai.agent.name", "fleet-manager-agent")
-            span.set_attribute("wpp.fleet_manager.batch_size", len(batch))
+            span.set_attribute("zava.fleet_manager.batch_size", len(batch))
             span.set_attribute(
-                "wpp.fleet_manager.workflow_ids",
+                "zava.fleet_manager.workflow_ids",
                 [b.workflow_id for b in batch if b.workflow_id],
             )
             # Capture context so session-event tool spans attach as children.
@@ -318,3 +407,41 @@ class FleetManagerService:
         if self._client:
             await self._client.stop()
         self._started = False
+
+    # ----------------------------------------------------------------------
+    # Phase 4 IP2 (TASK-011) — KPI publish API
+    # ----------------------------------------------------------------------
+    def publish_kpi(self, metric: str, value: float, period: str) -> None:
+        """Publish one KPI snapshot for this FM's function.
+
+        Writes via :class:`api.server.services.kpi_store.KpiStore` and
+        emits an SSE event on the FM's per-function topic. No-op for the
+        fleet-wide singleton (``self._function is None``) since fleet-
+        wide KPIs aren't a thing in the schema.
+        """
+        if self._function is None:
+            return
+        from api.server.state import app_state
+        from api.shared.functions import FUNCTIONS
+
+        schema_version = FUNCTIONS[self._function].kpi_schema_version
+        app_state.kpi_store.publish(
+            self._function, metric, value, period, schema_version,
+        )
+        try:
+            self._on_live({
+                "type": "kpi.published",
+                "function": self._function,
+                "metric": metric,
+                "value": value,
+                "period": period,
+                "schema_version": schema_version,
+            })
+        except Exception:  # pragma: no cover — SSE broadcast is best-effort
+            pass
+
+
+# Phase 3 blueprint primitive name (TASK-025). The ``Function`` Fleet
+# Manager is implementation-identical to ``FleetManagerService`` — only
+# the constructor's ``function=`` flag differs at call sites.
+FunctionFleetManager = FleetManagerService

@@ -1,0 +1,47 @@
+# Treasury FX — compose-domain v4 brief.
+#
+# Mirrors api/server/services/entity_projections/treasury_fx.py (TASK-025).
+# Payload at data/synthetic/treasury-fx/ops.json. The Money node carries
+# op_kind + currency_pair in a JSON-blob attribute (helper logic the
+# codegen does not synthesise).
+
+domain:
+  workflow_type: treasury-fx
+  prefix: fleet
+  display_name: Treasury FX operation
+  description: |
+    Treasury proposes an FX hedge or spot conversion; treasurer signs
+    off before the order is sent to the bank.
+
+phases:
+  - name: op_intake
+    kind: deterministic
+    intent: Capture op kind, currency pair, GBP-equivalent notional.
+  - name: limit_check
+    kind: agent
+    agent_skill_name: fx-limit-checker
+    intent: Check the op against counterparty + currency exposure limits.
+  - name: approver_signoff
+    kind: hitl
+    persona: treasurer
+    external_event: approver_signoff_decision
+
+entities:
+  - kind: Money
+    source: fx
+    ref_field: payload.op_id
+    attributes:
+      currency: payload.currency_pair
+
+decisions:
+  - phase: approver_signoff
+    persona: treasurer
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.op_id]
+    attributes_from_context:
+      op_id: payload.op_id
+      op_kind: payload.op_kind
+      currency_pair: payload.currency_pair
+      notional_gbp: payload.notional_gbp
+
+function: finance

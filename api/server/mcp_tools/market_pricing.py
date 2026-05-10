@@ -32,8 +32,8 @@ _VENDORS = [
 def get_quotes(category: str, region: str) -> dict:
     """Return three fresh market quotes for (category, region) — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.market_pricing.category", str(category))
-    span.set_attribute("wpp.market_pricing.region", str(region))
+    span.set_attribute("zava.market_pricing.category", str(category))
+    span.set_attribute("zava.market_pricing.region", str(region))
     return _synth_get_quotes(category, region)
 
 

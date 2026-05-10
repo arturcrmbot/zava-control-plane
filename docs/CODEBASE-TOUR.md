@@ -217,6 +217,10 @@ Three Vite apps:
   locally; Azure Container Apps in production) — the editorial page +
   live observatory of the substrate. Walks `GET /api/blueprint/composition`
   on load; subscribes to `GET /api/blueprint/stream` for the live mind-map.
+  Also hosts four full-bleed visualisation surfaces at `?view=constellation`,
+  `?view=entities`, `?view=functions`, `?view=org-clone` — see
+  [visualisation.md](visualisation.md) for the full surface inventory and
+  visual vocabulary.
 
 Shared types in [web/shared/types.ts](../web/shared/types.ts) mirror
 Python [api/shared/types.py](../api/shared/types.py); smoke test enforces
@@ -282,10 +286,10 @@ simulator inject → Durable phase → validator blocks → EventBus
 | POC1 acceptance criteria + remaining work | [poc1-status.md](poc1-status.md) |
 | POC2 capability matrix + status | [poc2-status.md](poc2-status.md) |
 | Code-anchored architecture reference | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| How to run POC1 | [DEMO.md](DEMO.md) |
-| How to run POC2 | [poc2-DEMO.md](poc2-DEMO.md) (full) · [poc2-quick-demo.md](poc2-quick-demo.md) (5–8 min) |
+| How to run POC1 | Root [README.md](../README.md) Quickstart (`make up`) |
+| How to run POC2 | [poc2-quick-demo.md](poc2-quick-demo.md) (5–8 min walkthrough) |
 | Make a new domain show up on the blueprint page | [blueprint-microsite-contributor-guide.md](blueprint-microsite-contributor-guide.md) |
 | Compose a new domain end-to-end | [superpowers/skills/compose-domain/SKILL.md](superpowers/skills/compose-domain/SKILL.md) |
 | Local dev setup | [DEVELOPMENT.md](DEVELOPMENT.md) |
-| Verbatim WPP brief | [poc1-brief.md](poc1-brief.md) |
+| Verbatim Zava brief | [poc1-brief.md](poc1-brief.md) |
 | What every doc in `docs/` is for | [README.md](README.md) (this directory) |

@@ -44,7 +44,7 @@ def _draw_letter(
         leftMargin=0.9 * inch, rightMargin=0.9 * inch,
         topMargin=0.9 * inch, bottomMargin=0.9 * inch,
         title=f"Offer Letter — {candidate_name}",
-        author="WPP Talent Acquisition",
+        author="Zava Talent Acquisition",
     )
     styles = getSampleStyleSheet()
     h1 = ParagraphStyle("h1", parent=styles["Heading1"], spaceAfter=12)
@@ -56,7 +56,7 @@ def _draw_letter(
     juris = role_jurisdiction or "the hiring jurisdiction"
 
     story = [
-        Paragraph("WPP — Offer of Employment", h1),
+        Paragraph("Zava — Offer of Employment", h1),
         Paragraph(f"Dear {candidate_name},", body),
         Paragraph(
             f"We are delighted to offer you the position of <b>{level} {role}</b> "
@@ -89,7 +89,7 @@ def _draw_letter(
         ),
         Spacer(1, 12),
         Paragraph("Warm regards,", sig),
-        Paragraph("<b>WPP Talent Acquisition</b>", body),
+        Paragraph("<b>Zava Talent Acquisition</b>", body),
         Paragraph(
             f"<font size=8 color='#777777'>Reference: {workflow_id}</font>",
             body,

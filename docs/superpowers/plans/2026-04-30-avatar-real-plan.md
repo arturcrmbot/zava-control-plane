@@ -8,7 +8,7 @@
 
 **Tech Stack:** Azure AI Speech batch avatar synthesis REST API (under Azure Cognitive Services), `httpx` for HTTP, `azure-identity` for `DefaultAzureCredential` (already in deps), `azure-storage-blob` for upload (added in pre-scaffolding commit), sha256 cache key.
 
-**Why Azure Speech (not HeyGen):** All-Microsoft narrative for the WPP demo; same Azure subscription, same auth (Entra ID via `DefaultAzureCredential`); no third-party API key. Tradeoff: avatar polish slightly behind HeyGen's premium tier, but more than enough for a 30-second onboarding welcome video.
+**Why Azure Speech (not HeyGen):** All-Microsoft narrative for the Zava demo; same Azure subscription, same auth (Entra ID via `DefaultAzureCredential`); no third-party API key. Tradeoff: avatar polish slightly behind HeyGen's premium tier, but more than enough for a 30-second onboarding welcome video.
 
 **Master spec:** [docs/superpowers/specs/2026-04-30-poc1-poc2-demo-ready-design.md](../specs/2026-04-30-poc1-poc2-demo-ready-design.md) §6
 
@@ -37,7 +37,7 @@ The exact endpoint paths, payload shape, and response schema MUST be confirmed b
     "voice": "en-US-JennyNeural"
   },
   "inputKind": "PlainText",
-  "inputs": [{"content": "Welcome to your new role at WPP, Alice. ..."}],
+  "inputs": [{"content": "Welcome to your new role at Zava, Alice. ..."}],
   "avatarConfig": {
     "talkingAvatarCharacter": "lisa",
     "talkingAvatarStyle": "graceful-sitting",

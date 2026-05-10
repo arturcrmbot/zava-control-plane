@@ -4,6 +4,7 @@ See docs/superpowers/plans/2026-04-30-candidate-portal-plan.md Tasks 5-7, 13.
 """
 from __future__ import annotations
 
+import os
 import uuid
 from pathlib import Path
 
@@ -254,17 +255,37 @@ async def admin_links():
 async def admin_candidates():
     """List every candidate the system knows about, with their workflow phase,
     role, and any active magic links. Powers the recruiter list view at
-    /recruiter."""
+    /recruiter.
+
+    `status_token_url` and `screen_token_url` are full ready-to-click URLs
+    so the operator can open the candidate-side experience directly from
+    the recruiter table when email delivery is unavailable (the demo's
+    primary fallback path).
+    """
     candidates = app_state.store.list_candidates()
     active_tokens = app_state.magic_links.list_active()
     by_cid: dict[str, list[dict]] = {}
     for t in active_tokens:
         by_cid.setdefault(t["candidate_id"], []).append(t)
 
+    # Match _portal_base_url() in portal_orchestration.py rather than importing
+    # to keep this route free of orchestration deps.
+    portal_base = os.getenv("PORTAL_BASE_URL", "http://localhost:5174").rstrip("/")
+
     out = []
     for c in candidates:
         wf = app_state.store.get_workflow(c.get("workflow_id", ""))
         meta = (wf.metadata if wf else {}) or {}
+        cand_tokens = by_cid.get(c["id"], [])
+        # Newest token wins per scope — magic_links.list_active() returns all
+        # live tokens, including older still-valid status links from earlier
+        # in the lifecycle.
+        def _newest(scope: str) -> dict | None:
+            rows = [t for t in cand_tokens if t.get("scope") == scope]
+            rows.sort(key=lambda r: r.get("issued_at") or 0, reverse=True)
+            return rows[0] if rows else None
+        status_tok = _newest("status")
+        screen_tok = _newest("screen")
         out.append({
             "candidate_id": c["id"],
             "name": c.get("name"),
@@ -276,7 +297,13 @@ async def admin_candidates():
             "phase": wf.current_phase if wf else None,
             "status": wf.status if wf else None,
             "awaiting_reason": meta.get("awaiting_reason"),
-            "active_tokens": [t["scope"] for t in by_cid.get(c["id"], [])],
+            "active_tokens": [t["scope"] for t in cand_tokens],
+            "status_token_url": (
+                f"{portal_base}/portal?token={status_tok['token']}" if status_tok else None
+            ),
+            "screen_token_url": (
+                f"{portal_base}/screen?token={screen_tok['token']}" if screen_tok else None
+            ),
         })
     return {"candidates": out}
 

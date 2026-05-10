@@ -57,6 +57,46 @@ _CHAIN_LOCK_CACHE_MAX = 10_000  # Lock objects are cheap; cap is a backstop.
 
 
 # ---------------------------------------------------------------------------
+# Event registry (Phase 4 IP8 — TASK-038)
+# ---------------------------------------------------------------------------
+#
+# This module deliberately keeps :meth:`AuditLogger.log` schema-free —
+# any (action, details) pair lands on the chain. The dictionary below
+# is documentation only: it enumerates the event types that the
+# substrate's hot-path code emits, and the ``details`` keys downstream
+# consumers (verify_chain, the /admin/org-clone observatory page,
+# precedent queries) expect to find.
+#
+# Adding an event type here is non-binding but contributors should keep
+# this list up to date — it is the single grep-target for "what events
+# can land on the audit ledger?".
+
+AUDIT_EVENT_REGISTRY: dict[str, tuple[str, ...]] = {
+    # Phase 1 — entity graph plane
+    "entity.upserted": ("kind", "id", "workflow_id"),
+    "entity.linked": ("src_id", "rel", "dst_id"),
+    "entity.write.failed": ("subscriber", "event_type", "error"),
+    "decision.recorded": ("decision_id", "workflow_id", "phase", "persona_role"),
+    # Phase 3 — ambient agents
+    "ambient.decided": (
+        "ambient_agent", "function", "trigger_kind",
+        "trigger_payload", "spawn_outcome", "timestamp",
+    ),
+    # Phase 3 — governance kernel surfaces
+    "governance.find_entities": ("agent_id", "pattern"),
+    "governance.find_entities.denied": ("agent_id", "pattern", "reason"),
+    # Phase 4 IP1 — cadence loop
+    "cadence.tick": (
+        "cadence_name", "scheduled_for", "fired_at", "ambient_agent",
+    ),
+    # Phase 4 IP4 — meta-workflow codegen
+    "workflow.sub_spawned": (
+        "parent_workflow_id", "child_workflow_id", "child_workflow_type",
+    ),
+}
+
+
+# ---------------------------------------------------------------------------
 # Public records
 # ---------------------------------------------------------------------------
 
@@ -74,6 +114,7 @@ class VerifyReport(BaseModel):
     total_entries: int
     broken_at: int | None = None
     bad_signatures_at: list[int] | None = None  # populated in Phase 5 TASK-041
+    unresolved_decisions_at: list[int] | None = None  # Phase 7 TASK-053
     reason: str | None = None
 
 
@@ -169,6 +210,87 @@ def _verify_signatures(chain: list[dict]) -> list[int]:
         details = entry.get("details") if isinstance(entry.get("details"), dict) else {"value": entry.get("details")}
         if not k.verify_jws(agent_id, jws, details):
             bad.append(idx)
+    return bad
+
+
+def _extract_decision_refs(details: Any) -> list[tuple[str, str | None]]:
+    """Pluck every ``(decision_id, recorded_policy_version)`` pair out
+    of an audit entry's ``details`` blob.
+
+    Two shapes the substrate writes today:
+
+    1. **Nested governance dict** (chokepoint emit, ``call_mcp`` /
+       ``traced_tool``)::
+
+           {"governance": {"decision_id": "<uuid>",
+                           "policy_version": "<12 hex>", ...}}
+
+    2. **Top-level fields** (any future call site that wants to log a
+       decision_id directly without the nested wrapper, including the
+       :class:`ActionLedgerEntry` shape in :mod:`api.shared.types`).
+
+    Returns the list of pairs (empty when no governance metadata is
+    present). ``policy_version`` is ``None`` when the entry didn't
+    record one alongside the id — :meth:`AuditLogger.verify_chain` then
+    only checks existence, not version match.
+    """
+    if not isinstance(details, dict):
+        return []
+    refs: list[tuple[str, str | None]] = []
+    nested = details.get("governance")
+    if isinstance(nested, dict):
+        did = nested.get("decision_id")
+        if isinstance(did, str) and did:
+            pv = nested.get("policy_version")
+            refs.append((did, pv if isinstance(pv, str) else None))
+    top_did = details.get("decision_id")
+    if isinstance(top_did, str) and top_did:
+        top_pv = details.get("policy_version")
+        refs.append((top_did, top_pv if isinstance(top_pv, str) else None))
+    return refs
+
+
+def _verify_decisions(chain: list[dict]) -> list[int]:
+    """Phase 7 TASK-053 — return chain indices whose recorded
+    ``decision_id`` cannot be resolved against the in-process kernel.
+
+    An entry "needs resolving" iff its details carry at least one
+    decision_id (see :func:`_extract_decision_refs`). Entries with no
+    decision_ids are skipped; a chain with zero decision_id-bearing
+    entries returns ``[]`` (vacuously resolvable).
+
+    Resolution semantics:
+
+    - Decision_id missing from the kernel registry -> unresolved.
+    - Decision_id present BUT the recorded ``policy_version`` differs
+      from the kernel's -> unresolved (someone tampered, or the entry
+      was authored under a different policy bundle than what's live).
+
+    Caveat: the registry is in-process and bounded
+    (``AGT_DECISION_REGISTRY_MAX``). After a substrate restart all
+    historical decision_ids become unresolved — that's correct
+    behaviour ("we can no longer prove what was decided"); for a
+    long-lived audit you'd persist the registry alongside the blob.
+    """
+    try:
+        from api.server.services.governance import kernel as _gov_kernel
+        k = _gov_kernel()
+    except Exception:
+        return []
+
+    bad: list[int] = []
+    for idx, entry in enumerate(chain):
+        refs = _extract_decision_refs(entry.get("details"))
+        if not refs:
+            continue
+        for decision_id, recorded_pv in refs:
+            decision = k.resolve_decision(decision_id)
+            if decision is None:
+                bad.append(idx)
+                break
+            if recorded_pv is not None and decision.policy_version != recorded_pv:
+                bad.append(idx)
+                break
     return bad
 
 
@@ -495,14 +617,20 @@ class AuditLogger:
         # and that JWS MUST verify against the registered pubkey.
         bad_sig_indices = _verify_signatures(chain)
 
+        # Phase 7 TASK-053: resolve every decision_id in the chain
+        # against the kernel's in-process decision registry. Vacuously
+        # true for chains without any governance decision_ids.
+        unresolved_indices = _verify_decisions(chain)
+
         return VerifyReport(
             workflow_id=workflow_id,
             chain_intact=True,
             signatures_valid=not bad_sig_indices,
-            decisions_resolvable=True,
+            decisions_resolvable=not unresolved_indices,
             total_entries=len(chain),
             broken_at=None,
             bad_signatures_at=bad_sig_indices or None,
+            unresolved_decisions_at=unresolved_indices or None,
         )
 
     # --- Helpers for routes -------------------------------------------------

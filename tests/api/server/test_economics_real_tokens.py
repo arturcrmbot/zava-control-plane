@@ -15,8 +15,8 @@ def _wf(workflow_id: str = "EXP-TEST-1") -> Workflow:
         current_phase="Intake",
         created_at=0.0,
         sla_due_at=0.0,
-        jurisdiction="London-WPP",
-        agency="WPP",
+        jurisdiction="London-Zava",
+        agency="Zava",
     )
 
 

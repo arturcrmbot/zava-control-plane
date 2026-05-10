@@ -16,12 +16,12 @@ export default function FleetEconomicsPanel() {
       <div className="panel-header">Fleet Economics</div>
       <div className="panel-body space-y-2 text-sm">
         <div>
-          <div className="text-[10px] uppercase text-slate-500 leading-tight">Compute · active</div>
-          <div className="font-semibold">${d.totalComputeCostUsd.toFixed(2)}</div>
+          <div className="text-[10px] uppercase text-slate-500 leading-tight">Compute · session</div>
+          <div className="font-semibold">${d.totalComputeCostUsd.toFixed(4)}</div>
         </div>
         <div>
           <div className="text-[10px] uppercase text-slate-500 leading-tight">Avg / workflow</div>
-          <div className="font-semibold">${d.averageCostPerWorkflow.toFixed(2)}</div>
+          <div className="font-semibold">${d.averageCostPerWorkflow.toFixed(4)}</div>
         </div>
         <div>
           <div className="text-[10px] uppercase text-slate-500 leading-tight">Model calls</div>

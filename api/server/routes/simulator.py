@@ -400,3 +400,172 @@ async def inject_creative_campaign(body: CreativeCampaignBody):
     )
     return {"workflow_id": workflow_id}
 # === END POC3: creative-campaign ===
+
+
+# === BEGIN constellation-mode: one-click autonomous-org finale ===
+import asyncio  # noqa: E402
+import os  # noqa: E402
+
+# Personae that should auto-resolve in Constellation Mode. Mirrors the
+# `scripts/profile-everything.sh` profile so the on-screen button reproduces
+# what the operator would otherwise have to source-and-restart for.
+_CONSTELLATION_PERSONAE = ",".join([
+    "line_manager", "claim_submitter", "ssc_reviewer", "finance_bp", "hr_bp",
+    "recruiter", "candidate", "onboarding_it_admin", "vendor_kyc_finance_bp",
+    "it_access_line_manager", "it_access_it_admin", "contract_finance_bp",
+    "contract_line_manager", "perf_review_hr_bp", "perf_review_line_manager",
+    "ap_clerk", "controller", "category_manager", "sourcing_lead", "cpo",
+    "contracts_counsel", "gc", "dpo", "treasurer", "cfo", "finance_controller",
+])
+
+
+@router.post("/constellation-start")
+async def constellation_start():
+    """Flip the substrate into the autonomous-org finale state at runtime,
+    no restart required.
+
+    Two side effects, both designed to be safe to call repeatedly:
+
+    1. Set ``PERSONA_AUTO_CLOSE`` in the live process env to the full persona
+       list. ``persona_responder._auto_close_set()`` reads this var on every
+       gate (no caching), so the *next* HITL handoff for any persona in the
+       list will auto-resolve. Existing in-flight gates do not retroactively
+       close — that's fine, the ramp loop and Constellation seed below
+       generate enough fresh workflows to fill the view in seconds.
+
+    2. Spawn one workflow per known domain in parallel so the constellation
+       view fills immediately instead of waiting for the steady-state ramp
+       (which only spawns from ``SIMULATOR_RAMP_DOMAINS`` — typically
+       just expense-claim during the demo). Each spawn uses the same
+       infra as the per-domain ``/api/simulator/<domain>`` endpoints, so any
+       failure surfaces in the response payload.
+
+    Returns ``{ok, auto_close_count, spawned: [...], failed: [...]}``.
+    """
+    os.environ["PERSONA_AUTO_CLOSE"] = _CONSTELLATION_PERSONAE
+
+    spawners = [
+        ("expense-claim", spawn_expense_workflow()),
+        ("hiring", spawn_hiring_workflow()),
+        ("travel-preapproval", spawn_travel_preapproval_workflow()),
+        ("employee-onboarding", spawn_fleet_employee_onboarding_workflow()),
+        ("vendor-kyc", spawn_fleet_vendor_kyc_workflow()),
+        ("it-access-request", spawn_fleet_it_access_request_workflow()),
+        ("contract-renewal", spawn_fleet_contract_renewal_workflow()),
+        ("perf-review", spawn_fleet_perf_review_workflow()),
+        ("ap-invoice", spawn_fleet_ap_invoice_workflow()),
+        ("purchase-order", spawn_fleet_purchase_order_workflow()),
+        ("contract-review", spawn_fleet_contract_review_workflow()),
+        ("privacy-dpia", spawn_fleet_privacy_dpia_workflow()),
+        ("creative-campaign", spawn_creative_campaign_workflow()),
+        ("treasury-fx", spawn_fleet_treasury_fx_workflow()),
+    ]
+    domains = [d for d, _ in spawners]
+    results = await asyncio.gather(
+        *[coro for _, coro in spawners], return_exceptions=True,
+    )
+
+    spawned: list[dict] = []
+    failed: list[dict] = []
+    for domain, result in zip(domains, results):
+        if isinstance(result, Exception):
+            failed.append({"domain": domain, "error": str(result)})
+        else:
+            spawned.append({"domain": domain, "workflow_id": result})
+
+    return {
+        "ok": True,
+        "auto_close_count": len(_CONSTELLATION_PERSONAE.split(",")),
+        "spawned": spawned,
+        "failed": failed,
+    }
+# === END constellation-mode ===
+
+
+# Ralph-loop helper — seed every function FM's KPIs with synthetic
+# values so the building's KPI tickers read as populated for the
+# demo / smoke. Idempotent. Safe to call repeatedly.
+@router.post("/seed-kpis")
+async def seed_kpis():
+    import random as _rnd
+    from api.shared.functions import FUNCTIONS
+
+    fm_registry = getattr(app_state, "function_fms", None)
+    if not fm_registry:
+        return {"ok": False, "reason": "function_fms not initialised"}
+
+    period = _time.strftime("%Y-%m")
+    seeded: list[dict] = []
+    for fn_key, fn_spec in FUNCTIONS.items():
+        if fn_key == "legacy" or not fn_spec.kpis:
+            continue
+        fm = fm_registry.get(fn_key)
+        if fm is None:
+            continue
+        for metric in fn_spec.kpis:
+            # Pseudo-random but deterministic per (fn, metric) so reseeds
+            # don't churn the building's KPI tickers wildly.
+            rng = _rnd.Random(f"{fn_key}:{metric}")
+            base = rng.uniform(10, 95)
+            value = round(base + rng.uniform(-2.0, 2.0), 1)
+            try:
+                fm.publish_kpi(metric, value, period)
+                seeded.append({"function": fn_key, "metric": metric,
+                               "value": value, "period": period})
+            except Exception as exc:  # noqa: BLE001
+                seeded.append({"function": fn_key, "metric": metric,
+                               "error": str(exc)})
+    return {"ok": True, "count": len(seeded), "seeded": seeded[:20]}
+
+
+# ---------------------------------------------------------------------------
+# Org Ops v2 — burst injector for the operator views' "spawn 5" button.
+# Picks a varied selection of workflows so the live stream / conversations /
+# river immediately show activity across multiple functions, not just one.
+# ---------------------------------------------------------------------------
+@router.post("/inject-burst")
+async def inject_burst(n: int = 5):
+    """Spawn ~n varied workflows across multiple domains.
+
+    Used by the Org Ops v2 page top-right "burst" button so an operator can
+    pump activity at will. Distributes across finance / hr / ops / legal /
+    marketing so all three views get cross-function content. Returns a list
+    of spawned workflow_ids.
+    """
+    import asyncio
+    from api.server.services.simulator_orchestrator import (  # noqa: E402
+        spawn_fleet_vendor_kyc_workflow,
+        spawn_fleet_ap_invoice_workflow,
+        spawn_fleet_perf_review_workflow,
+        spawn_fleet_treasury_fx_workflow,
+        spawn_fleet_contract_renewal_workflow,
+        spawn_fleet_employee_onboarding_workflow,
+        spawn_fleet_it_access_request_workflow,
+        spawn_fleet_purchase_order_workflow,
+        spawn_creative_campaign_workflow,
+        spawn_hiring_workflow,
+    )
+    n = max(1, min(int(n or 5), 20))
+    spawners = [
+        ("vendor-kyc", spawn_fleet_vendor_kyc_workflow()),
+        ("ap-invoice", spawn_fleet_ap_invoice_workflow()),
+        ("perf-review", spawn_fleet_perf_review_workflow()),
+        ("hiring", spawn_hiring_workflow()),
+        ("treasury-fx", spawn_fleet_treasury_fx_workflow()),
+        ("creative-campaign", spawn_creative_campaign_workflow()),
+        ("contract-renewal", spawn_fleet_contract_renewal_workflow()),
+        ("employee-onboarding", spawn_fleet_employee_onboarding_workflow()),
+        ("it-access-request", spawn_fleet_it_access_request_workflow()),
+        ("purchase-order", spawn_fleet_purchase_order_workflow()),
+    ]
+    selected = spawners[:n]
+    results = await asyncio.gather(
+        *[coro for _, coro in selected], return_exceptions=True,
+    )
+    spawned: list[dict] = []
+    for (domain, _), result in zip(selected, results):
+        if isinstance(result, Exception):
+            spawned.append({"domain": domain, "error": str(result)})
+        else:
+            spawned.append({"domain": domain, "workflow_id": result})
+    return {"ok": True, "count": len(spawned), "spawned": spawned}

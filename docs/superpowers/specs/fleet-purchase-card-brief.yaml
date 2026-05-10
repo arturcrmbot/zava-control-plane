@@ -1,0 +1,68 @@
+# Purchase-card — compose-domain v4 brief.
+#
+# THE 13th BRIEF (TASK-040). Fresh "substrate-by-construction" smoke:
+# unlike the 12 backfills, this domain has NO Phase 1 hand-written
+# projection module. The codegen is exercised end-to-end against this
+# brief in tests/docs/superpowers/skills/compose_domain/test_fleet_purchase_card_smoke.py.
+#
+# Story: an employee pays for a small business expense with their
+# corporate purchase-card. The card transaction lands; they upload a
+# receipt; their line manager reviews and approves (or rejects, kicking
+# off a clawback). Two entities (Person, Money), one HITL gate.
+
+domain:
+  workflow_type: purchase-card
+  prefix: fleet
+  display_name: Purchase-card reconciliation
+  description: |
+    A corporate purchase-card transaction needs a receipt + line
+    manager approval before it is reconciled to the cardholder's
+    cost-centre. Substrate smoke: no hand-written projection — the
+    compose-domain v4 codegens are the canonical authoring surface.
+
+phases:
+  - name: txn_intake
+    kind: deterministic
+    intent: Capture the card transaction (cardholder, amount, currency, MCC).
+  - name: receipt_match
+    kind: agent
+    agent_skill_name: receipt-matcher
+    intent: Match an uploaded receipt to the transaction; flag mismatches.
+  - name: manager_approval
+    kind: hitl
+    persona: line_manager
+    external_event: manager_approval_decision
+
+entities:
+  - kind: Person
+    source: cardholder
+    ref_field: payload.cardholder_id
+    attributes:
+      department: payload.department
+  - kind: Money
+    source: pcard-txn
+    ref_field: payload.txn_id
+    attributes:
+      currency: payload.currency
+      merchant_category: payload.mcc
+
+decisions:
+  - phase: manager_approval
+    persona: line_manager
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.txn_id]
+    attributes_from_context:
+      txn_id: payload.txn_id
+      amount_gbp: payload.amount_gbp
+      cardholder_id: payload.cardholder_id
+
+function: finance
+
+ambient:
+  name: PurchaseCardWatcher
+  function: finance
+  reasoning_skill: null
+  spawnable_workflow_types: [purchase-card]
+  triggers:
+    - kind: bus
+      event_type: pcard.txn.posted

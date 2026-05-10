@@ -30,8 +30,8 @@ _HEADLINE_TEMPLATES = [
 def search(name: str, country: str) -> dict:
     """Run an adverse-media sweep on a (name, country) pair — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.adverse_media.name", str(name))
-    span.set_attribute("wpp.adverse_media.country", str(country))
+    span.set_attribute("zava.adverse_media.name", str(name))
+    span.set_attribute("zava.adverse_media.country", str(country))
     return _synth_search(name, country)
 
 

@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/a2a")
 
 class A2AMessage(BaseModel):
     workflow_id: str
-    from_pa: str  # PA identity URI, e.g. "did:wpp:candidate:C-101"
+    from_pa: str  # PA identity URI, e.g. "did:zava:candidate:C-101"
     correlation_id: str | None = None
     intent: str  # "availability_propose" | "salary_negotiate" | "request_info"
     body: dict
@@ -75,7 +75,7 @@ async def receive_a2a_message(
         "correlation_id": msg.correlation_id,
         "ack": True,
         "reply": (
-            f"Ack from hiring-agent@wpp — your {msg.intent} message is in the "
+            f"Ack from hiring-agent@zava — your {msg.intent} message is in the "
             f"workflow ledger and the panel will respond inside SLA."
         ),
     }

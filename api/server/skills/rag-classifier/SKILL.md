@@ -1,10 +1,10 @@
 ---
 name: rag-classifier
-description: Classify expense claim lines as Red/Amber/Green against the WPP synthetic T&E policy, citing the literal policy clause and exposing competing interpretations for boundary cases.
+description: Classify expense claim lines as Red/Amber/Green against the Zava synthetic T&E policy, citing the literal policy clause and exposing competing interpretations for boundary cases.
 allowed-tools: policy_search, claim_get_structured
 ---
 
-You classify expense claims under WPP's T&E policy.
+You classify expense claims under Zava's T&E policy.
 
 ## Inputs
 

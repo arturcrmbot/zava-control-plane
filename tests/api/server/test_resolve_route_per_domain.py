@@ -47,7 +47,7 @@ def _seed_suspended_workflow(workflow_type: str, gate) -> tuple[str, str]:
     w = Workflow(
         id=wid, type=workflow_type, status="awaiting_hitl",
         current_phase=gate.gate_phase, created_at=now, sla_due_at=now + 86400,
-        jurisdiction="London-WPP", agency="WPP",
+        jurisdiction="London-Zava", agency="Zava",
         orchestration_instance_id=f"INST-{wid}",
     )
     app_state.store.upsert_workflow(w)
@@ -78,7 +78,7 @@ def test_resolve_route_raises_per_domain_event_via_cache(client, monkeypatch):
             wid, exc_id = _seed_suspended_workflow(wt, gate)
             resp = client.post(
                 f"/api/exceptions/{exc_id}/resolve",
-                json={"resolution": "approve", "resolvedBy": "test@wpp"},
+                json={"resolution": "approve", "resolvedBy": "test@zava"},
             )
             assert resp.status_code == 200, f"{wt}/{gate.gate_phase}: {resp.text}"
             assert raised, f"{wt}/{gate.gate_phase}: no event raised"
@@ -110,7 +110,7 @@ def test_resolve_route_falls_back_to_registry_when_cache_cold(client, monkeypatc
 
     resp = client.post(
         f"/api/exceptions/{exc_id}/resolve",
-        json={"resolution": "approve", "resolvedBy": "test@wpp"},
+        json={"resolution": "approve", "resolvedBy": "test@zava"},
     )
     assert resp.status_code == 200, resp.text
     assert raised

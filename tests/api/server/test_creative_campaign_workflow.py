@@ -118,7 +118,7 @@ def test_build_workflow_from_corpus_record():
     assert (w.payload or {}).get("brief", {}).get("client_brand") == "Voltari"
     assert (w.payload or {}).get("scenario") == "clean"
     assert w.agency == "Wunderman Thompson"
-    assert w.jurisdiction == "DE-WPP"
+    assert w.jurisdiction == "DE-Zava"
 
 
 # --------------------------------------------------------------------------

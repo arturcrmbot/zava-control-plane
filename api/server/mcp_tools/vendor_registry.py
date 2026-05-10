@@ -40,8 +40,8 @@ _COUNTRIES = ["GB", "US", "DE", "FR", "JP", "AE", "SG", "CH"]
 def lookup_vendor(vendor_name: str, country: str) -> dict:
     """Return the registry record for a (vendor_name, country) pair — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.vendor_registry.vendor_name", str(vendor_name))
-    span.set_attribute("wpp.vendor_registry.country", str(country))
+    span.set_attribute("zava.vendor_registry.vendor_name", str(vendor_name))
+    span.set_attribute("zava.vendor_registry.country", str(country))
     return _synth_lookup_vendor(vendor_name, country)
 
 
@@ -95,8 +95,8 @@ def vendor_registry_lookup_vendor_tool(params: _LookupVendorParams) -> ToolResul
 def list_filings(registry_id: str, months: int = 24) -> dict:
     """Return the regulatory filings for a registry_id over the last N months — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.vendor_registry.registry_id", str(registry_id))
-    span.set_attribute("wpp.vendor_registry.months", int(months))
+    span.set_attribute("zava.vendor_registry.registry_id", str(registry_id))
+    span.set_attribute("zava.vendor_registry.months", int(months))
     return _synth_list_filings(registry_id, months)
 
 
@@ -160,7 +160,7 @@ def vendor_registry_list_filings_tool(params: _ListFilingsParams) -> ToolResult:
 def list_ubos(registry_id: str) -> dict:
     """Return the ultimate beneficial owners for a registry_id — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.vendor_registry.registry_id", str(registry_id))
+    span.set_attribute("zava.vendor_registry.registry_id", str(registry_id))
     return _synth_list_ubos(registry_id)
 
 

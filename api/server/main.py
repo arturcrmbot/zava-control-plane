@@ -24,6 +24,12 @@ app_state.fm = FleetManagerService(
     bus=app_state.bus, store=app_state.store, audit=app_state.audit,
     on_live=_on_live,
 )
+# Phase 3 (TASK-028) — instantiate per-non-legacy-function FMs once
+# ``app_state`` is module-bound. Done here (not in AppState.__init__)
+# because the mcp_tools package eagerly imports submodules that
+# themselves do ``from api.server.state import app_state``; populating
+# function_fms inside __init__ would race the binding.
+app_state.init_function_fms()
 
 
 @asynccontextmanager
@@ -39,6 +45,13 @@ async def lifespan(app: FastAPI):
         await app_state.fm.start()
     except Exception as ex:
         print(f"[server] Fleet Manager failed to start: {ex}")
+    # Phase 3 IP6 — start the ambient dispatcher inside the lifespan so
+    # cypher sweep loops are scheduled on the running event loop.
+    try:
+        if hasattr(app_state, "ambient_dispatcher"):
+            app_state.ambient_dispatcher.start()
+    except Exception as ex:
+        print(f"[server] Ambient dispatcher failed to start: {ex}")
     # Start the simulator ramp loop (spawns workflows via the AF Durable host)
     ramp_task = asyncio.create_task(simulator_orchestrator.ramp_loop())
     from api.server.eval.online_subscriber import lifespan_register, lifespan_shutdown
@@ -73,15 +86,21 @@ async def lifespan(app: FastAPI):
     # data/synthetic/hiring/reqs.json). Idempotent — safe to re-run.
     # Run as a background task so FastAPI startup is not blocked while
     # seed_demo_reqs waits for the Functions host to bind.
-    from api.server.services.portal_seed import seed_demo_reqs
-    async def _seed_in_background():
-        try:
-            seeded = await seed_demo_reqs(app_state)
-            if seeded:
-                print(f"[server] seeded {len(seeded)} demo hiring reqs: {seeded}")
-        except Exception as ex:
-            print(f"[server] portal demo-req seeding failed: {ex}")
-    seed_task = asyncio.create_task(_seed_in_background())
+    # Gated by PORTAL_SEED_REQS=1; off by default so the POC2 demo can
+    # walk a real apply → triage → screen flow without three pre-existing
+    # HIRE-DEMO-* workflows in the queue.
+    if _os.environ.get("PORTAL_SEED_REQS") == "1":
+        from api.server.services.portal_seed import seed_demo_reqs
+        async def _seed_in_background():
+            try:
+                seeded = await seed_demo_reqs(app_state)
+                if seeded:
+                    print(f"[server] seeded {len(seeded)} demo hiring reqs: {seeded}")
+            except Exception as ex:
+                print(f"[server] portal demo-req seeding failed: {ex}")
+        seed_task = asyncio.create_task(_seed_in_background())
+    else:
+        seed_task = asyncio.create_task(asyncio.sleep(0))
 
     # Wire bus -> hub fan-out inside the lifespan so each app instance owns
     # exactly one subscription. Previously this lived at module import time,
@@ -130,7 +149,7 @@ async def lifespan(app: FastAPI):
         await lifespan_shutdown(app)
 
 
-app = FastAPI(title="WPP Control Plane (Python POC1)", lifespan=lifespan)
+app = FastAPI(title="Zava Control Plane (Python POC1)", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], allow_credentials=True,
@@ -179,6 +198,13 @@ from api.server.routes.personas import router as personas_router
 from api.server.routes.authority import router as authority_router
 # Governance kernel surface (Phase 4 of feature-agent-governance-toolkit-1).
 from api.server.routes.governance import router as governance_router
+# Entity-graph plane read API (Phase 1 TASK-030..-035).
+from api.server.routes.entities import router as entities_router
+from api.server.routes.functions import router as functions_router
+from api.server.routes.functions_ambient import router as functions_ambient_router
+from api.server.routes.cadences import router as cadences_router
+# Cosmic Lens v2 — capabilities/entities city roster + affinity for the new viz
+from api.server.routes.cities import router as cities_router
 
 for r in (stream_router, workflows_router, exceptions_router, policy_router,
           simulator_router, audit_router, evals_router, orchestration_router,
@@ -191,6 +217,11 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           blueprint_router,
           personas_router, authority_router,
           governance_router,
+          entities_router,
+          functions_router,
+          functions_ambient_router,
+          cadences_router,
+          cities_router,
           foundry_router):
     app.include_router(r)
 

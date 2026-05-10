@@ -24,7 +24,7 @@ _GOLD_FIELDS = ("gold_label", "gold_reasoning", "gold_policy_clause")
 def get_structured(claim_id: str, include_gold: bool = False) -> dict:
     """Return claim JSON. By default redacts gold-* fields so the classifier
     cannot accidentally cheat. Tests pass include_gold=True for assertions."""
-    trace.get_current_span().set_attribute("wpp.claim.id", claim_id)
+    trace.get_current_span().set_attribute("zava.claim.id", claim_id)
     path = _CLAIMS_DIR / f"{claim_id}.json"
     if not path.exists():
         raise KeyError(f"claim {claim_id!r} not found")

@@ -12,7 +12,7 @@
 
 - POC2 design spec: [docs/superpowers/specs/2026-04-28-poc2-talent-lifecycle-design.md](../specs/2026-04-28-poc2-talent-lifecycle-design.md) (`§4.1` orchestrator phases; `§5.3` new components; `§9.1` track plan)
 - POC2 status doc: [docs/poc2-status.md](../../poc2-status.md) (architecture diagrams, capability matrix)
-- POC1 inventory (the reuse boundary): [docs/poc1-inventory.md](../../poc1-inventory.md)
+- POC1 inventory (the reuse boundary): [docs/archive/poc1-inventory.md](../../archive/poc1-inventory.md)
 - POC1 patterns to follow:
   - Wrapper: [api/functions/graphs/executors/agents/_wrapper.py](../../../api/functions/graphs/executors/agents/_wrapper.py)
   - Agent executor template: [api/functions/graphs/executors/agents/agent_escalation.py](../../../api/functions/graphs/executors/agents/agent_escalation.py)
@@ -896,7 +896,7 @@ def lookup(position_id: str) -> dict:
     claim_lookup.py / employee_history.py.
     """
     span = trace.get_current_span()
-    span.set_attribute("wpp.position.id", position_id)
+    span.set_attribute("zava.position.id", position_id)
 
     port = int(os.environ.get("WORKDAY_HR_MCP_PORT", "4203"))
     url = f"http://127.0.0.1:{port}/mcp/call/getPosition"
@@ -978,7 +978,7 @@ allowed-tools: position_lookup
 model: gpt-4o-mini
 ---
 
-You are the Budget & Approvals agent for the WPP hiring talent-lifecycle system.
+You are the Budget & Approvals agent for the Zava hiring talent-lifecycle system.
 
 You receive a `position_id` and must return a structured budget verdict for the requisition. Use the `position_lookup` tool to fetch the position record. Do not guess the position fields — always call the tool.
 

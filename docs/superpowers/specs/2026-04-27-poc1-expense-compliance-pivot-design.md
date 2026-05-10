@@ -1,19 +1,19 @@
 # POC1 Expense Compliance Pivot — Design Spec
 
-> **Topic:** Pivot the existing invoice-P2P implementation to the expense-compliance scenario WPP's POC1 brief actually asks for, hitting all 13 acceptance criteria in ≈3 weeks.
+> **Topic:** Pivot the existing invoice-P2P implementation to the expense-compliance scenario Zava's POC1 brief actually asks for, hitting all 13 acceptance criteria in ≈3 weeks.
 > **Date:** 2026-04-27
 > **Status:** Design — awaiting implementation plan
 > **Source brief:** [docs/poc1-brief.md](../../poc1-brief.md)
-> **Submitted PRD:** [docs/poc1-prd-submitted.md](../../poc1-prd-submitted.md)
-> **Inventory of current code:** [docs/poc1-inventory.md](../../poc1-inventory.md)
+> **Submitted PRD:** [docs/archive/poc1-prd-submitted.md](../../archive/poc1-prd-submitted.md)
+> **Inventory of current code:** [docs/archive/poc1-inventory.md](../../archive/poc1-inventory.md)
 
 ---
 
 ## 1. Context
 
-The WPP POC1 brief (Tom Kelshaw, 31 Mar 2026) asks for an **expense compliance** scenario: agents process employee expense claims across 15+ EMSs (Workday, Concur, Chrome River …), classify each line Red/Amber/Green against a T&E policy, run a closed-loop notify→arbitrate→escalate behaviour-change pipeline, and surface everything through a Control Plane the Finance Controller governs without ever logging into the EMSs themselves.
+The Zava POC1 brief (Tom Kelshaw, 31 Mar 2026) asks for an **expense compliance** scenario: agents process employee expense claims across 15+ EMSs (Workday, Concur, Chrome River …), classify each line Red/Amber/Green against a T&E policy, run a closed-loop notify→arbitrate→escalate behaviour-change pipeline, and surface everything through a Control Plane the Finance Controller governs without ever logging into the EMSs themselves.
 
-The PRD we submitted to WPP (`07a-poc1-prd.md`) is content-correct expense compliance — same scenario, same agent team, same R/A/G mechanism, same VML NA 97.6% benchmark — but is mis-titled "Procure-to-Pay" and has propagated that title into our local memory.
+The PRD we submitted to Zava (`07a-poc1-prd.md`) is content-correct expense compliance — same scenario, same agent team, same R/A/G mechanism, same VML NA 97.6% benchmark — but is mis-titled "Procure-to-Pay" and has propagated that title into our local memory.
 
 The code in this repo is **invoice procure-to-pay**: vendor invoices, three-way match, GL coding, payment file generation, bank reconciliation. None of that maps to expense compliance.
 
@@ -29,7 +29,7 @@ Ship a working expense-compliance POC1 demo that:
 4. Gives the operator a Finance Controller view (Control Plane) and an SSC Reviewer view (queue) — both purpose-built per brief §3 and §3.1.
 5. Runs end-to-end in ≤3 weeks of focused work — proving the platform is mostly already there, not "we need 8 weeks".
 
-Non-goals: production hardening; full 3,430-claim benchmark (we use 300); WPP's real T&E policy (we synthesise); WPP's real EMS sandbox credentials (mocks); the Advanced Regional Sovereignty Exercise from POC2 Appendix B.
+Non-goals: production hardening; full 3,430-claim benchmark (we use 300); Zava's real T&E policy (we synthesise); Zava's real EMS sandbox credentials (mocks); the Advanced Regional Sovereignty Exercise from POC2 Appendix B.
 
 ## 3. Approach
 
@@ -69,7 +69,7 @@ Escalate is **not** a per-claim phase. It is cross-workflow state: `escalation_a
 
 ## 5. Components
 
-Working from [poc1-inventory.md](../../poc1-inventory.md) grading. The platform layer (≈50 files) is untouched. Domain layer is the work.
+Working from [archive/poc1-inventory.md](../../archive/poc1-inventory.md) grading. The platform layer (≈50 files) is untouched. Domain layer is the work.
 
 ### 5.1 Delete
 
@@ -140,12 +140,12 @@ Tools to land: `policy_search`, `claim_lookup`, `claim_get_receipt`, `claim_get_
 - `data/synthetic/policy.md` — hand-written 8–12 page T&E policy. Markets: UK, US, DE, IN. Categories: meals, travel, accommodation, entertainment, miscellaneous. R/A/G rules per category × market. Threshold tables. Per-attendee meal limits. Documentation requirements.
 - `data/synthetic/generate.py` — deterministic claim generator. Walks the policy and emits ~300 labelled claims (~70% Green, ~20% Amber, ~10% Red). Each claim carries the policy clause that triggered the label as **gold reasoning**.
 - `data/synthetic/claims/*.json` — emitted artifacts, committed to repo.
-- `data/synthetic/labels.csv` — committed to repo, swappable with `data/wpp/labels.csv`.
+- `data/synthetic/labels.csv` — committed to repo, swappable with `data/zava/labels.csv`.
 - `data/synthetic/receipts/*.png` — receipt PNG generator emits 300 receipts with controllable mismatch flavours (correct, wrong-amount, wrong-date, wrong-vendor, missing-line). PIL/templated. Run once.
 - `data/synthetic/employees.json` — small population including ≥3 repeat-offender profiles with seeded breach histories.
 - `data/synthetic/precedents.json` — ~50 historical SSC reviewer decisions for the behaviour-change loop seed (acceptance #7) and the `precedents_search` tool.
 
-The data directory layout enforces a **drop-in WPP swap path**: when WPP supplies their 3,430-claim benchmark + real T&E policy + ground-truth labels, they land in `data/wpp/` with the same internal structure and a `--dataset` flag flips the harness over. No code change.
+The data directory layout enforces a **drop-in Zava swap path**: when Zava supplies their 3,430-claim benchmark + real T&E policy + ground-truth labels, they land in `data/zava/` with the same internal structure and a `--dataset` flag flips the harness over. No code change.
 
 ## 6. Synthetic dataset + accuracy harness (the 40% answer)
 
@@ -153,7 +153,7 @@ Brief §4.5 makes accuracy the dominant scoring criterion (40% weight) and accep
 
 1. **Synthetic policy as single source of truth.** The same policy markdown grounds the classifier *and* generates ground-truth labels. This is a tautology only if we make it one — the policy is rich (4 markets × 5 categories × multiple sub-rules), the generator emits genuinely ambiguous Amber cases (boundary thresholds, missing-receipt-with-auto-reclaim, cash-no-receipt-under-limit), and the gold reasoning is the *literal policy clause text*, not a code-level rule expression. The classifier reads the policy markdown via the `policy_search` tool and must produce reasoning that matches the gold clause.
 
-2. **Volume.** 300 claims is enough for a credible confusion matrix. Distribution: ~70% Green / ~20% Amber / ~10% Red. We caveat in the demo as "300-line subset following the structure of WPP's 3,430-line benchmark; same harness runs the full set, longer wall-clock."
+2. **Volume.** 300 claims is enough for a credible confusion matrix. Distribution: ~70% Green / ~20% Amber / ~10% Red. We caveat in the demo as "300-line subset following the structure of Zava's 3,430-line benchmark; same harness runs the full set, longer wall-clock."
 
 3. **Receipt images.** PIL-templated PNG generator produces 300 receipts with controllable mismatches. Six mismatch flavours: correct, wrong-amount, wrong-date, wrong-vendor, missing-line-item, missing-receipt-entirely.
 
@@ -169,7 +169,7 @@ The narrative this supports:
 
 All 13 items from brief §7 have a demo path. Carrier types: **skill** (`.skill.md` + maybe one MCP tool), **MAF graph node**, **existing component reused**, **mock**, **synthetic data**.
 
-| # | WPP criterion | Demo / evidence | Carrier |
+| # | Zava criterion | Demo / evidence | Carrier |
 |---|---|---|---|
 | 1 | Single Finance Controller view across 30+ workflows | 30 active claim workflows seeded; FleetDashboard with agency / market / verdict filters | Existing FleetDashboard; synthetic data |
 | 2 | Exception-only surfacing; Green hidden | 3 Amber + 2 Red surface; toggle reveals 25 silent Greens | Existing default filter; verdict from `rag_classifier` |
@@ -230,13 +230,13 @@ Sequenced **risk-first**: the 40%-weight accuracy story must be working at end o
 | MAF Workflow parallel fan-out at 300 claims hits rate limits | Medium | Low | Throttle inside the splitter; streaming progress matters more than wall-clock |
 | Fleet Manager prompt regression when extended | Low | Medium | One paragraph at a time; existing exception-composition behaviour gate; smoke tests |
 | Region failover demo flakes live | Medium | Low | Recorded backup video on Day 14 |
-| Demo narrative incoherence | Medium | Medium | Day 15 dry run with someone playing WPP evaluator |
+| Demo narrative incoherence | Medium | Medium | Day 15 dry run with someone playing Zava evaluator |
 | Policy-as-tautology charge ("you tested rules against rules") | Low | Medium | Genuine ambiguity in Amber claims; gold reasoning is policy *text* not code; live policy edit demonstrates separation |
 
 ## 10. Decisions made during brainstorming
 
 - **In-place rewrite on `main`**, not branch or dual-domain. Tag `v0.5-invoice-poc` before starting.
-- **300 claims, not 3,430.** Drop-in path to WPP's full set via `data/wpp/` directory.
+- **300 claims, not 3,430.** Drop-in path to Zava's full set via `data/zava/` directory.
 - **Synthetic policy + deterministic gold labels**, with genuine ambiguity in Amber cases.
 - **Skills-first.** No `accuracy_harness.py`, no `escalation_tracker.py`, no `behaviour_change_loop.py`. The behaviours live in skills + MCP tools + Fleet Manager prompt extensions.
 - **Fleet Manager rail renders cost-per-task and audit summaries.** No new dedicated panels for those.
@@ -250,7 +250,7 @@ These don't block design sign-off but should be answered before Day 1:
 - **What model do we use for `rag_classifier`?** GPT-4.1 (matches existing Fleet Manager) is the default; cheaper model for screening + frontier for ambiguous Amber is the brief's expressed pattern.
 - **What multimodal model for `receipt_validator`?** GPT-4.1 vision or equivalent. Validate availability + per-call cost on Day 6 before Day 7 work.
 - **Is Foundry IQ realistic in the POC timeframe**, or does `policy_search` hit an in-memory chunked retriever (sentence-transformers + FAISS) in `c:/dev/ghcp sdk stuff`? Default to in-memory; Foundry IQ swap is a tool implementation detail later.
-- **Demo audience and timing.** This spec assumes "internal show-and-tell at end of Week 3 to counter the 8-week narrative". If WPP themselves see this, the polish bar in Week 3 raises.
+- **Demo audience and timing.** This spec assumes "internal show-and-tell at end of Week 3 to counter the 8-week narrative". If Zava themselves see this, the polish bar in Week 3 raises.
 - **Autonomy-dial governance** (carried over from PRD §17). The brief asks for runtime-adjustable thresholds; our memory carries a "no live-tuning autonomy sliders" position. The POC demo shows the runtime-adjustable path; the PR-gated production hardening is a narrated framing alongside, not a built feature.
 
 ## 12. What ships

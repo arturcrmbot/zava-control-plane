@@ -2255,6 +2255,29 @@ wheels = [
 ]
 
 [[package]]
+name = "kuzu"
+version = "0.6.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/7b/54/7ca80bbd6c2c4cfdc880df1fa4a0044903e1f01591864714d052a15ba89e/kuzu-0.6.1.tar.gz", hash = "sha256:0281cfd3fb39993a72967eb6fdf4be740fba43fbea527d1c2cb575a4ebcfc69c", size = 4214124, upload-time = "2024-10-14T22:14:31.248Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9d/89/0692eec0f8cc7fe098f52a05b2730a27bff40994d5b4bec558a205fe2dc8/kuzu-0.6.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:82e6caa2b96ae58b67dd826b6fc6486f99496437172e59f939a488b81f521a79", size = 3339931, upload-time = "2024-10-14T22:13:33.742Z" },
+    { url = "https://files.pythonhosted.org/packages/32/56/0c38692236eb56dd4f1047d8b5d028b2a94801130b81b34944a2e8d810f2/kuzu-0.6.1-cp311-cp311-macosx_11_0_x86_64.whl", hash = "sha256:f765bfc415ba636c56b41cb40a37edcd4edb4389f4009654f40aafae29550531", size = 3814197, upload-time = "2024-10-14T22:13:35.588Z" },
+    { url = "https://files.pythonhosted.org/packages/16/74/781fb691099de1d1397cc065a906b2c477f3f0eb2f69103863cd9d7567c4/kuzu-0.6.1-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:eb6d16d2e17e2b472e6714f6c0e84ca93d43e46c997bafba3b1be537919d9d92", size = 5530632, upload-time = "2024-10-14T22:13:37.163Z" },
+    { url = "https://files.pythonhosted.org/packages/03/16/d4a90acb4240be37780fd74c60091d8d9786de3eacc504b67d2260bd7530/kuzu-0.6.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:2a17eff4deefca07a7321d99d38c6828c5cd5b534e5a42899bb59991bbc38794", size = 6009752, upload-time = "2024-10-14T22:13:39.528Z" },
+    { url = "https://files.pythonhosted.org/packages/76/56/a64b725b3e1573cb4e490a73eb61468a778a04f81c915e11b90b05234142/kuzu-0.6.1-cp311-cp311-win_amd64.whl", hash = "sha256:3814c3f6454caa01dd9da19fb0e2ce8997c82f28b2918cd34a9124b08732db92", size = 3829108, upload-time = "2024-10-14T22:13:42.546Z" },
+    { url = "https://files.pythonhosted.org/packages/09/60/db6d3e760768f7a61378380535abf5169137ff23a78ce9ca2c310bcd9ec5/kuzu-0.6.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:04139f0fc0bbca57bf4f4db87e1d971d0337fa88739682eef1809bd65baf959d", size = 3340493, upload-time = "2024-10-14T22:13:44.048Z" },
+    { url = "https://files.pythonhosted.org/packages/23/10/b51c1100abc6172f0202d731bae2af7be5a8874b5e5b8bdb651870d3b1cf/kuzu-0.6.1-cp312-cp312-macosx_11_0_x86_64.whl", hash = "sha256:9b246408f8b442679f573d933fe4beb56e6cc0cb594222c9b546e9be300b567d", size = 3816403, upload-time = "2024-10-14T22:13:45.6Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/4a/5769576f9e67ef9b1c6a0388e8332bba3da26d58df8f0b2febe7843d881e/kuzu-0.6.1-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:4309805a656621c9aa31771024b5a7b2e5c86ce0a517173e42a70e7cef657e67", size = 5529103, upload-time = "2024-10-14T22:13:47.41Z" },
+    { url = "https://files.pythonhosted.org/packages/e1/8e/58433b8deeeb736f368a2b375502884e7d6b68dae371164e3a47903d4de8/kuzu-0.6.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:2094f598c8648faeade08ecf97c30ef99984d14cb2cbd03fdc6baaab499ba2ca", size = 6007605, upload-time = "2024-10-14T22:13:49.137Z" },
+    { url = "https://files.pythonhosted.org/packages/77/46/54c4d784ab8916169d5500a531a8c9f4bec7226b19461b05374eeabe7627/kuzu-0.6.1-cp312-cp312-win_amd64.whl", hash = "sha256:fcb07d62cc9c7dd3c320d780ac6fe3248c9cb9d8e90e64050c281088dc09a772", size = 3830506, upload-time = "2024-10-14T22:13:50.849Z" },
+    { url = "https://files.pythonhosted.org/packages/29/eb/c2abbafe7469b18b0272160e837a03839b1ab3bd4add8fef72004a5004ad/kuzu-0.6.1-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:1bcab0f215791ff52721771a1162323264bdec7e7f57e5692367e75d58be413b", size = 5528861, upload-time = "2024-10-14T22:13:52.886Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/f2/aa1c6039d7a2205f29f9f59ef250f178e2b932670c47b80d9d01746624b9/kuzu-0.6.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:c6005015f903a73cb7b2f4b11c1443d46a44e3772cec29a112c3bed687f03735", size = 6007079, upload-time = "2024-10-14T22:13:54.593Z" },
+    { url = "https://files.pythonhosted.org/packages/84/4a/c7f42e9769107eb80bacf7ba727a33b0ab16e8e8063a85e266760b266250/kuzu-0.6.1-cp313-cp313-win_amd64.whl", hash = "sha256:de0c4ffc4f0df6daafcf0a00a0f299fe528a41c15f438ff449c3fa57fd1f2db8", size = 3830221, upload-time = "2024-10-14T22:13:57.832Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/f5/350d1fbed555e3ee8cdee0892b7ab94e25d5dd24c5825d228ac2f1b234b4/kuzu-0.6.1-cp313-cp313t-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:7787a5950d05c4d3d06173ee53b8f6cd38522bf985985355265648c87792ae0d", size = 5533608, upload-time = "2024-10-14T22:13:59.408Z" },
+    { url = "https://files.pythonhosted.org/packages/37/e4/a8f5c504a6e827c25f709ce6937ff44f0a8f7c311bf6f56fe44e95f1b4f2/kuzu-0.6.1-cp313-cp313t-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:ea0f458168b8354971b2bc3996db8a684d5c4a8e18ea050ca980b47a9396083d", size = 6013294, upload-time = "2024-10-14T22:14:01.08Z" },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -5187,91 +5210,6 @@ wheels = [
 ]
 
 [[package]]
-name = "wpp-control-plane-py"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "agent-framework" },
-    { name = "agent-framework-azurefunctions" },
-    { name = "agent-framework-github-copilot" },
-    { name = "agent-governance-toolkit", extra = ["full"] },
-    { name = "azure-ai-documentintelligence" },
-    { name = "azure-ai-evaluation" },
-    { name = "azure-functions" },
-    { name = "azure-functions-durable" },
-    { name = "azure-identity" },
-    { name = "azure-monitor-opentelemetry" },
-    { name = "azure-storage-blob" },
-    { name = "fastapi" },
-    { name = "github-copilot-sdk" },
-    { name = "httpx" },
-    { name = "nanoid" },
-    { name = "opentelemetry-instrumentation-fastapi" },
-    { name = "opentelemetry-instrumentation-httpx" },
-    { name = "pillow" },
-    { name = "pydantic" },
-    { name = "python-dotenv" },
-    { name = "python-multipart" },
-    { name = "pyyaml" },
-    { name = "reportlab" },
-    { name = "sentence-transformers" },
-    { name = "sse-starlette" },
-    { name = "uvicorn", extra = ["standard"] },
-    { name = "weasyprint" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "google-genai" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-mock" },
-    { name = "respx" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "agent-framework", specifier = ">=1.0.1" },
-    { name = "agent-framework-azurefunctions", specifier = ">=1.0.0b260409" },
-    { name = "agent-framework-github-copilot", specifier = ">=1.0.0b260409" },
-    { name = "agent-governance-toolkit", extras = ["full"], specifier = ">=3.4,<3.5" },
-    { name = "azure-ai-documentintelligence", specifier = ">=1.0.2" },
-    { name = "azure-ai-evaluation", specifier = ">=1.0.0" },
-    { name = "azure-functions", specifier = ">=1.24" },
-    { name = "azure-functions-durable", specifier = ">=1.2" },
-    { name = "azure-identity", specifier = ">=1.25.3" },
-    { name = "azure-monitor-opentelemetry", specifier = ">=1.6.0" },
-    { name = "azure-storage-blob", specifier = ">=12.20" },
-    { name = "fastapi", specifier = ">=0.115" },
-    { name = "github-copilot-sdk", specifier = ">=0.2.1" },
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "nanoid", specifier = ">=2.0" },
-    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.48b0" },
-    { name = "opentelemetry-instrumentation-httpx", specifier = ">=0.48b0" },
-    { name = "pillow", specifier = ">=10.0" },
-    { name = "pydantic", specifier = ">=2.9" },
-    { name = "python-dotenv", specifier = ">=1.0" },
-    { name = "python-multipart", specifier = ">=0.0.20" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "reportlab", specifier = ">=4.5.0" },
-    { name = "sentence-transformers", specifier = ">=3.0" },
-    { name = "sse-starlette", specifier = ">=2.1" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
-    { name = "weasyprint", specifier = ">=68.1" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "google-genai", specifier = ">=1.0" },
-    { name = "pytest", specifier = ">=8.3" },
-    { name = "pytest-asyncio", specifier = ">=0.24" },
-    { name = "pytest-mock", specifier = ">=3.14" },
-    { name = "respx", specifier = ">=0.21" },
-    { name = "ruff", specifier = ">=0.7" },
-]
-
-[[package]]
 name = "wrapt"
 version = "1.17.3"
 source = { registry = "https://pypi.org/simple" }
@@ -5450,6 +5388,93 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/e1/19/3774d162f6732d1cfb0b47b4140a942a35ca82bb19b6db1f80e9e7bdc8f8/yarl-1.23.0-cp314-cp314t-win_amd64.whl", hash = "sha256:4503053d296bc6e4cbd1fad61cf3b6e33b939886c4f249ba7c78b602214fabe2", size = 97610, upload-time = "2026-03-01T22:07:45.773Z" },
     { url = "https://files.pythonhosted.org/packages/51/47/3fa2286c3cb162c71cdb34c4224d5745a1ceceb391b2bd9b19b668a8d724/yarl-1.23.0-cp314-cp314t-win_arm64.whl", hash = "sha256:44bb7bef4ea409384e3f8bc36c063d77ea1b8d4a5b2706956c0d6695f07dcc25", size = 86041, upload-time = "2026-03-01T22:07:49.026Z" },
     { url = "https://files.pythonhosted.org/packages/69/68/c8739671f5699c7dc470580a4f821ef37c32c4cb0b047ce223a7f115757f/yarl-1.23.0-py3-none-any.whl", hash = "sha256:a2df6afe50dea8ae15fa34c9f824a3ee958d785fd5d089063d960bae1daa0a3f", size = 48288, upload-time = "2026-03-01T22:07:51.388Z" },
+]
+
+[[package]]
+name = "zava-control-plane-py"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "agent-framework" },
+    { name = "agent-framework-azurefunctions" },
+    { name = "agent-framework-github-copilot" },
+    { name = "agent-governance-toolkit", extra = ["full"] },
+    { name = "azure-ai-documentintelligence" },
+    { name = "azure-ai-evaluation" },
+    { name = "azure-functions" },
+    { name = "azure-functions-durable" },
+    { name = "azure-identity" },
+    { name = "azure-monitor-opentelemetry" },
+    { name = "azure-storage-blob" },
+    { name = "fastapi" },
+    { name = "github-copilot-sdk" },
+    { name = "httpx" },
+    { name = "kuzu" },
+    { name = "nanoid" },
+    { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-httpx" },
+    { name = "pillow" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "python-multipart" },
+    { name = "pyyaml" },
+    { name = "reportlab" },
+    { name = "sentence-transformers" },
+    { name = "sse-starlette" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "weasyprint" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "google-genai" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-mock" },
+    { name = "respx" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "agent-framework", specifier = ">=1.0.1" },
+    { name = "agent-framework-azurefunctions", specifier = ">=1.0.0b260409" },
+    { name = "agent-framework-github-copilot", specifier = ">=1.0.0b260409" },
+    { name = "agent-governance-toolkit", extras = ["full"], specifier = ">=3.4,<3.5" },
+    { name = "azure-ai-documentintelligence", specifier = ">=1.0.2" },
+    { name = "azure-ai-evaluation", specifier = ">=1.0.0" },
+    { name = "azure-functions", specifier = ">=1.24" },
+    { name = "azure-functions-durable", specifier = ">=1.2" },
+    { name = "azure-identity", specifier = ">=1.25.3" },
+    { name = "azure-monitor-opentelemetry", specifier = ">=1.6.0" },
+    { name = "azure-storage-blob", specifier = ">=12.20" },
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "github-copilot-sdk", specifier = ">=0.2.1" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "kuzu", specifier = ">=0.6,<0.7" },
+    { name = "nanoid", specifier = ">=2.0" },
+    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.48b0" },
+    { name = "opentelemetry-instrumentation-httpx", specifier = ">=0.48b0" },
+    { name = "pillow", specifier = ">=10.0" },
+    { name = "pydantic", specifier = ">=2.9" },
+    { name = "python-dotenv", specifier = ">=1.0" },
+    { name = "python-multipart", specifier = ">=0.0.20" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "reportlab", specifier = ">=4.5.0" },
+    { name = "sentence-transformers", specifier = ">=3.0" },
+    { name = "sse-starlette", specifier = ">=2.1" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
+    { name = "weasyprint", specifier = ">=68.1" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "google-genai", specifier = ">=1.0" },
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "pytest-mock", specifier = ">=3.14" },
+    { name = "respx", specifier = ">=0.21" },
+    { name = "ruff", specifier = ">=0.7" },
 ]
 
 [[package]]

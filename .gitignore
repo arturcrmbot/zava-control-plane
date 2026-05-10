@@ -107,3 +107,9 @@ AI-Transformation-in-Days.pptx
 !.github/workflows/agt-governance.yml
 !.github/hooks/
 !.github/hooks/pre-commit-agt
+# Coverage artifacts
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+

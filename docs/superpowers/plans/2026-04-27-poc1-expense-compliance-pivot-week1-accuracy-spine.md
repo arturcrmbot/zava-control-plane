@@ -10,7 +10,7 @@
 
 **Reference docs (read before starting):**
 - Spec: [docs/superpowers/specs/2026-04-27-poc1-expense-compliance-pivot-design.md](../specs/2026-04-27-poc1-expense-compliance-pivot-design.md)
-- Inventory grading: [docs/poc1-inventory.md](../../poc1-inventory.md) — defines what's R / A / D
+- Inventory grading: [docs/archive/poc1-inventory.md](../../archive/poc1-inventory.md) — defines what's R / A / D
 - Brief: [docs/poc1-brief.md](../../poc1-brief.md) — §4.5 (accuracy = 40%), §7 acceptance criteria
 
 **Out of scope for this plan (covered in later plans):**
@@ -56,7 +56,7 @@
 - `api/server/main.py` — register the `accuracy` router
 - `tests/api/unit/test_invoice_p2p_rejection.py` — delete or rename (invoice-only); decision in Task 2
 
-**Deleted (Day 1 cleanup — D-grade per [poc1-inventory.md](../../poc1-inventory.md)):**
+**Deleted (Day 1 cleanup — D-grade per [archive/poc1-inventory.md](../../archive/poc1-inventory.md)):**
 - `mocks/d365-mcp/`, `mocks/payment-mcp/`
 - `api/functions/graphs/validation.py`, `payment.py`, `reconciliation.py`
 - `api/functions/graphs/executors/deterministic/three_way_match.py`, `generate_payment_file.py`, `submit_payment.py`, `bank_statement_match.py`, `lookup_active_gls.py`, `lookup_cost_centre_policy.py`, `lookup_vendor_context.py`
@@ -225,13 +225,13 @@ touch "data/synthetic/__init__.py"
 Required structure (the generator and classifier both rely on this):
 
 ```markdown
-# WPP Group T&E Policy (Synthetic — POC1)
+# Zava Group T&E Policy (Synthetic — POC1)
 
-> Effective 2026-04-01. Applies to all WPP agencies and markets unless market-specific overrides apply. This is the single authoritative source for R/A/G classification of expense claims.
+> Effective 2026-04-01. Applies to all Zava agencies and markets unless market-specific overrides apply. This is the single authoritative source for R/A/G classification of expense claims.
 
 ## 1. Scope
 
-Covers meals, travel, accommodation, entertainment, and miscellaneous business expenses incurred by WPP employees in the course of client work or internal operations across the UK, US, DE, and IN markets.
+Covers meals, travel, accommodation, entertainment, and miscellaneous business expenses incurred by Zava employees in the course of client work or internal operations across the UK, US, DE, and IN markets.
 
 ## 2. Markets and currencies
 
@@ -977,7 +977,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from opentelemetry import trace
 
-_tracer = trace.get_tracer("wpp.mcp.policy_search")
+_tracer = trace.get_tracer("zava.mcp.policy_search")
 _POLICY_PATH = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "policy.md"
 
 
@@ -1044,16 +1044,16 @@ def reset_cache() -> None:
 def search(query: str, k: int = 5) -> list[dict]:
     """Return top-k policy chunks ranked by cosine similarity to query."""
     with _tracer.start_as_current_span("mcp.policy.search") as span:
-        span.set_attribute("wpp.mcp.tool", "policy.search")
-        span.set_attribute("wpp.mcp.query", query)
-        span.set_attribute("wpp.mcp.k", k)
+        span.set_attribute("zava.mcp.tool", "policy.search")
+        span.set_attribute("zava.mcp.query", query)
+        span.set_attribute("zava.mcp.k", k)
         chunks = _ensure_index()
         model = _load_model()
         q_emb = model.encode([query], convert_to_numpy=True, normalize_embeddings=True)[0]
         scored = [(float(np.dot(q_emb, c.embedding)), c) for c in chunks]
         scored.sort(key=lambda t: t[0], reverse=True)
         out = [{"section": c.section, "text": c.text, "score": s} for s, c in scored[:k]]
-        span.set_attribute("wpp.mcp.result_count", len(out))
+        span.set_attribute("zava.mcp.result_count", len(out))
         return out
 ```
 
@@ -1138,7 +1138,7 @@ from pathlib import Path
 
 from opentelemetry import trace
 
-_tracer = trace.get_tracer("wpp.mcp.claim_get_structured")
+_tracer = trace.get_tracer("zava.mcp.claim_get_structured")
 _CLAIMS_DIR = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "claims"
 
 _GOLD_FIELDS = ("gold_label", "gold_reasoning", "gold_policy_clause")
@@ -1148,8 +1148,8 @@ def get_structured(claim_id: str, include_gold: bool = False) -> dict:
     """Return claim JSON. By default redacts gold-* fields so the classifier
     cannot accidentally cheat. Tests pass include_gold=True for assertions."""
     with _tracer.start_as_current_span("mcp.claim.getStructured") as span:
-        span.set_attribute("wpp.mcp.tool", "claim.getStructured")
-        span.set_attribute("wpp.claim.id", claim_id)
+        span.set_attribute("zava.mcp.tool", "claim.getStructured")
+        span.set_attribute("zava.claim.id", claim_id)
         path = _CLAIMS_DIR / f"{claim_id}.json"
         if not path.exists():
             raise KeyError(f"claim {claim_id!r} not found")
@@ -1193,7 +1193,7 @@ description: Classify expense claim lines as Red/Amber/Green against the synthet
 allowed-tools: policy.search, claim.getStructured
 ---
 
-You classify expense claims under WPP's T&E policy.
+You classify expense claims under Zava's T&E policy.
 
 For each claim id you receive:
 1. Call `claim.getStructured(claim_id)` once. The returned record has category, market, currency, amount, attendees, vendor, and metadata.

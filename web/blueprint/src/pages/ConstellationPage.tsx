@@ -1,5 +1,5 @@
 /**
- * Standalone full-screen Constellation page.
+ * Standalone full-screen Cosmic Lens v2 page.
  *
  * No editorial chrome — just the visual + a minimal HUD strip. Addressable
  * at /?view=constellation. Designed to be projected, recorded, or shown
@@ -11,20 +11,11 @@
  */
 
 import { useEffect } from "react";
-import { Constellation } from "../components/Constellation";
-import { useObservatory } from "../lib/useObservatory";
+import { CosmicLens } from "../components/cosmicLens/CosmicLens";
 
 export function ConstellationPage() {
-  // We just need the connection status + a no-op subscription so the EventSource
-  // is open and feeding the Constellation's onEvent stream — the canvas itself
-  // does its own subscription internally too, but exposing the status here keeps
-  // the HUD honest.
-  const { status } = useObservatory({ bufferSize: 1 });
-
   // The blueprint is a pure client-side Vite app (no SSR), so reading
-  // window.location.search synchronously on render is safe. Avoid wrapping
-  // in `typeof window !== "undefined"` — esbuild folds that branch to
-  // false and the conditional below collapses, defeating the embed flag.
+  // window.location.search synchronously on render is safe.
   const embed =
     new URLSearchParams(window.location.search).get("embed") === "1";
 
@@ -37,15 +28,25 @@ export function ConstellationPage() {
 
   return (
     <div className="constellation-page">
-      <Constellation status={status} fullScreen />
-      <div className="constellation-page__title">
-        <div className="constellation-page__eyebrow">the substrate, running</div>
-        {!embed && (
-          <div className="constellation-page__return">
-            <a href="/">← return to the page</a>
-          </div>
-        )}
-      </div>
+      <CosmicLens embed={embed} />
+      {!embed && (
+        <div
+          className="constellation-page__return"
+          style={{ position: "absolute", bottom: 16, left: 16, zIndex: 10 }}
+        >
+          <a
+            href="/"
+            style={{
+              color: "rgba(148, 163, 184, 0.7)",
+              fontSize: 12,
+              fontFamily: "ui-sans-serif, system-ui",
+              textDecoration: "none",
+            }}
+          >
+            ← return to the page
+          </a>
+        </div>
+      )}
     </div>
   );
 }

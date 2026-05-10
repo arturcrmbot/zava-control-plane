@@ -60,7 +60,7 @@ _AMENDMENT_TYPES = [
 def get_contract(contract_id: str) -> dict:
     """Read a managed-services contract record — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.contract_repository.contract_id", str(contract_id))
+    span.set_attribute("zava.contract_repository.contract_id", str(contract_id))
     return _synth_get_contract(contract_id)
 
 
@@ -135,10 +135,10 @@ def find_similar(
     """Return three comparable contracts in the same category + region within
     [value_usd_low, value_usd_high]. Stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.contract_repository.category", str(category))
-    span.set_attribute("wpp.contract_repository.region", str(region))
-    span.set_attribute("wpp.contract_repository.value_low", float(value_usd_low))
-    span.set_attribute("wpp.contract_repository.value_high", float(value_usd_high))
+    span.set_attribute("zava.contract_repository.category", str(category))
+    span.set_attribute("zava.contract_repository.region", str(region))
+    span.set_attribute("zava.contract_repository.value_low", float(value_usd_low))
+    span.set_attribute("zava.contract_repository.value_high", float(value_usd_high))
     return _synth_find_similar(category, region, value_usd_low, value_usd_high)
 
 
@@ -208,7 +208,7 @@ def contract_repository_find_similar_tool(params: _FindSimilarParams) -> ToolRes
 def list_amendments(contract_id: str) -> dict:
     """List the amendment history for a contract — stub."""
     span = trace.get_current_span()
-    span.set_attribute("wpp.contract_repository.contract_id", str(contract_id))
+    span.set_attribute("zava.contract_repository.contract_id", str(contract_id))
     return _synth_list_amendments(contract_id)
 
 

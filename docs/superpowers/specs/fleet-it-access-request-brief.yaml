@@ -8,6 +8,10 @@
 # graduated; this domain is a pure compounding showcase.
 
 domain:
+  # v4 fields (TASK-031 backfill).
+  workflow_type: it-access-request
+  prefix: fleet
+  # v3 fields (back-compat).
   name: fleet-it-access-request
   display_name: IT access request
   owner_role: it_access_it_admin
@@ -133,3 +137,38 @@ external_systems:
     mcp_tool: audit_query
     operations:
       - audit_query
+
+# --------------------------------------------------------------------
+# v4 enrichment (TASK-031 backfill). Mirrors
+# api/server/services/entity_projections/it_access_request.py. The Asset
+# stashes the requested_role_templates list and business justification
+# in a JSON-blob attribute (helper logic — not codegen-synthesisable).
+# --------------------------------------------------------------------
+entities:
+  - kind: Person
+    source: requester
+    ref_field: payload.employee_id
+    attributes:
+      department: payload.department
+  - kind: Asset
+    source: access-grant
+    ref_field: payload.employee_id
+    relations:
+      - kind: OWNS
+        target_ref: payload.employee_id
+
+decisions:
+  - phase: line_manager_approval
+    persona: it_access_line_manager
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.employee_id]
+    attributes_from_context:
+      employee_id: payload.employee_id
+  - phase: it_admin_approval
+    persona: it_access_it_admin
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.employee_id]
+    attributes_from_context:
+      employee_id: payload.employee_id
+
+function: tech

@@ -5,6 +5,7 @@ import type { Workflow } from "@shared/types";
 
 interface FleetEcon {
   activeWorkflowCount: number;
+  totalWorkflowCount: number;
   totalComputeCostUsd: number;
   totalModelCalls: number;
   totalToolCalls: number;
@@ -49,13 +50,13 @@ export default function Economics() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="panel panel-body">
           <div className="text-[11px] uppercase tracking-wide text-slate-500">Compute spend</div>
-          <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">${computeCost.toFixed(2)}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">{d?.totalModelCalls ?? 0} model · {d?.totalToolCalls ?? 0} tool calls</div>
+          <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">${computeCost.toFixed(4)}</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">{d?.totalModelCalls ?? 0} model · {d?.totalToolCalls ?? 0} tool calls · session total</div>
         </div>
         <div className="panel panel-body">
           <div className="text-[11px] uppercase tracking-wide text-slate-500">Avg cost / workflow</div>
-          <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">${(d?.averageCostPerWorkflow ?? 0).toFixed(3)}</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">across {d?.activeWorkflowCount ?? 0} active</div>
+          <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">${(d?.averageCostPerWorkflow ?? 0).toFixed(4)}</div>
+          <div className="text-[11px] text-slate-500 mt-0.5">across {d?.totalWorkflowCount ?? 0} workflows · {d?.activeWorkflowCount ?? 0} active</div>
         </div>
         <div className="panel panel-body">
           <div className="text-[11px] uppercase tracking-wide text-slate-500">Human-review cost</div>
@@ -78,7 +79,7 @@ export default function Economics() {
             <div>
               <div className="flex justify-between text-xs mb-1">
                 <span className="text-slate-700">Compute (LLM + tools)</span>
-                <span className="font-medium text-slate-900 tabular-nums">${computeCost.toFixed(2)}</span>
+                <span className="font-medium text-slate-900 tabular-nums">${computeCost.toFixed(4)}</span>
               </div>
               <div className="h-2 bg-slate-100 rounded">
                 <div className="h-2 bg-blue-500 rounded" style={{ width: `${totalActualCost > 0 ? (computeCost / totalActualCost) * 100 : 0}%` }} />

@@ -32,14 +32,14 @@ def query(
     """Return chronological audit-ledger entries matching the supplied filters."""
     span = trace.get_current_span()
     if since is not None:
-        span.set_attribute("wpp.audit.since", since)
+        span.set_attribute("zava.audit.since", since)
     if until is not None:
-        span.set_attribute("wpp.audit.until", until)
+        span.set_attribute("zava.audit.until", until)
     if actor_kind:
-        span.set_attribute("wpp.audit.actor_kind", actor_kind)
+        span.set_attribute("zava.audit.actor_kind", actor_kind)
     if workflow_id:
-        span.set_attribute("wpp.audit.workflow_id", workflow_id)
-    span.set_attribute("wpp.audit.limit", limit)
+        span.set_attribute("zava.audit.workflow_id", workflow_id)
+    span.set_attribute("zava.audit.limit", limit)
 
     entries: list[dict] = []
     for w in app_state.store.list_workflows():
@@ -63,7 +63,7 @@ def query(
     entries.sort(key=lambda x: x["timestamp"], reverse=True)
     total = len(entries)
     out_entries = entries[:limit]
-    span.set_attribute("wpp.audit.result_count", len(out_entries))
+    span.set_attribute("zava.audit.result_count", len(out_entries))
     return {"entries": out_entries, "n": total}
 
 

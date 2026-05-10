@@ -69,7 +69,7 @@ def _welcome_script(
         else ""
     )
     return (
-        f"Welcome to WPP, {candidate_name}. We're delighted you've accepted "
+        f"Welcome to Zava, {candidate_name}. We're delighted you've accepted "
         f"the offer for {role_title}. On day one we'll walk you through your "
         f"laptop setup, your accounts, and your first-week onboarding plan."
         f"{mgr} See you soon."

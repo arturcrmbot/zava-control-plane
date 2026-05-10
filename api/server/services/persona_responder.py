@@ -194,6 +194,37 @@ def _sandbox_authority_check(
         }
 
 
+def _sandbox_query_precedents(
+    persona_role: str,
+    entity_id: str,
+    limit: int = 10,
+    *,
+    workflow_type: str | None = None,
+    phase: str | None = None,
+) -> list[dict[str, Any]]:
+    """Sandbox-safe wrapper around the query_precedents MCP tool.
+
+    Phase 4 IP3 (TASK-016, DEC-OQ1). Persona ``decision_policy`` blocks
+    may call ``precedents = query_precedents(persona_role, entity_id,
+    limit=10)`` to fetch recent ``Decision`` nodes for the entity. Lazy
+    imports keep persona_responder import-light at boot.
+    """
+    try:
+        from api.server.state import app_state
+        from api.server.mcp_tools.query_precedents import make_query_precedents_tool
+
+        tool = make_query_precedents_tool(app_state.entities)
+        return tool(
+            persona_role,
+            entity_id,
+            limit,
+            workflow_type=workflow_type,
+            phase=phase,
+        )
+    except Exception:  # pragma: no cover — degrade to "no precedent"
+        return []
+
+
 _DECISION_BUILTINS: dict[str, Any] = {
     "isinstance": isinstance, "len": len,
     "str": str, "int": int, "float": float, "bool": bool,
@@ -202,6 +233,7 @@ _DECISION_BUILTINS: dict[str, Any] = {
     "any": any, "all": all, "sum": sum,
     "True": True, "False": False, "None": None,
     "authority_check": _sandbox_authority_check,
+    "query_precedents": _sandbox_query_precedents,
 }
 
 
@@ -336,12 +368,22 @@ async def _handle_hitl(event: FleetEvent) -> None:
 
     Skipped silently for any persona NOT in PERSONA_AUTO_CLOSE, so real
     humans can drive the gate via the existing portal/UI flows.
+
+    v2 (Org Ops view): emits ``persona.thinking`` BEFORE deciding so the live
+    activity stream can show the gate is open and the persona is reasoning;
+    then emits ``persona.decided`` AFTER deciding. When ``DEMO_LOUD=1`` the
+    responder waits a random 2-8s between thinking and deciding so the
+    visualisation actually shows time passing rather than instant flips.
     """
+    import random as _rand
+
     data = event.model_dump()
     persona_role = data.get("persona")
     external_event_override = data.get("external_event")
     instance_id = data.get("instance_id")
     context = data.get("context") or {}
+    workflow_id = data.get("workflow_id")
+    gate_phase = data.get("phase") or context.get("phase")
 
     # No persona contract on this gate (UI-driven legacy path) → nothing to do.
     if not (persona_role and instance_id):
@@ -357,6 +399,28 @@ async def _handle_hitl(event: FleetEvent) -> None:
         print(f"[persona_responder] AUTO_CLOSE includes {persona_role!r} but no "
               f"SKILL.md defines that persona; gate stays open")
         return
+
+    # v2: announce that the persona is thinking. The ops view reads this to
+    # show a "thinking..." pill in the persona strip + a typing indicator in
+    # the conversations view + a slow-pulse on the river's gate chip.
+    try:
+        from api.server.state import app_state
+        app_state.bus.emit(FleetEvent(
+            type="persona.thinking",
+            workflow_id=workflow_id,
+            persona=persona_role,
+            phase=gate_phase,
+            instance_id=instance_id,
+            external_event=external_event_override or persona.external_event,
+        ))
+    except Exception as ex:  # pragma: no cover — bus emit is best-effort
+        print(f"[persona_responder] failed to emit persona.thinking: {ex}")
+
+    # v2: simulate human reaction time so the demo isn't a blur. Off by
+    # default in tests / production-honest mode; on when DEMO_LOUD=1.
+    if os.environ.get("DEMO_LOUD", "0") == "1":
+        delay = _rand.uniform(2.0, 8.0)
+        await asyncio.sleep(delay)
 
     try:
         decision_payload = persona.decide(context)
@@ -397,6 +461,62 @@ async def _handle_hitl(event: FleetEvent) -> None:
         f"{decision_str!r} for {data.get('workflow_id')} "
         f"({data.get('reason')}); raising {event_name!r}"
     )
+
+    # Phase 1 sub-phase 3 follow-up — stash the decision into
+    # workflow.payload['decisions'] so the entity-graph projection's
+    # ``find_decision`` helper can pick it up when ``workflow.completed``
+    # fires. The Durable external event we raise below carries the verdict
+    # to the orchestrator but doesn't write it back to the Workflow record;
+    # without this stash, projections see no decisions and Decision nodes
+    # never materialise. Gate the write so it's a silent no-op when the
+    # workflow isn't in the store (e.g. tests, half-torn-down state).
+    if workflow_id and gate_phase:
+        try:
+            from api.server.state import app_state
+            import datetime as _dt
+            w = app_state.store.get_workflow(workflow_id)
+            if w is not None:
+                if not isinstance(w.payload, dict):
+                    w.payload = {}
+                decisions = list(w.payload.get("decisions") or [])
+                # Idempotent on the natural key (phase, persona_role) — re-emits
+                # of the same gate update in place rather than appending dupes.
+                key = (str(gate_phase).lower(), str(persona_role).lower())
+                decisions = [
+                    d for d in decisions
+                    if (str(d.get("phase", "")).lower(),
+                        str(d.get("persona_role", "")).lower()) != key
+                ]
+                decisions.append({
+                    "phase": gate_phase,
+                    "persona_role": persona_role,
+                    "verdict": decision_str,
+                    "reason": decision_payload.get("reason"),
+                    "decided_at": _dt.datetime.now(tz=_dt.timezone.utc).isoformat(),
+                    "source_event": event_name,
+                })
+                w.payload["decisions"] = decisions
+                app_state.store.upsert_workflow(w)
+        except Exception as ex:
+            print(f"[persona_responder] failed to stash decision: {ex}")
+
+    # v2: announce the decision. Ops live stream renders a green/red row;
+    # conversations view shows the message as @persona; river highlights the
+    # gate chip and slides the workflow forward.
+    try:
+        from api.server.state import app_state
+        app_state.bus.emit(FleetEvent(
+            type="persona.decided",
+            workflow_id=workflow_id,
+            persona=persona_role,
+            phase=gate_phase,
+            verdict=decision_str,
+            reason=decision_payload.get("reason"),
+            instance_id=instance_id,
+            external_event=event_name,
+        ))
+    except Exception as ex:
+        print(f"[persona_responder] failed to emit persona.decided: {ex}")
 
     try:
         await raise_orchestration_event(instance_id, event_name, decision_payload)

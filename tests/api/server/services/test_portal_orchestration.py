@@ -51,8 +51,8 @@ def _seed_workflow_and_candidate(
         current_phase="Triage",
         created_at=now,
         sla_due_at=now + 86400,
-        jurisdiction="London-WPP",
-        agency="WPP-HR",
+        jurisdiction="London-Zava",
+        agency="Zava-HR",
         orchestration_instance_id=f"INST-{workflow_id}",
         metadata={"role_id": role_id},
     ))
@@ -148,8 +148,8 @@ def test_ignores_completion_for_unknown_candidate(tmp_path):
         current_phase="Triage",
         created_at=now,
         sla_due_at=now + 86400,
-        jurisdiction="London-WPP",
-        agency="WPP-HR",
+        jurisdiction="London-Zava",
+        agency="Zava-HR",
         metadata={"role_id": "REQ-X"},
     ))
     off = attach(state)

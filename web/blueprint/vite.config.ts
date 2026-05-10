@@ -19,5 +19,20 @@ export default defineConfig(({ mode }) => {
         "/api": apiTarget,
       },
     },
+    resolve: {
+      // stats-gl ships a nested three@0.170 — without dedup, R3F's
+      // useThree throws "Hooks can only be used within Canvas component"
+      // and the scene renders to pure black. (PR #6 fix; do not remove.)
+      dedupe: ["three", "@react-three/fiber", "@react-three/drei"],
+    },
+    optimizeDeps: {
+      include: [
+        "three",
+        "@react-three/fiber",
+        "@react-three/drei",
+        "@react-three/postprocessing",
+        "d3-force",
+      ],
+    },
   };
 });

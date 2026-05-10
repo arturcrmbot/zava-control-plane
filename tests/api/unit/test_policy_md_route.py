@@ -17,7 +17,7 @@ def test_get_content_returns_policy_markdown():
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert "content" in body
-    assert "# WPP Group T&E Policy" in body["content"]
+    assert "# Zava Group T&E Policy" in body["content"]
 
 
 def test_save_writes_file_and_invalidates_cache(monkeypatch, tmp_path):

@@ -1520,7 +1520,7 @@ from api.shared.events import FleetEvent
 
 _SKILLS_DIR = Path(__file__).resolve().parents[4] / "server" / "skills"
 SKILLS_DIR = _SKILLS_DIR
-_tracer = trace.get_tracer("wpp.agents.finance")
+_tracer = trace.get_tracer("zava.agents.finance")
 _MAX_RESPONSE_EVENT_BYTES = 4096
 
 
@@ -1564,9 +1564,9 @@ def _install_session_otel_bridge(session, tool_calls_out: list[dict]) -> callabl
                     except Exception:
                         args = str(args)
                 span = _tracer.start_span(f"tool.{name}", context=parent_ctx)
-                span.set_attribute("wpp.tool.name", str(name))
+                span.set_attribute("zava.tool.name", str(name))
                 if call_id:
-                    span.set_attribute("wpp.tool.call_id", str(call_id))
+                    span.set_attribute("zava.tool.call_id", str(call_id))
                     open_spans[call_id] = span
                     open_meta[call_id] = {
                         "name": str(name), "args": args, "started_at": time.monotonic(),
@@ -1656,8 +1656,8 @@ async def run_agent_session(
         span.set_attribute("gen_ai.request.model", model)
         span.set_attribute("gen_ai.agent.name", "finance-agent")
         if skill_label:
-            span.set_attribute("wpp.skill", skill_label)
-        span.set_attribute("wpp.tools.count", len(tools))
+            span.set_attribute("zava.skill", skill_label)
+        span.set_attribute("zava.tools.count", len(tools))
         if attachments:
             span.set_attribute("gen_ai.attachments.count", len(attachments))
 

@@ -1,0 +1,3 @@
+name: quarterly-okr
+schedule: "0 8 1 1,4,7,10 *"
+fires_ambient_agent: quarterly-okr

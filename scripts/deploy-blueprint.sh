@@ -8,21 +8,21 @@
 #   scripts/deploy-blueprint.sh
 #
 # Override defaults via env vars:
-#   RG=...           override resource group  (default: project-apex-demo)
+#   RG=...           override resource group  (default: zava-control-plane-demo)
 #   LOCATION=...     override region          (default: swedencentral)
 #   APP_NAME=...     override container app   (default: blueprint)
 #   ENV_NAME=...     override environment     (default: blueprint-env)
-#   ACR_NAME=...     override ACR name        (default: blueprintacrapexdemo)
+#   ACR_NAME=...     override ACR name        (default: blueprintacrzavademo)
 
 set -euo pipefail
 
-RG="${RG:-project-apex-demo}"
+RG="${RG:-zava-control-plane-demo}"
 LOCATION="${LOCATION:-swedencentral}"
 APP_NAME="${APP_NAME:-blueprint}"
 ENV_NAME="${ENV_NAME:-blueprint-env}"
 # ACR names: 5-50 lowercase alphanumeric chars. Use a short deterministic
 # name so re-runs find the same registry.
-ACR_NAME="${ACR_NAME:-blueprintacrapexdemo}"
+ACR_NAME="${ACR_NAME:-blueprintacrzavademo}"
 IMAGE_TAG="$(date +%Y%m%d-%H%M%S)"
 
 cd "$(dirname "$0")/.."

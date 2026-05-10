@@ -12,7 +12,7 @@ The drafted JD from Phase 2 + the req metadata (jurisdiction, market, comp band)
 
 ## Procedure
 
-1. Call `greenhouse_post(jd, market)` to publish the JD on the WPP careers feed and return a `posting_id`.
+1. Call `greenhouse_post(jd, market)` to publish the JD on the Zava careers feed and return a `posting_id`.
 2. Call `linkedin_search(role, level, market, comp_band)` for passive candidates matching the role profile. Use the comp band as a filter so out-of-band reachouts don't pollute the pool.
 3. Wait for both to complete. Combine the inbound applicants pulled from `greenhouse_post.applicants_so_far` with the LinkedIn passive list. Deduplicate by `linkedin_url` or `email`.
 

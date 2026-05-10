@@ -8,35 +8,35 @@ policies:
     description: "Amber-verdict claims above this USD value go to SSC Reviewer queue; below auto-approve."
     value: 100
     gitSha: "9e2c11a"
-    author: "finance-platform@wpp"
+    author: "finance-platform@zava"
     updatedAt: "2026-04-15T10:20:00Z"
   - id: expense.classifier.confidence_floor
     description: "Minimum classifier confidence (0-1) for green auto-approval. Below floor sends Amber to reviewer."
     value: 0.78
     gitSha: "9e2c11a"
-    author: "finance-platform@wpp"
+    author: "finance-platform@zava"
     updatedAt: "2026-04-15T10:20:00Z"
   - id: expense.policy.meal_per_attendee_limit_usd
     description: "Per-attendee meal cap (USD). Lines above flagged for justification."
     value: 75
     gitSha: "9e2c11a"
-    author: "finance-platform@wpp"
+    author: "finance-platform@zava"
     updatedAt: "2026-04-20T14:00:00Z"
   - id: expense.repeat_offender.escalation_window_days
     description: "Window for counting prior breaches when escalation_advisor sets tier."
     value: 90
     gitSha: "1d3e4f5"
-    author: "finance-platform@wpp"
+    author: "finance-platform@zava"
     updatedAt: "2026-04-22T09:30:00Z"
   - id: expense.receipt.missing_grace_amount_usd
     description: "Below this USD amount, missing receipts auto-reclaim with attestation; above require receipt."
     value: 25
     gitSha: "1d3e4f5"
-    author: "finance-platform@wpp"
+    author: "finance-platform@zava"
     updatedAt: "2026-04-22T09:30:00Z"
   - id: expense.notification.warning_to_escalation_count
     description: "Number of warnings before progressive enforcement bumps to manager escalation tier."
     value: 3
     gitSha: "1d3e4f5"
-    author: "finance-platform@wpp"
+    author: "finance-platform@zava"
     updatedAt: "2026-04-22T09:30:00Z"

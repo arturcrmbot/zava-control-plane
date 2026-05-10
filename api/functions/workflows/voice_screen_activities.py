@@ -74,7 +74,7 @@ def send_screen_email_activity(payload: dict) -> dict:
         f"<p>Your screening call is ready. "
         f"<a href=\"{portal_url}\">Start the call</a> when you're ready — "
         f"the link works once and expires after 24 hours.</p>"
-        f"<p>Thanks,<br/>WPP Talent</p>"
+        f"<p>Thanks,<br/>Zava Talent</p>"
     )
     try:
         message_id = app_state.email_sender.send(

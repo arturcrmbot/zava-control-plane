@@ -141,7 +141,8 @@ export default function Recruiter() {
                     <th>Role</th>
                     <th>Phase</th>
                     <th>Active links</th>
-                    <th className="text-right">Open</th>
+                    <th>Open as candidate</th>
+                    <th className="text-right">Detail</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -167,6 +168,33 @@ export default function Recruiter() {
                             ))}
                             {(row.active_tokens ?? []).length === 0 && <span className="text-xs text-slate-400">—</span>}
                           </div>
+                        </td>
+                        {/* Email-fallback links — click opens the candidate UI in a new tab
+                            so the recruiter can demo the candidate flow without depending on
+                            ACS Email delivery. */}
+                        <td className="text-xs space-x-2 whitespace-nowrap">
+                          {row.status_token_url ? (
+                            <a
+                              href={row.status_token_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 hover:underline"
+                              title="Open the candidate's portal in a new tab"
+                            >
+                              portal ↗
+                            </a>
+                          ) : <span className="text-slate-400">—</span>}
+                          {row.screen_token_url && (
+                            <a
+                              href={row.screen_token_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-emerald-700 hover:underline"
+                              title="Open the voice screening surface in a new tab"
+                            >
+                              screen ↗
+                            </a>
+                          )}
                         </td>
                         <td className="text-right">
                           <Link to={`/recruiter/c/${row.candidate_id}`} className="btn-secondary">

@@ -40,8 +40,8 @@ def _make_workflow(workflow_id: str, role_id: str) -> Workflow:
         current_phase="Triage",
         created_at=now,
         sla_due_at=now + 86400,
-        jurisdiction="London-WPP",
-        agency="WPP-HR",
+        jurisdiction="London-Zava",
+        agency="Zava-HR",
         orchestration_instance_id=f"INST-{workflow_id}",
         metadata={"role_id": role_id},
     )

@@ -578,7 +578,7 @@ def send_book_interview_email_activity(payload: dict) -> dict:
         f"the <strong>{role_title}</strong> role.</p>"
         f"<p><a href=\"{portal_url}\">Pick a time that works for you</a> "
         f"— the link works once and expires after 7 days.</p>"
-        f"<p>Thanks,<br/>WPP Talent</p>"
+        f"<p>Thanks,<br/>Zava Talent</p>"
     )
     try:
         msg_id = app_state.email_sender.send(
@@ -623,7 +623,7 @@ def send_rejection_email_activity(payload: dict) -> dict:
         f"<p>Thanks for taking the time to interview with us. {bridge}</p>"
         f"<p>We'll keep your details on file and be in touch if a better "
         f"fit opens up.</p>"
-        f"<p>Best,<br/>WPP Talent</p>"
+        f"<p>Best,<br/>Zava Talent</p>"
     )
     try:
         msg_id = app_state.email_sender.send(
@@ -1295,14 +1295,14 @@ def test_interview_invite_invite_decision_raises_event():
     ) as mock_raise:
         resp = client.post(
             "/api/portal/admin/candidate/C-1/interview-invite",
-            json={"decision": "invite", "resolved_by": "recruiter@wpp"},
+            json={"decision": "invite", "resolved_by": "recruiter@zava"},
         )
     assert resp.status_code == 200
     args = mock_raise.await_args.args
     assert args[0] == "DF-1"
     assert args[1] == "interview_invite"
     assert args[2]["decision"] == "invite"
-    assert args[2]["resolved_by"] == "recruiter@wpp"
+    assert args[2]["resolved_by"] == "recruiter@zava"
 
 
 def test_interview_invite_reject_decision_raises_event():
@@ -1363,7 +1363,7 @@ def test_post_interview_offer_with_level_raises_event():
             json={
                 "decision": "offer", "level": "Senior",
                 "notes": "strong on Spark", "rating": 5,
-                "resolved_by": "recruiter@wpp",
+                "resolved_by": "recruiter@zava",
             },
         )
     assert resp.status_code == 200

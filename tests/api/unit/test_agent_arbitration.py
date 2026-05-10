@@ -10,7 +10,7 @@ from api.functions.graphs.executors.agents import agent_arbitration
 async def test_returns_recommendation_payload():
     fake = {
         "recommendation": "accept-justification",
-        "rationale": "Named senior client at WPP NA; PREC-0017 supports.",
+        "rationale": "Named senior client at Zava NA; PREC-0017 supports.",
         "cited_precedent_id": "PREC-0017",
         "policy_clause": "§3.1 Meals — UK per-attendee cap GBP 75",
         "confidence": 0.86,

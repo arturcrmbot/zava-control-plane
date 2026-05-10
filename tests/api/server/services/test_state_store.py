@@ -20,8 +20,8 @@ def _make_workflow(workflow_id: str = "HIRE-1") -> Workflow:
         current_phase="Triage",
         created_at=now,
         sla_due_at=now + 86400,
-        jurisdiction="London-WPP",
-        agency="WPP-HR",
+        jurisdiction="London-Zava",
+        agency="Zava-HR",
     )
 
 

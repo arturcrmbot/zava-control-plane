@@ -8,6 +8,10 @@
 # (onboarding_it_admin) auto-closes via decision_code.
 
 domain:
+  # v4 fields (TASK-028 backfill).
+  workflow_type: employee-onboarding
+  prefix: fleet
+  # v3 fields (back-compat).
   name: fleet-employee-onboarding
   display_name: Employee onboarding
   owner_role: onboarding_it_admin
@@ -108,3 +112,36 @@ external_systems:
       - find_availability
       - get_room_options
       - book_event
+
+# --------------------------------------------------------------------
+# v4 enrichment (TASK-028 backfill). Mirrors
+# api/server/services/entity_projections/employee_onboarding.py. The
+# laptop Asset is conditionally suppressed for `no-laptop` / `byod`
+# scenarios (helper logic in the live module — not codegen-synthesisable).
+# --------------------------------------------------------------------
+entities:
+  - kind: Person
+    source: employee
+    ref_field: payload.employee_id
+    attributes:
+      department: payload.department
+  - kind: Person
+    source: buddy
+    ref_field: payload.buddy_id
+    relations:
+      - kind: MANAGES
+        target_ref: payload.employee_id
+  - kind: Asset
+    source: laptop
+    ref_field: payload.employee_id
+
+decisions:
+  - phase: it_admin_approval
+    persona: onboarding_it_admin
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.employee_id]
+    attributes_from_context:
+      employee_id: payload.employee_id
+      department: payload.department
+
+function: hr

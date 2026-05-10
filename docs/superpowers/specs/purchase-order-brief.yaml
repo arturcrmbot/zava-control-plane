@@ -1,0 +1,59 @@
+# Purchase-order — compose-domain v4 brief.
+#
+# Mirrors api/server/services/entity_projections/purchase_order.py (TASK-016).
+# Payload at data/synthetic/purchase-order/pos.json. The live projection
+# also derives a quarterly Period node from workflow.created_at and
+# emits Money -[:BELONGS_TO]-> Period; the brief documents the
+# entity/decision shape but the period derivation is helper logic the
+# codegen cannot synthesise from a brief.
+
+domain:
+  workflow_type: purchase-order
+  prefix: fleet
+  display_name: Purchase order issuance
+  description: |
+    A buyer raises a PO against an approved supplier; line manager (or
+    finance for high-value) signs off before the PO is committed to the
+    quarterly budget.
+
+phases:
+  - name: po_intake
+    kind: deterministic
+    intent: Capture PO header (vendor, amount, category, approved-supplier flag).
+  - name: budget_check
+    kind: agent
+    agent_skill_name: budget-checker
+    intent: Resolve owning quarter; check residual budget; flag overruns.
+  - name: approver_signoff
+    kind: hitl
+    persona: line_manager
+    external_event: approver_signoff_decision
+
+entities:
+  - kind: Organisation
+    source: vendor
+    ref_field: payload.vendor_name
+    attributes:
+      name: payload.vendor_name
+  - kind: Asset
+    source: purchase-order
+    ref_field: payload.po_id
+    attributes:
+      identifier: payload.po_id
+      category: payload.category
+  - kind: Money
+    source: budget-line
+    ref_field: payload.po_id
+    attributes:
+      currency: payload.currency
+
+decisions:
+  - phase: approver_signoff
+    persona: line_manager
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.po_id]
+    attributes_from_context:
+      po_id: payload.po_id
+      amount_gbp: payload.amount_gbp
+
+function: finance

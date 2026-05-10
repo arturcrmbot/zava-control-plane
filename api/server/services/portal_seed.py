@@ -29,10 +29,10 @@ _REQS_FILE = Path(__file__).resolve().parents[3] / "data" / "synthetic" / "hirin
 
 def _market_for_jurisdiction(jurisdiction: str) -> str:
     if jurisdiction == "DE":
-        return "Berlin-WPP"
+        return "Berlin-Zava"
     if jurisdiction == "UK":
-        return "London-WPP"
-    return "London-WPP"
+        return "London-Zava"
+    return "London-Zava"
 
 
 async def seed_demo_reqs(app_state) -> list[str]:
@@ -66,7 +66,7 @@ async def seed_demo_reqs(app_state) -> list[str]:
             created_at=now,
             sla_due_at=now + 7 * 86400,
             jurisdiction=_market_for_jurisdiction(jurisdiction),
-            agency="WPP-HR",
+            agency="Zava-HR",
             metadata={
                 "role_id": role_id,
                 "role_title": req.get("title"),
@@ -76,30 +76,11 @@ async def seed_demo_reqs(app_state) -> list[str]:
         )
         app_state.store.upsert_workflow(w)
         spawned.append(workflow_id)
-        # Kick a real HiringOrchestrator instance so the workflow actually
-        # progresses through phases instead of sitting at a placeholder.
-        # Functions host typically binds 5–10 s after FastAPI; retry on
-        # connection-refused for up to ~60 s.
-        payload = {
-            "workflow_id": workflow_id,
-            "type": "hiring",
-            "role_id": role_id,
-            "role_title": req.get("title"),
-            "jurisdiction": jurisdiction,
-            "agency": w.agency,
-            "demo_seed": True,
-        }
-        for attempt in range(12):  # 12 × 5 s = 60 s
-            try:
-                result = await schedule_new_orchestration(
-                    payload, function_name="HiringOrchestrator",
-                )
-                w.orchestration_instance_id = result.get("id")
-                app_state.store.upsert_workflow(w)
-                break
-            except Exception as ex:
-                if attempt == 11:
-                    print(f"[portal_seed] gave up scheduling {workflow_id} after 60s: {ex}")
-                    break
-                await asyncio.sleep(5)
+        # NOTE: orchestrator is intentionally NOT auto-scheduled here. The
+        # /api/portal/apply route (or portal_orchestration's candidate.applied
+        # subscriber) is what actually starts the HiringOrchestrator once a
+        # real candidate exists. Auto-scheduling at boot caused workflows to
+        # progress through phases before any candidate had applied, which
+        # broke demos. (See plan/feature-authority-and-personae-1.md.)
+        _ = (asyncio, schedule_new_orchestration)  # keep imports referenced
     return spawned

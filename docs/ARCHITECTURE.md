@@ -241,6 +241,14 @@ recordings baked in at build time. The full deploy procedure, image
 contents, and resource layout live in
 [blueprint-microsite-contributor-guide.md §Deploying to Azure](blueprint-microsite-contributor-guide.md#deploying-to-azure).
 
+The microsite hosts five visualisation surfaces today (the editorial
+page plus four full-bleed views at `?view=constellation` /
+`?view=entities` / `?view=functions` / `?view=org-clone`). The surface
+inventory, visual vocabulary, and SSE event → visual mapping are
+canonical in [visualisation.md](visualisation.md); the forward design
+that consolidates the Constellation into a 4-zoom Org Building lives
+in [superpowers/specs/2026-05-09-org-building-design.md](superpowers/specs/2026-05-09-org-building-design.md).
+
 ## Shared types & events
 
 - Python: [api/shared/types.py](../api/shared/types.py),

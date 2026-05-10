@@ -22,8 +22,8 @@ The candidate, the JD's panel composition (e.g. hiring manager + 2 ICs + 1 cross
 {
   "candidate_id": "C-001",
   "slot_iso": "2026-05-12T14:00:00Z",
-  "panelists": ["pm@wpp.com", "..."],
-  "agenda_per_panelist": {"pm@wpp.com": "system design", "...": "..."},
+  "panelists": ["pm@zava.com", "..."],
+  "agenda_per_panelist": {"pm@zava.com": "system design", "...": "..."},
   "invite_message_id": "msg-...",
   "gaps": [{"panelist": "...", "reason": "no slot available"}]
 }

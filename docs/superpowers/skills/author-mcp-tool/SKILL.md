@@ -119,7 +119,7 @@ from ._otel import traced_tool
 def <operation>(<typed-args>) -> dict:
     """<One-line purpose. Mention this is a stub.>"""
     span = trace.get_current_span()
-    span.set_attribute("wpp.<tool>.<arg>", str(<arg>))
+    span.set_attribute("zava.<tool>.<arg>", str(<arg>))
     return _synth(<arg>)
 
 
@@ -231,7 +231,7 @@ the caller.
 - Importing `httpx` and pointing at a non-existent localhost port. The
   whole point of the in-memory stub is no port management.
 - Inventing OTEL attribute names. Mirror what `claim_lookup.py` does
-  (`wpp.<tool>.<arg>`).
+  (`zava.<tool>.<arg>`).
 - Returning lists where the canonical examples return dicts. Stay
   isomorphic.
 - Adding multiple `mcp_tool` files in one invocation. One file per call.
