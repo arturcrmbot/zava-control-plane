@@ -11,6 +11,7 @@ import type {
 import { MoonRegistry, RocketRegistry } from "./lib/registries";
 import { moonPosition } from "./WorkflowMoons";
 import { isReadEvent, isWriteEvent, labelForCapability, labelForEntity } from "./lib/labels";
+import { buildWorkflowTypeToFunction, resolveFunction, workflowTypeFromId } from "./lib/workflowFunction";
 
 interface RocketsProps {
   flashesRef: React.MutableRefObject<{ buffer: CosmicFlash[]; version: number }>;
@@ -50,10 +51,14 @@ export function Rockets({ flashesRef, inFlight, cities, functions, mode }: Rocke
 
   // Build quick lookup: workflow_id → function key (for moon position resolution)
   const wfFn = useMemo(() => {
+    const wfTypeMap = buildWorkflowTypeToFunction(functions);
     const m = new Map<string, string>();
-    inFlight.forEach((wf) => m.set(wf.id, wf.function ?? wf.workflow_type ?? "unknown"));
+    inFlight.forEach((wf) => {
+      const wfType = wf.workflow_type || workflowTypeFromId(wf.id) || "";
+      m.set(wf.id, resolveFunction({ ...wf, workflow_type: wfType } as WorkflowMoonData, wfTypeMap));
+    });
     return m;
-  }, [inFlight]);
+  }, [inFlight, functions]);
 
   // Rebuild city list lookup by id for quick resolution
   const cityById = useMemo(() => {

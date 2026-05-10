@@ -4,13 +4,14 @@ import { useFrame } from "@react-three/fiber";
 import type { FunctionMeta, WorkflowMoonData } from "./lib/types";
 import { MoonRegistry } from "./lib/registries";
 import { planetPosition } from "./FunctionPlanets";
+import { buildWorkflowTypeToFunction, resolveFunction, workflowTypeFromId } from "./lib/workflowFunction";
 
 interface WorkflowMoonsProps {
   inFlight: WorkflowMoonData[];
   functions: FunctionMeta[];
 }
 
-const MOON_RADIUS = 0.16;
+const MOON_RADIUS = 0.22;
 const MOON_ORBIT_RADIUS = 1.6;
 const MAX_MOONS = 600;
 
@@ -28,20 +29,20 @@ export function WorkflowMoons({ inFlight, functions }: WorkflowMoonsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const registry = useMemo(() => new MoonRegistry(), []);
 
-  // Map workflow_id → workflow_type prefix → function lookup. Existing
-  // PREFIX_TO_WORKFLOW_TYPE maps in the codebase use prefixes like
-  // VKY → vendor-kyc. Phase B adds proper mapping; Phase A just uses
-  // workflow.function field if backend provides it.
+  // Resolve each workflow to its owning function via the ownsDomains map
+  // (workflow.function may be "legacy" for older durable functions).
   const moons = useMemo(() => {
-    return inFlight.slice(0, MAX_MOONS).map((wf) => ({
-      id: wf.id,
-      // Try multiple keys: explicit `function` field first, else workflow_type, else
-      // unknown.
-      fn: wf.function ?? wf.workflow_type ?? "unknown",
-      // Cache offset
-      offset: registry.offsetFor(wf.id),
-    }));
-  }, [inFlight, registry]);
+    const wfTypeMap = buildWorkflowTypeToFunction(functions);
+    return inFlight.slice(0, MAX_MOONS).map((wf) => {
+      const wfType = wf.workflow_type || workflowTypeFromId(wf.id) || "";
+      const wfWithType = { ...wf, workflow_type: wfType } as WorkflowMoonData;
+      return {
+        id: wf.id,
+        fn: resolveFunction(wfWithType, wfTypeMap),
+        offset: registry.offsetFor(wf.id),
+      };
+    });
+  }, [inFlight, functions, registry]);
 
   useFrame((state) => {
     if (!meshRef.current) return;
@@ -72,9 +73,9 @@ export function WorkflowMoons({ inFlight, functions }: WorkflowMoonsProps) {
     <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_MOONS]} castShadow>
       <sphereGeometry args={[MOON_RADIUS, 12, 12]} />
       <meshStandardMaterial
-        color="#e2e8f0"
-        emissive="#94a3b8"
-        emissiveIntensity={0.6}
+        color="#f1f5f9"
+        emissive="#cbd5e1"
+        emissiveIntensity={1.1}
         metalness={0.1}
         roughness={0.4}
       />

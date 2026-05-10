@@ -11,6 +11,11 @@ interface FunctionPlanetsProps {
 const ORBIT_RADIUS = 14;
 const PLANET_RADIUS = 0.7;
 
+/** Backend functions endpoint uses `name`. Some surfaces use `key`. */
+function fnKey(fn: FunctionMeta): string {
+  return fn.name ?? fn.key ?? "";
+}
+
 /**
  * One sphere per function, positioned in even orbital slots around the hub.
  * Slow rotation around Y so the system feels alive even when no events fire.
@@ -24,17 +29,19 @@ export function FunctionPlanets({ functions }: FunctionPlanetsProps) {
     groupRef.current.rotation.y = state.clock.getElapsedTime() * 0.02;
   });
 
-  if (!functions.length) return null;
+  const visible = functions.filter((f) => fnKey(f));
+  if (!visible.length) return null;
 
   return (
     <group ref={groupRef}>
-      {functions.map((fn, i) => {
-        const angle = (i * 2 * Math.PI) / functions.length;
+      {visible.map((fn, i) => {
+        const k = fnKey(fn);
+        const angle = (i * 2 * Math.PI) / visible.length;
         const x = Math.cos(angle) * ORBIT_RADIUS;
         const z = Math.sin(angle) * ORBIT_RADIUS;
-        const color = colorForFunction(fn.key);
+        const color = colorForFunction(k);
         return (
-          <group key={fn.key} position={[x, 1.5, z]}>
+          <group key={k} position={[x, 1.5, z]}>
             <mesh castShadow>
               <sphereGeometry args={[PLANET_RADIUS, 24, 24]} />
               <meshStandardMaterial
@@ -65,9 +72,10 @@ export function planetPosition(
   time: number,
 ): [number, number, number] {
   if (!functions.length || !fn) return [0, 1.5, 0];
-  const idx = functions.findIndex((f) => f.key === fn);
+  const visible = functions.filter((f) => fnKey(f));
+  const idx = visible.findIndex((f) => fnKey(f) === fn);
   if (idx < 0) return [0, 1.5, 0];
-  const baseAngle = (idx * 2 * Math.PI) / functions.length;
+  const baseAngle = (idx * 2 * Math.PI) / visible.length;
   const precession = time * 0.02;
   const angle = baseAngle + precession;
   return [Math.cos(angle) * ORBIT_RADIUS, 1.5, Math.sin(angle) * ORBIT_RADIUS];

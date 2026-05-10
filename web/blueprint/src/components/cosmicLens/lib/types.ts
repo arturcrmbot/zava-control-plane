@@ -5,10 +5,14 @@
 export type CosmicMode = "capabilities" | "entities";
 
 export interface FunctionMeta {
-  key: string; // "vendor-kyc"
-  label: string; // "Vendor KYC"
-  family?: string; // "finance"
-  /** Some endpoints expose `domains` instead of a single key. */
+  /** Backend uses `name` field. Alias `key` for compat across components. */
+  name?: string;
+  key?: string; // alias - some surfaces use `key`
+  label?: string;
+  display?: string; // backend display name
+  family?: string;
+  /** Backend exposes `ownsDomains` listing workflow_type strings owned by this function. */
+  ownsDomains?: string[];
   domains?: string[];
 }
 

@@ -37,19 +37,19 @@ export function HubDisc({ radius = 8, thickness = 0.5 }: HubDiscProps) {
         />
       </mesh>
 
-      {/* Dome cap on top */}
+      {/* Dome cap on top — slim and barely-there, just for personality */}
       <mesh position={[0, thickness * 0.5, 0]}>
         <sphereGeometry
-          args={[radius * 1.005, 96, 48, 0, Math.PI * 2, 0, Math.PI / 2.6]}
+          args={[radius * 0.96, 96, 48, 0, Math.PI * 2, 0, Math.PI / 4]}
         />
         <meshStandardMaterial
-          color="#1e293b"
-          metalness={0.4}
-          roughness={0.55}
-          emissive="#0f172a"
-          emissiveIntensity={0.4}
+          color="#22d3ee"
+          metalness={0.3}
+          roughness={0.7}
+          emissive="#0e7490"
+          emissiveIntensity={0.3}
           transparent
-          opacity={0.85}
+          opacity={0.18}
         />
       </mesh>
 
