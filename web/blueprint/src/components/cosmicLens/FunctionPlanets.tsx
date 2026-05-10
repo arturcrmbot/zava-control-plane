@@ -78,6 +78,11 @@ export function FunctionPlanets({ functions, loadByFunction, onFunctionClick }: 
               <sphereGeometry args={[PLANET_RADIUS * 1.5, 16, 16]} />
               <meshBasicMaterial color={color} transparent opacity={haloOpacity} />
             </mesh>
+            {/* Orbital guide ring — subtle hint of where moons orbit */}
+            <mesh rotation={[Math.PI / 2, 0, 0]}>
+              <ringGeometry args={[1.55, 1.65, 64]} />
+              <meshBasicMaterial color={color} transparent opacity={0.12} side={2} />
+            </mesh>
             {/* Function name label */}
             <Html
               position={[0, PLANET_RADIUS + 0.6, 0]}
