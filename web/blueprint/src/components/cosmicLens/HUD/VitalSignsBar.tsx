@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import type { CosmicMode, PersonaState, WorkflowMoonData } from "../lib/types";
 
 interface VitalSignsBarProps {
@@ -11,6 +10,8 @@ interface VitalSignsBarProps {
   onSeed: () => void;
   /** Live counter from flashesRef (read once per second). */
   recentEvents: number;
+  /** Workflow completions per minute (computed by parent). */
+  throughputPerMin?: number;
 }
 
 /** Top HUD: vital signs + ⚡BURST + mode toggle. */
@@ -26,24 +27,9 @@ export function VitalSignsBar(props: VitalSignsBarProps) {
     recentEvents,
   } = props;
 
-  // Throughput: track in-flight delta over the last 60s
-  const [throughput, setThroughput] = useState<number>(0);
-  useEffect(() => {
-    const samples: { ts: number; count: number }[] = [];
-    const interval = setInterval(() => {
-      const now = Date.now();
-      samples.push({ ts: now, count: inFlight.length });
-      const cutoff = now - 60_000;
-      while (samples.length && samples[0].ts < cutoff) samples.shift();
-      if (samples.length >= 2) {
-        const first = samples[0];
-        const last = samples[samples.length - 1];
-        const seconds = Math.max(1, (last.ts - first.ts) / 1000);
-        setThroughput(Math.max(0, (last.count - first.count) / seconds));
-      }
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [inFlight.length]);
+  // Throughput is computed by the parent (CosmicLens) which has direct
+  // access to flashesRef. Pass via prop.
+  const throughput = props.throughputPerMin ?? 0;
 
   const pendingDecisions = personas.reduce(
     (sum, p) => sum + (p.pending_count ?? 0),
@@ -74,7 +60,7 @@ export function VitalSignsBar(props: VitalSignsBarProps) {
       <Divider />
       <Stat label="pending decisions" value={pendingDecisions} accent="#fb923c" />
       <Divider />
-      <Stat label="throughput / min" value={(throughput * 60).toFixed(1)} accent="#a78bfa" />
+      <Stat label="throughput / min" value={throughput.toFixed(1)} accent="#a78bfa" />
       <Divider />
       <Stat label="exceptions" value={exceptions} accent={exceptions > 0 ? "#ef4444" : "#475569"} />
       <Divider />

@@ -49,15 +49,41 @@ export function CosmicLens({ embed: _embed }: CosmicLensProps) {
 
   // Throttle a "recent events / min" counter from flashesRef
   const [eventsPerMin, setEventsPerMin] = useState(0);
+  // Throughput: workflow.completed events per minute (sample window).
+  const [throughputPerMin, setThroughputPerMin] = useState(0);
   useEffect(() => {
     let lastVersion = 0;
     let lastSampleTs = Date.now();
+    let totalCompletedSeen = 0;
+    const completedHistory: { ts: number; count: number }[] = [];
     const interval = setInterval(() => {
       const ref = live.flashesRef.current;
       const delta = ref.version - lastVersion;
       const elapsed = (Date.now() - lastSampleTs) / 1000;
       if (elapsed > 0) {
         setEventsPerMin((delta / elapsed) * 60);
+      }
+      // Count NEW completion events in the buffer
+      const buffer = ref.buffer;
+      const newSlice = buffer.slice(Math.max(0, buffer.length - delta));
+      let completedDelta = 0;
+      for (const f of newSlice) {
+        if (
+          f.type === "workflow.resolved" ||
+          f.type === "durable.workflow.completed" ||
+          f.type === "workflow.completed"
+        ) completedDelta++;
+      }
+      totalCompletedSeen += completedDelta;
+      const now = Date.now();
+      completedHistory.push({ ts: now, count: totalCompletedSeen });
+      const cutoff = now - 60_000;
+      while (completedHistory.length && completedHistory[0].ts < cutoff) completedHistory.shift();
+      if (completedHistory.length >= 2) {
+        const first = completedHistory[0];
+        const last = completedHistory[completedHistory.length - 1];
+        const seconds = Math.max(1, (last.ts - first.ts) / 1000);
+        setThroughputPerMin(((last.count - first.count) / seconds) * 60);
       }
       lastVersion = ref.version;
       lastSampleTs = Date.now();
@@ -146,6 +172,7 @@ export function CosmicLens({ embed: _embed }: CosmicLensProps) {
         onBurst={() => live.injectBurst(8)}
         onSeed={() => live.seedKpis()}
         recentEvents={eventsPerMin}
+        throughputPerMin={throughputPerMin}
       />
 
       <ActivityRail flashesRef={live.flashesRef} mode={live.mode} />
