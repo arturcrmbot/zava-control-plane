@@ -1,6 +1,4 @@
-import { useMemo, useRef } from "react";
-import * as THREE from "three";
-import { useFrame } from "@react-three/fiber";
+import { useMemo } from "react";
 import type { CityMeta, CosmicMode } from "./lib/types";
 import { colorForKind, colorForEntityType } from "./lib/colors";
 
@@ -10,115 +8,86 @@ interface CitiesProps {
 }
 
 const CITY_RADIUS = 0.18;
-const DISC_RADIUS = 7.2; // stay inside the hub disc edge
-const HUB_TOP_Y = 0.42; // disc thickness/2 + small lift
+const DISC_RADIUS = 7.2;
+const HUB_TOP_Y = 0.42;
 
-const MAX_CITIES = 80;
-
-const matrix = new THREE.Matrix4();
-const position = new THREE.Vector3();
-const scale = new THREE.Vector3(1, 1, 1);
-const quaternion = new THREE.Quaternion();
-const tmpColor = new THREE.Color();
+/** Compute deterministic random position on the disc surface for a city id.
+ *  Exported so Rockets and other consumers reach the same coordinate. */
+export function cityPosition(id: string): [number, number, number] {
+  let hash = 5381;
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) + hash + id.charCodeAt(i)) | 0;
+  }
+  const rNorm = (Math.abs(hash) % 1000) / 1000;
+  const tNorm = (Math.abs(hash >> 8) % 1000) / 1000;
+  const r = Math.sqrt(rNorm) * DISC_RADIUS; // sqrt for even areal distribution
+  const angle = tNorm * Math.PI * 2;
+  return [Math.cos(angle) * r, HUB_TOP_Y, Math.sin(angle) * r];
+}
 
 /**
  * Cities scattered on the disc surface.
  *
- * Phase A: deterministic random layout (hashed off city id) so positions
- * don't change per render. Phase C replaces with force-directed layout.
+ * Phase A: deterministic random layout (hashed off city id).
+ * Phase C replaces with force-directed layout.
+ *
+ * Each city = sphere + halo. Non-instanced because per-instance emissive
+ * isn't supported by InstancedMesh standard materials, and 110 cities
+ * is well within budget for individual meshes.
  */
 export function Cities({ cities, mode }: CitiesProps) {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-
-  const layout = useMemo(() => {
-    return cities.slice(0, MAX_CITIES).map((city) => {
-      // Deterministic random position using djb2 hash of city id
-      let hash = 5381;
-      for (let i = 0; i < city.id.length; i++) {
-        hash = ((hash << 5) + hash + city.id.charCodeAt(i)) | 0;
-      }
-      const rNorm = (Math.abs(hash) % 1000) / 1000; // 0..1
-      const tNorm = (Math.abs(hash >> 8) % 1000) / 1000;
-      const r = Math.sqrt(rNorm) * DISC_RADIUS; // sqrt for even areal distribution
-      const angle = tNorm * Math.PI * 2;
-      const x = Math.cos(angle) * r;
-      const z = Math.sin(angle) * r;
+  const positioned = useMemo(() => {
+    return cities.map((city) => {
+      const [x, y, z] = cityPosition(city.id);
       const color =
         mode === "entities" ? colorForEntityType(city.kind) : colorForKind(city.kind);
-      return { id: city.id, x, z, color };
+      return { ...city, x, y, z, color };
     });
   }, [cities, mode]);
 
-  useFrame(() => {
-    if (!meshRef.current) return;
-    const mesh = meshRef.current;
-    layout.forEach((c, i) => {
-      position.set(c.x, HUB_TOP_Y, c.z);
-      matrix.compose(position, quaternion, scale);
-      mesh.setMatrixAt(i, matrix);
-      tmpColor.set(c.color);
-      mesh.setColorAt(i, tmpColor);
-    });
-    for (let i = layout.length; i < MAX_CITIES; i++) {
-      position.set(0, -100, 0);
-      matrix.compose(position, quaternion, scale);
-      mesh.setMatrixAt(i, matrix);
-    }
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    mesh.count = MAX_CITIES;
-  });
-
-  if (cities.length === 0) {
-    // Phase A may have no cities until Phase B endpoint exists; render
-    // a small placeholder ring so the disc isn't empty.
-    return <PlaceholderRing />;
-  }
+  if (positioned.length === 0) return <PlaceholderRing />;
 
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_CITIES]} castShadow>
-      <sphereGeometry args={[CITY_RADIUS, 12, 12]} />
-      <meshStandardMaterial
-        emissive="#22d3ee"
-        emissiveIntensity={0.8}
-        metalness={0.2}
-        roughness={0.4}
-        vertexColors
-      />
-    </instancedMesh>
+    <group>
+      {positioned.map((c) => (
+        <group key={c.id} position={[c.x, c.y, c.z]}>
+          {/* The city itself — emissive sphere */}
+          <mesh>
+            <sphereGeometry args={[CITY_RADIUS, 12, 12]} />
+            <meshStandardMaterial
+              color={c.color}
+              emissive={c.color}
+              emissiveIntensity={1.0}
+              metalness={0.2}
+              roughness={0.4}
+            />
+          </mesh>
+          {/* Halo */}
+          <mesh>
+            <sphereGeometry args={[CITY_RADIUS * 1.8, 10, 10]} />
+            <meshBasicMaterial color={c.color} transparent opacity={0.18} />
+          </mesh>
+        </group>
+      ))}
+    </group>
   );
 }
 
-/** A simple cluster of glowing dots so the hub doesn't look empty before /api/cities exists. */
+/** A simple ring of placeholder dots so the hub doesn't look empty before /api/cities returns. */
 function PlaceholderRing() {
-  const ref = useRef<THREE.InstancedMesh>(null);
-  const count = 30;
-
-  useFrame((state) => {
-    if (!ref.current) return;
-    const mesh = ref.current;
-    const t = state.clock.getElapsedTime();
-    for (let i = 0; i < count; i++) {
-      const angle = (i / count) * Math.PI * 2;
-      const r = 4 + Math.sin(t * 0.5 + i) * 0.2;
-      position.set(Math.cos(angle) * r, HUB_TOP_Y, Math.sin(angle) * r);
-      matrix.compose(position, quaternion, scale);
-      mesh.setMatrixAt(i, matrix);
-    }
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.count = count;
-  });
-
-  return (
-    <instancedMesh ref={ref} args={[undefined, undefined, count]}>
-      <sphereGeometry args={[0.14, 10, 10]} />
-      <meshStandardMaterial
-        color="#94a3b8"
-        emissive="#22d3ee"
-        emissiveIntensity={0.5}
-        transparent
-        opacity={0.6}
-      />
-    </instancedMesh>
-  );
+  const dots = 30;
+  const items = [];
+  for (let i = 0; i < dots; i++) {
+    const angle = (i / dots) * Math.PI * 2;
+    const r = 5.5;
+    const x = Math.cos(angle) * r;
+    const z = Math.sin(angle) * r;
+    items.push(
+      <mesh key={i} position={[x, HUB_TOP_Y, z]}>
+        <sphereGeometry args={[0.1, 8, 8]} />
+        <meshBasicMaterial color="#475569" transparent opacity={0.5} />
+      </mesh>,
+    );
+  }
+  return <group>{items}</group>;
 }

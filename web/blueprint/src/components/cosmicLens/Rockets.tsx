@@ -10,6 +10,7 @@ import type {
 } from "./lib/types";
 import { MoonRegistry, RocketRegistry } from "./lib/registries";
 import { moonPosition } from "./WorkflowMoons";
+import { cityPosition } from "./Cities";
 import { isReadEvent, isWriteEvent, labelForCapability, labelForEntity } from "./lib/labels";
 import { buildWorkflowTypeToFunction, resolveFunction, workflowTypeFromId } from "./lib/workflowFunction";
 
@@ -71,15 +72,7 @@ export function Rockets({ flashesRef, inFlight, cities, functions, mode }: Rocke
   const cityPositions = useMemo(() => {
     const m = new Map<string, [number, number, number]>();
     cities.forEach((city) => {
-      let hash = 5381;
-      for (let i = 0; i < city.id.length; i++) {
-        hash = ((hash << 5) + hash + city.id.charCodeAt(i)) | 0;
-      }
-      const rNorm = (Math.abs(hash) % 1000) / 1000;
-      const tNorm = (Math.abs(hash >> 8) % 1000) / 1000;
-      const r = Math.sqrt(rNorm) * 7.2;
-      const angle = tNorm * Math.PI * 2;
-      m.set(city.id, [Math.cos(angle) * r, 0.42, Math.sin(angle) * r]);
+      m.set(city.id, cityPosition(city.id));
     });
     return m;
   }, [cities]);
@@ -262,13 +255,7 @@ export function Rockets({ flashesRef, inFlight, cities, functions, mode }: Rocke
   return (
     <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_ROCKETS]} castShadow>
       <coneGeometry args={[ROCKET_BODY, ROCKET_BODY * 2.5, 6]} />
-      <meshStandardMaterial
-        emissive="#22d3ee"
-        emissiveIntensity={1.2}
-        metalness={0.3}
-        roughness={0.3}
-        vertexColors
-      />
+      <meshBasicMaterial vertexColors />
     </instancedMesh>
   );
 }
