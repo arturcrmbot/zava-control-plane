@@ -6,6 +6,7 @@ import { colorForFunction } from "./lib/colors";
 
 interface FunctionPlanetsProps {
   functions: FunctionMeta[];
+  onFunctionClick?: (key: string, label: string) => void;
 }
 
 const ORBIT_RADIUS = 14;
@@ -20,7 +21,7 @@ function fnKey(fn: FunctionMeta): string {
  * One sphere per function, positioned in even orbital slots around the hub.
  * Slow rotation around Y so the system feels alive even when no events fire.
  */
-export function FunctionPlanets({ functions }: FunctionPlanetsProps) {
+export function FunctionPlanets({ functions, onFunctionClick }: FunctionPlanetsProps) {
   const groupRef = useRef<THREE.Group>(null);
 
   useFrame((state) => {
@@ -42,7 +43,20 @@ export function FunctionPlanets({ functions }: FunctionPlanetsProps) {
         const color = colorForFunction(k);
         return (
           <group key={k} position={[x, 1.5, z]}>
-            <mesh castShadow>
+            <mesh
+              castShadow
+              onClick={(e) => {
+                e.stopPropagation();
+                onFunctionClick?.(k, fn.display ?? fn.label ?? k);
+              }}
+              onPointerOver={(e) => {
+                e.stopPropagation();
+                document.body.style.cursor = "pointer";
+              }}
+              onPointerOut={() => {
+                document.body.style.cursor = "default";
+              }}
+            >
               <sphereGeometry args={[PLANET_RADIUS, 24, 24]} />
               <meshStandardMaterial
                 color={color}

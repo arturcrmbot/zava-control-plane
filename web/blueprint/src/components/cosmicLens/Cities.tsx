@@ -5,6 +5,7 @@ import { colorForKind, colorForEntityType } from "./lib/colors";
 interface CitiesProps {
   cities: CityMeta[];
   mode: CosmicMode;
+  onCityClick?: (id: string, label: string) => void;
 }
 
 const CITY_RADIUS = 0.18;
@@ -35,7 +36,7 @@ export function cityPosition(id: string): [number, number, number] {
  * isn't supported by InstancedMesh standard materials, and 110 cities
  * is well within budget for individual meshes.
  */
-export function Cities({ cities, mode }: CitiesProps) {
+export function Cities({ cities, mode, onCityClick }: CitiesProps) {
   const positioned = useMemo(() => {
     return cities.map((city) => {
       const [x, y, z] = cityPosition(city.id);
@@ -52,7 +53,19 @@ export function Cities({ cities, mode }: CitiesProps) {
       {positioned.map((c) => (
         <group key={c.id} position={[c.x, c.y, c.z]}>
           {/* The city itself — emissive sphere */}
-          <mesh>
+          <mesh
+            onClick={(e) => {
+              e.stopPropagation();
+              onCityClick?.(c.id, c.label);
+            }}
+            onPointerOver={(e) => {
+              e.stopPropagation();
+              document.body.style.cursor = "pointer";
+            }}
+            onPointerOut={() => {
+              document.body.style.cursor = "default";
+            }}
+          >
             <sphereGeometry args={[CITY_RADIUS, 12, 12]} />
             <meshStandardMaterial
               color={c.color}

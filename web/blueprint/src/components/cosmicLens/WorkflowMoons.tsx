@@ -9,6 +9,7 @@ import { buildWorkflowTypeToFunction, resolveFunction, workflowTypeFromId } from
 interface WorkflowMoonsProps {
   inFlight: WorkflowMoonData[];
   functions: FunctionMeta[];
+  onMoonClick?: (workflowId: string) => void;
 }
 
 const MOON_RADIUS = 0.22;
@@ -25,7 +26,7 @@ const quaternion = new THREE.Quaternion();
  * Position = parent planet's position + per-moon rotational offset.
  * Implemented with InstancedMesh for cheap rendering at 200+ moons.
  */
-export function WorkflowMoons({ inFlight, functions }: WorkflowMoonsProps) {
+export function WorkflowMoons({ inFlight, functions, onMoonClick }: WorkflowMoonsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const registry = useMemo(() => new MoonRegistry(), []);
 
@@ -70,7 +71,26 @@ export function WorkflowMoons({ inFlight, functions }: WorkflowMoonsProps) {
   });
 
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_MOONS]} castShadow>
+    <instancedMesh
+      ref={meshRef}
+      args={[undefined, undefined, MAX_MOONS]}
+      castShadow
+      onClick={(e) => {
+        if (typeof e.instanceId === "number" && e.instanceId < moons.length) {
+          e.stopPropagation();
+          onMoonClick?.(moons[e.instanceId].id);
+        }
+      }}
+      onPointerOver={(e) => {
+        if (typeof e.instanceId === "number" && e.instanceId < moons.length) {
+          e.stopPropagation();
+          document.body.style.cursor = "pointer";
+        }
+      }}
+      onPointerOut={() => {
+        document.body.style.cursor = "default";
+      }}
+    >
       <sphereGeometry args={[MOON_RADIUS, 12, 12]} />
       <meshStandardMaterial
         color="#f1f5f9"

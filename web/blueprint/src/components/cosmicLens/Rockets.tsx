@@ -8,7 +8,7 @@ import type {
   FunctionMeta,
   WorkflowMoonData,
 } from "./lib/types";
-import { MoonRegistry, RocketRegistry } from "./lib/registries";
+import { MoonRegistry, RocketRegistry, TrailRegistry } from "./lib/registries";
 import { moonPosition } from "./WorkflowMoons";
 import { cityPosition } from "./Cities";
 import { isReadEvent, isWriteEvent, labelForCapability, labelForEntity } from "./lib/labels";
@@ -20,6 +20,8 @@ interface RocketsProps {
   cities: CityMeta[];
   functions: FunctionMeta[];
   mode: CosmicMode;
+  /** External trail registry so Trails component can render the same data. */
+  trailRegistry: TrailRegistry;
 }
 
 const MAX_ROCKETS = 200;
@@ -43,7 +45,7 @@ const yAxis = new THREE.Vector3(0, 1, 0);
  * even if cities aren't yet labeled correctly. Phase B does proper city
  * targeting via tool_name lookup.
  */
-export function Rockets({ flashesRef, inFlight, cities, functions, mode }: RocketsProps) {
+export function Rockets({ flashesRef, inFlight, cities, functions, mode, trailRegistry }: RocketsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const moonRegistry = useMemo(() => new MoonRegistry(), []);
   const rocketRegistry = useMemo(() => new RocketRegistry(), []);
@@ -207,6 +209,20 @@ export function Rockets({ flashesRef, inFlight, cities, functions, mode }: Rocke
         if (progress >= 1) {
           r.phase = "done";
           r.returned_at = now;
+          // Emit a trail sample on completion (only once per rocket)
+          let trailColor = "#22d3ee";
+          if (r.is_write) trailColor = "#fb923c";
+          else if (r.is_read) trailColor = "#67e8f9";
+          else if (r.is_exception) trailColor = "#ef4444";
+          // Two segments: outbound (moon → city) and return (city → moon).
+          // Render as ONE segment from moon to city and back? Simpler: just
+          // moon → city which is the operationally meaningful path.
+          trailRegistry.push({
+            from: moonPos,
+            to: cityPos,
+            emitted_at: now,
+            color: trailColor,
+          });
         }
       } else {
         // done — park off-screen
