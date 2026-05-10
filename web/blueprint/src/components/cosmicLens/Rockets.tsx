@@ -22,6 +22,8 @@ interface RocketsProps {
   mode: CosmicMode;
   /** External trail registry so Trails component can render the same data. */
   trailRegistry: TrailRegistry;
+  /** External rocket registry so DirectionalBeams can read parked rockets. */
+  rocketRegistry: RocketRegistry;
 }
 
 const MAX_ROCKETS = 200;
@@ -45,10 +47,9 @@ const yAxis = new THREE.Vector3(0, 1, 0);
  * even if cities aren't yet labeled correctly. Phase B does proper city
  * targeting via tool_name lookup.
  */
-export function Rockets({ flashesRef, inFlight, cities, functions, mode, trailRegistry }: RocketsProps) {
+export function Rockets({ flashesRef, inFlight, cities, functions, mode, trailRegistry, rocketRegistry }: RocketsProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const moonRegistry = useMemo(() => new MoonRegistry(), []);
-  const rocketRegistry = useMemo(() => new RocketRegistry(), []);
   const lastVersionRef = useRef(0);
   const counterRef = useRef(0);
 

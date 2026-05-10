@@ -7,7 +7,9 @@ import { WorkflowMoons } from "./WorkflowMoons";
 import { Cities } from "./Cities";
 import { Rockets } from "./Rockets";
 import { Trails } from "./Trails";
-import { TrailRegistry } from "./lib/registries";
+import { EntityEdges } from "./EntityEdges";
+import { DirectionalBeams } from "./DirectionalBeams";
+import { RocketRegistry, TrailRegistry } from "./lib/registries";
 import { useLiveCosmic } from "./lib/useLiveCosmic";
 import { VitalSignsBar } from "./HUD/VitalSignsBar";
 import { ActivityRail } from "./HUD/ActivityRail";
@@ -28,6 +30,7 @@ interface CosmicLensProps {
 export function CosmicLens({ embed: _embed }: CosmicLensProps) {
   const live = useLiveCosmic();
   const trailRegistry = useMemo(() => new TrailRegistry(500), []);
+  const rocketRegistry = useMemo(() => new RocketRegistry(), []);
   const [drawer, setDrawer] = useState<DrawerView>({ type: null });
 
   // Throttle a "recent events / min" counter from flashesRef
@@ -81,6 +84,7 @@ export function CosmicLens({ embed: _embed }: CosmicLensProps) {
             mode={live.mode}
             onCityClick={(id, label) => setDrawer({ type: "city", id, label })}
           />
+          <EntityEdges cities={live.cities} visible={live.mode === "entities"} />
           <Rockets
             flashesRef={live.flashesRef}
             inFlight={live.inFlight}
@@ -88,8 +92,14 @@ export function CosmicLens({ embed: _embed }: CosmicLensProps) {
             functions={live.functions}
             mode={live.mode}
             trailRegistry={trailRegistry}
+            rocketRegistry={rocketRegistry}
           />
           <Trails registry={trailRegistry} />
+          <DirectionalBeams
+            rocketRegistry={rocketRegistry}
+            cities={live.cities}
+            visible={live.mode === "entities"}
+          />
         </Suspense>
 
         <OrbitControls
