@@ -10,6 +10,7 @@ import { Rockets } from "./Rockets";
 import { Trails } from "./Trails";
 import { EntityEdges } from "./EntityEdges";
 import { DirectionalBeams } from "./DirectionalBeams";
+import { PlanetCompletions } from "./PlanetCompletions";
 import { RocketRegistry, TrailRegistry } from "./lib/registries";
 import { useLiveCosmic } from "./lib/useLiveCosmic";
 import { buildWorkflowTypeToFunction, resolveFunction, workflowTypeFromId } from "./lib/workflowFunction";
@@ -141,6 +142,11 @@ export function CosmicLens({ embed: _embed }: CosmicLensProps) {
             rocketRegistry={rocketRegistry}
             cities={live.cities}
             visible={live.mode === "entities"}
+          />
+          <PlanetCompletions
+            flashesRef={live.flashesRef}
+            inFlight={live.inFlight}
+            functions={live.functions}
           />
         </Suspense>
 
