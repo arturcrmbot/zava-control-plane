@@ -1,12 +1,14 @@
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { HubDisc } from "./HubDisc";
 import { FunctionPlanets } from "./FunctionPlanets";
 import { WorkflowMoons } from "./WorkflowMoons";
 import { Cities } from "./Cities";
 import { Rockets } from "./Rockets";
 import { useLiveCosmic } from "./lib/useLiveCosmic";
+import { VitalSignsBar } from "./HUD/VitalSignsBar";
+import { ActivityRail } from "./HUD/ActivityRail";
 
 interface CosmicLensProps {
   embed?: boolean;
@@ -21,6 +23,24 @@ interface CosmicLensProps {
  */
 export function CosmicLens({ embed: _embed }: CosmicLensProps) {
   const live = useLiveCosmic();
+
+  // Throttle a "recent events / min" counter from flashesRef
+  const [eventsPerMin, setEventsPerMin] = useState(0);
+  useEffect(() => {
+    let lastVersion = 0;
+    let lastSampleTs = Date.now();
+    const interval = setInterval(() => {
+      const ref = live.flashesRef.current;
+      const delta = ref.version - lastVersion;
+      const elapsed = (Date.now() - lastSampleTs) / 1000;
+      if (elapsed > 0) {
+        setEventsPerMin((delta / elapsed) * 60);
+      }
+      lastVersion = ref.version;
+      lastSampleTs = Date.now();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [live.flashesRef]);
 
   return (
     <div style={{ position: "absolute", inset: 0, background: "#020617" }}>
@@ -61,45 +81,18 @@ export function CosmicLens({ embed: _embed }: CosmicLensProps) {
         />
       </Canvas>
 
-      {/* Minimal status badge — Phase B/C add VitalSignsBar / ActivityRail / Drawer */}
-      <div
-        style={{
-          position: "absolute",
-          top: 16,
-          left: 16,
-          padding: "6px 10px",
-          background: "rgba(15, 23, 42, 0.7)",
-          color: live.status === "watching" ? "#4ade80" : "#fb923c",
-          fontFamily: "ui-sans-serif, system-ui",
-          fontSize: 12,
-          borderRadius: 6,
-          border: "1px solid rgba(148, 163, 184, 0.2)",
-          pointerEvents: "none",
-        }}
-      >
-        ● {live.status} · {live.inFlight.length} in-flight · {live.cities.length} cities
-      </div>
+      <VitalSignsBar
+        inFlight={live.inFlight}
+        personas={live.personas}
+        status={live.status}
+        mode={live.mode}
+        setMode={live.setMode}
+        onBurst={() => live.injectBurst(8)}
+        onSeed={() => live.seedKpis()}
+        recentEvents={eventsPerMin}
+      />
 
-      {/* Temporary burst button so we can verify rocket flow */}
-      <button
-        onClick={() => live.injectBurst(8)}
-        style={{
-          position: "absolute",
-          top: 16,
-          right: 16,
-          padding: "8px 14px",
-          background: "linear-gradient(135deg, #6366f1, #ec4899)",
-          color: "white",
-          border: "none",
-          borderRadius: 6,
-          cursor: "pointer",
-          fontFamily: "ui-sans-serif, system-ui",
-          fontSize: 13,
-          fontWeight: 600,
-        }}
-      >
-        ⚡ BURST 8
-      </button>
+      <ActivityRail flashesRef={live.flashesRef} mode={live.mode} />
     </div>
   );
 }
