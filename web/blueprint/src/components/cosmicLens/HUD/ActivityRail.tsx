@@ -24,7 +24,7 @@ const FILTERS = [
   { key: "started", label: "started", color: "#22d3ee", default: true },
   { key: "spawned", label: "spawned", color: "#ec4899", default: true },
   { key: "tool", label: "tools", color: "#0ea5e9", default: false },
-  { key: "entity", label: "entities", color: "#14b8a6", default: true },
+  { key: "entity", label: "entities", color: "#14b8a6", default: false },
 ] as const;
 
 /** Right-edge live event feed with filter chips. */
@@ -33,6 +33,25 @@ export function ActivityRail({ flashesRef, mode }: ActivityRailProps) {
   const [enabled, setEnabled] = useState<Set<string>>(
     () => new Set(FILTERS.filter((f) => f.default).map((f) => f.key)),
   );
+  // When user switches to Entities mode, auto-enable the entity chip so the
+  // rail surfaces the right signal for that view. We still let users override.
+  useEffect(() => {
+    if (mode === "entities") {
+      setEnabled((prev) => {
+        if (prev.has("entity")) return prev;
+        const next = new Set(prev);
+        next.add("entity");
+        return next;
+      });
+    } else {
+      setEnabled((prev) => {
+        if (!prev.has("entity")) return prev;
+        const next = new Set(prev);
+        next.delete("entity");
+        return next;
+      });
+    }
+  }, [mode]);
   const lastVersionRef = useRef(0);
   const counterRef = useRef(0);
 

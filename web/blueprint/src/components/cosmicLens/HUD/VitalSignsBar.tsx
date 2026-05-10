@@ -62,7 +62,11 @@ export function VitalSignsBar(props: VitalSignsBarProps) {
       <Divider />
       <Stat label="throughput / min" value={throughput.toFixed(1)} accent="#a78bfa" />
       <Divider />
-      <Stat label="exceptions" value={exceptions} accent={exceptions > 0 ? "#ef4444" : "#475569"} />
+      <Stat
+        label="at gate"
+        value={exceptions}
+        accent={exceptions > 0 ? "#f59e0b" : "#475569"}
+      />
       <Divider />
       <Stat label="events / min" value={Math.round(recentEvents)} accent="#10b981" />
 

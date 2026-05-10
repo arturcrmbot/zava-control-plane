@@ -21,14 +21,25 @@ export function buildWorkflowTypeToFunction(functions: FunctionMeta[]): Map<stri
   return map;
 }
 
+/** Manual overrides for workflow_types whose owning function is ambiguous,
+ *  legacy, or not declared in /api/functions ownsDomains. */
+const TYPE_TO_FUNCTION_OVERRIDE: Record<string, string> = {
+  hiring: "hr",
+  // Add others here as the substrate grows.
+};
+
 /** Resolve a workflow's owning function key.
- *  Priority: explicit wf.function (when not "legacy") → wf.workflow_type → "ops" fallback. */
+ *  Priority: explicit wf.function (when not "legacy") → wfType override
+ *  → wfType→function map from /api/functions → "ops" fallback. */
 export function resolveFunction(
   wf: WorkflowMoonData,
   wfTypeMap: Map<string, string>,
 ): string {
   const fn = wf.function;
   if (fn && fn !== "legacy" && fn !== "unknown") return fn;
+  if (wf.workflow_type && TYPE_TO_FUNCTION_OVERRIDE[wf.workflow_type]) {
+    return TYPE_TO_FUNCTION_OVERRIDE[wf.workflow_type];
+  }
   const byType = wf.workflow_type ? wfTypeMap.get(wf.workflow_type) : undefined;
   if (byType) return byType;
   return "ops";
