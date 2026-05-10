@@ -62,7 +62,29 @@ export function ActivityRail({ flashesRef, mode }: ActivityRailProps) {
 
       if (newEntries.length === 0) return;
       setEntries((prev) => {
-        const merged = [...newEntries.reverse(), ...prev];
+        // Coalesce: collapse consecutive same-type same-category entries
+        // into a single row with a "(xN)" suffix so the rail isn't dominated
+        // by repetitive entity.upserted noise.
+        const merged: RailEntry[] = [];
+        const all = [...newEntries.reverse(), ...prev];
+        for (const e of all) {
+          const last = merged[merged.length - 1];
+          if (
+            last &&
+            last.type === e.type &&
+            last.category === e.category &&
+            !last.workflow_id &&
+            !e.workflow_id
+          ) {
+            // Bump the count on the existing entry's title
+            const m = last.title.match(/^(.+?)(?:\s+\(x(\d+)\))?$/);
+            const base = m?.[1] ?? last.title;
+            const n = (m?.[2] ? parseInt(m[2], 10) : 1) + 1;
+            last.title = `${base} (x${n})`;
+          } else {
+            merged.push(e);
+          }
+        }
         if (merged.length > 200) merged.length = 200;
         return merged;
       });
