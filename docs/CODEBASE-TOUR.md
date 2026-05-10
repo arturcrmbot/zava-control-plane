@@ -217,6 +217,10 @@ Three Vite apps:
   locally; Azure Container Apps in production) — the editorial page +
   live observatory of the substrate. Walks `GET /api/blueprint/composition`
   on load; subscribes to `GET /api/blueprint/stream` for the live mind-map.
+  Also hosts four full-bleed visualisation surfaces at `?view=constellation`,
+  `?view=entities`, `?view=functions`, `?view=org-clone` — see
+  [visualisation.md](visualisation.md) for the full surface inventory and
+  visual vocabulary.
 
 Shared types in [web/shared/types.ts](../web/shared/types.ts) mirror
 Python [api/shared/types.py](../api/shared/types.py); smoke test enforces

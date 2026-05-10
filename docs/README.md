@@ -17,6 +17,9 @@ place to look for X?".
 | To run the stack | Root [README.md](../README.md) Quickstart (`make up`) |
 | To run the POC2 demo | [poc2-quick-demo.md](poc2-quick-demo.md) (5–8 min) |
 | To make a new domain show up on the blueprint page | [blueprint-microsite-contributor-guide.md](blueprint-microsite-contributor-guide.md) |
+| How the visualisation surfaces work | [visualisation.md](visualisation.md) |
+| To add a new visualisation layer (event, function, kind, cadence pip) | [visualisation-contributor-guide.md](visualisation-contributor-guide.md) |
+| Where the observatory is going (4-zoom Org Building) | [superpowers/specs/2026-05-09-org-building-design.md](superpowers/specs/2026-05-09-org-building-design.md) |
 | To compose a new domain end-to-end | [superpowers/skills/compose-domain/SKILL.md](superpowers/skills/compose-domain/SKILL.md) |
 | Local dev setup | [DEVELOPMENT.md](DEVELOPMENT.md) |
 | Verbatim Zava brief | [poc1-brief.md](poc1-brief.md) |
@@ -46,6 +49,7 @@ The single source for "what's true today". When facts change, edit here.
 | [SCOPE-DELTA.md](SCOPE-DELTA.md) | Lab build vs engagement POC | What's identical, what swaps at engagement-POC time, what landed at the substrate level since the bid was written |
 | [blueprint.md](blueprint.md) | The pitch (manuscript → press; case of type) | The argument the substrate is making to the audience; copy + reasoning |
 | [agentic-org-design.md](agentic-org-design.md) | Forward design — first-slice Plane 1 (entity graph) on top of the existing 18-domain substrate | Five-plane decomposition; the next thing this substrate becomes |
+| [visualisation.md](visualisation.md) | Canonical visualisation reference | Surface inventory (`?view=constellation` / `entities` / `functions` / `org-clone`); visual vocabulary; SSE event → visual mapping; performance budget |
 
 ### 3. Reference (how the codebase works)
 
@@ -57,6 +61,7 @@ These describe HOW, not WHAT-IS-DONE. Stable as long as the design holds.
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Code-anchored architecture: tier diagrams, file paths, MCP-tool list, runtime ports, identities, known limitations |
 | [poc2-quick-demo.md](poc2-quick-demo.md) | 5–8 min POC2 hiring walkthrough — apply → triage → screen → interview → offer |
 | [blueprint-microsite-contributor-guide.md](blueprint-microsite-contributor-guide.md) | The contract for making new skills/MCPs/domains appear on the blueprint page; also documents the Azure Container Apps deploy |
+| [visualisation-contributor-guide.md](visualisation-contributor-guide.md) | How to add a new event, function, entity kind, or cadence pip to the visualisation surfaces. Companion to [visualisation.md](visualisation.md). |
 | [blueprint-script.md](blueprint-script.md) | Designer brief / one-pager prompt for the printed version of the blueprint |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Local dev: prereqs, terminals, hot reload, test commands, debugging |
 | [poc1-accuracy-runbook.md](poc1-accuracy-runbook.md) | Step-by-step for running the 300-claim ≥95% accuracy gate (AC #4) |
@@ -95,6 +100,8 @@ Most recent first.
 
 | Spec | Subject |
 |---|---|
+| [2026-05-10-simulator-expansion-design.md](superpowers/specs/2026-05-10-simulator-expansion-design.md) | Org-simulation expansion — Tier 1-3 endpoints that drive the Org Building primitives on demand |
+| [2026-05-09-org-building-design.md](superpowers/specs/2026-05-09-org-building-design.md) | "The Org Building" — 4-zoom 3D visualisation replacing the Constellation page |
 | [2026-05-03-substrate-fix-design.md](superpowers/specs/2026-05-03-substrate-fix-design.md) | Substrate event vocabulary + personae + autonomous run loop |
 | [2026-05-03-compose-domain-v3-design.md](superpowers/specs/2026-05-03-compose-domain-v3-design.md) | `compose-domain` v3 — encodes the substrate-fix contract |
 | [2026-05-03-blueprint-microsite-design.md](superpowers/specs/2026-05-03-blueprint-microsite-design.md) | Editorial microsite + live observatory + interactive architecture |
@@ -155,3 +162,5 @@ execution plans live here under `superpowers/plans/`. Most recent first.
 | Mock MCP list | Many places — fine, mocks come up everywhere | — |
 | Rebrand known issues (binary pixel-leaks from legacy-brand → Zava) | [archive/rebrand-known-issues.md](archive/rebrand-known-issues.md) | — |
 | Governance core (AGT v3.4) for POC3 adoption | [governance-poc3-adoption-guide.md](governance-poc3-adoption-guide.md) | — |
+| Visualisation surfaces + visual vocabulary + SSE event → visual mapping | [visualisation.md](visualisation.md) | Other docs link, don't restate |
+| Adding a new visualisation layer | [visualisation-contributor-guide.md](visualisation-contributor-guide.md) | Other docs link, don't re-document |
