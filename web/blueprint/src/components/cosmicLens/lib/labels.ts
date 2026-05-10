@@ -52,7 +52,9 @@ export function labelForCapability(ev: RocketEvent): string {
 
 export function labelForEntity(ev: RocketEvent): string {
   const kind = ev.entity_kind ?? "entity";
-  const id = ev.entity_id ? ` ${ev.entity_id}` : "";
+  // Drop "-unknown" suffix and similar placeholder noise
+  const cleanId = (ev.entity_id ?? "").replace(/-unknown$/i, "").replace(/^.*-unknown-/, "");
+  const id = cleanId && !cleanId.endsWith("-unknown") ? ` ${cleanId}` : "";
   switch (ev.type) {
     case "entity.read":
       return `reading ${kindToVerb(kind)}${id}`;

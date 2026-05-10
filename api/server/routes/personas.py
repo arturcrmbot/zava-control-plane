@@ -105,6 +105,17 @@ async def personas_state():
     pending_by_role: dict[str, list[dict]] = _defaultdict(list)
     last_decision_by_role: dict[str, dict] = {}
 
+    # Lazy import: DOMAINS gives us workflow_type → hitl_gates → persona for
+    # the fallback case where the workflow's payload doesn't directly name a
+    # persona for the active gate. Without this fallback, awaiting workflows
+    # show 0 pending decisions even though humans are clearly being asked.
+    try:
+        from api.shared.domains import DOMAINS  # type: ignore
+        # DOMAINS is a dict[workflow_type, Domain]
+        _domains_by_type = DOMAINS if isinstance(DOMAINS, dict) else {}
+    except Exception:
+        _domains_by_type = {}
+
     for w in _app_state.store.list_workflows():
         if w.status == "awaiting_hitl":
             ctx = (w.payload or {}).get("hitl_context") or {}
@@ -113,6 +124,27 @@ async def personas_state():
                 or (w.payload or {}).get("persona")
                 or None
             )
+            # Fallback: look up persona via DOMAINS hitl_gates roster.
+            # We don't know which exact gate fired so we attribute to the
+            # first persona declared by the domain — at the cosmic-lens
+            # zoom level that's accurate enough to draw a parked rocket
+            # at SOME warm-coloured city in the right family. Phase 2: use
+            # current_phase to match the exact gate.
+            if not persona_role:
+                domain = _domains_by_type.get(w.type)
+                if domain is not None:
+                    gates = getattr(domain, "hitl_gates", None) or []
+                    # Try to match by current phase first
+                    for gate in gates:
+                        if getattr(gate, "gate_phase", None) == w.current_phase:
+                            persona_role = getattr(gate, "persona", None) or getattr(gate, "persona_role", None)
+                            break
+                    if not persona_role:
+                        for gate in gates:
+                            cand = getattr(gate, "persona", None) or getattr(gate, "persona_role", None)
+                            if cand:
+                                persona_role = cand
+                                break
             if persona_role:
                 pending_by_role[persona_role].append({
                     "workflow_id": w.id,
