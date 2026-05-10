@@ -13,6 +13,7 @@ import { moonPosition } from "./WorkflowMoons";
 import { cityPosition } from "./Cities";
 import { isReadEvent, isWriteEvent, labelForCapability, labelForEntity } from "./lib/labels";
 import { buildWorkflowTypeToFunction, resolveFunction, workflowTypeFromId } from "./lib/workflowFunction";
+import { colorForFunction } from "./lib/colors";
 
 interface RocketsProps {
   flashesRef: React.MutableRefObject<{ buffer: CosmicFlash[]; version: number }>;
@@ -210,14 +211,13 @@ export function Rockets({ flashesRef, inFlight, cities, functions, mode, trailRe
         if (progress >= 1) {
           r.phase = "done";
           r.returned_at = now;
-          // Emit a trail sample on completion (only once per rocket)
-          let trailColor = "#22d3ee";
+          // Emit a trail sample on completion (only once per rocket).
+          // Color: function family of the origin moon, with read/write
+          // override taking precedence so entity ops are still visible.
+          let trailColor = colorForFunction(fn);
           if (r.is_write) trailColor = "#fb923c";
           else if (r.is_read) trailColor = "#67e8f9";
           else if (r.is_exception) trailColor = "#ef4444";
-          // Two segments: outbound (moon → city) and return (city → moon).
-          // Render as ONE segment from moon to city and back? Simpler: just
-          // moon → city which is the operationally meaningful path.
           trailRegistry.push({
             from: moonPos,
             to: cityPos,
