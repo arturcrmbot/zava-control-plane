@@ -1,11 +1,14 @@
 import { useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
+import { Html } from "@react-three/drei";
 import type { FunctionMeta } from "./lib/types";
 import { colorForFunction } from "./lib/colors";
 
 interface FunctionPlanetsProps {
   functions: FunctionMeta[];
+  /** workflow_id-prefix → function key counts (for sizing planets by load). */
+  loadByFunction?: Map<string, number>;
   onFunctionClick?: (key: string, label: string) => void;
 }
 
@@ -21,7 +24,7 @@ function fnKey(fn: FunctionMeta): string {
  * One sphere per function, positioned in even orbital slots around the hub.
  * Slow rotation around Y so the system feels alive even when no events fire.
  */
-export function FunctionPlanets({ functions, onFunctionClick }: FunctionPlanetsProps) {
+export function FunctionPlanets({ functions, loadByFunction, onFunctionClick }: FunctionPlanetsProps) {
   const groupRef = useRef<THREE.Group>(null);
 
   useFrame((state) => {
@@ -41,6 +44,10 @@ export function FunctionPlanets({ functions, onFunctionClick }: FunctionPlanetsP
         const x = Math.cos(angle) * ORBIT_RADIUS;
         const z = Math.sin(angle) * ORBIT_RADIUS;
         const color = colorForFunction(k);
+        const load = loadByFunction?.get(k) ?? 0;
+        // Brighter halo when busy
+        const haloOpacity = 0.08 + Math.min(0.25, load / 50);
+        const labelText = (fn.display ?? fn.label ?? k).toUpperCase();
         return (
           <group key={k} position={[x, 1.5, z]}>
             <mesh
@@ -61,16 +68,39 @@ export function FunctionPlanets({ functions, onFunctionClick }: FunctionPlanetsP
               <meshStandardMaterial
                 color={color}
                 emissive={color}
-                emissiveIntensity={0.55}
+                emissiveIntensity={0.6 + Math.min(0.8, load / 80)}
                 metalness={0.2}
                 roughness={0.6}
               />
             </mesh>
             {/* Soft halo */}
             <mesh>
-              <sphereGeometry args={[PLANET_RADIUS * 1.4, 16, 16]} />
-              <meshBasicMaterial color={color} transparent opacity={0.08} />
+              <sphereGeometry args={[PLANET_RADIUS * 1.5, 16, 16]} />
+              <meshBasicMaterial color={color} transparent opacity={haloOpacity} />
             </mesh>
+            {/* Function name label */}
+            <Html
+              position={[0, PLANET_RADIUS + 0.6, 0]}
+              center
+              style={{
+                pointerEvents: "none",
+                color: color,
+                fontSize: 9,
+                fontFamily: "ui-sans-serif, system-ui",
+                fontWeight: 700,
+                letterSpacing: 1.2,
+                textShadow: "0 0 6px rgba(0,0,0,0.9)",
+                whiteSpace: "nowrap",
+                opacity: 0.9,
+              }}
+            >
+              {labelText}
+              {load > 0 && (
+                <span style={{ color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}>
+                  · {load}
+                </span>
+              )}
+            </Html>
           </group>
         );
       })}

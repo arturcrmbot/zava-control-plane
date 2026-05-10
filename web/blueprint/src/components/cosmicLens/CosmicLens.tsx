@@ -1,5 +1,6 @@
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
+import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { HubDisc } from "./HubDisc";
 import { FunctionPlanets } from "./FunctionPlanets";
@@ -11,6 +12,7 @@ import { EntityEdges } from "./EntityEdges";
 import { DirectionalBeams } from "./DirectionalBeams";
 import { RocketRegistry, TrailRegistry } from "./lib/registries";
 import { useLiveCosmic } from "./lib/useLiveCosmic";
+import { buildWorkflowTypeToFunction, resolveFunction, workflowTypeFromId } from "./lib/workflowFunction";
 import { VitalSignsBar } from "./HUD/VitalSignsBar";
 import { ActivityRail } from "./HUD/ActivityRail";
 import { WorkflowDrawer, type DrawerView } from "./HUD/WorkflowDrawer";
@@ -32,6 +34,18 @@ export function CosmicLens({ embed: _embed }: CosmicLensProps) {
   const trailRegistry = useMemo(() => new TrailRegistry(500), []);
   const rocketRegistry = useMemo(() => new RocketRegistry(), []);
   const [drawer, setDrawer] = useState<DrawerView>({ type: null });
+
+  // Compute per-function workflow load for planet glow + label.
+  const loadByFunction = useMemo(() => {
+    const wfTypeMap = buildWorkflowTypeToFunction(live.functions);
+    const counts = new Map<string, number>();
+    for (const wf of live.inFlight) {
+      const wfType = wf.workflow_type || workflowTypeFromId(wf.id) || "";
+      const fnKey = resolveFunction({ ...wf, workflow_type: wfType }, wfTypeMap);
+      counts.set(fnKey, (counts.get(fnKey) ?? 0) + 1);
+    }
+    return counts;
+  }, [live.inFlight, live.functions]);
 
   // Throttle a "recent events / min" counter from flashesRef
   const [eventsPerMin, setEventsPerMin] = useState(0);
@@ -70,6 +84,7 @@ export function CosmicLens({ embed: _embed }: CosmicLensProps) {
           <HubDisc />
           <FunctionPlanets
             functions={live.functions}
+            loadByFunction={loadByFunction}
             onFunctionClick={(key, label) =>
               setDrawer({ type: "function", id: key, label })
             }
@@ -101,6 +116,15 @@ export function CosmicLens({ embed: _embed }: CosmicLensProps) {
             visible={live.mode === "entities"}
           />
         </Suspense>
+
+        <EffectComposer>
+          <Bloom
+            intensity={0.55}
+            luminanceThreshold={0.4}
+            luminanceSmoothing={0.7}
+            mipmapBlur
+          />
+        </EffectComposer>
 
         <OrbitControls
           enablePan={false}
