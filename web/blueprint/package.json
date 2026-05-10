@@ -12,6 +12,8 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "@react-three/postprocessing": "^3.0.4",
+    "@types/d3-force": "^3.0.10",
+    "d3-force": "^3.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "three": "^0.184.0"
