@@ -1,0 +1,1318 @@
+agents: {}
+policy:
+  defaults:
+    action: allow
+    confidence_threshold: 0.8
+    max_tokens: 4096
+    max_tool_calls: 10
+  description: Compiled from data/synthetic/authority/matrix.json + data/policies/tools.yaml. See plan/feature-agent-governance-toolkit-1.md (TASK-012).
+  inherit: true
+  name: apex-substrate
+  rules:
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: adverse_media.search
+    message: tool adverse_media.search (reversible=True, requires_authority=False, scope=finance)
+    name: tool:adverse_media.search
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: audit.query
+    message: tool audit.query (reversible=True, requires_authority=False, scope=shared)
+    name: tool:audit.query
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: authority.check_authority
+    message: tool authority.check_authority (reversible=True, requires_authority=False, scope=shared)
+    name: tool:authority.check_authority
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: authority.resolve_approver
+    message: tool authority.resolve_approver (reversible=True, requires_authority=False, scope=shared)
+    name: tool:authority.resolve_approver
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: avatar.render
+    message: tool avatar.render (reversible=False, requires_authority=False, scope=creative)
+    name: tool:avatar.render
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: brand_rag
+    message: tool brand_rag (reversible=True, requires_authority=False, scope=creative)
+    name: tool:brand_rag
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: calendar_service.book_event
+    message: tool calendar_service.book_event (reversible=False, requires_authority=False, scope=shared)
+    name: tool:calendar_service.book_event
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: calendar_service.find_availability
+    message: tool calendar_service.find_availability (reversible=True, requires_authority=False, scope=shared)
+    name: tool:calendar_service.find_availability
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: calendar_service.get_room_options
+    message: tool calendar_service.get_room_options (reversible=True, requires_authority=False, scope=shared)
+    name: tool:calendar_service.get_room_options
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: claim.getReceipt
+    message: tool claim.getReceipt (reversible=True, requires_authority=False, scope=finance)
+    name: tool:claim.getReceipt
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: claim.getStructured
+    message: tool claim.getStructured (reversible=True, requires_authority=False, scope=finance)
+    name: tool:claim.getStructured
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: claim.lookup
+    message: tool claim.lookup (reversible=True, requires_authority=False, scope=finance)
+    name: tool:claim.lookup
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: claim.summary
+    message: tool claim.summary (reversible=True, requires_authority=False, scope=finance)
+    name: tool:claim.summary
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: compose_exception
+    message: tool compose_exception (reversible=True, requires_authority=False, scope=shared)
+    name: tool:compose_exception
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: concur_travel.policy.get_policy
+    message: tool concur_travel.policy.get_policy (reversible=True, requires_authority=False, scope=finance)
+    name: tool:concur_travel.policy.get_policy
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: concur_travel.search.search_options
+    message: tool concur_travel.search.search_options (reversible=True, requires_authority=False, scope=finance)
+    name: tool:concur_travel.search.search_options
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: contract_repository.find_similar
+    message: tool contract_repository.find_similar (reversible=True, requires_authority=False, scope=finance)
+    name: tool:contract_repository.find_similar
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: contract_repository.get_contract
+    message: tool contract_repository.get_contract (reversible=True, requires_authority=False, scope=finance)
+    name: tool:contract_repository.get_contract
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: contract_repository.list_amendments
+    message: tool contract_repository.list_amendments (reversible=True, requires_authority=False, scope=finance)
+    name: tool:contract_repository.list_amendments
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: dry_run_policy
+    message: tool dry_run_policy (reversible=True, requires_authority=False, scope=shared)
+    name: tool:dry_run_policy
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: employee.history
+    message: tool employee.history (reversible=True, requires_authority=False, scope=hiring)
+    name: tool:employee.history
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: entity.write
+    message: tool entity.write (reversible=False, requires_authority=False, scope=shared)
+    name: tool:entity.write
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: feedback_collector.get_okr_results
+    message: tool feedback_collector.get_okr_results (reversible=True, requires_authority=False, scope=hiring)
+    name: tool:feedback_collector.get_okr_results
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: feedback_collector.list_360
+    message: tool feedback_collector.list_360 (reversible=True, requires_authority=False, scope=hiring)
+    name: tool:feedback_collector.list_360
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: getExpenseClaim
+    message: tool getExpenseClaim (reversible=True, requires_authority=False, scope=finance)
+    name: tool:getExpenseClaim
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: getExpenseLine
+    message: tool getExpenseLine (reversible=True, requires_authority=False, scope=finance)
+    name: tool:getExpenseLine
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: getVendor
+    message: tool getVendor (reversible=True, requires_authority=False, scope=finance)
+    name: tool:getVendor
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: identity_provider.check_separation_of_duties
+    message: tool identity_provider.check_separation_of_duties (reversible=True, requires_authority=False, scope=shared)
+    name: tool:identity_provider.check_separation_of_duties
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: identity_provider.get_role_template
+    message: tool identity_provider.get_role_template (reversible=True, requires_authority=False, scope=shared)
+    name: tool:identity_provider.get_role_template
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: identity_provider.list_role_templates
+    message: tool identity_provider.list_role_templates (reversible=True, requires_authority=False, scope=shared)
+    name: tool:identity_provider.list_role_templates
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: image_gen
+    message: tool image_gen (reversible=False, requires_authority=False, scope=creative)
+    name: tool:image_gen
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: invoice_repository.find_three_way_match
+    message: tool invoice_repository.find_three_way_match (reversible=True, requires_authority=False, scope=finance)
+    name: tool:invoice_repository.find_three_way_match
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: invoice_repository.get_invoice
+    message: tool invoice_repository.get_invoice (reversible=True, requires_authority=False, scope=finance)
+    name: tool:invoice_repository.get_invoice
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: listClaimsForApproval
+    message: tool listClaimsForApproval (reversible=True, requires_authority=False, scope=finance)
+    name: tool:listClaimsForApproval
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: listEmployeeClaimHistory
+    message: tool listEmployeeClaimHistory (reversible=True, requires_authority=False, scope=finance)
+    name: tool:listEmployeeClaimHistory
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: listExpenseReports
+    message: tool listExpenseReports (reversible=True, requires_authority=False, scope=finance)
+    name: tool:listExpenseReports
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: market_pricing.get_quotes
+    message: tool market_pricing.get_quotes (reversible=True, requires_authority=False, scope=finance)
+    name: tool:market_pricing.get_quotes
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: ocr.extract
+    message: tool ocr.extract (reversible=True, requires_authority=False, scope=finance)
+    name: tool:ocr.extract
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: performance_norms.get_calibration_history
+    message: tool performance_norms.get_calibration_history (reversible=True, requires_authority=False, scope=hiring)
+    name: tool:performance_norms.get_calibration_history
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: performance_norms.get_grade_distribution
+    message: tool performance_norms.get_grade_distribution (reversible=True, requires_authority=False, scope=hiring)
+    name: tool:performance_norms.get_grade_distribution
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: policy.cite
+    message: tool policy.cite (reversible=True, requires_authority=False, scope=shared)
+    name: tool:policy.cite
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: policy.search
+    message: tool policy.search (reversible=True, requires_authority=False, scope=shared)
+    name: tool:policy.search
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: postGLEntry
+    message: tool postGLEntry (reversible=False, requires_authority=True, scope=finance)
+    name: tool:postGLEntry
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: precedents.search
+    message: tool precedents.search (reversible=True, requires_authority=False, scope=shared)
+    name: tool:precedents.search
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: propose_skill_amplification
+    message: tool propose_skill_amplification (reversible=True, requires_authority=False, scope=hiring)
+    name: tool:propose_skill_amplification
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: query.economics
+    message: tool query.economics (reversible=True, requires_authority=False, scope=shared)
+    name: tool:query.economics
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: query.reviewer_decisions
+    message: tool query.reviewer_decisions (reversible=True, requires_authority=False, scope=shared)
+    name: tool:query.reviewer_decisions
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: query_fleet
+    message: tool query_fleet (reversible=True, requires_authority=False, scope=shared)
+    name: tool:query_fleet
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: query_traces
+    message: tool query_traces (reversible=True, requires_authority=False, scope=shared)
+    name: tool:query_traces
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: recall.similar_hires
+    message: tool recall.similar_hires (reversible=True, requires_authority=False, scope=hiring)
+    name: tool:recall.similar_hires
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: sanctions_api.screen_entity
+    message: tool sanctions_api.screen_entity (reversible=True, requires_authority=False, scope=finance)
+    name: tool:sanctions_api.screen_entity
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: submitJustification
+    message: tool submitJustification (reversible=False, requires_authority=True, scope=finance)
+    name: tool:submitJustification
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: vendor_registry.list_filings
+    message: tool vendor_registry.list_filings (reversible=True, requires_authority=False, scope=finance)
+    name: tool:vendor_registry.list_filings
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: vendor_registry.list_ubos
+    message: tool vendor_registry.list_ubos (reversible=True, requires_authority=False, scope=finance)
+    name: tool:vendor_registry.list_ubos
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: vendor_registry.lookup_vendor
+    message: tool vendor_registry.lookup_vendor (reversible=True, requires_authority=False, scope=finance)
+    name: tool:vendor_registry.lookup_vendor
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: workday_hr.employee.get_employee
+    message: tool workday_hr.employee.get_employee (reversible=True, requires_authority=False, scope=hiring)
+    name: tool:workday_hr.employee.get_employee
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: access_recertification_signoff
+    message: matrix:ACCESS-RECERT-001 action=access_recertification_signoff approver=line_manager band=(None,None) basis='Quarterly recertification; line manager attests.'
+    name: matrix:ACCESS-RECERT-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: access_recertification_signoff
+    message: matrix:ACCESS-RECERT-002 action=access_recertification_signoff approver=it_access_it_admin band=(None,None) basis='Privileged access recertification; IT admin re-attests + CISO oversight.'
+    name: matrix:ACCESS-RECERT-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: ap_invoice_approval
+    message: matrix:AP-001 action=ap_invoice_approval approver=ap_clerk band=(0,1000) basis='Standard AP invoice in low band; AP clerk processes.'
+    name: matrix:AP-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: ap_invoice_approval
+    message: matrix:AP-002 action=ap_invoice_approval approver=ap_clerk band=(1000,25000) basis='Mid-band AP invoice; AP clerk processes with three-way match.'
+    name: matrix:AP-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: ap_invoice_approval
+    message: matrix:AP-003 action=ap_invoice_approval approver=controller band=(25000,250000) basis='Material AP invoice; controller sign-off.'
+    name: matrix:AP-003
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: ap_invoice_approval
+    message: matrix:AP-004 action=ap_invoice_approval approver=cfo band=(250000,None) basis='Top-band AP invoice; CFO sign-off.'
+    name: matrix:AP-004
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: contract_review_signoff
+    message: matrix:CONTRACT-REVIEW-001 action=contract_review_signoff approver=contracts_counsel band=(None,None) basis='NDA review; counsel sign-off, GC for material deviation from template.'
+    name: matrix:CONTRACT-REVIEW-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: contract_review_signoff
+    message: matrix:CONTRACT-REVIEW-002 action=contract_review_signoff approver=contracts_counsel band=(0,250000) basis='MSA in standard band; counsel signs off; GC + finance controller for escalations.'
+    name: matrix:CONTRACT-REVIEW-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: contract_review_signoff
+    message: matrix:CONTRACT-REVIEW-003 action=contract_review_signoff approver=gc band=(250000,None) basis='Material MSA; mandatory GC sign-off.'
+    name: matrix:CONTRACT-REVIEW-003
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: contract_renewal_signoff
+    message: matrix:CRN-001 action=contract_renewal_signoff approver=contract_line_manager band=(0,50000) basis='Flat renewal in standard band; line manager confirms continued need.'
+    name: matrix:CRN-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: contract_renewal_signoff
+    message: matrix:CRN-002 action=contract_renewal_signoff approver=contract_finance_bp band=(50000,250000) basis='Flat renewal above line-manager band; finance BP sign-off.'
+    name: matrix:CRN-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: contract_renewal_signoff
+    message: matrix:CRN-003 action=contract_renewal_signoff approver=finance_controller band=(250000,None) basis='Material contract renewal; controller sign-off.'
+    name: matrix:CRN-003
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: contract_renewal_signoff
+    message: matrix:CRN-010 action=contract_renewal_signoff approver=contract_finance_bp band=(0,50000) basis='Price jump above 25% YoY routes to finance BP regardless of value (governance flag).'
+    name: matrix:CRN-010
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: contract_renewal_signoff
+    message: matrix:CRN-011 action=contract_renewal_signoff approver=finance_controller band=(50000,250000) basis='Material price jump; controller sign-off and benchmark verification.'
+    name: matrix:CRN-011
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: contract_renewal_signoff
+    message: matrix:CRN-012 action=contract_renewal_signoff approver=cfo band=(250000,None) basis='Material price jump in top band; CFO sign-off.'
+    name: matrix:CRN-012
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: contract_renewal_signoff
+    message: matrix:CRN-020 action=contract_renewal_signoff approver=contract_line_manager band=(0,100000) basis='Scope expansion within standard band; line manager confirms business need; counsel on standby.'
+    name: matrix:CRN-020
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: contract_renewal_signoff
+    message: matrix:CRN-021 action=contract_renewal_signoff approver=contracts_counsel band=(100000,None) basis='Material scope expansion; contracts counsel reviews terms before finance sign-off.'
+    name: matrix:CRN-021
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: expense_claim_approval
+    message: matrix:DEFAULT-EXP action=expense_claim_approval approver=ssc_reviewer band=(0,None) basis='Default fallback for any expense claim category not otherwise matched; SSC reviewer.'
+    name: matrix:DEFAULT-EXP
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: perf_calibration_signoff
+    message: matrix:DEFAULT-PERF action=perf_calibration_signoff approver=perf_review_hr_bp band=(None,None) basis='Default fallback for any performance calibration category not otherwise matched.'
+    name: matrix:DEFAULT-PERF
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: privacy_dpia_signoff
+    message: matrix:DPIA-001 action=privacy_dpia_signoff approver=dpo band=(None,None) basis='Low-risk DPIA; DPO sign-off.'
+    name: matrix:DPIA-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: privacy_dpia_signoff
+    message: matrix:DPIA-002 action=privacy_dpia_signoff approver=dpo band=(None,None) basis='High-risk DPIA (special-category data, automated decisioning); DPO + GC + CISO.'
+    name: matrix:DPIA-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: privacy_dpia_signoff
+    message: 'matrix:DPIA-003-EMEA action=privacy_dpia_signoff approver=dpo band=(None,None) basis=''EMEA high-risk DPIA: GDPR Art. 35 path; DPO + GC (CISO consulted but not required).'''
+    name: matrix:DPIA-003-EMEA
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: expense_claim_approval
+    message: matrix:EXP-001 action=expense_claim_approval approver=auto band=(0,100) basis='Routine meals expense within standard per-diem; auto-approved.'
+    name: matrix:EXP-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: expense_claim_approval
+    message: matrix:EXP-002 action=expense_claim_approval approver=line_manager band=(100,500) basis='Meals expense above per-diem requires line manager review.'
+    name: matrix:EXP-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: expense_claim_approval
+    message: matrix:EXP-003 action=expense_claim_approval approver=ssc_reviewer band=(500,2500) basis='Material meals expense; SSC reviewer applies policy + cross-checks receipts.'
+    name: matrix:EXP-003
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: expense_claim_approval
+    message: matrix:EXP-004 action=expense_claim_approval approver=finance_controller band=(2500,None) basis='Exceptional meals expense; controller sign-off required.'
+    name: matrix:EXP-004
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: expense_claim_approval
+    message: matrix:EXP-010 action=expense_claim_approval approver=auto band=(0,1000) basis='Routine travel expense reconciled against pre-approved trip.'
+    name: matrix:EXP-010
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: expense_claim_approval
+    message: matrix:EXP-011 action=expense_claim_approval approver=line_manager band=(1000,5000) basis='Standard travel expense above auto-band; line manager confirms business purpose.'
+    name: matrix:EXP-011
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: expense_claim_approval
+    message: matrix:EXP-012 action=expense_claim_approval approver=ssc_reviewer band=(5000,25000) basis='High-value travel expense; SSC reviewer cross-checks against pre-approval and receipts.'
+    name: matrix:EXP-012
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: expense_claim_approval
+    message: matrix:EXP-013 action=expense_claim_approval approver=finance_controller band=(25000,None) basis='Exceptional travel spend requires controller sign-off.'
+    name: matrix:EXP-013
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: expense_claim_approval
+    message: matrix:EXP-020 action=expense_claim_approval approver=line_manager band=(0,250) basis='Client entertainment always requires line manager sign-off regardless of value.'
+    name: matrix:EXP-020
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: expense_claim_approval
+    message: matrix:EXP-021 action=expense_claim_approval approver=ssc_reviewer band=(250,2500) basis='Material client entertainment requires SSC reviewer + attendee declaration.'
+    name: matrix:EXP-021
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: expense_claim_approval
+    message: matrix:EXP-022 action=expense_claim_approval approver=finance_controller band=(2500,None) basis='Exceptional client entertainment; controller confirms gifts-and-hospitality policy fit.'
+    name: matrix:EXP-022
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: expense_claim_approval
+    message: matrix:EXP-030 action=expense_claim_approval approver=auto band=(0,500) basis='Routine supplies / consumables; auto-approved within band.'
+    name: matrix:EXP-030
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: expense_claim_approval
+    message: matrix:EXP-031 action=expense_claim_approval approver=line_manager band=(500,5000) basis='Supplies above auto-band; line manager confirms project allocation.'
+    name: matrix:EXP-031
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: expense_claim_approval
+    message: matrix:EXP-032 action=expense_claim_approval approver=ssc_reviewer band=(5000,None) basis='High-value supplies; SSC reviewer applies category controls.'
+    name: matrix:EXP-032
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: expense_claim_approval
+    message: matrix:EXP-040-PROD-AMER action=expense_claim_approval approver=line_manager band=(0,50000) basis='Production unit AMER carries elevated line-manager limit per the production-finance MoU.'
+    name: matrix:EXP-040-PROD-AMER
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: hire_budget_approval
+    message: matrix:HIRE-BUDGET-001 action=hire_budget_approval approver=auto band=(0,5000) basis='Hire within band, delta vs midpoint < £5k; auto-approved.'
+    name: matrix:HIRE-BUDGET-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: hire_budget_approval
+    message: matrix:HIRE-BUDGET-002 action=hire_budget_approval approver=finance_bp band=(5000,10000) basis='Hire within band, delta £5k-£10k; finance BP delegation.'
+    name: matrix:HIRE-BUDGET-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: hire_budget_approval
+    message: matrix:HIRE-BUDGET-003 action=hire_budget_approval approver=finance_controller band=(10000,None) basis='Hire within band, delta > £10k vs midpoint; finance BP delegation exceeded — controller sign-off.'
+    name: matrix:HIRE-BUDGET-003
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: hire_budget_approval
+    message: matrix:HIRE-BUDGET-010 action=hire_budget_approval approver=finance_controller band=(0,None) basis='Hire request exceeds remaining envelope regardless of band delta; controller decision.'
+    name: matrix:HIRE-BUDGET-010
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: hire_offer_approval
+    message: matrix:HIRE-OFFER-001 action=hire_offer_approval approver=recruiter band=(0,75000) basis='Standard offer in standard band; recruiter sign-off.'
+    name: matrix:HIRE-OFFER-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: hire_offer_approval
+    message: matrix:HIRE-OFFER-002 action=hire_offer_approval approver=hr_bp band=(75000,150000) basis='Mid-band offer; HR BP sign-off.'
+    name: matrix:HIRE-OFFER-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: hire_offer_approval
+    message: matrix:HIRE-OFFER-003 action=hire_offer_approval approver=hr_bp band=(150000,None) basis='High-band offer; HR BP + finance controller sign-off.'
+    name: matrix:HIRE-OFFER-003
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: hire_offer_approval
+    message: matrix:HIRE-OFFER-010 action=hire_offer_approval approver=comp_ben_analyst band=(0,None) basis='Executive offer always routes through comp/ben analyst regardless of value.'
+    name: matrix:HIRE-OFFER-010
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: incident_triage_signoff
+    message: matrix:INCIDENT-001 action=incident_triage_signoff approver=change_manager band=(None,None) basis='Routine incident; change manager confirms triage.'
+    name: matrix:INCIDENT-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: incident_triage_signoff
+    message: matrix:INCIDENT-002 action=incident_triage_signoff approver=change_manager band=(None,None) basis='Severity 1/2 incident; change manager + CISO.'
+    name: matrix:INCIDENT-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: it_access_grant
+    message: matrix:ITAR-001 action=it_access_grant approver=it_access_line_manager band=(None,None) basis='Standard role template; line manager confirms business need, IT admin grants.'
+    name: matrix:ITAR-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: it_access_grant
+    message: matrix:ITAR-002 action=it_access_grant approver=it_access_line_manager band=(None,None) basis='Elevated role; line manager + IT admin + change manager review.'
+    name: matrix:ITAR-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: it_access_grant
+    message: matrix:ITAR-003 action=it_access_grant approver=it_access_it_admin band=(None,None) basis='Privileged role (e.g. global admin); IT admin sign-off + change record + CISO escalation path.'
+    name: matrix:ITAR-003
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: it_access_grant
+    message: matrix:ITAR-004 action=it_access_grant approver=it_access_it_admin band=(None,None) basis='Broad-scope request (>5 elevated role templates); IT admin reviews scope, recommends narrowing.'
+    name: matrix:ITAR-004
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: it_access_grant
+    message: matrix:ITAR-010-AMER action=it_access_grant approver=it_access_it_admin band=(None,None) basis='AMER region operates under inverted approval order (IT admin first per regional security policy).'
+    name: matrix:ITAR-010-AMER
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: internal_mobility_approval
+    message: matrix:MOBILITY-001 action=internal_mobility_approval approver=hr_bp band=(None,None) basis='Domestic transfer; HR BP coordinates with mobility specialist if needed.'
+    name: matrix:MOBILITY-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: internal_mobility_approval
+    message: matrix:MOBILITY-002 action=internal_mobility_approval approver=mobility_specialist band=(None,None) basis='International transfer; mobility specialist owns visa, tax, payroll coordination.'
+    name: matrix:MOBILITY-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: offboarding_signoff
+    message: matrix:OFFBOARDING-001 action=offboarding_signoff approver=hr_bp band=(None,None) basis='Standard leaver; HR BP signs off, IT admin revokes access on last day.'
+    name: matrix:OFFBOARDING-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: offboarding_signoff
+    message: matrix:OFFBOARDING-002 action=offboarding_signoff approver=onboarding_it_admin band=(None,None) basis='Leaver had elevated access; IT admin revokes immediately, change manager records, CISO informed.'
+    name: matrix:OFFBOARDING-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: employee_onboarding_access
+    message: matrix:ONB-001 action=employee_onboarding_access approver=onboarding_it_admin band=(None,None) basis='Standard joiner; IT admin provisions baseline access from role template.'
+    name: matrix:ONB-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: employee_onboarding_access
+    message: matrix:ONB-002 action=employee_onboarding_access approver=onboarding_it_admin band=(None,None) basis='Joiner with elevated access ask; IT admin reviews scope, change manager records.'
+    name: matrix:ONB-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: employee_onboarding_access
+    message: matrix:ONB-003 action=employee_onboarding_access approver=onboarding_it_admin band=(None,None) basis='External contractor; IT admin provisions, counsel confirms NDA + data-handling agreement on file.'
+    name: matrix:ONB-003
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: pitch_resourcing_approval
+    message: matrix:PITCH-RESOURCING-001 action=pitch_resourcing_approval approver=account_director band=(0,50000) basis='Standard pitch resourcing; account director sign-off.'
+    name: matrix:PITCH-RESOURCING-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: pitch_resourcing_approval
+    message: matrix:PITCH-RESOURCING-002 action=pitch_resourcing_approval approver=account_director band=(50000,None) basis='Material pitch resourcing; account director + finance controller.'
+    name: matrix:PITCH-RESOURCING-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: purchase_order_approval
+    message: matrix:PO-001 action=purchase_order_approval approver=line_manager band=(0,5000) basis='Routine PO; line manager sign-off.'
+    name: matrix:PO-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: purchase_order_approval
+    message: matrix:PO-002 action=purchase_order_approval approver=category_manager band=(5000,50000) basis='Mid-band PO; category manager validates against approved suppliers.'
+    name: matrix:PO-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: purchase_order_approval
+    message: matrix:PO-003 action=purchase_order_approval approver=sourcing_lead band=(50000,500000) basis='High-band PO; sourcing lead confirms RFP path.'
+    name: matrix:PO-003
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: purchase_order_approval
+    message: matrix:PO-004 action=purchase_order_approval approver=cpo band=(500000,None) basis='Strategic PO; CPO sign-off.'
+    name: matrix:PO-004
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: policy_set
+    message: matrix:POL-CDO-001 action=policy_set approver=chief_data_officer band=(None,None) basis='CDO is authorised to set freeze policies on data workflows and clean-room setups in their domain.'
+    name: matrix:POL-CDO-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: policy_set
+    message: matrix:POL-CFO-001 action=policy_set approver=cfo band=(None,None) basis='CFO is authorised to set freeze policies on brand purchase-order spending in their domain.'
+    name: matrix:POL-CFO-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: policy_set
+    message: matrix:POL-DPO-001 action=policy_set approver=dpo band=(None,None) basis='DPO is authorised to set freeze/restriction policies on vendor data-sharing in their domain.'
+    name: matrix:POL-DPO-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: policy_set
+    message: matrix:POL-GC-001 action=policy_set approver=gc band=(None,None) basis='General Counsel is authorised to set freeze policies on contract-renewal review thresholds in their domain.'
+    name: matrix:POL-GC-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: policy_set
+    message: matrix:POL-HRD-001 action=policy_set approver=hr_director band=(None,None) basis='HR Director is authorised to set hiring-freeze policies on departments with elevated attrition.'
+    name: matrix:POL-HRD-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: policy_set
+    message: matrix:POL-IT-001 action=policy_set approver=it_admin_director band=(None,None) basis='IT Admin Director is authorised to set access-control freeze policies in their domain.'
+    name: matrix:POL-IT-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: policy_set
+    message: matrix:POL-REC-001 action=policy_set approver=recruiter band=(None,None) basis='Recruiter is authorised to set hiring-prioritisation freeze policies in their domain.'
+    name: matrix:POL-REC-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: policy_set
+    message: matrix:POL-SRC-001 action=policy_set approver=sourcing_lead band=(None,None) basis='Sourcing Lead is authorised to set vendor-PO freeze policies on concentration-risk vendors in their domain.'
+    name: matrix:POL-SRC-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: policy_set
+    message: matrix:POL-TRS-001 action=policy_set approver=treasurer band=(None,None) basis='Treasurer is authorised to set FX hedging cap policies on high-exposure currency pairs in their domain.'
+    name: matrix:POL-TRS-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: perf_calibration_signoff
+    message: matrix:PRR-001 action=perf_calibration_signoff approver=perf_review_hr_bp band=(None,None) basis='On-track calibration; HR BP signs off, line manager delivers.'
+    name: matrix:PRR-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: perf_calibration_signoff
+    message: matrix:PRR-002 action=perf_calibration_signoff approver=perf_review_hr_bp band=(None,None) basis='Calibration outlier (>2 bands shift); HR BP + comp/ben analyst review before line-manager delivery.'
+    name: matrix:PRR-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: perf_calibration_signoff
+    message: matrix:PRR-003 action=perf_calibration_signoff approver=perf_review_hr_bp band=(None,None) basis='Promotion candidate; HR BP confirms calibration, comp/ben analyst sizes the package.'
+    name: matrix:PRR-003
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: treasury_fx_hedge
+    message: matrix:TREASURY-FX-001 action=treasury_fx_hedge approver=treasurer band=(0,1000000) basis='Standard FX hedge; treasurer sign-off.'
+    name: matrix:TREASURY-FX-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: treasury_fx_hedge
+    message: matrix:TREASURY-FX-002 action=treasury_fx_hedge approver=cfo band=(1000000,None) basis='Material FX hedge; CFO sign-off.'
+    name: matrix:TREASURY-FX-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: travel_preapproval
+    message: matrix:TRV-001 action=travel_preapproval approver=auto band=(0,1500) basis='Domestic trip within standard band; auto-approved.'
+    name: matrix:TRV-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: travel_preapproval
+    message: matrix:TRV-002 action=travel_preapproval approver=line_manager band=(1500,5000) basis='Domestic trip above auto-band; line manager confirms business purpose.'
+    name: matrix:TRV-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: travel_preapproval
+    message: matrix:TRV-010 action=travel_preapproval approver=line_manager band=(0,3000) basis='International trip always requires line manager sign-off; standard band.'
+    name: matrix:TRV-010
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: travel_preapproval
+    message: matrix:TRV-011 action=travel_preapproval approver=finance_controller band=(3000,15000) basis='International trip above line-manager band; controller sign-off.'
+    name: matrix:TRV-011
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: travel_preapproval
+    message: matrix:TRV-012 action=travel_preapproval approver=cfo band=(15000,None) basis='Exceptional international trip; CFO sign-off required.'
+    name: matrix:TRV-012
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: travel_preapproval
+    message: matrix:TRV-020 action=travel_preapproval approver=account_director band=(0,None) basis='Pitch travel routes through account director regardless of value (P&L attribution).'
+    name: matrix:TRV-020
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: vendor_kyc_signoff
+    message: matrix:VKY-001 action=vendor_kyc_signoff approver=vendor_kyc_finance_bp band=(None,None) basis='Low-risk vendor; standard finance BP sign-off.'
+    name: matrix:VKY-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: vendor_kyc_signoff
+    message: matrix:VKY-002 action=vendor_kyc_signoff approver=vendor_kyc_finance_bp band=(None,None) basis='Medium-risk vendor; finance BP signs off, contracts counsel on standby.'
+    name: matrix:VKY-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: vendor_kyc_signoff
+    message: matrix:VKY-003 action=vendor_kyc_signoff approver=contracts_counsel band=(None,None) basis='High-risk vendor (sanctions hit, adverse media, high-risk jurisdiction) requires legal review.'
+    name: matrix:VKY-003
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: vendor_kyc_signoff
+    message: matrix:VKY-004 action=vendor_kyc_signoff approver=gc band=(None,None) basis='Direct sanctions hit; mandatory General Counsel sign-off and likely vendor rejection.'
+    name: matrix:VKY-004
+    override: false
+    priority: 20
+  scope: null
+  version: '1.0'

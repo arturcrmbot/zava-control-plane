@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0082",
+  "employee_id": "EMP-0018",
+  "submitted_at": "2026-04-09T11:17:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "accommodation",
+  "vendor": "Steigenberger Frankfurt",
+  "amount": 190.53,
+  "attendees": 1,
+  "narrative": "Munich stay at Steigenberger Frankfurt",
+  "receipt_filename": "CLM-0082.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Munich hotel at EUR 190.53/night is at or below the Tier 1 cap of EUR 240, with itemised hotel folio and dates aligned to itinerary — Green per §3.3.",
+  "gold_policy_clause": "§3.3 Accommodation — DE Tier 1 cap EUR 240",
+  "receipt_mismatch_flavour": "correct"
+}

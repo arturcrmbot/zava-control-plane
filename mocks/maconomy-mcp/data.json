@@ -1,0 +1,19 @@
+{
+  "claims": [
+    {
+      "claim_id": "MAC-0001",
+      "employee_id": "EMP-0042",
+      "submitted_at": "2026-04-15T11:30:00",
+      "market": "DK",
+      "currency": "DKK",
+      "category": "meals",
+      "vendor": "Restaurant Schønnemann",
+      "amount": 412.50,
+      "attendees": 2,
+      "narrative": "Client lunch with creative agency lead, Copenhagen.",
+      "receipt_filename": "MAC-0001.png",
+      "ems_source": "maconomy",
+      "receipt_mismatch_flavour": "correct"
+    }
+  ]
+}

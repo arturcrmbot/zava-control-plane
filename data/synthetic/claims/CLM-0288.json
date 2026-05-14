@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0288",
+  "employee_id": "EMP-0006",
+  "submitted_at": "2026-04-29T17:01:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "entertainment",
+  "vendor": "Sketch",
+  "amount": 227.2,
+  "attendees": 2,
+  "narrative": "Client dinner at Sketch, business-development discussion",
+  "receipt_filename": "CLM-0288.png",
+  "ems_source": "workday",
+  "gold_label": "amber",
+  "gold_reasoning": "Client entertainment at GBP 113.60/head is above the per-head cap (GBP 110) but at or below 110% of cap — Amber per §3.4, reviewer attention required.",
+  "gold_policy_clause": "§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)",
+  "receipt_mismatch_flavour": "wrong-date"
+}

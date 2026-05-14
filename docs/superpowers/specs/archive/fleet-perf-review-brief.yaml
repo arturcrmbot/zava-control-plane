@@ -1,0 +1,161 @@
+# Performance review cycle — sixth compose-domain brief.
+#
+# Year-end performance review cycle for one employee. Reuses Workday HR;
+# introduces two new MCPs (feedback_collector, performance_norms). Two
+# agent phases (peer-feedback aggregator + calibration drafter) followed
+# by sequential HITL gates (HR business partner calibrates, line manager
+# delivers). Domain-scoped personae auto-close.
+
+domain:
+  # v4 fields (TASK-029 backfill).
+  workflow_type: perf-review
+  prefix: fleet
+  # v3 fields (back-compat).
+  name: fleet-perf-review
+  display_name: Performance review
+  owner_role: perf_review_hr_bp
+  description: |
+    A year-end performance review cycle for one employee. The
+    orchestrator reads the employee's Workday HR record. A peer-feedback
+    aggregator agent collects 360-degree peer reviews for the cycle,
+    re-confirms the employee's reporting line, and pulls the OKR
+    results for the cycle. A calibration drafter agent then drafts a
+    proposed rating + narrative by combining the OKR results with the
+    grade-band distribution norm and the employee's calibration
+    history. The HR business partner calibrates (auto-approves when
+    the proposed rating fits the grade-band distribution and at least
+    three peer reviews are present). The line manager delivers
+    (auto-approves once HR has calibrated).
+
+phases:
+  - name: employee_lookup
+    intent: |
+      Read the reviewee's grade, cost-centre, agency, and home market
+      from Workday HR. Pass forward.
+    kind: deterministic
+    external_systems: [workday_hr]
+
+  - name: peer_feedback_aggregator
+    intent: |
+      Collect 360-degree peer reviews for the cycle. Re-confirm the
+      reviewee's reporting line via Workday HR. Pull the cycle's OKR
+      results from the feedback collector.
+    kind: agent
+    agent_skill_name: peer-feedback-aggregator
+    external_systems: [feedback_collector, workday_hr]
+
+  - name: calibration_drafter
+    intent: |
+      Draft a proposed rating + narrative. Combine the cycle's OKR
+      results with the grade-band distribution norm (so we don't
+      cluster too many high ratings in one grade) and the reviewee's
+      calibration history. Output proposed_rating + narrative +
+      distribution_fit verdict.
+    kind: agent
+    agent_skill_name: calibration-drafter
+    external_systems: [performance_norms, feedback_collector]
+
+  - name: hr_calibration
+    intent: |
+      HR business partner calibrates. Approve when the proposed rating
+      fits the grade-band distribution AND at least three peer reviews
+      are present.
+    kind: hitl
+    persona: perf_review_hr_bp
+    external_systems: []
+
+  - name: line_manager_delivery
+    intent: |
+      Line manager delivers the rating to the reviewee. Approve once
+      HR has calibrated. Real human conversation is out of scope here;
+      this gate captures the acknowledgement.
+    kind: hitl
+    persona: perf_review_line_manager
+    external_systems: []
+
+personae:
+  - role: perf_review_hr_bp
+    workflow_label: Performance review
+    decision_policy: |
+      Approve when calibration_drafter.distribution_fit is "fits" AND
+      peer_feedback_aggregator.peer_review_count is at least 3.
+    decision_code: |
+      cd = (context or {}).get("calibration_drafter") or {}
+      pf = (context or {}).get("peer_feedback_aggregator") or {}
+      fit = (cd.get("distribution_fit") or "").lower()
+      try:
+          peer_count = int(pf.get("peer_review_count") or 0)
+      except (TypeError, ValueError):
+          peer_count = 0
+      if fit != "fits":
+          decision = "reject"
+          reason = "rating does not fit grade-band distribution (" + fit + ")"
+      elif peer_count < 3:
+          decision = "reject"
+          reason = "only " + str(peer_count) + " peer reviews; need >= 3"
+      else:
+          decision = "approve"
+          reason = "fits distribution; " + str(peer_count) + " peer reviews"
+
+  - role: perf_review_line_manager
+    workflow_label: Performance review
+    decision_policy: |
+      Approve once HR has calibrated. The HR gate is the binding one;
+      this captures the manager's acknowledgement of delivery.
+    decision_code: |
+      hr = (context or {}).get("hr_calibration") or {}
+      hr_dec = (hr.get("decision") or "").lower()
+      if hr_dec != "approve":
+          decision = "reject"
+          reason = "HR has not calibrated"
+      else:
+          decision = "approve"
+          reason = "HR calibrated; manager acknowledges delivery"
+
+external_systems:
+  - id: workday_hr
+    mcp_tool: workday_hr_employee
+    operations:
+      - get_employee
+  - id: feedback_collector
+    mcp_tool: feedback_collector
+    operations:
+      - list_360
+      - get_okr_results
+  - id: performance_norms
+    mcp_tool: performance_norms
+    operations:
+      - get_grade_distribution
+      - get_calibration_history
+
+# --------------------------------------------------------------------
+# v4 enrichment (TASK-029 backfill). Mirrors
+# api/server/services/entity_projections/perf_review.py.
+# --------------------------------------------------------------------
+entities:
+  - kind: Person
+    source: reviewee
+    ref_field: payload.employee_id
+  - kind: Period
+    source: review-cycle
+    ref_field: payload.cycle
+    attributes:
+      label: payload.cycle
+
+decisions:
+  - phase: hr_calibration
+    persona: perf_review_hr_bp
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.employee_id]
+    attributes_from_context:
+      cycle: payload.cycle
+      prior_rating: payload.prior_rating
+  - phase: line_manager_delivery
+    persona: perf_review_line_manager
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.employee_id]
+    attributes_from_context:
+      cycle: payload.cycle
+      prior_rating: payload.prior_rating
+
+function: hr

@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0225",
+  "employee_id": "EMP-0009",
+  "submitted_at": "2026-04-23T16:55:00",
+  "market": "US",
+  "currency": "USD",
+  "category": "meals",
+  "vendor": "Sweetgreen",
+  "amount": 41.86,
+  "attendees": 1,
+  "narrative": "Solo dinner at Sweetgreen",
+  "receipt_filename": "CLM-0225.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of USD 41.86 is within the US solo meal cap of USD 50. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
+  "gold_policy_clause": "§3.1 Meals — US solo cap USD 50",
+  "receipt_mismatch_flavour": "correct"
+}

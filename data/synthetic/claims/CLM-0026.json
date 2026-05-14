@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0026",
+  "employee_id": "EMP-0020",
+  "submitted_at": "2026-04-03T11:45:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "travel",
+  "vendor": "DB Regio",
+  "amount": 672.62,
+  "attendees": 1,
+  "narrative": "Long-haul return booking via DB Regio",
+  "receipt_filename": "CLM-0026.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of EUR 672.62 is at or below the DE long-haul economy cap of EUR 950, booked in economy with itinerary — Green per §3.2.",
+  "gold_policy_clause": "§3.2 Travel — DE long-haul economy cap EUR 950",
+  "receipt_mismatch_flavour": "correct"
+}

@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0297",
+  "employee_id": "EMP-0008",
+  "submitted_at": "2026-04-30T14:35:00",
+  "market": "US",
+  "currency": "USD",
+  "category": "accommodation",
+  "vendor": "Kimpton LA",
+  "amount": 395.56,
+  "attendees": 1,
+  "narrative": "New York stay at Kimpton LA",
+  "receipt_filename": "CLM-0297.png",
+  "ems_source": "concur",
+  "gold_label": "amber",
+  "gold_reasoning": "New York hotel at USD 395.56/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
+  "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
+  "receipt_mismatch_flavour": "correct"
+}

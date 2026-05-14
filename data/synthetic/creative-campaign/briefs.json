@@ -1,0 +1,183 @@
+[
+  {
+    "id": "BRF-001",
+    "client_brand": "Solene",
+    "category": "luxury_fragrance",
+    "audience": "Aspirational European 25-44, primary market FR + UK, secondary DE",
+    "mandatory_messages": [
+      "regenerative provenance",
+      "low-impact craftsmanship",
+      "single-source botanicals"
+    ],
+    "channels": ["CTV", "OOH", "social"],
+    "kpis": {"awareness": "+15%", "intent": "+8%", "earned_media": "+25%"},
+    "constraints": [
+      "no human faces in hero stills",
+      "EU green-claims directive — no '100% sustainable' wording"
+    ],
+    "jurisdictions": ["UK", "FR", "DE"],
+    "agency": "Ogilvy",
+    "scenario": "clean"
+  },
+  {
+    "id": "BRF-002",
+    "client_brand": "Solene",
+    "category": "luxury_fragrance",
+    "audience": "Gen-Z aesthetic-luxury, TikTok-first",
+    "mandatory_messages": ["regenerative provenance", "ASMR-led product reveals"],
+    "channels": ["TikTok", "Instagram Reels", "Pinterest"],
+    "kpis": {"awareness": "+18%", "intent": "+10%"},
+    "constraints": ["no human faces"],
+    "jurisdictions": ["UK", "FR"],
+    "agency": "Ogilvy",
+    "scenario": "clean"
+  },
+  {
+    "id": "BRF-003",
+    "client_brand": "Voltari",
+    "category": "ev_reveal",
+    "audience": "Enthusiast EV early-adopter 35-54, UK + DE",
+    "mandatory_messages": [
+      "550 mile range",
+      "carbon-negative manufacture",
+      "designed in Munich"
+    ],
+    "channels": ["CTV", "premium print", "automotive press"],
+    "kpis": {"awareness": "+22%", "test_drive_bookings": "+12%"},
+    "constraints": ["no people inside the vehicle"],
+    "jurisdictions": ["UK", "DE"],
+    "agency": "Wunderman Thompson",
+    "scenario": "clean"
+  },
+  {
+    "id": "BRF-004",
+    "client_brand": "Verdaire",
+    "category": "regenerative_skincare",
+    "audience": "Health-conscious 30-49, primary UK",
+    "mandatory_messages": [
+      "soil-to-skin traceability",
+      "regenerative agriculture",
+      "no synthetic preservatives"
+    ],
+    "channels": ["social", "OOH", "in-store"],
+    "kpis": {"awareness": "+12%", "trial": "+9%"},
+    "constraints": [],
+    "jurisdictions": ["UK"],
+    "agency": "AKQA",
+    "scenario": "clean"
+  },
+  {
+    "id": "BRF-005",
+    "client_brand": "Heritor",
+    "category": "heritage_watches",
+    "audience": "Collector 45-65, global",
+    "mandatory_messages": [
+      "150 years in Geneva",
+      "limited edition of 250",
+      "hand-finished"
+    ],
+    "channels": ["premium print", "watch fairs", "DTC site"],
+    "kpis": {"awareness": "+8%", "qualified_leads": "+15%"},
+    "constraints": ["no celebrity endorsements"],
+    "jurisdictions": ["UK", "FR", "CH"],
+    "agency": "Ogilvy",
+    "scenario": "clean"
+  },
+  {
+    "id": "BRF-006",
+    "client_brand": "Solene",
+    "category": "luxury_fragrance",
+    "audience": "Returning customer reactivation, all markets",
+    "mandatory_messages": ["limited release", "AW26 collection"],
+    "channels": ["email", "DTC site"],
+    "kpis": {"reactivation": "+20%"},
+    "constraints": [],
+    "jurisdictions": ["UK", "FR", "DE", "IT"],
+    "agency": "Ogilvy",
+    "scenario": "clean"
+  },
+  {
+    "id": "BRF-007",
+    "client_brand": "Voltari",
+    "category": "ev_reveal",
+    "audience": "Aspirational urban professional 28-42",
+    "mandatory_messages": ["fast charging", "designed for the city"],
+    "channels": ["OOH", "social", "spotify"],
+    "kpis": {"awareness": "+15%"},
+    "constraints": ["no humans driving"],
+    "jurisdictions": ["UK"],
+    "agency": "Wunderman Thompson",
+    "scenario": "amber"
+  },
+  {
+    "id": "BRF-008",
+    "client_brand": "Verdaire",
+    "category": "regenerative_skincare",
+    "audience": "New-to-category 22-30",
+    "mandatory_messages": ["clean ingredients", "TikTok-friendly packaging"],
+    "channels": ["TikTok", "Instagram"],
+    "kpis": {"awareness": "+18%", "trial": "+7%"},
+    "constraints": [],
+    "jurisdictions": ["UK"],
+    "agency": "AKQA",
+    "scenario": "clean"
+  },
+  {
+    "id": "BRF-009",
+    "client_brand": "Heritor",
+    "category": "heritage_watches",
+    "audience": "Next-generation collector 28-40",
+    "mandatory_messages": ["modernist update of the 1958 archive piece"],
+    "channels": ["Instagram", "DTC", "boutique"],
+    "kpis": {"awareness": "+10%", "boutique_visits": "+12%"},
+    "constraints": [],
+    "jurisdictions": ["UK", "US", "JP"],
+    "agency": "Ogilvy",
+    "scenario": "clean"
+  },
+  {
+    "id": "BRF-010",
+    "client_brand": "Solene",
+    "category": "luxury_fragrance",
+    "audience": "Holiday gifting season 2026",
+    "mandatory_messages": ["festive limited edition", "engravable bottle"],
+    "channels": ["CTV", "OOH", "department store partnerships"],
+    "kpis": {"gift_attach": "+25%"},
+    "constraints": ["holiday imagery — no specific religious symbolism"],
+    "jurisdictions": ["UK", "FR", "DE"],
+    "agency": "Ogilvy",
+    "scenario": "clean"
+  },
+  {
+    "id": "BRF-011",
+    "client_brand": "Voltari",
+    "category": "ev_reveal",
+    "audience": "Existing EV owner upgrade segment",
+    "mandatory_messages": [
+      "trade-in incentive",
+      "battery health guarantee"
+    ],
+    "channels": ["DTC", "OOH at charging stations"],
+    "kpis": {"trade_in_quotes": "+30%"},
+    "constraints": [],
+    "jurisdictions": ["UK", "DE", "NO"],
+    "agency": "Wunderman Thompson",
+    "scenario": "clean"
+  },
+  {
+    "id": "BRF-012",
+    "client_brand": "Solene",
+    "category": "luxury_fragrance",
+    "audience": "Provocative cultural campaign",
+    "mandatory_messages": ["provoke conversation", "challenge convention"],
+    "channels": ["OOH", "earned media"],
+    "kpis": {"earned_media": "+40%"},
+    "constraints": [
+      "must trigger brand-distinctiveness review",
+      "potential content-safety flag is intentional"
+    ],
+    "jurisdictions": ["UK", "FR"],
+    "agency": "Ogilvy",
+    "scenario": "escalated"
+  }
+]

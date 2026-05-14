@@ -1,0 +1,30 @@
+zava-ambient.mp3
+─────────────────
+
+Title:    "SynthWave Synth Slow Atmo Ambience Music Surround"
+Author:   szegvari
+Source:   https://freesound.org/people/szegvari/sounds/611279
+License:  CC0 1.0 Universal (Public Domain Dedication)
+          https://creativecommons.org/publicdomain/zero/1.0/
+
+This file is in the public domain. No attribution required, but
+provided here as a courtesy.
+
+Discovered via Openverse (https://openverse.org/), filtered to CC0,
+matching tags: 70s, 80s, Ambient, Atmo, Atmosphere, Chill, Cinematic,
+Cyber, Drone, Electro, Electronic, Film, Keys, Slow, Synth, SynthWave.
+
+Picked because it's:
+  - Properly LOFI / RETRO / SLOW (the previous "technology ambience"
+    track was too uptempo and too aggressive — sounded like an active
+    machine room rather than a calm ambient backdrop)
+  - 70s/80s synthwave aesthetic (Blade Runner / Vangelis / Tangerine
+    Dream lineage) which fits the cosmic-lens cinematic mood
+  - Loops gracefully — no melodic hook that would distract from
+    demo narration
+  - Low-frequency emphasis sits behind voice without competing
+
+Used as the optional background ambience on the cosmic-lens demo page.
+Toggle is in the top-right corner; default is off so the page never
+auto-plays audio without an explicit user click.
+

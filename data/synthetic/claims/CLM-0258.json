@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0258",
+  "employee_id": "EMP-0018",
+  "submitted_at": "2026-04-26T08:29:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "entertainment",
+  "vendor": "Restaurant Tantris",
+  "amount": 216.72,
+  "attendees": 2,
+  "narrative": "Client dinner at Restaurant Tantris, business-development discussion",
+  "receipt_filename": "CLM-0258.png",
+  "ems_source": "workday",
+  "gold_label": "amber",
+  "gold_reasoning": "Client entertainment at EUR 108.36/head is above the per-head cap (EUR 100) but at or below 110% of cap — Amber per §3.4, reviewer attention required.",
+  "gold_policy_clause": "§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)",
+  "receipt_mismatch_flavour": "correct"
+}

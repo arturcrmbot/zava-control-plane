@@ -1,0 +1,282 @@
+[
+  {
+    "id": "REV-001",
+    "employee_id": "EMP-8194",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-002",
+    "employee_id": "EMP-8034",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-003",
+    "employee_id": "EMP-8400",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-004",
+    "employee_id": "EMP-1217",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-005",
+    "employee_id": "EMP-8446",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-006",
+    "employee_id": "EMP-5435",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-007",
+    "employee_id": "EMP-2323",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-008",
+    "employee_id": "EMP-3920",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-009",
+    "employee_id": "EMP-6804",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-010",
+    "employee_id": "EMP-5046",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-011",
+    "employee_id": "EMP-8727",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-012",
+    "employee_id": "EMP-1568",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-013",
+    "employee_id": "EMP-7127",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-014",
+    "employee_id": "EMP-7543",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-015",
+    "employee_id": "EMP-8798",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-016",
+    "employee_id": "EMP-7968",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-017",
+    "employee_id": "EMP-2486",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-018",
+    "employee_id": "EMP-3132",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-019",
+    "employee_id": "EMP-1315",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-020",
+    "employee_id": "EMP-3177",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-021",
+    "employee_id": "EMP-3397",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-022",
+    "employee_id": "EMP-6416",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-023",
+    "employee_id": "EMP-3590",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-024",
+    "employee_id": "EMP-1157",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "on-track"
+  },
+  {
+    "id": "REV-025",
+    "employee_id": "EMP-6214",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "calibration-outlier-high"
+  },
+  {
+    "id": "REV-026",
+    "employee_id": "EMP-7733",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "calibration-outlier-high"
+  },
+  {
+    "id": "REV-027",
+    "employee_id": "EMP-6819",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "calibration-outlier-high"
+  },
+  {
+    "id": "REV-028",
+    "employee_id": "EMP-3205",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "calibration-outlier-high"
+  },
+  {
+    "id": "REV-029",
+    "employee_id": "EMP-6301",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "calibration-outlier-high"
+  },
+  {
+    "id": "REV-030",
+    "employee_id": "EMP-8527",
+    "cycle": "2026-H1",
+    "prior_rating": "meets",
+    "scenario": "calibration-outlier-high"
+  },
+  {
+    "id": "REV-031",
+    "employee_id": "EMP-9170",
+    "cycle": "2026-H1",
+    "prior_rating": "exceeds",
+    "scenario": "calibration-outlier-low"
+  },
+  {
+    "id": "REV-032",
+    "employee_id": "EMP-1972",
+    "cycle": "2026-H1",
+    "prior_rating": "exceeds",
+    "scenario": "calibration-outlier-low"
+  },
+  {
+    "id": "REV-033",
+    "employee_id": "EMP-2762",
+    "cycle": "2026-H1",
+    "prior_rating": "exceeds",
+    "scenario": "calibration-outlier-low"
+  },
+  {
+    "id": "REV-034",
+    "employee_id": "EMP-7492",
+    "cycle": "2026-H1",
+    "prior_rating": "exceeds",
+    "scenario": "calibration-outlier-low"
+  },
+  {
+    "id": "REV-035",
+    "employee_id": "EMP-7037",
+    "cycle": "2026-H1",
+    "prior_rating": "exceeds",
+    "scenario": "calibration-outlier-low"
+  },
+  {
+    "id": "REV-036",
+    "employee_id": "EMP-6886",
+    "cycle": "2026-H1",
+    "prior_rating": "exceeds",
+    "scenario": "calibration-outlier-low"
+  },
+  {
+    "id": "REV-037",
+    "employee_id": "EMP-4804",
+    "cycle": "2026-H1",
+    "prior_rating": "exceeds",
+    "scenario": "promotion-candidate"
+  },
+  {
+    "id": "REV-038",
+    "employee_id": "EMP-8814",
+    "cycle": "2026-H1",
+    "prior_rating": "exceeds",
+    "scenario": "promotion-candidate"
+  },
+  {
+    "id": "REV-039",
+    "employee_id": "EMP-4700",
+    "cycle": "2026-H1",
+    "prior_rating": "exceeds",
+    "scenario": "promotion-candidate"
+  },
+  {
+    "id": "REV-040",
+    "employee_id": "EMP-7092",
+    "cycle": "2026-H1",
+    "prior_rating": "exceeds",
+    "scenario": "promotion-candidate"
+  }
+]

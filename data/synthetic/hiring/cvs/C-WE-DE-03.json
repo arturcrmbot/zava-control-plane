@@ -1,0 +1,33 @@
+{
+  "candidate_id": "C-WE-DE-03",
+  "name": "Tobias Klein",
+  "current_title": "Werkstudent Frontend Engineer",
+  "tenure_years_total": 4.800000000000001,
+  "education": [
+    {
+      "institution": "Synthetic University",
+      "degree": "BSc CS",
+      "year": 2015
+    }
+  ],
+  "work_history": [
+    {
+      "employer": "Synth Corp 3",
+      "title": "Werkstudent Frontend Engineer",
+      "start": "2020-01",
+      "end": "2024-06"
+    }
+  ],
+  "skills": [
+    "typescript",
+    "react",
+    "tailwind"
+  ],
+  "right_to_work": {
+    "jurisdiction": "DE",
+    "evidence": "unknown"
+  },
+  "inconsistencies": [],
+  "level_target": "L2",
+  "jurisdiction_target": "DE"
+}

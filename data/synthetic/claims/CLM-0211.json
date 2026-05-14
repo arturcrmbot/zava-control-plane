@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0211",
+  "employee_id": "EMP-0026",
+  "submitted_at": "2026-04-22T16:10:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "travel",
+  "vendor": "IndiGo",
+  "amount": 42659.0,
+  "attendees": 1,
+  "narrative": "Long-haul return booking via IndiGo",
+  "receipt_filename": "CLM-0211.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of INR 42659.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
+  "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
+  "receipt_mismatch_flavour": "wrong-amount"
+}

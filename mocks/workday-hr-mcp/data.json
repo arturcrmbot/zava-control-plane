@@ -1,0 +1,34 @@
+{
+  "positions": [
+    {
+      "position_id": "POS-001",
+      "cost_centre_id": "CC-DATA-LON",
+      "title": "Senior Data Engineer",
+      "level": "L5",
+      "market": "London",
+      "jurisdiction": "USA",
+      "comp_band_gbp": {"min": 85000, "midpoint": 105000, "max": 125000},
+      "headcount_approved": 1,
+      "headcount_filled": 0,
+      "envelope_remaining_gbp": 125000,
+      "manager_id": "EMP-1042"
+    },
+    {
+      "position_id": "POS-002",
+      "cost_centre_id": "CC-DESIGN-BER",
+      "title": "Werkstudent Frontend Engineer",
+      "level": "L2",
+      "market": "Berlin",
+      "jurisdiction": "DE",
+      "comp_band_gbp": {"min": 18000, "midpoint": 22000, "max": 26000},
+      "headcount_approved": 1,
+      "headcount_filled": 0,
+      "envelope_remaining_gbp": 26000,
+      "manager_id": "EMP-2017"
+    }
+  ],
+  "employees": [
+    {"id": "EMP-1042", "name": "Sara Park", "title": "Director, Data Platform", "market": "London", "jurisdiction": "USA"},
+    {"id": "EMP-2017", "name": "Klaus Weber", "title": "Head of Design", "market": "Berlin", "jurisdiction": "DE"}
+  ]
+}

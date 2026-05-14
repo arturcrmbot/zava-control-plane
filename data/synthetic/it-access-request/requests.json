@@ -1,0 +1,462 @@
+[
+  {
+    "id": "REQ-001",
+    "employee_id": "EMP-8305",
+    "department": "Engineering",
+    "requested_role_templates": [
+      "tmpl-eng-g3-57",
+      "tmpl-eng-g3-06"
+    ],
+    "business_justification": "Project rotation onto Q3 engineering workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-002",
+    "employee_id": "EMP-9243",
+    "department": "Production",
+    "requested_role_templates": [
+      "tmpl-pro-g3-77",
+      "tmpl-pro-g3-22"
+    ],
+    "business_justification": "Project rotation onto Q3 production workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-003",
+    "employee_id": "EMP-1048",
+    "department": "Legal",
+    "requested_role_templates": [
+      "tmpl-leg-g3-79",
+      "tmpl-leg-g3-87"
+    ],
+    "business_justification": "Project rotation onto Q3 legal workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-004",
+    "employee_id": "EMP-7849",
+    "department": "Production",
+    "requested_role_templates": [
+      "tmpl-pro-g3-67",
+      "tmpl-pro-g3-67"
+    ],
+    "business_justification": "Project rotation onto Q3 production workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-005",
+    "employee_id": "EMP-9861",
+    "department": "Legal",
+    "requested_role_templates": [
+      "tmpl-leg-g3-86",
+      "tmpl-leg-g3-99"
+    ],
+    "business_justification": "Project rotation onto Q3 legal workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-006",
+    "employee_id": "EMP-7266",
+    "department": "Production",
+    "requested_role_templates": [
+      "tmpl-pro-g3-06",
+      "tmpl-pro-g3-81"
+    ],
+    "business_justification": "Project rotation onto Q3 production workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-007",
+    "employee_id": "EMP-1681",
+    "department": "Operations",
+    "requested_role_templates": [
+      "tmpl-ope-g3-66",
+      "tmpl-ope-g3-30"
+    ],
+    "business_justification": "Project rotation onto Q3 operations workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-008",
+    "employee_id": "EMP-2988",
+    "department": "Account",
+    "requested_role_templates": [
+      "tmpl-acc-g3-47",
+      "tmpl-acc-g3-36"
+    ],
+    "business_justification": "Project rotation onto Q3 account workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-009",
+    "employee_id": "EMP-1654",
+    "department": "Account",
+    "requested_role_templates": [
+      "tmpl-acc-g3-23",
+      "tmpl-acc-g3-57"
+    ],
+    "business_justification": "Project rotation onto Q3 account workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-010",
+    "employee_id": "EMP-1728",
+    "department": "Data",
+    "requested_role_templates": [
+      "tmpl-dat-g3-51",
+      "tmpl-dat-g3-38"
+    ],
+    "business_justification": "Project rotation onto Q3 data workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-011",
+    "employee_id": "EMP-5284",
+    "department": "Creative",
+    "requested_role_templates": [
+      "tmpl-cre-g3-41",
+      "tmpl-cre-g3-08"
+    ],
+    "business_justification": "Project rotation onto Q3 creative workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-012",
+    "employee_id": "EMP-3769",
+    "department": "Operations",
+    "requested_role_templates": [
+      "tmpl-ope-g3-43",
+      "tmpl-ope-g3-07"
+    ],
+    "business_justification": "Project rotation onto Q3 operations workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-013",
+    "employee_id": "EMP-3222",
+    "department": "PR",
+    "requested_role_templates": [
+      "tmpl-pr-g3-88",
+      "tmpl-pr-g3-46"
+    ],
+    "business_justification": "Project rotation onto Q3 pr workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-014",
+    "employee_id": "EMP-9705",
+    "department": "Operations",
+    "requested_role_templates": [
+      "tmpl-ope-g3-23",
+      "tmpl-ope-g3-13"
+    ],
+    "business_justification": "Project rotation onto Q3 operations workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-015",
+    "employee_id": "EMP-9627",
+    "department": "Data",
+    "requested_role_templates": [
+      "tmpl-dat-g3-04",
+      "tmpl-dat-g3-16"
+    ],
+    "business_justification": "Project rotation onto Q3 data workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-016",
+    "employee_id": "EMP-8071",
+    "department": "Legal",
+    "requested_role_templates": [
+      "tmpl-leg-g3-17",
+      "tmpl-leg-g3-68"
+    ],
+    "business_justification": "Project rotation onto Q3 legal workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-017",
+    "employee_id": "EMP-1034",
+    "department": "Account",
+    "requested_role_templates": [
+      "tmpl-acc-g3-28",
+      "tmpl-acc-g3-63"
+    ],
+    "business_justification": "Project rotation onto Q3 account workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-018",
+    "employee_id": "EMP-2453",
+    "department": "Data",
+    "requested_role_templates": [
+      "tmpl-dat-g3-50",
+      "tmpl-dat-g3-26"
+    ],
+    "business_justification": "Project rotation onto Q3 data workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-019",
+    "employee_id": "EMP-9306",
+    "department": "Engineering",
+    "requested_role_templates": [
+      "tmpl-eng-g3-77",
+      "tmpl-eng-g3-31"
+    ],
+    "business_justification": "Project rotation onto Q3 engineering workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-020",
+    "employee_id": "EMP-4152",
+    "department": "Strategy",
+    "requested_role_templates": [
+      "tmpl-str-g3-26",
+      "tmpl-str-g3-48"
+    ],
+    "business_justification": "Project rotation onto Q3 strategy workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-021",
+    "employee_id": "EMP-9931",
+    "department": "Legal",
+    "requested_role_templates": [
+      "tmpl-leg-g3-01",
+      "tmpl-leg-g3-30"
+    ],
+    "business_justification": "Project rotation onto Q3 legal workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-022",
+    "employee_id": "EMP-1910",
+    "department": "Legal",
+    "requested_role_templates": [
+      "tmpl-leg-g3-17",
+      "tmpl-leg-g3-74"
+    ],
+    "business_justification": "Project rotation onto Q3 legal workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-023",
+    "employee_id": "EMP-5508",
+    "department": "Account",
+    "requested_role_templates": [
+      "tmpl-acc-g3-77",
+      "tmpl-acc-g3-03"
+    ],
+    "business_justification": "Project rotation onto Q3 account workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-024",
+    "employee_id": "EMP-7469",
+    "department": "Production",
+    "requested_role_templates": [
+      "tmpl-pro-g3-57",
+      "tmpl-pro-g3-06"
+    ],
+    "business_justification": "Project rotation onto Q3 production workstream; needs read-access to dashboards.",
+    "scenario": "routine-rotation"
+  },
+  {
+    "id": "REQ-025",
+    "employee_id": "EMP-3481",
+    "department": "Legal",
+    "requested_role_templates": [
+      "tmpl-leg-g4-39",
+      "tmpl-leg-g4-62",
+      "tmpl-leg-g4-39",
+      "tmpl-leg-g4-91",
+      "tmpl-leg-g4-83",
+      "tmpl-leg-g4-86"
+    ],
+    "business_justification": "Cross-functional incident-response role; needs broad write-access across systems.",
+    "scenario": "privileged-broad"
+  },
+  {
+    "id": "REQ-026",
+    "employee_id": "EMP-5682",
+    "department": "Engineering",
+    "requested_role_templates": [
+      "tmpl-eng-g4-55",
+      "tmpl-eng-g4-56",
+      "tmpl-eng-g4-06",
+      "tmpl-eng-g4-27",
+      "tmpl-eng-g4-08"
+    ],
+    "business_justification": "Cross-functional incident-response role; needs broad write-access across systems.",
+    "scenario": "privileged-broad"
+  },
+  {
+    "id": "REQ-027",
+    "employee_id": "EMP-4103",
+    "department": "Legal",
+    "requested_role_templates": [
+      "tmpl-leg-g4-17",
+      "tmpl-leg-g4-71",
+      "tmpl-leg-g4-92",
+      "tmpl-leg-g4-77",
+      "tmpl-leg-g4-56"
+    ],
+    "business_justification": "Cross-functional incident-response role; needs broad write-access across systems.",
+    "scenario": "privileged-broad"
+  },
+  {
+    "id": "REQ-028",
+    "employee_id": "EMP-5678",
+    "department": "Engineering",
+    "requested_role_templates": [
+      "tmpl-eng-g4-63",
+      "tmpl-eng-g4-58",
+      "tmpl-eng-g4-62",
+      "tmpl-eng-g4-73"
+    ],
+    "business_justification": "Cross-functional incident-response role; needs broad write-access across systems.",
+    "scenario": "privileged-broad"
+  },
+  {
+    "id": "REQ-029",
+    "employee_id": "EMP-2693",
+    "department": "Engineering",
+    "requested_role_templates": [
+      "tmpl-eng-g4-27",
+      "tmpl-eng-g4-48",
+      "tmpl-eng-g4-95",
+      "tmpl-eng-g4-96"
+    ],
+    "business_justification": "Cross-functional incident-response role; needs broad write-access across systems.",
+    "scenario": "privileged-broad"
+  },
+  {
+    "id": "REQ-030",
+    "employee_id": "EMP-6777",
+    "department": "Engineering",
+    "requested_role_templates": [
+      "tmpl-eng-g4-52",
+      "tmpl-eng-g4-50",
+      "tmpl-eng-g4-77",
+      "tmpl-eng-g4-87",
+      "tmpl-eng-g4-01"
+    ],
+    "business_justification": "Cross-functional incident-response role; needs broad write-access across systems.",
+    "scenario": "privileged-broad"
+  },
+  {
+    "id": "REQ-031",
+    "employee_id": "EMP-3393",
+    "department": "Legal",
+    "requested_role_templates": [
+      "tmpl-leg-g4-73",
+      "tmpl-leg-g4-45",
+      "tmpl-leg-g4-36",
+      "tmpl-leg-g4-11"
+    ],
+    "business_justification": "Cross-functional incident-response role; needs broad write-access across systems.",
+    "scenario": "privileged-broad"
+  },
+  {
+    "id": "REQ-032",
+    "employee_id": "EMP-8227",
+    "department": "Finance",
+    "requested_role_templates": [
+      "tmpl-fin-g4-47",
+      "tmpl-fin-g4-08",
+      "tmpl-fin-g4-23",
+      "tmpl-fin-g4-29"
+    ],
+    "business_justification": "Cross-functional incident-response role; needs broad write-access across systems.",
+    "scenario": "privileged-broad"
+  },
+  {
+    "id": "REQ-033",
+    "employee_id": "EMP-9381",
+    "department": "Finance",
+    "requested_role_templates": [
+      "tmpl-fin-g4-70",
+      "tmpl-fin-g4-55",
+      "tmpl-fin-g4-70",
+      "tmpl-fin-g4-16"
+    ],
+    "business_justification": "Cross-functional incident-response role; needs broad write-access across systems.",
+    "scenario": "privileged-broad"
+  },
+  {
+    "id": "REQ-034",
+    "employee_id": "EMP-3331",
+    "department": "Engineering",
+    "requested_role_templates": [
+      "tmpl-eng-g4-05",
+      "tmpl-eng-g4-67",
+      "tmpl-eng-g4-04",
+      "tmpl-eng-g4-42",
+      "tmpl-eng-g4-18"
+    ],
+    "business_justification": "Cross-functional incident-response role; needs broad write-access across systems.",
+    "scenario": "privileged-broad"
+  },
+  {
+    "id": "REQ-035",
+    "employee_id": "EMP-9605",
+    "department": "Finance",
+    "requested_role_templates": [
+      "tmpl-fin-g2-readonly-01"
+    ],
+    "business_justification": "Post-incident audit access; read-only to a single folder for 14 days.",
+    "scenario": "post-incident-narrow"
+  },
+  {
+    "id": "REQ-036",
+    "employee_id": "EMP-3917",
+    "department": "Creative",
+    "requested_role_templates": [
+      "tmpl-cre-g2-readonly-01"
+    ],
+    "business_justification": "Post-incident audit access; read-only to a single folder for 14 days.",
+    "scenario": "post-incident-narrow"
+  },
+  {
+    "id": "REQ-037",
+    "employee_id": "EMP-6102",
+    "department": "Engineering",
+    "requested_role_templates": [
+      "tmpl-eng-g2-readonly-01"
+    ],
+    "business_justification": "Post-incident audit access; read-only to a single folder for 14 days.",
+    "scenario": "post-incident-narrow"
+  },
+  {
+    "id": "REQ-038",
+    "employee_id": "EMP-1782",
+    "department": "Account",
+    "requested_role_templates": [
+      "tmpl-acc-g2-readonly-01"
+    ],
+    "business_justification": "Post-incident audit access; read-only to a single folder for 14 days.",
+    "scenario": "post-incident-narrow"
+  },
+  {
+    "id": "REQ-039",
+    "employee_id": "EMP-6824",
+    "department": "Legal",
+    "requested_role_templates": [
+      "tmpl-leg-g2-readonly-01"
+    ],
+    "business_justification": "Post-incident audit access; read-only to a single folder for 14 days.",
+    "scenario": "post-incident-narrow"
+  },
+  {
+    "id": "REQ-040",
+    "employee_id": "EMP-9828",
+    "department": "Finance",
+    "requested_role_templates": [
+      "tmpl-fin-g2-readonly-01"
+    ],
+    "business_justification": "Post-incident audit access; read-only to a single folder for 14 days.",
+    "scenario": "post-incident-narrow"
+  }
+]

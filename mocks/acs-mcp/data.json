@@ -1,0 +1,16 @@
+{
+  "transcripts": [
+    {
+      "candidate_id": "C-101",
+      "transcript": [
+        {"speaker": "agent", "text": "Hi Priya, thanks for taking the call. Tell me what drew you to the Senior Data Engineer role at Zava?"},
+        {"speaker": "candidate", "text": "I've been working on similar Spark/Airflow stacks for five years and the chance to work across creative agencies is unusual; I want that breadth."},
+        {"speaker": "agent", "text": "Walk me through how you'd debug a slowly-degrading dbt model run."},
+        {"speaker": "candidate", "text": "I'd start with dbt run --vars to isolate the failing model, then dbt-checkpoint diff against last green run, then check upstream source freshness, and last look at warehouse compute scaling."},
+        {"speaker": "agent", "text": "Final two: how do you handle disagreement with a peer on a design choice, and what's your earliest start?"},
+        {"speaker": "candidate", "text": "I write a one-pager surfacing the trade-offs and ask the senior engineer to weigh in. Earliest start mid-June."}
+      ],
+      "duration_sec": 420
+    }
+  ]
+}

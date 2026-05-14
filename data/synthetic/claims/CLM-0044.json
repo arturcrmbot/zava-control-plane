@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0044",
+  "employee_id": "EMP-0002",
+  "submitted_at": "2026-04-05T11:12:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "miscellaneous",
+  "vendor": "Atlassian Subscriptions",
+  "amount": 911.86,
+  "attendees": 1,
+  "narrative": "Conference registration via Atlassian Subscriptions",
+  "receipt_filename": "CLM-0044.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Conference fee of GBP 911.86 is within the UK conference/training cap of GBP 1500, vendor recognisable, business purpose annotated — Green per §3.5.",
+  "gold_policy_clause": "§3.5 Miscellaneous — UK conference/training cap GBP 1500",
+  "receipt_mismatch_flavour": "correct"
+}

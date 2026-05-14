@@ -1,0 +1,225 @@
+# compose-domain v4 brief schema (PAT-002).
+#
+# Authoritative JSON-Schema-style declaration of the v4 brief shape.
+# Every sub-skill validates the slice it owns against the matching
+# section of this document. The brief grows through five conceptual
+# passes (v0..v5) but lives as ONE YAML file at
+# `docs/superpowers/specs/<domain>-brief.yaml`.
+#
+# v0  (skeleton)                  : domain + phases + personae + external_systems
+# v1  (entity-projection)         : + entities
+# v2  (decision-mapping)          : + decisions
+# v3  (function-membership)       : + function
+# v4  (ambient-trigger, optional) : + ambient
+# v5  (sealed)                    : ready for codegen + graduate.sh
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://zava.dev/compose-domain/brief.schema.yaml"
+title: "compose-domain v4 brief"
+type: object
+required: [domain, phases]
+additionalProperties: true   # v3 sections (personae, external_systems) tolerated for back-compat
+
+properties:
+
+  # ---------------------------------------------------------------- v0
+  domain:
+    type: object
+    required: [workflow_type, prefix, display_name]
+    additionalProperties: true
+    properties:
+      # Canonical kebab-case workflow_type stamped on every payload.
+      # Drives BOTH the projection module name (underscored) AND the
+      # Cypher file name (kebab). Phase 1 PAT-005 contract.
+      workflow_type:
+        type: string
+        pattern: "^[a-z][a-z0-9-]*$"
+      # File-name prefix used by orchestrator + activities modules
+      # (e.g. "fleet" -> api/functions/workflows/fleet_<wt_snake>.py).
+      prefix:
+        type: string
+        pattern: "^[a-z][a-z0-9_]*$"
+      display_name:
+        type: string
+        minLength: 1
+      # v3 back-compat:
+      name:        { type: string }
+      owner_role:  { type: string }
+      description: { type: string }
+
+  phases:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      required: [name, kind]
+      additionalProperties: true
+      properties:
+        name: { type: string, pattern: "^[a-z][a-z0-9_]*$" }
+        # Phase 4 IP4 (TASK-019): `sub_orchestrator` joins the original
+        # three. Sub-orchestrator phases compose existing fleet domains
+        # into a meta-workflow via Durable's `call_sub_orchestrator`.
+        kind: { enum: [deterministic, agent, hitl, sub_orchestrator] }
+        persona: { type: string }
+        external_event: { type: string }
+        intent: { type: string }
+        agent_skill_name: { type: string }
+        external_systems: { type: array, items: { type: string } }
+        # ---- sub_orchestrator-specific fields (TASK-019) ----
+        # Required when kind == sub_orchestrator. Names the workflow_type
+        # of the child workflow being spawned. The codegen derives the
+        # PascalCase orchestrator class name from this (e.g.
+        # `vendor-kyc` -> `FleetVendorKycOrchestrator` when prefix is
+        # `fleet`); the brief may override via `target_orchestrator`.
+        target_workflow_type: { type: string, pattern: "^[a-z][a-z0-9-]*$" }
+        # Override for the auto-derived orchestrator class name. Useful
+        # when the child domain's orchestrator does not follow the
+        # `<Prefix><WorkflowType>Orchestrator` PascalCase convention.
+        target_orchestrator: { type: string, pattern: "^[A-Z][A-Za-z0-9_]*$" }
+        # Either a Cypher snippet (string) or a Python dict-builder
+        # expression. The codegen embeds it as the `payload_expr` arg
+        # to `context.call_sub_orchestrator`. If a literal dict-builder
+        # is desired, prefix with `python:`; anything else is treated
+        # as a Cypher template string the codegen will quote.
+        payload_from: { type: string }
+        # Optional grouping label. Sub-orchestrator phases sharing the
+        # same `parallel_group` are emitted into one `context.task_all`.
+        parallel_group: { type: string, pattern: "^[a-z][a-z0-9_]*$" }
+
+  # ---------------------------------------------------------------- v1
+  entities:
+    type: array
+    items:
+      type: object
+      required: [kind, ref_field, source]
+      additionalProperties: true
+      properties:
+        # Must be a member of api.server.services.entity_graph._VALID_KINDS.
+        kind: { type: string }
+        # Dotted path inside workflow.payload that holds the entity id.
+        ref_field: { type: string, pattern: "^payload(\\.[A-Za-z_][A-Za-z0-9_]*)+$" }
+        # Free-form sub-kind label landed on the node's `kind` attr (e.g.
+        # "vendor", "joiner", "campaign"). Optional — when absent the
+        # node table's intrinsic `kind` column stays unset.
+        source: { type: string }
+        # Map of Kuzu attr column -> dotted ref into payload.
+        attributes:
+          type: object
+          additionalProperties: { type: string }
+        # Optional outbound relations from this entity.
+        relations:
+          type: array
+          items:
+            type: object
+            required: [kind, target_ref]
+            properties:
+              # Must be a member of _VALID_RELS.
+              kind: { type: string }
+              # Either another entity's ref_field OR an entity_id literal.
+              target_ref: { type: string }
+
+  # ---------------------------------------------------------------- v2
+  decisions:
+    type: array
+    items:
+      type: object
+      required: [phase, persona, source_event]
+      additionalProperties: true
+      properties:
+        # Must match a phase in `phases` with kind == hitl.
+        phase: { type: string }
+        # Must match a persona role declared in `personae` (when v3
+        # personae block is present) or under api/server/personae/.
+        persona: { type: string }
+        # FleetEvent type stamped on the Decision node. Defaults to
+        # `workflow.hitl.requested` when omitted.
+        source_event: { type: string }
+        # Optional list of entity ref_fields the decision pertains to.
+        decided_on_entities:
+          type: array
+          items: { type: string }
+        # Optional dict of attribute key -> dotted context path. Lands
+        # on the Decision node's `attributes` JSON blob.
+        attributes_from_context:
+          type: object
+          additionalProperties: { type: string }
+
+  # ---------------------------------------------------------------- v3
+  function:
+    # Single canonical function name. Validated against api.shared.functions
+    # FUNCTIONS keys when importable, otherwise FUNCTIONS_PLACEHOLDER.
+    type: string
+    enum: [finance, hr, revenue, ops, legal, marketing, tech, data, customer-success, legacy]
+
+  # ---------------------------------------------------------------- v4
+  ambient:
+    type: object
+    required: [name, function, triggers, spawnable_workflow_types]
+    additionalProperties: true
+    properties:
+      name: { type: string, pattern: "^[A-Z][A-Za-z0-9]*$" }
+      function:
+        type: string
+        enum: [finance, hr, revenue, ops, legal, marketing, tech, data, customer-success, legacy]
+      reasoning_skill: { type: [string, "null"] }
+      spawnable_workflow_types:
+        type: array
+        minItems: 1
+        items: { type: string }
+      triggers:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          required: [kind]
+          properties:
+            kind: { enum: [bus, cypher, cadence] }
+            # bus
+            event_type: { type: string }
+            filter:     { type: string }
+            # cypher
+            pattern:        { type: string }
+            sweep_seconds:  { type: integer, minimum: 1 }
+            # cadence
+            cron: { type: string }
+
+
+# --------------------------------------------------------------------
+# Example (full v4 brief — synthetic, for documentation only).
+# --------------------------------------------------------------------
+example:
+  domain:
+    workflow_type: vendor-kyc
+    prefix: fleet
+    display_name: "Vendor onboarding & KYC"
+    description: "Vendor onboarding with KYC + UBO sweep + finance signoff."
+  phases:
+    - { name: vendor_intake, kind: deterministic, intent: "Capture vendor name + country." }
+    - { name: kyc_diligence, kind: agent, agent_skill_name: kyc-diligence-checker, intent: "..." }
+    - { name: ubo_resolver,  kind: agent, agent_skill_name: ubo-resolver, intent: "..." }
+    - { name: finance_signoff, kind: hitl, persona: vendor_kyc_finance_bp, external_event: finance_signoff_decision }
+  entities:
+    - kind: Organisation
+      source: vendor
+      ref_field: payload.vendor.id
+      attributes:
+        country:   payload.vendor.country_of_incorporation
+        risk_band: payload.kyc.risk_band
+  decisions:
+    - phase: finance_signoff
+      persona: vendor_kyc_finance_bp
+      source_event: workflow.hitl.requested
+      decided_on_entities: [payload.vendor.id]
+      attributes_from_context:
+        vendor_name: payload.vendor.name
+        country:     payload.vendor.country_of_incorporation
+  function: finance
+  ambient:
+    name: VendorRiskWatcher
+    function: finance
+    reasoning_skill: null
+    spawnable_workflow_types: [vendor-kyc]
+    triggers:
+      - kind: cypher
+        pattern: "(o:Organisation {kind:'vendor'}) WHERE o.risk_band = 'high'"
+        sweep_seconds: 3600

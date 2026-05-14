@@ -1,0 +1,145 @@
+# Vendor onboarding & KYC — third compose-domain brief.
+#
+# A new third-party vendor needs onboarding before any spend can be
+# approved. Two agent phases (KYC diligence + UBO sanctions screening)
+# followed by a finance business-partner sign-off. Introduces three new
+# MCPs (vendor_registry, sanctions_api, adverse_media). Domain-scoped
+# persona (vendor_kyc_finance_bp) auto-closes via decision_code.
+
+domain:
+  # v4 fields (TASK-027 backfill).
+  workflow_type: vendor-kyc
+  prefix: fleet
+  # v3 fields (back-compat — v3 generators still consume `name`).
+  name: fleet-vendor-kyc
+  display_name: Vendor onboarding & KYC
+  owner_role: vendor_kyc_finance_bp
+  description: |
+    A vendor has been proposed by a buying agency. The orchestrator
+    captures the vendor name + country (deterministic intake). A
+    KYC-diligence agent looks the vendor up in the registry, lists
+    their regulatory filings, and screens the legal entity against
+    sanctions. A UBO-resolver agent then enumerates ultimate beneficial
+    owners, screens each one, and runs an adverse-media sweep on the
+    top three. The finance business partner signs off (auto-approves
+    when entity sanctions, UBO sanctions, and adverse-media verdicts
+    are all clean). All MCPs are deterministic in-memory stubs.
+
+phases:
+  - name: vendor_intake
+    intent: |
+      Capture the proposed vendor name + country of incorporation +
+      proposing agency. Pass forward.
+    kind: deterministic
+    external_systems: []
+
+  - name: kyc_diligence
+    intent: |
+      Look the vendor up in the vendor registry. List their regulatory
+      filings (last 24 months). Screen the legal entity against
+      sanctions for both the vendor's country of incorporation and any
+      country the vendor's filings reference.
+    kind: agent
+    agent_skill_name: kyc-diligence-checker
+    external_systems: [vendor_registry, sanctions_api]
+
+  - name: ubo_resolver
+    intent: |
+      Enumerate ultimate beneficial owners (UBOs) of the vendor.
+      Screen each UBO against sanctions. Run an adverse-media sweep on
+      the top three UBOs by ownership percentage.
+    kind: agent
+    agent_skill_name: ubo-resolver
+    external_systems: [vendor_registry, sanctions_api, adverse_media]
+
+  - name: finance_signoff
+    intent: |
+      Finance business partner signs off. Approve when entity
+      sanctions, all UBO sanctions, and the adverse-media sweep all
+      came back clean. Otherwise reject naming the failure.
+    kind: hitl
+    persona: vendor_kyc_finance_bp
+    external_systems: []
+
+personae:
+  - role: vendor_kyc_finance_bp
+    workflow_label: Vendor onboarding & KYC
+    decision_policy: |
+      Approve when entity_sanctions_hits, ubo_sanctions_hits, and
+      adverse_media_hits are all empty. Otherwise reject naming the
+      first non-empty list in one sentence.
+    decision_code: |
+      kyc = (context or {}).get("kyc_diligence") or {}
+      ubo = (context or {}).get("ubo_resolver") or {}
+      entity_hits = kyc.get("entity_sanctions_hits") or []
+      ubo_hits = ubo.get("ubo_sanctions_hits") or []
+      media_hits = ubo.get("adverse_media_hits") or []
+      if entity_hits:
+          decision = "reject"
+          reason = (
+              "entity sanctions hits: "
+              + ", ".join(str(h) for h in entity_hits[:3])
+          )
+      elif ubo_hits:
+          decision = "reject"
+          reason = (
+              "UBO sanctions hits: "
+              + ", ".join(str(h) for h in ubo_hits[:3])
+          )
+      elif media_hits:
+          decision = "reject"
+          reason = (
+              "adverse media hits: "
+              + ", ".join(str(h) for h in media_hits[:3])
+          )
+      else:
+          decision = "approve"
+          reason = "entity, UBOs and adverse-media sweep all clean"
+
+external_systems:
+  - id: vendor_registry
+    mcp_tool: vendor_registry
+    operations:
+      - lookup_vendor
+      - list_filings
+      - list_ubos
+  - id: sanctions_api
+    mcp_tool: sanctions_api
+    operations:
+      - screen_entity
+  - id: adverse_media
+    mcp_tool: adverse_media
+    operations:
+      - search
+
+# --------------------------------------------------------------------
+# v4 enrichment (TASK-027 backfill).
+# Mirrors api/server/services/entity_projections/vendor_kyc.py. The
+# live module additionally derives a `risk_band` attribute from the
+# scenario string via _risk_band() — that helper is not synthesisable
+# from the brief and is not regenerated.
+# --------------------------------------------------------------------
+entities:
+  - kind: Organisation
+    source: vendor
+    ref_field: payload.vendor_name
+    attributes:
+      name: payload.vendor_name
+      country: payload.country_of_incorporation
+  - kind: Organisation
+    source: agency
+    ref_field: payload.proposing_agency
+    attributes:
+      name: payload.proposing_agency
+
+decisions:
+  - phase: finance_signoff
+    persona: vendor_kyc_finance_bp
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.vendor_name]
+    attributes_from_context:
+      vendor_name: payload.vendor_name
+      country: payload.country_of_incorporation
+      scenario: payload.scenario
+
+function: finance

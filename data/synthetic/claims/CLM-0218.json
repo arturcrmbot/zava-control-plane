@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0218",
+  "employee_id": "EMP-0018",
+  "submitted_at": "2026-04-22T13:27:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "entertainment",
+  "vendor": "Borchardt Berlin",
+  "amount": 421.02,
+  "attendees": 4,
+  "narrative": "Client dinner at Borchardt Berlin, business-development discussion",
+  "receipt_filename": "CLM-0218.png",
+  "ems_source": "workday",
+  "gold_label": "amber",
+  "gold_reasoning": "Client entertainment at EUR 105.25/head is above the per-head cap (EUR 100) but at or below 110% of cap — Amber per §3.4, reviewer attention required.",
+  "gold_policy_clause": "§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)",
+  "receipt_mismatch_flavour": "correct"
+}

@@ -1,0 +1,91 @@
+[project]
+name = "zava-control-plane-py"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.32",
+  "pydantic>=2.9",
+  "httpx>=0.27",
+  "sse-starlette>=2.1",
+  "pyyaml>=6.0",
+  "python-dotenv>=1.0",
+  "nanoid>=2.0",
+  # azure-functions 1.24+ required by agent-framework-azurefunctions
+  "azure-functions>=1.24",
+  "azure-functions-durable>=1.2",
+  # Phase 0.2 spike resolved: github-copilot-sdk is the Python sibling of @github/copilot-sdk
+  "github-copilot-sdk>=0.2.1",
+  # Microsoft Agent Framework: meta-package pulls in agent-framework-core[all]
+  "agent-framework>=1.0.1",
+  # MAF GitHub Copilot integration (wraps copilot.CopilotClient as a MAF Agent)
+  "agent-framework-github-copilot>=1.0.0b260409",
+  # MAF Azure Durable Functions hosting + Durable Task integration
+  "agent-framework-azurefunctions>=1.0.0b260409",
+  # OpenTelemetry → Azure Monitor (App Insights) for Foundry Tracing tab
+  "azure-monitor-opentelemetry>=1.6.0",
+  "opentelemetry-instrumentation-httpx>=0.48b0",
+  "opentelemetry-instrumentation-fastapi>=0.48b0",
+  "pillow>=10.0",
+  "sentence-transformers>=3.0",
+  "azure-ai-documentintelligence>=1.0.2",
+  "weasyprint>=68.1",
+  "azure-identity>=1.25.3",
+  # Azure AI Foundry evaluation (LLM-judge + custom evaluators + portal upload)
+  "azure-ai-evaluation>=1.0.0",
+  # Candidate portal — Blob storage for CV uploads + HeyGen mp4 cache
+  "azure-storage-blob>=12.20",
+  # Candidate portal — multipart parsing for FastAPI UploadFile
+  "python-multipart>=0.0.20",
+  "reportlab>=4.5.0",
+  # Microsoft Agent Governance Toolkit — runtime governance core for the
+  # substrate. Mediates every MCP tool call + every authority resolution
+  # via api.server.services.governance.GovernanceKernel. See
+  # plan/feature-agent-governance-toolkit-1.md (CON-002: this is the only
+  # import surface for agent_os.*, agentmesh.*, etc.). Pinned to 3.4.* —
+  # AGT is in Public Preview; breaking changes possible before GA so we
+  # bump deliberately, narrowly, and through one file.
+  "agent-governance-toolkit[full]>=3.4,<3.5",
+  # KuzuDB — embedded property graph (Plane 1 of the Agentic Org Blueprint).
+  # Local-first: file-backed at data/portal/entity_graph.kuzu. MIT, Cypher 9,
+  # ACID. See docs/archive/agentic-org-blueprint.md §2 Plane 1 + plan/feature-
+  # agentic-org-phase-1-entity-graph.md (REQ-001/CON-003: kuzu via Python
+  # wheel only, no external server). Pinned to 0.6.x — current stable.
+  "kuzu>=0.6,<0.7",
+  # Faker — synthetic Person names for the data fabric employee generator
+  # (plan/feature-enterprise-pitch-readiness-1.md task pitch-b2). Used at
+  # demo-data generation time only; no runtime dependency on user data.
+  "faker>=20.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "pytest-mock>=3.14",
+  "ruff>=0.7",
+  # Mock httpx in service tests (email_send, heygen_client)
+  "respx>=0.21",
+  # Used only by scripts/generate_blueprint_image.py (Gemini image generation)
+  "google-genai>=1.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests/api"]
+addopts = "-m 'not smoke'"
+markers = [
+  "smoke: requires GHCP credentials and live model calls; opt-in via -m smoke (overrides default deselection)",
+  "foundry: integration test requiring real Azure AI Foundry creds; skipped otherwise",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.hatch.build.targets.wheel]
+packages = ["api"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

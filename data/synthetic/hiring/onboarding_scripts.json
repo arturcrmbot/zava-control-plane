@@ -1,0 +1,23 @@
+[
+  {
+    "role": "Senior Data Engineer",
+    "avatar_character": "harry",
+    "avatar_style": "business",
+    "voice": "en-US-AndrewNeural",
+    "script": "Welcome to Zava, and congratulations on the Senior Data Engineer role. You'll be helping our agencies make sense of audience and campaign data at scale. On day one we'll get your laptop set up, walk through your accounts and access groups, and meet your manager. See you soon."
+  },
+  {
+    "role": "Senior Data Engineer (DE)",
+    "avatar_character": "harry",
+    "avatar_style": "business",
+    "voice": "en-US-AndrewNeural",
+    "script": "Welcome to Zava Germany. Congratulations on the Senior Data Engineer offer. On day one we'll cover your German payroll and tax forms, your laptop and accounts, and your first-week onboarding plan. Looking forward to meeting you."
+  },
+  {
+    "role": "Creative Director",
+    "avatar_character": "lori",
+    "avatar_style": "graceful-sitting",
+    "voice": "en-US-JennyNeural",
+    "script": "Welcome to Zava, and congratulations on the Creative Director role. You'll be leading our brand storytelling work for some of the most exciting accounts in the network. Day one is about meeting your team, walking through your brief portfolio, and getting your studio set up."
+  }
+]

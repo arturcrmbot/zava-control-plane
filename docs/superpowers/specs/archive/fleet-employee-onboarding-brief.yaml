@@ -1,0 +1,147 @@
+# Employee onboarding — second compose-domain brief.
+#
+# Day-1 access provisioning + induction scheduling for a new joiner. Two
+# agent phases (access drafting + induction planning) with one HITL gate
+# in the middle (IT Admin signs off on the access bundle). Reuses
+# `workday_hr_employee` from the travel domain; introduces two new MCPs
+# (identity_provider, calendar_service); introduces one new persona
+# (onboarding_it_admin) auto-closes via decision_code.
+
+domain:
+  # v4 fields (TASK-028 backfill).
+  workflow_type: employee-onboarding
+  prefix: fleet
+  # v3 fields (back-compat).
+  name: fleet-employee-onboarding
+  display_name: Employee onboarding
+  owner_role: onboarding_it_admin
+  description: |
+    A new joiner has accepted an offer. The orchestrator looks up their
+    grade, cost-centre and agency from Workday HR. An access-drafter
+    agent assembles the day-1 RBAC bundle by listing role templates that
+    fit the department + level, fetching each template, and screening
+    the union for separation-of-duties conflicts. IT Admin signs off
+    (auto-approves when there are no SoD conflicts and the bundle is
+    within the template default size). An induction-planner agent then
+    finds a 90-minute slot in the joiner's first two weeks across the
+    buddy and the line manager, books the induction event, and pulls
+    the joiner's recent-starts history (in case they're a re-hire). All
+    MCPs are deterministic in-memory stubs.
+
+phases:
+  - name: employee_lookup
+    intent: |
+      Read the joiner's grade, cost-centre and agency from Workday HR.
+      Pass forward.
+    kind: deterministic
+    external_systems: [workday_hr]
+
+  - name: access_drafter
+    intent: |
+      Draft the day-1 RBAC bundle. List role templates that fit the
+      joiner's (department, grade), fetch each candidate template, and
+      check the union of permissions for separation-of-duties conflicts.
+      Output the proposed bundle + a SoD verdict.
+    kind: agent
+    agent_skill_name: access-drafter
+    external_systems: [identity_provider]
+
+  - name: it_admin_approval
+    intent: |
+      IT Admin signs off on the access bundle. Approve when there are
+      zero SoD conflicts AND the bundle size is at or below the
+      template-default count for the joiner's grade. Otherwise reject
+      with a one-sentence reason.
+    kind: hitl
+    persona: onboarding_it_admin
+    external_systems: []
+
+  - name: induction_planner
+    intent: |
+      Find a 90-minute induction slot within the joiner's first two
+      weeks across the joiner, buddy, and line manager. Look up a
+      suitable room in the joiner's home office building, and book the
+      event.
+    kind: agent
+    agent_skill_name: induction-planner
+    external_systems: [calendar_service]
+
+personae:
+  - role: onboarding_it_admin
+    workflow_label: Employee onboarding
+    decision_policy: |
+      Approve when the access_drafter verdict shows zero SoD conflicts
+      AND the proposed bundle size is at or below the template-default
+      count for the joiner's grade. Otherwise reject naming which
+      condition failed.
+    decision_code: |
+      ad = (context or {}).get("access_drafter") or {}
+      conflicts = ad.get("sod_conflicts") or []
+      bundle = ad.get("proposed_bundle") or []
+      default_size = int(ad.get("template_default_size") or 0)
+      if conflicts:
+          decision = "reject"
+          reason = "SoD conflicts: " + ", ".join(conflicts[:3])
+      elif default_size and len(bundle) > default_size:
+          decision = "reject"
+          reason = (
+              "bundle size " + str(len(bundle))
+              + " exceeds template default " + str(default_size)
+          )
+      else:
+          decision = "approve"
+          reason = (
+              "no SoD conflicts; bundle within template default ("
+              + str(len(bundle)) + " of " + str(default_size or "?") + ")"
+          )
+
+external_systems:
+  - id: workday_hr
+    mcp_tool: workday_hr_employee
+    operations:
+      - get_employee
+  - id: identity_provider
+    mcp_tool: identity_provider
+    operations:
+      - list_role_templates
+      - get_role_template
+      - check_separation_of_duties
+  - id: calendar_service
+    mcp_tool: calendar_service
+    operations:
+      - find_availability
+      - get_room_options
+      - book_event
+
+# --------------------------------------------------------------------
+# v4 enrichment (TASK-028 backfill). Mirrors
+# api/server/services/entity_projections/employee_onboarding.py. The
+# laptop Asset is conditionally suppressed for `no-laptop` / `byod`
+# scenarios (helper logic in the live module — not codegen-synthesisable).
+# --------------------------------------------------------------------
+entities:
+  - kind: Person
+    source: employee
+    ref_field: payload.employee_id
+    attributes:
+      department: payload.department
+  - kind: Person
+    source: buddy
+    ref_field: payload.buddy_id
+    relations:
+      - kind: MANAGES
+        target_ref: payload.employee_id
+  - kind: Asset
+    source: laptop
+    ref_field: payload.employee_id
+
+decisions:
+  - phase: it_admin_approval
+    persona: onboarding_it_admin
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.employee_id]
+    attributes_from_context:
+      employee_id: payload.employee_id
+      department: payload.department
+
+function: hr

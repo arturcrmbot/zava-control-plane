@@ -1,0 +1,23 @@
+[
+  {
+    "id": "REQ-SDE-USA-DEMO",
+    "title": "Senior Data Engineer",
+    "jurisdiction": "USA",
+    "level_target": "Senior",
+    "role_family": "Data Engineering"
+  },
+  {
+    "id": "REQ-SDE-DE-DEMO",
+    "title": "Senior Data Engineer",
+    "jurisdiction": "DE",
+    "level_target": "Senior",
+    "role_family": "Data Engineering"
+  },
+  {
+    "id": "REQ-CD-USA-DEMO",
+    "title": "Creative Director",
+    "jurisdiction": "USA",
+    "level_target": "Director",
+    "role_family": "Creative"
+  }
+]

@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0089",
+  "employee_id": "EMP-0011",
+  "submitted_at": "2026-04-09T17:15:00",
+  "market": "US",
+  "currency": "USD",
+  "category": "miscellaneous",
+  "vendor": "Best Buy Business",
+  "amount": 2491.07,
+  "attendees": 1,
+  "narrative": "Conference registration via Best Buy Business",
+  "receipt_filename": "CLM-0089.png",
+  "ems_source": "concur",
+  "gold_label": "red",
+  "gold_reasoning": "Conference fee of USD 2491.07 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
+  "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
+  "receipt_mismatch_flavour": "correct"
+}

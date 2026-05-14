@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0233",
+  "employee_id": "EMP-0010",
+  "submitted_at": "2026-04-24T09:30:00",
+  "market": "US",
+  "currency": "USD",
+  "category": "entertainment",
+  "vendor": "RPM Steak Chicago",
+  "amount": 325.83,
+  "attendees": 3,
+  "narrative": "Client dinner at RPM Steak Chicago, business-development discussion",
+  "receipt_filename": "CLM-0233.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Client entertainment at USD 325.83 for 3 attendees (USD 108.61/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
+  "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
+  "receipt_mismatch_flavour": "correct"
+}

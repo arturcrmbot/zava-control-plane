@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0122",
+  "employee_id": "EMP-0021",
+  "submitted_at": "2026-04-13T17:35:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "accommodation",
+  "vendor": "Sofitel Munich",
+  "amount": 193.63,
+  "attendees": 1,
+  "narrative": "Munich stay at Sofitel Munich",
+  "receipt_filename": "CLM-0122.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Munich hotel at EUR 193.63/night is at or below the Tier 1 cap of EUR 240, with itemised hotel folio and dates aligned to itinerary — Green per §3.3.",
+  "gold_policy_clause": "§3.3 Accommodation — DE Tier 1 cap EUR 240",
+  "receipt_mismatch_flavour": "correct"
+}

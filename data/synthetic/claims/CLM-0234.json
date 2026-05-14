@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0234",
+  "employee_id": "EMP-0017",
+  "submitted_at": "2026-04-24T13:49:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "miscellaneous",
+  "vendor": "XING Events",
+  "amount": 1191.72,
+  "attendees": 1,
+  "narrative": "Conference registration via XING Events",
+  "receipt_filename": "CLM-0234.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Conference fee of EUR 1191.72 is within the DE conference/training cap of EUR 1600, vendor recognisable, business purpose annotated — Green per §3.5.",
+  "gold_policy_clause": "§3.5 Miscellaneous — DE conference/training cap EUR 1600",
+  "receipt_mismatch_flavour": "correct"
+}

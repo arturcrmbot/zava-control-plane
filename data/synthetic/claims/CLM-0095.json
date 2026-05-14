@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0095",
+  "employee_id": "EMP-0024",
+  "submitted_at": "2026-04-10T09:52:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "meals",
+  "vendor": "Bombay Canteen",
+  "amount": 1695.0,
+  "attendees": 1,
+  "narrative": "Solo dinner at Bombay Canteen",
+  "receipt_filename": "CLM-0095.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of INR 1695.00 is within the IN solo meal cap of INR 2500. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
+  "gold_policy_clause": "§3.1 Meals — IN solo cap INR 2500",
+  "receipt_mismatch_flavour": "correct"
+}

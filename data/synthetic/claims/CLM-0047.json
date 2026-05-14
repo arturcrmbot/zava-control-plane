@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0047",
+  "employee_id": "EMP-0026",
+  "submitted_at": "2026-04-05T11:32:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "accommodation",
+  "vendor": "The Oberoi Bangalore",
+  "amount": 17575.0,
+  "attendees": 1,
+  "narrative": "Mumbai stay at The Oberoi Bangalore",
+  "receipt_filename": "CLM-0047.png",
+  "ems_source": "concur",
+  "gold_label": "amber",
+  "gold_reasoning": "Mumbai hotel at INR 17575.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
+  "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
+  "receipt_mismatch_flavour": "wrong-amount"
+}

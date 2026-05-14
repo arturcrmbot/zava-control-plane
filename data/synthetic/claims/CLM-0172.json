@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0172",
+  "employee_id": "EMP-0003",
+  "submitted_at": "2026-04-18T11:31:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "accommodation",
+  "vendor": "Hilton Manchester",
+  "amount": 206.64,
+  "attendees": 1,
+  "narrative": "London stay at Hilton Manchester",
+  "receipt_filename": "CLM-0172.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "London hotel at GBP 206.64/night is at or below the Tier 1 cap of GBP 280, with itemised hotel folio and dates aligned to itinerary — Green per §3.3.",
+  "gold_policy_clause": "§3.3 Accommodation — UK Tier 1 cap GBP 280",
+  "receipt_mismatch_flavour": "correct"
+}

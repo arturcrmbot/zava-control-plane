@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0126",
+  "employee_id": "EMP-0018",
+  "submitted_at": "2026-04-13T12:31:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "travel",
+  "vendor": "Eurowings",
+  "amount": 678.14,
+  "attendees": 1,
+  "narrative": "Long-haul return booking via Eurowings",
+  "receipt_filename": "CLM-0126.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of EUR 678.14 is at or below the DE long-haul economy cap of EUR 950, booked in economy with itinerary — Green per §3.2.",
+  "gold_policy_clause": "§3.2 Travel — DE long-haul economy cap EUR 950",
+  "receipt_mismatch_flavour": "wrong-date"
+}

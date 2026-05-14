@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0034",
+  "employee_id": "EMP-0019",
+  "submitted_at": "2026-04-04T11:35:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "miscellaneous",
+  "vendor": "MediaMarkt Business",
+  "amount": 1072.98,
+  "attendees": 1,
+  "narrative": "Conference registration via MediaMarkt Business",
+  "receipt_filename": "CLM-0034.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Conference fee of EUR 1072.98 is within the DE conference/training cap of EUR 1600, vendor recognisable, business purpose annotated — Green per §3.5.",
+  "gold_policy_clause": "§3.5 Miscellaneous — DE conference/training cap EUR 1600",
+  "receipt_mismatch_flavour": "correct"
+}

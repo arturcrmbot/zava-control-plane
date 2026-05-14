@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0057",
+  "employee_id": "EMP-0013",
+  "submitted_at": "2026-04-06T08:55:00",
+  "market": "US",
+  "currency": "USD",
+  "category": "accommodation",
+  "vendor": "Marriott Marquis NYC",
+  "amount": 390.86,
+  "attendees": 1,
+  "narrative": "New York stay at Marriott Marquis NYC",
+  "receipt_filename": "CLM-0057.png",
+  "ems_source": "concur",
+  "gold_label": "amber",
+  "gold_reasoning": "New York hotel at USD 390.86/night is above the Tier 1 cap (USD 380) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
+  "gold_policy_clause": "§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)",
+  "receipt_mismatch_flavour": "correct"
+}

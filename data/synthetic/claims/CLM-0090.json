@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0090",
+  "employee_id": "EMP-0018",
+  "submitted_at": "2026-04-10T08:47:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "meals",
+  "vendor": "Block House",
+  "amount": 34.47,
+  "attendees": 1,
+  "narrative": "Solo dinner at Block House",
+  "receipt_filename": "CLM-0090.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of EUR 34.47 is within the DE solo meal cap of EUR 45. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
+  "gold_policy_clause": "§3.1 Meals — DE solo cap EUR 45",
+  "receipt_mismatch_flavour": "correct"
+}

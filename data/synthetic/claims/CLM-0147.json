@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0147",
+  "employee_id": "EMP-0028",
+  "submitted_at": "2026-04-15T08:48:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "accommodation",
+  "vendor": "Trident Hyderabad",
+  "amount": 16433.0,
+  "attendees": 1,
+  "narrative": "Mumbai stay at Trident Hyderabad",
+  "receipt_filename": "CLM-0147.png",
+  "ems_source": "concur",
+  "gold_label": "amber",
+  "gold_reasoning": "Mumbai hotel at INR 16433.00/night is above the Tier 1 cap (INR 16000) but at or below 110% of cap — Amber per §3.3, reviewer attention required.",
+  "gold_policy_clause": "§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)",
+  "receipt_mismatch_flavour": "correct"
+}

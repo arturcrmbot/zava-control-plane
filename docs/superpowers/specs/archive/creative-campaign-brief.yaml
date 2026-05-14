@@ -1,0 +1,99 @@
+# Creative-campaign — compose-domain v4 brief.
+#
+# Mirrors api/server/services/entity_projections/creative_campaign.py (TASK-026).
+# Payload at data/synthetic/creative-campaign/briefs.json. The live
+# projection iterates the jurisdictions list to emit a Place per
+# market; this loop is helper logic — the brief documents one
+# representative Place ref via payload.jurisdictions but the codegen
+# cannot synthesise the iteration.
+
+domain:
+  workflow_type: creative-campaign
+  prefix: fleet
+  display_name: Creative campaign brief
+  description: |
+    Marketing brief intake → concept lock → storyboard → final sign-off.
+    Five HITL gates today are all routed through the creative_director
+    persona (the spec calls out creative_strategy_director as a future
+    alias when the persona registry splits the role).
+
+phases:
+  - name: brief_intake
+    kind: deterministic
+    intent: Capture client brand, agency, channels, KPIs, jurisdictions.
+  - name: concept_drafter
+    kind: agent
+    agent_skill_name: concept-drafter
+    intent: Propose creative concepts that satisfy mandatory messages + constraints.
+  - name: brief_capture
+    kind: hitl
+    persona: creative_director
+    external_event: brief_capture_decision
+  - name: brief_approval
+    kind: hitl
+    persona: creative_director
+    external_event: brief_approval_decision
+  - name: concept_lock
+    kind: hitl
+    persona: creative_director
+    external_event: concept_lock_decision
+  - name: storyboard_approval
+    kind: hitl
+    persona: creative_director
+    external_event: storyboard_approval_decision
+  - name: final_signoff
+    kind: hitl
+    persona: creative_director
+    external_event: final_signoff_decision
+
+entities:
+  - kind: Organisation
+    source: customer
+    ref_field: payload.client_brand
+    attributes:
+      name: payload.client_brand
+  - kind: Organisation
+    source: agency
+    ref_field: payload.agency
+    attributes:
+      name: payload.agency
+  - kind: Asset
+    source: campaign
+    ref_field: payload.client_brand
+    attributes:
+      category: payload.category
+      audience: payload.audience
+
+decisions:
+  - phase: brief_capture
+    persona: creative_director
+    source_event: workflow.hitl.requested
+    attributes_from_context:
+      client_brand: payload.client_brand
+      agency: payload.agency
+  - phase: brief_approval
+    persona: creative_director
+    source_event: workflow.hitl.requested
+    attributes_from_context:
+      client_brand: payload.client_brand
+      agency: payload.agency
+  - phase: concept_lock
+    persona: creative_director
+    source_event: workflow.hitl.requested
+    attributes_from_context:
+      client_brand: payload.client_brand
+      agency: payload.agency
+  - phase: storyboard_approval
+    persona: creative_director
+    source_event: workflow.hitl.requested
+    attributes_from_context:
+      client_brand: payload.client_brand
+      agency: payload.agency
+  - phase: final_signoff
+    persona: creative_director
+    source_event: workflow.hitl.requested
+    attributes_from_context:
+      client_brand: payload.client_brand
+      agency: payload.agency
+
+function: marketing

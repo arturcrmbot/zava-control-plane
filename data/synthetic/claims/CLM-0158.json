@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0158",
+  "employee_id": "EMP-0020",
+  "submitted_at": "2026-04-16T15:23:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "entertainment",
+  "vendor": "Lutter & Wegner",
+  "amount": 202.11,
+  "attendees": 2,
+  "narrative": "Client dinner at Lutter & Wegner, business-development discussion",
+  "receipt_filename": "CLM-0158.png",
+  "ems_source": "workday",
+  "gold_label": "amber",
+  "gold_reasoning": "Client entertainment at EUR 101.06/head is above the per-head cap (EUR 100) but at or below 110% of cap — Amber per §3.4, reviewer attention required.",
+  "gold_policy_clause": "§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)",
+  "receipt_mismatch_flavour": "correct"
+}

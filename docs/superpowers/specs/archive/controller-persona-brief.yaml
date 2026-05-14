@@ -1,0 +1,57 @@
+persona:
+  role: controller
+  archetype: approver
+  scope_function: finance
+  scope_business_unit: "*"
+  scope_geography: "*"
+  workflow_label: AP / Finance
+  external_event: controller_signoff_decision
+  default_authority_band: "£25k-£250k AP invoices and material expense claims"
+  uses_authority_mcp: true
+  description: >
+    Approves AP invoices and material expense claims within the controller
+    band; escalates to CFO above £250k.
+  decision_policy_paragraph: |
+    Approve when the delegated-authority matrix confirms the controller
+    is the matched approver for this action+value+category. Escalate to
+    the CFO when the matrix routes the decision to `cfo`. Reject only
+    when the request is malformed (missing value or category).
+  decision_inputs:
+    - context.invoice or context.claim
+  decision_authority_action: ap_invoice_approval
+  decision_code: |
+    payload = (context or {}).get("invoice") or (context or {}).get("claim") or {}
+    value_raw = payload.get("amount_gbp") or payload.get("amount") or 0
+    try:
+        value = float(value_raw)
+    except (TypeError, ValueError):
+        value = None
+    category = (payload.get("category") or "standard")
+    action = "ap_invoice_approval" if "invoice" in (context or {}) else "expense_claim_approval"
+
+    auth = authority_check(
+        role="controller",
+        action=action,
+        value=value,
+        category=category,
+    )
+
+    rule = str(auth.get("governing_rule_id") or "n/a")
+    if value is None:
+        decision = "reject"
+        reason = "missing value on payload — controller cannot resolve authority"
+    elif auth.get("allowed"):
+        decision = "approve"
+        reason = (
+            "within controller delegation per matrix rule " + rule
+            + ": " + str(category) + " GBP " + str(value)
+        )
+    else:
+        # Matrix routed to a higher approver (typically CFO) — escalate
+        # rather than reject so the FM surfaces it for operator review.
+        decision = "escalate"
+        reason = (
+            "outside controller delegation per matrix rule " + rule
+            + ": " + str(category) + " GBP " + str(value)
+            + " — " + str(auth.get("reason") or "")
+        )

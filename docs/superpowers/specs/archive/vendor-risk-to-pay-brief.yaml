@@ -1,0 +1,47 @@
+# Vendor-risk-to-pay meta-workflow brief (Phase 4 IP5 TASK-024).
+#
+# Composes finance + legal domains into one end-to-end vendor pay
+# journey: KYC + contract review + PO + parallel AP/Treasury + CFO
+# signoff. Function key is `finance` (Phase 3 canonical, NOT `cfo`).
+domain:
+  workflow_type: vendor-risk-to-pay
+  prefix: fleet
+  display_name: "Vendor Risk to Pay"
+  description: "Vendor onboarding through invoice payment release, with KYC, contract, PO, and parallel AP/FX execution."
+phases:
+  - name: fetch_vendor_invoice
+    kind: agent
+    agent_skill_name: vendor-invoice-fetcher
+    intent: "Fetch the vendor + invoice record pair from the entity graph."
+  - name: kyc
+    kind: sub_orchestrator
+    target_workflow_type: vendor-kyc
+    target_orchestrator: FleetVendorKycOrchestrator
+    payload_from: "python:{'vendor_id': input_dict['vendor_id']}"
+  - name: contract
+    kind: sub_orchestrator
+    target_workflow_type: contract-review
+    target_orchestrator: FleetContractReviewOrchestrator
+    payload_from: "python:{'vendor_id': input_dict['vendor_id'], 'contract_id': input_dict['contract_id']}"
+  - name: purchase_order
+    kind: sub_orchestrator
+    target_workflow_type: purchase-order
+    target_orchestrator: FleetPurchaseOrderOrchestrator
+    payload_from: "python:{'vendor_id': input_dict['vendor_id'], 'invoice_id': input_dict['invoice_id']}"
+  - name: ap
+    kind: sub_orchestrator
+    target_workflow_type: ap-invoice
+    target_orchestrator: FleetApInvoiceOrchestrator
+    parallel_group: pay
+    payload_from: "python:{'invoice_id': input_dict['invoice_id']}"
+  - name: fx
+    kind: sub_orchestrator
+    target_workflow_type: treasury-fx
+    target_orchestrator: FleetTreasuryFxOrchestrator
+    parallel_group: pay
+    payload_from: "python:{'invoice_id': input_dict['invoice_id'], 'currency': input_dict.get('currency', 'USD')}"
+  - name: payment_release
+    kind: hitl
+    persona: cfo
+    external_event: payment_release_decision
+function: finance

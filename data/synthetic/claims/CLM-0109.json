@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0109",
+  "employee_id": "EMP-0013",
+  "submitted_at": "2026-04-11T16:56:00",
+  "market": "US",
+  "currency": "USD",
+  "category": "miscellaneous",
+  "vendor": "Adobe Creative Cloud",
+  "amount": 2514.44,
+  "attendees": 1,
+  "narrative": "Conference registration via Adobe Creative Cloud",
+  "receipt_filename": "CLM-0109.png",
+  "ems_source": "concur",
+  "gold_label": "red",
+  "gold_reasoning": "Conference fee of USD 2514.44 is above 110% of the US conference/training cap (USD 2000). Above 110% of cap is a hard breach — Red per §3.5.",
+  "gold_policy_clause": "§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)",
+  "receipt_mismatch_flavour": "correct"
+}

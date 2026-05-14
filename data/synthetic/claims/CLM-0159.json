@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0159",
+  "employee_id": "EMP-0024",
+  "submitted_at": "2026-04-16T18:13:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "miscellaneous",
+  "vendor": "BookMyShow Events",
+  "amount": 113968.0,
+  "attendees": 1,
+  "narrative": "Conference registration via BookMyShow Events",
+  "receipt_filename": "CLM-0159.png",
+  "ems_source": "concur",
+  "gold_label": "red",
+  "gold_reasoning": "Conference fee of INR 113968.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
+  "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
+  "receipt_mismatch_flavour": "wrong-vendor"
+}

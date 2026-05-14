@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0039",
+  "employee_id": "EMP-0030",
+  "submitted_at": "2026-04-04T16:23:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "miscellaneous",
+  "vendor": "Adobe Creative Cloud",
+  "amount": 115062.0,
+  "attendees": 1,
+  "narrative": "Conference registration via Adobe Creative Cloud",
+  "receipt_filename": "CLM-0039.png",
+  "ems_source": "concur",
+  "gold_label": "red",
+  "gold_reasoning": "Conference fee of INR 115062.00 is above 110% of the IN conference/training cap (INR 80000). Above 110% of cap is a hard breach — Red per §3.5.",
+  "gold_policy_clause": "§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)",
+  "receipt_mismatch_flavour": "wrong-date"
+}

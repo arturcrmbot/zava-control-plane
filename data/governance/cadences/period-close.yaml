@@ -1,0 +1,3 @@
+name: period-close
+schedule: "0 6 1 * *"
+fires_ambient_agent: period-close

@@ -1,0 +1,15 @@
+{
+  "version": "2.0",
+  "logging": {
+    "applicationInsights": { "samplingSettings": { "isEnabled": false } }
+  },
+  "extensionBundle": {
+    "id": "Microsoft.Azure.Functions.ExtensionBundle",
+    "version": "[4.0.0, 4.18.0)"
+  },
+  "extensions": {
+    "durableTask": {
+      "hubName": "InvoiceP2PHub"
+    }
+  }
+}

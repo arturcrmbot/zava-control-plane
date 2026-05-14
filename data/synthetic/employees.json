@@ -1,0 +1,102 @@
+[
+  {"id": "EMP-0001", "name": "Aisha Khan", "market": "UK", "department": "Account", "agency": "Mindshare",
+   "breach_history": [
+     {"date": "2026-02-14", "category": "meals", "tier": "warning"},
+     {"date": "2026-03-09", "category": "entertainment", "tier": "warning"},
+     {"date": "2026-04-02", "category": "meals", "tier": "escalation"}
+   ]},
+  {"id": "EMP-0002", "name": "Oliver Hughes", "market": "UK", "department": "Creative", "agency": "Ogilvy",
+   "breach_history": []},
+  {"id": "EMP-0003", "name": "Priya Raman", "market": "UK", "department": "Strategy", "agency": "Wavemaker",
+   "breach_history": [
+     {"date": "2026-01-22", "category": "travel", "tier": "warning"}
+   ]},
+  {"id": "EMP-0004", "name": "Daniel Whitfield", "market": "UK", "department": "Production", "agency": "VML",
+   "breach_history": []},
+  {"id": "EMP-0005", "name": "Eleanor Fitzgerald", "market": "UK", "department": "Account", "agency": "GroupM Central",
+   "breach_history": [
+     {"date": "2026-02-03", "category": "accommodation", "tier": "warning"},
+     {"date": "2026-02-28", "category": "accommodation", "tier": "warning"},
+     {"date": "2026-03-21", "category": "travel", "tier": "escalation"},
+     {"date": "2026-04-10", "category": "miscellaneous", "tier": "major-violation"}
+   ]},
+  {"id": "EMP-0006", "name": "Marcus Bennett", "market": "UK", "department": "Strategy", "agency": "Mindshare",
+   "breach_history": []},
+  {"id": "EMP-0007", "name": "Sophie Lambert", "market": "UK", "department": "Creative", "agency": "Ogilvy",
+   "breach_history": [
+     {"date": "2026-03-12", "category": "miscellaneous", "tier": "warning"}
+   ]},
+  {"id": "EMP-0008", "name": "James O'Connor", "market": "US", "department": "Account", "agency": "GroupM Central",
+   "breach_history": []},
+  {"id": "EMP-0009", "name": "Madison Carter", "market": "US", "department": "Creative", "agency": "VML",
+   "breach_history": [
+     {"date": "2026-01-30", "category": "meals", "tier": "warning"},
+     {"date": "2026-02-25", "category": "entertainment", "tier": "escalation"}
+   ]},
+  {"id": "EMP-0010", "name": "Ethan Robinson", "market": "US", "department": "Strategy", "agency": "Wavemaker",
+   "breach_history": []},
+  {"id": "EMP-0011", "name": "Isabella Romero", "market": "US", "department": "Production", "agency": "Mindshare",
+   "breach_history": [
+     {"date": "2026-02-16", "category": "travel", "tier": "warning"}
+   ]},
+  {"id": "EMP-0012", "name": "Christopher Lee", "market": "US", "department": "Account", "agency": "Ogilvy",
+   "breach_history": []},
+  {"id": "EMP-0013", "name": "Olivia Garcia", "market": "US", "department": "Creative", "agency": "VML",
+   "breach_history": []},
+  {"id": "EMP-0014", "name": "Nathan Schwartz", "market": "US", "department": "Strategy", "agency": "Mindshare",
+   "breach_history": [
+     {"date": "2026-03-04", "category": "accommodation", "tier": "warning"}
+   ]},
+  {"id": "EMP-0015", "name": "Hannah Park", "market": "US", "department": "Production", "agency": "GroupM Central",
+   "breach_history": []},
+  {"id": "EMP-0016", "name": "Lukas Müller", "market": "DE", "department": "Account", "agency": "Wavemaker",
+   "breach_history": [
+     {"date": "2026-02-11", "category": "entertainment", "tier": "escalation"},
+     {"date": "2026-03-15", "category": "meals", "tier": "warning"},
+     {"date": "2026-04-05", "category": "entertainment", "tier": "major-violation"}
+   ]},
+  {"id": "EMP-0017", "name": "Anna Schneider", "market": "DE", "department": "Creative", "agency": "Ogilvy",
+   "breach_history": []},
+  {"id": "EMP-0018", "name": "Sebastian Becker", "market": "DE", "department": "Strategy", "agency": "VML",
+   "breach_history": [
+     {"date": "2026-03-18", "category": "travel", "tier": "warning"}
+   ]},
+  {"id": "EMP-0019", "name": "Lena Hoffmann", "market": "DE", "department": "Account", "agency": "Mindshare",
+   "breach_history": []},
+  {"id": "EMP-0020", "name": "Felix Weber", "market": "DE", "department": "Production", "agency": "GroupM Central",
+   "breach_history": [
+     {"date": "2026-01-14", "category": "miscellaneous", "tier": "warning"},
+     {"date": "2026-02-09", "category": "miscellaneous", "tier": "warning"}
+   ]},
+  {"id": "EMP-0021", "name": "Clara Fischer", "market": "DE", "department": "Strategy", "agency": "Wavemaker",
+   "breach_history": []},
+  {"id": "EMP-0022", "name": "Maximilian Krause", "market": "DE", "department": "Creative", "agency": "Ogilvy",
+   "breach_history": []},
+  {"id": "EMP-0023", "name": "Arjun Sharma", "market": "IN", "department": "Account", "agency": "Mindshare",
+   "breach_history": [
+     {"date": "2026-02-20", "category": "travel", "tier": "warning"},
+     {"date": "2026-03-25", "category": "accommodation", "tier": "escalation"}
+   ]},
+  {"id": "EMP-0024", "name": "Kavya Iyer", "market": "IN", "department": "Creative", "agency": "Ogilvy",
+   "breach_history": []},
+  {"id": "EMP-0025", "name": "Rohan Mehta", "market": "IN", "department": "Strategy", "agency": "Wavemaker",
+   "breach_history": [
+     {"date": "2026-03-07", "category": "meals", "tier": "warning"}
+   ]},
+  {"id": "EMP-0026", "name": "Ananya Reddy", "market": "IN", "department": "Production", "agency": "VML",
+   "breach_history": []},
+  {"id": "EMP-0027", "name": "Vikram Chowdhury", "market": "IN", "department": "Account", "agency": "GroupM Central",
+   "breach_history": [
+     {"date": "2026-01-08", "category": "accommodation", "tier": "warning"},
+     {"date": "2026-02-22", "category": "miscellaneous", "tier": "warning"},
+     {"date": "2026-03-30", "category": "travel", "tier": "escalation"}
+   ]},
+  {"id": "EMP-0028", "name": "Neha Banerjee", "market": "IN", "department": "Creative", "agency": "Mindshare",
+   "breach_history": []},
+  {"id": "EMP-0029", "name": "Karthik Subramanian", "market": "IN", "department": "Strategy", "agency": "Ogilvy",
+   "breach_history": []},
+  {"id": "EMP-0030", "name": "Meera Joshi", "market": "IN", "department": "Account", "agency": "Wavemaker",
+   "breach_history": [
+     {"date": "2026-04-12", "category": "entertainment", "tier": "warning"}
+   ]}
+]

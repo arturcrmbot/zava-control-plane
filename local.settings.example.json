@@ -1,0 +1,17 @@
+{
+  "IsEncrypted": false,
+  "_comment": "Copy this to local.settings.json (gitignored) and adjust the absolute paths. PYTHONPATH MUST include both the repo root AND .funcvenv/Lib/site-packages — the Functions worker needs the latter to import azure.durable_functions / azure.identity / agent_framework etc. Without it, cold start hits ModuleNotFoundError. local.settings.json Values WIN over env vars set in the parent shell, so this is the only reliable place to pin PYTHONPATH.",
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "PYTHON_ISOLATE_WORKER_DEPENDENCIES": "0",
+    "PYTHONPATH": "c:/dev/ghcp sdk stuff;c:/dev/ghcp sdk stuff/.funcvenv/Lib/site-packages",
+    "FASTAPI_WEBHOOK_URL": "http://localhost:3101/internal/durable-event",
+    "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT": "",
+    "languageWorkers__python__defaultExecutablePath": "c:/dev/ghcp sdk stuff/.funcvenv/Scripts/python.exe",
+    "LANGUAGE_WORKERS__PYTHON__DEFAULTEXECUTABLEPATH": "c:/dev/ghcp sdk stuff/.funcvenv/Scripts/python.exe",
+    "_governance_comment": "Phase 6 of plan/feature-agent-governance-toolkit-1.md. AGT_ENFORCE flips the kernel from log-only (records every deny but never raises) to enforce (raises GovernanceDenied on a deny, which renders as a workflow exception). Default: '0' (log-only) so existing tests + the autonomous loop keep passing while the registry settles. Flip to '1' once you've iterated registries to convergence. AGT_DEFAULT_ACTOR labels un-attributed call_mcp() invocations; the gate skips that literal so legacy paths don't auto-deny under enforce.",
+    "AGT_ENFORCE": "0",
+    "AGT_DEFAULT_ACTOR": "unknown-agent"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0093",
+  "employee_id": "EMP-0015",
+  "submitted_at": "2026-04-10T08:39:00",
+  "market": "US",
+  "currency": "USD",
+  "category": "entertainment",
+  "vendor": "The Polo Bar",
+  "amount": 326.38,
+  "attendees": 3,
+  "narrative": "Client dinner at The Polo Bar, business-development discussion",
+  "receipt_filename": "CLM-0093.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Client entertainment at USD 326.38 for 3 attendees (USD 108.79/head) is within the per-head cap of USD 130. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
+  "gold_policy_clause": "§3.4 Entertainment — US per-head cap USD 130",
+  "receipt_mismatch_flavour": "wrong-amount"
+}

@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0296",
+  "employee_id": "EMP-0005",
+  "submitted_at": "2026-04-30T17:07:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "travel",
+  "vendor": "LNER",
+  "amount": 672.15,
+  "attendees": 1,
+  "narrative": "Long-haul return booking via LNER",
+  "receipt_filename": "CLM-0296.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of GBP 672.15 is at or below the UK long-haul economy cap of GBP 900, booked in economy with itinerary — Green per §3.2.",
+  "gold_policy_clause": "§3.2 Travel — UK long-haul economy cap GBP 900",
+  "receipt_mismatch_flavour": "correct"
+}

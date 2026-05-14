@@ -1,0 +1,35 @@
+{
+  "candidate_id": "C-FR-USA-04",
+  "name": "Jordan Lee",
+  "current_title": "Frontend Engineer",
+  "tenure_years_total": 5.9,
+  "education": [
+    {
+      "institution": "Synthetic University",
+      "degree": "BSc CS",
+      "year": 2014
+    }
+  ],
+  "work_history": [
+    {
+      "employer": "Synth Corp 4",
+      "title": "Frontend Engineer",
+      "start": "2020-01",
+      "end": "2024-06"
+    }
+  ],
+  "skills": [
+    "typescript",
+    "react",
+    "vite",
+    "tailwind",
+    "playwright"
+  ],
+  "right_to_work": {
+    "jurisdiction": "USA",
+    "evidence": "unknown"
+  },
+  "inconsistencies": [],
+  "level_target": "L3",
+  "jurisdiction_target": "USA"
+}

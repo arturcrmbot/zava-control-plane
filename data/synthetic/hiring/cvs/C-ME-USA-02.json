@@ -1,0 +1,33 @@
+{
+  "candidate_id": "C-ME-USA-02",
+  "name": "Daniel Chen",
+  "current_title": "Media Strategist",
+  "tenure_years_total": 3.7,
+  "education": [
+    {
+      "institution": "Synthetic University",
+      "degree": "BSc CS",
+      "year": 2016
+    }
+  ],
+  "work_history": [
+    {
+      "employer": "Synth Corp 2",
+      "title": "Media Strategist",
+      "start": "2020-01",
+      "end": "2024-06"
+    }
+  ],
+  "skills": [
+    "paid-media",
+    "attribution",
+    "audience-segmentation"
+  ],
+  "right_to_work": {
+    "jurisdiction": "USA",
+    "evidence": "h1b"
+  },
+  "inconsistencies": [],
+  "level_target": "L4",
+  "jurisdiction_target": "USA"
+}

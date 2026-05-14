@@ -1,0 +1,55 @@
+"""
+The single {{DOMAIN_DISPLAY_NAME}} generator orchestration — one workflow end-to-end.
+
+{{N_PHASES}} phases per docs/superpowers/specs/{{DOMAIN_NAME}}-brief.yaml:
+  {{PHASE_LIST_ARROWED}}
+
+HITL gates:
+{{HITL_GATE_LIST}}
+
+Sync generator per the Azure Durable Functions Python convention. Phase
+activities are registered in `function_app.py` by graduate.sh.
+"""
+from __future__ import annotations
+from collections.abc import Generator
+from datetime import timedelta
+from typing import Any
+
+import azure.durable_functions as df
+
+# Per-phase HITL timeouts. Defined locally pre-graduation; graduate.sh lifts
+# them into api/shared/constants.py and rewrites this file's import.
+{{TIMEOUT_CONSTANTS}}
+
+
+def {{DOMAIN_NAME_SNAKE}}_orchestration(context: df.DurableOrchestrationContext) -> Generator[Any, Any, dict]:
+    """Orchestrate the {{N_PHASES}} {{DOMAIN_DISPLAY_NAME}} phases for one workflow."""
+    input_dict = context.get_input() or {}
+    workflow_id = input_dict.get("workflow_id", "?")
+    # v3 substrate-fix contract: stamp workflow_type on every checkpoint
+    # payload so internal_durable_event populates its _workflow_types
+    # cache and forwards `workflow_type` onto every downstream FleetEvent.
+    # Without this, recordings come out tagged unknown-... and SSE events
+    # arrive with domain=null. See docs/superpowers/specs/2026-05-03-substrate-fix-design.md.
+    workflow_type = input_dict.get("type", "{{WORKFLOW_TYPE}}")
+    enriched = {**input_dict, "instance_id": context.instance_id}
+
+    yield context.call_activity("checkpoint_activity_trigger", {
+        "workflow_id": workflow_id, "instance_id": context.instance_id,
+        "kind": "workflow.started",
+        "payload": {"domain": "{{DOMAIN_NAME}}", "workflow_type": workflow_type},
+    })
+
+{{PHASE_BLOCKS}}
+
+    yield context.call_activity("checkpoint_activity_trigger", {
+        "workflow_id": workflow_id, "instance_id": context.instance_id,
+        "kind": "workflow.completed",
+        "payload": {"workflow_type": workflow_type},
+    })
+
+    return {
+        "status": "completed",
+        {{PHASE_RESULT_KEYS}}
+    }
+

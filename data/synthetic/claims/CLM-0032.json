@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0032",
+  "employee_id": "EMP-0006",
+  "submitted_at": "2026-04-04T08:16:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "accommodation",
+  "vendor": "The Savoy",
+  "amount": 225.32,
+  "attendees": 1,
+  "narrative": "London stay at The Savoy",
+  "receipt_filename": "CLM-0032.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "London hotel at GBP 225.32/night is at or below the Tier 1 cap of GBP 280, with itemised hotel folio and dates aligned to itinerary — Green per §3.3.",
+  "gold_policy_clause": "§3.3 Accommodation — UK Tier 1 cap GBP 280",
+  "receipt_mismatch_flavour": "correct"
+}

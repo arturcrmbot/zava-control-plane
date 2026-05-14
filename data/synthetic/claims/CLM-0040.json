@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0040",
+  "employee_id": "EMP-0006",
+  "submitted_at": "2026-04-05T10:08:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "meals",
+  "vendor": "The Ivy",
+  "amount": 32.68,
+  "attendees": 1,
+  "narrative": "Solo dinner at The Ivy",
+  "receipt_filename": "CLM-0040.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of GBP 32.68 is within the UK solo meal cap of GBP 40. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
+  "gold_policy_clause": "§3.1 Meals — UK solo cap GBP 40",
+  "receipt_mismatch_flavour": "correct"
+}

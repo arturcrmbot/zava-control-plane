@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0063",
+  "employee_id": "EMP-0029",
+  "submitted_at": "2026-04-07T11:48:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "entertainment",
+  "vendor": "Karavalli Bangalore",
+  "amount": 8838.0,
+  "attendees": 2,
+  "narrative": "Client dinner at Karavalli Bangalore, business-development discussion",
+  "receipt_filename": "CLM-0063.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Client entertainment at INR 8838.00 for 2 attendees (INR 4419.04/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
+  "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
+  "receipt_mismatch_flavour": "correct"
+}

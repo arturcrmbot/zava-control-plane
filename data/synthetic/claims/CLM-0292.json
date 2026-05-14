@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0292",
+  "employee_id": "EMP-0003",
+  "submitted_at": "2026-04-30T17:05:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "accommodation",
+  "vendor": "Marriott Park Lane",
+  "amount": 239.06,
+  "attendees": 1,
+  "narrative": "London stay at Marriott Park Lane",
+  "receipt_filename": "CLM-0292.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "London hotel at GBP 239.06/night is at or below the Tier 1 cap of GBP 280, with itemised hotel folio and dates aligned to itinerary — Green per §3.3.",
+  "gold_policy_clause": "§3.3 Accommodation — UK Tier 1 cap GBP 280",
+  "receipt_mismatch_flavour": "correct"
+}

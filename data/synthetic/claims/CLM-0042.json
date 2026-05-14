@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0042",
+  "employee_id": "EMP-0016",
+  "submitted_at": "2026-04-05T14:25:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "accommodation",
+  "vendor": "Hotel Adlon Berlin",
+  "amount": 217.02,
+  "attendees": 1,
+  "narrative": "Munich stay at Hotel Adlon Berlin",
+  "receipt_filename": "CLM-0042.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Munich hotel at EUR 217.02/night is at or below the Tier 1 cap of EUR 240, with itemised hotel folio and dates aligned to itinerary — Green per §3.3.",
+  "gold_policy_clause": "§3.3 Accommodation — DE Tier 1 cap EUR 240",
+  "receipt_mismatch_flavour": "correct"
+}

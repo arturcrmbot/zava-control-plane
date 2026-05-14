@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0138",
+  "employee_id": "EMP-0022",
+  "submitted_at": "2026-04-14T12:38:00",
+  "market": "DE",
+  "currency": "EUR",
+  "category": "entertainment",
+  "vendor": "Goldenes Kalb",
+  "amount": 409.43,
+  "attendees": 4,
+  "narrative": "Client dinner at Goldenes Kalb, business-development discussion",
+  "receipt_filename": "CLM-0138.png",
+  "ems_source": "workday",
+  "gold_label": "amber",
+  "gold_reasoning": "Client entertainment at EUR 102.36/head is above the per-head cap (EUR 100) but at or below 110% of cap — Amber per §3.4, reviewer attention required.",
+  "gold_policy_clause": "§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)",
+  "receipt_mismatch_flavour": "correct"
+}

@@ -1,0 +1,301 @@
+claim_id,category,market,amount,currency,gold_label,gold_policy_clause
+CLM-0000,meals,UK,33.81,GBP,green,§3.1 Meals — UK solo cap GBP 40
+CLM-0001,travel,US,1058.12,USD,green,§3.2 Travel — US long-haul economy cap USD 1200
+CLM-0002,accommodation,DE,182.09,EUR,green,§3.3 Accommodation — DE Tier 1 cap EUR 240
+CLM-0003,entertainment,IN,17096.0,INR,green,§3.4 Entertainment — IN per-head cap INR 5500
+CLM-0004,miscellaneous,UK,897.75,GBP,green,§3.5 Miscellaneous — UK conference/training cap GBP 1500
+CLM-0005,meals,US,38.03,USD,green,§3.1 Meals — US solo cap USD 50
+CLM-0006,travel,DE,567.44,EUR,green,§3.2 Travel — DE long-haul economy cap EUR 950
+CLM-0007,accommodation,IN,16217.0,INR,amber,§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)
+CLM-0008,entertainment,UK,459.0,GBP,amber,§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)
+CLM-0009,miscellaneous,US,2868.99,USD,red,§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)
+CLM-0010,meals,DE,26.43,EUR,green,§3.1 Meals — DE solo cap EUR 45
+CLM-0011,travel,IN,37426.0,INR,green,§3.2 Travel — IN long-haul economy cap INR 60000
+CLM-0012,accommodation,UK,246.34,GBP,green,§3.3 Accommodation — UK Tier 1 cap GBP 280
+CLM-0013,entertainment,US,385.88,USD,green,§3.4 Entertainment — US per-head cap USD 130
+CLM-0014,miscellaneous,DE,1449.22,EUR,green,§3.5 Miscellaneous — DE conference/training cap EUR 1600
+CLM-0015,meals,IN,1691.0,INR,green,§3.1 Meals — IN solo cap INR 2500
+CLM-0016,travel,UK,510.81,GBP,green,§3.2 Travel — UK long-haul economy cap GBP 900
+CLM-0017,accommodation,US,408.41,USD,amber,§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)
+CLM-0018,entertainment,DE,217.86,EUR,amber,§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)
+CLM-0019,miscellaneous,IN,100144.0,INR,red,§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)
+CLM-0020,meals,UK,22.69,GBP,green,§3.1 Meals — UK solo cap GBP 40
+CLM-0021,travel,US,719.61,USD,green,§3.2 Travel — US long-haul economy cap USD 1200
+CLM-0022,accommodation,DE,213.33,EUR,green,§3.3 Accommodation — DE Tier 1 cap EUR 240
+CLM-0023,entertainment,IN,7072.0,INR,green,§3.4 Entertainment — IN per-head cap INR 5500
+CLM-0024,miscellaneous,UK,895.06,GBP,green,§3.5 Miscellaneous — UK conference/training cap GBP 1500
+CLM-0025,meals,US,44.6,USD,green,§3.1 Meals — US solo cap USD 50
+CLM-0026,travel,DE,672.62,EUR,green,§3.2 Travel — DE long-haul economy cap EUR 950
+CLM-0027,accommodation,IN,17317.0,INR,amber,§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)
+CLM-0028,entertainment,UK,443.92,GBP,amber,§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)
+CLM-0029,miscellaneous,US,2652.39,USD,red,§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)
+CLM-0030,meals,DE,39.32,EUR,green,§3.1 Meals — DE solo cap EUR 45
+CLM-0031,travel,IN,36010.0,INR,green,§3.2 Travel — IN long-haul economy cap INR 60000
+CLM-0032,accommodation,UK,225.32,GBP,green,§3.3 Accommodation — UK Tier 1 cap GBP 280
+CLM-0033,entertainment,US,184.86,USD,green,§3.4 Entertainment — US per-head cap USD 130
+CLM-0034,miscellaneous,DE,1072.98,EUR,green,§3.5 Miscellaneous — DE conference/training cap EUR 1600
+CLM-0035,meals,IN,1759.0,INR,green,§3.1 Meals — IN solo cap INR 2500
+CLM-0036,travel,UK,739.33,GBP,green,§3.2 Travel — UK long-haul economy cap GBP 900
+CLM-0037,accommodation,US,412.99,USD,amber,§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)
+CLM-0038,entertainment,DE,214.86,EUR,amber,§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)
+CLM-0039,miscellaneous,IN,115062.0,INR,red,§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)
+CLM-0040,meals,UK,32.68,GBP,green,§3.1 Meals — UK solo cap GBP 40
+CLM-0041,travel,US,980.08,USD,green,§3.2 Travel — US long-haul economy cap USD 1200
+CLM-0042,accommodation,DE,217.02,EUR,green,§3.3 Accommodation — DE Tier 1 cap EUR 240
+CLM-0043,entertainment,IN,7515.0,INR,green,§3.4 Entertainment — IN per-head cap INR 5500
+CLM-0044,miscellaneous,UK,911.86,GBP,green,§3.5 Miscellaneous — UK conference/training cap GBP 1500
+CLM-0045,meals,US,44.27,USD,green,§3.1 Meals — US solo cap USD 50
+CLM-0046,travel,DE,630.87,EUR,green,§3.2 Travel — DE long-haul economy cap EUR 950
+CLM-0047,accommodation,IN,17575.0,INR,amber,§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)
+CLM-0048,entertainment,UK,474.28,GBP,amber,§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)
+CLM-0049,miscellaneous,US,2390.31,USD,red,§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)
+CLM-0050,meals,DE,25.35,EUR,green,§3.1 Meals — DE solo cap EUR 45
+CLM-0051,travel,IN,44693.0,INR,green,§3.2 Travel — IN long-haul economy cap INR 60000
+CLM-0052,accommodation,UK,179.93,GBP,green,§3.3 Accommodation — UK Tier 1 cap GBP 280
+CLM-0053,entertainment,US,173.79,USD,green,§3.4 Entertainment — US per-head cap USD 130
+CLM-0054,miscellaneous,DE,943.06,EUR,green,§3.5 Miscellaneous — DE conference/training cap EUR 1600
+CLM-0055,meals,IN,1836.0,INR,green,§3.1 Meals — IN solo cap INR 2500
+CLM-0056,travel,UK,515.74,GBP,green,§3.2 Travel — UK long-haul economy cap GBP 900
+CLM-0057,accommodation,US,390.86,USD,amber,§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)
+CLM-0058,entertainment,DE,432.9,EUR,amber,§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)
+CLM-0059,miscellaneous,IN,94439.0,INR,red,§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)
+CLM-0060,meals,UK,35.98,GBP,green,§3.1 Meals — UK solo cap GBP 40
+CLM-0061,travel,US,899.39,USD,green,§3.2 Travel — US long-haul economy cap USD 1200
+CLM-0062,accommodation,DE,182.24,EUR,green,§3.3 Accommodation — DE Tier 1 cap EUR 240
+CLM-0063,entertainment,IN,8838.0,INR,green,§3.4 Entertainment — IN per-head cap INR 5500
+CLM-0064,miscellaneous,UK,775.18,GBP,green,§3.5 Miscellaneous — UK conference/training cap GBP 1500
+CLM-0065,meals,US,35.22,USD,green,§3.1 Meals — US solo cap USD 50
+CLM-0066,travel,DE,803.39,EUR,green,§3.2 Travel — DE long-haul economy cap EUR 950
+CLM-0067,accommodation,IN,17404.0,INR,amber,§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)
+CLM-0068,entertainment,UK,351.2,GBP,amber,§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)
+CLM-0069,miscellaneous,US,2874.65,USD,red,§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)
+CLM-0070,meals,DE,25.69,EUR,green,§3.1 Meals — DE solo cap EUR 45
+CLM-0071,travel,IN,49827.0,INR,green,§3.2 Travel — IN long-haul economy cap INR 60000
+CLM-0072,accommodation,UK,226.27,GBP,green,§3.3 Accommodation — UK Tier 1 cap GBP 280
+CLM-0073,entertainment,US,212.94,USD,green,§3.4 Entertainment — US per-head cap USD 130
+CLM-0074,miscellaneous,DE,800.71,EUR,green,§3.5 Miscellaneous — DE conference/training cap EUR 1600
+CLM-0075,meals,IN,2185.0,INR,green,§3.1 Meals — IN solo cap INR 2500
+CLM-0076,travel,UK,505.99,GBP,green,§3.2 Travel — UK long-haul economy cap GBP 900
+CLM-0077,accommodation,US,384.63,USD,amber,§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)
+CLM-0078,entertainment,DE,203.66,EUR,amber,§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)
+CLM-0079,miscellaneous,IN,96274.0,INR,red,§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)
+CLM-0080,meals,UK,31.02,GBP,green,§3.1 Meals — UK solo cap GBP 40
+CLM-0081,travel,US,707.11,USD,green,§3.2 Travel — US long-haul economy cap USD 1200
+CLM-0082,accommodation,DE,190.53,EUR,green,§3.3 Accommodation — DE Tier 1 cap EUR 240
+CLM-0083,entertainment,IN,7095.0,INR,green,§3.4 Entertainment — IN per-head cap INR 5500
+CLM-0084,miscellaneous,UK,831.75,GBP,green,§3.5 Miscellaneous — UK conference/training cap GBP 1500
+CLM-0085,meals,US,40.47,USD,green,§3.1 Meals — US solo cap USD 50
+CLM-0086,travel,DE,580.93,EUR,green,§3.2 Travel — DE long-haul economy cap EUR 950
+CLM-0087,accommodation,IN,16386.0,INR,amber,§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)
+CLM-0088,entertainment,UK,227.3,GBP,amber,§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)
+CLM-0089,miscellaneous,US,2491.07,USD,red,§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)
+CLM-0090,meals,DE,34.47,EUR,green,§3.1 Meals — DE solo cap EUR 45
+CLM-0091,travel,IN,35541.0,INR,green,§3.2 Travel — IN long-haul economy cap INR 60000
+CLM-0092,accommodation,UK,253.71,GBP,green,§3.3 Accommodation — UK Tier 1 cap GBP 280
+CLM-0093,entertainment,US,326.38,USD,green,§3.4 Entertainment — US per-head cap USD 130
+CLM-0094,miscellaneous,DE,988.64,EUR,green,§3.5 Miscellaneous — DE conference/training cap EUR 1600
+CLM-0095,meals,IN,1695.0,INR,green,§3.1 Meals — IN solo cap INR 2500
+CLM-0096,travel,UK,819.0,GBP,green,§3.2 Travel — UK long-haul economy cap GBP 900
+CLM-0097,accommodation,US,416.04,USD,amber,§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)
+CLM-0098,entertainment,DE,302.62,EUR,amber,§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)
+CLM-0099,miscellaneous,IN,102111.0,INR,red,§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)
+CLM-0100,meals,UK,32.98,GBP,green,§3.1 Meals — UK solo cap GBP 40
+CLM-0101,travel,US,670.72,USD,green,§3.2 Travel — US long-haul economy cap USD 1200
+CLM-0102,accommodation,DE,155.14,EUR,green,§3.3 Accommodation — DE Tier 1 cap EUR 240
+CLM-0103,entertainment,IN,7404.0,INR,green,§3.4 Entertainment — IN per-head cap INR 5500
+CLM-0104,miscellaneous,UK,851.89,GBP,green,§3.5 Miscellaneous — UK conference/training cap GBP 1500
+CLM-0105,meals,US,29.52,USD,green,§3.1 Meals — US solo cap USD 50
+CLM-0106,travel,DE,600.41,EUR,green,§3.2 Travel — DE long-haul economy cap EUR 950
+CLM-0107,accommodation,IN,17483.0,INR,amber,§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)
+CLM-0108,entertainment,UK,444.91,GBP,amber,§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)
+CLM-0109,miscellaneous,US,2514.44,USD,red,§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)
+CLM-0110,meals,DE,38.75,EUR,green,§3.1 Meals — DE solo cap EUR 45
+CLM-0111,travel,IN,36846.0,INR,green,§3.2 Travel — IN long-haul economy cap INR 60000
+CLM-0112,accommodation,UK,240.59,GBP,green,§3.3 Accommodation — UK Tier 1 cap GBP 280
+CLM-0113,entertainment,US,471.17,USD,green,§3.4 Entertainment — US per-head cap USD 130
+CLM-0114,miscellaneous,DE,834.3,EUR,green,§3.5 Miscellaneous — DE conference/training cap EUR 1600
+CLM-0115,meals,IN,2266.0,INR,green,§3.1 Meals — IN solo cap INR 2500
+CLM-0116,travel,UK,558.26,GBP,green,§3.2 Travel — UK long-haul economy cap GBP 900
+CLM-0117,accommodation,US,404.04,USD,amber,§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)
+CLM-0118,entertainment,DE,418.13,EUR,amber,§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)
+CLM-0119,miscellaneous,IN,93502.0,INR,red,§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)
+CLM-0120,meals,UK,30.56,GBP,green,§3.1 Meals — UK solo cap GBP 40
+CLM-0121,travel,US,1025.17,USD,green,§3.2 Travel — US long-haul economy cap USD 1200
+CLM-0122,accommodation,DE,193.63,EUR,green,§3.3 Accommodation — DE Tier 1 cap EUR 240
+CLM-0123,entertainment,IN,13697.0,INR,green,§3.4 Entertainment — IN per-head cap INR 5500
+CLM-0124,miscellaneous,UK,1376.04,GBP,green,§3.5 Miscellaneous — UK conference/training cap GBP 1500
+CLM-0125,meals,US,45.55,USD,green,§3.1 Meals — US solo cap USD 50
+CLM-0126,travel,DE,678.14,EUR,green,§3.2 Travel — DE long-haul economy cap EUR 950
+CLM-0127,accommodation,IN,16584.0,INR,amber,§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)
+CLM-0128,entertainment,UK,476.41,GBP,amber,§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)
+CLM-0129,miscellaneous,US,2743.71,USD,red,§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)
+CLM-0130,meals,DE,38.13,EUR,green,§3.1 Meals — DE solo cap EUR 45
+CLM-0131,travel,IN,43772.0,INR,green,§3.2 Travel — IN long-haul economy cap INR 60000
+CLM-0132,accommodation,UK,236.78,GBP,green,§3.3 Accommodation — UK Tier 1 cap GBP 280
+CLM-0133,entertainment,US,184.99,USD,green,§3.4 Entertainment — US per-head cap USD 130
+CLM-0134,miscellaneous,DE,1159.92,EUR,green,§3.5 Miscellaneous — DE conference/training cap EUR 1600
+CLM-0135,meals,IN,2113.0,INR,green,§3.1 Meals — IN solo cap INR 2500
+CLM-0136,travel,UK,684.4,GBP,green,§3.2 Travel — UK long-haul economy cap GBP 900
+CLM-0137,accommodation,US,402.52,USD,amber,§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)
+CLM-0138,entertainment,DE,409.43,EUR,amber,§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)
+CLM-0139,miscellaneous,IN,102486.0,INR,red,§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)
+CLM-0140,meals,UK,23.89,GBP,green,§3.1 Meals — UK solo cap GBP 40
+CLM-0141,travel,US,1012.39,USD,green,§3.2 Travel — US long-haul economy cap USD 1200
+CLM-0142,accommodation,DE,215.46,EUR,green,§3.3 Accommodation — DE Tier 1 cap EUR 240
+CLM-0143,entertainment,IN,12766.0,INR,green,§3.4 Entertainment — IN per-head cap INR 5500
+CLM-0144,miscellaneous,UK,1023.81,GBP,green,§3.5 Miscellaneous — UK conference/training cap GBP 1500
+CLM-0145,meals,US,43.02,USD,green,§3.1 Meals — US solo cap USD 50
+CLM-0146,travel,DE,648.17,EUR,green,§3.2 Travel — DE long-haul economy cap EUR 950
+CLM-0147,accommodation,IN,16433.0,INR,amber,§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)
+CLM-0148,entertainment,UK,360.57,GBP,amber,§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)
+CLM-0149,miscellaneous,US,2553.61,USD,red,§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)
+CLM-0150,meals,DE,35.11,EUR,green,§3.1 Meals — DE solo cap EUR 45
+CLM-0151,travel,IN,54370.0,INR,green,§3.2 Travel — IN long-haul economy cap INR 60000
+CLM-0152,accommodation,UK,238.3,GBP,green,§3.3 Accommodation — UK Tier 1 cap GBP 280
+CLM-0153,entertainment,US,191.08,USD,green,§3.4 Entertainment — US per-head cap USD 130
+CLM-0154,miscellaneous,DE,1262.27,EUR,green,§3.5 Miscellaneous — DE conference/training cap EUR 1600
+CLM-0155,meals,IN,1933.0,INR,green,§3.1 Meals — IN solo cap INR 2500
+CLM-0156,travel,UK,657.67,GBP,green,§3.2 Travel — UK long-haul economy cap GBP 900
+CLM-0157,accommodation,US,398.61,USD,amber,§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)
+CLM-0158,entertainment,DE,202.11,EUR,amber,§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)
+CLM-0159,miscellaneous,IN,113968.0,INR,red,§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)
+CLM-0160,meals,UK,25.64,GBP,green,§3.1 Meals — UK solo cap GBP 40
+CLM-0161,travel,US,797.65,USD,green,§3.2 Travel — US long-haul economy cap USD 1200
+CLM-0162,accommodation,DE,153.73,EUR,green,§3.3 Accommodation — DE Tier 1 cap EUR 240
+CLM-0163,entertainment,IN,17682.0,INR,green,§3.4 Entertainment — IN per-head cap INR 5500
+CLM-0164,miscellaneous,UK,837.69,GBP,green,§3.5 Miscellaneous — UK conference/training cap GBP 1500
+CLM-0165,meals,US,31.43,USD,green,§3.1 Meals — US solo cap USD 50
+CLM-0166,travel,DE,687.2,EUR,green,§3.2 Travel — DE long-haul economy cap EUR 950
+CLM-0167,accommodation,IN,17318.0,INR,amber,§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)
+CLM-0168,entertainment,UK,355.02,GBP,amber,§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)
+CLM-0169,miscellaneous,US,2738.84,USD,red,§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)
+CLM-0170,meals,DE,35.3,EUR,green,§3.1 Meals — DE solo cap EUR 45
+CLM-0171,travel,IN,48801.0,INR,green,§3.2 Travel — IN long-haul economy cap INR 60000
+CLM-0172,accommodation,UK,206.64,GBP,green,§3.3 Accommodation — UK Tier 1 cap GBP 280
+CLM-0173,entertainment,US,450.88,USD,green,§3.4 Entertainment — US per-head cap USD 130
+CLM-0174,miscellaneous,DE,1324.54,EUR,green,§3.5 Miscellaneous — DE conference/training cap EUR 1600
+CLM-0175,meals,IN,1405.0,INR,green,§3.1 Meals — IN solo cap INR 2500
+CLM-0176,travel,UK,792.52,GBP,green,§3.2 Travel — UK long-haul economy cap GBP 900
+CLM-0177,accommodation,US,389.63,USD,amber,§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)
+CLM-0178,entertainment,DE,432.6,EUR,amber,§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)
+CLM-0179,miscellaneous,IN,108536.0,INR,red,§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)
+CLM-0180,meals,UK,27.94,GBP,green,§3.1 Meals — UK solo cap GBP 40
+CLM-0181,travel,US,661.4,USD,green,§3.2 Travel — US long-haul economy cap USD 1200
+CLM-0182,accommodation,DE,194.52,EUR,green,§3.3 Accommodation — DE Tier 1 cap EUR 240
+CLM-0183,entertainment,IN,17778.0,INR,green,§3.4 Entertainment — IN per-head cap INR 5500
+CLM-0184,miscellaneous,UK,1363.27,GBP,green,§3.5 Miscellaneous — UK conference/training cap GBP 1500
+CLM-0185,meals,US,35.85,USD,green,§3.1 Meals — US solo cap USD 50
+CLM-0186,travel,DE,553.5,EUR,green,§3.2 Travel — DE long-haul economy cap EUR 950
+CLM-0187,accommodation,IN,16890.0,INR,amber,§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)
+CLM-0188,entertainment,UK,221.07,GBP,amber,§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)
+CLM-0189,miscellaneous,US,2595.53,USD,red,§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)
+CLM-0190,meals,DE,27.58,EUR,green,§3.1 Meals — DE solo cap EUR 45
+CLM-0191,travel,IN,45635.0,INR,green,§3.2 Travel — IN long-haul economy cap INR 60000
+CLM-0192,accommodation,UK,187.07,GBP,green,§3.3 Accommodation — UK Tier 1 cap GBP 280
+CLM-0193,entertainment,US,465.02,USD,green,§3.4 Entertainment — US per-head cap USD 130
+CLM-0194,miscellaneous,DE,980.48,EUR,green,§3.5 Miscellaneous — DE conference/training cap EUR 1600
+CLM-0195,meals,IN,1612.0,INR,green,§3.1 Meals — IN solo cap INR 2500
+CLM-0196,travel,UK,563.78,GBP,green,§3.2 Travel — UK long-haul economy cap GBP 900
+CLM-0197,accommodation,US,409.55,USD,amber,§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)
+CLM-0198,entertainment,DE,201.59,EUR,amber,§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)
+CLM-0199,miscellaneous,IN,96634.0,INR,red,§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)
+CLM-0200,meals,UK,25.78,GBP,green,§3.1 Meals — UK solo cap GBP 40
+CLM-0201,travel,US,859.1,USD,green,§3.2 Travel — US long-haul economy cap USD 1200
+CLM-0202,accommodation,DE,173.2,EUR,green,§3.3 Accommodation — DE Tier 1 cap EUR 240
+CLM-0203,entertainment,IN,13501.0,INR,green,§3.4 Entertainment — IN per-head cap INR 5500
+CLM-0204,miscellaneous,UK,1296.49,GBP,green,§3.5 Miscellaneous — UK conference/training cap GBP 1500
+CLM-0205,meals,US,29.47,USD,green,§3.1 Meals — US solo cap USD 50
+CLM-0206,travel,DE,613.19,EUR,green,§3.2 Travel — DE long-haul economy cap EUR 950
+CLM-0207,accommodation,IN,16743.0,INR,amber,§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)
+CLM-0208,entertainment,UK,457.55,GBP,amber,§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)
+CLM-0209,miscellaneous,US,2432.1,USD,red,§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)
+CLM-0210,meals,DE,27.7,EUR,green,§3.1 Meals — DE solo cap EUR 45
+CLM-0211,travel,IN,42659.0,INR,green,§3.2 Travel — IN long-haul economy cap INR 60000
+CLM-0212,accommodation,UK,192.5,GBP,green,§3.3 Accommodation — UK Tier 1 cap GBP 280
+CLM-0213,entertainment,US,273.58,USD,green,§3.4 Entertainment — US per-head cap USD 130
+CLM-0214,miscellaneous,DE,1115.08,EUR,green,§3.5 Miscellaneous — DE conference/training cap EUR 1600
+CLM-0215,meals,IN,1915.0,INR,green,§3.1 Meals — IN solo cap INR 2500
+CLM-0216,travel,UK,814.68,GBP,green,§3.2 Travel — UK long-haul economy cap GBP 900
+CLM-0217,accommodation,US,391.81,USD,amber,§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)
+CLM-0218,entertainment,DE,421.02,EUR,amber,§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)
+CLM-0219,miscellaneous,IN,96486.0,INR,red,§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)
+CLM-0220,meals,UK,32.42,GBP,green,§3.1 Meals — UK solo cap GBP 40
+CLM-0221,travel,US,1030.93,USD,green,§3.2 Travel — US long-haul economy cap USD 1200
+CLM-0222,accommodation,DE,193.86,EUR,green,§3.3 Accommodation — DE Tier 1 cap EUR 240
+CLM-0223,entertainment,IN,15886.0,INR,green,§3.4 Entertainment — IN per-head cap INR 5500
+CLM-0224,miscellaneous,UK,1156.07,GBP,green,§3.5 Miscellaneous — UK conference/training cap GBP 1500
+CLM-0225,meals,US,41.86,USD,green,§3.1 Meals — US solo cap USD 50
+CLM-0226,travel,DE,750.18,EUR,green,§3.2 Travel — DE long-haul economy cap EUR 950
+CLM-0227,accommodation,IN,16056.0,INR,amber,§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)
+CLM-0228,entertainment,UK,355.89,GBP,amber,§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)
+CLM-0229,miscellaneous,US,2720.84,USD,red,§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)
+CLM-0230,meals,DE,31.05,EUR,green,§3.1 Meals — DE solo cap EUR 45
+CLM-0231,travel,IN,35632.0,INR,green,§3.2 Travel — IN long-haul economy cap INR 60000
+CLM-0232,accommodation,UK,170.44,GBP,green,§3.3 Accommodation — UK Tier 1 cap GBP 280
+CLM-0233,entertainment,US,325.83,USD,green,§3.4 Entertainment — US per-head cap USD 130
+CLM-0234,miscellaneous,DE,1191.72,EUR,green,§3.5 Miscellaneous — DE conference/training cap EUR 1600
+CLM-0235,meals,IN,1557.0,INR,green,§3.1 Meals — IN solo cap INR 2500
+CLM-0236,travel,UK,624.47,GBP,green,§3.2 Travel — UK long-haul economy cap GBP 900
+CLM-0237,accommodation,US,400.4,USD,amber,§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)
+CLM-0238,entertainment,DE,313.31,EUR,amber,§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)
+CLM-0239,miscellaneous,IN,92323.0,INR,red,§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)
+CLM-0240,meals,UK,28.43,GBP,green,§3.1 Meals — UK solo cap GBP 40
+CLM-0241,travel,US,944.44,USD,green,§3.2 Travel — US long-haul economy cap USD 1200
+CLM-0242,accommodation,DE,201.45,EUR,green,§3.3 Accommodation — DE Tier 1 cap EUR 240
+CLM-0243,entertainment,IN,13484.0,INR,green,§3.4 Entertainment — IN per-head cap INR 5500
+CLM-0244,miscellaneous,UK,1264.18,GBP,green,§3.5 Miscellaneous — UK conference/training cap GBP 1500
+CLM-0245,meals,US,39.65,USD,green,§3.1 Meals — US solo cap USD 50
+CLM-0246,travel,DE,607.08,EUR,green,§3.2 Travel — DE long-haul economy cap EUR 950
+CLM-0247,accommodation,IN,16979.0,INR,amber,§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)
+CLM-0248,entertainment,UK,332.57,GBP,amber,§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)
+CLM-0249,miscellaneous,US,2869.13,USD,red,§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)
+CLM-0250,meals,DE,26.03,EUR,green,§3.1 Meals — DE solo cap EUR 45
+CLM-0251,travel,IN,41093.0,INR,green,§3.2 Travel — IN long-haul economy cap INR 60000
+CLM-0252,accommodation,UK,236.63,GBP,green,§3.3 Accommodation — UK Tier 1 cap GBP 280
+CLM-0253,entertainment,US,330.1,USD,green,§3.4 Entertainment — US per-head cap USD 130
+CLM-0254,miscellaneous,DE,954.13,EUR,green,§3.5 Miscellaneous — DE conference/training cap EUR 1600
+CLM-0255,meals,IN,1840.0,INR,green,§3.1 Meals — IN solo cap INR 2500
+CLM-0256,travel,UK,601.06,GBP,green,§3.2 Travel — UK long-haul economy cap GBP 900
+CLM-0257,accommodation,US,401.62,USD,amber,§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)
+CLM-0258,entertainment,DE,216.72,EUR,amber,§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)
+CLM-0259,miscellaneous,IN,109055.0,INR,red,§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)
+CLM-0260,meals,UK,28.76,GBP,green,§3.1 Meals — UK solo cap GBP 40
+CLM-0261,travel,US,1020.75,USD,green,§3.2 Travel — US long-haul economy cap USD 1200
+CLM-0262,accommodation,DE,201.55,EUR,green,§3.3 Accommodation — DE Tier 1 cap EUR 240
+CLM-0263,entertainment,IN,16222.0,INR,green,§3.4 Entertainment — IN per-head cap INR 5500
+CLM-0264,miscellaneous,UK,933.81,GBP,green,§3.5 Miscellaneous — UK conference/training cap GBP 1500
+CLM-0265,meals,US,39.88,USD,green,§3.1 Meals — US solo cap USD 50
+CLM-0266,travel,DE,783.55,EUR,green,§3.2 Travel — DE long-haul economy cap EUR 950
+CLM-0267,accommodation,IN,16601.0,INR,amber,§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)
+CLM-0268,entertainment,UK,447.86,GBP,amber,§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)
+CLM-0269,miscellaneous,US,2365.64,USD,red,§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)
+CLM-0270,meals,DE,35.07,EUR,green,§3.1 Meals — DE solo cap EUR 45
+CLM-0271,travel,IN,41126.0,INR,green,§3.2 Travel — IN long-haul economy cap INR 60000
+CLM-0272,accommodation,UK,257.37,GBP,green,§3.3 Accommodation — UK Tier 1 cap GBP 280
+CLM-0273,entertainment,US,188.66,USD,green,§3.4 Entertainment — US per-head cap USD 130
+CLM-0274,miscellaneous,DE,1230.6,EUR,green,§3.5 Miscellaneous — DE conference/training cap EUR 1600
+CLM-0275,meals,IN,1982.0,INR,green,§3.1 Meals — IN solo cap INR 2500
+CLM-0276,travel,UK,678.48,GBP,green,§3.2 Travel — UK long-haul economy cap GBP 900
+CLM-0277,accommodation,US,391.48,USD,amber,§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)
+CLM-0278,entertainment,DE,303.76,EUR,amber,§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)
+CLM-0279,miscellaneous,IN,104829.0,INR,red,§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)
+CLM-0280,meals,UK,22.49,GBP,green,§3.1 Meals — UK solo cap GBP 40
+CLM-0281,travel,US,1093.72,USD,green,§3.2 Travel — US long-haul economy cap USD 1200
+CLM-0282,accommodation,DE,179.84,EUR,green,§3.3 Accommodation — DE Tier 1 cap EUR 240
+CLM-0283,entertainment,IN,7780.0,INR,green,§3.4 Entertainment — IN per-head cap INR 5500
+CLM-0284,miscellaneous,UK,1041.09,GBP,green,§3.5 Miscellaneous — UK conference/training cap GBP 1500
+CLM-0285,meals,US,31.22,USD,green,§3.1 Meals — US solo cap USD 50
+CLM-0286,travel,DE,694.72,EUR,green,§3.2 Travel — DE long-haul economy cap EUR 950
+CLM-0287,accommodation,IN,16094.0,INR,amber,§3.3 Accommodation — IN Tier 1 cap INR 16000 (110% boundary)
+CLM-0288,entertainment,UK,227.2,GBP,amber,§3.4 Entertainment — UK per-head cap GBP 110 (110% boundary)
+CLM-0289,miscellaneous,US,2775.7,USD,red,§3.5 Miscellaneous — US conference cap USD 2000 (above 110%)
+CLM-0290,meals,DE,34.17,EUR,green,§3.1 Meals — DE solo cap EUR 45
+CLM-0291,travel,IN,44781.0,INR,green,§3.2 Travel — IN long-haul economy cap INR 60000
+CLM-0292,accommodation,UK,239.06,GBP,green,§3.3 Accommodation — UK Tier 1 cap GBP 280
+CLM-0293,entertainment,US,188.94,USD,green,§3.4 Entertainment — US per-head cap USD 130
+CLM-0294,miscellaneous,DE,1090.6,EUR,green,§3.5 Miscellaneous — DE conference/training cap EUR 1600
+CLM-0295,meals,IN,1896.0,INR,green,§3.1 Meals — IN solo cap INR 2500
+CLM-0296,travel,UK,672.15,GBP,green,§3.2 Travel — UK long-haul economy cap GBP 900
+CLM-0297,accommodation,US,395.56,USD,amber,§3.3 Accommodation — US Tier 1 cap USD 380 (110% boundary)
+CLM-0298,entertainment,DE,308.99,EUR,amber,§3.4 Entertainment — DE per-head cap EUR 100 (110% boundary)
+CLM-0299,miscellaneous,IN,111433.0,INR,red,§3.5 Miscellaneous — IN conference cap INR 80000 (above 110%)

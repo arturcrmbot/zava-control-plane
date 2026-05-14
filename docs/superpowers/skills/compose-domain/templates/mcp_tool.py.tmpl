@@ -1,0 +1,49 @@
+"""{{TOOL_DOTTED_NAME}} MCP tool — {{ONE_LINE_PURPOSE}}.
+
+Stub. Returns deterministic synthetic data keyed on the input(s). No real
+upstream call. Replace the body of {{IMPL_FUNCTION_NAME}} with a real HTTP
+call when wiring to a production system.
+"""
+from __future__ import annotations
+import hashlib
+import json
+
+from copilot.tools import ToolResult, define_tool
+from opentelemetry import trace
+from pydantic import BaseModel, Field
+
+from ._otel import traced_tool
+
+
+@traced_tool("{{TOOL_DOTTED_NAME}}")
+def {{OPERATION_NAME}}({{TYPED_ARGS}}) -> dict:
+    """{{ONE_LINE_PURPOSE}} — stub."""
+    span = trace.get_current_span()
+    {{SPAN_ATTRIBUTES}}
+    return _synth_{{OPERATION_NAME}}({{ARG_NAMES}})
+
+
+def _synth_{{OPERATION_NAME}}({{TYPED_ARGS}}) -> dict:
+    """Deterministic synthesis. Same input -> byte-identical output."""
+    seed = int(hashlib.sha256(str({{SEED_INPUT}}).encode()).hexdigest()[:8], 16)
+    {{SYNTH_BODY}}
+    return {{SYNTH_RETURN_DICT}}
+
+
+class _{{OPERATION_CAMEL}}Params(BaseModel):
+    {{PYDANTIC_FIELDS}}
+
+
+@define_tool(
+    name="{{TOOL_NAME}}_{{OPERATION_NAME}}",
+    description=(
+        "{{TOOL_DESCRIPTION}} "
+        "Stub: returns deterministic synthetic data."
+    ),
+)
+def {{TOOL_NAME}}_{{OPERATION_NAME}}_tool(params: _{{OPERATION_CAMEL}}Params) -> ToolResult:
+    try:
+        result = {{OPERATION_NAME}}({{PARAMS_PASSTHROUGH}})
+        return ToolResult(text_result_for_llm=json.dumps(result, ensure_ascii=False))
+    except Exception as ex:
+        return ToolResult(text_result_for_llm="", result_type="failure", error=str(ex))

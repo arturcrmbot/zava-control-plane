@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0140",
+  "employee_id": "EMP-0006",
+  "submitted_at": "2026-04-15T12:05:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "meals",
+  "vendor": "Pret A Manger",
+  "amount": 23.89,
+  "attendees": 1,
+  "narrative": "Solo dinner at Pret A Manger",
+  "receipt_filename": "CLM-0140.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of GBP 23.89 is within the UK solo meal cap of GBP 40. Receipt provided where threshold applies. Within solo cap, with receipt where receipt-threshold applies, attendees <=1, no alcohol — Green per §3.1.",
+  "gold_policy_clause": "§3.1 Meals — UK solo cap GBP 40",
+  "receipt_mismatch_flavour": "correct"
+}

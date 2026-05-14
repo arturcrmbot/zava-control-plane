@@ -1,0 +1,133 @@
+# Git worktrees
+.worktrees/
+
+# Node
+node_modules/
+dist/
+test-results/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.venv.*/
+.funcvenv/
+.python_packages/
+.pytest_cache/
+.ruff_cache/
+
+# Azure Functions / Azurite
+azurite-data/
+# Note: azurite-data/ already ignored above. Phase 5 of the AGT plan
+# generates dev Ed25519 keypairs into azurite-data/agt-keys/ so
+# private keys never land in git. See
+# plan/feature-agent-governance-toolkit-1.md TASK-007.
+local.settings.json
+.env
+.env.local
+
+# Examples are tracked
+!.env.example
+!local.settings.json.example
+
+# MCP plugin session/cache data
+.playwright-mcp/
+
+# Claude Code skills cache
+.claude-cache/
+
+# Claude Code per-user state (skills, settings, lock files — all per-machine)
+.claude/
+
+# Playwright CLI per-user state (distinct from .playwright-mcp/)
+.playwright/
+.playwright-cli/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Old workbench dir (deleted, leave rule defensive)
+scratch/
+
+# compose-domain sandbox runs (design-time meta-skill output; never committed).
+# The README.md inside is the only tracked file. Negations re-include the
+# parent path so git can descend past the `scratch/` rule above.
+!tools/scratch/
+!tools/scratch/compose-domain/
+tools/scratch/compose-domain/*
+!tools/scratch/compose-domain/README.md
+
+# tsc emits .js next to .tsx/.ts sources — never check them in
+web/client/**/*.js
+web/shared/**/*.js
+web/portal/src/**/*.js
+web/portal/vite.config.js
+web/portal/vitest.config.js
+web/portal/tsconfig.tsbuildinfo
+web/blueprint/src/**/*.js
+web/blueprint/vite.config.js
+mocks/**/*-mcp/server.js
+tests/web/**/*.test.js
+
+# Azure Functions Core Tools auto-generates host.json on first start when
+# the file is absent — it's not the canonical config for this project.
+api/functions/host.json
+
+# Demo / dev screenshots — local artifacts, not source
+screenshots/
+*.png
+# But keep the blueprint editorial illustration — it's a real artefact,
+# expensive to regenerate (Nano Banana Pro), and the page depends on it.
+!web/blueprint/public/gutenberg.png
+
+# Local eval store
+data/.eval/
+
+# Snapshot bundles created by scripts/zava-snapshot.py — large + regenerable.
+data/snapshots/
+
+# api/ runtime artefacts (mirror of `data/` for code that runs out of api/).
+# Currently created by api/server/services/portal_orchestration.py when run from
+# inside api/.
+api/data/
+
+# Candidate portal local artefacts (magic-link sqlite, email outbox)
+data/portal/
+# Exception: pre-rendered welcome avatars are curated demo assets, not runtime state.
+!data/portal/welcome-videos/
+!data/portal/welcome-videos/*.mp4
+logs/azurite.log
+logs/*
+
+# HeyGen avatar cache — regenerable but expensive; ships in the migration bundle, not git
+data/.avatar/
+
+# Random-hex candidate PDFs from the /apply portal flow.
+# Deterministic role-based ones (C-CR-DE-00, C-FR-USA-04, …) stay tracked.
+data/synthetic/hiring/cv-pdfs/C-[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F].pdf
+
+# Migration bundle artefacts — personal runbook + deck source
+instruction.md
+AI-Transformation-in-Days.pptx
+.github/*
+# But DO ship governance CI artefacts (Phase 8 of plan/feature-agent-governance-toolkit-1.md).
+!.github/workflows/
+!.github/workflows/agt-governance.yml
+!.github/hooks/
+!.github/hooks/pre-commit-agt
+# Coverage artifacts
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# pitch-j1 — KPI history rolling 24h SQLite ring (per-process; ephemeral).
+data/kpi_history.sqlite
+data/kpi_history.sqlite-journal
+data/kpi_history.sqlite-wal
+data/kpi_history.sqlite-shm
+
+
+# Local agent scratch (entity-audit dumps, ad-hoc analysis)
+/tmp/

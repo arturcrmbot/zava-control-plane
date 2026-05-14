@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0031",
+  "employee_id": "EMP-0023",
+  "submitted_at": "2026-04-04T13:24:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "travel",
+  "vendor": "Air India",
+  "amount": 36010.0,
+  "attendees": 1,
+  "narrative": "Long-haul return booking via Air India",
+  "receipt_filename": "CLM-0031.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of INR 36010.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
+  "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
+  "receipt_mismatch_flavour": "correct"
+}

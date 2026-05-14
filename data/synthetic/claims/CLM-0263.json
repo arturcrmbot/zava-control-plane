@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0263",
+  "employee_id": "EMP-0029",
+  "submitted_at": "2026-04-27T14:30:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "entertainment",
+  "vendor": "Wasabi by Morimoto",
+  "amount": 16222.0,
+  "attendees": 4,
+  "narrative": "Client dinner at Wasabi by Morimoto, business-development discussion",
+  "receipt_filename": "CLM-0263.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Client entertainment at INR 16222.00 for 4 attendees (INR 4055.44/head) is within the per-head cap of INR 5500. Alcohol rules respected, all attendees named with org, ratio <=2:1, business purpose annotated — Green per §3.4.",
+  "gold_policy_clause": "§3.4 Entertainment — IN per-head cap INR 5500",
+  "receipt_mismatch_flavour": "correct"
+}

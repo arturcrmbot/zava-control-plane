@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0116",
+  "employee_id": "EMP-0002",
+  "submitted_at": "2026-04-12T08:48:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "travel",
+  "vendor": "Trainline",
+  "amount": 558.26,
+  "attendees": 1,
+  "narrative": "Long-haul return booking via Trainline",
+  "receipt_filename": "CLM-0116.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of GBP 558.26 is at or below the UK long-haul economy cap of GBP 900, booked in economy with itinerary — Green per §3.2.",
+  "gold_policy_clause": "§3.2 Travel — UK long-haul economy cap GBP 900",
+  "receipt_mismatch_flavour": "correct"
+}

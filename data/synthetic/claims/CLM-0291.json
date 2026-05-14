@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0291",
+  "employee_id": "EMP-0029",
+  "submitted_at": "2026-04-30T11:28:00",
+  "market": "IN",
+  "currency": "INR",
+  "category": "travel",
+  "vendor": "IRCTC AC1",
+  "amount": 44781.0,
+  "attendees": 1,
+  "narrative": "Long-haul return booking via IRCTC AC1",
+  "receipt_filename": "CLM-0291.png",
+  "ems_source": "concur",
+  "gold_label": "green",
+  "gold_reasoning": "Claim of INR 44781.00 is at or below the IN long-haul economy cap of INR 60000, booked in economy with itinerary — Green per §3.2.",
+  "gold_policy_clause": "§3.2 Travel — IN long-haul economy cap INR 60000",
+  "receipt_mismatch_flavour": "correct"
+}

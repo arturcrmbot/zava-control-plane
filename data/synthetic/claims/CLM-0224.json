@@ -1,0 +1,18 @@
+{
+  "claim_id": "CLM-0224",
+  "employee_id": "EMP-0004",
+  "submitted_at": "2026-04-23T08:54:00",
+  "market": "UK",
+  "currency": "GBP",
+  "category": "miscellaneous",
+  "vendor": "WHSmith",
+  "amount": 1156.07,
+  "attendees": 1,
+  "narrative": "Conference registration via WHSmith",
+  "receipt_filename": "CLM-0224.png",
+  "ems_source": "workday",
+  "gold_label": "green",
+  "gold_reasoning": "Conference fee of GBP 1156.07 is within the UK conference/training cap of GBP 1500, vendor recognisable, business purpose annotated — Green per §3.5.",
+  "gold_policy_clause": "§3.5 Miscellaneous — UK conference/training cap GBP 1500",
+  "receipt_mismatch_flavour": "correct"
+}
