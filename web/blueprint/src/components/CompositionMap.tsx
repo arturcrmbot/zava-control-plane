@@ -114,6 +114,7 @@ export function CompositionMap({
             const pulsing = pulsingSkills?.has(s.name);
             const className = [
               "tile",
+              "tile--dot",
               "tile--skill",
               active ? "tile--active" : "tile--dim",
               pulsing ? "tile--pulse" : "",
@@ -126,10 +127,9 @@ export function CompositionMap({
                 className={className}
                 onMouseEnter={() => setHover({ kind: "skill", name: s.name })}
                 onFocus={() => setHover({ kind: "skill", name: s.name })}
-                title={s.description}
-              >
-                {s.name}
-              </button>
+                title={s.name + " — " + s.description}
+                aria-label={s.name}
+              />
             );
           })}
         </div>
@@ -151,6 +151,7 @@ export function CompositionMap({
               const orphan = m.used_by_skills.length === 0;
               const className = [
                 "tile",
+                "tile--dot",
                 "tile--mcp",
                 orphan ? "tile--idle" : "",
                 active ? "tile--active" : "tile--dim",
@@ -158,8 +159,8 @@ export function CompositionMap({
                 .filter(Boolean)
                 .join(" ");
               const tooltip = orphan
-                ? `${m.name} — capability available, no skill calls it yet`
-                : `${m.name} — called by ${m.used_by_skills.length} skill${m.used_by_skills.length === 1 ? "" : "s"}`;
+                ? `${m.name} (capability available, no skill calls it yet)`
+                : `${m.name} (called by ${m.used_by_skills.length} skill${m.used_by_skills.length === 1 ? "" : "s"})`;
               return (
                 <button
                   key={m.name}
@@ -167,9 +168,8 @@ export function CompositionMap({
                   onMouseEnter={() => setHover({ kind: "mcp", name: m.name })}
                   onFocus={() => setHover({ kind: "mcp", name: m.name })}
                   title={tooltip}
-                >
-                  {m.name}
-                </button>
+                  aria-label={m.name}
+                />
               );
             })}
         </div>
@@ -253,7 +253,8 @@ export function CompositionMap({
         ) : (
           <span className="map__hover-empty">
             Skills, MCP tools and domains all live in the substrate as plain
-            files. Adding one is an edit, not a deployment.
+            files. Adding one is a file edit. The substrate picks it up
+            live.
           </span>
         )}
       </footer>

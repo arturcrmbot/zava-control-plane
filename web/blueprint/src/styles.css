@@ -480,6 +480,17 @@ body {
     padding: 0.65rem 0.85rem;
     font-size: 0.78rem;
   }
+  /* Dots stay dot-shaped but get a slight bump so they're tap-friendly
+     without losing the texture aesthetic. Override the labelled-tile
+     padding/font-size that wins by source order otherwise. */
+  .tile--dot {
+    padding: 0;
+    font-size: 0;
+    width: 1.1rem;
+    height: 1.1rem;
+    min-width: 1.1rem;
+    min-height: 1.1rem;
+  }
   /* The map block frames itself with its own padding/background; on narrow
      screens drop the outer composition section's horizontal gutters so the
      map can use the full width without forcing a horizontal scroll from
@@ -541,6 +552,41 @@ body {
 
 .tile--dim {
   opacity: 0.28;
+}
+
+/* Anonymous-by-default tiles for the Skills + MCPs rows. The default
+   visual is dense texture (proof of substrate breadth without bombarding
+   the reader with codebase identifiers); hover pops the name into the
+   footer hover-detail and highlights the connected nodes in the other
+   rows. The map's interaction pattern is unchanged — only the resting
+   look. */
+.tile--dot {
+  width: 0.9rem;
+  height: 0.9rem;
+  min-width: 0.9rem;
+  min-height: 0.9rem;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 0;
+}
+
+.tile--dot.tile--active {
+  /* Slight scale-up on hover/focus so the eye can track which dot is
+     selected without losing the rhythm of the texture. */
+  transform: scale(1.4);
+  z-index: 1;
+}
+
+.tile--dot.tile--mcp.tile--idle {
+  /* The dashed-border parking-lot style reads cleanly on dots too. */
+  border-radius: 50%;
+}
+
+/* Tighter gap for the dot rows — the larger gap meant for labelled
+   tiles makes the texture feel sparse and joyless when the labels
+   are gone. */
+.map__row-cards:has(> .tile--dot) {
+  gap: 0.35rem;
 }
 
 /* Idle MCP — declared as a capability but no skill calls it yet. Visually
