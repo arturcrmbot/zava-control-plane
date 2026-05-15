@@ -45,7 +45,7 @@ export function Authority() {
             human-driven or agent-driven — calls one MCP tool, gets back the
             matched rule, and proceeds. The persona itself carries no
             thresholds. The agentic side and the human side share the same
-            authority logic, the same way.
+            authority logic.
           </p>
         </header>
       </div>

@@ -28,9 +28,10 @@ export function Closing() {
         </p>
 
         <p className="body">
-          Then we ask for a week with you to work out your real ambition —
-          one workflow or fifty — and make sure it&apos;s operating inside
-          the substrate before we leave.
+          That&apos;s what we hand you. After that, a week together to work
+          out your real ambition — one workflow or fifty — and make sure
+          those workflows are operating inside the substrate before we
+          leave.
         </p>
 
         <p className="closing__final">

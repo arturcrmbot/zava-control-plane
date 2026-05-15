@@ -20,7 +20,7 @@ export function Composition() {
             <code className="mono">contract-renewal-terms-drafter</code>).
             All of them — plus the MCP tools they reach for and the domains
             that compose them — sit in the substrate as plain files. Adding
-            the next domain doesn&apos;t require new letters; it recomposes
+            the next domain doesn&apos;t require new letters. It recomposes
             the same case.
           </p>
         </header>
