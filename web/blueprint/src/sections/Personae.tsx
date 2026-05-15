@@ -33,14 +33,23 @@ export function Personae() {
         <header className="stack">
           <p className="subtitle">The cast that operates the press</p>
           <h2 className="section-title">
-            Four archetypes. {data.total} personae composed from them.
+            The people in the simulated organisation.
           </h2>
           <p className="body">
-            Skills are letterforms. MCPs are the words those letters can
-            spell. Personae are the people who decide which words go on the
-            page. The vocabulary is small: approver, subject, reviewer,
-            delegate. Every workflow draws its cast from those four, scoped
-            by function and geography.
+            The substrate runs as a simulated organisation. Workflows need
+            approvers. They need someone to confirm a budget, sign off a
+            contract, escalate an exception, attest to access. That requires
+            people. Sometimes the person is a real human pulling a message
+            into their inbox. Sometimes it&apos;s an agent acting on a
+            person&apos;s behalf. The orchestrator doesn&apos;t need to
+            know which.
+          </p>
+          <p className="body">
+            A persona is the abstraction that makes that work. It says who
+            the actor is, what function they belong to, what they&apos;re
+            authorised to approve. The substrate has {data.total} of them
+            today, drawn from four archetypes: approver, subject, reviewer,
+            delegate. Every workflow draws its cast from that registry.
           </p>
           <p className="body">
             One of them, the AP controller, looks like this:
@@ -49,13 +58,11 @@ export function Personae() {
           <pre className="snippet">{curatedJson(example, SHOWN_FIELDS)}</pre>
 
           <p className="body">
-            The controller carries no thresholds. The £25k to £250k band,
-            the escalation to CFO above it, the action category. None of
-            that lives here. It lives in the matrix below, in one ordered
-            ruleset that the controller consults via a single MCP call.
-            Adding the next persona is a brief through{" "}
-            <code className="mono">compose-persona</code>. The author writes
-            the role and scope, the substrate composes the rest.
+            While the substrate is running end-to-end and no real customer
+            is plugged in, every persona is a simulated agent. When you
+            replace one with a real person, the workflows behave the same
+            way. Same routing logic, same authority resolution, same MCP
+            calls. The persona is the seam between simulation and reality.
           </p>
         </header>
       </div>
