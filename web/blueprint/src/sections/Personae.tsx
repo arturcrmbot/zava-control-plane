@@ -1,8 +1,31 @@
 import { usePersonas } from "../lib/usePersonas";
-import { PersonaLibrary } from "../components/PersonaLibrary";
+
+/** Fields shown in the curated example. The persona record carries more
+ *  metadata (default_authority_band as a description, external_event_default
+ *  for the harness, scope wildcards), but the article is making a point
+ *  about archetype + scope + matrix-consumption — those are the fields
+ *  that carry that point without distracting the reader. */
+const SHOWN_FIELDS = [
+  "role",
+  "archetype",
+  "scope_function",
+  "workflow_label",
+  "uses_authority_mcp",
+  "description",
+] as const;
+
+function curatedJson<T extends object>(obj: T, keys: readonly (keyof T)[]): string {
+  const picked: Partial<T> = {};
+  for (const k of keys) picked[k] = obj[k];
+  return JSON.stringify(picked, null, 2);
+}
 
 export function Personae() {
-  const { data, error, loading } = usePersonas();
+  const { data } = usePersonas();
+  // Pick the AP controller — universally recognised, consults the matrix,
+  // and pairs directly with the AP-003 rule shown in the next section.
+  const example =
+    data.items.find((p) => p.role === "controller") ?? data.items[0];
 
   return (
     <section className="section personae">
@@ -10,36 +33,33 @@ export function Personae() {
         <header className="stack">
           <p className="subtitle">The cast that operates the press</p>
           <h2 className="section-title">
-            <em>Personae composed ahead of their domains.</em>
+            <em>Four archetypes. {data.total} personae composed from them.</em>
           </h2>
           <p className="body">
-            Skills are letterforms. MCPs are the words those letters can spell.
-            Personae are the people who decide which words go on the page —
-            who signs off, who reviews, who escalates. Below is the registered
-            cast read live from the substrate. Each entry tagged{" "}
-            <span className="mono">⚖ matrix</span> stops carrying its own
-            thresholds; it consults the delegated-authority matrix and gets a
-            governing rule id alongside the answer.
+            Skills are letterforms. MCPs are the words those letters can
+            spell. Personae are the people who decide which words go on the
+            page — who signs off, who reviews, who escalates. Approver,
+            subject, reviewer, delegate — that&apos;s the whole vocabulary.
+            Every workflow draws its cast from those four, scoped by
+            function and geography.
           </p>
           <p className="body">
-            This list grows by composition. A new approver in a new function is
-            a brief through{" "}
-            <code className="mono">compose-persona</code>, then a
-            graduation step. Not engineering work.
+            One of them, the AP controller, looks like this:
+          </p>
+
+          <pre className="snippet">{curatedJson(example, SHOWN_FIELDS)}</pre>
+
+          <p className="body">
+            The controller carries no thresholds. The £25k–£250k band, the
+            escalation to CFO above it, the action category — none of that
+            lives here. It lives in the matrix below, in one ordered
+            ruleset that the controller consults via a single MCP call.
+            Adding the next persona is a brief through{" "}
+            <code className="mono">compose-persona</code> — author writes
+            the role and scope, the substrate composes the rest. Not
+            engineering work.
           </p>
         </header>
-
-        {loading && <div className="map__placeholder">loading personae…</div>}
-        {error && (
-          <div className="map__placeholder map__placeholder--offline">
-            Persona registry is offline.
-            <br />
-            <span className="mono">
-              Start the FastAPI control plane on :3101 to see the live cast.
-            </span>
-          </div>
-        )}
-        {data && <PersonaLibrary data={data} />}
       </div>
     </section>
   );

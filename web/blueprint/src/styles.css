@@ -199,6 +199,30 @@ body {
   color: var(--mono);
 }
 
+/* JSON / YAML inline snippet block. Used by Personae + Authority sections
+   to show a single representative entry from the substrate without
+   dumping the whole library or matrix. */
+.snippet {
+  font-family: var(--mono-family);
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--bg-elev);
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--accent);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre;
+  border-radius: 2px;
+}
+.snippet .key   { color: var(--mono); }
+.snippet .str   { color: var(--ink-dim); }
+.snippet .num   { color: var(--accent); }
+.snippet .bool  { color: var(--accent); }
+.snippet .null  { color: var(--ink-mute); }
+.snippet .punct { color: var(--ink-mute); }
+
 /* ---------- Rules and dividers ---------- */
 .rule {
   border: 0;

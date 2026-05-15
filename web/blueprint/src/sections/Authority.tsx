@@ -1,8 +1,26 @@
 import { useAuthority } from "../lib/useAuthority";
-import { AuthorityTable } from "../components/AuthorityTable";
+
+const SHOWN_FIELDS = [
+  "rule_id",
+  "action",
+  "category",
+  "value_band_gbp",
+  "approver_role",
+  "escalation_chain",
+  "basis",
+] as const;
+
+function curatedJson<T extends object>(obj: T, keys: readonly (keyof T)[]): string {
+  const picked: Partial<T> = {};
+  for (const k of keys) picked[k] = obj[k];
+  return JSON.stringify(picked, null, 2);
+}
 
 export function Authority() {
-  const { data, error, loading } = useAuthority();
+  const { data } = useAuthority();
+  // AP-003 — material AP invoice routes to controller. Pairs directly with
+  // the controller persona shown in the section above.
+  const example = data.rules.find((r) => r.rule_id === "AP-003") ?? data.rules[0];
 
   return (
     <section className="section authority">
@@ -10,36 +28,26 @@ export function Authority() {
         <header className="stack">
           <p className="subtitle">Who is allowed to approve what</p>
           <h2 className="section-title">
-            <em>The delegated-authority matrix.</em>
+            <em>One file. The whole authority layer.</em>
           </h2>
           <p className="body">
-            Every approver in the persona library above stops carrying their
-            own thresholds. They consult one ordered ruleset — this matrix —
-            and get a governing rule id alongside the answer. Editing a limit
-            is a JSON edit picked up live; never a code change to the persona.
+            {data.rule_count} rules covering every approval action in the
+            organisation — AP invoices, purchase orders, hire offers, vendor
+            KYC, contract renewals, IT access, travel, treasury — all sit
+            in one JSON file. Here&apos;s what one rule looks like:
           </p>
+
+          <pre className="snippet">{curatedJson(example, SHOWN_FIELDS)}</pre>
+
           <p className="body">
-            The same matrix backs the agentic side. Every skill that produces
-            a HITL routing decision (escalation-advisor, the policy-fit-checker
-            for travel, the KYC diligence checker, the access-risk-assessor,
-            the renewal-terms-drafter, etc.) calls{" "}
-            <code className="mono">delegated_authority_resolve_approver</code>{" "}
-            and surfaces the matched rule on its output. The persona then reads{" "}
-            <code className="mono">context.authority</code> and proceeds.
+            Compliance edits the file. The change is picked up live, no
+            deployment. Every skill that needs to route a decision —
+            human-driven or agent-driven — calls one MCP tool, gets back the
+            matched rule, and proceeds. The persona itself carries no
+            thresholds. The agentic side and the human side share the same
+            authority logic, the same way.
           </p>
         </header>
-
-        {loading && <div className="map__placeholder">loading matrix…</div>}
-        {error && (
-          <div className="map__placeholder map__placeholder--offline">
-            Authority matrix is offline.
-            <br />
-            <span className="mono">
-              Start the FastAPI control plane on :3101 to see the live ruleset.
-            </span>
-          </div>
-        )}
-        {data && <AuthorityTable data={data} />}
       </div>
     </section>
   );
