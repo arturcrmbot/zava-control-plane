@@ -464,6 +464,31 @@ body {
   gap: 0.5rem;
 }
 
+@media (max-width: 720px) {
+  .map__row {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+  .map__row-label {
+    padding-top: 0;
+  }
+  .map__row-cards--domains {
+    grid-template-columns: 1fr;
+  }
+  /* Bigger tap targets on touch devices (Apple HIG / Material both want ≥44px). */
+  .tile {
+    padding: 0.65rem 0.85rem;
+    font-size: 0.78rem;
+  }
+  /* The map block frames itself with its own padding/background; on narrow
+     screens drop the outer composition section's horizontal gutters so the
+     map can use the full width without forcing a horizontal scroll from
+     the longest tile label. */
+  .composition .map {
+    padding: var(--space-3);
+  }
+}
+
 @media (max-width: 900px) {
   .map__row-cards--domains {
     grid-template-columns: repeat(2, 1fr);
