@@ -5,6 +5,52 @@ function plural(n: number, one: string, many: string = `${one}s`): string {
   return n === 1 ? `${n} ${one}` : `${n} ${many}`;
 }
 
+/** Real acronyms in the substrate vocabulary that should stay uppercased
+ *  when humanising kebab/snake-case identifiers for display. Anything not
+ *  in this set gets lower-cased after the first word. */
+const ACRONYMS = new Set([
+  "kyc",
+  "ap",
+  "mcp",
+  "it",
+  "fx",
+  "rag",
+  "rbac",
+  "ocr",
+  "ubo",
+  "cv",
+  "jd",
+  "dpia",
+  "msa",
+  "po",
+  "sap",
+  "gc",
+  "cfo",
+  "cpo",
+  "hr",
+  "bp",
+  "rfp",
+  "kpi",
+  "sla",
+  "nda",
+]);
+
+/** Convert a kebab-case or snake_case identifier into a human-readable
+ *  phrase. `vendor-kyc-diligence-checker` → "Vendor KYC diligence checker".
+ *  `query_workflows` → "Query workflows". Real acronyms are restored from
+ *  the ACRONYMS set above. */
+function humanise(name: string): string {
+  const parts = name.split(/[-_]/);
+  return parts
+    .map((word, i) => {
+      const lower = word.toLowerCase();
+      if (ACRONYMS.has(lower)) return word.toUpperCase();
+      if (i === 0) return lower.charAt(0).toUpperCase() + lower.slice(1);
+      return lower;
+    })
+    .join(" ");
+}
+
 type HoverTarget =
   | { kind: "skill"; name: string }
   | { kind: "mcp"; name: string }
@@ -108,36 +154,58 @@ export function CompositionMap({
 
       <div className="map__row">
         <div className="map__row-label">Skills</div>
-        <div className="map__row-cards">
-          {data.skills.map((s) => {
-            const active = isSkillActive(s.name);
-            const pulsing = pulsingSkills?.has(s.name);
-            const className = [
-              "tile",
-              "tile--dot",
-              "tile--skill",
-              active ? "tile--active" : "tile--dim",
-              pulsing ? "tile--pulse" : "",
-            ]
-              .filter(Boolean)
-              .join(" ");
-            return (
-              <button
-                key={s.name}
-                className={className}
-                onMouseEnter={() => setHover({ kind: "skill", name: s.name })}
-                onFocus={() => setHover({ kind: "skill", name: s.name })}
-                title={s.name + " — " + s.description}
-                aria-label={s.name}
-              />
-            );
-          })}
+        <div className="map__row-cards map__row-cards--skills">
+          {(() => {
+            // Group skills by their primary (first) domain so the row reads
+            // as visual clusters per workflow rather than one long alphabet
+            // soup. Skills without a domain (e.g. workflow-supervisor) sit
+            // in a trailing "shared" cluster.
+            const groups = new Map<string, Skill[]>();
+            for (const s of data.skills) {
+              const key = s.domains[0] ?? "shared";
+              const arr = groups.get(key) ?? [];
+              arr.push(s);
+              groups.set(key, arr);
+            }
+            const ordered = [...groups.entries()].sort((a, b) => {
+              if (a[0] === "shared") return 1;
+              if (b[0] === "shared") return -1;
+              return a[0].localeCompare(b[0]);
+            });
+            return ordered.map(([groupKey, skills]) => (
+              <div key={groupKey} className="tile-cluster" data-cluster={groupKey}>
+                {skills.map((s) => {
+                  const active = isSkillActive(s.name);
+                  const pulsing = pulsingSkills?.has(s.name);
+                  const className = [
+                    "tile",
+                    "tile--skill",
+                    active ? "tile--active" : "tile--dim",
+                    pulsing ? "tile--pulse" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
+                  return (
+                    <button
+                      key={s.name}
+                      className={className}
+                      onMouseEnter={() => setHover({ kind: "skill", name: s.name })}
+                      onFocus={() => setHover({ kind: "skill", name: s.name })}
+                      title={s.description}
+                    >
+                      {humanise(s.name)}
+                    </button>
+                  );
+                })}
+              </div>
+            ));
+          })()}
         </div>
       </div>
 
       <div className="map__row">
         <div className="map__row-label">MCPs</div>
-        <div className="map__row-cards">
+        <div className="map__row-cards map__row-cards--mcps">
           {[...data.mcps]
             .sort((a, b) => {
               // Wired MCPs first, then alphabetically; orphans bubble to the end.
@@ -151,7 +219,6 @@ export function CompositionMap({
               const orphan = m.used_by_skills.length === 0;
               const className = [
                 "tile",
-                "tile--dot",
                 "tile--mcp",
                 orphan ? "tile--idle" : "",
                 active ? "tile--active" : "tile--dim",
@@ -159,8 +226,8 @@ export function CompositionMap({
                 .filter(Boolean)
                 .join(" ");
               const tooltip = orphan
-                ? `${m.name} (capability available, no skill calls it yet)`
-                : `${m.name} (called by ${m.used_by_skills.length} skill${m.used_by_skills.length === 1 ? "" : "s"})`;
+                ? `${humanise(m.name)} (capability available, no skill calls it yet)`
+                : `${humanise(m.name)} (called by ${m.used_by_skills.length} skill${m.used_by_skills.length === 1 ? "" : "s"})`;
               return (
                 <button
                   key={m.name}
@@ -168,8 +235,9 @@ export function CompositionMap({
                   onMouseEnter={() => setHover({ kind: "mcp", name: m.name })}
                   onFocus={() => setHover({ kind: "mcp", name: m.name })}
                   title={tooltip}
-                  aria-label={m.name}
-                />
+                >
+                  {humanise(m.name)}
+                </button>
               );
             })}
         </div>
@@ -227,26 +295,26 @@ export function CompositionMap({
           <span className="map__hover-detail">
             {hover.kind === "skill" && (
               <>
-                <strong>{hover.name}</strong> →{" "}
-                {Array.from(highlight.mcps).join(", ") || "no MCP tools"} ·
-                used by {Array.from(highlight.domains).join(", ") || "no domains yet"}
+                <strong>{humanise(hover.name)}</strong> calls{" "}
+                {Array.from(highlight.mcps).map(humanise).join(", ") || "no MCP tools"}.
+                Used by {Array.from(highlight.domains).join(", ") || "no domains yet"}.
               </>
             )}
             {hover.kind === "mcp" && (
               <>
-                <strong>{hover.name}</strong>
+                <strong>{humanise(hover.name)}</strong>
                 {Array.from(highlight.skills).length === 0 ? (
-                  <> · capability available, no skill calls it yet</>
+                  <>. Capability available, no skill calls it yet.</>
                 ) : (
-                  <> ← called by {Array.from(highlight.skills).join(", ")}</>
+                  <> called by {Array.from(highlight.skills).map(humanise).join(", ")}.</>
                 )}
               </>
             )}
             {hover.kind === "domain" && (
               <>
                 <strong>{hover.name}</strong> composes{" "}
-                {plural(Array.from(highlight.skills).length, "skill")} ·{" "}
-                {plural(Array.from(highlight.mcps).length, "tool")}
+                {plural(Array.from(highlight.skills).length, "skill")} and{" "}
+                {plural(Array.from(highlight.mcps).length, "tool")}.
               </>
             )}
           </span>
