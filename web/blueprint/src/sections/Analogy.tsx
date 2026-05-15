@@ -10,7 +10,7 @@ export function Analogy() {
     <section className="section section--full analogy">
       <div className="analogy__image-frame">
         <img
-          src="/gutenberg.png"
+          src={`${import.meta.env.BASE_URL}gutenberg.png`}
           alt="Two-panel illustration: a medieval scriptorium where each book is hand-illuminated, beside a Gutenberg-era print shop where a compositor sets pages from a reusable case of metal type."
         />
       </div>

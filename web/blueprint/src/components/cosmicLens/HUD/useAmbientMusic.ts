@@ -14,7 +14,11 @@
 import { useEffect, useRef, useState } from "react";
 
 const STORAGE_KEY = "zava.hud.music";
-const AUDIO_SRC = "/audio/zava-ambient.mp3";
+// `import.meta.env.BASE_URL` is the Vite-configured base path (always ends
+// with `/`). Lets the file resolve correctly under GitHub Pages project
+// hosting (`/zava-control-plane/`) as well as the unprefixed local + ACA
+// builds.
+const AUDIO_SRC = `${import.meta.env.BASE_URL}audio/zava-ambient.mp3`;
 const TARGET_VOLUME = 0.32;
 const FADE_MS = 600;
 
