@@ -258,7 +258,7 @@ body {
 
 /* ---------- Section: Analogy ---------- */
 .analogy {
-  padding-top: var(--space-6);
+  padding-top: var(--space-7);
   padding-bottom: var(--space-7);
 }
 
@@ -349,7 +349,7 @@ body {
 /* ---------- Section: Closing ---------- */
 .closing {
   padding-top: var(--space-7);
-  padding-bottom: var(--space-8);
+  padding-bottom: var(--space-7);
 }
 
 .closing__final {
@@ -717,7 +717,7 @@ body {
 
 /* ---------- Section: Observatory ---------- */
 .observatory {
-  padding-top: var(--space-6);
+  padding-top: var(--space-7);
   padding-bottom: var(--space-7);
 }
 
@@ -1620,7 +1620,7 @@ body.constellation-page-body {
 
 /* ---------- Section: Meta-skill / how the type case extends itself ---------- */
 .meta {
-  padding-top: var(--space-6);
+  padding-top: var(--space-7);
   padding-bottom: var(--space-7);
 }
 

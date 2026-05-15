@@ -1,7 +1,7 @@
 export function Closing() {
   return (
     <section className="section closing">
-      <div className="column stack-lg">
+      <div className="column--wide stack-lg">
         <p className="subtitle">In closing</p>
 
         <p className="body">
