@@ -51,6 +51,26 @@ export function Personae() {
             today, drawn from four archetypes: approver, subject, reviewer,
             delegate. Every workflow draws its cast from that registry.
           </p>
+
+          <figure className="personae__demo">
+            <video
+              className="personae__demo-video"
+              src={`${import.meta.env.BASE_URL}constellation.mp4`}
+              poster={`${import.meta.env.BASE_URL}constellation-poster.jpg`}
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="metadata"
+              aria-label="The simulated organisation in motion. Persona spheres clustered into business units."
+            />
+            <figcaption className="personae__demo-caption">
+              The simulated organisation, recorded from a running session.
+              Each sphere is one of those personae, clustered into the
+              business unit it reports into.
+            </figcaption>
+          </figure>
+
           <p className="body">
             One of them, the AP controller, looks like this:
           </p>
