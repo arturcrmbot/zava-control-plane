@@ -9,7 +9,15 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   // FastAPI runs on 3101 (matches web/portal and web/client convention).
   const apiTarget = env.VITE_API_BASE_URL || "http://localhost:3101";
+  // BASE_PATH controls the public path of built assets. GitHub Pages project
+  // sites serve at `/<repo>/`, so the deploy workflow sets
+  // BASE_PATH=/zava-control-plane/ before `vite build`. Local dev, `vite
+  // preview`, and the Azure Container Apps build all leave BASE_PATH unset
+  // and serve from `/`. Trailing slash is required by Vite. Read from
+  // process.env directly — loadEnv only sees .env* files, not shell vars.
+  const base = process.env.BASE_PATH || "/";
   return {
+    base,
     plugins: [react()],
     server: {
       port: 5275,

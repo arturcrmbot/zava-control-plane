@@ -18,7 +18,13 @@ export default function App() {
   // Re-added after the entity-graph-coherence merge (Phase 2/3 added
   // AccountsPage + extended EntitiesPage; main's 71f48b96 had removed
   // the routing primitive). Replace with React Router when convenient.
-  if (typeof window !== "undefined") {
+  //
+  // Gated to dev builds only: every ?view=... page fetches from the
+  // FastAPI control plane (/api/...), which doesn't exist in the
+  // statically-hosted GitHub Pages bundle. In production we silently
+  // fall through to the essay so a curious LinkedIn reader poking at
+  // ?view=constellation doesn't land on a perpetually-loading shell.
+  if (import.meta.env.DEV && typeof window !== "undefined") {
     const params = new URLSearchParams(window.location.search);
     const view = params.get("view");
     if (view === "constellation") return <ConstellationPage />;

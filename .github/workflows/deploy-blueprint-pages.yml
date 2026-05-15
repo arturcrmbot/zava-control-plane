@@ -1,0 +1,78 @@
+# Build and publish the blueprint microsite (web/blueprint/) to GitHub Pages.
+#
+# The deployed surface is the static essay only — every ?view=... route is
+# gated behind import.meta.env.DEV in App.tsx because those pages fetch
+# /api/* from the FastAPI control plane, which doesn't exist in the
+# statically-hosted bundle.
+#
+# Project Pages serve at https://<owner>.github.io/<repo>/, so we build with
+# BASE_PATH=/zava-control-plane/ to make Vite emit asset URLs at that prefix.
+# If you later attach a custom domain (CNAME) at the root, drop the BASE_PATH
+# env var so vite.config.ts falls back to "/".
+#
+# One-time repo setup:
+#   Settings → Pages → Build and deployment → Source: GitHub Actions
+#
+# After that, every push to main that touches web/blueprint/** redeploys.
+# Manual redeploy: Actions → "deploy-blueprint-pages" → Run workflow.
+name: deploy-blueprint-pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/blueprint/**"
+      - ".github/workflows/deploy-blueprint-pages.yml"
+  workflow_dispatch:
+
+# Pages requires id-token (OIDC) to deploy and pages: write to publish.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Don't cancel an in-flight deploy — Pages is single-stream and a cancel
+# mid-deploy can leave the site in a wedged state. Queue instead.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build (vite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/blueprint/package-lock.json
+
+      - name: npm ci
+        working-directory: web/blueprint
+        run: npm ci
+
+      - name: vite build
+        working-directory: web/blueprint
+        env:
+          # Project Pages live at /<repo>/. Trailing slash required.
+          BASE_PATH: /${{ github.event.repository.name }}/
+        run: npm run build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/blueprint/dist
+
+  deploy:
+    name: deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
