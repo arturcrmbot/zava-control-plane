@@ -5,26 +5,39 @@ export function Closing() {
         <p className="subtitle">In closing</p>
 
         <p className="body">
-          Twelve domains running live today &mdash; AP invoice processing,
-          purchase orders, vendor onboarding &amp; KYC, treasury FX, IT access
-          requests, hiring, employee onboarding, contract renewal, contract
-          review, performance review, privacy DPIA, creative campaign &mdash;
-          with another two dozen composed in the substrate and ready to ramp.
-          The first took fifteen days. The most recent took thirty minutes,
-          end-to-end, without us touching a keyboard.
+          What we hand you is not a repository and a statement of work. It&apos;s
+          a working organisation. Every decision-maker mapped, every approval
+          routed through one matrix, every workflow already wired into the
+          substrate — twelve of them today, another two dozen composed and
+          ready to light up.
         </p>
 
         <p className="body">
-          We don&apos;t hand you a repository and a statement of work. We give
-          you everything. Then we ask for a week with you to work out your
-          real ambition &mdash; one use case or fifty &mdash; and make sure
-          it&apos;s operating inside the substrate before we leave.
+          Right now those workflows run against synthetic data and stubbed
+          MCPs. They are placeholders. The substrate around them — identity,
+          audit, the policy file, the validators, the agent harness, the
+          design-time skills that build the next skill — is real, and it
+          stays in place when you replace the stubs with your real Workday,
+          your real SAP, your real Salesforce, your real Mediaocean.
+        </p>
+
+        <p className="body">
+          That&apos;s why the cost of each subsequent piece of work falls. Not
+          because anyone is moving fast. Because the shape is already cast.
+          New work is composition over what&apos;s there, not construction
+          from zero.
+        </p>
+
+        <p className="body">
+          Then we ask for a week with you to work out your real ambition —
+          one workflow or fifty — and make sure it&apos;s operating inside
+          the substrate before we leave.
         </p>
 
         <p className="closing__final">
           The question stops being <em>which AI project do we fund next.</em>{" "}
-          It becomes <em>what your organisation looks like when it&apos;s
-          wired into a system like this and allowed to automate itself.</em>
+          It becomes <em>what your organisation looks like once it&apos;s
+          wired into something like this and allowed to extend itself.</em>
         </p>
 
         <p className="body" style={{ color: "var(--ink-mute)" }}>

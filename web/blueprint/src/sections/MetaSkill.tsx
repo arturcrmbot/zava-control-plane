@@ -9,14 +9,15 @@ export function MetaSkill() {
         <header className="stack">
           <p className="subtitle">How the type case extends itself</p>
           <h2 className="section-title">
-            <em>Each new domain takes less time to build than the one before it.</em>
+            <em>Each new domain is mostly built from what&apos;s already cast.</em>
           </h2>
           <p className="body">
             The first domain pays the full price — every skill is new. The
             second mostly recomposes what the first one cast. The third is
             mostly reuse. The cumulative curve below is drawn live from the
             codebase, not projected. By the third domain most of the case is
-            already cast; the fourth and fifth are mostly orchestrator code.
+            already cast; the fourth and fifth are mostly orchestrator code
+            over a substrate that&apos;s already there.
           </p>
         </header>
 

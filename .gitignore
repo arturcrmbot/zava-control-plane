@@ -80,6 +80,9 @@ screenshots/
 # But keep the blueprint editorial illustration — it's a real artefact,
 # expensive to regenerate (Nano Banana Pro), and the page depends on it.
 !web/blueprint/public/gutenberg.png
+# And the LinkedIn / OG share card derived from gutenberg.png. Regenerate
+# with the one-shot Pillow snippet in plan/ if/when the source changes.
+!web/blueprint/public/og-share.png
 
 # Local eval store
 data/.eval/
