@@ -8,8 +8,7 @@ export function Closing() {
           What we hand you is not a repository and a statement of work. It&apos;s
           a working organisation. Every decision-maker mapped, every approval
           routed through one matrix, every workflow already wired into the
-          substrate — twelve of them today, another two dozen composed and
-          ready to light up.
+          substrate — nine of them today, with more being composed.
         </p>
 
         <p className="body">

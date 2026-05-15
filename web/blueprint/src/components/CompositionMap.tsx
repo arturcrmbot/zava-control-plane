@@ -99,13 +99,10 @@ export function CompositionMap({
           </span>
           <span>
             <strong>{data.counts.domains_live}</strong> domains operating
-            <span className="map__counts-aside">
-              · {data.counts.domains_aspirational} on the roadmap
-            </span>
           </span>
         </div>
         <div className="map__legend">
-          <span>Hover any tile to see what it composes.</span>
+          <span>Tap or hover any tile to see what it composes.</span>
         </div>
       </header>
 
@@ -180,7 +177,11 @@ export function CompositionMap({
 
       {(() => {
         const liveDomains = data.domains.filter((d) => d.status === "live");
-        const aspirationalDomains = data.domains.filter((d) => d.status !== "live");
+        // Aspirational ("on the roadmap") domains are intentionally hidden in
+        // the public deployed view — they render as empty tiles (0 skills,
+        // 0 tools) which makes the substrate look thinner than it is. The
+        // count is still kept in data.counts.domains_aspirational for any
+        // future internal-facing variant.
         const renderTile = (d: Domain) => {
           const active = isDomainActive(d.name);
           const pulsing = pulsingDomains?.has(d.name);
@@ -217,14 +218,6 @@ export function CompositionMap({
                 {liveDomains.map(renderTile)}
               </div>
             </div>
-            {aspirationalDomains.length > 0 && (
-              <div className="map__row map__row--aspirational">
-                <div className="map__row-label">Roadmap</div>
-                <div className="map__row-cards map__row-cards--domains">
-                  {aspirationalDomains.map(renderTile)}
-                </div>
-              </div>
-            )}
           </>
         );
       })()}
@@ -259,8 +252,8 @@ export function CompositionMap({
           </span>
         ) : (
           <span className="map__hover-empty">
-            Each row reads from disk: <code>api/server/skills/</code>,{" "}
-            <code>api/server/mcp_tools/</code>, and the domain manifest.
+            Skills, MCP tools and domains all live in the substrate as plain
+            files. Adding one is an edit, not a deployment.
           </span>
         )}
       </footer>

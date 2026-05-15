@@ -13,9 +13,15 @@ export function Composition() {
             <em>What we have already cast.</em>
           </h2>
           <p className="body">
-            Read live from the running codebase. Hover any skill, MCP tool or
-            domain to see what it relates to. New domains don&apos;t require
-            new letters; they recompose the same case.
+            These are the letters in the case. Some are general
+            (<code className="mono">audit-summariser</code>,{" "}
+            <code className="mono">escalation-advisor</code>). Some are
+            domain-specific (<code className="mono">vendor-kyc-diligence-checker</code>,{" "}
+            <code className="mono">contract-renewal-terms-drafter</code>).
+            All of them — plus the MCP tools they reach for and the domains
+            that compose them — sit in the substrate as plain files. Adding
+            the next domain doesn&apos;t require new letters; it recomposes
+            the same case.
           </p>
         </header>
 
