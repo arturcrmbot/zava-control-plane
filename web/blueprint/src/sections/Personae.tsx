@@ -33,15 +33,14 @@ export function Personae() {
         <header className="stack">
           <p className="subtitle">The cast that operates the press</p>
           <h2 className="section-title">
-            <em>Four archetypes. {data.total} personae composed from them.</em>
+            Four archetypes. {data.total} personae composed from them.
           </h2>
           <p className="body">
             Skills are letterforms. MCPs are the words those letters can
             spell. Personae are the people who decide which words go on the
-            page — who signs off, who reviews, who escalates. Approver,
-            subject, reviewer, delegate — that&apos;s the whole vocabulary.
-            Every workflow draws its cast from those four, scoped by
-            function and geography.
+            page. The vocabulary is small: approver, subject, reviewer,
+            delegate. Every workflow draws its cast from those four, scoped
+            by function and geography.
           </p>
           <p className="body">
             One of them, the AP controller, looks like this:
@@ -50,14 +49,13 @@ export function Personae() {
           <pre className="snippet">{curatedJson(example, SHOWN_FIELDS)}</pre>
 
           <p className="body">
-            The controller carries no thresholds. The £25k–£250k band, the
-            escalation to CFO above it, the action category — none of that
-            lives here. It lives in the matrix below, in one ordered
+            The controller carries no thresholds. The £25k to £250k band,
+            the escalation to CFO above it, the action category. None of
+            that lives here. It lives in the matrix below, in one ordered
             ruleset that the controller consults via a single MCP call.
             Adding the next persona is a brief through{" "}
-            <code className="mono">compose-persona</code> — author writes
-            the role and scope, the substrate composes the rest. Not
-            engineering work.
+            <code className="mono">compose-persona</code>. The author writes
+            the role and scope, the substrate composes the rest.
           </p>
         </header>
       </div>
