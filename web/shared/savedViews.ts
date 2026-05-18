@@ -12,6 +12,9 @@ export function matchesView(item: FeedItem, v: SavedView): boolean {
     if (!item.domain) return false;
     if (!v.domains.includes(item.domain)) return false;
   }
+  // Truthy check intentionally treats null and undefined identically: both mean
+  // "no severity filter" for v1. A future caller wanting "items with no severity
+  // only" should use a tagged value (e.g. "none") rather than overloading null.
   if (v.severity && item.severity !== v.severity) return false;
   if (v.search && v.search.trim().length > 0) {
     const needle = v.search.trim().toLowerCase();

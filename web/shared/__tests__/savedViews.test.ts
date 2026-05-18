@@ -34,4 +34,37 @@ describe("matchesView", () => {
     expect(matchesView(item, v)).toBe(true);
     expect(matchesView(item, { ...v, search: "WF-99" })).toBe(false);
   });
+
+  it("rejects items whose workflowId is undefined when search is set", () => {
+    const noWfItem: FeedItem = {
+      type: "policy",
+      id: "policy:P-1:_",
+      timestamp: 100,
+      severity: null,
+      policyId: "P-1",
+      description: "d",
+      currentValue: 0,
+    };
+    const v: SavedView = { id: "v", label: "v", filter: "all-activity", domains: [], search: "foo" };
+    expect(matchesView(noWfItem, v)).toBe(false);
+  });
+
+  it("treats whitespace-only search as no filter", () => {
+    const v: SavedView = { id: "v", label: "v", filter: "needs-you", domains: [], search: "   " };
+    expect(matchesView(item, v)).toBe(true);
+  });
+
+  it("rejects items whose domain is undefined when domains is non-empty", () => {
+    const noDomainItem: FeedItem = {
+      type: "policy",
+      id: "policy:P-2:_",
+      timestamp: 100,
+      severity: null,
+      policyId: "P-2",
+      description: "d",
+      currentValue: 0,
+    };
+    const v: SavedView = { id: "v", label: "v", filter: "all-activity", domains: ["hiring"] };
+    expect(matchesView(noDomainItem, v)).toBe(false);
+  });
 });
