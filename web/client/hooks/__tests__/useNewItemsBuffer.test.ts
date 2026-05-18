@@ -38,4 +38,62 @@ describe("useNewItemsBuffer", () => {
     rerender({ list: [mk("a", 1)] });
     expect(result.current.pendingCount).toBe(0);
   });
+
+  it("uses the first non-empty items as baseline when mounted with empty list", () => {
+    const { result, rerender } = renderHook(({ list }) => useNewItemsBuffer(list), {
+      initialProps: { list: [] as FeedItem[] },
+    });
+    expect(result.current.visible).toEqual([]);
+    expect(result.current.pendingCount).toBe(0);
+
+    rerender({ list: [mk("a", 1), mk("b", 2)] });
+    expect(result.current.visible.map((i) => i.id)).toEqual(["a", "b"]);
+    expect(result.current.pendingCount).toBe(0); // baseline, not pending
+
+    // After baseline, a new id behaves as pending.
+    rerender({ list: [mk("c", 3), mk("a", 1), mk("b", 2)] });
+    expect(result.current.visible.map((i) => i.id)).toEqual(["a", "b"]);
+    expect(result.current.pendingCount).toBe(1);
+  });
+
+  it("returns the same visible reference across renders when ids and severities are unchanged", () => {
+    const { result, rerender } = renderHook(({ list }) => useNewItemsBuffer(list), {
+      initialProps: { list: [mk("a", 1), mk("b", 2)] },
+    });
+    const firstRef = result.current.visible;
+    rerender({ list: [mk("a", 1), mk("b", 2)] });
+    expect(result.current.visible).toBe(firstRef);
+  });
+
+  it("propagates severity escalations on existing items even when ids are unchanged", () => {
+    const { result, rerender } = renderHook(({ list }) => useNewItemsBuffer(list), {
+      initialProps: { list: [mk("a", 1)] },
+    });
+    expect(result.current.visible[0].severity).toBe("medium");
+    rerender({
+      list: [{ ...mk("a", 1), severity: "critical" }],
+    });
+    expect(result.current.visible[0].severity).toBe("critical");
+  });
+
+  it("pullIn() is a no-op when pendingCount is zero", () => {
+    const { result } = renderHook(() => useNewItemsBuffer([mk("a", 1), mk("b", 2)]));
+    const before = result.current.visible;
+    act(() => result.current.pullIn());
+    expect(result.current.visible).toBe(before);
+    expect(result.current.pendingCount).toBe(0);
+  });
+
+  it("accumulates pending across multiple churns before pullIn()", () => {
+    const { result, rerender } = renderHook(({ list }) => useNewItemsBuffer(list), {
+      initialProps: { list: [mk("a", 1)] },
+    });
+    rerender({ list: [mk("b", 2), mk("a", 1)] });
+    expect(result.current.pendingCount).toBe(1);
+    rerender({ list: [mk("c", 3), mk("b", 2), mk("a", 1)] });
+    expect(result.current.pendingCount).toBe(2);
+    act(() => result.current.pullIn());
+    expect(result.current.visible.map((i) => i.id)).toEqual(["c", "b", "a"]);
+    expect(result.current.pendingCount).toBe(0);
+  });
 });
