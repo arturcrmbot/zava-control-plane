@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // web/client/components/feed/__tests__/CardShell.test.tsx
-import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import CardShell from "@client/components/feed/CardShell";
 
 afterEach(cleanup);
@@ -49,5 +49,37 @@ describe("CardShell", () => {
     );
     const root = container.firstChild as HTMLElement;
     expect(root.className).toMatch(/@container/);
+  });
+
+  it("invokes onPrimaryClick when the body is clicked", () => {
+    const onPrimaryClick = vi.fn();
+    render(
+      <CardShell severity="medium" icon={null} typeLabel="X" workflowId="W" timestampSec={1}
+        body={<span data-testid="b">b</span>} actions={null} onPrimaryClick={onPrimaryClick} />,
+    );
+    fireEvent.click(screen.getByTestId("b").parentElement!);
+    expect(onPrimaryClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("activates onPrimaryClick via Enter and Space keys", () => {
+    const onPrimaryClick = vi.fn();
+    render(
+      <CardShell severity="medium" icon={null} typeLabel="X" workflowId="W" timestampSec={1}
+        body={<span data-testid="b">b</span>} actions={null} onPrimaryClick={onPrimaryClick} />,
+    );
+    const target = screen.getByTestId("b").parentElement!;
+    fireEvent.keyDown(target, { key: "Enter" });
+    fireEvent.keyDown(target, { key: " " });
+    expect(onPrimaryClick).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not make the action area interactive (no role=button on actions wrapper)", () => {
+    render(
+      <CardShell severity="medium" icon={null} typeLabel="X" workflowId="W" timestampSec={1}
+        body={null} actions={<button data-testid="act">go</button>} onPrimaryClick={() => {}} />,
+    );
+    // The actions wrapper should not have role="button"
+    const actionsWrapper = screen.getByTestId("act").parentElement!;
+    expect(actionsWrapper.getAttribute("role")).toBeNull();
   });
 });

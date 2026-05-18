@@ -48,6 +48,15 @@ export default function CardShell({
   body, actions, onPrimaryClick, testId,
 }: CardShellProps) {
   const sevKey = severity ?? "null";
+  const onKey = onPrimaryClick
+    ? (e: import("react").KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onPrimaryClick();
+        }
+      }
+    : undefined;
+
   return (
     <article
       data-testid={testId ?? `card-${workflowId}`}
@@ -63,13 +72,16 @@ export default function CardShell({
         <span className="font-mono text-slate-700">{workflowId}</span>
         <span className="ml-auto text-[11px] text-slate-400">{relativeTime(timestampSec)}</span>
       </div>
-      <div
-        className="px-4 py-3 flex flex-col @[720px]:flex-row @[720px]:items-start @[720px]:gap-4 gap-3"
-        onClick={onPrimaryClick}
-        role={onPrimaryClick ? "button" : undefined}
-        tabIndex={onPrimaryClick ? 0 : undefined}
-      >
-        <div className="flex-1 min-w-0">{body}</div>
+      <div className="px-4 py-3 flex flex-col @[720px]:flex-row @[720px]:items-start @[720px]:gap-4 gap-3">
+        <div
+          className="flex-1 min-w-0"
+          onClick={onPrimaryClick}
+          onKeyDown={onKey}
+          role={onPrimaryClick ? "button" : undefined}
+          tabIndex={onPrimaryClick ? 0 : undefined}
+        >
+          {body}
+        </div>
         <div className="flex flex-wrap gap-2 @[720px]:flex-nowrap @[720px]:justify-end shrink-0">
           {actions}
         </div>
