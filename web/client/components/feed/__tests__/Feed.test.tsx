@@ -58,4 +58,20 @@ describe("Feed", () => {
     fireEvent.click(await screen.findByRole("button", { name: /All activity/i }));
     expect(screen.getByRole("button", { name: /All activity/i }).className).toMatch(/bg-blue-600/);
   });
+
+  it("preserves the URL ?filter param across mount", async () => {
+    const role = getRolePreset("ops-reviewer"); // default filter is "needs-you"
+    render(
+      <MemoryRouter initialEntries={["/?filter=all"]}>
+        <ResolutionProvider>
+          <Feed role={role} onOpenDrawer={() => {}} />
+        </ResolutionProvider>
+      </MemoryRouter>,
+    );
+    // After mount the filter should reflect "all-activity" (from URL),
+    // not role's default "needs-you".
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /All activity/i }).className).toMatch(/bg-blue-600/);
+    });
+  });
 });

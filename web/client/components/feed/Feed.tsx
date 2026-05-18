@@ -4,7 +4,7 @@
 // useFeedItems (which takes the role + filter). The role-default filter
 // can be overridden by URL param `?filter=hitl|exceptions|needs-you|all`
 // (used by the 301 redirects from /reviewer-queue and /exceptions).
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { RolePreset } from "@shared/roles";
 import { useFeedItems, type FilterState } from "@client/hooks/useFeedItems";
@@ -44,14 +44,6 @@ export default function Feed({
     severity: null,
     search: "",
   }));
-
-  useEffect(() => {
-    setFilter((f) => ({
-      ...f,
-      mode: role.defaultFilter,
-      domains: role.defaultDomains,
-    }));
-  }, [role.id, role.defaultFilter, role.defaultDomains]);
 
   const items = useFeedItems(role, filter);
   const buffer = useNewItemsBuffer(items);
