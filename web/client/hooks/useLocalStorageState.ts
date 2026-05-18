@@ -10,7 +10,6 @@ export function useLocalStorageState<T>(
   key: string,
   defaultValue: T,
 ): [T, (next: Updater<T>) => void] {
-  const initialRef = useRef<T>(defaultValue);
   const [value, setValue] = useState<T>(() => {
     try {
       const raw = typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
@@ -21,12 +20,23 @@ export function useLocalStorageState<T>(
     }
   });
 
+  const isFirstRunRef = useRef(true);
   useEffect(() => {
-    initialRef.current = defaultValue;
-    // intentionally do not write the default on mount; only writes from
-    // setter calls are persisted, so the default never overwrites a value
-    // a different tab wrote first.
-  }, [defaultValue]);
+    if (isFirstRunRef.current) {
+      isFirstRunRef.current = false;
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem(key);
+      setValue(raw == null ? defaultValue : (JSON.parse(raw) as T));
+    } catch {
+      setValue(defaultValue);
+    }
+    // Intentionally only re-run on `key` change; defaultValue identity changes
+    // are not a sync signal. If the caller wants a forced reset, they should
+    // change the key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
   const set = useCallback(
     (next: Updater<T>) => {
