@@ -10,7 +10,7 @@ const MAX_EVENTS = 50;
 
 export function usePolicyEvents(intervalMs = 30_000): PolicySnapshot[] {
   const [events, setEvents] = useState<PolicySnapshot[]>([]);
-  const lastByKey = useRef<Map<string, string>>(new Map());
+  const lastSeen = useRef<Set<string>>(new Set());
   const baselineLoaded = useRef(false);
 
   useEffect(() => {
@@ -31,10 +31,15 @@ export function usePolicyEvents(intervalMs = 30_000): PolicySnapshot[] {
         if (cancelled) return;
         const newEvents: PolicySnapshot[] = [];
         for (const row of rows) {
-          const key = `${row.id}|${row.gitSha ?? "_"}`;
-          if (!lastByKey.current.has(key)) {
+          // When gitSha is absent, fold the serialised currentValue into the
+          // diff key so genuine value changes are detected. With gitSha present
+          // (the production contract), `${id}|${gitSha}` is sufficient.
+          const key = row.gitSha
+            ? `${row.id}|${row.gitSha}`
+            : `${row.id}|cv:${JSON.stringify(row.currentValue)}`;
+          if (!lastSeen.current.has(key)) {
             if (baselineLoaded.current) newEvents.push(row);
-            lastByKey.current.set(key, key);
+            lastSeen.current.add(key);
           }
         }
         baselineLoaded.current = true;
