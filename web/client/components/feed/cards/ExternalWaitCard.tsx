@@ -8,6 +8,7 @@ import { Hourglass } from "lucide-react";
 import type { ExternalWaitItem } from "@shared/feedItems";
 import CardShell from "../CardShell";
 import { useResolutionStore } from "@client/hooks/useResolutionStore";
+import { useToast } from "../Toast";
 
 export default function ExternalWaitCard({
   item, hideActions = false, onOpenDrawer,
@@ -17,6 +18,7 @@ export default function ExternalWaitCard({
   onOpenDrawer?: (workflowId: string) => void;
 }) {
   const store = useResolutionStore();
+  const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
 
   const nudge = async () => {
@@ -31,9 +33,13 @@ export default function ExternalWaitCard({
           payload: { by: "operator", action: "nudge-external" },
         }),
       });
-      if (!r.ok) store.revert(item.id);
+      if (!r.ok) {
+        store.revert(item.id);
+        toast.show("Couldn't nudge — try again");
+      }
     } catch {
       store.revert(item.id);
+      toast.show("Couldn't nudge — try again");
     } finally {
       setBusy(null);
     }

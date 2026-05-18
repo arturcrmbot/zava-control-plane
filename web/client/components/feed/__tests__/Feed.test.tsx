@@ -4,6 +4,7 @@ import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import Feed from "@client/components/feed/Feed";
 import { ResolutionProvider } from "@client/hooks/useResolutionStore";
+import { ToastProvider } from "@client/components/feed/Toast";
 import { getRolePreset } from "@shared/roles";
 
 beforeEach(() => {
@@ -35,9 +36,11 @@ describe("Feed", () => {
     const role = getRolePreset("ops-reviewer");
     render(
       <MemoryRouter>
-        <ResolutionProvider>
-          <Feed role={role} onOpenDrawer={() => {}} />
-        </ResolutionProvider>
+        <ToastProvider>
+          <ResolutionProvider>
+            <Feed role={role} onOpenDrawer={() => {}} />
+          </ResolutionProvider>
+        </ToastProvider>
       </MemoryRouter>,
     );
     await waitFor(() => {
@@ -50,9 +53,11 @@ describe("Feed", () => {
     const role = getRolePreset("ops-reviewer");
     render(
       <MemoryRouter>
-        <ResolutionProvider>
-          <Feed role={role} onOpenDrawer={() => {}} />
-        </ResolutionProvider>
+        <ToastProvider>
+          <ResolutionProvider>
+            <Feed role={role} onOpenDrawer={() => {}} />
+          </ResolutionProvider>
+        </ToastProvider>
       </MemoryRouter>,
     );
     fireEvent.click(await screen.findByRole("button", { name: /All activity/i }));
@@ -63,9 +68,11 @@ describe("Feed", () => {
     const role = getRolePreset("ops-reviewer"); // default filter is "needs-you"
     render(
       <MemoryRouter initialEntries={["/?filter=all"]}>
-        <ResolutionProvider>
-          <Feed role={role} onOpenDrawer={() => {}} />
-        </ResolutionProvider>
+        <ToastProvider>
+          <ResolutionProvider>
+            <Feed role={role} onOpenDrawer={() => {}} />
+          </ResolutionProvider>
+        </ToastProvider>
       </MemoryRouter>,
     );
     // After mount the filter should reflect "all-activity" (from URL),

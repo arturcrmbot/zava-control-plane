@@ -5,6 +5,7 @@ import { render, screen, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import CardList from "@client/components/feed/CardList";
 import { ResolutionProvider } from "@client/hooks/useResolutionStore";
+import { ToastProvider } from "@client/components/feed/Toast";
 import type { FeedItem } from "@shared/feedItems";
 
 afterEach(cleanup);
@@ -31,18 +32,18 @@ describe("CardList", () => {
   it("renders all items below the windowing threshold", () => {
     const items = Array.from({ length: 5 }, (_, i) => mk(i));
     render(
-      <MemoryRouter><ResolutionProvider>
+      <MemoryRouter><ToastProvider><ResolutionProvider>
         <CardList items={items} hideActions={false} onOpenDrawer={() => {}} selectMode={false} selected={new Set()} onToggleSelect={() => {}} />
-      </ResolutionProvider></MemoryRouter>,
+      </ResolutionProvider></ToastProvider></MemoryRouter>,
     );
     expect(screen.getAllByText(/^W-/).length).toBe(5);
   });
 
   it("renders an empty-state hint when items is empty", () => {
     render(
-      <MemoryRouter><ResolutionProvider>
+      <MemoryRouter><ToastProvider><ResolutionProvider>
         <CardList items={[]} hideActions={false} onOpenDrawer={() => {}} selectMode={false} selected={new Set()} onToggleSelect={() => {}} />
-      </ResolutionProvider></MemoryRouter>,
+      </ResolutionProvider></ToastProvider></MemoryRouter>,
     );
     expect(screen.getByText(/nothing here/i)).toBeTruthy();
   });
@@ -50,9 +51,9 @@ describe("CardList", () => {
   it("renders a checkbox per card in selectMode", () => {
     const items = Array.from({ length: 3 }, (_, i) => mk(i));
     render(
-      <MemoryRouter><ResolutionProvider>
+      <MemoryRouter><ToastProvider><ResolutionProvider>
         <CardList items={items} hideActions={false} onOpenDrawer={() => {}} selectMode={true} selected={new Set()} onToggleSelect={() => {}} />
-      </ResolutionProvider></MemoryRouter>,
+      </ResolutionProvider></ToastProvider></MemoryRouter>,
     );
     expect(screen.getAllByRole("checkbox").length).toBe(3);
   });
@@ -60,9 +61,9 @@ describe("CardList", () => {
   it("windows to 100 items at most when list is larger", () => {
     const items = Array.from({ length: 150 }, (_, i) => mk(i));
     render(
-      <MemoryRouter><ResolutionProvider>
+      <MemoryRouter><ToastProvider><ResolutionProvider>
         <CardList items={items} hideActions={false} onOpenDrawer={() => {}} selectMode={false} selected={new Set()} onToggleSelect={() => {}} />
-      </ResolutionProvider></MemoryRouter>,
+      </ResolutionProvider></ToastProvider></MemoryRouter>,
     );
     // After windowing, only first 100 cards' workflow ids render.
     expect(screen.queryByText(/^W-149$/)).toBeNull();

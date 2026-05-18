@@ -5,6 +5,7 @@ import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import HITLCard from "@client/components/feed/cards/HITLCard";
 import { ResolutionProvider, useResolutionStore } from "@client/hooks/useResolutionStore";
+import { ToastProvider } from "@client/components/feed/Toast";
 import type { HITLItem } from "@shared/feedItems";
 import type { Workflow } from "@shared/types";
 
@@ -37,9 +38,11 @@ afterEach(() => {
 function renderWithProviders(item: HITLItem, opts: { hideActions?: boolean } = {}) {
   return render(
     <MemoryRouter>
-      <ResolutionProvider>
-        <HITLCard item={item} hideActions={!!opts.hideActions} />
-      </ResolutionProvider>
+      <ToastProvider>
+        <ResolutionProvider>
+          <HITLCard item={item} hideActions={!!opts.hideActions} />
+        </ResolutionProvider>
+      </ToastProvider>
     </MemoryRouter>,
   );
 }
@@ -69,10 +72,12 @@ describe("HITLCard", () => {
     }
     render(
       <MemoryRouter>
-        <ResolutionProvider>
-          <HITLCard item={item} />
-          <Probe />
-        </ResolutionProvider>
+        <ToastProvider>
+          <ResolutionProvider>
+            <HITLCard item={item} />
+            <Probe />
+          </ResolutionProvider>
+        </ToastProvider>
       </MemoryRouter>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Approve/i }));
@@ -96,10 +101,12 @@ describe("HITLCard", () => {
     }
     render(
       <MemoryRouter>
-        <ResolutionProvider>
-          <HITLCard item={item} />
-          <Probe />
-        </ResolutionProvider>
+        <ToastProvider>
+          <ResolutionProvider>
+            <HITLCard item={item} />
+            <Probe />
+          </ResolutionProvider>
+        </ToastProvider>
       </MemoryRouter>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Approve/i }));

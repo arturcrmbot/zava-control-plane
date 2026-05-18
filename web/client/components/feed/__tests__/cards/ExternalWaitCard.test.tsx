@@ -5,6 +5,7 @@ import { render, screen, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import ExternalWaitCard from "@client/components/feed/cards/ExternalWaitCard";
 import { ResolutionProvider } from "@client/hooks/useResolutionStore";
+import { ToastProvider } from "@client/components/feed/Toast";
 import type { ExternalWaitItem } from "@shared/feedItems";
 
 afterEach(cleanup);
@@ -26,7 +27,9 @@ describe("ExternalWaitCard", () => {
   it("renders the awaiting reason", () => {
     render(
       <MemoryRouter>
-        <ResolutionProvider><ExternalWaitCard item={item} /></ResolutionProvider>
+        <ToastProvider>
+          <ResolutionProvider><ExternalWaitCard item={item} /></ResolutionProvider>
+        </ToastProvider>
       </MemoryRouter>,
     );
     expect(screen.getByText(/candidate-reply/i)).toBeTruthy();
@@ -34,7 +37,9 @@ describe("ExternalWaitCard", () => {
   it("offers Nudge / Reassign / View token buttons", () => {
     render(
       <MemoryRouter>
-        <ResolutionProvider><ExternalWaitCard item={item} /></ResolutionProvider>
+        <ToastProvider>
+          <ResolutionProvider><ExternalWaitCard item={item} /></ResolutionProvider>
+        </ToastProvider>
       </MemoryRouter>,
     );
     expect(screen.getByRole("button", { name: /Nudge/i })).toBeTruthy();

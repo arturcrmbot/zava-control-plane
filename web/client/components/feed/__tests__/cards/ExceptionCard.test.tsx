@@ -5,6 +5,7 @@ import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import ExceptionCard from "@client/components/feed/cards/ExceptionCard";
 import { ResolutionProvider, useResolutionStore } from "@client/hooks/useResolutionStore";
+import { ToastProvider } from "@client/components/feed/Toast";
 import type { ExceptionItem } from "@shared/feedItems";
 
 const baseItem: ExceptionItem = {
@@ -27,7 +28,9 @@ describe("ExceptionCard", () => {
   it("renders severity, summary, and recommendation", () => {
     render(
       <MemoryRouter>
-        <ResolutionProvider><ExceptionCard item={baseItem} /></ResolutionProvider>
+        <ToastProvider>
+          <ResolutionProvider><ExceptionCard item={baseItem} /></ResolutionProvider>
+        </ToastProvider>
       </MemoryRouter>,
     );
     expect(screen.getByText(/Vendor on watchlist/i)).toBeTruthy();
@@ -37,7 +40,9 @@ describe("ExceptionCard", () => {
   it("offers 5 actions including Snooze 1h", () => {
     render(
       <MemoryRouter>
-        <ResolutionProvider><ExceptionCard item={baseItem} /></ResolutionProvider>
+        <ToastProvider>
+          <ResolutionProvider><ExceptionCard item={baseItem} /></ResolutionProvider>
+        </ToastProvider>
       </MemoryRouter>,
     );
     expect(screen.getByRole("button", { name: /Snooze 1h/i })).toBeTruthy();
@@ -50,10 +55,12 @@ describe("ExceptionCard", () => {
     }
     render(
       <MemoryRouter>
-        <ResolutionProvider>
-          <ExceptionCard item={baseItem} />
-          <Probe />
-        </ResolutionProvider>
+        <ToastProvider>
+          <ResolutionProvider>
+            <ExceptionCard item={baseItem} />
+            <Probe />
+          </ResolutionProvider>
+        </ToastProvider>
       </MemoryRouter>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Approve/i }));

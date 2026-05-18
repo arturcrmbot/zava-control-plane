@@ -8,6 +8,7 @@ import { ShieldAlert } from "lucide-react";
 import type { ExceptionItem } from "@shared/feedItems";
 import CardShell from "../CardShell";
 import { useResolutionStore } from "@client/hooks/useResolutionStore";
+import { useToast } from "../Toast";
 
 const ACTIONS = [
   { id: "approve",       label: "Approve",       cls: "bg-emerald-600 hover:bg-emerald-700 text-white",       verb: "Approved" },
@@ -26,6 +27,7 @@ export default function ExceptionCard({
 }) {
   const e = item.exception;
   const store = useResolutionStore();
+  const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
 
   const onAction = async (id: string, verb: string) => {
@@ -41,9 +43,13 @@ export default function ExceptionCard({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ resolution: id, resolvedBy: "reviewer@zava" }),
       });
-      if (!r.ok) store.revert(item.id);
+      if (!r.ok) {
+        store.revert(item.id);
+        toast.show("Couldn't resolve — try again");
+      }
     } catch {
       store.revert(item.id);
+      toast.show("Couldn't resolve — try again");
     } finally {
       setBusy(null);
     }
