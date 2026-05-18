@@ -17,6 +17,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    setupFiles: [path.resolve(__dirname, "vitest.setup.ts")],
     exclude: ["**/node_modules/**", "**/dist/**", "**/e2e/**"]
   }
 });
