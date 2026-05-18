@@ -2,7 +2,7 @@
 //
 // Lightweight single-hire view, deep-linkable from Teams. Shows the candidate's
 // crystallised profile, the panel scheduling state, and a one-tap RSVP. The
-// HR BP's full-fleet view is the existing FleetDashboard; this surface is the
+// HR BP's full-fleet view is the Fleet Control Feed; this surface is the
 // hiring manager's narrow lens on one hire.
 //
 // Track B stub — wire-up to live workflow data lands in the next iteration.

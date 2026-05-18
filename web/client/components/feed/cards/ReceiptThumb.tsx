@@ -1,8 +1,8 @@
 // web/client/components/feed/cards/ReceiptThumb.tsx
 //
-// Receipt thumbnail extracted from routes/ReviewerQueue.tsx so HITLCard /
-// ExceptionCard / ResolvedCard can reuse it without depending on that
-// soon-to-be-deleted route file.
+// Receipt thumbnail extracted from the legacy reviewer-queue route during
+// the Feed of Work redesign so HITLCard / ExceptionCard / ResolvedCard can
+// reuse it.
 import { useState } from "react";
 
 export default function ReceiptThumb({

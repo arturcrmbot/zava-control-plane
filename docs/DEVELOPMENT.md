@@ -200,7 +200,7 @@ Every audit ledger entry written via `AuditLogger.log()` carries a
 per-workflow; tampering with any field of any historical entry is
 detected by `AuditLogger.verify_chain(workflow_id)` and surfaces on
 `GET /api/governance/verify/{workflow_id}` and the Control Plane
-WorkflowDetail Evidence chip.
+workflow drawer's Audit section.
 
 Backfill historical workflows that pre-date this wiring with:
 
@@ -231,7 +231,8 @@ Manager + simulator state (not persisted).
   acquired` (singleton election OK), and `ExpenseClaimOrchestrator:
   Started` on orchestrator start.
 - **Fleet Manager trace** — the `/api/stream/fleet-manager` SSE feed;
-  UI right rail subscribes.
+  cards for FM events appear in the Feed of Work when "Show all activity"
+  is on.
 - **OTEL spans** — set `APPLICATIONINSIGHTS_CONNECTION_STRING` in
   `.env` and spans export to Foundry Tracing (App Insights). Leave
   unset locally to keep `init_otel` a no-op.
