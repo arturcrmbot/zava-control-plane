@@ -16,13 +16,15 @@ export interface OrchestrationEvent {
     error?: string;
     [k: string]: unknown;
   };
+  receivedAt: number;  // ms since epoch, stamped on SSE receipt; deterministic across renders
 }
 
 export function useOrchestrationStream(max = 100) {
   const [events, setEvents] = useState<OrchestrationEvent[]>([]);
   const ref = useRef<OrchestrationEvent[]>([]);
-  useSSE<OrchestrationEvent>("/api/stream/orchestration", useCallback((e) => {
-    ref.current = [e, ...ref.current].slice(0, max);
+  useSSE<Omit<OrchestrationEvent, "receivedAt">>("/api/stream/orchestration", useCallback((e) => {
+    const stamped: OrchestrationEvent = { ...e, receivedAt: Date.now() };
+    ref.current = [stamped, ...ref.current].slice(0, max);
     setEvents(ref.current.slice());
   }, [max]));
   return events;

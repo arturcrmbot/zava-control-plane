@@ -55,7 +55,7 @@ export function useFeedItems(
         ...buildAgentEventCards(
           fmEvents.map((e) => ({ kind: e.kind, timestamp: e.timestamp, data: e.data })),
           orchEvents.map((e) => ({
-            kind: e.kind, timestamp: Date.now(), workflow_id: e.workflow_id, payload: e.payload,
+            kind: e.kind, timestamp: e.receivedAt, workflow_id: e.workflow_id, payload: e.payload,
           })),
         ),
       );
@@ -102,5 +102,9 @@ export function useFeedItems(
           }),
         ),
     );
-  }, [workflows, exceptions, fmEvents, orchEvents, policyEvents, resolutions, role, filter]);
+  }, [
+    workflows, exceptions, fmEvents, orchEvents, policyEvents, resolutions,
+    role.visibleCardTypes,
+    filter.mode, filter.domains, filter.severity, filter.search,
+  ]);
 }

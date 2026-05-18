@@ -5,6 +5,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { useFeedItems } from "../useFeedItems";
 import { ResolutionProvider } from "../useResolutionStore";
+import { useResolutionStore as useResolutionStoreImported } from "../useResolutionStore";
 import { getRolePreset } from "@shared/roles";
 
 const wrapper = ({ children }: { children: ReactNode }) => (
@@ -81,6 +82,80 @@ describe("useFeedItems", () => {
       expect(
         result.current.every((i) => exec.visibleCardTypes.includes(i.type)),
       ).toBe(true);
+    });
+  });
+
+  it("overlays a recorded resolution as a ResolvedItem in chronological place", async () => {
+    // Need to access the resolution store from inside the wrapper. Use a
+    // custom wrapper that exposes a setter.
+    let storeRef: ReturnType<typeof import("../useResolutionStore").useResolutionStore> | null = null;
+    function StoreProbe({ children }: { children: ReactNode }) {
+      const store = useResolutionStoreImported();
+      storeRef = store;
+      return <>{children}</>;
+    }
+    const customWrapper = ({ children }: { children: ReactNode }) => (
+      <ResolutionProvider>
+        <StoreProbe>{children}</StoreProbe>
+      </ResolutionProvider>
+    );
+
+    const { result, rerender } = renderHook(
+      () =>
+        useFeedItems(getRolePreset("ops-reviewer"), {
+          mode: "needs-you", domains: [], severity: null, search: "",
+        }),
+      { wrapper: customWrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.map((i) => i.id)).toContain("hitl:W-A");
+    });
+
+    // Record a resolution and re-render.
+    storeRef!.record("hitl:W-A", { verb: "Approved", actor: "you", actedAt: 200 });
+    rerender();
+
+    await waitFor(() => {
+      const ids = result.current.map((i) => i.id);
+      expect(ids).toContain("resolved:hitl:W-A");
+      expect(ids).not.toContain("hitl:W-A");
+    });
+  });
+
+  it("excludes milestone/policy/agent-event cards in needs-you mode but includes them in all-activity", async () => {
+    // The test fixture has W-A=awaiting_hitl, W-B=in_progress(external_party).
+    // Neither is completed/failed, so no milestone cards expected even in
+    // all-activity. Verify by adding a completed workflow to the mock.
+    globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.startsWith("/api/workflows")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { id: "W-Done", type: "expense-claim", status: "completed",
+              currentPhase: "Audit", createdAt: 50, slaDueAt: 1, jurisdiction: "UK",
+              agency: "Z", actionLedger: [], tokensSpent: 0, costUSD: 0 },
+            { id: "W-A", type: "expense-claim", status: "awaiting_hitl",
+              currentPhase: "Intake", createdAt: 200, slaDueAt: 1, jurisdiction: "UK",
+              agency: "Z", actionLedger: [], tokensSpent: 0, costUSD: 0 },
+          ],
+        } as Response);
+      }
+      return Promise.resolve({ ok: true, json: async () => [] } as Response);
+    });
+
+    const role = getRolePreset("sre");
+    const { result, rerender } = renderHook(
+      ({ mode }) => useFeedItems(role, { mode, domains: [], severity: null, search: "" }),
+      { wrapper, initialProps: { mode: "needs-you" as const } },
+    );
+
+    await waitFor(() => expect(result.current.length).toBeGreaterThan(0));
+    expect(result.current.find((i) => i.id === "milestone:W-Done")).toBeUndefined();
+
+    rerender({ mode: "all-activity" as const });
+    await waitFor(() => {
+      expect(result.current.find((i) => i.id === "milestone:W-Done")).toBeDefined();
     });
   });
 });
