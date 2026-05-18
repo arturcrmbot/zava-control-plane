@@ -32,8 +32,10 @@ export function ResolutionProvider({
   const [map, setMap] = useState<Record<string, Resolution>>({});
   const timersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
+  const mountedRef = useRef(true);
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
       for (const t of Object.values(timersRef.current)) clearTimeout(t);
     };
   }, []);
@@ -47,6 +49,7 @@ export function ResolutionProvider({
       const existing = timersRef.current[id];
       if (existing) clearTimeout(existing);
       timersRef.current[id] = setTimeout(() => {
+        if (!mountedRef.current) return;
         setMap((prev) =>
           prev[id] ? { ...prev, [id]: { ...prev[id], undoable: false } } : prev,
         );
