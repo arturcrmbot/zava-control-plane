@@ -152,7 +152,7 @@ export function buildPolicyCards(events: PolicySnapshot[]): PolicyItem[] {
   return events.map((p) => ({
     id: `policy:${p.id}:${p.gitSha ?? "_"}`,
     type: "policy",
-    timestamp: p.updatedAt ?? Math.floor(Date.now() / 1000),
+    timestamp: p.updatedAt ?? 0,
     policyId: p.id,
     severity: null,
     description: p.description,
@@ -161,9 +161,18 @@ export function buildPolicyCards(events: PolicySnapshot[]): PolicyItem[] {
   }));
 }
 
+// NOTE: Unit mismatch is intentional. Fleet-Manager events (`useFleetManagerStream`)
+// and Orchestration events (`useOrchestrationStream`) expose `timestamp` in
+// **milliseconds since epoch** — that is the native shape from the underlying
+// SSE event bus. Every other builder in this module uses seconds. The conversion
+// is done once inside `buildAgentEventCards` (`Math.floor(e.timestamp / 1000)`),
+// so consumers of FeedItem can rely on every item's `timestamp` being in seconds.
+//
+// `data` is the Fleet-Manager event payload; `payload` is the Orchestration event
+// payload. The builder normalises both into `AgentEventItem.data`.
 export interface AgentEventLike {
   kind: string;
-  timestamp: number;
+  timestamp: number;  // milliseconds since epoch
   workflow_id?: string;
   data?: unknown;
   payload?: unknown;

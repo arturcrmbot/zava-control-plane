@@ -5,6 +5,7 @@ import {
   buildExceptionCards,
   buildExternalWaitCards,
   buildMilestoneCards,
+  chronological,
   type FeedItem,
 } from "../feedItems";
 
@@ -76,12 +77,27 @@ describe("buildMilestoneCards", () => {
   });
 });
 
-describe("ordering helper", () => {
-  it("FeedItem type discriminant works", () => {
-    const it: FeedItem = {
-      type: "hitl", id: "x", timestamp: 1,
-      workflowId: "W", domain: "expense-claim", severity: "medium",
-    };
-    expect(it.type).toBe("hitl");
+describe("chronological", () => {
+  it("sorts items descending by timestamp", () => {
+    const items: FeedItem[] = [
+      { type: "hitl", id: "a", timestamp: 1, workflowId: "A", domain: "expense-claim", severity: "medium" },
+      { type: "hitl", id: "b", timestamp: 5, workflowId: "B", domain: "expense-claim", severity: "medium" },
+      { type: "hitl", id: "c", timestamp: 3, workflowId: "C", domain: "expense-claim", severity: "medium" },
+    ];
+    expect(chronological(items).map((i) => i.id)).toEqual(["b", "c", "a"]);
+  });
+
+  it("does not mutate the input array", () => {
+    const items: FeedItem[] = [
+      { type: "hitl", id: "a", timestamp: 1, workflowId: "A", domain: "expense-claim", severity: "medium" },
+      { type: "hitl", id: "b", timestamp: 5, workflowId: "B", domain: "expense-claim", severity: "medium" },
+    ];
+    const snapshot = items.map((i) => i.id);
+    chronological(items);
+    expect(items.map((i) => i.id)).toEqual(snapshot);
+  });
+
+  it("returns an empty array when given an empty array", () => {
+    expect(chronological([])).toEqual([]);
   });
 });
