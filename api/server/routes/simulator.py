@@ -419,6 +419,14 @@ _CONSTELLATION_PERSONAE = ",".join([
     "contract_line_manager", "perf_review_hr_bp", "perf_review_line_manager",
     "ap_clerk", "controller", "category_manager", "sourcing_lead", "cpo",
     "contracts_counsel", "gc", "dpo", "treasurer", "cfo", "finance_controller",
+    # Escalation parents: required so deterministic cascades (OOO,
+    # three-way-match failures, escalate-up-hierarchy) land on auto-closing
+    # personae instead of stalling the demo. Discovered when ap_clerk's
+    # AP-001/002 escalations and finance_bp's OOO cascade for HIRE Budget
+    # both stalled on bp_pod_lead — see persona_responder._escalation_parent.
+    "bp_pod_lead", "regional_controller_emea",
+    "regional_hr_lead", "hr_director",
+    "account_director",
 ])
 
 
