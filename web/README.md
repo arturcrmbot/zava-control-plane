@@ -57,12 +57,14 @@ A quick-reference rule of thumb: **operator dashboards → `client`, hiring flow
 
 ## `web/client/` — operator control plane (legacy host)
 
-- **Purpose.** The internal operator / "Agent Administrator" UI: fleet
-  dashboard, exception queue, reviewer queue, policy & autonomy, analytics,
-  evaluations, economics, workflow detail, hiring-manager view, plus the
-  governance toolkit (`KillSwitchPanel`, `EvidencePanel`, `OtelSpanTree`,
-  signed audit chains). Renders the `FleetManagerRail` and POC1/POC3 control
-  surfaces.
+- **Purpose.** The internal operator / "Agent Administrator" UI: a single
+  **Feed of Work** at `/` (cards for workflows, exceptions, and HITL items)
+  with a right-side **drawer** for per-workflow detail (Decision / Activity /
+  Audit sections), plus policy & autonomy, analytics, evaluations, economics,
+  and the hiring-manager view. The governance toolkit (`KillSwitchPanel`,
+  `EvidencePanel`, `OtelSpanTree`, signed audit chains) is surfaced through
+  the drawer and dedicated routes. Legacy paths (`/fleet`, `/exceptions`,
+  `/reviewer-queue`) redirect into the feed with the appropriate filter.
 - **Status.** Live, but **hosted from the repo root, not from `web/client/`
   itself.** Unlike the other two apps, this one has **no `package.json` and no
   `vite.config.ts` of its own.** It is served by:
@@ -76,10 +78,11 @@ A quick-reference rule of thumb: **operator dashboards → `client`, hiring flow
 - **Dev command.** `npm run dev:client` (root-level `vite`) — serves on
   **port 5273**. `npm run demo:ui` runs the production preview on 5273.
   Build via the root `npm run build`. Tests via root `npm test`.
-- **When to edit.** You're changing the operator dashboard, exceptions /
-  reviewer / policy / analytics / economics / evaluations / workflow-detail
-  routes, the governance toolkit (kill switch, evidence panel, audit chain),
-  or anything under `web/client/components/apex/`. The constellation link in
+- **When to edit.** You're changing the operator Feed of Work, the
+  workflow drawer (Decision / Activity / Audit), the policy / analytics /
+  economics / evaluations routes, the governance toolkit (kill switch,
+  evidence panel, audit chain), or anything under
+  `web/client/components/apex/`. The constellation link in
   the sidebar deliberately opens `web/blueprint/` in a new tab — do not try
   to inline it here (it gets squashed by the dashboard's grid layout; see
   commit `98acc04b`).

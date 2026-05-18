@@ -1,0 +1,112 @@
+// web/client/components/feed/cards/HITLCard.tsx
+//
+// HITL = workflow currently awaiting human-in-the-loop. The card surfaces
+// the receipt (when present), claim summary, fleet-manager recommendation
+// (when present), and four inline actions. Clicking an action optimistically
+// records a resolution (flips the card to ResolvedCard via useFeedItems'
+// overlay) and POSTs to /api/exceptions/{activeExceptionId}/resolve. On
+// backend failure the optimistic state is reverted.
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { AlertTriangle } from "lucide-react";
+import type { HITLItem } from "@shared/feedItems";
+import CardShell from "../CardShell";
+import ReceiptThumb from "./ReceiptThumb";
+import { useResolutionStore } from "@client/hooks/useResolutionStore";
+import { useToast } from "../Toast";
+
+const ACTIONS = [
+  { id: "approve",       label: "Approve",      cls: "bg-emerald-600 hover:bg-emerald-700 text-white", verb: "Approved" },
+  { id: "request-info",  label: "Request docs", cls: "bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50", verb: "Requested docs" },
+  { id: "escalate",      label: "Escalate L2",  cls: "bg-white text-amber-700 ring-1 ring-amber-300 hover:bg-amber-50", verb: "Escalated" },
+  { id: "reject",        label: "Reject",       cls: "bg-white text-red-700 ring-1 ring-red-300 hover:bg-red-50", verb: "Rejected" },
+] as const;
+
+export default function HITLCard({
+  item, hideActions = false, onOpenDrawer,
+}: {
+  item: HITLItem;
+  hideActions?: boolean;
+  onOpenDrawer?: (workflowId: string) => void;
+}) {
+  const w = item.workflow!;
+  const store = useResolutionStore();
+  const toast = useToast();
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const onAction = async (id: string, verb: string) => {
+    setBusy(id);
+    store.record(item.id, { verb, actor: "you", actedAt: Math.floor(Date.now() / 1000) });
+    try {
+      const exceptionId = w.activeExceptionId;
+      if (!exceptionId) return;
+      const r = await fetch(`/api/exceptions/${exceptionId}/resolve`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ resolution: id, resolvedBy: "reviewer@zava" }),
+      });
+      if (!r.ok) {
+        store.revert(item.id);
+        toast.show("Couldn't resolve — try again");
+      }
+    } catch {
+      store.revert(item.id);
+      toast.show("Couldn't resolve — try again");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const body = (
+    <div className="flex gap-3 min-w-0">
+      {w.claim ? (
+        <ReceiptThumb claimId={w.claim.claimId} flavour={w.claim.receiptMismatchFlavour} />
+      ) : null}
+      <div className="min-w-0 space-y-1">
+        <div className="text-sm font-medium text-slate-900 truncate">
+          {w.claim
+            ? `${w.claim.currency} ${w.claim.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })} · ${w.claim.vendor}`
+            : w.id}
+        </div>
+        {w.claim ? (
+          <div className="text-xs text-slate-500 truncate">
+            {w.claim.employeeId} · {w.claim.category} · {w.claim.market}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  const actions = hideActions ? null : (
+    <>
+      {ACTIONS.map((a) => (
+        <button
+          key={a.id}
+          type="button"
+          disabled={busy != null}
+          onClick={(e) => { e.stopPropagation(); void onAction(a.id, a.verb); }}
+          className={`text-xs px-3 py-1.5 rounded font-medium transition disabled:opacity-50 ${a.cls}`}
+        >
+          {busy === a.id ? "…" : a.label}
+        </button>
+      ))}
+    </>
+  );
+
+  return (
+    <CardShell
+      severity={item.severity ?? null}
+      icon={<AlertTriangle size={12} className="text-amber-600" />}
+      typeLabel="HITL · Needs you"
+      workflowId={w.id}
+      timestampSec={item.timestamp}
+      body={body}
+      actions={actions}
+      onPrimaryClick={
+        onOpenDrawer
+          ? () => onOpenDrawer(w.id)
+          : undefined
+      }
+    />
+  );
+}
