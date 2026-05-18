@@ -55,4 +55,18 @@ describe("FleetControlShell — integration", () => {
       screen.getByRole("button", { name: /All activity/i }).className,
     ).toMatch(/bg-blue-600/);
   });
+
+  it("notifications bell shows the unread count from useFeedItems", async () => {
+    render(<MemoryRouter initialEntries={["/"]}><FleetControlShell /></MemoryRouter>);
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /1 unread/i })).toBeTruthy();
+    });
+  });
+
+  it("Today chip for ops-reviewer reflects the unread count", async () => {
+    render(<MemoryRouter initialEntries={["/"]}><FleetControlShell /></MemoryRouter>);
+    await waitFor(() => {
+      expect(screen.getByText(/Today: 1 · 0 crit/i)).toBeTruthy();
+    });
+  });
 });
