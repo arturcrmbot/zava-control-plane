@@ -427,6 +427,12 @@ _CONSTELLATION_PERSONAE = ",".join([
     "bp_pod_lead", "regional_controller_emea",
     "regional_hr_lead", "hr_director",
     "account_director",
+    # Gate-owning personae for creative-* / crisis-response /
+    # data-clean-room-setup. All terminal in the hierarchy (no escalation
+    # parent), so they need to be in the auto-close set directly to keep
+    # creative-campaign brief_capture + 4 other CD gates, ops_signoff and
+    # data_signoff flowing in Constellation Mode.
+    "creative_director", "change_manager", "chief_data_officer",
 ])
 
 

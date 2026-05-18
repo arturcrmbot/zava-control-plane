@@ -21,7 +21,7 @@ unset  SIMULATOR_RAMP_DOMAINS    # all live domains
 
 export PORTAL_SEED_REQS=1
 
-export PERSONA_AUTO_CLOSE="line_manager,claim_submitter,ssc_reviewer,finance_bp,hr_bp,recruiter,candidate,onboarding_it_admin,vendor_kyc_finance_bp,it_access_line_manager,it_access_it_admin,contract_finance_bp,contract_line_manager,perf_review_hr_bp,perf_review_line_manager,ap_clerk,controller,category_manager,sourcing_lead,cpo,contracts_counsel,gc,dpo,treasurer,cfo,finance_controller,bp_pod_lead,regional_controller_emea,regional_hr_lead,hr_director,account_director"
+export PERSONA_AUTO_CLOSE="line_manager,claim_submitter,ssc_reviewer,finance_bp,hr_bp,recruiter,candidate,onboarding_it_admin,vendor_kyc_finance_bp,it_access_line_manager,it_access_it_admin,contract_finance_bp,contract_line_manager,perf_review_hr_bp,perf_review_line_manager,ap_clerk,controller,category_manager,sourcing_lead,cpo,contracts_counsel,gc,dpo,treasurer,cfo,finance_controller,bp_pod_lead,regional_controller_emea,regional_hr_lead,hr_director,account_director,creative_director,change_manager,chief_data_officer"
 
 echo "[profile-everything] every domain ramps; every persona auto-decides."
 echo "[profile-everything] SIMULATOR_RAMP_DOMAINS=<all>  AVG_INTERVAL=${SIMULATOR_RAMP_AVG_INTERVAL_SECONDS}s"
