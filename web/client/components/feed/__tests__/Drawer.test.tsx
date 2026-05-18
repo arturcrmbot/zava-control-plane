@@ -64,7 +64,7 @@ describe("Drawer", () => {
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(screen.getByText(/Audit/i)).toBeTruthy();
+      expect(screen.getByRole("heading", { name: /^Audit$/i })).toBeTruthy();
     });
     const headings = screen.getAllByRole("heading");
     const text = headings.map((h) => h.textContent ?? "");
