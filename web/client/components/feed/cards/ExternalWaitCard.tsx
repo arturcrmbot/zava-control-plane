@@ -23,7 +23,7 @@ export default function ExternalWaitCard({
     setBusy("nudge");
     store.record(item.id, { verb: "Nudged", actor: "you", actedAt: Math.floor(Date.now() / 1000) });
     try {
-      await fetch("/internal/durable-event", {
+      const r = await fetch("/internal/durable-event", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -31,6 +31,7 @@ export default function ExternalWaitCard({
           payload: { by: "operator", action: "nudge-external" },
         }),
       });
+      if (!r.ok) store.revert(item.id);
     } catch {
       store.revert(item.id);
     } finally {
