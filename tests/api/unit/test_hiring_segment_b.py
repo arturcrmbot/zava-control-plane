@@ -63,15 +63,16 @@ def test_validate_activity_rejects_invalid() -> None:
     assert "errors" in result
 
 
-def test_segment_mode_parser() -> None:
-    from api.functions.workflows.hiring import _parse_segments_enabled
-    assert _parse_segments_enabled("off") == set()
-    assert _parse_segments_enabled("") == set()
-    assert _parse_segments_enabled("b") == {"b"}
-    assert _parse_segments_enabled("b,e") == {"b", "e"}
-    assert _parse_segments_enabled("all") == {"all"}
-    # unknown letters dropped (with warning, not error)
-    assert _parse_segments_enabled("b,zz") == {"b"}
+def test_segment_mode_parser_removed() -> None:
+    """The HIRING_SEGMENT_MODE feature flag (and its `_parse_segments_enabled`
+    parser) were removed once segments became the only hiring path
+    (refactor commit — drop HIRING_SEGMENT_MODE flag). Pin that the
+    symbol stays gone so a revert doesn't silently restore the dead
+    scaffolding."""
+    import api.functions.workflows.hiring as hiring_mod
+    assert not hasattr(hiring_mod, "_parse_segments_enabled")
+    assert not hasattr(hiring_mod, "_segment_enabled")
+    assert not hasattr(hiring_mod, "SEGMENT_MAX_RETRIES")
 
 
 # --------------------------------------------------------------------------
@@ -148,10 +149,14 @@ class _SegmentBStubContext:
                 return self._validator_replies.pop(0)
             # Default: pass-through valid
             return {"ok": True, "output": payload}
-        if name == "hiring_screening_activity_trigger":
-            return {"verdict": "borderline"}
         if name == "issue_screen_link_activity_trigger":
             return {"token": "tok-1", "portal_url": "http://x"}
+        # Segments D/E/F (non-focal) need schema-valid defaults so the
+        # orchestrator completes instead of exhausting its retry budget.
+        from tests.api.unit._segment_defaults import default_segment_call_activity
+        default = default_segment_call_activity(name, payload)
+        if default is not None:
+            return default
         # Generic stub return
         return {}
 
@@ -196,39 +201,18 @@ def _drive_until_done_or_error(ctx: _SegmentBStubContext):
         sent = target
 
 
-def test_orchestrator_segment_b_on_replaces_four_phase_activities(monkeypatch):
-    monkeypatch.setenv("HIRING_SEGMENT_MODE", "b")
+def test_orchestrator_segment_b_yields_segment_activities(monkeypatch):
+    """Segment B is now the only path; the four legacy per-phase activities
+    have been deleted (refactor commit — drop HIRING_SEGMENT_MODE flag).
+    Asserts the orchestrator drives the segment-B activity + its validator."""
     ctx = _SegmentBStubContext()
     _drive_until_done_or_error(ctx)
     activities = [c[0] for c in ctx.calls]
     assert "hiring_segment_b_activity_trigger" in activities
     assert "validate_segment_b_output_activity_trigger" in activities
-    for legacy in (
-        "hiring_job_design_activity_trigger",
-        "hiring_sourcing_activity_trigger",
-        "hiring_triage_activity_trigger",
-        "hiring_screening_activity_trigger",
-    ):
-        assert legacy not in activities, f"Segment B should replace {legacy}"
-
-
-def test_orchestrator_segment_b_off_keeps_existing_path(monkeypatch):
-    monkeypatch.setenv("HIRING_SEGMENT_MODE", "off")
-    ctx = _SegmentBStubContext()
-    _drive_until_done_or_error(ctx)
-    activities = [c[0] for c in ctx.calls]
-    for legacy in (
-        "hiring_job_design_activity_trigger",
-        "hiring_sourcing_activity_trigger",
-        "hiring_triage_activity_trigger",
-        "hiring_screening_activity_trigger",
-    ):
-        assert legacy in activities, f"Off-path must still run {legacy}"
-    assert "hiring_segment_b_activity_trigger" not in activities
 
 
 def test_orchestrator_segment_b_retry_on_validation_failure(monkeypatch):
-    monkeypatch.setenv("HIRING_SEGMENT_MODE", "b")
     valid_output = {
         "verdict": "strong",
         "jd_draft_id": "JD-1",
@@ -249,9 +233,10 @@ def test_orchestrator_segment_b_retry_on_validation_failure(monkeypatch):
 
 
 def test_orchestrator_segment_b_retry_exhaustion(monkeypatch):
-    monkeypatch.setenv("HIRING_SEGMENT_MODE", "b")
-    # SEGMENT_MAX_RETRIES is read at module import time; patch directly.
-    monkeypatch.setattr("api.functions.workflows.hiring.SEGMENT_MAX_RETRIES", 1)
+    # SEGMENT_MAX_RETRIES is read inside the orchestrator on each run
+    # (refactor commit — drop HIRING_SEGMENT_MODE flag) so the env var
+    # is honoured without a worker restart. Patch the env.
+    monkeypatch.setenv("SEGMENT_MAX_RETRIES", "1")
     ctx = _SegmentBStubContext(
         validator_replies=[
             {"ok": False, "errors": ["e1"]},
@@ -272,11 +257,10 @@ def test_orchestrator_segment_b_retry_exhaustion(monkeypatch):
 
 
 def test_orchestrator_segment_b_runs_to_completion(monkeypatch):
-    """Defect 1 regression: under HIRING_SEGMENT_MODE=b the orchestrator
-    must reach the final workflow.completed return dict without raising
-    UnboundLocalError on job_design_result / sourcing_result / triage_result.
+    """Defect 1 regression: the orchestrator must reach the final
+    workflow.completed return dict without raising UnboundLocalError on
+    job_design_result / sourcing_result / triage_result.
     """
-    monkeypatch.setenv("HIRING_SEGMENT_MODE", "b")
     ctx = _SegmentBStubContext(candidate_id="C-COMPLETE-1")
     result = _drive_until_done_or_error(ctx)
     assert result is not None, "orchestrator must reach return statement"
@@ -289,23 +273,23 @@ def test_orchestrator_segment_b_runs_to_completion(monkeypatch):
 
 def test_orchestrator_segment_b_populates_enriched_keys(monkeypatch):
     """Defect 2 regression: enriched.get('triage')/sourcing/job_design
-    must be non-None on the segment-B path so the interview recommender
-    input and HITL payloads don't lose context.
+    must be non-None on the segment-B path so the Segment D input and
+    HITL payloads don't lose context.
     """
-    monkeypatch.setenv("HIRING_SEGMENT_MODE", "b")
     ctx = _SegmentBStubContext(candidate_id="C-ENRICHED-1")
     _drive_until_done_or_error(ctx)
-    # The interview recommender (gate 1) reads enriched.get("triage").
-    recommender_calls = [
+    # Segment D's input (gate-1 recommender, now folded in) reads
+    # enriched.get("triage").
+    segment_d_calls = [
         payload for (name, payload) in ctx.calls
-        if name == "hiring_interview_recommender_activity_trigger"
+        if name == "hiring_segment_d_activity_trigger"
     ]
-    assert recommender_calls, "interview recommender must have been invoked"
-    first = recommender_calls[0]
+    assert segment_d_calls, "Segment D must have been invoked"
+    first = segment_d_calls[0]
     assert first.get("triage") is not None, "enriched['triage'] must be seeded under segment-B"
     assert first.get("sourcing") is not None
     assert first.get("job_design") is not None
-    # HITL suspended payload around line 319 carries triage in its context.
+    # HITL suspended payload carries triage in its context.
     invite_suspend = [
         payload for (name, payload) in ctx.calls
         if name == "checkpoint_activity_trigger"

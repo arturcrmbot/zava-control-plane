@@ -2,11 +2,16 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Land a pluggable, AGT-governed `LessonStore` with a Mem0 reference implementation and Kuzu-backed provenance, so later plans can build the dream-pass loop on a stable, auditable substrate.
+**Goal:** Land a pluggable, AGT-governed `LessonStore` *and* `WorkingMemoryStore` with a Mem0 reference implementation and Kuzu-backed provenance, so later plans can build the dream-pass loop on a stable, auditable substrate.
 
-**Architecture:** A `LessonStore` Protocol in `api/server/services/lessons/` with `Mem0LessonStore` as the default implementation. Every write/prune goes through a `LessonGovernor` thin wrapper that calls `kernel().evaluate_tool_call()` and `AuditLogger.log()` for an AGT-signed ledger entry. Lessons are stored bidirectionally: the searchable body lives in Mem0 (Apache 2.0, self-hosted, local file backend), the provenance + scope metadata lives in Kuzu as `Lesson` nodes linked to the runs that birthed them. Both stores are joined by a UUID.
+**Architecture:** Two memory tiers, both Mem0-backed (different `user_id` buckets), both gated by AGT:
 
-**Tech Stack:** Python 3.11, `mem0ai>=0.1.115` (+`[nlp]` extras), `kuzu>=0.6,<0.7`, existing AGT 3.4 governance kernel, pytest 8.3.
+1. **LessonStore** — promoted, cross-agent, scoped per-domain. Read by *agents* (the LLM executors under `api/functions/graphs/executors/agents/`) at prompt-build time. The injection point is the `_build_prompt(input)` function of each agent executor, which already constructs the prompt that goes to `run_agent_session`. Plan 3 extends `_build_prompt` for the demo agent (`agent_interview_recommender`) to accept and embed lessons + working notes.
+2. **WorkingMemoryStore** — per-`workflow_id` scratchpad, written from the existing OTEL session events emitted by `api/functions/graphs/executors/agents/_wrapper.py`. Captures what each agent invocation said, decided, and which tools it called. The dream pass (Plan 3) reads working memory as its raw material — it is what agents *actually noticed during real runs*, not patterns invented from outcome data alone.
+
+Both stores expose a `LessonGovernor` / `WorkingMemoryGovernor` thin wrapper that calls `kernel().evaluate_tool_call()` and `AuditLogger.log()` for an AGT-signed ledger entry. Lesson provenance + scope metadata also lands in Kuzu as `Lesson` nodes linked to the runs that birthed them; the lesson body lives in Mem0. Working memory does **not** mirror to Kuzu — it is ephemeral by design, GC'd after the dream pass consolidates it.
+
+**Tech Stack:** Python 3.11, `mem0ai>=0.1.115` (+`[nlp]` extras), `kuzu>=0.6,<0.7`, existing AGT 3.4 governance kernel, existing GHCP runtime (`runtime_ghcp.py`) for the LLM, pytest 8.3.
 
 ---
 

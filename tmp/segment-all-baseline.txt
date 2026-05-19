@@ -1,4 +1,0 @@
-records=5
-HIRING_SEGMENT_MODE=all per-phase baseline: sessions=50 latency_s=0.0000
-HIRING_SEGMENT_MODE=all  segments:           sessions=20 (B=5 D=5 E=5 F=5) latency_s=0.1032
-saving: 30 sessions (60%)

@@ -111,10 +111,12 @@ class _SegmentDStubContext:
             if self._validator_replies:
                 return self._validator_replies.pop(0)
             return {"ok": True, "output": payload}
-        if name == "hiring_screening_activity_trigger":
-            return {"verdict": "borderline"}
         if name == "issue_screen_link_activity_trigger":
             return {"token": "tok-1", "portal_url": "http://x"}
+        from tests.api.unit._segment_defaults import default_segment_call_activity
+        default = default_segment_call_activity(name, payload)
+        if default is not None:
+            return default
         return {}
 
     def wait_for_external_event(self, name: str):
@@ -150,29 +152,18 @@ def _drive(ctx):
         sent = target
 
 
-def test_orchestrator_segment_d_on_replaces_per_phase_activities(monkeypatch):
-    monkeypatch.setenv("HIRING_SEGMENT_MODE", "d")
+def test_orchestrator_segment_d_yields_segment_activities(monkeypatch):
+    """Segment D is now the only path; the per-phase
+    hiring_interview_recommender_activity has been deleted (refactor
+    commit — drop HIRING_SEGMENT_MODE flag)."""
     ctx = _SegmentDStubContext()
     _drive(ctx)
     activities = [c[0] for c in ctx.calls]
     assert "hiring_segment_d_activity_trigger" in activities
     assert "validate_segment_d_output_activity_trigger" in activities
-    assert "hiring_interview_recommender_activity_trigger" not in activities, (
-        "Segment D should replace the interview recommender activity"
-    )
-
-
-def test_orchestrator_segment_d_off_keeps_existing_path(monkeypatch):
-    monkeypatch.setenv("HIRING_SEGMENT_MODE", "off")
-    ctx = _SegmentDStubContext()
-    _drive(ctx)
-    activities = [c[0] for c in ctx.calls]
-    assert "hiring_interview_recommender_activity_trigger" in activities
-    assert "hiring_segment_d_activity_trigger" not in activities
 
 
 def test_orchestrator_segment_d_retry_on_validation_failure(monkeypatch):
-    monkeypatch.setenv("HIRING_SEGMENT_MODE", "d")
     valid = {
         "decision": "advance",
         "interview_recommendation": {"format": "panel", "level": "senior"},
@@ -191,8 +182,7 @@ def test_orchestrator_segment_d_retry_on_validation_failure(monkeypatch):
 
 
 def test_orchestrator_segment_d_retry_exhaustion(monkeypatch):
-    monkeypatch.setenv("HIRING_SEGMENT_MODE", "d")
-    monkeypatch.setattr("api.functions.workflows.hiring.SEGMENT_MAX_RETRIES", 1)
+    monkeypatch.setenv("SEGMENT_MAX_RETRIES", "1")
     ctx = _SegmentDStubContext(
         validator_replies=[
             {"ok": False, "errors": ["e1"]},

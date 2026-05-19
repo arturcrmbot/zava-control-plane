@@ -23,19 +23,15 @@ from api.functions.workflows.activities import (
     arbitrate_activity,
     audit_activity,
     checkpoint_activity,
-    # POC2 hiring spine
+    # POC2 hiring spine — budget + voice + interview-coordination
+    # activities. The per-phase Job Design / Sourcing / Triage /
+    # Screening / Compliance / Offer / Onboarding / Interview-Recommender
+    # activities were removed once segments became the only path
+    # (refactor commit — drop HIRING_SEGMENT_MODE flag).
     hiring_budget_activity,
-    hiring_job_design_activity,
-    hiring_sourcing_activity,
-    hiring_triage_activity,
-    hiring_screening_activity,
     hiring_voice_activity,
     issue_screen_link_activity,
     send_screen_email_activity,
-    hiring_compliance_activity,
-    hiring_offer_activity,
-    hiring_onboarding_activity,
-    hiring_interview_recommender_activity,
     issue_book_interview_link_activity,
     send_book_interview_email_activity,
     send_rejection_email_activity,
@@ -124,26 +120,6 @@ def hiring_budget_activity_trigger(payload: dict) -> dict:
 
 
 @app.activity_trigger(input_name="payload")
-def hiring_job_design_activity_trigger(payload: dict) -> dict:
-    return hiring_job_design_activity(payload)
-
-
-@app.activity_trigger(input_name="payload")
-def hiring_sourcing_activity_trigger(payload: dict) -> dict:
-    return hiring_sourcing_activity(payload)
-
-
-@app.activity_trigger(input_name="payload")
-def hiring_triage_activity_trigger(payload: dict) -> dict:
-    return hiring_triage_activity(payload)
-
-
-@app.activity_trigger(input_name="payload")
-def hiring_screening_activity_trigger(payload: dict) -> dict:
-    return hiring_screening_activity(payload)
-
-
-@app.activity_trigger(input_name="payload")
 def hiring_voice_activity_trigger(payload: dict) -> dict:
     return hiring_voice_activity(payload)
 
@@ -163,11 +139,6 @@ def send_screen_email_activity_trigger(payload: dict) -> dict:
 
 
 @app.activity_trigger(input_name="payload")
-def hiring_interview_recommender_activity_trigger(payload: dict) -> dict:
-    return hiring_interview_recommender_activity(payload)
-
-
-@app.activity_trigger(input_name="payload")
 def issue_book_interview_link_activity_trigger(payload: dict) -> dict:
     return issue_book_interview_link_activity(payload)
 
@@ -182,29 +153,15 @@ def send_rejection_email_activity_trigger(payload: dict) -> dict:
     return send_rejection_email_activity(payload)
 
 
-@app.activity_trigger(input_name="payload")
-def hiring_compliance_activity_trigger(payload: dict) -> dict:
-    return hiring_compliance_activity(payload)
-
-
-@app.activity_trigger(input_name="payload")
-def hiring_offer_activity_trigger(payload: dict) -> dict:
-    return hiring_offer_activity(payload)
-
-
-@app.activity_trigger(input_name="payload")
-def hiring_onboarding_activity_trigger(payload: dict) -> dict:
-    return hiring_onboarding_activity(payload)
-
-
 # --- Hiring Segment B (Phase 3 of plan/refactor-substrate-agentic-segments-1.md) ---
 @app.activity_trigger(input_name="input")
 async def hiring_segment_b_activity_trigger(input: dict) -> dict:
     """Run the candidate-discovery agentic segment.
 
-    Replaces job_design + sourcing + triage + screening when
-    HIRING_SEGMENT_MODE includes 'b' or 'all'. The orchestrator wraps
-    this with a retry loop driven by validate_segment_b_output."""
+    Replaces what used to be the job_design + sourcing + triage +
+    screening per-phase activities — now the only path for those four
+    phases. The orchestrator wraps this with a retry loop driven by
+    validate_segment_b_output."""
     from api.functions.segments.hiring_b import run_segment_b
     return await run_segment_b(input)
 

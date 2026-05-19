@@ -89,16 +89,7 @@ def test_send_rejection_email_offer_gate(fake_app_state):
     assert "after the interview" in sent["html_body"].lower() or "interview stage" in sent["html_body"].lower()
 
 
-def test_recommender_activity_runs_executor(fake_app_state, monkeypatch):
-    """Activity is a thin asyncio.run wrapper around the executor — verify it
-    forwards payload + returns the executor's dict."""
-    async def fake_execute(payload):
-        return {"interview_recommender": {"decision": "advance"}}
-
-    import api.functions.graphs.executors.agents.agent_interview_recommender as agent
-    monkeypatch.setattr(agent, "execute", fake_execute)
-
-    out = interview_activities.hiring_interview_recommender_activity({
-        "workflow_id": "WF", "gate": "post_voice",
-    })
-    assert out == {"interview_recommender": {"decision": "advance"}}
+# (`test_recommender_activity_runs_executor` was removed alongside
+# hiring_interview_recommender_activity itself — the interview
+# recommender is now folded into Segment D's agentic loop, exercised
+# by tests/api/unit/test_hiring_segment_d.py.)

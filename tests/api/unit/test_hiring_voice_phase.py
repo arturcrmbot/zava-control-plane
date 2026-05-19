@@ -86,8 +86,21 @@ class _StubContext:
             }
         if name == "send_screen_email_activity_trigger":
             return {"sent": True, "message_id": "m1"}
-        if name == "hiring_screening_activity_trigger":
-            return {"verdict": self._screening_verdict}
+        if name == "hiring_segment_b_activity_trigger":
+            # Verdict from Segment B drives Phase 6 gating now that the
+            # legacy per-phase hiring_screening_activity is gone
+            # (refactor commit — drop HIRING_SEGMENT_MODE flag).
+            return {
+                "verdict": self._screening_verdict,
+                "jd_draft_id": "JD-V",
+                "sourcing_pool_id": "POOL-V",
+                "candidates": [{"id": "C-V", "score": 0.9, "rationale": "ok"}],
+                "rationale": "voice-phase test default",
+            }
+        from tests.api.unit._segment_defaults import default_segment_call_activity
+        default = default_segment_call_activity(name, payload)
+        if default is not None:
+            return default
         # Most activities just return an empty dict — orchestration only
         # needs flow-control here, not a realistic spine result.
         return {}

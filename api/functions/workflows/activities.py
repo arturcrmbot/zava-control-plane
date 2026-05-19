@@ -24,16 +24,14 @@ from api.functions.graphs import (
     build_arbitrate_workflow,
     build_audit_workflow,
     build_approval_workflow,
-    # POC2 hiring spine
+    # POC2 hiring spine — Budget + Voice are the only per-phase activities
+    # that survive after segments became the only path (refactor commit —
+    # drop HIRING_SEGMENT_MODE flag). Job Design / Sourcing / Triage /
+    # Screening / Compliance / Offer / Onboarding / Interview-Recommender
+    # are now folded into the segment activities (hiring_segment_b/d/e/f
+    # in api.functions.segments).
     build_hiring_budget_workflow,
-    build_hiring_job_design_workflow,
-    build_hiring_sourcing_workflow,
-    build_hiring_triage_workflow,
-    build_hiring_screening_workflow,
     build_hiring_voice_workflow,
-    build_hiring_compliance_workflow,
-    build_hiring_offer_workflow,
-    build_hiring_onboarding_workflow,
 )
 from api.functions.webhook import emit
 
@@ -135,34 +133,6 @@ def hiring_budget_activity(payload: dict) -> dict:
     ))
 
 
-def hiring_job_design_activity(payload: dict) -> dict:
-    """POC2 Phase 2 — Job Design (jd-drafter)."""
-    return asyncio.run(_run_workflow(
-        build_hiring_job_design_workflow, _with_phase(payload, "JobDesign"), "Job Design",
-    ))
-
-
-def hiring_sourcing_activity(payload: dict) -> dict:
-    """POC2 Phase 3 — Sourcing (linkedin_search + greenhouse_post)."""
-    return asyncio.run(_run_workflow(
-        build_hiring_sourcing_workflow, _with_phase(payload, "Sourcing"), "Sourcing",
-    ))
-
-
-def hiring_triage_activity(payload: dict) -> dict:
-    """POC2 Phase 4 — Triage / CV crystallisation (multimodal)."""
-    return asyncio.run(_run_workflow(
-        build_hiring_triage_workflow, _with_phase(payload, "Triage"), "Triage",
-    ))
-
-
-def hiring_screening_activity(payload: dict) -> dict:
-    """POC2 Phase 5 — Screening (auto-shortlister, verdict drives Voice gating)."""
-    return asyncio.run(_run_workflow(
-        build_hiring_screening_workflow, _with_phase(payload, "Screening"), "Screening",
-    ))
-
-
 def hiring_voice_activity(payload: dict) -> dict:
     """POC2 Phase 6 — Voice screen (acs_dial + transcript_score)."""
     return asyncio.run(_run_workflow(
@@ -179,7 +149,6 @@ from api.functions.workflows.voice_screen_activities import (  # noqa: E402
     send_screen_email_activity,
 )
 from api.functions.workflows.interview_activities import (  # noqa: E402
-    hiring_interview_recommender_activity,
     issue_book_interview_link_activity,
     send_book_interview_email_activity,
     send_rejection_email_activity,
@@ -188,32 +157,10 @@ from api.functions.workflows.interview_activities import (  # noqa: E402
 __all__ = list(globals().get("__all__", [])) + [
     "issue_screen_link_activity",
     "send_screen_email_activity",
-    "hiring_interview_recommender_activity",
     "issue_book_interview_link_activity",
     "send_book_interview_email_activity",
     "send_rejection_email_activity",
 ]
-
-
-def hiring_compliance_activity(payload: dict) -> dict:
-    """POC2 Phase 8 — Compliance (jurisdiction-router; BetrVG on DE)."""
-    return asyncio.run(_run_workflow(
-        build_hiring_compliance_workflow, _with_phase(payload, "Compliance"), "Compliance",
-    ))
-
-
-def hiring_offer_activity(payload: dict) -> dict:
-    """POC2 Phase 9 — Offer (offer-personaliser; non-revocable send hook-gated)."""
-    return asyncio.run(_run_workflow(
-        build_hiring_offer_workflow, _with_phase(payload, "Offer"), "Offer",
-    ))
-
-
-def hiring_onboarding_activity(payload: dict) -> dict:
-    """POC2 Phase 10 — Onboarding (servicenow_jml + heygen_avatar + graph_invite)."""
-    return asyncio.run(_run_workflow(
-        build_hiring_onboarding_workflow, _with_phase(payload, "Onboarding"), "Onboarding",
-    ))
 
 
 def checkpoint_activity(payload: dict) -> dict:

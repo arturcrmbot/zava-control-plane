@@ -168,10 +168,12 @@ class _SegmentFStubContext:
             if self._validator_replies:
                 return self._validator_replies.pop(0)
             return {"ok": True, "output": payload}
-        if name == "hiring_screening_activity_trigger":
-            return {"verdict": "borderline"}
         if name == "issue_screen_link_activity_trigger":
             return {"token": "tok-1", "portal_url": "http://x"}
+        from tests.api.unit._segment_defaults import default_segment_call_activity
+        default = default_segment_call_activity(name, payload)
+        if default is not None:
+            return default
         return {}
 
     def wait_for_external_event(self, name: str):
@@ -207,29 +209,17 @@ def _drive(ctx):
         sent = target
 
 
-def test_orchestrator_segment_f_on_replaces_per_phase_activities(monkeypatch):
-    monkeypatch.setenv("HIRING_SEGMENT_MODE", "f")
+def test_orchestrator_segment_f_yields_segment_activities(monkeypatch):
+    """Segment F is now the only path; the per-phase onboarding activity
+    has been deleted (refactor commit — drop HIRING_SEGMENT_MODE flag)."""
     ctx = _SegmentFStubContext()
     _drive(ctx)
     activities = [c[0] for c in ctx.calls]
     assert "hiring_segment_f_activity_trigger" in activities
     assert "validate_segment_f_output_activity_trigger" in activities
-    assert "hiring_onboarding_activity_trigger" not in activities, (
-        "Segment F should replace the onboarding activity"
-    )
-
-
-def test_orchestrator_segment_f_off_keeps_existing_path(monkeypatch):
-    monkeypatch.setenv("HIRING_SEGMENT_MODE", "off")
-    ctx = _SegmentFStubContext()
-    _drive(ctx)
-    activities = [c[0] for c in ctx.calls]
-    assert "hiring_onboarding_activity_trigger" in activities
-    assert "hiring_segment_f_activity_trigger" not in activities
 
 
 def test_orchestrator_segment_f_retry_on_validation_failure(monkeypatch):
-    monkeypatch.setenv("HIRING_SEGMENT_MODE", "f")
     valid = {
         "onboarding_kickoff_id": "ONB-1",
         "avatar_video_url": "https://example.test/avatar.mp4",
@@ -249,8 +239,7 @@ def test_orchestrator_segment_f_retry_on_validation_failure(monkeypatch):
 
 
 def test_orchestrator_segment_f_retry_exhaustion(monkeypatch):
-    monkeypatch.setenv("HIRING_SEGMENT_MODE", "f")
-    monkeypatch.setattr("api.functions.workflows.hiring.SEGMENT_MAX_RETRIES", 1)
+    monkeypatch.setenv("SEGMENT_MAX_RETRIES", "1")
     ctx = _SegmentFStubContext(
         validator_replies=[
             {"ok": False, "errors": ["e1"]},
@@ -270,7 +259,6 @@ def test_orchestrator_segment_f_retry_exhaustion(monkeypatch):
 
 
 def test_orchestrator_segment_f_skips_retry_after_irreversible_tool_call(monkeypatch):
-    monkeypatch.setenv("HIRING_SEGMENT_MODE", "f")
     ctx = _SegmentFStubContext(
         tool_call_summary=[
             {"name": "servicenow.create_ticket", "reversible": False},

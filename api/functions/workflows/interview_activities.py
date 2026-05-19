@@ -2,16 +2,17 @@
 voice_screen_activities. Keeping these in their own module so the unit
 tests don't pull in the agent-framework graph machinery.
 
-Four activities, all imported and re-exported by activities.py:
+Three activities, all imported and re-exported by activities.py:
 
-  - hiring_interview_recommender_activity — runs the recommender agent at
-    gates `post_voice` and `post_interview`.
   - issue_book_interview_link_activity   — mints book_interview scope token.
   - send_book_interview_email_activity   — emails candidate the /book URL.
   - send_rejection_email_activity        — auto-rejection at either reject gate.
+
+(`hiring_interview_recommender_activity` was removed alongside the
+HIRING_SEGMENT_MODE flag — the interview recommender is now folded into
+Segment D's agentic loop.)
 """
 from __future__ import annotations
-import asyncio
 import os
 
 from api.server.services.email_send import EmailSendError
@@ -19,17 +20,6 @@ from api.server.services.email_send import EmailSendError
 
 def _portal_base() -> str:
     return os.getenv("PORTAL_BASE_URL", "http://localhost:5274").rstrip("/")
-
-
-def hiring_interview_recommender_activity(payload: dict) -> dict:
-    """Run the interview-recommender executor inside the Functions worker.
-
-    Mirrors hiring_*_activity wrappers — synchronous entry-point that
-    `asyncio.run`s the async agent call. Returns whatever the executor
-    returned so the orchestrator can stash it on `enriched`.
-    """
-    from api.functions.graphs.executors.agents import agent_interview_recommender
-    return asyncio.run(agent_interview_recommender.execute(payload))
 
 
 def issue_book_interview_link_activity(payload: dict) -> dict:

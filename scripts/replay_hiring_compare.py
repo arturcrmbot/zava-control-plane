@@ -1,17 +1,16 @@
 # scripts/replay_hiring_compare.py
-"""A/B compare HIRING_SEGMENT_MODE=off vs =b (or =all) against FakeRuntime.
+"""Replay harness for the 4 hiring segments against FakeRuntime.
 
-Runs N (default 5) synthetic enriched-input records through both
-paths, prints session count, latency, and shared-field equality of
-the segment-b output vs the four per-phase outputs combined.
+Runs N synthetic enriched-input records through each segment (B / D /
+E / F), reports per-segment session counts and aggregate latency.
 
-With ``--mode=all`` the script drives the full segment set
-(B + D + E + F), summing FakeRuntime session counts across all four
-segments and comparing against the 10-phase per-record baseline of
-the original Hiring orchestration.
+Background — segments became the only hiring path (refactor commit —
+drop HIRING_SEGMENT_MODE flag), so there is no longer an "off" path to
+A/B against. This script now just produces a session-count baseline
+for the segment world.
 
-Use FakeRuntime for deterministic comparison. For real-LLM
-comparison run with LLM_RUNTIME=ghcp (requires gh auth).
+Use FakeRuntime for deterministic numbers. For real-LLM smoke runs
+set LLM_RUNTIME=ghcp (requires gh auth).
 """
 from __future__ import annotations
 import argparse
@@ -99,29 +98,9 @@ async def _run_segment_f(inputs: list[dict]) -> tuple[float, int, list[dict]]:
     return time.monotonic() - t0, FakeRuntime.call_count, results
 
 
-async def main(n: int, mode: str) -> None:
+async def main(n: int) -> None:
     inputs = _synthetic_inputs(n)
 
-    if mode == "b":
-        seg_dur, seg_sessions, _ = await _run_segment_b(inputs)
-
-        # Per-phase baseline: today the four phases each open one session.
-        # FakeRuntime makes that count deterministic without a Durable host.
-        FakeRuntime.call_count = 0
-        t0 = time.monotonic()
-        for _ in inputs:
-            for _ in range(4):
-                FakeRuntime.call_count += 1
-        off_dur = time.monotonic() - t0
-        off_sessions = FakeRuntime.call_count
-
-        print(f"records={n}")
-        print(f"HIRING_SEGMENT_MODE=off: sessions={off_sessions} latency_s={off_dur:.4f}")
-        print(f"HIRING_SEGMENT_MODE=b:   sessions={seg_sessions} latency_s={seg_dur:.4f}")
-        print(f"saving: {off_sessions - seg_sessions} sessions ({(off_sessions - seg_sessions) / off_sessions * 100:.0f}%)")
-        return
-
-    # mode == "all"
     b_dur, b_sessions, _ = await _run_segment_b(inputs)
     d_dur, d_sessions, _ = await _run_segment_d(inputs)
     e_dur, e_sessions, _ = await _run_segment_e(inputs)
@@ -129,29 +108,17 @@ async def main(n: int, mode: str) -> None:
 
     seg_sessions = b_sessions + d_sessions + e_sessions + f_sessions
     seg_dur = b_dur + d_dur + e_dur + f_dur
+    avg_latency = seg_dur / n if n else 0.0
 
-    # Per-phase baseline: hand-counted 10 sessions per record under
-    # the original 10-phase Hiring orchestration.
-    FakeRuntime.call_count = 0
-    t0 = time.monotonic()
-    for _ in inputs:
-        for _ in range(10):
-            FakeRuntime.call_count += 1
-    off_dur = time.monotonic() - t0
-    off_sessions = FakeRuntime.call_count
-
-    print(f"records={n}")
-    print(f"HIRING_SEGMENT_MODE=all per-phase baseline: sessions={off_sessions} latency_s={off_dur:.4f}")
     print(
-        f"HIRING_SEGMENT_MODE=all  segments:           sessions={seg_sessions} "
-        f"(B={b_sessions} D={d_sessions} E={e_sessions} F={f_sessions}) latency_s={seg_dur:.4f}"
+        f"records={n}, sessions={seg_sessions} "
+        f"(B={b_sessions} D={d_sessions} E={e_sessions} F={f_sessions}), "
+        f"avg latency_s={avg_latency:.4f}"
     )
-    print(f"saving: {off_sessions - seg_sessions} sessions ({(off_sessions - seg_sessions) / off_sessions * 100:.0f}%)")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("-n", type=int, default=5)
-    ap.add_argument("--mode", choices=["b", "all"], default="b")
     args = ap.parse_args()
-    asyncio.run(main(args.n, args.mode))
+    asyncio.run(main(args.n))
