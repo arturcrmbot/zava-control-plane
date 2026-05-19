@@ -63,3 +63,29 @@ def test_get_runtime_default_is_ghcp(monkeypatch: pytest.MonkeyPatch) -> None:
     from api.functions.graphs.executors.agents.runtime import _get_runtime
     from api.functions.graphs.executors.agents.runtime_ghcp import GHCPRuntime
     assert isinstance(_get_runtime(), GHCPRuntime)
+
+
+@pytest.mark.asyncio
+async def test_run_agent_session_under_fake_no_subprocess(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("LLM_RUNTIME", "fake")
+
+    # Patch subprocess.check_output to raise if anyone calls it
+    def _boom(*args, **kwargs):
+        raise AssertionError("FakeRuntime path must not spawn a subprocess")
+    monkeypatch.setattr(subprocess, "check_output", _boom)
+
+    # Configure FakeRuntime's canned response BEFORE the call
+    from api.functions.graphs.executors.agents.runtime_fake import FakeRuntime
+    FakeRuntime.canned_text = '{"verdict": "strong", "rationale": "x"}'
+
+    from api.functions.graphs.executors.agents._wrapper import run_agent_session
+    out = await run_agent_session(
+        prompt="screen these candidates",
+        tools=[],
+        skill_dir=None,
+        skill_label="hiring-segment-b",
+        workflow_id="WF-TEST-1",
+    )
+    assert out == {"verdict": "strong", "rationale": "x"}
