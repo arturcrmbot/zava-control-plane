@@ -575,3 +575,29 @@ tools:
     description: >-
       Soft-deletes a Lesson by marking status=pruned in both the LessonStore
       and the Kuzu provenance node. Reason is recorded in the audit ledger.
+
+  # -------------------------------------------------------------------------
+  # D1 exception portal: human-driven approve/reject of flagged candidates
+  # ---
+  # These are operator-only paths — agents must not invoke them. The dream-
+  # pass loop autonomously flags via lesson.write (same tool, status='candidate').
+  # -------------------------------------------------------------------------
+  - id: lesson.approve_flagged
+    reversible: true
+    requires_capability: lessons.write
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: >-
+      Human-driven promotion of a flagged candidate lesson to status=active.
+      Required args: lesson_id, approver (operator email).
+
+  - id: lesson.reject_flagged
+    reversible: true
+    requires_capability: lessons.write
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: >-
+      Human-driven rejection of a flagged candidate. Marks the Lesson
+      pruned with reason prefix 'rejected_by_review:'.
