@@ -264,7 +264,7 @@ async def run_agent_session(
             permission_handler=permission_handler,
             attachments=attachments,
             model=model,
-            timeout_s=120.0,
+            timeout_s=240.0,
             event_subscriber=on_event,
         )
 

@@ -42,7 +42,7 @@ class GHCPRuntime:
         permission_handler: Callable | None = None,
         attachments: list[dict] | None = None,
         model: str = "gpt-4.1",
-        timeout_s: float = 120.0,
+        timeout_s: float = 240.0,
         event_subscriber: Callable[[Any], None] | None = None,
     ) -> LLMRuntimeResult:
         config = SubprocessConfig(github_token=_gh_token(), log_level="warning")
