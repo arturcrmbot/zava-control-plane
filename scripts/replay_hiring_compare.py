@@ -11,6 +11,12 @@ for the segment world.
 
 Use FakeRuntime for deterministic numbers. For real-LLM smoke runs
 set LLM_RUNTIME=ghcp (requires gh auth).
+
+The reference baseline this script produced (with FakeRuntime) lives
+at docs/baselines/segment-baseline.txt. Regenerate it after any
+segment refactor with:
+
+    python scripts/replay_hiring_compare.py -n 5 | tee docs/baselines/segment-baseline.txt
 """
 from __future__ import annotations
 import argparse
