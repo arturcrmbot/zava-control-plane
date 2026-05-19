@@ -138,6 +138,7 @@ LeftRail button click
 | `fleetctl.role`                             | Active `RoleId`                                  | indefinite   |
 | `fleetctl.filter.<roleId>`                  | Last applied filter state per role               | indefinite   |
 | `fleetctl.savedViews.<roleId>`              | User-created SavedViews                          | indefinite   |
+| `fleetctl.notif.<roleId>`                   | Header bell dismissal state (`{seen, clearedAt}`) | indefinite (reset on Clear all) |
 | `fleetctl.resolutions.<YYYY-MM-DD>`         | Optimistic resolutions for "All my decisions today" | day-scoped (self-prunes — yesterday's slot is never read) |
 | `fleetctl.density`                          | `cosy` / `compact`                               | indefinite   |
 | `fleetctl.dark`                             | dark-mode override                               | indefinite   |

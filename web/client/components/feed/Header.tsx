@@ -122,7 +122,7 @@ export default function Header({
         )}
       </div>
       <div className="ml-auto flex items-center gap-3">
-        <NotificationsPopover items={unreadItems} onJumpTo={onJumpTo} />
+        <NotificationsPopover roleId={role.id} items={unreadItems} onJumpTo={onJumpTo} />
         <ConnectionStatusDot />
         <HeaderClock />
         <TodayChip role={role} items={unreadItems} workflows={workflows} />
