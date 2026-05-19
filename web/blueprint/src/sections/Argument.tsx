@@ -2,27 +2,27 @@
 const captions: { label: string; title: string; body: string }[] = [
   {
     label: "01 · The harness",
-    title: "Spawn an agent. Tear it down when done.",
+    title: "Agents are spawned for a piece of work and torn down when it's finished.",
     body:
-      "Agents are assembled with the right skills and MCP tools, do their work, and are torn down when finished. There are no thousands of standing agents to manage. It is orchestration, not an org chart.",
+      "Agents are assembled with the right skills and MCP tools, do their work, and are torn down when finished. There are no thousands of standing agents to manage. It looks more like orchestration than an organisational structure.",
   },
   {
     label: "02 · Skills",
     title: "Modular units of know-how, governed centrally.",
     body:
-      "A skill is a markdown file with a system prompt, a tool allow-list, and a model choice. Adding a skill is not a project. Replacing one does not require redeploying the system.",
+      "A skill is a markdown file with a system prompt, a tool allow-list, and a model choice. Adding or replacing a skill is a small change to a single file rather than a redeployment of the system.",
   },
   {
     label: "03 · MCPs",
-    title: "One adapter per system. Used by every agent.",
+    title: "One adapter per system, shared across every agent.",
     body:
-      "Workday, SAP, Salesforce, Mediaocean, ServiceNow, Greenhouse, Graph, plus your third-party APIs, surfaced as MCP tools with negotiated auth, schemas and contracts. The MCP servers are not agentic themselves. They are pure capability. Agents borrow them.",
+      "Workday, SAP, Salesforce, Mediaocean, ServiceNow, Greenhouse, Graph, plus your third-party APIs, surfaced as MCP tools with negotiated auth, schemas and contracts. The MCP servers are not agents themselves; they expose capability that agents borrow when they need it.",
   },
   {
     label: "04 · The foundation",
-    title: "Identity, validation, audit and policy. Built once.",
+    title: "Identity, validation, audit and policy, built into the substrate once.",
     body:
-      "Every agent runs under its own identity. Every output is checked by a validator before it leaves. Every step writes itself to an immutable audit ledger. Policy lives in YAML rather than code, so compliance can edit the rules directly. Built into the substrate once, inherited by every domain after.",
+      "Each agent runs under its own identity. A validator checks every output before it leaves the system, and every step is written to an immutable audit ledger. Policy lives in YAML rather than code, which means compliance can edit the rules directly. Once these pieces are in the substrate, every domain built on top of it inherits them.",
   },
 ];
 
@@ -46,9 +46,10 @@ export function Argument() {
             the things you don&apos;t want each project to re-invent: who an
             agent is, what it&apos;s allowed to do, where its actions get
             recorded, which policies apply. Build the substrate once and every
-            domain you put on top inherits all of it for free. That&apos;s the
-            thing that makes the cost of the next domain collapse. Not any one
-            piece, but all four operating as a single ground layer.
+            domain you put on top inherits all of it for free. This is what
+            makes the cost of the next domain drop sharply. It isn&apos;t any
+            single piece; it&apos;s the four of them operating together as one
+            ground layer.
           </p>
         </header>
 
@@ -65,11 +66,12 @@ export function Argument() {
         </ol>
 
         <p className="body">
-          The mechanism that comes out of all this is composition, not
-          construction. The alphabet is already cast. Each new domain is a
-          new orchestrator class plus a small number of new skills, composed
+          The result is that new work is composed from existing parts rather
+          than constructed from scratch. Each new domain is a new
+          orchestrator class plus a small number of new skills, composed
           against the same MCPs, identity and governance that were built for
-          the first one. Operators do not need retraining per agent.
+          the first one. Operators don&apos;t need separate training for each
+          new agent because they&apos;re all running on the same substrate.
         </p>
       </div>
     </section>

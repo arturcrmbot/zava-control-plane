@@ -23,8 +23,8 @@ export function Observatory() {
           laptop against the same orchestrator, skills and MCP tools
           described above. Every event was captured. We&apos;re replaying
           the recording on this page so it reads continuously instead of
-          waiting for live traffic. Same events, same cadence, no
-          animation.
+          waiting for live traffic. The events and their timing are the
+          original ones, and none of it is animation.
         </p>
 
         <p className="body">

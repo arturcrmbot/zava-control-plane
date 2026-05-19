@@ -24,8 +24,8 @@ export function Composition() {
         <CompositionMap data={data} />
 
         <p className="body">
-          Adding the next workflow doesn&apos;t require new letters. It
-          recomposes the same case.
+          Adding the next workflow doesn&apos;t require new letters; it
+          recomposes the same case of type.
         </p>
       </div>
     </section>

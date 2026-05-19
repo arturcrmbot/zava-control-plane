@@ -13,11 +13,12 @@ export function Opening() {
 
         <div className="column stack-lg">
           <p className="lede">
-            You&apos;ve sponsored the work. Demos went fine. Contracts signed.
-            Things shipped. Then the next initiative arrived and effectively
-            started over: new tech, new prompts, new evaluation, new
-            integrations, fresh six-week clock, often a different vendor. The
-            value stops compounding about a week after each contract ends.
+            You&apos;ve sponsored the work, the demos went fine, contracts
+            were signed, things shipped. Then the next initiative arrives and
+            effectively starts over with new tech, new prompts, new
+            evaluation, new integrations, a fresh six-week clock, often a
+            different vendor. By the time the next initiative starts, very
+            little of what the previous one built is still doing useful work.
           </p>
 
           <p className="lede">
@@ -29,18 +30,19 @@ export function Opening() {
           </p>
 
           <p className="lede">
-            The second is more controversial. Most organisations are running
-            several different frameworks for building agents at the same time.
-            None of them strengthen each other. Every team picks its own; every
-            implementation is a private effort; nothing accumulates because
-            nothing is allowed to share a foundation.
+            The second reason is less commonly named. Most organisations are
+            running several different frameworks for building agents at the
+            same time. None of them strengthen each other. Every team picks
+            its own, every implementation is a private effort, and nothing
+            accumulates, because none of the implementations share a
+            foundation that would let them.
           </p>
         </div>
 
         <div className="opening__pullquote-block">
           <p className="pullquote">
-            What you&apos;ve been buying is manuscript after manuscript after
-            manuscript. What you need is a press.
+            Each of these initiatives is a hand-copied manuscript. The thing
+            missing from the picture is a printing press.
           </p>
         </div>
       </div>

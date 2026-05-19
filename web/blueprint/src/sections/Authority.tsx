@@ -59,12 +59,13 @@ export function Authority() {
           <pre className="snippet">{curatedJson(example, SHOWN_FIELDS)}</pre>
 
           <p className="body">
-            Compliance edits this file. Changes are picked up live, no
-            redeploy. Any skill that needs to route a decision (human-driven
-            or agent-driven) consults the matrix, gets back the matched
-            rule, and proceeds. The persona itself carries no thresholds.
-            The agentic side and the human side share the same authority
-            logic.
+            Compliance edits the file directly, and the substrate picks the
+            change up on the next workflow without a redeploy. Any skill
+            that needs to route a decision (human-driven or agent-driven)
+            consults the matrix, gets back the matched rule, and proceeds.
+            Thresholds live on the rule, not on the persona, which means
+            the agent path and the human path resolve approvals through the
+            same logic.
           </p>
         </header>
       </div>

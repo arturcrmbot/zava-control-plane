@@ -40,9 +40,9 @@ export function Personae() {
             approvers. They need someone to confirm a budget, sign off a
             contract, escalate an exception, attest to access. That requires
             people. Sometimes the person is a real human pulling a message
-            into their inbox. Sometimes it&apos;s an agent acting on a
-            person&apos;s behalf. The orchestrator doesn&apos;t need to
-            know which.
+            into their inbox; sometimes it&apos;s an agent acting on
+            someone&apos;s behalf, and the orchestrator works the same way
+            either way.
           </p>
           <p className="body">
             A persona is the abstraction that makes that work. It says who
@@ -61,8 +61,9 @@ export function Personae() {
             While the substrate is running end-to-end and no real customer
             is plugged in, every persona is a simulated agent. When you
             replace one with a real person, the workflows behave the same
-            way. Same routing logic, same authority resolution, same MCP
-            calls. The persona is the seam between simulation and reality.
+            way. The routing logic, authority resolution and MCP calls all
+            stay the same. That&apos;s why we treat the persona as the
+            boundary between the simulated organisation and a real one.
           </p>
         </header>
       </div>

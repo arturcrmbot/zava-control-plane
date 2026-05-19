@@ -12,12 +12,12 @@ export function MetaSkill() {
             Each new domain is mostly built from what&apos;s already cast.
           </h2>
           <p className="body">
-            The first domain pays the full price. Every skill is new. The
-            second mostly recomposes what the first one cast. The third is
-            mostly reuse. The cumulative curve below is drawn live from the
-            codebase, not projected. By the third domain most of the case is
-            already cast. The fourth and fifth are mostly orchestrator code
-            over a substrate that&apos;s already there.
+            The first domain pays the full price because every skill is new.
+            The second mostly recomposes what the first one cast, the third
+            is largely reuse, and by the fourth or fifth most of the
+            remaining work is orchestrator code over a substrate that&apos;s
+            already there. The cumulative curve below is drawn live from the
+            codebase, not projected.
           </p>
         </header>
 
@@ -58,10 +58,11 @@ export function MetaSkill() {
             <p className="body">
               The skill-builder learns from every implementation it builds
               against the same primitives. The same identity, the same
-              audit ledger, the same MCPs. That loop only closes inside one
-              substrate. Drop a third-party agent in alongside it and the
-              loop breaks. There&apos;s no shared foundation for it to
-              learn against.
+              audit ledger, the same MCPs. That feedback loop only closes
+              inside a single substrate. If a third-party agent runs
+              alongside it on its own foundation, the loop doesn&apos;t
+              close, because there&apos;s no shared ground for the
+              skill-builder to learn against.
             </p>
           </div>
 
@@ -72,8 +73,9 @@ export function MetaSkill() {
             </div>
             <p>
               Used by the agent that talks to the customer (this Copilot
-              session, in fact). Lives outside the customer environment.
-              Already built. This is how we build the runtime skills above.
+              session, in fact), and lives outside the customer environment.
+              It&apos;s already built, and it&apos;s what we use to produce
+              the runtime skills above.
             </p>
           </aside>
         </div>
