@@ -49,7 +49,10 @@ class TrackedExecutor(Executor):
             span.set_attribute("zava.executor.type", self._executor_type)
             span.set_attribute("zava.executor.name", self._name)
             if self._executor_type == "agent":
-                span.set_attribute("gen_ai.agent.name", "finance-agent")
+                # Each executor name corresponds to a skill, which is its
+                # own agent in the AGT design. Tag the span with the
+                # executor name so audit/Foundry can attribute by agent.
+                span.set_attribute("gen_ai.agent.name", self._name)
 
             try:
                 result = await self._fn(input)

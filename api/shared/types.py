@@ -200,7 +200,7 @@ class Phase(BaseModel):
     status: Literal["pending", "in_progress", "completed", "failed"] = "pending"
     started_at: float | None = None
     completed_at: float | None = None
-    agent_id: Literal["finance-agent"] = "finance-agent"
+    agent_id: str = "finance-agent"
     tool_calls: list[ToolCall] = Field(default_factory=list)
     span_ids: list[str] = Field(default_factory=list)
 

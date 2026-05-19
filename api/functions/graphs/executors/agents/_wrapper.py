@@ -1,6 +1,6 @@
 # src/functions/graphs/executors/agents/_wrapper.py
 """
-Helper for invoking a finance-agent skill via the GHCP SDK natively.
+Helper for invoking a per-skill agent via the GHCP SDK natively.
 
 Pattern (post-2026-04-28 retrofit):
 1. Create an ephemeral CopilotSession with `skill_directories=[skills_dir]`
@@ -14,9 +14,11 @@ Pattern (post-2026-04-28 retrofit):
    the invocation. Wrapped in try/except — eval pipeline failures must never
    propagate up into the caller.
 
-The agent identity is "finance-agent" universally; specialisation comes from
-the loaded skill, matching the spec's "specialisation via skills, not via
-separate agents" pattern.
+Agent identity: every skill is its own agent. The runtime tags every span
+with `gen_ai.agent.name = <skill_label>` (or the skill_dir name as fallback)
+so the audit ledger and Foundry Tracing can attribute actions to a specific
+agent rather than a single shared identity. This matches the per-skill
+Ed25519 keypair design in `api.server.services.governance.identity`.
 """
 from __future__ import annotations
 import asyncio
@@ -196,7 +198,7 @@ async def run_agent_session(
     attachments: list[dict] | None = None,
     workflow_id: str | None = None,
 ) -> dict:
-    """Run a finance-agent ephemeral session and return the parsed JSON response.
+    """Run an ephemeral per-skill agent session and return the parsed JSON response.
 
     Args:
         prompt: The user prompt — per-call context.
@@ -212,6 +214,10 @@ async def run_agent_session(
     """
     tools = tools or []
     skill_text = _load_skill(skill_dir) if skill_dir else None
+    # Each skill is its own agent. Prefer the explicit skill_label; fall
+    # back to the skill_dir name; only use the legacy shared id when
+    # neither is available (e.g. test harness without a skill).
+    agent_name = skill_label or (skill_dir.name if skill_dir else "finance-agent")
     tool_calls_collected: list[dict] = []
     started_at = time.monotonic()
     in_tok = out_tok = None
@@ -219,7 +225,7 @@ async def run_agent_session(
     with _tracer.start_as_current_span("gen_ai.generate_content") as span:
         span.set_attribute("gen_ai.system", "github_copilot")
         span.set_attribute("gen_ai.request.model", model)
-        span.set_attribute("gen_ai.agent.name", "finance-agent")
+        span.set_attribute("gen_ai.agent.name", agent_name)
         if skill_label:
             span.set_attribute("zava.skill", skill_label)
         # 2026-05-05: workflow_id stamped so Foundry Tracing can filter

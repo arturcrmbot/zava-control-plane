@@ -24,7 +24,7 @@ interface DomainBreakdown {
   reusedSkills: string[];
   /** MCP tools wired into this domain — all reused after the first cast. */
   reusedMcps: number;
-  /** Always-on guarantees inherited by every domain (entra/validator/audit/policy). */
+  /** Always-on guarantees inherited by every domain (identity/validator/audit/policy). */
   reusedGuarantees: number;
   /** Harness primitives inherited by every domain (lifecycle, queue, retry, observability, cost). */
   reusedHarness: number;

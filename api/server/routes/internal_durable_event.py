@@ -640,7 +640,7 @@ async def receive_durable_event(
             "workflow.id": wid,
             "gen_ai.system": "github_copilot",
             "gen_ai.request.model": payload.get("model") or "gpt-4.1",
-            "gen_ai.agent.name": "finance-agent",
+            "gen_ai.agent.name": payload.get("agent_label") or "finance-agent",
             "gen_ai.usage.input_tokens": int(in_tok),
             "gen_ai.usage.output_tokens": int(out_tok),
             "gen_ai.usage.source": usage_source,
