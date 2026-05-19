@@ -91,6 +91,102 @@ def test_kill_switch_active_denies(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "kill" in (result.feedback or "").lower() or "paused" in (result.feedback or "").lower()
 
 
+# ---------------------------------------------------------------------------
+# Hiring segment ACL rows (plan/refactor-substrate-agentic-segments-1 TASK-005).
+# Each segment label is registered in api.shared.agents.AGENTS with a
+# deduped union of its constituent skills' allowed_tools. These tests pin
+# both the positive path (a tool in the union approves under enforce) and
+# the negative path (a tool NOT in the union denies with the standard
+# deny:capability:<actor>:<tool> rule_id).
+# ---------------------------------------------------------------------------
+
+
+def test_segment_b_allowed_tool_enforce_approves(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGT_ENFORCE", "1")
+    _reset_for_tests()
+    handler = AGTPermissionHandler(skill_label="hiring-segment-b", workflow_id="WF-SEG-B-1")
+    # policy.search is in the union (jd-drafter contributes it).
+    result = handler(_mcp_request(server="policy", tool="search"), {})
+    assert result.kind == "approved"
+
+
+def test_segment_b_disallowed_tool_enforce_denies(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGT_ENFORCE", "1")
+    _reset_for_tests()
+    handler = AGTPermissionHandler(skill_label="hiring-segment-b", workflow_id="WF-SEG-B-2")
+    # contract_repository.get_contract is in tools.yaml but not in
+    # segment-b's union; should deny under enforce.
+    result = handler(
+        _mcp_request(server="contract_repository", tool="get_contract"), {},
+    )
+    assert result.kind == "denied-by-rules"
+    assert "hiring-segment-b" in (result.feedback or "")
+    assert "contract_repository.get_contract" in (result.feedback or "")
+
+
+def test_segment_d_allowed_tool_enforce_approves() -> None:
+    """Segment D's union is empty (interview-recommender declares no tools).
+    There is no in-union tool to pick; the segment cannot legitimately
+    call any manifest tool. Documenting that explicitly here so the
+    matrix of (4 segments × 2 cases) tests stays visible — the negative
+    path below carries the regression weight for D."""
+    import pytest as _pytest
+    _pytest.skip("hiring-segment-d allow-list is intentionally empty")
+
+
+def test_segment_d_disallowed_tool_enforce_denies(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGT_ENFORCE", "1")
+    _reset_for_tests()
+    handler = AGTPermissionHandler(skill_label="hiring-segment-d", workflow_id="WF-SEG-D-2")
+    result = handler(
+        _mcp_request(server="contract_repository", tool="get_contract"), {},
+    )
+    assert result.kind == "denied-by-rules"
+    assert "hiring-segment-d" in (result.feedback or "")
+
+
+def test_segment_e_allowed_tool_enforce_approves(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGT_ENFORCE", "1")
+    _reset_for_tests()
+    handler = AGTPermissionHandler(skill_label="hiring-segment-e", workflow_id="WF-SEG-E-1")
+    # policy.search is in the union (jurisdiction-router + betrvg-checker).
+    result = handler(_mcp_request(server="policy", tool="search"), {})
+    assert result.kind == "approved"
+
+
+def test_segment_e_disallowed_tool_enforce_denies(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGT_ENFORCE", "1")
+    _reset_for_tests()
+    handler = AGTPermissionHandler(skill_label="hiring-segment-e", workflow_id="WF-SEG-E-2")
+    result = handler(
+        _mcp_request(server="contract_repository", tool="get_contract"), {},
+    )
+    assert result.kind == "denied-by-rules"
+    assert "hiring-segment-e" in (result.feedback or "")
+
+
+def test_segment_f_allowed_tool_enforce_approves(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGT_ENFORCE", "1")
+    _reset_for_tests()
+    handler = AGTPermissionHandler(skill_label="hiring-segment-f", workflow_id="WF-SEG-F-1")
+    # avatar.render is the only manifest tool in segment-f's union;
+    # reversible_only=False on the segment so this approves even though
+    # avatar.render is non-reversible.
+    result = handler(_mcp_request(server="avatar", tool="render"), {})
+    assert result.kind == "approved"
+
+
+def test_segment_f_disallowed_tool_enforce_denies(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AGT_ENFORCE", "1")
+    _reset_for_tests()
+    handler = AGTPermissionHandler(skill_label="hiring-segment-f", workflow_id="WF-SEG-F-2")
+    result = handler(
+        _mcp_request(server="contract_repository", tool="get_contract"), {},
+    )
+    assert result.kind == "denied-by-rules"
+    assert "hiring-segment-f" in (result.feedback or "")
+
+
 def test_non_mcp_kind_approves(monkeypatch: pytest.MonkeyPatch) -> None:
     """Other permission kinds (shell, write, etc) are not used by our
     session config; the handler must approve so the loop doesn't
