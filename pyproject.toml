@@ -24,7 +24,11 @@ dependencies = [
   # Phase 0.2 spike resolved: github-copilot-sdk is the Python sibling of @github/copilot-sdk
   "github-copilot-sdk>=0.2.1",
   # Microsoft Agent Framework: meta-package pulls in agent-framework-core[all]
-  "agent-framework>=1.0.1",
+  # Pinned to exactly 1.0.1 — 1.4.0 ships an empty __init__.py (symbols moved
+  # to subpackages) and breaks 'from agent_framework import Workflow' across
+  # the codebase. Required pin for mem0 install: see B1 plan, "mem0 install
+  # gotcha". Bump deliberately, not via floating resolution.
+  "agent-framework==1.0.1",
   # MAF GitHub Copilot integration (wraps copilot.CopilotClient as a MAF Agent)
   "agent-framework-github-copilot>=1.0.0b260409",
   # MAF Azure Durable Functions hosting + Durable Task integration
@@ -59,6 +63,12 @@ dependencies = [
   # agentic-org-phase-1-entity-graph.md (REQ-001/CON-003: kuzu via Python
   # wheel only, no external server). Pinned to 0.6.x — current stable.
   "kuzu>=0.6,<0.7",
+  # mem0ai — lesson + working-memory store for the dream-pass loop.
+  # Requires 'uv sync --prerelease=allow' because agent-framework-mem0 (a
+  # transitive peer) publishes pre-release-only versions. agent-framework
+  # itself is pinned ==1.0.1 above so the prerelease flag cannot float it
+  # forward into the broken 1.4.0 packaging.
+  "mem0ai>=0.1.115,<0.2",
   # Faker — synthetic Person names for the data fabric employee generator
   # (plan/feature-enterprise-pitch-readiness-1.md task pitch-b2). Used at
   # demo-data generation time only; no runtime dependency on user data.
