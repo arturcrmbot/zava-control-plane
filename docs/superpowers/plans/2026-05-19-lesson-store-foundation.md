@@ -15,6 +15,57 @@ Both stores expose a `LessonGovernor` / `WorkingMemoryGovernor` thin wrapper tha
 
 ---
 
+## ⚠️ Plan-vs-reality corrections (discovered during execution)
+
+This plan was drafted before the implementation was attempted. The following
+deviations were found in the worktree (branch `feat/dream-pass-b1-lesson-store`,
+commits prefixed with the relevant task number). **Apply them as you go** — the
+code blocks below are otherwise out of date.
+
+1. **Task 1 mem0 install.** `mem0ai==0.1.118` has no `[nlp]` extra; drop it.
+   The spaCy download step is unnecessary. Install with
+   `uv sync --prerelease=allow` because `agent-framework-mem0` is pre-release
+   only. Pin `agent-framework==1.0.1` exactly (not `>=1.0.1`) in
+   `pyproject.toml` first — `--prerelease=allow` otherwise floats it to
+   `1.4.0`, which ships an empty `__init__.py` and breaks
+   `from agent_framework import Workflow` everywhere.
+2. **Install-order race.** After `uv sync --prerelease=allow`, the namespace
+   directory `site-packages/agent_framework/` can end up missing its
+   `__init__.py` because other `agent-framework-*` packages stomp the install
+   order. Fix with `uv pip install --reinstall agent-framework-core==1.0.1`.
+   Verify with `python -c "from agent_framework import Workflow"`.
+3. **Task 4 `Mem0LessonStore` API.** `mem0.Memory` actually exposes
+   `search(query, *, user_id, filters, limit, ...)` — `user_id` is a kwarg,
+   not in the filters dict, and `limit` not `top_k`. `add(messages, ...)`
+   needs `infer=False` so mem0 doesn't fire an LLM entity-extraction pass on
+   every lesson body. The plan's `_MemoryLike` Protocol and code block are
+   wrong; the unit tests pass only because `MagicMock` accepts any kwargs.
+   Add an opt-in `pytest.mark.foundry` integration test against real Azure
+   OpenAI to catch this class of drift.
+4. **Task 5 Kuzu API.** `EntityGraph` exposes `.query(cypher, params)`, not
+   `.execute_cypher(...)`. Replace every occurrence in the test file and
+   `kuzu_provenance.py`.
+5. **Task 6 `tools.yaml` schema.** The real manifest (read by
+   `api/server/services/governance/manifest.py`) uses fields
+   `reversible: bool`, `requires_capability: str|null`,
+   `requires_authority: bool`, `value_field: str|null`, `scope_function: str`,
+   `description`. The plan's `reversibility:` / `enforcement:` /
+   `capabilities_required:` fields don't exist. Verify with
+   `python -c "from api.server.services.governance.manifest import load_tools_yaml; load_tools_yaml()"`.
+6. **Task 7 `AuditLogger.log` signature.** Real signature:
+   `log(action: str, details: Any) -> None` — two positional args. Pack
+   `workflow_id`, `decision_id`, `policy_version`, `enforcement_mode`,
+   `governance_action`, `governance_allowed` into the `details` dict; the
+   per-workflow hash chain picks `workflow_id` out via the existing
+   `_extract_workflow_id` path. The plan's kwargs-style call would not
+   compile.
+7. **Task 9 smoke script.** Use `from api.server.services.governance.kernel import kernel`
+   (the singleton factory function), not `from api.server.services.governance import kernel`
+   (the module). Call `graph.close()` at the end to release the Kuzu file
+   lock.
+
+---
+
 ## File Structure
 
 **New files:**
