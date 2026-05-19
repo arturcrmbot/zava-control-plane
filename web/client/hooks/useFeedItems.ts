@@ -29,6 +29,7 @@ export interface FilterState {
   domains: string[];     // empty = all
   severity: "critical" | "high" | "medium" | null;
   search: string;
+  mine?: boolean;        // when true, only items the operator has acted on
 }
 
 export function useFeedItems(
@@ -88,15 +89,57 @@ export function useFeedItems(
         domain: it.domain,
         severity: null,
         origin: it,
+        originId: it.id,
         verb: r.verb,
         actor: r.actor,
         actedAt: r.actedAt,
       };
     });
 
+    // Materialise resolved cards for any persisted resolution whose original
+    // card has *already left* the live stream (server closed the exception,
+    // SSE removed it). Without this fallback "All my decisions today"
+    // empties out the moment the server confirms the action.
+    const covered = new Set(
+      decorated.filter((d) => d.type === "resolved").map((d) => d.id),
+    );
+    const wfById = new Map(workflows.map((w) => [w.id, w]));
+    const orphanResolutions: FeedItem[] = [];
+    for (const [origId, r] of Object.entries(resolutions.all())) {
+      const resolvedId = `resolved:${origId}`;
+      if (covered.has(resolvedId)) continue;
+      // Best-effort domain/workflow lookup from the id prefix (e.g. "exception:EXC-..."
+      // → fall through to workflow map via stripped id). We can't always
+      // recover the workflowId post-eviction, so render the card with what
+      // we have and skip the domain filter cleanly via domain=undefined.
+      const m = origId.match(/^(?:exception|hitl|external-wait):(.+)$/);
+      const stripped = m?.[1] ?? origId;
+      const wf = wfById.get(stripped);
+      orphanResolutions.push({
+        type: "resolved" as const,
+        id: resolvedId,
+        timestamp: r.actedAt,
+        workflowId: wf?.id ?? stripped,
+        domain: wf?.type,
+        severity: null,
+        originId: origId,
+        verb: r.verb,
+        actor: r.actor,
+        actedAt: r.actedAt,
+      });
+    }
+    const allItems = [...decorated, ...orphanResolutions];
+
     return chronological(
-      decorated
+      allItems
         .filter((i) => role.visibleCardTypes.includes(i.type))
+        .filter((i) => {
+          if (!filter.mine) return true;
+          // "my decisions today": only resolved cards (current session)
+          if (i.type !== "resolved") return false;
+          const cutoff = Date.now() / 1000 - 86_400;
+          return (i.actedAt ?? 0) >= cutoff;
+        })
         .filter((i) => {
           if (filter.domains.length === 0) return true;
           return i.domain ? filter.domains.includes(i.domain) : false;
@@ -115,6 +158,6 @@ export function useFeedItems(
   }, [
     workflows, exceptions, fmEvents, orchEvents, policyEvents, resolutions,
     role.visibleCardTypes,
-    filter.mode, filter.domains, filter.severity, filter.search,
+    filter.mode, filter.domains, filter.severity, filter.search, filter.mine,
   ]);
 }

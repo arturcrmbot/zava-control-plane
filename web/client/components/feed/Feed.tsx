@@ -55,17 +55,19 @@ export default function Feed({
   const urlDomains = params.get("domains");
   const urlSearch = params.get("q");
   const urlSeverity = params.get("severity") as FilterState["severity"];
+  const urlMine = params.get("mine") === "1";
   const [persisted, setPersisted] = useLocalStorageState<FilterState | null>(storageKey, null);
 
   const [filter, setFilterRaw] = useState<FilterState>(() => {
     // Explicit URL params win over persisted state. If no URL params, hydrate
     // from localStorage. Otherwise fall back to role defaults.
-    if (initialUrl || urlDomains || urlSearch || urlSeverity) {
+    if (initialUrl || urlDomains || urlSearch || urlSeverity || urlMine) {
       return {
         mode: initialUrl?.mode ?? role.defaultFilter,
         domains: urlDomains ? urlDomains.split(",").filter(Boolean) : role.defaultDomains,
         severity: urlSeverity ?? null,
         search: urlSearch ?? "",
+        mine: urlMine,
       };
     }
     if (persisted) return persisted;
@@ -74,8 +76,31 @@ export default function Feed({
       domains: role.defaultDomains,
       severity: null,
       search: "",
+      mine: false,
     };
   });
+
+  // Re-sync filter when URL params change *after* mount (e.g. saved-view click
+  // navigates and updates the query string — the existing Feed instance must
+  // pick up the new filter values rather than ignore them).
+  const lastSyncedRef = useRef<string>("");
+  useEffect(() => {
+    const sig = `${params.get("filter") ?? ""}|${params.get("domains") ?? ""}|${params.get("severity") ?? ""}|${params.get("q") ?? ""}|${params.get("mine") ?? ""}`;
+    if (sig === lastSyncedRef.current) return;
+    lastSyncedRef.current = sig;
+    const urlFromUrl = filterFromUrl(params.get("filter"));
+    const dom = params.get("domains");
+    const next: FilterState = {
+      mode: urlFromUrl?.mode ?? role.defaultFilter,
+      domains: dom ? dom.split(",").filter(Boolean) : role.defaultDomains,
+      severity: (params.get("severity") as FilterState["severity"]) ?? null,
+      search: params.get("q") ?? "",
+      mine: params.get("mine") === "1",
+    };
+    setFilterRaw(next);
+    setPersisted(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params]);
 
   // Wrap setFilter so every change persists + reflects to URL params (so
   // refresh and external links both round-trip).
@@ -91,6 +116,10 @@ export default function Feed({
     else nextParams.delete("severity");
     if (next.search) nextParams.set("q", next.search);
     else nextParams.delete("q");
+    if (next.mine) nextParams.set("mine", "1");
+    else nextParams.delete("mine");
+    // Mirror back into the ref so the URL-sync effect doesn't bounce.
+    lastSyncedRef.current = `${nextParams.get("filter") ?? ""}|${nextParams.get("domains") ?? ""}|${nextParams.get("severity") ?? ""}|${nextParams.get("q") ?? ""}|${nextParams.get("mine") ?? ""}`;
     setParams(nextParams, { replace: true });
   };
 
@@ -209,6 +238,7 @@ export default function Feed({
             domains: role.defaultDomains,
             severity: null,
             search: "",
+            mine: false,
           })}
         />
       ) : (

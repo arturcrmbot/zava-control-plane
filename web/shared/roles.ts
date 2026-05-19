@@ -39,7 +39,7 @@ export interface SavedView {
   filter: FilterMode;
   domains: string[];           // empty = all
   severity?: "critical" | "high" | "medium" | null;
-  mine?: boolean;              // future use; v1 ignores
+  mine?: boolean;              // when true, restrict to operator's own actions (resolved cards last 24h)
   search?: string;
 }
 

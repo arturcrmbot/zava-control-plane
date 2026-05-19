@@ -62,8 +62,14 @@ export interface AgentEventItem extends FeedItemBase {
 export interface ResolvedItem extends FeedItemBase {
   type: "resolved";
   // The original card it replaced; preserved so the Resolved card can
-  // re-render the receipt thumb / summary in collapsed form.
-  origin: HITLItem | ExceptionItem | ExternalWaitItem;
+  // re-render the receipt thumb / summary in collapsed form. Optional
+  // because hydrated resolutions whose original stream item has already
+  // been evicted by the server (closed exception / cleared HITL) still
+  // need to render a card.
+  origin?: HITLItem | ExceptionItem | ExternalWaitItem;
+  // The id of the original item, kept verbatim so Undo can revert via the
+  // resolution store even when `origin` was evicted from the live feed.
+  originId?: string;
   verb: string;           // "Approved" | "Rejected" | ...
   actor: string;          // "you" | "agent" | ...
   actedAt: number;

@@ -96,9 +96,13 @@ function ShellInner({
           userViews={userViews}
           onSelectView={(v) => {
             const params = new URLSearchParams();
+            if (v.filter !== role.defaultFilter) params.set("filter", v.filter);
             if (v.domains.length > 0) params.set("domains", v.domains.join(","));
+            if (v.severity) params.set("severity", v.severity);
+            if (v.mine) params.set("mine", "1");
             if (v.search) params.set("q", v.search);
-            navigate(`/?${params.toString()}`);
+            const qs = params.toString();
+            navigate(qs ? `/?${qs}` : "/");
           }}
           onSaveCurrent={() => {
             const label = window.prompt("Name this view?", "My view");

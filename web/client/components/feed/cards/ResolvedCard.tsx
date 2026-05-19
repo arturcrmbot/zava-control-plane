@@ -25,7 +25,8 @@ export default function ResolvedCard({
 }) {
   const store = useResolutionStore();
   const [didUndo, setDidUndo] = useState(false);
-  const r = store.get(item.origin.id);
+  const originKey = item.origin?.id ?? item.originId ?? "";
+  const r = originKey ? store.get(originKey) : undefined;
   const undoable = !didUndo && (r?.undoable ?? false);
 
   const body = (
@@ -39,7 +40,7 @@ export default function ResolvedCard({
   const actions = undoable ? (
     <button
       type="button"
-      onClick={(e) => { e.stopPropagation(); setDidUndo(true); store.revert(item.origin.id); }}
+      onClick={(e) => { e.stopPropagation(); setDidUndo(true); store.revert(originKey); }}
       className="text-xs px-3 py-1 rounded font-medium bg-white dark:bg-slate-900 text-amber-700 ring-1 ring-amber-300 hover:bg-amber-50"
     >Undo</button>
   ) : null;
