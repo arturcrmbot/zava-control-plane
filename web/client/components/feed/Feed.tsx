@@ -1,14 +1,22 @@
+// web/client/components/feed/Feed.tsx
 //
 // The Feed is the operator's home. It owns the active filter state, the
 // inbound-buffer state, and select-mode for bulk actions. Items come from
 // useFeedItems (which takes the role + filter). The role-default filter
 // can be overridden by URL param `?filter=hitl|exceptions|needs-you|all`
 // (used by the 301 redirects from /reviewer-queue and /exceptions).
+//
+// Filter persistence: the active filter state survives reload via a
+// per-role localStorage key (fleetctl.filter.<roleId>). Explicit URL
+// overrides (`?filter=…`, `?domains=…`, `?q=…`) take precedence on first
+// mount and replace the stored value, so deep links and saved-view
+// navigation still work.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { RolePreset } from "@shared/roles";
 import { useFeedItems, type FilterState } from "@client/hooks/useFeedItems";
 import { useNewItemsBuffer } from "@client/hooks/useNewItemsBuffer";
+import { useLocalStorageState } from "@client/hooks/useLocalStorageState";
 import FilterBar from "./FilterBar";
 import NewItemsPill from "./NewItemsPill";
 import CardList from "./CardList";
@@ -36,15 +44,53 @@ export default function Feed({
   role: RolePreset;
   onOpenDrawer: (workflowId: string) => void;
 }) {
-  const [params] = useSearchParams();
-  const initialUrl = filterFromUrl(params.get("filter"));
+  const [params, setParams] = useSearchParams();
 
-  const [filter, setFilter] = useState<FilterState>(() => ({
-    mode: initialUrl?.mode ?? role.defaultFilter,
-    domains: role.defaultDomains,
-    severity: null,
-    search: "",
-  }));
+  // Per-role default & URL overrides → starting filter; subsequent edits are
+  // persisted under fleetctl.filter.<roleId>.
+  const storageKey = `fleetctl.filter.${role.id}`;
+  const initialUrl = filterFromUrl(params.get("filter"));
+  const urlDomains = params.get("domains");
+  const urlSearch = params.get("q");
+  const urlSeverity = params.get("severity") as FilterState["severity"];
+  const [persisted, setPersisted] = useLocalStorageState<FilterState | null>(storageKey, null);
+
+  const [filter, setFilterRaw] = useState<FilterState>(() => {
+    // Explicit URL params win over persisted state. If no URL params, hydrate
+    // from localStorage. Otherwise fall back to role defaults.
+    if (initialUrl || urlDomains || urlSearch || urlSeverity) {
+      return {
+        mode: initialUrl?.mode ?? role.defaultFilter,
+        domains: urlDomains ? urlDomains.split(",").filter(Boolean) : role.defaultDomains,
+        severity: urlSeverity ?? null,
+        search: urlSearch ?? "",
+      };
+    }
+    if (persisted) return persisted;
+    return {
+      mode: role.defaultFilter,
+      domains: role.defaultDomains,
+      severity: null,
+      search: "",
+    };
+  });
+
+  // Wrap setFilter so every change persists + reflects to URL params (so
+  // refresh and external links both round-trip).
+  const setFilter = (next: FilterState) => {
+    setFilterRaw(next);
+    setPersisted(next);
+    const nextParams = new URLSearchParams(params);
+    if (next.mode !== role.defaultFilter) nextParams.set("filter", next.mode);
+    else nextParams.delete("filter");
+    if (next.domains.length > 0) nextParams.set("domains", next.domains.join(","));
+    else nextParams.delete("domains");
+    if (next.severity) nextParams.set("severity", next.severity);
+    else nextParams.delete("severity");
+    if (next.search) nextParams.set("q", next.search);
+    else nextParams.delete("q");
+    setParams(nextParams, { replace: true });
+  };
 
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
