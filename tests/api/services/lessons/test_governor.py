@@ -97,10 +97,10 @@ def test_write_denied_in_log_only_records_deny_but_skips_store(
 
     governor.write(lesson)
 
-    # log_only: no raise, no actual write (we honour deny intent), but
-    # the ledger captures the would-have-been-denied event.
-    assert store.get(lesson.id) is None
-    fake_provenance.record.assert_not_called()
+    # Phase 2 log_only: no raise, write proceeds, ledger records deny.
+    # Phase 6 will flip this — same call will raise GovernanceDenied.
+    assert store.get(lesson.id) == lesson
+    fake_provenance.record.assert_called_once_with(lesson)
     action_arg, details = fake_audit.log.call_args[0]
     assert action_arg == "lesson.write"
     assert details["governance_action"] == "deny"

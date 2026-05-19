@@ -59,9 +59,11 @@ class LessonGovernor:
             workflow_id=self._workflow_id,
         )
         self._enforce(decision)
-        if decision.allowed:
-            self._store.add(lesson)
-            self._provenance.record(lesson)
+        # Phase 2 semantics: in log_only mode the write proceeds even on
+        # a policy deny — the ledger entry below records the governance
+        # outcome so Phase 6 can flip to enforce without surprises.
+        self._store.add(lesson)
+        self._provenance.record(lesson)
         self._record_ledger(
             decision,
             action="lesson.write",
@@ -81,9 +83,8 @@ class LessonGovernor:
             workflow_id=self._workflow_id,
         )
         self._enforce(decision)
-        if decision.allowed:
-            self._store.prune(lesson_id, reason=reason)
-            self._provenance.mark_pruned(lesson_id, reason=reason)
+        self._store.prune(lesson_id, reason=reason)
+        self._provenance.mark_pruned(lesson_id, reason=reason)
         self._record_ledger(
             decision,
             action="lesson.prune",
