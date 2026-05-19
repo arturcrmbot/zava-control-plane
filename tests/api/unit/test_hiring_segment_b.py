@@ -28,3 +28,36 @@ def test_segment_b_output_rejects(bad: dict) -> None:
     from api.functions.segments.hiring_b import SegmentBOutput
     with pytest.raises(ValidationError):
         SegmentBOutput.model_validate(bad)
+
+
+@pytest.mark.asyncio
+async def test_run_segment_b_with_fake_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_RUNTIME", "fake")
+    from api.functions.graphs.executors.agents.runtime_fake import FakeRuntime
+    FakeRuntime.canned_text = (
+        '{"verdict": "strong", "jd_draft_id": "JD-1", '
+        '"sourcing_pool_id": "POOL-1", '
+        '"candidates": [{"id": "C-1", "score": 0.92, "rationale": "ok"}], '
+        '"rationale": "all green"}'
+    )
+    from api.functions.segments.hiring_b import run_segment_b, SegmentBOutput
+    out = await run_segment_b({"workflow_id": "WF-1", "req_id": "REQ-1"})
+    parsed = SegmentBOutput.model_validate(out)
+    assert parsed.verdict == "strong"
+
+
+def test_validate_activity_accepts_valid_output() -> None:
+    """Plain Python call to the validator activity's body."""
+    from function_app import validate_segment_b_output_activity_trigger as v_act
+    result = v_act({
+        "verdict": "strong", "jd_draft_id": "JD-1", "sourcing_pool_id": "POOL-1",
+        "candidates": [{"id":"c","score":0.5,"rationale":"r"}], "rationale": "ok",
+    })
+    assert result["ok"] is True
+
+
+def test_validate_activity_rejects_invalid() -> None:
+    from function_app import validate_segment_b_output_activity_trigger as v_act
+    result = v_act({"verdict": "MAYBE"})
+    assert result["ok"] is False
+    assert "errors" in result

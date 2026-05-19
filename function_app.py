@@ -197,6 +197,31 @@ def hiring_onboarding_activity_trigger(payload: dict) -> dict:
     return hiring_onboarding_activity(payload)
 
 
+# --- Hiring Segment B (Phase 3 of plan/refactor-substrate-agentic-segments-1.md) ---
+@app.activity_trigger(input_name="input")
+async def hiring_segment_b_activity_trigger(input: dict) -> dict:
+    """Run the candidate-discovery agentic segment.
+
+    Replaces job_design + sourcing + triage + screening when
+    HIRING_SEGMENT_MODE includes 'b' or 'all'. The orchestrator wraps
+    this with a retry loop driven by validate_segment_b_output."""
+    from api.functions.segments.hiring_b import run_segment_b
+    return await run_segment_b(input)
+
+
+@app.activity_trigger(input_name="payload")
+def validate_segment_b_output_activity_trigger(payload: dict) -> dict:
+    """Pydantic validation of the segment's output. Returns
+    {ok: True, output} or {ok: False, errors}."""
+    from api.functions.segments.hiring_b import SegmentBOutput
+    from pydantic import ValidationError
+    try:
+        validated = SegmentBOutput.model_validate(payload)
+        return {"ok": True, "output": validated.model_dump()}
+    except ValidationError as e:
+        return {"ok": False, "errors": e.errors()}
+
+
 # --- Generated-domain activity triggers (compose-domain v1) ----------------
 
 @app.activity_trigger(input_name="payload")
