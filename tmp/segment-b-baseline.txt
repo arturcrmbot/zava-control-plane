@@ -1,0 +1,4 @@
+records=5
+HIRING_SEGMENT_MODE=off: sessions=20 latency_s=0.0000
+HIRING_SEGMENT_MODE=b:   sessions=0 latency_s=0.0651
+saving: 20 sessions (100%)
