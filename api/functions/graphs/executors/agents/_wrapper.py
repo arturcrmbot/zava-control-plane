@@ -23,6 +23,7 @@ Ed25519 keypair design in `api.server.services.governance.identity`.
 from __future__ import annotations
 import asyncio
 import json
+import os
 import subprocess
 import time
 import uuid
@@ -38,6 +39,7 @@ from opentelemetry.trace import Status, StatusCode
 
 from api.server.state import app_state
 from api.shared.events import FleetEvent
+from api.server.services.governance.permission_handler import AGTPermissionHandler
 
 
 _SKILLS_DIR = Path(__file__).resolve().parents[4] / "server" / "skills"
@@ -240,8 +242,19 @@ async def run_agent_session(
         config = SubprocessConfig(github_token=_gh_token(), log_level="warning")
         client = CopilotClient(config)
         async with client:
+            # AGT pre-tool hook: per-skill capability gate via governance
+            # kernel when AGT_ENFORCE=1; rubber-stamp otherwise so dev
+            # behaviour is unchanged. See plan/refactor-substrate-
+            # agentic-segments-1.md TASK-002.
+            if os.environ.get("AGT_ENFORCE", "0").strip() in ("1", "true", "TRUE", "yes"):
+                permission_handler = AGTPermissionHandler(
+                    skill_label=agent_name,
+                    workflow_id=workflow_id,
+                )
+            else:
+                permission_handler = PermissionHandler.approve_all
             session_kwargs: dict = {
-                "on_permission_request": PermissionHandler.approve_all,
+                "on_permission_request": permission_handler,
                 "model": model,
                 "tools": tools,
             }
