@@ -222,6 +222,23 @@ def validate_segment_b_output_activity_trigger(payload: dict) -> dict:
         return {"ok": False, "errors": e.errors()}
 
 
+# --- Hiring Segment D (Phase 4 of plan/refactor-substrate-agentic-segments-1.md) ---
+@app.activity_trigger(input_name="input")
+async def hiring_segment_d_activity_trigger(input: dict) -> dict:
+    from api.functions.segments.hiring_d import run_segment_d
+    return await run_segment_d(input)
+
+
+@app.activity_trigger(input_name="payload")
+def validate_segment_d_output_activity_trigger(payload: dict) -> dict:
+    from api.functions.segments.hiring_d import SegmentDOutput
+    from pydantic import ValidationError
+    try:
+        return {"ok": True, "output": SegmentDOutput.model_validate(payload).model_dump()}
+    except ValidationError as e:
+        return {"ok": False, "errors": e.errors()}
+
+
 # --- Generated-domain activity triggers (compose-domain v1) ----------------
 
 @app.activity_trigger(input_name="payload")
