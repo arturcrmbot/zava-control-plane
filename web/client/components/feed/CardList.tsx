@@ -18,6 +18,7 @@ const PAGE = 100;
 
 export default function CardList({
   items, hideActions, onOpenDrawer, selectMode, selected, onToggleSelect,
+  focusedIndex,
 }: {
   items: FeedItem[];
   hideActions: boolean;
@@ -25,6 +26,7 @@ export default function CardList({
   selectMode: boolean;
   selected: Set<string>;
   onToggleSelect: (itemId: string) => void;
+  focusedIndex?: number;
 }) {
   const [limit, setLimit] = useState(PAGE);
 
@@ -40,8 +42,14 @@ export default function CardList({
 
   return (
     <div className="space-y-3">
-      {visible.map((it) => (
-        <div key={it.id} className="flex items-start gap-2">
+      {visible.map((it, idx) => (
+        <div
+          key={it.id}
+          data-feed-idx={idx}
+          className={`flex items-start gap-2 rounded-lg ${
+            idx === focusedIndex ? "ring-2 ring-blue-400 dark:ring-blue-500 ring-offset-2 ring-offset-slate-50 dark:ring-offset-slate-950" : ""
+          }`}
+        >
           {selectMode && (
             <input
               type="checkbox"

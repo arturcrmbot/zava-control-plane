@@ -5,7 +5,7 @@
 // Preserves the existing secondary routes inside <Routes> so the LeftRail's
 // "More ▾" links still navigate. Role state is persisted via localStorage;
 // switching role re-keys the Feed so it re-mounts with fresh defaults.
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Route, Routes, useNavigate, useParams, Navigate } from "react-router-dom";
 import { type RoleId, getRolePreset, type SavedView } from "@shared/roles";
 import { useLocalStorageState } from "@client/hooks/useLocalStorageState";
@@ -142,6 +142,25 @@ function FeedWithDrawer({
 }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  // Esc closes the drawer. We don't go through useKeyboardShortcuts here
+  // because the Feed below already binds Esc for its own help overlay;
+  // listening at this level ensures the drawer-close shortcut runs first
+  // and is independent of focused-card state.
+  useEffect(() => {
+    if (!id) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const t = e.target;
+      if (t instanceof HTMLElement) {
+        const tag = t.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        if (t.isContentEditable) return;
+      }
+      navigate("/");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [id, navigate]);
   return (
     <>
       <Feed key={role.id} role={role} onOpenDrawer={onOpenDrawer} />

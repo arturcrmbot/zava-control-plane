@@ -17,11 +17,13 @@ import type { RolePreset } from "@shared/roles";
 import { useFeedItems, type FilterState } from "@client/hooks/useFeedItems";
 import { useNewItemsBuffer } from "@client/hooks/useNewItemsBuffer";
 import { useLocalStorageState } from "@client/hooks/useLocalStorageState";
+import { useKeyboardShortcuts } from "@client/hooks/useKeyboardShortcuts";
 import FilterBar from "./FilterBar";
 import NewItemsPill from "./NewItemsPill";
 import CardList from "./CardList";
 import EmptyFeed from "./EmptyFeed";
 import BulkActionBar from "./BulkActionBar";
+import ShortcutHelp from "./ShortcutHelp";
 
 const KNOWN_DOMAINS = [
   "expense-claim", "hiring", "invoice-p2p", "travel-preapproval", "vendor-kyc",
@@ -138,6 +140,55 @@ export default function Feed({
     topThresholdPx: 80,
   });
 
+  // Keyboard navigation: j/k cycle a "focused" index into buffer.visible
+  // (rendered via a faint ring on the focused card). Enter opens. The
+  // focus value lives in state so we can scroll the focused card into
+  // view smoothly.
+  const [focusIdx, setFocusIdx] = useState(0);
+  const [helpOpen, setHelpOpen] = useState(false);
+  useEffect(() => {
+    // Keep focus in bounds when items shrink.
+    if (focusIdx >= buffer.visible.length) {
+      setFocusIdx(Math.max(0, buffer.visible.length - 1));
+    }
+  }, [buffer.visible.length, focusIdx]);
+
+  const scrollFocusedIntoView = (idx: number) => {
+    // Defer to next frame so DOM has the new focus class applied.
+    requestAnimationFrame(() => {
+      const el = scrollRef.current?.querySelector<HTMLElement>(`[data-feed-idx="${idx}"]`);
+      el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  };
+
+  useKeyboardShortcuts({
+    onNext: () => {
+      setFocusIdx((i) => {
+        const next = Math.min(buffer.visible.length - 1, i + 1);
+        scrollFocusedIntoView(next);
+        return next;
+      });
+    },
+    onPrev: () => {
+      setFocusIdx((i) => {
+        const next = Math.max(0, i - 1);
+        scrollFocusedIntoView(next);
+        return next;
+      });
+    },
+    onOpen: () => {
+      const item = buffer.visible[focusIdx];
+      if (item?.workflowId) onOpenDrawer(item.workflowId);
+    },
+    onFocusSearch: () => {
+      // Header search has placeholder "Search workflows…" — find by that.
+      const el = document.querySelector<HTMLInputElement>('input[placeholder^="Search workflows"]');
+      el?.focus();
+    },
+    onToggleHelp: () => setHelpOpen((v) => !v),
+    onClose: () => setHelpOpen(false),
+  });
+
   return (
     <div ref={scrollRef} className="px-6 pb-4 flex-1 min-w-0 overflow-y-auto bg-slate-50 dark:bg-slate-950">
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-4 pb-2 bg-slate-50 dark:bg-slate-950">
@@ -168,8 +219,10 @@ export default function Feed({
           selectMode={selectMode && !role.hideActionButtons}
           selected={selected}
           onToggleSelect={toggleSelect}
+          focusedIndex={focusIdx}
         />
       )}
+      {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
       {selectMode && !role.hideActionButtons && (
         <BulkActionBar
           selectedIds={[...selected]}
