@@ -3,6 +3,14 @@
   {{GRAPH_FLOW}}
 
 Per brief: {{PHASE_INTENT}}.
+
+NOTE: LEGACY / `kind: graph` ONLY. The default agent-phase shape under
+compose-domain v4+ is a SEGMENT activity (see `segment.py.tmpl` and
+`segment_activity_trigger.py.tmpl`). Use this template only for phases
+the brief explicitly marks `kind: graph` per the "When to use kind:graph"
+criteria in `compose-domain/SKILL.md` (parallel fan-out with blind merge;
+agent → validator → agent inside a single activity; saga/compensation
+chains where Durable round-trips per node are unacceptable).
 """
 from __future__ import annotations
 from agent_framework import Workflow, WorkflowBuilder

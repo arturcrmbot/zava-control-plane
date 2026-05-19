@@ -1,0 +1,34 @@
+# --- {{DOMAIN_DISPLAY_NAME}} Segment {{SEGMENT_LETTER_UPPER}} (compose-domain segments-by-default) ---
+#
+# Two activity triggers per segment. Patched into `function_app.py` by
+# `graduate.sh`. Mirrors function_app.py:156-241 (hiring segments B/D/E/F).
+
+@app.activity_trigger(input_name="input")
+async def {{WT_SNAKE}}_segment_{{SEGMENT_LETTER}}_activity_trigger(input: dict) -> dict:
+    """Run the {{SEGMENT_INTENT}} agentic segment.
+
+    The orchestrator wraps this with a retry loop driven by
+    validate_{{WT_SNAKE}}_segment_{{SEGMENT_LETTER}}_output."""
+    from api.functions.segments.{{WT_SNAKE}}_{{SEGMENT_LETTER}} import run_segment_{{SEGMENT_LETTER}}
+    return await run_segment_{{SEGMENT_LETTER}}(input)
+
+
+@app.activity_trigger(input_name="payload")
+def validate_{{WT_SNAKE}}_segment_{{SEGMENT_LETTER}}_output_activity_trigger(payload: dict) -> dict:
+    """Pydantic validation of the segment's output. Returns
+    {ok: True, output} or {ok: False, errors}.
+
+    The errors list goes through ``json.loads(e.json())`` rather than
+    ``e.errors()`` because the latter returns dicts containing native
+    ``ValueError`` instances under ``ctx.error`` for custom-validator
+    failures, which Azure Durable Functions then rejects with
+    ``ValueError: activity trigger output must be json serializable``.
+    """
+    import json as _json
+    from api.functions.segments.{{WT_SNAKE}}_{{SEGMENT_LETTER}} import Segment{{SEGMENT_LETTER_UPPER}}Output
+    from pydantic import ValidationError
+    try:
+        validated = Segment{{SEGMENT_LETTER_UPPER}}Output.model_validate(payload)
+        return {"ok": True, "output": validated.model_dump()}
+    except ValidationError as e:
+        return {"ok": False, "errors": _json.loads(e.json())}

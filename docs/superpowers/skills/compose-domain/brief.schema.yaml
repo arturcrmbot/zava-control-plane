@@ -56,10 +56,14 @@ properties:
       additionalProperties: true
       properties:
         name: { type: string, pattern: "^[a-z][a-z0-9_]*$" }
-        # Phase 4 IP4 (TASK-019): `sub_orchestrator` joins the original
-        # three. Sub-orchestrator phases compose existing fleet domains
-        # into a meta-workflow via Durable's `call_sub_orchestrator`.
-        kind: { enum: [deterministic, agent, hitl, sub_orchestrator] }
+        # Phase 5 (TASK-025): `graph` is the explicit opt-in for the
+        # legacy MAF-graph shape (agent → in-graph validator → terminal,
+        # in-process). Default for an agentic phase is `agent`, which
+        # now generates a SEGMENT activity instead of a MAF graph. Use
+        # `graph` only when the brief needs parallel fan-out with blind
+        # merge, agent→validator→agent inside one activity, or saga
+        # chains where per-node Durable round-trips are unacceptable.
+        kind: { enum: [deterministic, agent, hitl, sub_orchestrator, graph] }
         persona: { type: string }
         external_event: { type: string }
         intent: { type: string }

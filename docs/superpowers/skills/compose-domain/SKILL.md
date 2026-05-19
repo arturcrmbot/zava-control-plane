@@ -121,10 +121,10 @@ domain:
 
 phases:
   - name: <snake_case>
-    kind: deterministic | agent | hitl | sub_orchestrator
+    kind: deterministic | agent | hitl | sub_orchestrator | graph
     intent: <one sentence>
     external_systems: [<id>, ...]    # optional; ids from the top-level external_systems list
-    # only when kind == agent:
+    # only when kind == agent (default) or kind == graph (legacy):
     agent_skill_name: <kebab-case>
     # only when kind == hitl:
     persona: <role from personae below>
@@ -219,20 +219,117 @@ operator before you write a single file.** Wait for "go".
 > The 12 backfill briefs and `fleet-purchase-card-brief.yaml` are the
 > canonical worked examples.
 
-For each phase:
+For each phase, the default output shape is **segments-by-default**
+(Phase 5 of `plan/refactor-substrate-agentic-segments-1.md`). The legacy
+per-phase MAF graph shape is now opt-in via `kind: graph` — see
+"When to use kind:graph" below for the three criteria.
+
 - `kind: deterministic` → 1 MAF graph file with a single deterministic
   executor. No agent skill. May still have a validator.
-- `kind: agent` → 1 MAF graph file with `agent → validator → terminal`.
+- `kind: agent` (default agentic shape) → 1 **segment activity** at
+  `api/functions/segments/<wt_snake>_<segment_letter>.py` with a
+  Pydantic `Segment<Letter>Output` model and a matching
+  `validate_<wt_snake>_segment_<letter>_output_activity_trigger`
+  patched into `function_app.py`. The orchestrator wraps the segment
+  in a retry loop driven by the validator (see
+  `api/functions/workflows/hiring.py:120-162` for the canonical loop;
+  `SEGMENT_MAX_RETRIES` defaults to 2). One runtime SKILL.md per
+  participating skill at `api/server/skills/<wt>-<skill_name>/`. No
+  per-phase MAF graph, no in-graph agent_executor, no in-graph
+  validator file.
+- `kind: graph` (legacy / opt-in) → 1 MAF graph file with
+  `agent → validator → terminal`.
   1 runtime SKILL.md at `api/server/skills/<wt>-<agent_skill_name>/`.
   1 agent executor at `api/functions/graphs/executors/agents/agent_<prefix>_<wt_snake>_<phase>.py`.
   1 validator at `api/functions/graphs/executors/validators/validate_<prefix>_<wt_snake>_<phase>_schema.py`.
+  Only use when the three criteria in "When to use kind:graph" apply.
 - `kind: hitl` → no graph (the orchestrator does the wait directly).
   1 persona SKILL.md at `api/server/personae/<role>/SKILL.md` (only if
   the role doesn't already exist under `api/server/personae/`).
+- `kind: sub_orchestrator` → no per-phase file; the orchestrator calls
+  `context.call_sub_orchestrator` against an already-graduated domain.
+
+#### Path table (segment-default vs. legacy graph)
+
+The following table is authoritative. The right-hand column flags rows
+that exist only under the legacy `kind: graph` path.
+
+| Artefact | Path | When |
+|---|---|---|
+| orchestrator | `api/functions/workflows/<prefix>_<wt_snake>.py` | always |
+| activities module | `api/functions/workflows/<prefix>_<wt_snake>_activities.py` | always |
+| **segment activity** | `api/functions/segments/<wt_snake>_<segment_letter>.py` | `kind: agent` (default) |
+| **segment output Pydantic model** | inline in the segment file as `Segment<Letter>Output(BaseModel)` | `kind: agent` (default) |
+| **segment validator activity** | `validate_<wt_snake>_segment_<letter>_output_activity_trigger` patched into `function_app.py` | `kind: agent` (default) |
+| phase agent runtime SKILL.md | `api/server/skills/<wt>-<skill_name>/SKILL.md` | per-skill (both paths) |
+| persona SKILL.md | `api/server/personae/<role>/SKILL.md` | per HITL role |
+| MCP tool stub | `api/server/mcp_tools/<mcp_tool>.py` | per `external_systems[]` |
+| entity projection | `api/server/services/entity_projections/<wt_snake>.py` | always (v4) |
+| Cypher precedent | `api/server/services/precedent_queries/<wt>_<phase>.cypher` | per HITL phase (v4) |
+| ambient block | append to `api/server/services/ambient_agents/<function>.py` | if brief carries `ambient:` |
+| deterministic phase graph | `api/functions/graphs/<prefix>_<wt_snake>_<phase>.py` | `kind: deterministic` |
+| per-phase MAF graph file | `api/functions/graphs/<prefix>_<wt_snake>_<phase>.py` | **legacy / `kind: graph` only** |
+| in-graph agent executor | `api/functions/graphs/executors/agents/agent_<prefix>_<wt_snake>_<phase>.py` | **legacy / `kind: graph` only** |
+| in-graph validator | `api/functions/graphs/executors/validators/validate_<prefix>_<wt_snake>_<phase>_schema.py` | **legacy / `kind: graph` only** |
+| GRADUATION.md | `<RUN_ROOT>/GRADUATION.md` | always |
+| graduate.sh | `<RUN_ROOT>/graduate.sh` | always |
+
+Template references (under `docs/superpowers/skills/compose-domain/templates/`):
+
+| Template | Purpose | Path |
+|---|---|---|
+| `segment.py.tmpl` | segment activity + Pydantic output model | `kind: agent` (default) |
+| `segment_activity_trigger.py.tmpl` | function_app.py activity-trigger pair (run + validate) | `kind: agent` (default) |
+| `activity.py.tmpl` | per-phase Durable activity wrappers for graph phases | deterministic + legacy graph |
+| `phase_graph.py.tmpl` | per-phase MAF graph (WorkflowBuilder) | **legacy / `kind: graph` only** |
+| `validator.py.tmpl` | in-graph validator returning `{ok: bool}` | **legacy / `kind: graph` only** |
+| `agent_executor.py.tmpl` | per-phase agent executor calling `run_agent_session` | **legacy / `kind: graph` only** |
+| `orchestrator.py.tmpl` | the orchestrator | always |
+| `mcp_tool.py.tmpl` | MCP tool stub | per `external_systems[]` |
+| `persona_SKILL.md.tmpl` | persona runtime SKILL.md | per HITL role |
+| `SKILL.md.tmpl` | phase-agent runtime SKILL.md | per skill (both paths) |
+| `GRADUATION.md.tmpl` / `graduate.sh.tmpl` | graduation artefacts | always |
 
 For each `external_systems[]` entry whose `mcp_tool` does not already
 exist in `api/server/mcp_tools/` (check this against the live filesystem):
 - 1 MCP tool stub at `api/server/mcp_tools/<mcp_tool>.py`.
+
+#### When to use `kind: graph`
+
+The default for an agentic phase is `kind: agent`, which generates a
+**segment activity** (one CopilotSession loaded with all the skills
+that segment needs; the model picks invocation order). Only opt into
+the legacy MAF-graph shape via `kind: graph` when one of these three
+criteria is genuinely true:
+
+1. **Parallel fan-out with blind merge.** The phase needs to fan out
+   into N parallel executors and join them with a merge node that does
+   not coordinate with the spawning agent. The segment loop is
+   sequential within one CopilotSession; parallel fan-out belongs in
+   a graph.
+2. **Agent → validator → agent inside one activity.** The phase needs
+   a *bounded* retry where the second agent invocation reads the
+   validator's structured response in-process (no Durable round-trip
+   between agent calls). Segment retry crosses Durable activity
+   boundaries; if the round-trip cost is unacceptable, use a graph.
+3. **Saga / compensation chains where Durable round-trips per node
+   are unacceptable.** The phase composes ≥ 3 executors with
+   compensating actions that must execute atomically with respect to
+   each other; the orchestrator-level retry granularity is too coarse.
+
+Everything else — including the common "one agentic skill produces a
+structured output that the orchestrator hands to the next phase" case
+— is **`kind: agent` (default segment)**. When in doubt, default to
+segment.
+
+Mechanically, `kind: agent` writes a segment file from
+`segment.py.tmpl` + a function_app.py patch from
+`segment_activity_trigger.py.tmpl`. `kind: graph` writes a per-phase
+MAF graph from `phase_graph.py.tmpl` + an in-graph validator from
+`validator.py.tmpl` + an agent executor from `agent_executor.py.tmpl`,
+and is patched into `function_app.py` as a single
+`<wt_snake>_<phase>_activity_trigger` (no separate validator-trigger
+— validation happens inside the graph).
 
 Always:
 - 1 orchestrator at `api/functions/workflows/<prefix>_<wt_snake>.py`.
@@ -525,6 +622,110 @@ authoritative spec for every generated domain. To author a new one:
    stable `path` field for assertions.
 5. **Hand off to graduate.** The compose-domain orchestrator above
    handles the rest — the brief is the only operator-authored file.
+
+### Walking through a segment-default agent phase
+
+Concrete example for an agentic phase generated under the default
+`kind: agent` (segment-by-default) path. Assume the brief contains:
+
+```yaml
+domain: { workflow_type: vendor-kyc, prefix: fleet, display_name: "Vendor KYC" }
+phases:
+  - { name: vendor_intake, kind: deterministic, intent: "Capture vendor name + country." }
+  - name: kyc_diligence            # ← agentic phase, default segment shape
+    kind: agent
+    agent_skill_name: kyc-diligence-checker
+    intent: "Resolve UBOs, sanctions, adverse-media."
+    external_systems: [companies_house, sanctions_api]
+  - { name: finance_signoff, kind: hitl, persona: vendor_kyc_finance_bp,
+      external_event: finance_signoff_decision }
+```
+
+For the `kyc_diligence` phase, `compose-domain` generates **a segment
+activity, not a MAF graph**:
+
+1. **Pick the segment letter.** Segments are letter-indexed within a
+   workflow_type (A for the first segment, B for the second, …). For
+   a single-segment workflow the letter is `b` by convention (mirrors
+   `hiring_b`); for multi-segment workflows allocate in order.
+   Example: `kyc_diligence` becomes Segment **B** of vendor-kyc →
+   `api/functions/segments/vendor_kyc_b.py`.
+2. **Render `segment.py.tmpl`.** Fill in:
+   - `SKILL_LIST_LINES` — every `<wt>-<skill>` SKILL.md the segment
+     should auto-load (the phase's own `agent_skill_name` plus any
+     adjacent agentic skills the operator decides belong in the same
+     CopilotSession).
+   - `MCP_LIST_LINES` — the MCP tools resolved from the phase's
+     `external_systems[]`.
+   - `OUTPUT_MODEL_BODY` — the Pydantic `SegmentBOutput(BaseModel)`
+     class. One field per structured output the orchestrator reads
+     downstream (see `enriched.get(...)` references in the
+     orchestrator + HITL payloads). Custom validators go on the
+     model, not in a separate file.
+   - `SEGMENT_GOAL_SENTENCE` — one sentence describing the deliverable,
+     matching the phase's `intent`.
+3. **Render `segment_activity_trigger.py.tmpl`** into the sandboxed
+   `function_app.py` patch block. This emits **two** activity triggers:
+   - `vendor_kyc_segment_b_activity_trigger` — calls
+     `run_segment_b(input)`.
+   - `validate_vendor_kyc_segment_b_output_activity_trigger` — Pydantic-
+     validates and returns `{ok, output|errors}`. The Pydantic errors
+     are JSON-serialised via `json.loads(e.json())` so Durable does not
+     reject them.
+4. **Wire the orchestrator retry loop.** The orchestrator generated
+   from `orchestrator.py.tmpl` MUST call the pair inside a
+   `for attempt in range(segment_max_retries + 1)` loop, feeding
+   `validator["errors"]` back as `prior_validator_error` on retry, and
+   breaking when `validator["ok"]`. Copy the loop shape from
+   `api/functions/workflows/hiring.py:120-162` byte-for-byte.
+5. **Graduate.** `graduate.sh` copies the segment file under
+   `api/functions/segments/` and applies the function_app.py patch
+   between the existing segment markers. No new file under
+   `api/functions/graphs/` is created for this phase; no entry in
+   `api/functions/graphs/__init__.py` is added.
+
+The runtime SKILL.md for `vendor-kyc-kyc-diligence-checker` is still
+generated the same way it was for `kind: graph` (via
+`author-runtime-skill` in `phase_agent` mode). The only thing that
+changes between segment and legacy graph paths is the *carrier* of
+the agent — segment activity vs. MAF graph.
+
+### Appendix — legacy `kind: graph` walkthrough
+
+When the brief explicitly sets `kind: graph` (because one of the three
+criteria in "When to use kind:graph" applies), the per-phase output
+shape reverts to the v3 MAF-graph form. For the same `kyc_diligence`
+phase:
+
+```yaml
+  - name: kyc_diligence
+    kind: graph                     # explicit opt-in
+    agent_skill_name: kyc-diligence-checker
+    intent: "Resolve UBOs, sanctions, adverse-media."
+    external_systems: [companies_house, sanctions_api]
+```
+
+`compose-domain` then generates three files (none of which are written
+under the segment path):
+
+1. `api/functions/graphs/fleet_vendor_kyc_kyc_diligence.py` from
+   `phase_graph.py.tmpl` — `WorkflowBuilder` wiring
+   `agent → validator → terminal`.
+2. `api/functions/graphs/executors/agents/agent_fleet_vendor_kyc_kyc_diligence.py`
+   from `agent_executor.py.tmpl` — single-skill `run_agent_session` call.
+3. `api/functions/graphs/executors/validators/validate_fleet_vendor_kyc_kyc_diligence_schema.py`
+   from `validator.py.tmpl` — in-graph validator returning
+   `{"ok": bool, ...}` (NOT a Pydantic model; the graph terminal
+   handles the `ok=False` branch).
+
+`function_app.py` gets ONE activity trigger
+(`vendor_kyc_kyc_diligence_activity_trigger`) instead of the pair, and
+the graph builder is exported from `api/functions/graphs/__init__.py`.
+The orchestrator calls the trigger once per attempt (no in-orchestrator
+retry loop — retry, if any, is the graph's responsibility).
+
+Prefer the segment-default path. Reach for this appendix only when one
+of the three "When to use kind:graph" criteria genuinely applies.
 
 The 12 backfill briefs (everything matching `docs/superpowers/specs/*-brief.yaml`
 that is NOT `fleet-purchase-card`) document the entity/decision shape

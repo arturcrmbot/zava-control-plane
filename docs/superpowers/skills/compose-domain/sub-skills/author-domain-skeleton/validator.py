@@ -7,7 +7,7 @@ express:
 * ``domain.workflow_type`` and ``domain.prefix`` and ``domain.display_name``
   are present.
 * ``phases`` is non-empty.
-* every ``phase.kind`` is one of ``deterministic | agent | hitl``.
+* every ``phase.kind`` is one of ``deterministic | agent | hitl | sub_orchestrator | graph``.
 * every HITL phase carries ``persona`` and ``external_event``.
 * ≥ 1 phase is ``kind: deterministic`` (the intake gate).
 * ≥ 1 phase is ``kind: hitl`` (the operator gate).
@@ -18,7 +18,7 @@ from _shared.brief_validator import SchemaError, validate_brief
 
 __all__ = ["SchemaError", "validate"]
 
-_VALID_KINDS = {"deterministic", "agent", "hitl", "sub_orchestrator"}
+_VALID_KINDS = {"deterministic", "agent", "hitl", "sub_orchestrator", "graph"}
 
 
 def validate(brief: dict) -> None:
