@@ -3,12 +3,14 @@
 In-graph validators return `{"ok": bool, ...}` so TrackedExecutor can emit
 `validator.blocked` cleanly. Mirrors validate_classification_schema_node.py.
 
-NOTE: LEGACY / `kind: graph` ONLY. The default agent-phase shape under
-compose-domain v4+ uses a Pydantic `Segment<Letter>Output` model declared
-inside the segment file (`segment.py.tmpl`) and validated by a
+NOTE: LEGACY for agentic phases. Reused by `kind: deterministic`
+validators AND by the opt-in `kind: graph` shape — both consume the
+in-graph `{"ok": bool, ...}` contract here. NOT used for `kind: agent`
+(the default segments-by-default shape), which validates via a Pydantic
+`Segment<Letter>Output` model declared inside the segment file
+(`segment.py.tmpl`) and a
 `validate_<wt_snake>_segment_<letter>_output_activity_trigger` activity
-(see `segment_activity_trigger.py.tmpl`). Use this in-graph validator
-template only alongside `phase_graph.py.tmpl` for `kind: graph` phases.
+(see `segment_activity_trigger.py.tmpl`).
 """
 from __future__ import annotations
 

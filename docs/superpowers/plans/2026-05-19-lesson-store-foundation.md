@@ -11,7 +11,58 @@
 
 Both stores expose a `LessonGovernor` / `WorkingMemoryGovernor` thin wrapper that calls `kernel().evaluate_tool_call()` and `AuditLogger.log()` for an AGT-signed ledger entry. Lesson provenance + scope metadata also lands in Kuzu as `Lesson` nodes linked to the runs that birthed them; the lesson body lives in Mem0. Working memory does **not** mirror to Kuzu — it is ephemeral by design, GC'd after the dream pass consolidates it.
 
-**Tech Stack:** Python 3.11, `mem0ai>=0.1.115` (+`[nlp]` extras), `kuzu>=0.6,<0.7`, existing AGT 3.4 governance kernel, existing GHCP runtime (`runtime_ghcp.py`) for the LLM, pytest 8.3.
+**Tech Stack:** Python 3.11, `mem0ai>=0.1.115,<0.2`, `kuzu>=0.6,<0.7`, existing AGT 3.4 governance kernel, existing GHCP runtime (`runtime_ghcp.py`) for the LLM, pytest 8.3.
+
+---
+
+## ⚠️ Plan-vs-reality corrections (discovered during execution)
+
+This plan was drafted before the implementation was attempted. The following
+deviations were found in the worktree (branch `feat/dream-pass-b1-lesson-store`,
+commits prefixed with the relevant task number). **Apply them as you go** — the
+code blocks below are otherwise out of date.
+
+1. **Task 1 mem0 install.** `mem0ai==0.1.118` has no `[nlp]` extra; drop it.
+   The spaCy download step is unnecessary. Install with
+   `uv sync --prerelease=allow` because `agent-framework-mem0` is pre-release
+   only. Pin `agent-framework==1.0.1` exactly (not `>=1.0.1`) in
+   `pyproject.toml` first — `--prerelease=allow` otherwise floats it to
+   `1.4.0`, which ships an empty `__init__.py` and breaks
+   `from agent_framework import Workflow` everywhere.
+2. **Install-order race.** After `uv sync --prerelease=allow`, the namespace
+   directory `site-packages/agent_framework/` can end up missing its
+   `__init__.py` because other `agent-framework-*` packages stomp the install
+   order. Fix with `uv pip install --reinstall agent-framework-core==1.0.1`.
+   Verify with `python -c "from agent_framework import Workflow"`.
+3. **Task 4 `Mem0LessonStore` API.** `mem0.Memory` actually exposes
+   `search(query, *, user_id, filters, limit, ...)` — `user_id` is a kwarg,
+   not in the filters dict, and `limit` not `top_k`. `add(messages, ...)`
+   needs `infer=False` so mem0 doesn't fire an LLM entity-extraction pass on
+   every lesson body. The plan's `_MemoryLike` Protocol and code block are
+   wrong; the unit tests pass only because `MagicMock` accepts any kwargs.
+   Add an opt-in `pytest.mark.foundry` integration test against real Azure
+   OpenAI to catch this class of drift.
+4. **Task 5 Kuzu API.** `EntityGraph` exposes `.query(cypher, params)`, not
+   `.execute_cypher(...)`. Replace every occurrence in the test file and
+   `kuzu_provenance.py`.
+5. **Task 6 `tools.yaml` schema.** The real manifest (read by
+   `api/server/services/governance/manifest.py`) uses fields
+   `reversible: bool`, `requires_capability: str|null`,
+   `requires_authority: bool`, `value_field: str|null`, `scope_function: str`,
+   `description`. The plan's `reversibility:` / `enforcement:` /
+   `capabilities_required:` fields don't exist. Verify with
+   `python -c "from api.server.services.governance.manifest import load_tools_yaml; load_tools_yaml()"`.
+6. **Task 7 `AuditLogger.log` signature.** Real signature:
+   `log(action: str, details: Any) -> None` — two positional args. Pack
+   `workflow_id`, `decision_id`, `policy_version`, `enforcement_mode`,
+   `governance_action`, `governance_allowed` into the `details` dict; the
+   per-workflow hash chain picks `workflow_id` out via the existing
+   `_extract_workflow_id` path. The plan's kwargs-style call would not
+   compile.
+7. **Task 9 smoke script.** Use `from api.server.services.governance.kernel import kernel`
+   (the singleton factory function), not `from api.server.services.governance import kernel`
+   (the module). Call `graph.close()` at the end to release the Kuzu file
+   lock.
 
 ---
 
@@ -34,7 +85,7 @@ Both stores expose a `LessonGovernor` / `WorkingMemoryGovernor` thin wrapper tha
 - `tests/api/services/lessons/conftest.py` — shared fixtures
 
 **Modified files:**
-- `pyproject.toml` — add `mem0ai[nlp]>=0.1.115,<0.2`
+- `pyproject.toml` — add `mem0ai>=0.1.115,<0.2` (install via `uv sync --prerelease=allow` due to `agent-framework-mem0` pre-release pinning)
 - `api/server/services/entity_graph.py` — extend `_NODE_TABLES` with `Lesson`, extend `_REL_TABLES` with `LESSON_FROM_RUN`, `LESSON_ABOUT_PERSONA`, `LESSON_SUPERSEDES`
 - `data/policies/tools.yaml` — register `lesson.write` and `lesson.prune` tools (initially `audit`-only, no enforce)
 
@@ -65,29 +116,35 @@ Expected: a line of the form `"kuzu>=0.6,<0.7",` showing the current dependency 
 Add this line immediately after the `kuzu` line in the `[project] dependencies` array:
 
 ```toml
-    "mem0ai[nlp]>=0.1.115,<0.2",
+    "mem0ai>=0.1.115,<0.2",
 ```
+
+> **Note:** the `[nlp]` extra documented in mem0ai's README does not exist in
+> `mem0ai==0.1.118` and is not needed — the `from mem0 import Memory` import
+> works without spaCy. If a future release reintroduces the extra and we need
+> entity extraction, add it back then.
 
 - [ ] **Step 3: Install the dependency**
 
-Run: `uv sync`
-Expected: `mem0ai` and its transitive deps (qdrant-client, spacy, etc.) install without error.
+Run: `uv sync --prerelease=allow`
+Expected: `mem0ai` and its transitive deps install without error.
 
-- [ ] **Step 4: Download the spaCy English model required by Mem0's NLP extras**
+> **Why `--prerelease=allow`:** `agent-framework-mem0` (a peer of
+> `agent-framework`, already in our dependency graph) currently publishes
+> pre-release-only versions. Without the flag, resolution fails. We pin the
+> allow at the command level rather than baking it into `[tool.uv]` to keep
+> the policy visible at install time.
 
-Run: `uv run python -m spacy download en_core_web_sm`
-Expected: model downloads to the venv site-packages.
-
-- [ ] **Step 5: Smoke-import to verify the package loads**
+- [ ] **Step 4: Smoke-import to verify the package loads**
 
 Run: `uv run python -c "from mem0 import Memory; print('ok')"`
 Expected: prints `ok`.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add pyproject.toml uv.lock
-git commit -m "chore(lessons): add mem0ai[nlp] dependency"
+git commit -m "chore(lessons): add mem0ai dependency"
 ```
 
 ---

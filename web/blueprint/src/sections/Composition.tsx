@@ -25,6 +25,18 @@ export function Composition() {
         <CompositionMap data={data} />
 
         <p className="body">
+          A workflow&apos;s phases don&apos;t each get their own agent.
+          Adjacent phases that share an approval boundary collapse into a
+          single segment, so an n-phase workflow runs as m ≤ n segments
+          with a human checkpoint between them. Inside a segment the model
+          decides which skill to call next; the orchestrator decides
+          segment order, approval gates and retries. Hiring is the
+          canonical example: ten phases collapse into six short agent
+          sessions — four loaded with several skills, two with a single
+          skill — separated by six human approval points.
+        </p>
+
+        <p className="body">
           Adding the next workflow doesn&apos;t require new letters; it
           recomposes the same case of type.
         </p>

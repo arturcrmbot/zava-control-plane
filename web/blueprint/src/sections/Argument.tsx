@@ -2,13 +2,13 @@
 const captions: { label: string; title: string; body: string }[] = [
   {
     label: "01 · The harness",
-    title: "Agents are spawned for a piece of work and torn down when it's finished.",
+    title: "Agentic segments inside deterministic workflows.",
     body:
-      "Agents are assembled with the right skills and MCP tools, do their work, and are torn down when finished. There are no thousands of standing agents to manage. It looks more like orchestration than an organisational structure.",
+      "A workflow is a sequence of segments. Each segment opens one short-lived agent session with a bounded set of skills and MCP tools, runs to a checkpoint, and closes. The segment boundaries, the order of segments, the human approval gates and the retry rules all live in orchestrator code that the model never sees. The model picks the next tool inside a segment; the orchestrator picks everything else.",
   },
   {
     label: "02 · Skills",
-    title: "Modular units of know-how, governed centrally.",
+    title: "Modular units of know-how, governed in one place.",
     body:
       "A skill is a markdown file with a system prompt, a tool allow-list, and a model choice. Adding or replacing a skill is a small change to a single file rather than a redeployment of the system.",
   },
@@ -22,7 +22,7 @@ const captions: { label: string; title: string; body: string }[] = [
     label: "04 · The foundation",
     title: "Identity, validation, audit and policy, built into the substrate once.",
     body:
-      "Each agent runs under its own identity. A validator checks every output before it leaves the system, and every step is written to an immutable audit ledger. Policy lives in YAML rather than code, which means compliance can edit the rules directly. Once these pieces are in the substrate, every domain built on top of it inherits them.",
+      "Each skill runs under its own agent identity: a stable agent id and a per-skill Ed25519 signing key the substrate issues itself. Every MCP tool call is gated by an allow-list (the AGT capability set) checked at call time by a pre-tool hook, and denials surface to the model as a tool error. After each segment, a paired validator activity Pydantic-checks the output before the workflow moves on. Every MCP call, including AGT denials, is written to an audit ledger signed with the calling skill's key. Policy lives in YAML so compliance can edit the rules directly. To be honest about what this is: there is no Entra Agent ID and no per-skill Entra identity in this substrate today; the identity, the signing key and the allow-list are all issued and enforced inside the substrate itself.",
   },
 ];
 
