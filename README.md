@@ -10,14 +10,14 @@ top of it. Production-shaped — [Microsoft Agent Framework](https://learn.micro
 durable workflows for orchestration, GHCP SDK Python for agent identities,
 a long-lived Fleet Manager session supervising exceptions in real time.
 
-**14 live domains in `main`, plus 5 strategic placeholders for future
-graduation.** Two were hand-built (POC1 finance, POC2 hiring); twelve were
-graduated end-to-end by the
-[`compose-domain`](docs/superpowers/skills/compose-domain/SKILL.md) meta-skill
-(v3) over a single weekend. The five `stub=True` placeholders
-(hire-to-productive, vendor-risk-to-pay, lead-to-cash, fy-close, board-prep)
-appear in the org-clone surface but are not spawned at runtime — graduate
-them via `compose-domain` when ready. Every per-domain integration fact
+**37 live domains in `main`** — all spawnable at runtime (the
+previously-stubbed CEO meta-workflows were filled in by the v1.x wave).
+Two were hand-built (POC1 finance expense-claim, POC2 hiring); the rest
+were graduated end-to-end by the
+[`compose-domain`](docs/superpowers/skills/compose-domain/SKILL.md) v4
+meta-skill. Authoritative count + per-function breakdown lives in
+[`docs/ARCHITECTURE.md` §2](docs/ARCHITECTURE.md#2-domain-registry); the
+table below is a curated subset of headline domains. Every per-domain integration fact
 (workflow_type, prefix, orchestrator, persona gates, persona, operator surface,
 wake hints, spawner, realistic cadence) lives in a single registry —
 [`api/shared/domains.py`](api/shared/domains.py) — so the substrate's
@@ -41,13 +41,18 @@ hard-coded literals.
 | **Fleet treasury FX** | [`api/functions/workflows/fleet_treasury_fx.py`](api/functions/workflows/fleet_treasury_fx.py) — 4 phases | Composed · `compose-domain` v3 |
 | **Creative campaign** | [`api/functions/workflows/creative_campaign.py`](api/functions/workflows/creative_campaign.py) — 10 phases | Composed · `compose-domain` v3 |
 
-> The 5 `stub=True` placeholders (hire-to-productive, vendor-risk-to-pay,
-> lead-to-cash, fy-close, board-prep) appear in the org-clone surface but
-> aren't spawned at runtime — graduate them via `compose-domain` when ready.
 > Each domain spawns at its own realistic cadence (`realistic_interval_seconds`
 > in [`api/shared/domains.py`](api/shared/domains.py)) scaled by
 > `DEMO_TIME_WARP_FACTOR` (default 60) — so AP-invoice spawns every ~30s of
 > demo, perf-review effectively dormant. See [`.env.example`](.env.example).
+>
+> Hiring (POC2) executes as four agentic **segments** (B / D / E / F) rather
+> than per-phase activities — the orchestrator hands enriched state to a
+> single goal-shaped agent per segment. See
+> [`docs/runtime-providers.md`](docs/runtime-providers.md) for the
+> `LLMRuntime` Protocol (GHCP + Fake implementations) and
+> [`api/server/services/governance/permission_handler.py`](api/server/services/governance/permission_handler.py)
+> for the AGT pre-tool hook that gates every tool call inside a segment.
 
 The pitch behind this is captured in [docs/archive/blueprint.md](docs/archive/blueprint.md);
 the live editorial microsite that visualises the substrate is
@@ -149,7 +154,7 @@ make up                                        # boots azurite + POC1 mocks + Fa
 
 UI at http://localhost:5273, candidate portal at http://localhost:5274.
 The simulator's domain-aware ramp loop trickles real workflows from
-all 14 live domains into the dashboard automatically when the substrate
+all 37 live domains into the dashboard automatically when the substrate
 is up, each at its own realistic cadence (AP-invoice ~every 30s of demo,
 hiring ~every 24min, perf-review effectively dormant — see
 [`api/shared/domains.py`](api/shared/domains.py); tune via

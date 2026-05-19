@@ -508,6 +508,27 @@ activity originating from the Durable worker. OTEL is initialised in
 both the FastAPI lifespan and at Functions module load
 (`api/shared/otel.py`).
 
+**Agentic segments (hiring).** Hiring no longer runs ten per-phase
+activities. The orchestrator now branches into four goal-shaped
+*segments* — `B` (sourcing → triage → screening), `D` (interview
+decisioning), `E` (compliance + offer prep), `F` (onboarding with
+reversibility tracking) — declared under
+[`api/functions/segments/`](../api/functions/segments/) and registered
+as activity triggers in [`function_app.py`](../function_app.py). Each
+segment is a single agent session that calls MCP tools through the
+`LLMRuntime` Protocol
+([`api/functions/graphs/executors/agents/runtime.py`](../api/functions/graphs/executors/agents/runtime.py)).
+Two implementations ship: `GHCPRuntime` (production GitHub Copilot SDK)
+and `FakeRuntime` (deterministic, used by unit tests to bypass the
+subprocess). See [`docs/runtime-providers.md`](runtime-providers.md)
+for provider contracts and the GHCP-shaped seams the Protocol still
+exposes. Every tool call inside a segment is gated by the AGT
+pre-tool hook
+([`api/server/services/governance/permission_handler.py`](../api/server/services/governance/permission_handler.py))
+using the per-skill agent identity (no hard-coded runtime label);
+ACL rows for every hiring skill + segment label are seeded in
+[`api/shared/agents.py`](../api/shared/agents.py).
+
 ---
 
 ## 9. HTTP surface (selected)

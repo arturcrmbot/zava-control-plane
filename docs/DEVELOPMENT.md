@@ -102,7 +102,8 @@ make reset   # wipes Azurite state (azurite-data/)
 
 The Plane-1 entity graph that powers the portal is generated programmatically
 from `api/server/data_fabric/` (per
-[plan/feature-enterprise-pitch-readiness-1.md](../plan/feature-enterprise-pitch-readiness-1.md)).
+[plan/archive/feature-enterprise-pitch-readiness-1.md](../plan/archive/feature-enterprise-pitch-readiness-1.md);
+active plans now live under [docs/superpowers/plans/](../docs/superpowers/plans/)).
 A single `DataPack.materialise()` call orchestrates every generator and
 writes the result to `data/portal/entity_graph.kuzu`; a snapshot bundles
 that directory into a portable tarball for fast cold-start restore.

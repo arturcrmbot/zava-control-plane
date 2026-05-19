@@ -1,6 +1,6 @@
 # `data/policies/` — AGT policy inputs
 
-Per [`plan/feature-agent-governance-toolkit-1.md`](../../plan/feature-agent-governance-toolkit-1.md)
+Per [`plan/archive/feature-agent-governance-toolkit-1.md`](../../plan/archive/feature-agent-governance-toolkit-1.md)
 TASK-010, this directory holds the **inputs** that the kernel's policy
 compiler ([`api/server/services/governance/policy_compiler.py`](../../api/server/services/governance/policy_compiler.py))
 consumes at boot to produce the `agent_os.policies.PolicyDocument`

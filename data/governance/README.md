@@ -2,7 +2,7 @@
 
 Governance-bundle artefacts that are committed to the repo so they're
 auditor-reviewable. Per
-[`plan/feature-agent-governance-toolkit-1.md`](../../plan/feature-agent-governance-toolkit-1.md)
+[`plan/archive/feature-agent-governance-toolkit-1.md`](../../plan/archive/feature-agent-governance-toolkit-1.md)
 TASK-044 (Phase 5).
 
 ## `agent-pubkeys/`
