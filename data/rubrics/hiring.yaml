@@ -1,0 +1,26 @@
+# Hiring domain rubric.
+#
+# Promotion threshold: a candidate lesson must improve the rolled-up score by
+# at least 0.05 (absolute) on min_samples=40 held-out personas before the
+# dream pass may auto-promote it (governed by dream-pass.policy.yaml, Plan 3).
+domain: hiring
+promotion_threshold: 0.05
+min_samples: 40
+checks:
+  - name: decision_matches_label
+    kind: decision_matches_label
+    weight: 3.0
+    params:
+      labels_csv: data/synthetic/hiring/labels.csv
+
+  - name: policy_compliance
+    kind: policy_compliance
+    weight: 1.5
+    params:
+      # Reject decisions that lack a recorded rationale or that contradict
+      # the active hiring policy bundle.
+      forbid_blank_reason: true
+
+  - name: rationale_present
+    kind: rationale_present
+    weight: 0.5
