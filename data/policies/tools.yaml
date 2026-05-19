@@ -546,3 +546,32 @@ tools:
       System tool used by EntityReflector to upsert nodes / links / decisions
       into the embedded KuzuDB entity graph. Mutates local state only;
       governed via the kill switch (actor=reflector.entity_reflector).
+
+  # -------------------------------------------------------------------------
+  # Lesson-store tier (dream-pass loop, B1 Task 6)
+  # ---
+  # Both tools are reversible: write is undone by prune, prune is undone by
+  # re-promoting the same body. They are still capability-gated because only
+  # the dream-pass actor (proposer + governor) is meant to call them; domain
+  # agents read lessons but never write them.
+  # -------------------------------------------------------------------------
+  - id: lesson.write
+    reversible: true
+    requires_capability: lessons.write
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: >-
+      Writes a promoted Lesson into the LessonStore and its provenance into
+      the Kuzu Lesson subgraph. Invoked exclusively by the dream-pass loop
+      via LessonGovernor; never by domain agents directly.
+
+  - id: lesson.prune
+    reversible: true
+    requires_capability: lessons.write
+    requires_authority: false
+    value_field: null
+    scope_function: shared
+    description: >-
+      Soft-deletes a Lesson by marking status=pruned in both the LessonStore
+      and the Kuzu provenance node. Reason is recorded in the audit ledger.
