@@ -12,6 +12,7 @@ import { useNewItemsBuffer } from "@client/hooks/useNewItemsBuffer";
 import FilterBar from "./FilterBar";
 import NewItemsPill from "./NewItemsPill";
 import CardList from "./CardList";
+import EmptyFeed from "./EmptyFeed";
 import BulkActionBar from "./BulkActionBar";
 
 const KNOWN_DOMAINS = [
@@ -103,14 +104,26 @@ export default function Feed({
         />
       </div>
       <NewItemsPill count={buffer.pendingCount} onPullIn={buffer.pullIn} />
-      <CardList
-        items={buffer.visible}
-        hideActions={role.hideActionButtons}
-        onOpenDrawer={onOpenDrawer}
-        selectMode={selectMode && !role.hideActionButtons}
-        selected={selected}
-        onToggleSelect={toggleSelect}
-      />
+      {buffer.visible.length === 0 ? (
+        <EmptyFeed
+          hasItems={items.length > 0}
+          onClearFilters={() => setFilter({
+            mode: role.defaultFilter,
+            domains: role.defaultDomains,
+            severity: null,
+            search: "",
+          })}
+        />
+      ) : (
+        <CardList
+          items={buffer.visible}
+          hideActions={role.hideActionButtons}
+          onOpenDrawer={onOpenDrawer}
+          selectMode={selectMode && !role.hideActionButtons}
+          selected={selected}
+          onToggleSelect={toggleSelect}
+        />
+      )}
       {selectMode && !role.hideActionButtons && (
         <BulkActionBar
           selectedIds={[...selected]}
