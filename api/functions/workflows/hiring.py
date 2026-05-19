@@ -74,6 +74,7 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
     # for hiring runs the same way they do for travel.
     workflow_type = input_dict.get("type", "hiring")
     enriched = {**input_dict, "instance_id": context.instance_id}
+    _segments_enabled = _parse_segments_enabled(os.environ.get("HIRING_SEGMENT_MODE", "off"))
 
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
@@ -128,21 +129,56 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
         "kind": "resumed", "payload": {"phase": "Budget", "decision": budget_decision}
     })
 
-    # Phase 2: Job Design
-    job_design_result = yield context.call_activity("hiring_job_design_activity_trigger", enriched)
-    enriched = {**enriched, "job_design": job_design_result}
+    # Phase 2-5: Job Design / Sourcing / Triage / Screening
+    if _segment_enabled("b", _segments_enabled):
+        # --- Segment B: candidate discovery as one agentic loop ---
+        segment_input = {**enriched, "workflow_id": context.instance_id}
+        segment_result = None
+        validator: dict = {}
+        for attempt in range(SEGMENT_MAX_RETRIES + 1):
+            segment_result = yield context.call_activity(
+                "hiring_segment_b_activity_trigger", segment_input,
+            )
+            validator = yield context.call_activity(
+                "validate_segment_b_output_activity_trigger", segment_result,
+            )
+            if validator.get("ok"):
+                segment_result = validator["output"]
+                break
+            segment_input = {
+                **segment_input,
+                "prior_validator_error": repr(validator.get("errors")),
+            }
+        else:
+            yield context.call_activity("checkpoint_activity_trigger", {
+                "workflow_id": context.instance_id,
+                "kind": "segment.failed",
+                "segment": "b",
+                "errors": validator.get("errors"),
+            })
+            raise RuntimeError(
+                f"Segment B validation failed after {SEGMENT_MAX_RETRIES + 1} attempts"
+            )
+        # Map segment output back to the variables the rest of the
+        # orchestrator expects (verdict drives Voice gating).
+        screening_result = {"verdict": segment_result["verdict"], **segment_result}
+        enriched = {**enriched, "screening": screening_result}
+    else:
+        # Phase 2: Job Design
+        job_design_result = yield context.call_activity("hiring_job_design_activity_trigger", enriched)
+        enriched = {**enriched, "job_design": job_design_result}
 
-    # Phase 3: Sourcing
-    sourcing_result = yield context.call_activity("hiring_sourcing_activity_trigger", enriched)
-    enriched = {**enriched, "sourcing": sourcing_result}
+        # Phase 3: Sourcing
+        sourcing_result = yield context.call_activity("hiring_sourcing_activity_trigger", enriched)
+        enriched = {**enriched, "sourcing": sourcing_result}
 
-    # Phase 4: Triage (CV crystallisation — multimodal)
-    triage_result = yield context.call_activity("hiring_triage_activity_trigger", enriched)
-    enriched = {**enriched, "triage": triage_result}
+        # Phase 4: Triage (CV crystallisation — multimodal)
+        triage_result = yield context.call_activity("hiring_triage_activity_trigger", enriched)
+        enriched = {**enriched, "triage": triage_result}
 
-    # Phase 5: Screening (R/A/G-style verdict drives Voice gating)
-    screening_result = yield context.call_activity("hiring_screening_activity_trigger", enriched)
-    enriched = {**enriched, "screening": screening_result}
+        # Phase 5: Screening (R/A/G-style verdict drives Voice gating)
+        screening_result = yield context.call_activity("hiring_screening_activity_trigger", enriched)
+        enriched = {**enriched, "screening": screening_result}
 
     screening_verdict = (screening_result or {}).get("verdict", "borderline")
 
