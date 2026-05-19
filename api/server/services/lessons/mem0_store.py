@@ -21,8 +21,22 @@ _USER_ID = "lesson-store"
 
 
 class _MemoryLike(Protocol):
-    def add(self, messages: str, *, user_id: str, metadata: dict[str, Any]) -> Any: ...
-    def search(self, query: str, *, filters: dict[str, Any], top_k: int) -> Any: ...
+    def add(
+        self,
+        messages: str,
+        *,
+        user_id: str,
+        metadata: dict[str, Any],
+        infer: bool = ...,
+    ) -> Any: ...
+    def search(
+        self,
+        query: str,
+        *,
+        user_id: str,
+        filters: dict[str, Any],
+        limit: int,
+    ) -> Any: ...
     def delete(self, *, memory_id: str) -> Any: ...
 
 
@@ -45,13 +59,18 @@ class Mem0LessonStore:
             messages=lesson.body,
             user_id=_USER_ID,
             metadata=_serialise_lesson(lesson),
+            # infer=False skips mem0's LLM entity-extraction step. Our
+            # body is already a curated lesson; we don't want mem0 to
+            # rewrite it.
+            infer=False,
         )
 
     def get(self, lesson_id: str) -> Lesson | None:
         results = self._memory.search(
             query=lesson_id,
-            filters={"user_id": _USER_ID, "lesson_id": lesson_id},
-            top_k=1,
+            user_id=_USER_ID,
+            filters={"lesson_id": lesson_id},
+            limit=1,
         )
         for result in (results or {}).get("results", []):
             return _deserialise_lesson(result["metadata"])
@@ -66,8 +85,9 @@ class Mem0LessonStore:
     ) -> list[Lesson]:
         results = self._memory.search(
             query=query,
-            filters={"user_id": _USER_ID, "domain": scope.domain},
-            top_k=top_k,
+            user_id=_USER_ID,
+            filters={"domain": scope.domain},
+            limit=top_k,
         )
         lessons: list[Lesson] = []
         for result in (results or {}).get("results", []):

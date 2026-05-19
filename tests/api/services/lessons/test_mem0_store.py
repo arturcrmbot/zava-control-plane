@@ -25,6 +25,7 @@ def test_add_calls_mem0_with_serialised_lesson(make_lesson, fake_memory) -> None
     fake_memory.add.assert_called_once()
     _, kwargs = fake_memory.add.call_args
     assert kwargs["user_id"] == "lesson-store"
+    assert kwargs["infer"] is False
     metadata = kwargs["metadata"]
     assert metadata["lesson_id"] == lesson.id
     assert metadata["domain"] == "hiring"
@@ -45,8 +46,9 @@ def test_search_passes_scope_into_mem0_filters(make_lesson, fake_memory) -> None
 
     fake_memory.search.assert_called_once()
     _, kwargs = fake_memory.search.call_args
-    assert kwargs["filters"] == {"user_id": "lesson-store", "domain": "hiring"}
-    assert kwargs["top_k"] == 3
+    assert kwargs["user_id"] == "lesson-store"
+    assert kwargs["filters"] == {"domain": "hiring"}
+    assert kwargs["limit"] == 3
 
 
 def test_search_rehydrates_lessons_and_filters_by_scope(
