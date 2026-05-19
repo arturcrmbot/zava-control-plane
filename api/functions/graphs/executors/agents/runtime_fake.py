@@ -37,7 +37,7 @@ class FakeRuntime:
         timeout_s: float = 120.0,
         event_subscriber: Callable[[Any], None] | None = None,
     ) -> LLMRuntimeResult:
-        self.call_count += 1
+        FakeRuntime.call_count += 1
         self.last_prompt = prompt
         return LLMRuntimeResult(
             text=self.canned_text,
