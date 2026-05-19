@@ -31,3 +31,22 @@ def test_runtime_protocol_runtime_checkable() -> None:
             return LLMRuntimeResult(text="x", tool_calls=[])
 
     assert isinstance(_Stub(), LLMRuntime)
+
+
+import asyncio
+
+
+def test_fake_runtime_canned_response() -> None:
+    from api.functions.graphs.executors.agents.runtime_fake import FakeRuntime
+    rt = FakeRuntime()
+    rt.canned_text = '{"verdict":"strong"}'
+    result = asyncio.run(rt.run_session(prompt="x"))
+    assert result.text == '{"verdict":"strong"}'
+    assert rt.call_count == 1
+
+
+def test_get_runtime_dispatch_fake(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("LLM_RUNTIME", "fake")
+    from api.functions.graphs.executors.agents.runtime import _get_runtime
+    from api.functions.graphs.executors.agents.runtime_fake import FakeRuntime
+    assert isinstance(_get_runtime(), FakeRuntime)
