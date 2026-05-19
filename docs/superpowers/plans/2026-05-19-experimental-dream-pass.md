@@ -22,7 +22,7 @@ The demo target is `agent_interview_recommender` (in `api/functions/graphs/execu
 
 **Tech Stack:** Python 3.11, the existing **GHCP runtime** (`api/functions/graphs/executors/agents/runtime_ghcp.py` — your GitHub Copilot seat) for all LLM work, `pyyaml`, plus everything from Plans 1–2. Sandboxes invoke real agents through `run_agent_session`; no `agent-framework`, no fake decision shims.
 
-## ⚠️ Plan-vs-reality corrections
+## ⚠️ Plan-vs-Reality corrections
 
 - `EntityGraph.query(cypher, params)` is the real Kuzu API surface here; the plan's `.execute_cypher(...)` examples need to be translated accordingly.
 - Dream-pass skill bundles live under `api/server/skills/…` (the `_wrapper.SKILLS_DIR` root), not a top-level `skills/…` directory.
