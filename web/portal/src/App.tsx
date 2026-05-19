@@ -5,6 +5,7 @@ import Screen from "./routes/Screen";
 import Book from "./routes/Book";
 import Recruiter from "./routes/Recruiter";
 import RecruiterCandidate from "./routes/RecruiterCandidate";
+import DreamPassExceptions from "./pages/DreamPassExceptions";
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/book" element={<Book />} />
           <Route path="/recruiter" element={<Recruiter />} />
           <Route path="/recruiter/c/:id" element={<RecruiterCandidate />} />
+          <Route path="/dream-pass-exceptions" element={<DreamPassExceptions />} />
         </Routes>
       </main>
       <footer className="text-center text-xs text-slate-400 py-4 border-t border-slate-200 bg-white/60">
