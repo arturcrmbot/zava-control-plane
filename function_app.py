@@ -169,14 +169,22 @@ async def hiring_segment_b_activity_trigger(input: dict) -> dict:
 @app.activity_trigger(input_name="payload")
 def validate_segment_b_output_activity_trigger(payload: dict) -> dict:
     """Pydantic validation of the segment's output. Returns
-    {ok: True, output} or {ok: False, errors}."""
+    {ok: True, output} or {ok: False, errors}.
+
+    The errors list goes through ``json.loads(e.json())`` rather than
+    ``e.errors()`` because the latter returns dicts containing native
+    ``ValueError`` instances under ``ctx.error`` for custom-validator
+    failures, which Azure Durable Functions then rejects with
+    ``ValueError: activity trigger output must be json serializable``.
+    """
+    import json as _json
     from api.functions.segments.hiring_b import SegmentBOutput
     from pydantic import ValidationError
     try:
         validated = SegmentBOutput.model_validate(payload)
         return {"ok": True, "output": validated.model_dump()}
     except ValidationError as e:
-        return {"ok": False, "errors": e.errors()}
+        return {"ok": False, "errors": _json.loads(e.json())}
 
 
 # --- Hiring Segment D (Phase 4 of plan/refactor-substrate-agentic-segments-1.md) ---
@@ -188,12 +196,13 @@ async def hiring_segment_d_activity_trigger(input: dict) -> dict:
 
 @app.activity_trigger(input_name="payload")
 def validate_segment_d_output_activity_trigger(payload: dict) -> dict:
+    import json as _json
     from api.functions.segments.hiring_d import SegmentDOutput
     from pydantic import ValidationError
     try:
         return {"ok": True, "output": SegmentDOutput.model_validate(payload).model_dump()}
     except ValidationError as e:
-        return {"ok": False, "errors": e.errors()}
+        return {"ok": False, "errors": _json.loads(e.json())}
 
 
 # --- Hiring Segment E (Phase 4 of plan/refactor-substrate-agentic-segments-1.md) ---
@@ -205,12 +214,13 @@ async def hiring_segment_e_activity_trigger(input: dict) -> dict:
 
 @app.activity_trigger(input_name="payload")
 def validate_segment_e_output_activity_trigger(payload: dict) -> dict:
+    import json as _json
     from api.functions.segments.hiring_e import SegmentEOutput
     from pydantic import ValidationError
     try:
         return {"ok": True, "output": SegmentEOutput.model_validate(payload).model_dump()}
     except ValidationError as e:
-        return {"ok": False, "errors": e.errors()}
+        return {"ok": False, "errors": _json.loads(e.json())}
 
 
 # --- Hiring Segment F (Phase 4 of plan/refactor-substrate-agentic-segments-1.md) ---
@@ -222,12 +232,13 @@ async def hiring_segment_f_activity_trigger(input: dict) -> dict:
 
 @app.activity_trigger(input_name="payload")
 def validate_segment_f_output_activity_trigger(payload: dict) -> dict:
+    import json as _json
     from api.functions.segments.hiring_f import SegmentFOutput
     from pydantic import ValidationError
     try:
         return {"ok": True, "output": SegmentFOutput.model_validate(payload).model_dump()}
     except ValidationError as e:
-        return {"ok": False, "errors": e.errors()}
+        return {"ok": False, "errors": _json.loads(e.json())}
 
 
 # --- Generated-domain activity triggers (compose-domain v1) ----------------
