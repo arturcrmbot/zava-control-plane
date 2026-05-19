@@ -141,6 +141,13 @@ class DreamPassOrchestrator:
                     lesson_id=None,
                 )
             elif decision.verdict == 'flagged':
+                self._governor.write_flagged_candidate(
+                    candidate=candidate,
+                    experiment_id=experiment.id,
+                    delta=experiment.delta,
+                    n=experiment.n_samples,
+                    flag_reason=decision.reason,
+                )
                 flagged.append(candidate.id)
                 self._record_experiment(
                     dream_pass_id=dream_pass_id,
