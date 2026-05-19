@@ -181,6 +181,7 @@ async def run_agent_session(
     *,
     tools: list[Tool] | None = None,
     skill_dir: Path | None = None,
+    skill_directories: list[Path] | None = None,
     skill_label: str | None = None,
     model: str = "gpt-4.1",
     attachments: list[dict] | None = None,
@@ -202,6 +203,17 @@ async def run_agent_session(
     """
     tools = tools or []
     skill_text = _load_skill(skill_dir) if skill_dir else None
+    # SDK skill auto-discovery uses the union of skill_dir (primary,
+    # drives SKILL.md system-message loading + span tagging) and any
+    # extra skill_directories the caller passes. Dedup preserves order
+    # with the primary first.
+    all_skill_dirs: list[Path] = []
+    if skill_dir:
+        all_skill_dirs.append(skill_dir)
+    if skill_directories:
+        for d in skill_directories:
+            if d not in all_skill_dirs:
+                all_skill_dirs.append(d)
     # Each skill is its own agent. Prefer the explicit skill_label; fall
     # back to the skill_dir name; only use the legacy shared id when
     # neither is available (e.g. test harness without a skill).
@@ -247,7 +259,7 @@ async def run_agent_session(
         result: LLMRuntimeResult = await runtime.run_session(
             prompt=prompt,
             system_message=skill_text,
-            skill_directories=[skill_dir] if skill_dir else None,
+            skill_directories=all_skill_dirs or None,
             tools=tools,
             permission_handler=permission_handler,
             attachments=attachments,

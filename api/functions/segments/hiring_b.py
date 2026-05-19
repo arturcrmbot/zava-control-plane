@@ -100,10 +100,10 @@ async def run_segment_b(input: dict) -> dict:
 
     skills_root = _skills_dir()
     skill_dirs = [skills_root / s for s in _SEGMENT_B_SKILLS]
-    # The wrapper accepts ONE skill_dir today; we pass the first as the
-    # primary skill_dir for SKILL.md loading and rely on
-    # skill_directories= in the runtime kwargs for auto-discovery of
-    # the rest. (Phase 2's runtime accepts skill_directories= as a list.)
+    # One agent session loaded with all four Segment B skills. The first
+    # skill_dir is the primary (drives SKILL.md system-message + OTEL
+    # span tag); the rest are passed via skill_directories= so the SDK
+    # auto-discovers their SKILL.md files for on-demand invocation.
     prior_err = input.get("prior_validator_error")
     prompt = _build_segment_b_prompt(input, prior_validator_error=prior_err)
 
@@ -111,6 +111,7 @@ async def run_segment_b(input: dict) -> dict:
         prompt=prompt,
         tools=[],  # Tool objects resolved by the SDK from skill_directories
         skill_dir=skill_dirs[0],
+        skill_directories=skill_dirs[1:],
         skill_label="hiring-segment-b",
         workflow_id=input.get("workflow_id"),
         model="gpt-4.1",

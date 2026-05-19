@@ -109,6 +109,10 @@ class _SegmentBStubContext:
         validator_replies: list[dict] | None = None,
         segment_result: dict | None = None,
         candidate_id: str | None = None,
+        voice_event: dict | None = None,
+        invite_decision: dict | None = None,
+        booked_decision: dict | None = None,
+        post_decision: dict | None = None,
     ):
         self.instance_id = "instance-segb-1"
         self.current_utc_datetime = datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc)
@@ -122,6 +126,12 @@ class _SegmentBStubContext:
             "rationale": "all green",
         }
         self._candidate_id = candidate_id
+        # Defaults mirror the green-path defaults in test_hiring_voice_phase
+        # so completion-path tests can opt in without spelling each gate.
+        self._voice_event = voice_event or {"score": 0.8, "duration_s": 120.0}
+        self._invite_decision = invite_decision or {"decision": "invite"}
+        self._booked_decision = booked_decision or {"slot": "2026-06-01T10:00Z"}
+        self._post_decision = post_decision or {"decision": "offer", "level": "L4", "rating": 4}
 
     def get_input(self):
         out: dict[str, Any] = {"workflow_id": "HIRE-SEGB-1"}
@@ -152,6 +162,14 @@ class _SegmentBStubContext:
             return _StubExternalEvent(name, {"decision": "approve"})
         if name == "offer_approval":
             return _StubExternalEvent(name, {"decision": "approve"})
+        if name == "voice_complete":
+            return _StubExternalEvent(name, self._voice_event)
+        if name == "interview_invite":
+            return _StubExternalEvent(name, self._invite_decision)
+        if name == "interview_booked":
+            return _StubExternalEvent(name, self._booked_decision)
+        if name == "offer_decision":
+            return _StubExternalEvent(name, self._post_decision)
         return _StubExternalEvent(name, {})
 
     def create_timer(self, fire_at):
@@ -251,3 +269,48 @@ def test_orchestrator_segment_b_retry_exhaustion(monkeypatch):
     ]
     assert len(failure_checkpoints) == 1
     assert failure_checkpoints[0]["segment"] == "b"
+
+
+def test_orchestrator_segment_b_runs_to_completion(monkeypatch):
+    """Defect 1 regression: under HIRING_SEGMENT_MODE=b the orchestrator
+    must reach the final workflow.completed return dict without raising
+    UnboundLocalError on job_design_result / sourcing_result / triage_result.
+    """
+    monkeypatch.setenv("HIRING_SEGMENT_MODE", "b")
+    ctx = _SegmentBStubContext(candidate_id="C-COMPLETE-1")
+    result = _drive_until_done_or_error(ctx)
+    assert result is not None, "orchestrator must reach return statement"
+    assert result["status"] == "completed"
+    # These three were the UnboundLocalError vars in the bug.
+    assert result["job_design"] is not None
+    assert result["sourcing"] is not None
+    assert result["triage"] is not None
+
+
+def test_orchestrator_segment_b_populates_enriched_keys(monkeypatch):
+    """Defect 2 regression: enriched.get('triage')/sourcing/job_design
+    must be non-None on the segment-B path so the interview recommender
+    input and HITL payloads don't lose context.
+    """
+    monkeypatch.setenv("HIRING_SEGMENT_MODE", "b")
+    ctx = _SegmentBStubContext(candidate_id="C-ENRICHED-1")
+    _drive_until_done_or_error(ctx)
+    # The interview recommender (gate 1) reads enriched.get("triage").
+    recommender_calls = [
+        payload for (name, payload) in ctx.calls
+        if name == "hiring_interview_recommender_activity_trigger"
+    ]
+    assert recommender_calls, "interview recommender must have been invoked"
+    first = recommender_calls[0]
+    assert first.get("triage") is not None, "enriched['triage'] must be seeded under segment-B"
+    assert first.get("sourcing") is not None
+    assert first.get("job_design") is not None
+    # HITL suspended payload around line 319 carries triage in its context.
+    invite_suspend = [
+        payload for (name, payload) in ctx.calls
+        if name == "checkpoint_activity_trigger"
+        and payload.get("kind") == "suspended"
+        and payload.get("payload", {}).get("reason") == "awaiting_interview_invite"
+    ]
+    assert invite_suspend, "expected awaiting_interview_invite suspend checkpoint"
+    assert invite_suspend[0]["payload"]["context"]["triage"] is not None

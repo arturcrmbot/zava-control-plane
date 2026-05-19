@@ -130,6 +130,12 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
     })
 
     # Phase 2-5: Job Design / Sourcing / Triage / Screening
+    # Pre-declare result vars so the final return dict can reference them
+    # under both the segment-B branch (which only computes an aggregate
+    # screening_result) and the legacy off-branch (which sets each).
+    job_design_result: dict | None = None
+    sourcing_result: dict | None = None
+    triage_result: dict | None = None
     if _segment_enabled("b", _segments_enabled):
         # --- Segment B: candidate discovery as one agentic loop ---
         segment_input = {**enriched, "workflow_id": context.instance_id}
@@ -162,7 +168,19 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
         # Map segment output back to the variables the rest of the
         # orchestrator expects (verdict drives Voice gating).
         screening_result = {"verdict": segment_result["verdict"], **segment_result}
-        enriched = {**enriched, "screening": screening_result}
+        # Seed the four downstream-readable keys so HITL payloads and the
+        # interview recommender's `enriched.get("triage")` chain don't lose
+        # context. The segment output itself is the closest aggregate we have.
+        job_design_result = {"jd_draft_id": segment_result.get("jd_draft_id")}
+        sourcing_result = {"sourcing_pool_id": segment_result.get("sourcing_pool_id")}
+        triage_result = {"candidates": segment_result.get("candidates", [])}
+        enriched = {
+            **enriched,
+            "job_design": job_design_result,
+            "sourcing": sourcing_result,
+            "triage": triage_result,
+            "screening": screening_result,
+        }
     else:
         # Phase 2: Job Design
         job_design_result = yield context.call_activity("hiring_job_design_activity_trigger", enriched)
