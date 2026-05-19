@@ -22,6 +22,7 @@ import Evaluations from "@client/routes/Evaluations";
 import Economics from "@client/routes/Economics";
 import PolicyAndAutonomy from "@client/routes/PolicyAndAutonomy";
 import HiringManager from "@client/routes/HiringManager";
+import Dashboard from "@client/routes/Dashboard";
 
 function ShellBody() {
   const [roleId, setRoleId] = useLocalStorageState<RoleId>("fleetctl.role", "ops-reviewer");
@@ -114,6 +115,7 @@ function ShellInner({
         <main className="flex-1 min-w-0 flex">
           <Routes>
             <Route path="/" element={<Feed key={role.id} role={role} onOpenDrawer={onOpenDrawer} />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/fleet" element={<Navigate to="/" replace />} />
             <Route path="/exceptions" element={<Navigate to="/?filter=exceptions" replace />} />
             <Route path="/reviewer-queue" element={<Navigate to="/?filter=hitl" replace />} />

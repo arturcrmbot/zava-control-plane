@@ -5,7 +5,7 @@
 // secondary routes, and the Constellation external link.
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { ChevronDown, ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
+import { ChevronDown, ChevronsLeft, ChevronsRight, Plus, BarChart3 } from "lucide-react";
 import type { RolePreset, SavedView } from "@shared/roles";
 import { useLocalStorageState } from "@client/hooks/useLocalStorageState";
 
@@ -48,6 +48,14 @@ export default function LeftRail({
           title="Expand sidebar"
           className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400"
         ><ChevronsRight size={16} /></button>
+        <NavLink
+          to="/dashboard"
+          aria-label="Dashboard"
+          title="Dashboard"
+          className={({ isActive }) =>
+            `p-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"}`
+          }
+        ><BarChart3 size={16} /></NavLink>
       </aside>
     );
   }
@@ -81,6 +89,13 @@ export default function LeftRail({
           ><Plus size={12} /> Save current filter</button>
         </div>
       </div>
+
+      <NavLink
+        to="/dashboard"
+        className={({ isActive }) =>
+          `flex items-center gap-2 text-xs px-3 py-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"}`
+        }
+      ><BarChart3 size={14} /> Dashboard</NavLink>
 
       <div className="mt-auto">
         <button
