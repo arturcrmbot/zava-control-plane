@@ -307,6 +307,7 @@ from api.server.routes.audit import router as audit_router
 from api.server.routes.evals import router as evals_router
 from api.server.routes.orchestration import router as orchestration_router
 from api.server.routes.internal_durable_event import router as durable_event_router
+from api.server.routes.dream_pass_exceptions import router as dream_pass_exceptions_router
 from api.server.routes.fleet import router as fleet_router
 from api.server.routes.accuracy import router as accuracy_router
 from api.server.routes.policy_md import router as policy_md_router
@@ -387,7 +388,8 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           insights_router,
           demo_triggers_router,
           ticker_router,
-          foundry_router):
+          foundry_router,
+          dream_pass_exceptions_router):
     app.include_router(r)
 
 # Mount the built blueprint Vite bundle if present (production deploy).

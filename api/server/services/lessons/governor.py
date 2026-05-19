@@ -19,7 +19,7 @@ from api.server.services.governance.kernel import (
 )
 from api.server.services.lessons.kuzu_provenance import KuzuLessonProvenance
 from api.server.services.lessons.store import LessonStore
-from api.server.services.lessons.types import Lesson
+from api.server.services.lessons.types import Lesson, LessonCandidate
 
 
 class _AuditLike(Protocol):
@@ -97,6 +97,107 @@ class LessonGovernor:
         if decision.enforcement_mode == "enforce":
             raise GovernanceDenied(decision)
         # log_only: caller proceeds; ledger entry below records the deny.
+
+    # ------------------------------------------------------------------
+    # D1 exception portal: flagged-candidate surfaces.
+    # ------------------------------------------------------------------
+
+    def write_flagged_candidate(
+        self,
+        *,
+        candidate: LessonCandidate,
+        experiment_id: str,
+        delta: float,
+        n: int,
+        flag_reason: str,
+    ) -> None:
+        """Persist a candidate lesson with status='candidate' for human review."""
+        decision = self._kernel_factory().evaluate_tool_call(
+            actor=self._actor,
+            tool="lesson.write",
+            args={
+                "lesson_id": candidate.id,
+                "domain": candidate.scope.domain,
+                "flag_reason": flag_reason,
+            },
+            workflow_id=self._workflow_id,
+        )
+        self._enforce(decision)
+        self._provenance.record_candidate(
+            candidate_id=candidate.id,
+            body=candidate.body,
+            domain=candidate.scope.domain,
+            persona_role=candidate.scope.persona_role or "",
+            market=candidate.scope.market or "",
+            proposed_by=candidate.proposed_by,
+            experiment_id=experiment_id,
+            delta=delta,
+            n=n,
+            flag_reason=flag_reason,
+        )
+        self._record_ledger(
+            decision,
+            action="lesson.flag_candidate",
+            details={
+                "lesson_id": candidate.id,
+                "domain": candidate.scope.domain,
+                "flag_reason": flag_reason,
+                "delta": delta,
+                "n": n,
+                "experiment_id": experiment_id,
+            },
+        )
+
+    def approve_flagged(self, *, lesson_id: str, approver: str) -> None:
+        """Operator action: promote a status='candidate' Lesson to active."""
+        decision = self._kernel_factory().evaluate_tool_call(
+            actor=self._actor,
+            tool="lesson.approve_flagged",
+            args={"lesson_id": lesson_id, "approver": approver},
+            workflow_id=self._workflow_id,
+        )
+        self._enforce(decision)
+        candidate = self._provenance.fetch_candidate(lesson_id)
+        if candidate is None:
+            raise LookupError(f"no candidate lesson found with id {lesson_id}")
+        # Re-record as active (status flips from 'candidate' to 'active').
+        from dataclasses import replace as _replace
+        active = _replace(candidate, status="active")
+        self._store.add(active)
+        self._provenance.record(active)
+        self._record_ledger(
+            decision,
+            action="lesson.approve_flagged",
+            details={"lesson_id": lesson_id, "approver": approver},
+        )
+
+    def reject_flagged(
+        self, *, lesson_id: str, reviewer: str, reason: str
+    ) -> None:
+        """Operator action: prune a status='candidate' Lesson permanently."""
+        decision = self._kernel_factory().evaluate_tool_call(
+            actor=self._actor,
+            tool="lesson.reject_flagged",
+            args={
+                "lesson_id": lesson_id,
+                "reviewer": reviewer,
+                "reason": reason,
+            },
+            workflow_id=self._workflow_id,
+        )
+        self._enforce(decision)
+        self._provenance.mark_pruned(
+            lesson_id, reason=f"rejected_by_review: {reason}"
+        )
+        self._record_ledger(
+            decision,
+            action="lesson.reject_flagged",
+            details={
+                "lesson_id": lesson_id,
+                "reviewer": reviewer,
+                "reason": reason,
+            },
+        )
 
     def _record_ledger(
         self,
