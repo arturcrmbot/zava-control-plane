@@ -4,12 +4,13 @@
 // Today chip content is keyed off role.todayChip.
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Sun, Moon } from "lucide-react";
+import { Sun, Moon, Rows3, Rows4 } from "lucide-react";
 import type { RoleId, RolePreset } from "@shared/roles";
 import type { FeedItem } from "@shared/feedItems";
 import type { Workflow } from "@shared/types";
 import { useNow } from "@client/hooks/useNow";
 import { useDarkMode } from "@client/hooks/useDarkMode";
+import { useDensity } from "@client/hooks/useDensity";
 import { useSSEStatus } from "@client/hooks/useSSE";
 import RoleSwitcher from "./RoleSwitcher";
 import NotificationsPopover from "./NotificationsPopover";
@@ -93,6 +94,7 @@ export default function Header({
   const matches = q.trim().length === 0 ? [] :
     workflows.filter((w) => w.id.toLowerCase().includes(q.toLowerCase())).slice(0, 8);
   const { resolved: theme, toggle: toggleTheme } = useDarkMode();
+  const { density, toggle: toggleDensity } = useDensity();
 
   return (
     <header className="flex items-center gap-4 px-6 h-12 border-b border-slate-200 bg-white sticky top-0 z-30 dark:bg-slate-900 dark:border-slate-700">
@@ -124,6 +126,15 @@ export default function Header({
         <ConnectionStatusDot />
         <HeaderClock />
         <TodayChip role={role} items={unreadItems} workflows={workflows} />
+        <button
+          type="button"
+          onClick={toggleDensity}
+          aria-label={density === "compact" ? "Switch to cosy density" : "Switch to compact density"}
+          title={density === "compact" ? "Switch to cosy density" : "Switch to compact density"}
+          className="p-1.5 rounded text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800"
+        >
+          {density === "compact" ? <Rows3 size={16} /> : <Rows4 size={16} />}
+        </button>
         <button
           type="button"
           onClick={toggleTheme}
