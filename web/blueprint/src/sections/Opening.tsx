@@ -11,7 +11,7 @@ export function Opening() {
           <p className="subhead">And what we think actually does.</p>
         </div>
 
-        <div className="column stack-lg">
+        <div className="stack-lg">
           <p className="lede">
             You&apos;ve sponsored the work, the demos went fine, contracts
             were signed, things shipped. Then the next initiative arrives and
