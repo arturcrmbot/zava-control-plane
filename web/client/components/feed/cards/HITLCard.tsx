@@ -38,19 +38,45 @@ export default function HITLCard({
   const onAction = async (id: string, verb: string) => {
     setBusy(id);
     store.record(item.id, { verb, actor: "you", actedAt: Math.floor(Date.now() / 1000) });
+    const exceptionId = w.activeExceptionId;
+    const ctrl = new AbortController();
+    let undone = false;
+    toast.showWithAction({
+      msg: `${verb} ${w.id}`,
+      ttlMs: 5_000,
+      action: {
+        label: "Undo",
+        onAction: () => {
+          undone = true;
+          ctrl.abort();
+          store.revert(item.id);
+        },
+      },
+    });
+    await new Promise((res) => setTimeout(res, 5_000));
+    if (undone) {
+      setBusy(null);
+      return;
+    }
+    // No backend exception to resolve (HITL view without an activeException):
+    // the optimistic local resolution is the only state we need to preserve.
+    if (!exceptionId) {
+      setBusy(null);
+      return;
+    }
     try {
-      const exceptionId = w.activeExceptionId;
-      if (!exceptionId) return;
       const r = await fetch(`/api/exceptions/${exceptionId}/resolve`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ resolution: id, resolvedBy: "reviewer@zava" }),
+        signal: ctrl.signal,
       });
       if (!r.ok) {
         store.revert(item.id);
         toast.show("Couldn't resolve — try again");
       }
-    } catch {
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       store.revert(item.id);
       toast.show("Couldn't resolve — try again");
     } finally {

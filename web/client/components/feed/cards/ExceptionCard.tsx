@@ -36,6 +36,35 @@ export default function ExceptionCard({
     store.record(item.id, { verb, actor: "you", actedAt: Math.floor(Date.now() / 1000) });
     if (id === "snooze") {
       setBusy(null);
+      toast.showWithAction({
+        msg: `${verb} ${e.workflowId}`,
+        action: { label: "Undo", onAction: () => store.revert(item.id) },
+      });
+      return;
+    }
+    // Defer the actual network call by 5s, giving the user a window to
+    // click Undo (which aborts the in-flight request before it leaves the
+    // browser). Pattern: setTimeout + AbortController.
+    const ctrl = new AbortController();
+    let undone = false;
+    toast.showWithAction({
+      msg: `${verb} ${e.workflowId}`,
+      ttlMs: 5_000,
+      action: {
+        label: "Undo",
+        onAction: () => {
+          undone = true;
+          ctrl.abort();
+          store.revert(item.id);
+        },
+      },
+    });
+    // Hold the optimistic state for ~5s, then fire. The store.record
+    // already flipped the card to ResolvedCard via the overlay so the
+    // user sees instant feedback either way.
+    await new Promise((res) => setTimeout(res, 5_000));
+    if (undone) {
+      setBusy(null);
       return;
     }
     try {
@@ -43,12 +72,14 @@ export default function ExceptionCard({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ resolution: id, resolvedBy: "reviewer@zava" }),
+        signal: ctrl.signal,
       });
       if (!r.ok) {
         store.revert(item.id);
         toast.show("Couldn't resolve — try again");
       }
-    } catch {
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
       store.revert(item.id);
       toast.show("Couldn't resolve — try again");
     } finally {
