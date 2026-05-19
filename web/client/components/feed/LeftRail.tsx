@@ -1,12 +1,13 @@
 // web/client/components/feed/LeftRail.tsx
 //
-// 160-200px sidebar: role-default saved views + user-added saved views +
-// More ▾ submenu containing the demoted secondary routes + Constellation
-// external link at the bottom.
+// Collapsible sidebar (160–200px expanded → 44px collapsed). Houses role
+// saved views, user-added saved views, More ▾ submenu with the demoted
+// secondary routes, and the Constellation external link.
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, ChevronsLeft, ChevronsRight, Plus } from "lucide-react";
 import type { RolePreset, SavedView } from "@shared/roles";
+import { useLocalStorageState } from "@client/hooks/useLocalStorageState";
 
 const ROUTE_LABEL: Record<string, string> = {
   "/analytics": "Analytics",
@@ -33,13 +34,37 @@ export default function LeftRail({
   onSelectView: (v: SavedView) => void;
   onSaveCurrent: () => void;
 }) {
+  const [collapsed, setCollapsed] = useLocalStorageState<boolean>("fleetctl.leftRail.collapsed", false);
   const [moreOpen, setMoreOpen] = useState(false);
   const allViews = [...role.defaultSavedViews, ...userViews];
 
+  if (collapsed) {
+    return (
+      <aside className="w-[44px] shrink-0 bg-white border-r border-slate-200 p-2 flex flex-col items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          aria-label="Expand sidebar"
+          title="Expand sidebar"
+          className="p-1.5 rounded hover:bg-slate-100 text-slate-500"
+        ><ChevronsRight size={16} /></button>
+      </aside>
+    );
+  }
+
   return (
     <aside className="w-[200px] shrink-0 bg-white border-r border-slate-200 p-3 flex flex-col gap-3 text-sm overflow-y-auto">
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] uppercase tracking-wide text-slate-400 px-2">Saved views</div>
+        <button
+          type="button"
+          onClick={() => setCollapsed(true)}
+          aria-label="Collapse sidebar"
+          title="Collapse sidebar"
+          className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+        ><ChevronsLeft size={14} /></button>
+      </div>
       <div>
-        <div className="text-[10px] uppercase tracking-wide text-slate-400 px-2 mb-1">Saved views</div>
         <div className="space-y-0.5">
           {allViews.map((v) => (
             <button
