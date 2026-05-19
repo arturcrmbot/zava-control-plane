@@ -289,6 +289,15 @@ async def run_agent_session(
     parsed = _extract_json(text)
     elapsed_ms = int(elapsed_s * 1000)
 
+    # Surface collected tool calls on a leading-underscore key so
+    # downstream segments (e.g. Segment F's idempotent-only retry
+    # gate) can inspect them without spawning a span query. Only
+    # added when the parsed payload is a dict AND at least one tool
+    # call was collected, keeping the return shape backwards-
+    # compatible for non-tool-using callers (Segments B/D/E).
+    if isinstance(parsed, dict) and tool_calls_collected:
+        parsed["_raw_tool_calls"] = tool_calls_collected
+
     try:
         from api.server.eval.evaluator_set import extract_context
         context = extract_context(skill_label or "", tool_calls_collected)
