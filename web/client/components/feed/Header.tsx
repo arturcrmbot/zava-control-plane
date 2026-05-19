@@ -1,12 +1,13 @@
 // web/client/components/feed/Header.tsx
 //
-// Sticky thin top row: brand · search · 🔔 · Today chip · RoleSwitcher.
+// Sticky thin top row: brand · search · 🔔 · clock · Today chip · RoleSwitcher.
 // Today chip content is keyed off role.todayChip.
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { RoleId, RolePreset } from "@shared/roles";
 import type { FeedItem } from "@shared/feedItems";
 import type { Workflow } from "@shared/types";
+import { useNow } from "@client/hooks/useNow";
 import RoleSwitcher from "./RoleSwitcher";
 import NotificationsPopover from "./NotificationsPopover";
 
@@ -30,6 +31,31 @@ function TodayChip({ role, items, workflows }: { role: RolePreset; items: FeedIt
     return <span className="text-xs text-slate-600">Throughput: {completed}</span>;
   }
   return null;
+}
+
+function HeaderClock() {
+  // 1s tick. Includes a stable TZ abbreviation derived once via Intl, so the
+  // operator knows whether the displayed time matches their wall clock.
+  const now = useNow(1000);
+  const d = new Date(now);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const ss = String(d.getSeconds()).padStart(2, "0");
+  let tz = "";
+  try {
+    const parts = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" }).formatToParts(d);
+    tz = parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+  } catch {
+    tz = "";
+  }
+  return (
+    <span
+      className="text-xs font-mono tabular-nums text-slate-600"
+      title={d.toString()}
+    >
+      {hh}:{mm}:{ss}{tz && <span className="ml-1 text-slate-400">{tz}</span>}
+    </span>
+  );
 }
 
 export default function Header({
@@ -73,6 +99,7 @@ export default function Header({
       </div>
       <div className="ml-auto flex items-center gap-3">
         <NotificationsPopover items={unreadItems} onJumpTo={onJumpTo} />
+        <HeaderClock />
         <TodayChip role={role} items={unreadItems} workflows={workflows} />
         <RoleSwitcher current={role.id} onChange={onRoleChange} />
         <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 text-xs flex items-center justify-center font-medium" aria-label="user avatar">A</div>

@@ -7,6 +7,7 @@
 // horizontally at container ≥ 720px (spec §3.1 — drawer-open narrowing).
 import type { ReactNode } from "react";
 import type { Severity } from "@shared/types";
+import { useNow, formatRelative } from "@client/hooks/useNow";
 
 const SEVERITY_BORDER: Record<string, string> = {
   critical: "border-l-4 border-red-500",
@@ -21,15 +22,6 @@ const SEVERITY_DOT: Record<string, string> = {
   medium: "bg-slate-300",
   null: "bg-slate-200",
 };
-
-function relativeTime(tsSec: number): string {
-  const now = Date.now() / 1000;
-  const diff = Math.max(0, now - tsSec);
-  if (diff < 60) return `${Math.round(diff)}s ago`;
-  if (diff < 3600) return `${Math.round(diff / 60)}m ago`;
-  if (diff < 86400) return `${(diff / 3600).toFixed(1)}h ago`;
-  return `${Math.round(diff / 86400)}d ago`;
-}
 
 export interface CardShellProps {
   severity: Severity | null;
@@ -48,6 +40,7 @@ export default function CardShell({
   body, actions, onPrimaryClick, testId,
 }: CardShellProps) {
   const sevKey = severity ?? "null";
+  const now = useNow(1000);
   const onKey = onPrimaryClick
     ? (e: import("react").KeyboardEvent<HTMLDivElement>) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -76,7 +69,7 @@ export default function CardShell({
         </span>
         <span className="text-slate-300">·</span>
         <span className="font-mono text-slate-700">{workflowId}</span>
-        <span className="ml-auto text-[11px] text-slate-400">{relativeTime(timestampSec)}</span>
+        <span className="ml-auto text-[11px] text-slate-400 tabular-nums">{formatRelative(timestampSec, now)}</span>
       </div>
       <div className="px-4 py-3 flex flex-col @[720px]:flex-row @[720px]:items-start @[720px]:gap-4 gap-3">
         <div className="flex-1 min-w-0">{body}</div>
