@@ -125,16 +125,16 @@ export default function KillSwitchPanel() {
   }
 
   return (
-    <div className="rounded-md border border-zinc-200 bg-white p-3">
+    <div className="rounded-md border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
       <div className="mb-2 flex items-baseline justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-700">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
           Kill switches
         </h3>
-        <span className="text-xs text-zinc-500">{kills.length} active</span>
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">{kills.length} active</span>
       </div>
 
       {error && (
-        <div className="mb-2 rounded border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700">
+        <div className="mb-2 rounded border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
           {error}
         </div>
       )}
@@ -145,23 +145,23 @@ export default function KillSwitchPanel() {
           {kills.map((k) => (
             <li
               key={k.kill_id}
-              className="flex items-center justify-between rounded border border-rose-200 bg-rose-50 px-2 py-1 text-xs"
+              className="flex items-center justify-between rounded border border-rose-200 bg-rose-50 px-2 py-1 text-xs dark:border-rose-900 dark:bg-rose-950/40"
             >
               <div className="min-w-0 flex-1">
-                <div className="truncate font-mono text-rose-800">
+                <div className="truncate font-mono text-rose-800 dark:text-rose-200">
                   {k.actor} → {k.tool}
                 </div>
-                <div className="truncate text-rose-700">{k.reason}</div>
+                <div className="truncate text-rose-700 dark:text-rose-300">{k.reason}</div>
               </div>
               <div className="ml-2 flex items-center gap-1">
-                <span className="font-mono text-rose-700">
+                <span className="font-mono text-rose-700 dark:text-rose-300">
                   {fmtRemaining(k.expires_at - now)}
                 </span>
                 <button
                   type="button"
                   onClick={() => remove(k.kill_id)}
                   disabled={busy}
-                  className="rounded border border-rose-300 bg-white px-1.5 py-0.5 text-[11px] text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                  className="rounded border border-rose-300 bg-white px-1.5 py-0.5 text-[11px] text-rose-700 hover:bg-rose-100 disabled:opacity-50 dark:border-rose-800 dark:bg-zinc-800 dark:text-rose-300 dark:hover:bg-rose-900/30"
                   title="Remove kill"
                 >
                   ✕
@@ -174,48 +174,48 @@ export default function KillSwitchPanel() {
 
       {/* Add form */}
       <details className="text-xs">
-        <summary className="cursor-pointer text-zinc-600 hover:text-zinc-900">
+        <summary className="cursor-pointer text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100">
           Add a kill
         </summary>
         <div className="mt-2 space-y-2">
           <label className="block">
-            <span className="text-[11px] uppercase tracking-wide text-zinc-500">
+            <span className="text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
               actor (or *)
             </span>
             <input
-              className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 font-mono text-xs"
+              className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               value={actor}
               onChange={(e) => setActor(e.target.value)}
             />
           </label>
           <label className="block">
-            <span className="text-[11px] uppercase tracking-wide text-zinc-500">
+            <span className="text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
               tool (or *)
             </span>
             <input
-              className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 font-mono text-xs"
+              className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               value={tool}
               onChange={(e) => setTool(e.target.value)}
             />
           </label>
           <label className="block">
-            <span className="text-[11px] uppercase tracking-wide text-zinc-500">
+            <span className="text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
               ttl (minutes)
             </span>
             <input
               type="number"
               min={1}
-              className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 font-mono text-xs"
+              className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               value={ttlMinutes}
               onChange={(e) => setTtlMinutes(parseInt(e.target.value, 10) || 1)}
             />
           </label>
           <label className="block">
-            <span className="text-[11px] uppercase tracking-wide text-zinc-500">
+            <span className="text-[11px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
               reason
             </span>
             <input
-              className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 text-xs"
+              className="mt-0.5 w-full rounded border border-zinc-300 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="e.g. anomalous spike on this tool"
@@ -225,11 +225,11 @@ export default function KillSwitchPanel() {
             type="button"
             onClick={add}
             disabled={busy || !reason.trim()}
-            className="w-full rounded bg-rose-600 px-2 py-1 text-xs font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+            className="w-full rounded bg-rose-600 px-2 py-1 text-xs font-medium text-white hover:bg-rose-700 disabled:opacity-50 dark:bg-rose-700 dark:hover:bg-rose-600"
           >
             {busy ? "…" : "Add kill"}
           </button>
-          <p className="text-[10px] leading-snug text-zinc-500">
+          <p className="text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">
             Use <span className="font-mono">*</span> as a wildcard. The
             kernel consults this list on every MCP call. Lazy expiry.
           </p>

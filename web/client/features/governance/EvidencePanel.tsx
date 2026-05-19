@@ -45,10 +45,10 @@ function Chip({
   pending?: boolean;
 }) {
   const colour = pending
-    ? "bg-zinc-100 text-zinc-600 border-zinc-200"
+    ? "bg-zinc-100 text-zinc-600 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700"
     : ok
-    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-    : "bg-rose-50 text-rose-700 border-rose-200";
+    ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900"
+    : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900";
   const glyph = pending ? "•" : ok ? "✓" : "✗";
   return (
     <div
@@ -98,14 +98,14 @@ export default function EvidencePanel({ workflowId }: Props) {
   // chip is always visible during the demo.
   if (report.total_entries === 0) {
     return (
-      <div className="rounded-md border border-zinc-200 bg-white p-3">
+      <div className="rounded-md border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
         <div className="mb-2 flex items-baseline justify-between">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-700">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
             Evidence
           </h3>
-          <span className="text-xs text-zinc-500">no activity yet</span>
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">no activity yet</span>
         </div>
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
           Audit chain is empty for this workflow. Entries appear as the
           orchestrator writes ledger events.
         </p>
@@ -127,7 +127,7 @@ export default function EvidencePanel({ workflowId }: Props) {
 
   return (
     <div
-      className="rounded-md border border-zinc-200 bg-white p-3"
+      className="rounded-md border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900"
       title={tooltip}
     >
       <button
@@ -137,12 +137,12 @@ export default function EvidencePanel({ workflowId }: Props) {
         aria-expanded={expanded}
       >
         <div className="mb-2 flex items-baseline justify-between">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-700">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
             Evidence
           </h3>
           <span
             className={`text-xs ${
-              allGreen ? "text-emerald-700" : "text-rose-700"
+              allGreen ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"
             }`}
           >
             {allGreen ? "verified" : "see details"}
@@ -156,27 +156,27 @@ export default function EvidencePanel({ workflowId }: Props) {
       </button>
 
       {expanded && (
-        <div className="mt-3 space-y-1 border-t border-zinc-100 pt-2 text-xs text-zinc-600">
+        <div className="mt-3 space-y-1 border-t border-zinc-100 pt-2 text-xs text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
           <div>
-            <span className="text-zinc-500">entries:</span>{" "}
+            <span className="text-zinc-500 dark:text-zinc-500">entries:</span>{" "}
             <span className="font-mono">{report.total_entries}</span>
           </div>
           <div>
-            <span className="text-zinc-500">signatures:</span>{" "}
+            <span className="text-zinc-500 dark:text-zinc-500">signatures:</span>{" "}
             <span className="font-mono">{sigCount} valid</span>
           </div>
           {report.broken_at !== null && (
-            <div className="text-rose-700">
-              <span className="text-zinc-500">broken_at:</span>{" "}
+            <div className="text-rose-700 dark:text-rose-400">
+              <span className="text-zinc-500 dark:text-zinc-500">broken_at:</span>{" "}
               <span className="font-mono">{report.broken_at}</span>
             </div>
           )}
           {report.reason && (
-            <div className="break-words text-rose-700">{report.reason}</div>
+            <div className="break-words text-rose-700 dark:text-rose-400">{report.reason}</div>
           )}
           {report.bad_signatures_at && report.bad_signatures_at.length > 0 && (
-            <div className="text-rose-700">
-              <span className="text-zinc-500">bad signatures at:</span>{" "}
+            <div className="text-rose-700 dark:text-rose-400">
+              <span className="text-zinc-500 dark:text-zinc-500">bad signatures at:</span>{" "}
               <span className="font-mono">
                 [{report.bad_signatures_at.join(", ")}]
               </span>
@@ -184,14 +184,14 @@ export default function EvidencePanel({ workflowId }: Props) {
           )}
           {report.unresolved_decisions_at &&
             report.unresolved_decisions_at.length > 0 && (
-              <div className="text-rose-700">
-                <span className="text-zinc-500">unresolved decisions at:</span>{" "}
+              <div className="text-rose-700 dark:text-rose-400">
+                <span className="text-zinc-500 dark:text-zinc-500">unresolved decisions at:</span>{" "}
                 <span className="font-mono">
                   [{report.unresolved_decisions_at.join(", ")}]
                 </span>
               </div>
             )}
-          <div className="pt-1 text-[10px] uppercase tracking-wide text-zinc-400">
+          <div className="pt-1 text-[10px] uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
             See plan/feature-agent-governance-toolkit-1.md (Phase 4 + 5 + 7)
           </div>
         </div>
