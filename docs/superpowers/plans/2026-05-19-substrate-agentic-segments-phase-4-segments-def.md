@@ -202,6 +202,7 @@ Same pattern as Task 1. Schema-accept fixture:
     "jurisdiction": "USA",
     "compliance_steps": ["EEO checks complete"],
     "policy_citations": ["data/policies/hr/eeo.md#L34"],
+    "rationale": "USA jurisdiction routed via offer-personaliser; EEO checks satisfied",
 }
 ```
 
@@ -234,6 +235,7 @@ class SegmentEOutput(BaseModel):
     jurisdiction: Literal["USA", "DE"]
     compliance_steps: list[str]
     policy_citations: list[str]
+    rationale: str  # mirrors SegmentB/D for auditability — downstream scorer reads this
 ```
 
 `run_segment_e` and the prompt builder follow the Segment D pattern exactly.
@@ -278,6 +280,7 @@ Same pattern as previous. Schema-accept fixture:
     "avatar_video_url": "https://example.test/avatar.mp4",
     "day1_calendar_id": "MS-INV-1",
     "provisioning_steps": ["JML ticket SN-1234 raised"],
+    "rationale": "onboarding-buddy emitted JML + calendar; avatar rendered",
 }
 ```
 
@@ -307,6 +310,7 @@ class SegmentFOutput(BaseModel):
     avatar_video_url: str | None = None
     day1_calendar_id: str | None = None
     provisioning_steps: list[str]
+    rationale: str  # mirrors SegmentB/D for auditability — downstream scorer reads this
 ```
 
 The `run_segment_f` body must also surface the `tool_calls` collected by the runtime so the orchestrator can inspect them for idempotent-only retry gating. Extend the return shape:

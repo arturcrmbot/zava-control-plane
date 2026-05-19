@@ -13,10 +13,12 @@
 ## Prerequisites
 
 This plan depends on:
-- Plan 1 landed (`LessonGovernor`, Kuzu `Lesson` schema, `data/policies/tools.yaml`).
-- Plan 3 landed (`Experiment` Kuzu schema, dream-pass orchestrator writes flagged candidates into `Lesson` table with `status='candidate'`).
+- [2026-05-19-lesson-store-foundation.md](2026-05-19-lesson-store-foundation.md) (B1) — `LessonGovernor`, Kuzu `Lesson` schema, `data/policies/tools.yaml`.
+- [2026-05-19-experimental-dream-pass.md](2026-05-19-experimental-dream-pass.md) (C1) — `Experiment` Kuzu schema and the orchestrator hook that calls `LessonGovernor.write_flagged_candidate(...)` to persist flagged rows with `status='candidate'`.
 
-A small **upstream change** in Plan 3 is required to make flagged candidates persist as `Lesson` rows with `status='candidate'`. Plan 3's orchestrator currently returns flagged IDs in memory but does not persist the candidate body. This plan does the persistence work as Task 1.
+**Split of responsibilities for flagged-candidate persistence:**
+- **C1 (already specified in its plan)** modifies `dream_pass/orchestrator.py` to call the governor when verdict is `flagged`.
+- **This plan, Task 1** adds the governor method that call invokes (`write_flagged_candidate`) plus `approve_flagged` / `reject_flagged`, and the matching `KuzuProvenance.record_candidate` write.
 
 ---
 

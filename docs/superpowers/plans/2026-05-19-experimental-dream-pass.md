@@ -4,6 +4,11 @@
 
 **Goal:** Land the end-to-end dream-pass loop: an agentic, AGT-gated, **closed-loop experimental** lesson optimiser that proposes candidate lessons from working memory + outcomes, A/B-tests them by re-running an LLM agent twice (control vs treatment) against held-out synthetic personas using the rubric scorer, and auto-promotes winners via policy — no human required in the default path.
 
+**Depends on:**
+- [2026-05-19-substrate-agentic-segments-phase-3-segment-b.md](2026-05-19-substrate-agentic-segments-phase-3-segment-b.md) (A2) — gives `agent_interview_recommender` an LLM-driven segment to optimise.
+- [2026-05-19-lesson-store-foundation.md](2026-05-19-lesson-store-foundation.md) (B1) — `LessonGovernor`, `WorkingMemoryStore`, Kuzu `Lesson` schema, `data/policies/tools.yaml` entries.
+- [2026-05-19-domain-rubric-scorer.md](2026-05-19-domain-rubric-scorer.md) (B2) — `RunScorer` for computing A/B score deltas.
+
 **Architecture:** A `DreamPassOrchestrator` runs one pass per (domain, dream-skill). For each pass it:
 
 1. Reads recent **WorkingNotes** for the target agent (Plan 1 working memory tier) and recent runs + their rubric scores.

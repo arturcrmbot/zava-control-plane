@@ -2,6 +2,8 @@
 
 This is the canonical location for executable implementation plans in this repo.
 
+> **Working on the dream-pass?** Start at [2026-05-19-dream-pass-overview.md](2026-05-19-dream-pass-overview.md) for the ordered pickup list and dependency graph across the 7 related plans.
+
 ## Convention
 
 - **Filename**: `YYYY-MM-DD-<feature-name>.md` (date first, lowercase kebab-case name).
