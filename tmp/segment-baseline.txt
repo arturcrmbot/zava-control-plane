@@ -1,0 +1,1 @@
+records=5, sessions=20 (B=5 D=5 E=5 F=5), avg latency_s=0.0252
