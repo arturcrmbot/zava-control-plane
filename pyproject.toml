@@ -59,11 +59,6 @@ dependencies = [
   # agentic-org-phase-1-entity-graph.md (REQ-001/CON-003: kuzu via Python
   # wheel only, no external server). Pinned to 0.6.x — current stable.
   "kuzu>=0.6,<0.7",
-  # mem0ai — lesson + working-memory store backing the dream-pass loop
-  # (docs/superpowers/plans/2026-05-19-lesson-store-foundation.md, Task 1).
-  # Note: the [nlp] extra documented in the plan does not exist in
-  # mem0ai 0.1.118; the core package is sufficient for our usage.
-  "mem0ai>=0.1.115,<0.2",
   # Faker — synthetic Person names for the data fabric employee generator
   # (plan/feature-enterprise-pitch-readiness-1.md task pitch-b2). Used at
   # demo-data generation time only; no runtime dependency on user data.
