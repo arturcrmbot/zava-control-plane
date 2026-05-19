@@ -13,6 +13,7 @@ import { useMemo } from "react";
 import {
   buildHITLCards, buildExceptionCards, buildExternalWaitCards,
   buildMilestoneCards, buildPolicyCards, buildAgentEventCards,
+  buildWorkflowCards,
   chronological, type FeedItem,
 } from "@shared/feedItems";
 import { matchesView } from "@shared/savedViews";
@@ -71,6 +72,22 @@ export function useFeedItems(
         ),
       );
     }
+    // Generic workflow cards: ensure every workflow is observable in the
+    // control plane. De-dup against the more-specific card types so a
+    // workflow that already has a HITL / exception / external-wait /
+    // milestone card doesn't double-render. Added in both filter modes
+    // — `needs-you` would otherwise hide active workflows that aren't
+    // gating on the operator, which is the whole observability gap.
+    const coveredWorkflowIds = new Set<string>(
+      items
+        .map((i) => i.workflowId)
+        .filter((id): id is string => typeof id === "string"),
+    );
+    items.push(
+      ...buildWorkflowCards(workflows).filter(
+        (i) => !coveredWorkflowIds.has(i.workflowId),
+      ),
+    );
 
     // Overlay optimistic resolutions: replace HITL/Exception/ExternalWait
     // items that have a recorded resolution with a ResolvedItem in the same

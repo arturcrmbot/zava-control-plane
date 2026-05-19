@@ -75,6 +75,16 @@ export interface ResolvedItem extends FeedItemBase {
   actedAt: number;
 }
 
+export interface WorkflowItem extends FeedItemBase {
+  type: "workflow";
+  workflowId: string;
+  workflow: Workflow;
+  // Snapshot of phase/status at card-build time so the card can render
+  // a one-line summary without re-deriving them.
+  phase: string;
+  status: string;
+}
+
 export type FeedItem =
   | HITLItem
   | ExceptionItem
@@ -82,7 +92,8 @@ export type FeedItem =
   | MilestoneItem
   | PolicyItem
   | AgentEventItem
-  | ResolvedItem;
+  | ResolvedItem
+  | WorkflowItem;
 
 // ---------- builders ----------
 
@@ -217,6 +228,26 @@ export function buildAgentEventCards(
     workflowId: e.workflow_id,
   }));
   return [...fm, ...orch];
+}
+
+// Generic per-workflow card. One card per workflow regardless of phase /
+// status / domain — guarantees that every active or recently-finished
+// workflow is observable in the control plane, even when no HITL gate,
+// exception, external-wait, or terminal milestone applies. The hook
+// layer is responsible for de-duplicating against the more-specific
+// card builders so a workflow doesn't render twice.
+export function buildWorkflowCards(workflows: Workflow[]): WorkflowItem[] {
+  return workflows.map((w) => ({
+    id: `workflow:${w.id}`,
+    type: "workflow",
+    timestamp: w.createdAt,
+    workflowId: w.id,
+    domain: w.type,
+    severity: null,
+    workflow: w,
+    phase: w.currentPhase,
+    status: w.status,
+  }));
 }
 
 export function chronological(items: FeedItem[]): FeedItem[] {

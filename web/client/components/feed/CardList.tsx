@@ -13,6 +13,7 @@ import MilestoneCard from "./cards/MilestoneCard";
 import PolicyCard from "./cards/PolicyCard";
 import AgentEventCard from "./cards/AgentEventCard";
 import ResolvedCard from "./cards/ResolvedCard";
+import WorkflowCard from "./cards/WorkflowCard";
 
 const PAGE = 100;
 
@@ -89,5 +90,6 @@ function renderCard(
     case "policy":        return <PolicyCard       item={it} hideActions={o.hideActions} onOpenDrawer={o.onOpenDrawer} />;
     case "agent-event":   return <AgentEventCard   item={it} />;
     case "resolved":      return <ResolvedCard     item={it} onOpenDrawer={o.onOpenDrawer} />;
+    case "workflow":      return <WorkflowCard     item={it} hideActions={o.hideActions} onOpenDrawer={o.onOpenDrawer} />;
   }
 }

@@ -20,7 +20,8 @@ export type CardType =
   | "milestone"
   | "policy"
   | "agent-event"
-  | "resolved";
+  | "resolved"
+  | "workflow";
 
 export type DrawerSection = "decision" | "activity" | "audit";
 
@@ -70,7 +71,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     label: "Ops Reviewer",
     defaultFilter: "needs-you",
     defaultDomains: [],
-    visibleCardTypes: ["hitl", "exception", "external-wait", "milestone", "policy", "agent-event", "resolved"],
+    visibleCardTypes: ["hitl", "exception", "external-wait", "milestone", "policy", "agent-event", "resolved", "workflow"],
     hideActionButtons: false,
     defaultSavedViews: [
       { id: "ops-needs-you-critical", label: "Critical · needs you", filter: "needs-you", domains: [], severity: "critical" },
@@ -85,7 +86,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     label: "Finance Controller",
     defaultFilter: "needs-you",
     defaultDomains: FINANCE_DOMAINS,
-    visibleCardTypes: ["hitl", "exception", "external-wait", "policy", "resolved"],
+    visibleCardTypes: ["hitl", "exception", "external-wait", "policy", "resolved", "workflow"],
     hideActionButtons: false,
     defaultSavedViews: [
       { id: "fin-expense", label: "Expense claims", filter: "needs-you", domains: ["expense-claim"] },
@@ -101,7 +102,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     label: "Hiring Manager",
     defaultFilter: "needs-you",
     defaultDomains: ["hiring"],
-    visibleCardTypes: ["hitl", "exception", "resolved"],
+    visibleCardTypes: ["hitl", "exception", "resolved", "workflow"],
     hideActionButtons: false,
     defaultSavedViews: [
       { id: "hire-all", label: "All open roles", filter: "needs-you", domains: ["hiring"] },
@@ -115,7 +116,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     label: "Agent-Platform Engineer",
     defaultFilter: "all-activity",
     defaultDomains: [],
-    visibleCardTypes: ["hitl", "exception", "external-wait", "milestone", "policy", "agent-event", "resolved"],
+    visibleCardTypes: ["hitl", "exception", "external-wait", "milestone", "policy", "agent-event", "resolved", "workflow"],
     hideActionButtons: false,
     defaultSavedViews: [
       { id: "sre-errors", label: "Errors only", filter: "all-activity", domains: [] },
@@ -130,7 +131,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     label: "Executive",
     defaultFilter: "all-activity",
     defaultDomains: [],
-    visibleCardTypes: ["milestone", "policy", "resolved"],
+    visibleCardTypes: ["milestone", "policy", "resolved", "workflow"],
     hideActionButtons: true,
     defaultSavedViews: [
       { id: "exec-milestones", label: "Today's milestones", filter: "all-activity", domains: [] },
