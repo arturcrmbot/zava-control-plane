@@ -14,6 +14,13 @@ dependencies = [
   # azure-functions 1.24+ required by agent-framework-azurefunctions
   "azure-functions>=1.24",
   "azure-functions-durable>=1.2",
+  # LLM runtime providers — pluggable via LLM_RUNTIME env var
+  # (LLM_RUNTIME=ghcp default, or fake for tests). The four packages
+  # below back GHCPRuntime; a future ClaudeRuntime / AzureOpenAIRuntime
+  # implementation would not require any of them. See
+  # api/functions/graphs/executors/agents/runtime.py for the Protocol
+  # and docs/superpowers/specs/2026-05-19-substrate-agentic-segments-design.md
+  # for the architectural rationale.
   # Phase 0.2 spike resolved: github-copilot-sdk is the Python sibling of @github/copilot-sdk
   "github-copilot-sdk>=0.2.1",
   # Microsoft Agent Framework: meta-package pulls in agent-framework-core[all]
