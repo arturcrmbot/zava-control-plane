@@ -1440,7 +1440,604 @@ git commit -m "feat(lessons): add end-to-end CLI smoke script"
 
 ---
 
-## Task 10: Full test suite + final commit
+## Task 11: Working memory types
+
+**Files:**
+- Create: `api/server/services/lessons/working_memory_types.py`
+- Test: `tests/api/services/lessons/test_working_memory_types.py`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/api/services/lessons/test_working_memory_types.py`:
+
+```python
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+import pytest
+
+from api.server.services.lessons.working_memory_types import (
+    WorkingNote,
+    WorkingNoteKind,
+)
+
+
+def test_working_note_minimal() -> None:
+    note = WorkingNote(
+        id="WN-1",
+        workflow_id="WF-1",
+        agent_skill="interview-recommender",
+        kind="observation",
+        body="screening flagged employment-date inconsistency",
+    )
+    assert note.workflow_id == "WF-1"
+    assert note.kind == "observation"
+    assert note.consumed_by_dream_pass is None
+
+
+def test_working_note_kind_alphabet_rejects_unknown() -> None:
+    with pytest.raises(ValueError):
+        WorkingNote(
+            id="WN-1",
+            workflow_id="WF-1",
+            agent_skill="x",
+            kind="bogus",   # type: ignore[arg-type]
+            body="x",
+        )
+
+
+def test_working_note_mark_consumed_returns_new_instance() -> None:
+    note = WorkingNote(
+        id="WN-1",
+        workflow_id="WF-1",
+        agent_skill="x",
+        kind="observation",
+        body="x",
+    )
+    consumed = note.mark_consumed(dream_pass_id="DP-1")
+    assert consumed.consumed_by_dream_pass == "DP-1"
+    assert note.consumed_by_dream_pass is None  # original unchanged
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `uv run pytest tests/api/services/lessons/test_working_memory_types.py -v`
+Expected: `ModuleNotFoundError`.
+
+- [ ] **Step 3: Implement the types**
+
+Create `api/server/services/lessons/working_memory_types.py`:
+
+```python
+"""Value types for the working memory tier."""
+from __future__ import annotations
+
+from dataclasses import dataclass, field, replace
+from datetime import datetime, timezone
+from typing import Literal, Optional
+
+
+WorkingNoteKind = Literal[
+    "observation",   # something the agent noticed (free text)
+    "decision",      # what the agent decided + brief why
+    "tool_call",     # a tool invocation captured from session events
+    "surprise",      # explicit "this differed from expectation"
+]
+
+
+@dataclass(frozen=True)
+class WorkingNote:
+    id: str
+    workflow_id: str
+    agent_skill: str        # e.g. "interview-recommender"
+    kind: WorkingNoteKind
+    body: str
+    captured_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    consumed_by_dream_pass: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        from typing import get_args
+        if self.kind not in get_args(WorkingNoteKind):
+            raise ValueError(f"unknown WorkingNoteKind {self.kind!r}")
+
+    def mark_consumed(self, *, dream_pass_id: str) -> "WorkingNote":
+        return replace(self, consumed_by_dream_pass=dream_pass_id)
+```
+
+- [ ] **Step 4: Run the test to verify it passes**
+
+Run: `uv run pytest tests/api/services/lessons/test_working_memory_types.py -v`
+Expected: 3 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add api/server/services/lessons/working_memory_types.py tests/api/services/lessons/test_working_memory_types.py
+git commit -m "feat(lessons): add WorkingNote value type"
+```
+
+---
+
+## Task 12: WorkingMemoryStore (Mem0-backed, scoped by workflow_id)
+
+**Files:**
+- Create: `api/server/services/lessons/working_memory_store.py`
+- Test: `tests/api/services/lessons/test_working_memory_store.py`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/api/services/lessons/test_working_memory_store.py`:
+
+```python
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+import pytest
+
+from api.server.services.lessons.working_memory_store import (
+    InMemoryWorkingMemoryStore,
+    Mem0WorkingMemoryStore,
+    _user_id_for,
+)
+from api.server.services.lessons.working_memory_types import WorkingNote
+
+
+def _note(workflow_id: str = "WF-1", agent_skill: str = "interview-recommender") -> WorkingNote:
+    return WorkingNote(
+        id="WN-1",
+        workflow_id=workflow_id,
+        agent_skill=agent_skill,
+        kind="observation",
+        body="screening flagged employment-date inconsistency",
+    )
+
+
+def test_user_id_isolation_per_workflow() -> None:
+    a = _user_id_for("WF-1")
+    b = _user_id_for("WF-2")
+    assert a != b
+    assert a.startswith("working-memory:")
+
+
+def test_in_memory_add_then_list() -> None:
+    store = InMemoryWorkingMemoryStore()
+    note = _note()
+    store.add(note)
+    notes = store.list_for_workflow(workflow_id="WF-1")
+    assert notes == [note]
+
+
+def test_in_memory_list_skips_consumed() -> None:
+    store = InMemoryWorkingMemoryStore()
+    n = _note()
+    store.add(n)
+    store.mark_consumed(note_id=n.id, dream_pass_id="DP-1")
+    assert store.list_for_workflow(workflow_id="WF-1") == []
+
+
+def test_in_memory_list_recent_across_workflows() -> None:
+    store = InMemoryWorkingMemoryStore()
+    store.add(_note(workflow_id="WF-1"))
+    other = WorkingNote(id="WN-2", workflow_id="WF-2", agent_skill="x", kind="observation", body="y")
+    store.add(other)
+    notes = store.list_recent_unconsumed(domain_agents=("interview-recommender", "x"), limit=10)
+    assert {n.id for n in notes} == {"WN-1", "WN-2"}
+
+
+def test_mem0_add_uses_workflow_scoped_user_id() -> None:
+    fake = MagicMock()
+    store = Mem0WorkingMemoryStore(memory=fake)
+    note = _note(workflow_id="WF-7")
+
+    store.add(note)
+
+    fake.add.assert_called_once()
+    _, kwargs = fake.add.call_args
+    assert kwargs["user_id"] == _user_id_for("WF-7")
+    assert kwargs["metadata"]["agent_skill"] == "interview-recommender"
+    assert kwargs["metadata"]["kind"] == "observation"
+
+
+def test_mem0_list_recent_filters_consumed_in_memory(make_lesson) -> None:
+    fake = MagicMock()
+    fake.search.return_value = {
+        "results": [
+            {"metadata": _serialise(_note())},
+        ]
+    }
+    store = Mem0WorkingMemoryStore(memory=fake)
+
+    notes = store.list_recent_unconsumed(domain_agents=("interview-recommender",), limit=10)
+
+    assert len(notes) == 1
+    assert notes[0].id == "WN-1"
+
+
+def _serialise(note: WorkingNote) -> dict:
+    from api.server.services.lessons.working_memory_store import _serialise_note
+    return _serialise_note(note)
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `uv run pytest tests/api/services/lessons/test_working_memory_store.py -v`
+Expected: `ImportError`.
+
+- [ ] **Step 3: Implement both stores**
+
+Create `api/server/services/lessons/working_memory_store.py`:
+
+```python
+"""Working memory tier.
+
+Per-workflow_id scratchpad written by agents during a run; consumed by
+the dream pass between runs. Mem0-backed for production, in-memory for
+tests. Like LessonStore, this is storage only — governance and ledger
+writes live in WorkingMemoryGovernor (Task 13).
+"""
+from __future__ import annotations
+
+import json
+from dataclasses import asdict
+from datetime import datetime
+from typing import Any, Protocol
+
+from api.server.services.lessons.working_memory_types import WorkingNote
+
+
+def _user_id_for(workflow_id: str) -> str:
+    return f"working-memory:{workflow_id}"
+
+
+class WorkingMemoryStore(Protocol):
+    def add(self, note: WorkingNote) -> None: ...
+    def list_for_workflow(self, *, workflow_id: str) -> list[WorkingNote]: ...
+    def list_recent_unconsumed(
+        self, *, domain_agents: tuple[str, ...], limit: int = 200
+    ) -> list[WorkingNote]: ...
+    def mark_consumed(self, *, note_id: str, dream_pass_id: str) -> None: ...
+
+
+class InMemoryWorkingMemoryStore:
+    def __init__(self) -> None:
+        self._by_id: dict[str, WorkingNote] = {}
+
+    def add(self, note: WorkingNote) -> None:
+        self._by_id[note.id] = note
+
+    def list_for_workflow(self, *, workflow_id: str) -> list[WorkingNote]:
+        return [
+            n for n in self._by_id.values()
+            if n.workflow_id == workflow_id and n.consumed_by_dream_pass is None
+        ]
+
+    def list_recent_unconsumed(
+        self, *, domain_agents: tuple[str, ...], limit: int = 200
+    ) -> list[WorkingNote]:
+        out = [
+            n for n in self._by_id.values()
+            if n.consumed_by_dream_pass is None and n.agent_skill in domain_agents
+        ]
+        out.sort(key=lambda n: n.captured_at, reverse=True)
+        return out[:limit]
+
+    def mark_consumed(self, *, note_id: str, dream_pass_id: str) -> None:
+        existing = self._by_id.get(note_id)
+        if existing is None:
+            return
+        self._by_id[note_id] = existing.mark_consumed(dream_pass_id=dream_pass_id)
+
+
+class _MemoryLike(Protocol):
+    def add(self, messages: str, *, user_id: str, metadata: dict[str, Any]) -> Any: ...
+    def search(self, query: str, *, filters: dict[str, Any], top_k: int) -> Any: ...
+    def update(self, *, memory_id: str, data: str | None = None, metadata: dict[str, Any] | None = None) -> Any: ...
+
+
+class Mem0WorkingMemoryStore:
+    def __init__(self, *, memory: _MemoryLike | None = None) -> None:
+        if memory is None:
+            from mem0 import Memory
+            memory = Memory()
+        self._memory = memory
+
+    def add(self, note: WorkingNote) -> None:
+        self._memory.add(
+            messages=note.body,
+            user_id=_user_id_for(note.workflow_id),
+            metadata=_serialise_note(note),
+        )
+
+    def list_for_workflow(self, *, workflow_id: str) -> list[WorkingNote]:
+        results = self._memory.search(
+            query="",
+            filters={"user_id": _user_id_for(workflow_id)},
+            top_k=200,
+        )
+        return [
+            n for n in (_deserialise_note(r.get("metadata") or {}) for r in (results or {}).get("results", []))
+            if n is not None and n.consumed_by_dream_pass is None
+        ]
+
+    def list_recent_unconsumed(
+        self, *, domain_agents: tuple[str, ...], limit: int = 200
+    ) -> list[WorkingNote]:
+        # Mem0 doesn't natively filter across user_ids, so we filter by metadata.
+        results = self._memory.search(
+            query="",
+            filters={"agent_skill": list(domain_agents)},  # mem0 list-in semantics
+            top_k=limit,
+        )
+        notes: list[WorkingNote] = []
+        for r in (results or {}).get("results", []):
+            n = _deserialise_note(r.get("metadata") or {})
+            if n is not None and n.consumed_by_dream_pass is None:
+                notes.append(n)
+        notes.sort(key=lambda n: n.captured_at, reverse=True)
+        return notes[:limit]
+
+    def mark_consumed(self, *, note_id: str, dream_pass_id: str) -> None:
+        # Soft-delete via metadata update; the actual prune happens in GC.
+        self._memory.update(
+            memory_id=note_id,
+            metadata={"consumed_by_dream_pass": dream_pass_id},
+        )
+
+
+def _serialise_note(note: WorkingNote) -> dict[str, Any]:
+    payload = asdict(note)
+    payload["captured_at"] = note.captured_at.isoformat()
+    return {
+        "note_id": note.id,
+        "workflow_id": note.workflow_id,
+        "agent_skill": note.agent_skill,
+        "kind": note.kind,
+        "captured_at": payload["captured_at"],
+        "consumed_by_dream_pass": note.consumed_by_dream_pass or "",
+        "note_json": json.dumps(payload),
+    }
+
+
+def _deserialise_note(metadata: dict[str, Any]) -> WorkingNote | None:
+    raw_json = metadata.get("note_json")
+    if not raw_json:
+        return None
+    try:
+        raw = json.loads(raw_json)
+    except json.JSONDecodeError:
+        return None
+    return WorkingNote(
+        id=raw["id"],
+        workflow_id=raw["workflow_id"],
+        agent_skill=raw["agent_skill"],
+        kind=raw["kind"],
+        body=raw["body"],
+        captured_at=datetime.fromisoformat(raw["captured_at"]),
+        consumed_by_dream_pass=(raw.get("consumed_by_dream_pass") or None) or None,
+    )
+```
+
+- [ ] **Step 4: Run the test to verify it passes**
+
+Run: `uv run pytest tests/api/services/lessons/test_working_memory_store.py -v`
+Expected: 6 passed.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add api/server/services/lessons/working_memory_store.py tests/api/services/lessons/test_working_memory_store.py
+git commit -m "feat(lessons): add WorkingMemoryStore (in-memory + Mem0 impls)"
+```
+
+---
+
+## Task 13: Capture working notes from existing OTEL session events
+
+**Files:**
+- Create: `api/server/services/lessons/working_memory_capture.py`
+- Test: `tests/api/services/lessons/test_working_memory_capture.py`
+- Modify: `api/functions/graphs/executors/agents/_wrapper.py` — add a single hook line that calls into `working_memory_capture` when an agent session completes
+
+The substrate's `_wrapper.py` already emits `FleetEvent("agent.completed", ...)` for every agent session and already streams tool-call events via the OTEL bridge. Working memory capture is a passive subscriber that turns those events into `WorkingNote` rows.
+
+- [ ] **Step 0: Verify the existing event surface**
+
+Run: `grep -n "agent.completed\|FleetEvent\|on_event\|TOOL_EXECUTION" api/functions/graphs/executors/agents/_wrapper.py | head -30`
+
+Expected: confirm the events you'll subscribe to (`agent.completed`, `TOOL_EXECUTION_COMPLETE`). Note the exact payload shape — the test fixture in Step 1 must mirror it.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/api/services/lessons/test_working_memory_capture.py`:
+
+```python
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+from api.server.services.lessons.working_memory_capture import (
+    WorkingMemoryCapture,
+)
+from api.server.services.lessons.working_memory_store import (
+    InMemoryWorkingMemoryStore,
+)
+
+
+def test_agent_completed_event_produces_decision_note() -> None:
+    store = InMemoryWorkingMemoryStore()
+    capture = WorkingMemoryCapture(store=store)
+
+    capture.on_agent_completed(
+        workflow_id="WF-1",
+        agent_skill="interview-recommender",
+        response_text='{"decision": "advance", "rationale": "level signal strong"}',
+        tool_calls=[],
+    )
+
+    notes = store.list_for_workflow(workflow_id="WF-1")
+    assert len(notes) == 1
+    assert notes[0].kind == "decision"
+    assert "advance" in notes[0].body
+
+
+def test_tool_call_event_produces_tool_note() -> None:
+    store = InMemoryWorkingMemoryStore()
+    capture = WorkingMemoryCapture(store=store)
+
+    capture.on_agent_completed(
+        workflow_id="WF-1",
+        agent_skill="interview-recommender",
+        response_text="{}",
+        tool_calls=[
+            {"tool": "greenhouse_get_candidate", "args": {"id": "C-001"}, "latency_ms": 120},
+        ],
+    )
+
+    notes = store.list_for_workflow(workflow_id="WF-1")
+    tool_notes = [n for n in notes if n.kind == "tool_call"]
+    assert len(tool_notes) == 1
+    assert "greenhouse_get_candidate" in tool_notes[0].body
+
+
+def test_capture_ignores_workflow_id_none() -> None:
+    store = InMemoryWorkingMemoryStore()
+    capture = WorkingMemoryCapture(store=store)
+
+    capture.on_agent_completed(
+        workflow_id=None,
+        agent_skill="x",
+        response_text="{}",
+        tool_calls=[],
+    )
+
+    assert store.list_for_workflow(workflow_id="WF-anything") == []
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `uv run pytest tests/api/services/lessons/test_working_memory_capture.py -v`
+Expected: `ImportError`.
+
+- [ ] **Step 3: Implement the capture**
+
+Create `api/server/services/lessons/working_memory_capture.py`:
+
+```python
+"""Capture agent session events into working memory.
+
+Subscribes to the existing `agent.completed` FleetEvent stream and the
+tool-call events emitted by `_wrapper.py`. Turns each session into a
+small bundle of WorkingNotes: one `decision` (the parsed response), one
+`tool_call` per invocation. The dream pass reads these later.
+
+This module is *passive*: it does not change the agent runtime, it only
+turns events into structured notes the dream pass can consume.
+"""
+from __future__ import annotations
+
+import json
+import uuid
+from typing import Any
+
+from api.server.services.lessons.working_memory_store import WorkingMemoryStore
+from api.server.services.lessons.working_memory_types import WorkingNote
+
+
+class WorkingMemoryCapture:
+    def __init__(self, *, store: WorkingMemoryStore) -> None:
+        self._store = store
+
+    def on_agent_completed(
+        self,
+        *,
+        workflow_id: str | None,
+        agent_skill: str,
+        response_text: str,
+        tool_calls: list[dict[str, Any]],
+    ) -> None:
+        if not workflow_id:
+            return  # synthetic / unattributed sessions don't write working memory
+
+        decision_body = self._summarise_decision(response_text)
+        self._store.add(WorkingNote(
+            id=f"WN-{uuid.uuid4()}",
+            workflow_id=workflow_id,
+            agent_skill=agent_skill,
+            kind="decision",
+            body=decision_body,
+        ))
+
+        for tc in tool_calls:
+            tool = str(tc.get("tool", "unknown"))
+            latency = tc.get("latency_ms")
+            body = f"called {tool}" + (f" ({latency}ms)" if latency is not None else "")
+            self._store.add(WorkingNote(
+                id=f"WN-{uuid.uuid4()}",
+                workflow_id=workflow_id,
+                agent_skill=agent_skill,
+                kind="tool_call",
+                body=body,
+            ))
+
+    @staticmethod
+    def _summarise_decision(response_text: str) -> str:
+        try:
+            parsed = json.loads(response_text)
+        except json.JSONDecodeError:
+            return response_text[:240]
+        if isinstance(parsed, dict):
+            decision = parsed.get("decision")
+            rationale = parsed.get("rationale") or parsed.get("reason")
+            if decision and rationale:
+                return f"{decision}: {rationale}"
+            if decision:
+                return f"decision={decision}"
+        return response_text[:240]
+```
+
+- [ ] **Step 4: Run the test to verify it passes**
+
+Run: `uv run pytest tests/api/services/lessons/test_working_memory_capture.py -v`
+Expected: 3 passed.
+
+- [ ] **Step 5: Wire the capture into `_wrapper.py`**
+
+Find the `FleetEvent("agent.completed", ...)` emit site in `api/functions/graphs/executors/agents/_wrapper.py`. Immediately after that emit, add a singleton call into the capture:
+
+```python
+        # Working memory capture — passive, never raises into the caller.
+        try:
+            from api.server.services.lessons.working_memory_capture import WorkingMemoryCapture
+            from api.server.services.lessons.working_memory_store import Mem0WorkingMemoryStore
+            WorkingMemoryCapture(store=Mem0WorkingMemoryStore()).on_agent_completed(
+                workflow_id=workflow_id,
+                agent_skill=skill_label or "unknown",
+                response_text=str(result.text or ""),
+                tool_calls=tool_calls_out,
+            )
+        except Exception:
+            pass  # never break an agent session on working-memory write failure
+```
+
+(The exact local variable names — `workflow_id`, `skill_label`, `result`, `tool_calls_out` — should already be in scope at the FleetEvent emit site. Use the actual names from the file.)
+
+- [ ] **Step 6: Run the full lessons suite to confirm no regression**
+
+Run: `uv run pytest tests/api/services/lessons/ -v`
+Expected: all tests pass.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add api/server/services/lessons/working_memory_capture.py tests/api/services/lessons/test_working_memory_capture.py api/functions/graphs/executors/agents/_wrapper.py
+git commit -m "feat(lessons): capture working memory from agent.completed events"
+```
+
+---
+
+## Task 14: Full test suite + final commit
 
 - [ ] **Step 1: Run the full lessons package test suite**
 
@@ -1474,5 +2071,7 @@ git commit -m "chore(lessons): fix lint/mypy follow-ups"
 - `scripts/lessons_smoke.py` runs cleanly end-to-end.
 - The `Lesson` node and three new edge tables exist in the Kuzu schema, additively (no existing tables changed).
 - `lesson.write` and `lesson.prune` appear in the compiled AGT policy bundle in `audit` enforcement.
+- **`WorkingMemoryStore` exists, is Mem0-backed (scoped by `workflow_id`), and is populated automatically by `_wrapper.py` for every agent session via passive capture from existing OTEL/FleetEvent stream — no agent code changes.**
+- **`WorkingNote` rows include `kind`, `body`, `agent_skill`, `workflow_id`, `captured_at`, `consumed_by_dream_pass` and can be queried by Plan 3.**
 - The full existing test suite still passes — additive change only.
-- Plan 2 (`domain-rubric-scorer`) can now be authored against this foundation.
+- Plan 2 (`domain-rubric-scorer`) and Plan 3 (`experimental-dream-pass`) can now be authored against this foundation.

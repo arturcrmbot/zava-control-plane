@@ -2,11 +2,20 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Land the end-to-end dream-pass loop: an agentic, AGT-gated, **closed-loop experimental** lesson optimiser that proposes candidate lessons, A/B-tests them in a sandbox against held-out synthetic personas using the rubric scorer, and auto-promotes winners via policy — no human required in the default path.
+**Goal:** Land the end-to-end dream-pass loop: an agentic, AGT-gated, **closed-loop experimental** lesson optimiser that proposes candidate lessons from working memory + outcomes, A/B-tests them by re-running an LLM agent twice (control vs treatment) against held-out synthetic personas using the rubric scorer, and auto-promotes winners via policy — no human required in the default path.
 
-**Architecture:** A `DreamPassOrchestrator` runs one pass per (domain, dream-skill). For each pass it: (1) reads recent runs + lessons + rubric, (2) asks an `LessonProposer` (LLM) for N candidates, (3) for each candidate, runs A/B experiments in an isolated sandbox (control = active lessons only; treatment = active + candidate) on a partitioned held-out corpus, (4) computes score deltas via Plan 2's `RunScorer`, (5) evaluates promotion against `dream-pass.policy.yaml` (AGT-gated tool calls), (6) writes winners via Plan 1's `LessonGovernor`. Sandboxes never touch real Kuzu / real LessonStore — they get their own ephemeral instances. Every action is a signed ledger entry pointing at experiment evidence.
+**Architecture:** A `DreamPassOrchestrator` runs one pass per (domain, dream-skill). For each pass it:
 
-**Tech Stack:** Python 3.11, existing `agent-framework` for LLM calls, `pyyaml`, plus everything from Plans 1–2. Reuses the existing hiring eval batch runner pattern at `api/server/eval/hiring_batch_runner.py` to execute a workflow in-process against one persona/CV at a time.
+1. Reads recent **WorkingNotes** for the target agent (Plan 1 working memory tier) and recent runs + their rubric scores.
+2. Asks an `LessonProposer` (LLM) for N candidate lessons distilled from those notes. Crucially, proposals are grounded in *what agents actually noticed during real runs*, not invented from outcome data alone.
+3. For each candidate, runs A/B experiments by invoking the real agent twice via the existing `run_agent_session` (the GHCP runtime is the LLM). The only difference between the two calls is the lesson context embedded into the agent's prompt: **control** = active lessons only; **treatment** = active + candidate. Sandbox each run by writing to a tmp Kuzu DB so production state is untouched; the LLM is real.
+4. Computes score deltas via Plan 2's `RunScorer`.
+5. Evaluates promotion against `dream-pass.policy.yaml` (AGT-gated tool calls).
+6. Writes winners via Plan 1's `LessonGovernor`. Marks consumed working notes via `WorkingMemoryStore.mark_consumed` so they are not re-distilled by the next pass.
+
+The demo target is `agent_interview_recommender` (in `api/functions/graphs/executors/agents/`). Its `_build_prompt()` gains a `lessons` and `working_notes` slot — that's the only change needed on the agent side. The recruiter persona gets one small change: it consumes `interview_recommender.decision` instead of ignoring it, so a lesson-improved recommendation actually changes the gate outcome (and therefore the rubric score).
+
+**Tech Stack:** Python 3.11, the existing **GHCP runtime** (`api/functions/graphs/executors/agents/runtime_ghcp.py` — your GitHub Copilot seat) for all LLM work, `pyyaml`, plus everything from Plans 1–2. Sandboxes invoke real agents through `run_agent_session`; no `agent-framework`, no fake decision shims.
 
 ---
 
@@ -17,13 +26,13 @@
 - `api/server/services/dream_pass/types.py` — `DreamSkill`, `CorpusSplit`, `Experiment`, `ExperimentVerdict`, `DreamPassResult`
 - `api/server/services/dream_pass/skill_loader.py` — load `skills/dream-passes/<domain>/SKILL.md` with YAML frontmatter
 - `api/server/services/dream_pass/partitioner.py` — `CorpusPartitioner` (split a corpus; track rotation in Kuzu so eval samples don't leak)
-- `api/server/services/dream_pass/sandbox.py` — `SandboxRunner` Protocol + `HiringSandboxRunner` that invokes the existing hiring eval path per-candidate with an injected lesson context
-- `api/server/services/dream_pass/proposer.py` — `LessonProposer` Protocol + `AgentFrameworkProposer` default impl
+- `api/server/services/dream_pass/sandbox.py` — `SandboxRunner` Protocol + `InterviewRecommenderSandbox` that invokes `run_agent_session` against the real `interview-recommender` skill with prompt-injected lessons, writing decisions to a tmp Kuzu
+- `api/server/services/dream_pass/proposer.py` — `LessonProposer` Protocol + `WorkingMemoryProposer` default impl that reads WorkingNotes via the GHCP runtime
 - `api/server/services/dream_pass/experiment.py` — `ExperimentRunner` (control vs treatment → delta)
 - `api/server/services/dream_pass/policy.py` — load and evaluate `dream-pass.policy.yaml`
 - `api/server/services/dream_pass/orchestrator.py` — `DreamPassOrchestrator` (the loop)
 - `data/policies/dream-pass.policy.yaml`
-- `skills/dream-passes/hiring/SKILL.md` (frontmatter + body)
+- `skills/dream-passes/hiring/SKILL.md` (frontmatter + body — the dream-pass agent's own prompt)
 - `scripts/dream_pass.py` — CLI: `dream_pass.py --domain hiring`
 - `tests/api/services/dream_pass/__init__.py`
 - `tests/api/services/dream_pass/conftest.py`
@@ -34,19 +43,235 @@
 - `tests/api/services/dream_pass/test_experiment.py`
 - `tests/api/services/dream_pass/test_policy.py`
 - `tests/api/services/dream_pass/test_orchestrator.py`
+- `tests/api/services/dream_pass/test_recruiter_consumes_recommender.py`
 
 **Modified files:**
 - `api/server/services/entity_graph.py` — add `DreamPass`, `Experiment` node tables + `EXPERIMENT_FOR_LESSON`, `EXPERIMENT_USED_PERSONA` edges
 - `data/policies/tools.yaml` — promote `lesson.write` / `lesson.prune` from `audit` to `enforce` enforcement mode now that the dream-pass policy gates them
+- `api/functions/graphs/executors/agents/agent_interview_recommender.py` — `_build_prompt` accepts and embeds `lessons: list[str]` and `working_notes: list[str]` (additive; defaults to empty lists so existing call sites keep working)
+- `api/server/personae/recruiter/SKILL.md` — `decision_policy:` consumes `interview_recommender.decision` when present, so a lesson-improved recommendation actually changes the gate verdict
 
 ---
 
 ## Conventions
 
-- Sandboxes are **strict**: a `HiringSandboxRunner` instance owns a tmp Kuzu DB, a fresh `InMemoryLessonStore`, and refuses to touch any real path under `data/portal/` or any real Mem0 server.
-- The proposer LLM call is behind a Protocol; tests use a deterministic `StubProposer`.
+- Sandboxes are **strict**: an `InterviewRecommenderSandbox` instance owns a tmp Kuzu DB and writes only there. It calls `run_agent_session` with `LLM_RUNTIME=fake` in tests (deterministic, no GHCP cost) and `LLM_RUNTIME=ghcp` in real runs.
+- The proposer LLM call is behind a Protocol; tests use a deterministic `StubProposer`. The default impl reads recent working notes via `WorkingMemoryStore` and invokes the dream-pass agent skill via `run_agent_session` against the GHCP runtime.
 - The `dream-pass.policy.yaml` evaluation is pure (no I/O); it takes an `Experiment` and returns a verdict.
 - The orchestrator is the only thing that talks to `LessonGovernor`. Everything else returns values.
+- The two prerequisite tasks (A — agent prompt plumbing, B — persona consumption) MUST land before Task 5, because Task 5's sandbox assertions about lesson influence depend on both.
+
+---
+
+## Task A: Plumb lessons + working_notes into `agent_interview_recommender` prompt
+
+**Files:**
+- Modify: `api/functions/graphs/executors/agents/agent_interview_recommender.py` (`_build_prompt`, `execute`)
+- Test: extend `tests/api/functions/agents/test_agent_interview_recommender.py` (already exists in repo)
+
+This is the **agent-side injection point** for lessons. Additive: empty lists keep behaviour identical, so no existing call sites break.
+
+- [ ] **Step 0: Read the current `_build_prompt` and `execute` signatures**
+
+Run: `sed -n '1,90p' api/functions/graphs/executors/agents/agent_interview_recommender.py`
+Expected: see the current `payload` dict assembled in `_build_prompt(input)` and the `execute(input)` entry-point. Note that `input` is already an opaque dict — adding new optional keys is non-breaking.
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `tests/api/functions/agents/test_agent_interview_recommender.py`:
+
+```python
+import pytest
+from unittest.mock import patch, MagicMock
+from api.functions.graphs.executors.agents import agent_interview_recommender
+
+
+@pytest.mark.asyncio
+async def test_build_prompt_includes_lessons_and_working_notes() -> None:
+    prompt = agent_interview_recommender._build_prompt({
+        "gate": "post_voice",
+        "role_title": "Engineer",
+        "lessons": ["candidates with tenure < 2y targeting L6 should be re-screened"],
+        "working_notes": ["screening flagged employment-date inconsistency"],
+    })
+    assert "tenure < 2y" in prompt
+    assert "employment-date inconsistency" in prompt
+    # And the empty-list case is identical to the no-key case (backwards compat).
+    prompt_no_lessons = agent_interview_recommender._build_prompt({
+        "gate": "post_voice", "role_title": "Engineer",
+    })
+    prompt_empty_lessons = agent_interview_recommender._build_prompt({
+        "gate": "post_voice", "role_title": "Engineer",
+        "lessons": [], "working_notes": [],
+    })
+    assert prompt_no_lessons == prompt_empty_lessons
+
+
+@pytest.mark.asyncio
+async def test_execute_passes_lessons_to_prompt() -> None:
+    with patch.object(agent_interview_recommender, "run_agent_session") as ras:
+        ras.return_value = {"decision": "advance", "rationale": "x"}
+        await agent_interview_recommender.execute({
+            "workflow_id": "WF-1",
+            "gate": "post_voice",
+            "role_title": "Engineer",
+            "lessons": ["a specific lesson"],
+            "working_notes": [],
+        })
+    assert "a specific lesson" in ras.call_args.kwargs["prompt"]
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `uv run pytest tests/api/functions/agents/test_agent_interview_recommender.py -v -k "lessons or working_notes"`
+Expected: FAIL — current `_build_prompt` ignores both keys.
+
+- [ ] **Step 3: Modify `_build_prompt` to embed lessons + working_notes**
+
+In `api/functions/graphs/executors/agents/agent_interview_recommender.py`, replace `_build_prompt` with:
+
+```python
+def _build_prompt(input: dict) -> str:
+    gate = input.get("gate") or "post_voice"
+    role_title = input.get("role_title") or "Candidate"
+    role_jurisdiction = input.get("role_jurisdiction") or "—"
+    levels = levels_for(role_title)
+    lessons = list(input.get("lessons") or [])
+    working_notes = list(input.get("working_notes") or [])
+    payload = {
+        "gate": gate,
+        "role_title": role_title,
+        "role_jurisdiction": role_jurisdiction,
+        "levels_for_role": levels,
+        "cv_crystalliser": input.get("cv_crystalliser") or {},
+        "screening": input.get("screening") or {},
+        "voice_transcript": input.get("voice_transcript") or [],
+        "voice_score": input.get("voice_score"),
+        "lessons": lessons,
+        "working_notes": working_notes,
+    }
+    return (
+        f"Recommend at gate `{gate}` for `{role_title}`. "
+        f"Context (JSON):\n```json\n{json.dumps(payload, indent=2)}\n```\n"
+        f"You MUST consider any `lessons` and `working_notes` provided — they\n"
+        f"are organisational priors from past runs. Apply them when they are\n"
+        f"relevant; ignore them when they aren't and say so in your rationale.\n"
+        f"Return ONLY the JSON object specified in your skill — no prose, "
+        f"no markdown fences."
+    )
+```
+
+- [ ] **Step 4: Run the test to verify it passes**
+
+Run: `uv run pytest tests/api/functions/agents/test_agent_interview_recommender.py -v`
+Expected: all tests pass, including the new ones.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add api/functions/graphs/executors/agents/agent_interview_recommender.py tests/api/functions/agents/test_agent_interview_recommender.py
+git commit -m "feat(dream-pass): agent_interview_recommender accepts lessons + working_notes"
+```
+
+---
+
+## Task B: Recruiter persona consumes `interview_recommender.decision`
+
+**Files:**
+- Modify: `api/server/personae/recruiter/SKILL.md` (just the `decision_policy:` block body)
+- Test: `tests/api/services/dream_pass/test_recruiter_consumes_recommender.py`
+
+The recruiter persona currently ignores the recommender's output and decides on `voice_score >= 0.7`. That makes lesson-driven recommender improvements invisible at the gate. This task makes the persona route on the recommender's `decision` when present, falling back to today's rule when it's not.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/api/services/dream_pass/test_recruiter_consumes_recommender.py`:
+
+```python
+from __future__ import annotations
+
+from api.server.services.persona_responder import PersonaResponder
+
+
+def _context(recommender_decision: str | None, voice_score: float = 0.75) -> dict:
+    base = {
+        "gate": "post_voice",
+        "workflow_id": "WF-1",
+        "candidate_id": "C-001",
+        "screening": {"verdict": "borderline"},
+        "voice": {"score": voice_score},
+    }
+    if recommender_decision is not None:
+        base["interview_recommender"] = {"decision": recommender_decision}
+    return base
+
+
+def test_recruiter_uses_recommender_reject_over_voice_score() -> None:
+    """voice_score=0.75 would normally approve. A recommender 'reject' must win."""
+    responder = PersonaResponder()
+    result = responder.respond(persona_role="recruiter", context=_context("reject"))
+    assert result["decision"] == "reject"
+
+
+def test_recruiter_uses_recommender_advance_when_present() -> None:
+    responder = PersonaResponder()
+    result = responder.respond(persona_role="recruiter", context=_context("advance"))
+    assert result["decision"] == "approve"
+
+
+def test_recruiter_falls_back_when_no_recommender() -> None:
+    """No recommender output → today's deterministic rule wins."""
+    responder = PersonaResponder()
+    result = responder.respond(persona_role="recruiter", context=_context(None, voice_score=0.75))
+    assert result["decision"] == "approve"  # voice_score >= 0.7 → approve
+```
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `uv run pytest tests/api/services/dream_pass/test_recruiter_consumes_recommender.py -v`
+Expected: `test_recruiter_uses_recommender_reject_over_voice_score` FAILS (current rule approves on voice_score alone).
+
+- [ ] **Step 3: Modify the recruiter `decision_policy:` block**
+
+In `api/server/personae/recruiter/SKILL.md`, find the `decision_policy:` YAML block. Immediately after the line setting `voice_score = ...`, insert:
+
+```yaml
+    # Recommender override: when an interview_recommender produced a structured
+    # decision, trust it. This lets a lesson-improved recommendation actually
+    # change the gate outcome. Map recommender vocab onto recruiter vocab:
+    #   advance/approve -> approve
+    #   reject/no_hire  -> reject
+    rec = (context or {}).get("interview_recommender") or {}
+    rec_decision = (rec.get("decision") or "").lower()
+    if rec_decision in {"advance", "approve"}:
+        decision = "approve"
+        reason = "deferring to interview_recommender=advance"
+        return
+    if rec_decision in {"reject", "no_hire"}:
+        decision = "reject"
+        reason = "deferring to interview_recommender=reject"
+        return
+    # else: fall through to existing rule below.
+```
+
+NOTE: `decision_policy` runs inside a sandboxed exec context where `return` is not legal at module scope. The exact control-flow primitive depends on how `persona_responder._compile_decision_policy` wraps the code. From the file: `def _validate_persona_source(source: str, role: str, kind: str)` followed by compile-into-callable. Inspect `_compile_decision_policy` to confirm whether the block is wrapped in a function (in which case `return` works) or executed at module level (in which case use a guard variable: `_decided = False; ... if rec_decision ...: decision = ...; _decided = True; ...; if not _decided: <existing if/else>`).
+
+- [ ] **Step 4: Run the test to verify it passes**
+
+Run: `uv run pytest tests/api/services/dream_pass/test_recruiter_consumes_recommender.py -v`
+Expected: 3 passed.
+
+- [ ] **Step 5: Run the broader recruiter/hiring suites to confirm no regression**
+
+Run: `uv run pytest tests/api -k "recruiter or hiring" -v`
+Expected: all pass. The change is backwards-compatible (no recommender → old behaviour).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add api/server/personae/recruiter/SKILL.md tests/api/services/dream_pass/test_recruiter_consumes_recommender.py
+git commit -m "feat(dream-pass): recruiter persona consumes interview_recommender.decision"
+```
 
 ---
 
@@ -643,30 +868,18 @@ git commit -m "feat(dream-pass): add CorpusPartitioner with Kuzu leakage trackin
 
 ---
 
-## Task 5: Sandbox runner
+## Task 5: Sandbox runner (real agent, sandboxed Kuzu)
 
 **Files:**
 - Create: `api/server/services/dream_pass/sandbox.py`
 - Test: `tests/api/services/dream_pass/test_sandbox.py`
 
-The sandbox must execute the existing hiring workflow logic against one CV at a time, with an optional injected lesson context, writing the resulting `Decision` to a tmp Kuzu only.
+The sandbox runs the **real** `interview-recommender` agent skill via `run_agent_session`, with `lessons` + `working_notes` injected through the prompt-plumbing from Task A. Decisions land in a tmp Kuzu DB so production state is untouched. Tests use `LLM_RUNTIME=fake` to keep them deterministic and free.
 
-- [ ] **Step 0: Verify the integration surface**
+- [ ] **Step 0: Confirm the existing FakeRuntime + run_agent_session shape**
 
-Run: `grep -n "def " api/server/eval/hiring_batch_runner.py | head -30`
-Expected: locate the existing function that takes a CV + persona and returns / records a decision. Note its exact signature. If the surface differs from the assumption below, adjust the `HiringSandboxRunner` body in Step 3 accordingly. The intended surface is:
-
-```python
-from api.server.eval.hiring_batch_runner import run_one_candidate
-# def run_one_candidate(cv: dict, *, lessons: list[str], target_graph: EntityGraph) -> dict
-```
-
-If `run_one_candidate` does not exist with a compatible signature, the engineer must either:
-
-1. Add a thin wrapper inside `api/server/eval/hiring_batch_runner.py` exposing that signature, or
-2. Update `HiringSandboxRunner` to call the actual existing entry point and shape its result identically.
-
-Document the chosen approach in the commit message for this task.
+Run: `grep -n "def run_session\|class FakeRuntime\|def fixed_response" api/functions/graphs/executors/agents/runtime_fake.py | head -20`
+Expected: confirm how `FakeRuntime` is seeded with canned responses (typically `FakeRuntime(scripted_responses=[...])` or via an env var). The test below assumes a `scripted_responses` list keyed off the prompt content; adapt to the actual API.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -676,75 +889,67 @@ Create `tests/api/services/dream_pass/test_sandbox.py`:
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch, AsyncMock
 
 import pytest
 
-from api.server.services.dream_pass.sandbox import HiringSandboxRunner
+from api.server.services.dream_pass.sandbox import InterviewRecommenderSandbox
 
 
 @pytest.fixture
-def stub_runner(graph, monkeypatch):
-    """Patch run_one_candidate to a deterministic stub for the test."""
+def fake_session(monkeypatch):
+    """Patch run_agent_session so the test never touches GHCP."""
     calls: list[dict] = []
 
-    def fake_run(cv, *, lessons, target_graph):
-        calls.append({"cv": cv, "lessons": list(lessons)})
-        target_graph.execute_cypher(
-            """
-            CREATE (:Decision {id: $did, workflow_id: $wf, phase: 'arbitrate',
-                               persona_role: 'recruiter',
-                               verdict: $verdict, reason: 'sandbox'})
-            """,
-            {
-                "did": f"D-{cv['candidate_id']}",
-                "wf": f"WF-SANDBOX-{cv['candidate_id']}",
-                "verdict": "approve" if not lessons else "reject",
-            },
-        )
-        target_graph.execute_cypher(
-            "CREATE (:Person {id: $pid, name: $pid, role: 'synthetic'})",
-            {"pid": cv["candidate_id"]},
-        )
-        target_graph.execute_cypher(
-            """
-            MATCH (d:Decision {id: $did}), (p:Person {id: $pid})
-            CREATE (d)-[:DECIDED_PERSON {decided_at: timestamp()}]->(p)
-            """,
-            {"did": f"D-{cv['candidate_id']}", "pid": cv["candidate_id"]},
-        )
-        return {"workflow_id": f"WF-SANDBOX-{cv['candidate_id']}"}
+    async def fake_run(*, prompt, tools, skill_dir, skill_label, workflow_id, **kwargs):
+        calls.append({"prompt": prompt, "skill_label": skill_label, "workflow_id": workflow_id})
+        # Return reject when the prompt contains the sentinel lesson, else approve.
+        if "sentinel-reject-lesson" in prompt:
+            return {"decision": "reject", "rationale": "sentinel matched"}
+        return {"decision": "advance", "rationale": "baseline"}
 
     monkeypatch.setattr(
-        "api.server.services.dream_pass.sandbox._run_one_candidate", fake_run
+        "api.server.services.dream_pass.sandbox.run_agent_session",
+        fake_run,
     )
     return calls
 
 
-def test_sandbox_runs_with_no_lessons(stub_runner, tmp_path: Path) -> None:
-    cvs = [{"candidate_id": "C-001"}, {"candidate_id": "C-002"}]
-    runner = HiringSandboxRunner(kuzu_root=tmp_path / "sandbox")
+@pytest.mark.asyncio
+async def test_sandbox_runs_real_agent_with_empty_lessons(fake_session, tmp_path: Path) -> None:
+    cvs = [
+        {"candidate_id": "C-001", "role_title": "Engineer"},
+        {"candidate_id": "C-002", "role_title": "Engineer"},
+    ]
+    sandbox = InterviewRecommenderSandbox(kuzu_root=tmp_path / "sb")
 
-    result = runner.run_arm(cvs=cvs, lessons=[])
+    result = await sandbox.run_arm(cvs=cvs, lessons=[], working_notes=[])
 
     assert len(result.workflow_ids) == 2
-    assert stub_runner[0]["lessons"] == []
+    assert all("sentinel-reject-lesson" not in c["prompt"] for c in fake_session)
 
 
-def test_sandbox_injects_lessons(stub_runner, tmp_path: Path) -> None:
-    cvs = [{"candidate_id": "C-001"}]
-    runner = HiringSandboxRunner(kuzu_root=tmp_path / "sandbox")
+@pytest.mark.asyncio
+async def test_sandbox_lesson_injection_changes_agent_decision(fake_session, tmp_path: Path) -> None:
+    cvs = [{"candidate_id": "C-001", "role_title": "Engineer"}]
+    sandbox = InterviewRecommenderSandbox(kuzu_root=tmp_path / "sb")
 
-    runner.run_arm(cvs=cvs, lessons=["vendors from agency X often miss step 3"])
+    await sandbox.run_arm(cvs=cvs, lessons=["sentinel-reject-lesson"], working_notes=[])
 
-    assert stub_runner[0]["lessons"] == ["vendors from agency X often miss step 3"]
+    # Decision node written into the sandbox graph should reflect the reject.
+    rows = sandbox.graph.execute_cypher(
+        "MATCH (d:Decision) RETURN d.verdict AS v"
+    )
+    assert rows[0]["v"] == "reject"
 
 
-def test_sandbox_graph_is_isolated(stub_runner, tmp_path: Path) -> None:
-    runner_a = HiringSandboxRunner(kuzu_root=tmp_path / "sandbox-a")
-    runner_b = HiringSandboxRunner(kuzu_root=tmp_path / "sandbox-b")
+@pytest.mark.asyncio
+async def test_sandbox_graph_is_isolated(fake_session, tmp_path: Path) -> None:
+    a = InterviewRecommenderSandbox(kuzu_root=tmp_path / "a")
+    b = InterviewRecommenderSandbox(kuzu_root=tmp_path / "b")
 
-    runner_a.run_arm(cvs=[{"candidate_id": "C-001"}], lessons=[])
-    rows_b = runner_b.graph.execute_cypher("MATCH (d:Decision) RETURN d.id AS id")
+    await a.run_arm(cvs=[{"candidate_id": "C-001", "role_title": "Engineer"}], lessons=[], working_notes=[])
+    rows_b = b.graph.execute_cypher("MATCH (d:Decision) RETURN d.id AS id")
 
     assert rows_b == []
 ```
@@ -759,30 +964,34 @@ Expected: FAIL on missing module.
 Create `api/server/services/dream_pass/sandbox.py`:
 
 ```python
-"""Sandboxed workflow runner for the dream pass.
+"""Sandboxed runner for dream-pass experiments.
 
-A sandbox owns its own tmp Kuzu DB and runs the hiring workflow against
-one CV at a time with an injected list of lesson bodies. It never
-touches `data/portal/entity_graph.kuzu` or any real Mem0 instance.
+Invokes the real `interview-recommender` agent skill via the existing
+`run_agent_session` wrapper, with `lessons` and `working_notes` injected
+through the prompt-plumbing from Task A. Writes the resulting Decision
+into a tmp Kuzu so production state is never touched.
 
-The actual workflow execution is delegated to
-`api.server.eval.hiring_batch_runner.run_one_candidate`. If that surface
-changes, update the `_run_one_candidate` alias.
+The LLM runtime is whatever `LLM_RUNTIME` env var selects:
+  - `fake` (tests) — deterministic, no cost
+  - `ghcp` (default) — real GitHub Copilot session
 """
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol
 
+from api.functions.graphs.executors.agents._wrapper import (
+    SKILLS_DIR,
+    run_agent_session,
+)
+from api.functions.graphs.executors.agents.agent_interview_recommender import _build_prompt
 from api.server.services.entity_graph import EntityGraph
 
-# Indirected so tests can monkeypatch without importing the eval pipeline.
-try:
-    from api.server.eval.hiring_batch_runner import run_one_candidate as _run_one_candidate
-except ImportError:  # pragma: no cover — sandbox tests patch this anyway
-    def _run_one_candidate(*args, **kwargs):  # type: ignore[no-redef]
-        raise NotImplementedError("hiring_batch_runner.run_one_candidate is required")
+
+_SKILL_DIR = SKILLS_DIR / "interview-recommender"
 
 
 @dataclass(frozen=True)
@@ -793,10 +1002,12 @@ class ArmResult:
 class SandboxRunner(Protocol):
     @property
     def graph(self) -> EntityGraph: ...
-    def run_arm(self, *, cvs: list[dict], lessons: list[str]) -> ArmResult: ...
+    async def run_arm(
+        self, *, cvs: list[dict], lessons: list[str], working_notes: list[str]
+    ) -> ArmResult: ...
 
 
-class HiringSandboxRunner:
+class InterviewRecommenderSandbox:
     def __init__(self, *, kuzu_root: Path) -> None:
         kuzu_root.mkdir(parents=True, exist_ok=True)
         self._graph = EntityGraph(str(kuzu_root / "sandbox.kuzu"))
@@ -805,12 +1016,78 @@ class HiringSandboxRunner:
     def graph(self) -> EntityGraph:
         return self._graph
 
-    def run_arm(self, *, cvs: list[dict], lessons: list[str]) -> ArmResult:
+    async def run_arm(
+        self, *, cvs: list[dict], lessons: list[str], working_notes: list[str]
+    ) -> ArmResult:
         ids: list[str] = []
         for cv in cvs:
-            result = _run_one_candidate(cv, lessons=lessons, target_graph=self._graph)
-            ids.append(result["workflow_id"])
+            wf_id = f"WF-SB-{_short_hash(cv, lessons)}"
+            prompt = _build_prompt({
+                **cv,
+                "lessons": lessons,
+                "working_notes": working_notes,
+            })
+            parsed = await run_agent_session(
+                prompt=prompt,
+                tools=[],
+                skill_dir=_SKILL_DIR,
+                skill_label="interview_recommender",
+                workflow_id=wf_id,
+            )
+            self._write_decision(
+                workflow_id=wf_id,
+                candidate_id=cv["candidate_id"],
+                verdict=_normalise_verdict((parsed or {}).get("decision", "reject")),
+                reason=str((parsed or {}).get("rationale", "")),
+            )
+            ids.append(wf_id)
         return ArmResult(workflow_ids=tuple(ids))
+
+    def _write_decision(
+        self, *, workflow_id: str, candidate_id: str, verdict: str, reason: str
+    ) -> None:
+        self._graph.execute_cypher(
+            "MERGE (p:Person {id: $pid}) ON CREATE SET p.name = $pid, p.role = 'synthetic'",
+            {"pid": candidate_id},
+        )
+        self._graph.execute_cypher(
+            """
+            CREATE (:Decision {id: $did, workflow_id: $wf,
+                               phase: 'post_voice', persona_role: 'recruiter',
+                               verdict: $verdict, reason: $reason,
+                               decided_at: $now})
+            """,
+            {
+                "did": f"D-SB-{workflow_id}",
+                "wf": workflow_id,
+                "verdict": verdict,
+                "reason": reason,
+                "now": datetime.now(timezone.utc),
+            },
+        )
+        self._graph.execute_cypher(
+            """
+            MATCH (d:Decision {id: $did}), (p:Person {id: $pid})
+            CREATE (d)-[:DECIDED_PERSON {decided_at: $now}]->(p)
+            """,
+            {
+                "did": f"D-SB-{workflow_id}",
+                "pid": candidate_id,
+                "now": datetime.now(timezone.utc),
+            },
+        )
+
+
+def _normalise_verdict(raw: str) -> str:
+    raw_l = (raw or "").lower()
+    if raw_l in {"approve", "advance"}:
+        return "approve"
+    return "reject"
+
+
+def _short_hash(cv: dict, lessons: list[str]) -> str:
+    payload = repr((cv.get("candidate_id"), tuple(sorted(lessons))))
+    return hashlib.sha256(payload.encode()).hexdigest()[:12]
 ```
 
 - [ ] **Step 4: Run the test to verify it passes**
@@ -822,16 +1099,18 @@ Expected: 3 passed.
 
 ```bash
 git add api/server/services/dream_pass/sandbox.py tests/api/services/dream_pass/test_sandbox.py
-git commit -m "feat(dream-pass): add HiringSandboxRunner with isolated tmp Kuzu"
+git commit -m "feat(dream-pass): InterviewRecommenderSandbox runs real agent in tmp Kuzu"
 ```
 
 ---
 
-## Task 6: Lesson proposer (Protocol + stub for tests + agent-framework default)
+## Task 6: Lesson proposer (reads working memory as raw material)
 
 **Files:**
 - Create: `api/server/services/dream_pass/proposer.py`
 - Test: `tests/api/services/dream_pass/test_proposer.py`
+
+The proposer reads recent `WorkingNote` rows for the target agent (from Plan 1's `WorkingMemoryStore`) and asks an LLM (via `run_agent_session` against the dream-pass skill) to distill candidate lessons. Tests use a `StubProposer`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -840,55 +1119,84 @@ Create `tests/api/services/dream_pass/test_proposer.py`:
 ```python
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
 from api.server.services.dream_pass.proposer import (
+    GHCPProposer,
     ProposalContext,
     StubProposer,
 )
 from api.server.services.dream_pass.types import DreamSkill
+from api.server.services.lessons.working_memory_types import WorkingNote
+
+
+def _skill(max_c: int = 2) -> DreamSkill:
+    return DreamSkill(
+        domain="hiring", version="1.0",
+        max_candidates_per_pass=max_c, max_experiments_per_pass=max_c * 3,
+        body="distill recurring patterns from working notes",
+    )
+
+
+def _note(body: str, kind: str = "observation") -> WorkingNote:
+    return WorkingNote(
+        id=f"WN-{body[:6]}", workflow_id="WF-1",
+        agent_skill="interview-recommender", kind=kind, body=body,
+    )
 
 
 def test_stub_proposer_returns_configured_candidates() -> None:
-    skill = DreamSkill(
-        domain="hiring",
-        version="1.0",
-        max_candidates_per_pass=2,
-        max_experiments_per_pass=6,
-        body="x",
-    )
     proposer = StubProposer(candidates=[
         ("agency X candidates often miss step 3", "observed in 4 of 5 recent rejections"),
         ("market UK requires extra RTW evidence", "observed in 3 of 5"),
     ])
     ctx = ProposalContext(
-        skill=skill,
+        skill=_skill(),
+        working_notes=[_note("agency X failed at step 3"), _note("another fail")],
         recent_runs=[{"workflow_id": "WF-1", "score": 0.7}],
         active_lessons=[],
     )
-
     candidates = proposer.propose(ctx)
-
     assert len(candidates) == 2
     assert candidates[0].body.startswith("agency X")
-    assert candidates[0].rationale.startswith("observed")
     assert candidates[0].scope.domain == "hiring"
 
 
 def test_stub_proposer_respects_max() -> None:
-    skill = DreamSkill(
-        domain="hiring",
-        version="1.0",
-        max_candidates_per_pass=1,
-        max_experiments_per_pass=3,
-        body="x",
-    )
-    proposer = StubProposer(candidates=[
-        ("a", "r"), ("b", "r"), ("c", "r"),
-    ])
-    ctx = ProposalContext(skill=skill, recent_runs=[], active_lessons=[])
+    proposer = StubProposer(candidates=[("a", "r"), ("b", "r"), ("c", "r")])
+    ctx = ProposalContext(skill=_skill(max_c=1), working_notes=[], recent_runs=[], active_lessons=[])
+    assert len(proposer.propose(ctx)) == 1
 
-    candidates = proposer.propose(ctx)
 
-    assert len(candidates) == 1
+@pytest.mark.asyncio
+async def test_ghcp_proposer_embeds_working_notes_in_prompt() -> None:
+    sent_prompts: list[str] = []
+
+    async def fake_run(*, prompt, tools, skill_dir, skill_label, workflow_id, **kwargs):
+        sent_prompts.append(prompt)
+        return [
+            {"body": "distilled lesson 1", "rationale": "3 notes mention agency X"},
+            {"body": "distilled lesson 2", "rationale": "2 notes mention RTW"},
+        ]
+
+    with patch("api.server.services.dream_pass.proposer.run_agent_session", fake_run):
+        proposer = GHCPProposer(skill_dir=None)  # None → use embedded body
+        ctx = ProposalContext(
+            skill=_skill(),
+            working_notes=[
+                _note("agency X failed at step 3"),
+                _note("agency X had inconsistent dates"),
+            ],
+            recent_runs=[{"workflow_id": "WF-1", "score": 0.7}],
+            active_lessons=[],
+        )
+        candidates = await proposer.propose_async(ctx)
+
+    assert len(candidates) == 2
+    assert candidates[0].body == "distilled lesson 1"
+    assert "agency X failed at step 3" in sent_prompts[0]
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -901,25 +1209,36 @@ Expected: FAIL on missing module.
 Create `api/server/services/dream_pass/proposer.py`:
 
 ```python
-"""LessonProposer — generates candidate lessons for a dream pass.
+"""LessonProposer — distills candidate lessons from working memory.
 
-Default impl uses the agent-framework LLM client. Tests use StubProposer.
+Working notes are the dream pass's *raw material*. Reading them is
+what keeps the proposer grounded in things agents actually noticed,
+rather than inventing patterns from outcome data alone.
+
+Default impl uses `run_agent_session` against a dream-pass skill
+(GHCP runtime, i.e. your GitHub Copilot seat). Tests use StubProposer.
 """
 from __future__ import annotations
 
+import asyncio
+import json
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 
+from api.functions.graphs.executors.agents._wrapper import run_agent_session
 from api.server.services.dream_pass.types import DreamSkill
 from api.server.services.lessons.types import LessonCandidate, LessonScope
+from api.server.services.lessons.working_memory_types import WorkingNote
 
 
 @dataclass(frozen=True)
 class ProposalContext:
     skill: DreamSkill
-    recent_runs: list[dict[str, Any]]  # opaque; passed to the LLM as JSON
-    active_lessons: list[dict[str, Any]]  # ditto
+    working_notes: list[WorkingNote]
+    recent_runs: list[dict[str, Any]]
+    active_lessons: list[dict[str, Any]]
 
 
 class LessonProposer(Protocol):
@@ -945,53 +1264,69 @@ class StubProposer:
         return out
 
 
-class AgentFrameworkProposer:
-    """Default proposer using the agent-framework LLM client."""
+class GHCPProposer:
+    """Default proposer using `run_agent_session` against a dream-pass skill."""
 
-    def __init__(self, *, agent_id: str = "dream-pass-proposer") -> None:
-        self._agent_id = agent_id
+    def __init__(self, *, skill_dir: Path | None = None) -> None:
+        self._skill_dir = skill_dir
 
     def propose(self, ctx: ProposalContext) -> list[LessonCandidate]:
-        # Late import so tests don't need agent-framework configured.
-        from agent_framework import AIAgent
+        return asyncio.run(self.propose_async(ctx))
 
-        agent = AIAgent(
-            name=self._agent_id,
-            instructions=ctx.skill.body,
+    async def propose_async(self, ctx: ProposalContext) -> list[LessonCandidate]:
+        prompt = self._render_prompt(ctx)
+        parsed = await run_agent_session(
+            prompt=prompt,
+            tools=[],
+            skill_dir=self._skill_dir,
+            skill_label=f"dream-pass-{ctx.skill.domain}",
+            workflow_id=f"dream-pass:{ctx.skill.domain}",
         )
-        prompt = (
-            "Recent runs (JSON):\n"
-            f"{ctx.recent_runs}\n\n"
-            "Active lessons (JSON):\n"
-            f"{ctx.active_lessons}\n\n"
-            f"Propose up to {ctx.skill.max_candidates_per_pass} candidate lessons "
-            "as a JSON array of objects {body, rationale}. No prose outside JSON."
-        )
-        raw = agent.run_sync(prompt)
-        import json
-        items = json.loads(raw.content if hasattr(raw, "content") else str(raw))
+        items = parsed if isinstance(parsed, list) else (parsed or {}).get("candidates") or []
         out: list[LessonCandidate] = []
         for item in items[: ctx.skill.max_candidates_per_pass]:
             out.append(LessonCandidate(
                 id=str(uuid.uuid4()),
                 body=str(item["body"]),
                 scope=LessonScope(domain=ctx.skill.domain),
-                proposed_by=f"dream-pass:{ctx.skill.domain}:agent-framework",
+                proposed_by=f"dream-pass:{ctx.skill.domain}:ghcp",
                 rationale=str(item.get("rationale", "")),
             ))
         return out
+
+    @staticmethod
+    def _render_prompt(ctx: ProposalContext) -> str:
+        notes_payload = [
+            {
+                "workflow_id": n.workflow_id,
+                "kind": n.kind,
+                "body": n.body,
+            }
+            for n in ctx.working_notes
+        ]
+        return (
+            f"You are the dream-pass agent for the `{ctx.skill.domain}` domain.\n\n"
+            f"Dream-skill body:\n{ctx.skill.body}\n\n"
+            f"Recent working notes ({len(notes_payload)}):\n"
+            f"```json\n{json.dumps(notes_payload, indent=2)}\n```\n\n"
+            f"Recent run scores:\n```json\n{json.dumps(ctx.recent_runs, indent=2)}\n```\n\n"
+            f"Active lessons (do not restate):\n"
+            f"```json\n{json.dumps(ctx.active_lessons, indent=2)}\n```\n\n"
+            f"Distill up to {ctx.skill.max_candidates_per_pass} candidate lessons.\n"
+            f"Return ONLY a JSON array of objects {{body, rationale}}.\n"
+        )
 ```
 
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `uv run pytest tests/api/services/dream_pass/test_proposer.py -v`
-Expected: 2 passed.
+Expected: 3 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add api/server/services/dream_pass/proposer.py tests/api/services/dream_pass/test_proposer.py
-git commit -m "feat(dream-pass): add LessonProposer (StubProposer + AgentFrameworkProposer)"
+git commit -m "feat(dream-pass): add LessonProposer (StubProposer + GHCPProposer)"
 ```
 
 ---
@@ -1010,7 +1345,7 @@ Create `tests/api/services/dream_pass/test_experiment.py`:
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -1018,11 +1353,12 @@ from api.server.services.dream_pass.experiment import ExperimentRunner
 from api.server.services.dream_pass.sandbox import ArmResult
 
 
-def test_experiment_returns_positive_delta_when_treatment_better() -> None:
+@pytest.mark.asyncio
+async def test_experiment_returns_positive_delta_when_treatment_better() -> None:
     sandbox_control = MagicMock()
-    sandbox_control.run_arm.return_value = ArmResult(workflow_ids=("WF-C-1",))
+    sandbox_control.run_arm = AsyncMock(return_value=ArmResult(workflow_ids=("WF-C-1",)))
     sandbox_treatment = MagicMock()
-    sandbox_treatment.run_arm.return_value = ArmResult(workflow_ids=("WF-T-1",))
+    sandbox_treatment.run_arm = AsyncMock(return_value=ArmResult(workflow_ids=("WF-T-1",)))
 
     scorer_control = MagicMock()
     scorer_control.score.return_value = MagicMock(rollup=lambda _: 0.7)
@@ -1036,7 +1372,7 @@ def test_experiment_returns_positive_delta_when_treatment_better() -> None:
         scorer_for=lambda sandbox: scorer_control if sandbox is sandbox_control else scorer_treatment,
     )
 
-    experiment = runner.run(
+    experiment = await runner.run(
         experiment_id="EXP-1",
         candidate_lesson_id="L-1",
         candidate_body="lesson body",
@@ -1049,18 +1385,19 @@ def test_experiment_returns_positive_delta_when_treatment_better() -> None:
     assert experiment.control_score == 0.7
     assert experiment.treatment_score == 0.85
     assert experiment.delta == pytest.approx(0.15)
-    sandbox_control.run_arm.assert_called_once_with(
-        cvs=[{"candidate_id": "C-001"}], lessons=["other lesson"]
+    sandbox_control.run_arm.assert_awaited_once_with(
+        cvs=[{"candidate_id": "C-001"}], lessons=["other lesson"], working_notes=[]
     )
-    sandbox_treatment.run_arm.assert_called_once_with(
-        cvs=[{"candidate_id": "C-001"}], lessons=["other lesson", "lesson body"]
+    sandbox_treatment.run_arm.assert_awaited_once_with(
+        cvs=[{"candidate_id": "C-001"}], lessons=["other lesson", "lesson body"], working_notes=[]
     )
 
 
-def test_experiment_handles_negative_delta() -> None:
+@pytest.mark.asyncio
+async def test_experiment_handles_negative_delta() -> None:
     sandbox_a, sandbox_b = MagicMock(), MagicMock()
-    sandbox_a.run_arm.return_value = ArmResult(workflow_ids=("WF-A",))
-    sandbox_b.run_arm.return_value = ArmResult(workflow_ids=("WF-B",))
+    sandbox_a.run_arm = AsyncMock(return_value=ArmResult(workflow_ids=("WF-A",)))
+    sandbox_b.run_arm = AsyncMock(return_value=ArmResult(workflow_ids=("WF-B",)))
     sc, st = MagicMock(), MagicMock()
     sc.score.return_value = MagicMock(rollup=lambda _: 0.80)
     st.score.return_value = MagicMock(rollup=lambda _: 0.60)
@@ -1070,7 +1407,7 @@ def test_experiment_handles_negative_delta() -> None:
         scorer_for=lambda s: sc if s is sandbox_a else st,
     )
 
-    experiment = runner.run(
+    experiment = await runner.run(
         experiment_id="EXP-2",
         candidate_lesson_id="L-2",
         candidate_body="harmful",
@@ -1121,7 +1458,7 @@ class ExperimentRunner:
         self._sandbox_factory = sandbox_factory
         self._scorer_for = scorer_for
 
-    def run(
+    async def run(
         self,
         *,
         experiment_id: str,
@@ -1132,7 +1469,9 @@ class ExperimentRunner:
         rubric: Rubric,
     ) -> Experiment:
         control_sandbox = self._sandbox_factory()
-        control_arm = control_sandbox.run_arm(cvs=cvs, lessons=active_lessons)
+        control_arm = await control_sandbox.run_arm(
+            cvs=cvs, lessons=active_lessons, working_notes=[]
+        )
         control_score = self._mean_score(
             scorer=self._scorer_for(control_sandbox),
             workflow_ids=control_arm.workflow_ids,
@@ -1140,8 +1479,8 @@ class ExperimentRunner:
         )
 
         treatment_sandbox = self._sandbox_factory()
-        treatment_arm = treatment_sandbox.run_arm(
-            cvs=cvs, lessons=[*active_lessons, candidate_body]
+        treatment_arm = await treatment_sandbox.run_arm(
+            cvs=cvs, lessons=[*active_lessons, candidate_body], working_notes=[]
         )
         treatment_score = self._mean_score(
             scorer=self._scorer_for(treatment_sandbox),
@@ -1483,7 +1822,7 @@ Create `tests/api/services/dream_pass/test_orchestrator.py`:
 from __future__ import annotations
 
 import uuid
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -1503,13 +1842,15 @@ def skill() -> DreamSkill:
     )
 
 
-def test_full_pass_promotes_winners_and_rejects_losers(skill: DreamSkill) -> None:
+@pytest.mark.asyncio
+async def test_full_pass_promotes_winners_and_rejects_losers(skill: DreamSkill) -> None:
     governor = MagicMock()
     partitioner = MagicMock()
     partitioner.next_split.return_value = MagicMock(held_out_ids=("C-001", "C-002"))
 
     # Build deterministic experiment outcomes per candidate body.
     def fake_run_experiment(*, experiment_id, candidate_lesson_id, candidate_body, cvs, active_lessons, rubric):
+        # Experiment.run is now async; the mock is wrapped to AsyncMock at the bottom of this test.
         if "winner" in candidate_body:
             return Experiment(
                 id=experiment_id, candidate_lesson_id=candidate_lesson_id,
@@ -1520,7 +1861,7 @@ def test_full_pass_promotes_winners_and_rejects_losers(skill: DreamSkill) -> Non
             control_score=0.70, treatment_score=0.65, n_samples=40,
         )
     experiment_runner = MagicMock()
-    experiment_runner.run.side_effect = fake_run_experiment
+    experiment_runner.run = AsyncMock(side_effect=fake_run_experiment)
 
     proposer = StubProposer(candidates=[
         ("winner lesson", "good rationale"),
@@ -1543,10 +1884,11 @@ def test_full_pass_promotes_winners_and_rejects_losers(skill: DreamSkill) -> Non
         load_cvs=lambda ids: [{"candidate_id": cid} for cid in ids],
         load_active_lessons=lambda domain: [],
         load_recent_runs=lambda domain: [],
+        load_working_notes=lambda agents: [],
         rubric=MagicMock(min_samples=40),
     )
 
-    result = orchestrator.run_pass(skill=skill, sample_size=2)
+    result = await orchestrator.run_pass(skill=skill, sample_size=2)
 
     assert result.domain == "hiring"
     assert len(result.experiments) == 2
@@ -1559,15 +1901,16 @@ def test_full_pass_promotes_winners_and_rejects_losers(skill: DreamSkill) -> Non
     assert written.provenance.experiment_n == 40
 
 
-def test_skill_max_experiments_caps_loop(skill: DreamSkill) -> None:
+@pytest.mark.asyncio
+async def test_skill_max_experiments_caps_loop(skill: DreamSkill) -> None:
     governor = MagicMock()
     partitioner = MagicMock()
     partitioner.next_split.return_value = MagicMock(held_out_ids=("C-001",))
     experiment_runner = MagicMock()
-    experiment_runner.run.return_value = Experiment(
+    experiment_runner.run = AsyncMock(return_value=Experiment(
         id="EXP-X", candidate_lesson_id="L-X",
         control_score=0.7, treatment_score=0.72, n_samples=40,
-    )
+    ))
     proposer = StubProposer(candidates=[("a", "r"), ("b", "r"), ("c", "r")])
     policy = MagicMock()
     policy.evaluate.return_value = MagicMock(verdict="reject", reason="x")
@@ -1588,9 +1931,10 @@ def test_skill_max_experiments_caps_loop(skill: DreamSkill) -> None:
         load_cvs=lambda ids: [{"candidate_id": cid} for cid in ids],
         load_active_lessons=lambda domain: [],
         load_recent_runs=lambda domain: [],
+        load_working_notes=lambda agents: [],
         rubric=MagicMock(min_samples=40),
     )
-    result = orchestrator.run_pass(skill=skill_capped, sample_size=1)
+    result = await orchestrator.run_pass(skill=skill_capped, sample_size=1)
 
     assert len(result.experiments) == 2  # capped
 ```
@@ -1651,6 +1995,7 @@ class DreamPassOrchestrator:
         load_cvs: Callable[[tuple[str, ...]], list[dict]],
         load_active_lessons: Callable[[str], list[str]],
         load_recent_runs: Callable[[str], list[dict]],
+        load_working_notes: Callable[[tuple[str, ...]], list],  # WorkingNote
         rubric: Rubric,
     ) -> None:
         self._governor = governor
@@ -1661,15 +2006,20 @@ class DreamPassOrchestrator:
         self._load_cvs = load_cvs
         self._load_active_lessons = load_active_lessons
         self._load_recent_runs = load_recent_runs
+        self._load_working_notes = load_working_notes
         self._rubric = rubric
 
-    def run_pass(self, *, skill: DreamSkill, sample_size: int) -> DreamPassResult:
+    async def run_pass(self, *, skill: DreamSkill, sample_size: int) -> DreamPassResult:
         dream_pass_id = f"DP-{uuid.uuid4()}"
         active = self._load_active_lessons(skill.domain)
         recent = self._load_recent_runs(skill.domain)
+        # Working notes for the demo agent (hiring -> interview-recommender).
+        # In a multi-agent domain, supply the tuple of agent skill names you care about.
+        working_notes = self._load_working_notes(("interview-recommender",))
 
         candidates = self._proposer.propose(ProposalContext(
             skill=skill,
+            working_notes=working_notes,
             recent_runs=recent,
             active_lessons=[{"body": b} for b in active],
         ))
@@ -1683,17 +2033,11 @@ class DreamPassOrchestrator:
             if len(experiments) >= skill.max_experiments_per_pass:
                 break
 
-            split = self._partitioner.next_split(
-                available=[f"placeholder-{i}" for i in range(sample_size)] or list(),
-                n=sample_size,
-            ) if False else None  # the orchestrator delegates partitioning to caller-supplied CVs
-            cvs = self._load_cvs(tuple(
-                f"CV-{i}" for i in range(sample_size)
-            ))
+            cvs = self._load_cvs(tuple(f"CV-{i}" for i in range(sample_size)))
             # Real impl: caller-supplied load_cvs reads from data/synthetic/hiring/cvs/
 
             experiment_id = f"EXP-{uuid.uuid4()}"
-            experiment = self._experiment_runner.run(
+            experiment = await self._experiment_runner.run(
                 experiment_id=experiment_id,
                 candidate_lesson_id=candidate.id,
                 candidate_body=candidate.body,
@@ -1774,14 +2118,15 @@ from api.server.services.dream_pass.orchestrator import DreamPassOrchestrator
 from api.server.services.dream_pass.partitioner import CorpusPartitioner
 from api.server.services.dream_pass.policy import PromotionDecision, PromotionPolicy
 from api.server.services.dream_pass.proposer import (
-    AgentFrameworkProposer,
+    GHCPProposer,
+    InterviewRecommenderSandbox,
     LessonProposer,
     ProposalContext,
     StubProposer,
 )
 from api.server.services.dream_pass.sandbox import (
     ArmResult,
-    HiringSandboxRunner,
+    InterviewRecommenderSandbox,
     SandboxRunner,
 )
 from api.server.services.dream_pass.skill_loader import (
@@ -1797,7 +2142,7 @@ from api.server.services.dream_pass.types import (
 )
 
 __all__ = [
-    "AgentFrameworkProposer",
+    "GHCPProposer",
     "ArmResult",
     "CorpusPartitioner",
     "CorpusSplit",
@@ -1808,7 +2153,7 @@ __all__ = [
     "Experiment",
     "ExperimentRunner",
     "ExperimentVerdict",
-    "HiringSandboxRunner",
+    "InterviewRecommenderSandbox",
     "LessonProposer",
     "ProposalContext",
     "PromotionDecision",
@@ -1843,7 +2188,7 @@ from api.server.services.dream_pass import (
     CorpusPartitioner,
     DreamPassOrchestrator,
     ExperimentRunner,
-    HiringSandboxRunner,
+    InterviewRecommenderSandbox,
     PromotionPolicy,
     StubProposer,
     load_dream_skill,
@@ -1903,8 +2248,14 @@ def main() -> None:
         )
         return [{"workflow_id": r["id"]} for r in rows]
 
-    def sandbox_factory() -> HiringSandboxRunner:
-        return HiringSandboxRunner(kuzu_root=Path(tempfile.mkdtemp(prefix="dream-sb-")))
+    def load_working_notes(agent_skills):
+        from api.server.services.lessons.working_memory_store import Mem0WorkingMemoryStore
+        return Mem0WorkingMemoryStore().list_recent_unconsumed(
+            domain_agents=tuple(agent_skills), limit=200,
+        )
+
+    def sandbox_factory() -> InterviewRecommenderSandbox:
+        return InterviewRecommenderSandbox(kuzu_root=Path(tempfile.mkdtemp(prefix="dream-sb-")))
 
     truth = HiringLabelsGroundTruth(
         labels_csv=Path("data/synthetic/hiring/labels.csv")
@@ -1923,8 +2274,8 @@ def main() -> None:
             ("candidates with no recorded reason should be re-screened", "smoke test"),
         ])
     else:
-        from api.server.services.dream_pass import AgentFrameworkProposer
-        proposer = AgentFrameworkProposer()
+        from api.server.services.dream_pass import GHCPProposer
+        proposer = GHCPProposer()
 
     orchestrator = DreamPassOrchestrator(
         governor=governor,
@@ -1935,10 +2286,12 @@ def main() -> None:
         load_cvs=load_cvs,
         load_active_lessons=load_active_lessons,
         load_recent_runs=load_recent_runs,
+        load_working_notes=load_working_notes,
         rubric=rubric,
     )
 
-    result = orchestrator.run_pass(skill=skill, sample_size=args.sample_size)
+    import asyncio
+    result = asyncio.run(orchestrator.run_pass(skill=skill, sample_size=args.sample_size))
 
     print(f"dream pass:  {result.dream_pass_id}")
     print(f"domain:      {result.domain}")
@@ -1994,8 +2347,11 @@ Expected: prints `True`. Then unkill: `... state_store.unkill('dream-pass:hiring
 
 ## Definition of Done
 
+- **Prerequisites (Tasks A and B) landed: `agent_interview_recommender._build_prompt` accepts `lessons` + `working_notes`, and the recruiter persona's `decision_policy` consumes `interview_recommender.decision` when present.**
 - A dream pass can be triggered via CLI for a domain, executes end-to-end with no human intervention.
+- The sandbox invokes the real `interview-recommender` agent via `run_agent_session` (under `LLM_RUNTIME=fake` in tests, `ghcp` in real runs — your GitHub Copilot seat).
 - Promoted lessons are written via `LessonGovernor`, visible in both Mem0 (or the configured `LessonStore`) and the Kuzu `Lesson` node table with `LESSON_FROM_RUN` edges.
+- The proposer reads recent `WorkingNote` rows (from Plan 1's `WorkingMemoryStore`) as its raw material — proposals are grounded in what agents actually noticed, not invented from outcome data alone.
 - Rejected and flagged candidates are recorded in the result, with flagged ones available for Plan 4 to surface.
 - `dream-pass.policy.yaml` is the only place "what to promote" is encoded.
 - Every lesson write is a signed AGT ledger entry.
