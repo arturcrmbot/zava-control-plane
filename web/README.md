@@ -86,6 +86,11 @@ A quick-reference rule of thumb: **operator dashboards → `client`, hiring flow
   the sidebar deliberately opens `web/blueprint/` in a new tab — do not try
   to inline it here (it gets squashed by the dashboard's grid layout; see
   commit `98acc04b`).
+- **Runbook.** Operational details (env vars, `PERSONA_AUTO_CLOSE`,
+  saved-view dataflow, localStorage keys, known issues) live in
+  [`web/client/RUNBOOK.md`](client/RUNBOOK.md). Read it before debugging
+  feed behaviour — it captures the non-obvious server / client invariants
+  that this README intentionally elides.
 
 ---
 

@@ -13,6 +13,9 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 beforeEach(() => {
+  // useResolutionStore persists to localStorage under a day-keyed slot —
+  // wipe it between tests so prior recordings don't leak across cases.
+  if (typeof localStorage !== "undefined") localStorage.clear();
   (globalThis as any).EventSource = class {
     onmessage: ((ev: MessageEvent) => void) | null = null;
     addEventListener() {}
@@ -30,6 +33,11 @@ beforeEach(() => {
             currentPhase: "Intake", createdAt: 100, slaDueAt: 1, jurisdiction: "UK",
             agency: "Z", actionLedger: [], tokensSpent: 0, costUSD: 0,
             metadata: { wait_kind: "external_party", awaiting_reason: "cand" } },
+          // W-C is the workflow E-1 attaches to — separate from W-A so the
+          // HITL/Exception per-workflow dedup doesn't swallow hitl:W-A.
+          { id: "W-C", type: "vendor-kyc", status: "awaiting_hitl",
+            currentPhase: "Intake", createdAt: 150, slaDueAt: 1, jurisdiction: "UK",
+            agency: "Z", actionLedger: [], tokensSpent: 0, costUSD: 0 },
         ],
       } as Response);
     }
@@ -37,7 +45,7 @@ beforeEach(() => {
       return Promise.resolve({
         ok: true,
         json: async () => [
-          { id: "E-1", workflowId: "W-A", composedBy: "fleet-manager",
+          { id: "E-1", workflowId: "W-C", composedBy: "fleet-manager",
             severity: "high", category: "compliance", summary: "s",
             recommendation: "r", options: [], relatedPolicyRefs: [],
             confidence: 0.8, createdAt: 150 },
