@@ -21,6 +21,8 @@ Skipped phases: §4.6 Voice runs only when the screening verdict is
 by checking `screening.verdict`; downstream tracks fill in the real verdict.
 """
 from __future__ import annotations
+import logging
+import os
 from collections.abc import Generator
 from typing import Any
 
@@ -35,6 +37,31 @@ from api.shared.constants import (
     INTERVIEW_BOOKING_TIMEOUT,
     INTERVIEW_DECISION_TIMEOUT,
 )
+
+_log = logging.getLogger(__name__)
+
+_VALID_SEGMENT_LETTERS = frozenset({"a", "b", "c", "d", "e", "f"})
+SEGMENT_MAX_RETRIES = int(os.environ.get("SEGMENT_MAX_RETRIES", "2"))
+
+
+def _parse_segments_enabled(raw: str) -> set[str]:
+    """Parse HIRING_SEGMENT_MODE. Supports 'off' / '' / 'all' / comma-
+    separated letters (e.g. 'b' or 'b,e'). Unknown letters dropped
+    with a warning so a typo doesn't silently break the orchestrator."""
+    if not raw or raw.strip().lower() == "off":
+        return set()
+    tokens = {t.strip().lower() for t in raw.split(",") if t.strip()}
+    if "all" in tokens:
+        return {"all"}
+    out = tokens & _VALID_SEGMENT_LETTERS
+    unknown = tokens - out
+    for u in unknown:
+        _log.warning("HIRING_SEGMENT_MODE: ignoring unknown letter %r", u)
+    return out
+
+
+def _segment_enabled(letter: str, enabled: set[str]) -> bool:
+    return letter in enabled or "all" in enabled
 
 
 def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[Any, Any, dict]:

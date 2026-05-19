@@ -61,3 +61,14 @@ def test_validate_activity_rejects_invalid() -> None:
     result = v_act({"verdict": "MAYBE"})
     assert result["ok"] is False
     assert "errors" in result
+
+
+def test_segment_mode_parser() -> None:
+    from api.functions.workflows.hiring import _parse_segments_enabled
+    assert _parse_segments_enabled("off") == set()
+    assert _parse_segments_enabled("") == set()
+    assert _parse_segments_enabled("b") == {"b"}
+    assert _parse_segments_enabled("b,e") == {"b", "e"}
+    assert _parse_segments_enabled("all") == {"all"}
+    # unknown letters dropped (with warning, not error)
+    assert _parse_segments_enabled("b,zz") == {"b"}
