@@ -282,7 +282,7 @@ Template references (under `docs/superpowers/skills/compose-domain/templates/`):
 | `segment_activity_trigger.py.tmpl` | function_app.py activity-trigger pair (run + validate) | `kind: agent` (default) |
 | `activity.py.tmpl` | per-phase Durable activity wrappers for graph phases | deterministic + legacy graph |
 | `phase_graph.py.tmpl` | per-phase MAF graph (WorkflowBuilder) | **deterministic + legacy `kind: graph` only** |
-| `validator.py.tmpl` | in-graph validator returning `{ok: bool}` | **legacy / `kind: graph` only** |
+| `validator.py.tmpl` | in-graph validator returning `{ok: bool}` | **deterministic + legacy `kind: graph` only** |
 | `agent_executor.py.tmpl` | per-phase agent executor calling `run_agent_session` | **legacy / `kind: graph` only** |
 | `orchestrator.py.tmpl` | the orchestrator | always |
 | `mcp_tool.py.tmpl` | MCP tool stub | per `external_systems[]` |
