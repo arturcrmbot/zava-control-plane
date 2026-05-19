@@ -329,6 +329,19 @@ AGENTS: dict[str, AgentRegistryEntry] = {
     # actor so AppState's `governance=self.governance` wiring doesn't
     # auto-deny under the unknown-agent rule in
     # api/server/services/governance/kernel.py:_registry_gate.
+    "dream-pass:hiring": AgentRegistryEntry(
+        agent_id="dream-pass:hiring",
+        allowed_tools=(
+            "lesson.write",
+            "lesson.prune",
+        ),
+        max_value_gbp=None,
+        reversible_only=True,
+        scope_function="hiring",
+        description=(
+            "Dream-pass hiring orchestrator — promotes and prunes governed lessons."
+        ),
+    ),
     "reflector.entity_reflector": AgentRegistryEntry(
         agent_id="reflector.entity_reflector",
         allowed_tools=("entity.write",),

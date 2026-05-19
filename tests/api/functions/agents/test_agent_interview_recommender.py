@@ -66,3 +66,53 @@ async def test_executor_handles_parse_error_gracefully():
     rec = out["interview_recommender"]
     assert rec["decision"] == "advance"
     assert rec["recommender_status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_build_prompt_includes_lessons_and_working_notes() -> None:
+    prompt = agent_interview_recommender._build_prompt({
+        "gate": "post_voice",
+        "role_title": "Engineer",
+        "lessons": ["candidates with tenure < 2y targeting L6 should be re-screened"],
+        "working_notes": ["screening flagged employment-date inconsistency"],
+    })
+    assert "tenure < 2y" in prompt
+    assert "employment-date inconsistency" in prompt
+
+    prompt_no_lessons = agent_interview_recommender._build_prompt({
+        "gate": "post_voice",
+        "role_title": "Engineer",
+    })
+    prompt_empty_lessons = agent_interview_recommender._build_prompt({
+        "gate": "post_voice",
+        "role_title": "Engineer",
+        "lessons": [],
+        "working_notes": [],
+    })
+    assert prompt_no_lessons == prompt_empty_lessons
+
+
+@pytest.mark.asyncio
+async def test_executor_passes_lessons_to_prompt() -> None:
+    parsed = {
+        "decision": "advance",
+        "level_suggestion": None,
+        "rationale": "Voice transcript shows depth on Spark.",
+        "talking_points": ["pipeline ownership"],
+    }
+    with patch.object(
+        agent_interview_recommender, "run_agent_session",
+        new=AsyncMock(return_value=parsed),
+    ) as mock:
+        await agent_interview_recommender.execute({
+            "gate": "post_voice",
+            "role_title": "Senior Data Engineer",
+            "role_jurisdiction": "USA",
+            "workflow_id": "WF-1",
+            "lessons": ["flag inconsistent dates before advancing"],
+            "working_notes": ["candidate has overlapping employment dates"],
+        })
+
+    prompt = mock.call_args.kwargs["prompt"]
+    assert "flag inconsistent dates" in prompt
+    assert "overlapping employment dates" in prompt

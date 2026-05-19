@@ -126,3 +126,23 @@ def test_prune_records_in_ledger_with_reason(
     fake_provenance.mark_pruned.assert_called_once_with(
         lesson.id, reason="superseded by stronger evidence"
     )
+
+
+
+def test_write_denied_by_kernel_in_enforce_mode_with_real_registry_gate(
+    make_lesson, monkeypatch
+) -> None:
+    from api.server.services.governance import kernel
+
+    monkeypatch.setenv('AGT_ENFORCE', '1')
+    store = InMemoryLessonStore()
+    governor = LessonGovernor(
+        store=store,
+        kernel=kernel,
+        audit=MagicMock(name='AuditLogger'),
+        provenance=MagicMock(name='KuzuLessonProvenance'),
+        actor='interview-recommender',
+    )
+
+    with pytest.raises(GovernanceDenied):
+        governor.write(make_lesson())

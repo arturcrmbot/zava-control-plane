@@ -451,6 +451,39 @@ _NODE_TABLES: tuple[tuple[str, str], ...] = (
         )
         """,
     ),
+    (
+        "DreamPass",
+        """
+        CREATE NODE TABLE IF NOT EXISTS DreamPass (
+            id STRING,
+            domain STRING,
+            skill_version STRING,
+            started_at TIMESTAMP,
+            completed_at TIMESTAMP,
+            status STRING,
+            candidates_proposed INT64,
+            candidates_promoted INT64,
+            PRIMARY KEY (id)
+        )
+        """,
+    ),
+    (
+        "Experiment",
+        """
+        CREATE NODE TABLE IF NOT EXISTS Experiment (
+            id STRING,
+            dream_pass_id STRING,
+            candidate_lesson_id STRING,
+            control_score DOUBLE,
+            treatment_score DOUBLE,
+            delta DOUBLE,
+            n_samples INT64,
+            verdict STRING,
+            run_at TIMESTAMP,
+            PRIMARY KEY (id)
+        )
+        """,
+    ),
 )
 
 _REL_TABLES: tuple[tuple[str, str], ...] = (
@@ -503,6 +536,8 @@ _REL_TABLES: tuple[tuple[str, str], ...] = (
     ("LESSON_FROM_RUN", "CREATE REL TABLE IF NOT EXISTS LESSON_FROM_RUN (FROM Lesson TO Workflow, recorded_at TIMESTAMP)"),
     ("LESSON_ABOUT_PERSONA", "CREATE REL TABLE IF NOT EXISTS LESSON_ABOUT_PERSONA (FROM Lesson TO Person, recorded_at TIMESTAMP)"),
     ("LESSON_SUPERSEDES", "CREATE REL TABLE IF NOT EXISTS LESSON_SUPERSEDES (FROM Lesson TO Lesson, recorded_at TIMESTAMP)"),
+    ("EXPERIMENT_FOR_LESSON", "CREATE REL TABLE IF NOT EXISTS EXPERIMENT_FOR_LESSON (FROM Experiment TO Lesson, recorded_at TIMESTAMP)"),
+    ("EXPERIMENT_USED_PERSONA", "CREATE REL TABLE IF NOT EXISTS EXPERIMENT_USED_PERSONA (FROM Experiment TO Person, arm STRING, recorded_at TIMESTAMP)"),
 )
 
 # Decision target kind → rel-table name. Keys must match :data:`_VALID_KINDS`

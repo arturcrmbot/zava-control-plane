@@ -35,6 +35,8 @@ def _build_prompt(input: dict) -> str:
         "screening": input.get("screening") or {},
         "voice_transcript": input.get("voice_transcript") or [],
         "voice_score": input.get("voice_score"),
+        "lessons": input.get("lessons") or [],
+        "working_notes": input.get("working_notes") or [],
     }
     return (
         f"Recommend at gate `{gate}` for `{role_title}`. "

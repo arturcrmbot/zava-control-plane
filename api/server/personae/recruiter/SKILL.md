@@ -24,8 +24,17 @@ decision_policy: |
     # when the score never made it into the parked context.
     voice_score = float(voice.get("score") or 0.75)
 
+    recommender = (context or {}).get("interview_recommender") or {}
+    recommender_decision = str(recommender.get("decision") or "").lower()
+
     if gate == "post_voice":
-        if screening_verdict in {"strong", "auto-advance"} or voice_score >= 0.7:
+        if recommender_decision in {"decline", "reject"}:
+            decision = "reject"
+            reason = "recommender declined advancement at post_voice"
+        elif recommender_decision in {"advance", "approve"}:
+            decision = "approve"
+            reason = "recommender recommended advancement at post_voice"
+        elif screening_verdict in {"strong", "auto-advance"} or voice_score >= 0.7:
             decision = "approve"
             reason = (
                 "advancing: screening=" + screening_verdict
