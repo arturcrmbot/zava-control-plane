@@ -10,6 +10,32 @@
 
 ---
 
+## ⚠️ Plan-vs-reality corrections (discovered during execution)
+
+Implemented on branch `feat/dream-pass-b2-rubric-scorer` (merged into main).
+Apply these as you read the detailed task code below.
+
+1. **`EntityGraph` API.** Use `graph.query(cypher, params)`, not the plan's
+   `graph.execute_cypher(...)` which doesn't exist (same defect from B1).
+2. **Kuzu `timestamp()`.** Kuzu 0.6 doesn't support the no-arg `timestamp()`
+   Cypher function. For `CREATE (...)-[:REL {decided_at: ...}]->(...)`, pass
+   a Python `datetime` as a parameter (`{"now": datetime.now(timezone.utc)}`)
+   instead of inlining `timestamp()`.
+3. **Test fixture cleanup.** `EntityGraph` opens a Kuzu single-writer file
+   lock. Test fixtures must `g.close()` (or use the context manager) on
+   teardown or subsequent tests in the same process fail with
+   `Could not set lock on file`. The CLI in Task 6 wraps its work in
+   `try/finally` for the same reason.
+4. **Synthetic `labels.csv` does not have an `expected_decision` column** and
+   six other call sites read this file. Rather than backfilling the column
+   (Step 6 of Task 3's plan), `HiringLabelsGroundTruth` derives the expected
+   decision from `rtw_evidence` (`""`/`none`/`n/a`/`expired` → reject, else
+   approve) when the column is absent, and prefers the column when present.
+   Add a fixture `labels_csv_without_expected_column` that exercises the
+   derivation path.
+
+---
+
 ## File Structure
 
 **New files:**
