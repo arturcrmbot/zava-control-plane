@@ -31,8 +31,9 @@ export function Composition() {
           with a human checkpoint between them. Inside a segment the model
           decides which skill to call next; the orchestrator decides
           segment order, approval gates and retries. Hiring is the
-          canonical example: ten phases collapse into six segments
-          separated by five human checkpoints.
+          canonical example: ten phases collapse into six short agent
+          sessions — four loaded with several skills, two with a single
+          skill — separated by six human approval points.
         </p>
 
         <p className="body">
