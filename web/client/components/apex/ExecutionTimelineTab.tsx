@@ -25,7 +25,7 @@ export default function ExecutionTimelineTab({ mcpCalls, workflowId, onLogAction
     <div className="grid grid-cols-3 gap-4" data-testid="execution-timeline">
       <div className="col-span-2 space-y-2">
         <div className="flex items-center justify-between">
-          <div className="text-sm text-slate-600">Run ID: <span className="font-mono">{workflowId}</span></div>
+          <div className="text-sm text-slate-600 dark:text-slate-300">Run ID: <span className="font-mono">{workflowId}</span></div>
           <div className="flex gap-2">
             <button className="btn-secondary" data-testid="rollback-workflow"
                     onClick={() => onLogAction("workflow.rollback-requested")}>
@@ -38,7 +38,7 @@ export default function ExecutionTimelineTab({ mcpCalls, workflowId, onLogAction
           </div>
         </div>
         {mcpCalls.length === 0 && (
-          <div className="panel panel-body text-xs text-slate-500">
+          <div className="panel panel-body text-xs text-slate-500 dark:text-slate-400">
             Timeline populates as the orchestration fires MCP calls.
           </div>
         )}
@@ -52,11 +52,11 @@ export default function ExecutionTimelineTab({ mcpCalls, workflowId, onLogAction
                       ${i === selected ? "ring-2 ring-blue-400" : ""}
                       ${failed ? "border-red-300" : ""}`}>
               <div className="flex items-center gap-3">
-                <span className="text-[10px] font-mono text-slate-500">STEP {String(i + 1).padStart(2, "0")}</span>
-                <span className="text-sm font-semibold text-slate-800">{c.method} {new URL(c.url).pathname}</span>
+                <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">STEP {String(i + 1).padStart(2, "0")}</span>
+                <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{c.method} {new URL(c.url).pathname}</span>
                 <span className="ml-auto">{statusChip(c.statusCode)}</span>
               </div>
-              <div className="text-[11px] text-slate-500 mt-1">
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                 tool: {c.tool} · {c.durationMs} ms · {new Date(c.timestamp * 1000).toLocaleTimeString()}
               </div>
               {failed && (
@@ -76,15 +76,15 @@ export default function ExecutionTimelineTab({ mcpCalls, workflowId, onLogAction
         <div className="panel" data-testid="api-configuration">
           <div className="panel-header">API Configuration</div>
           <div className="panel-body">
-            {!sel && <div className="text-xs text-slate-500">select a step</div>}
+            {!sel && <div className="text-xs text-slate-500 dark:text-slate-400">select a step</div>}
             {sel && (
               <>
-                <div className="text-[11px] uppercase text-slate-500 mb-1">Request</div>
-                <pre className="text-[11px] bg-slate-50 border border-slate-200 rounded p-2 whitespace-pre-wrap break-all max-h-48 overflow-auto">
+                <div className="text-[11px] uppercase text-slate-500 dark:text-slate-400 mb-1">Request</div>
+                <pre className="text-[11px] bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded p-2 whitespace-pre-wrap break-all max-h-48 overflow-auto">
 {JSON.stringify(sel.request, null, 2)}
                 </pre>
-                <div className="text-[11px] uppercase text-slate-500 mb-1 mt-2">Response</div>
-                <pre className="text-[11px] bg-slate-50 border border-slate-200 rounded p-2 whitespace-pre-wrap break-all max-h-48 overflow-auto">
+                <div className="text-[11px] uppercase text-slate-500 dark:text-slate-400 mb-1 mt-2">Response</div>
+                <pre className="text-[11px] bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded p-2 whitespace-pre-wrap break-all max-h-48 overflow-auto">
 {JSON.stringify(sel.response, null, 2)}
                 </pre>
               </>
@@ -95,11 +95,11 @@ export default function ExecutionTimelineTab({ mcpCalls, workflowId, onLogAction
         <div className="panel" data-testid="agent-thought-stream">
           <div className="panel-header">Agent Thought Stream</div>
           <div className="panel-body space-y-1.5">
-            {fmEvents.length === 0 && <div className="text-xs text-slate-500">no agent activity</div>}
+            {fmEvents.length === 0 && <div className="text-xs text-slate-500 dark:text-slate-400">no agent activity</div>}
             {fmEvents.slice(-6).map((e, i) => (
               <div key={i} className="text-xs">
-                <div className="text-slate-800 font-medium">{e.kind}</div>
-                <div className="text-slate-500 break-all">
+                <div className="text-slate-800 dark:text-slate-100 font-medium">{e.kind}</div>
+                <div className="text-slate-500 dark:text-slate-400 break-all">
                   {e.data ? JSON.stringify(e.data).slice(0, 140) : ""}
                 </div>
               </div>

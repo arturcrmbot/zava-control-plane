@@ -40,45 +40,45 @@ function DevPanelInner() {
     <div className="fixed top-2 right-2 z-40 text-xs">
       <button
         onClick={() => setOpen(o => !o)}
-        className="px-2 py-1 border border-amber-300 bg-amber-50 text-amber-800 rounded hover:bg-amber-100 font-medium"
+        className="px-2 py-1 border border-amber-300 bg-amber-50 dark:bg-amber-950/30 text-amber-800 rounded hover:bg-amber-100 font-medium"
         title="Dev tools — hidden in production builds"
       >
         Dev {open ? "▾" : "▸"}
       </button>
       {open && (
-        <div className="mt-1 w-72 bg-white border border-slate-200 rounded-lg p-3 space-y-2 shadow-xl">
-          <div className="font-semibold text-slate-800">Inject scenario</div>
+        <div className="mt-1 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-3 space-y-2 shadow-xl">
+          <div className="font-semibold text-slate-800 dark:text-slate-100">Inject scenario</div>
           <div className="flex flex-col gap-1">
             <button
               onClick={() => void inject("normal")}
               disabled={busy !== null}
-              className="px-2 py-1 border border-slate-300 text-slate-700 rounded hover:bg-slate-50 disabled:opacity-50 text-left"
+              className="px-2 py-1 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 text-left"
             >
               Inject normal
             </button>
             <button
               onClick={() => void inject("demo-fail")}
               disabled={busy !== null}
-              className="px-2 py-1 border border-red-300 bg-red-50 text-red-700 rounded hover:bg-red-100 disabled:opacity-50 text-left"
+              className="px-2 py-1 border border-red-300 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 rounded hover:bg-red-100 disabled:opacity-50 text-left"
             >
               Inject demo-fail (validator blocks at Routing)
             </button>
             <button
               onClick={() => void inject("demo-hitl")}
               disabled={busy !== null}
-              className="px-2 py-1 border border-amber-300 bg-amber-50 text-amber-800 rounded hover:bg-amber-100 disabled:opacity-50 text-left"
+              className="px-2 py-1 border border-amber-300 bg-amber-50 dark:bg-amber-950/30 text-amber-800 rounded hover:bg-amber-100 disabled:opacity-50 text-left"
             >
               Inject demo-hitl (Approval suspends)
             </button>
           </div>
-          <div className="pt-2 border-t border-slate-200">
-            <div className="font-semibold text-slate-800 mb-1">Reset Azurite</div>
-            <div className="text-[11px] text-slate-500 leading-snug">
+          <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+            <div className="font-semibold text-slate-800 dark:text-slate-100 mb-1">Reset Azurite</div>
+            <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
               Use the Makefile:
-              <pre className="mt-1 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-700">make reset-azurite</pre>
+              <pre className="mt-1 px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-700 dark:text-slate-200">make reset-azurite</pre>
             </div>
           </div>
-          {last && <div className="text-[11px] text-slate-600 break-all">{last}</div>}
+          {last && <div className="text-[11px] text-slate-600 dark:text-slate-300 break-all">{last}</div>}
         </div>
       )}
     </div>

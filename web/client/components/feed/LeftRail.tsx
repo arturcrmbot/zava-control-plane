@@ -40,28 +40,28 @@ export default function LeftRail({
 
   if (collapsed) {
     return (
-      <aside className="w-[44px] shrink-0 bg-white border-r border-slate-200 p-2 flex flex-col items-center gap-2">
+      <aside className="w-[44px] shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 p-2 flex flex-col items-center gap-2">
         <button
           type="button"
           onClick={() => setCollapsed(false)}
           aria-label="Expand sidebar"
           title="Expand sidebar"
-          className="p-1.5 rounded hover:bg-slate-100 text-slate-500"
+          className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400"
         ><ChevronsRight size={16} /></button>
       </aside>
     );
   }
 
   return (
-    <aside className="w-[200px] shrink-0 bg-white border-r border-slate-200 p-3 flex flex-col gap-3 text-sm overflow-y-auto">
+    <aside className="w-[200px] shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 p-3 flex flex-col gap-3 text-sm overflow-y-auto">
       <div className="flex items-center justify-between">
-        <div className="text-[10px] uppercase tracking-wide text-slate-400 px-2">Saved views</div>
+        <div className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500 px-2">Saved views</div>
         <button
           type="button"
           onClick={() => setCollapsed(true)}
           aria-label="Collapse sidebar"
           title="Collapse sidebar"
-          className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+          className="p-1 rounded text-slate-400 dark:text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
         ><ChevronsLeft size={14} /></button>
       </div>
       <div>
@@ -71,13 +71,13 @@ export default function LeftRail({
               key={v.id}
               type="button"
               onClick={() => onSelectView(v)}
-              className="block w-full text-left text-xs px-3 py-1.5 rounded text-slate-700 hover:bg-slate-100"
+              className="block w-full text-left text-xs px-3 py-1.5 rounded text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
             >{v.label}</button>
           ))}
           <button
             type="button"
             onClick={onSaveCurrent}
-            className="flex items-center gap-1 text-[11px] px-3 py-1.5 text-slate-500 hover:text-slate-700"
+            className="flex items-center gap-1 text-[11px] px-3 py-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700"
           ><Plus size={12} /> Save current filter</button>
         </div>
       </div>
@@ -86,7 +86,7 @@ export default function LeftRail({
         <button
           type="button"
           onClick={() => setMoreOpen((v) => !v)}
-          className="flex items-center justify-between w-full text-[11px] uppercase tracking-wide text-slate-400 px-2 py-1 hover:text-slate-600"
+          className="flex items-center justify-between w-full text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500 px-2 py-1 hover:text-slate-600"
         >
           More
           <ChevronDown size={12} className={moreOpen ? "rotate-180 transition" : "transition"} />
@@ -98,7 +98,7 @@ export default function LeftRail({
                 key={to}
                 to={to}
                 className={({ isActive }) =>
-                  `block text-xs px-3 py-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-700 hover:bg-slate-100"}`
+                  `block text-xs px-3 py-1.5 rounded ${isActive ? "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 font-medium" : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"}`
                 }
               >{ROUTE_LABEL[to] ?? to}</NavLink>
             ))}
@@ -107,7 +107,7 @@ export default function LeftRail({
         <a
           href={constellationUrl()}
           target="_blank" rel="noopener noreferrer"
-          className="block text-xs px-3 py-1.5 mt-1 rounded text-slate-700 hover:bg-slate-100"
+          className="block text-xs px-3 py-1.5 mt-1 rounded text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
         >Constellation ↗</a>
       </div>
     </aside>

@@ -31,7 +31,7 @@ export default function InterventionProtocols({ exception, onResolved }: {
                   data-testid={`protocol-${o.action}`}
                   className={o.recommended ? "btn-primary" :
                              o.action === "reject" ? "btn-danger" : "btn-secondary"}>
-            {o.recommended && <span className="text-[10px] uppercase tracking-wider bg-white/20 rounded px-1">recommended</span>}
+            {o.recommended && <span className="text-[10px] uppercase tracking-wider bg-white dark:bg-slate-900/20 rounded px-1">recommended</span>}
             {o.label}{o.nonRevocable ? " ⚠" : ""}
           </button>
         ))}

@@ -20,17 +20,17 @@ export default function ExceptionAnalysisCard({ narrative }: { narrative: Narrat
       </div>
       <div className="panel-body space-y-4 text-sm">
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1">What Happened</div>
-          <p className="text-slate-800">{highlight(narrative.whatHappened)}</p>
+          <div className="text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">What Happened</div>
+          <p className="text-slate-800 dark:text-slate-100">{highlight(narrative.whatHappened)}</p>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1">What the Agent Tried</div>
-          <ul className="list-disc pl-5 space-y-1 text-slate-700">
+          <div className="text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">What the Agent Tried</div>
+          <ul className="list-disc pl-5 space-y-1 text-slate-700 dark:text-slate-200">
             {narrative.whatAgentTried.map((b, i) => <li key={i}>{b}</li>)}
           </ul>
         </div>
-        <div className="bg-emerald-50 border border-emerald-200 rounded p-3">
-          <div className="text-[10px] uppercase tracking-wide text-emerald-700 mb-1">Agent Recommendation</div>
+        <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded p-3">
+          <div className="text-[10px] uppercase tracking-wide text-emerald-700 dark:text-emerald-400 mb-1">Agent Recommendation</div>
           <p className="text-emerald-900">{narrative.agentRecommendation}</p>
         </div>
       </div>

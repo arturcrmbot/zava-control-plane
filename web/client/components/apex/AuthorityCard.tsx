@@ -188,41 +188,41 @@ export default function AuthorityCard({ workflow }: { workflow: Workflow }) {
       <div className="panel-header flex items-center justify-between">
         <span>Delegated Authority</span>
         {resolution.rule_id && (
-          <code className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded ring-1 ring-amber-200">
+          <code className="text-[10px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 rounded ring-1 ring-amber-200">
             {resolution.rule_id}
           </code>
         )}
       </div>
       <div className="panel-body space-y-2 text-xs">
         <div className="flex items-center gap-2">
-          <span className="text-slate-500 shrink-0">Approver</span>
-          <code className="text-slate-900 font-medium bg-slate-100 px-1.5 py-0.5 rounded">
+          <span className="text-slate-500 dark:text-slate-400 shrink-0">Approver</span>
+          <code className="text-slate-900 dark:text-slate-100 font-medium bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
             {resolution.approver_role}
           </code>
         </div>
         {resolution.threshold_gbp != null && (
           <div className="flex items-center gap-2">
-            <span className="text-slate-500 shrink-0">Up to</span>
-            <span className="text-slate-800 tabular-nums font-medium">
+            <span className="text-slate-500 dark:text-slate-400 shrink-0">Up to</span>
+            <span className="text-slate-800 dark:text-slate-100 tabular-nums font-medium">
               {fmtGbp(resolution.threshold_gbp)}
             </span>
           </div>
         )}
         {resolution.escalation_chain && resolution.escalation_chain.length > 0 && (
           <div className="space-y-0.5">
-            <div className="text-slate-500">Escalation</div>
-            <div className="text-slate-700 leading-snug">
+            <div className="text-slate-500 dark:text-slate-400">Escalation</div>
+            <div className="text-slate-700 dark:text-slate-200 leading-snug">
               {resolution.escalation_chain.map((r, i) => (
                 <span key={r}>
-                  {i > 0 && <span className="text-slate-400 px-1">→</span>}
-                  <code className="bg-slate-100 px-1 py-0.5 rounded text-[11px]">{r}</code>
+                  {i > 0 && <span className="text-slate-400 dark:text-slate-500 px-1">→</span>}
+                  <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[11px]">{r}</code>
                 </span>
               ))}
             </div>
           </div>
         )}
         {resolution.basis && (
-          <div className="text-[11px] text-slate-500 leading-snug border-t border-slate-200 pt-1.5 mt-1">
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug border-t border-slate-200 dark:border-slate-700 pt-1.5 mt-1">
             {resolution.basis}
           </div>
         )}

@@ -52,15 +52,15 @@ const Icon = ({ s }: { s: Status }) => {
   if (s === "in_progress") return <Loader2 size={14} className="text-blue-600 animate-spin" />;
   if (s === "blocked") return <Ban size={14} className="text-red-600" />;
   if (s === "rejected") return <Ban size={14} className="text-red-600" />;
-  return <CircleDashed size={14} className="text-slate-400" />;
+  return <CircleDashed size={14} className="text-slate-400 dark:text-slate-500" />;
 };
 
 const PILL: Record<Status, string> = {
-  completed: "bg-emerald-50 border-emerald-200 text-emerald-800",
-  in_progress: "bg-blue-50 border-blue-200 text-blue-800",
-  blocked: "bg-red-50 border-red-200 text-red-800",
-  rejected: "bg-red-50 border-red-300 text-red-800 ring-1 ring-red-200",
-  pending: "bg-slate-50 border-slate-200 text-slate-500",
+  completed: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-800",
+  in_progress: "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-800",
+  blocked: "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-red-800",
+  rejected: "bg-red-50 dark:bg-red-950/30 border-red-300 text-red-800 ring-1 ring-red-200",
+  pending: "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400",
 };
 
 export default function PhaseRibbon({ workflow, phases }: {

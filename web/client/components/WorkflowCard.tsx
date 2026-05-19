@@ -5,10 +5,10 @@ import { PHASE_ORDER, EXPENSE_PHASE_ORDER, HIRING_PHASE_ORDER } from "@shared/ty
 import { AlertTriangle, Clock } from "lucide-react";
 
 const STATUS_COLOR: Record<Workflow["status"], string> = {
-  in_progress: "bg-blue-50 text-blue-700 ring-1 ring-blue-200",
-  awaiting_hitl: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
-  completed: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
-  failed: "bg-red-50 text-red-700 ring-1 ring-red-200",
+  in_progress: "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 ring-1 ring-blue-200",
+  awaiting_hitl: "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200",
+  completed: "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200",
+  failed: "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 ring-1 ring-red-200",
 };
 
 const STATUS_LABEL: Record<Workflow["status"], string> = {
@@ -19,9 +19,9 @@ const STATUS_LABEL: Record<Workflow["status"], string> = {
 };
 
 const VERDICT_COLOR: Record<NonNullable<Workflow["verdict"]>, string> = {
-  green: "bg-emerald-100 text-emerald-700",
-  amber: "bg-amber-100 text-amber-700",
-  red: "bg-red-100 text-red-700",
+  green: "bg-emerald-100 text-emerald-700 dark:text-emerald-400",
+  amber: "bg-amber-100 text-amber-700 dark:text-amber-400",
+  red: "bg-red-100 text-red-700 dark:text-red-400",
 };
 
 const PROGRESS_BAR: Record<Workflow["status"], string> = {
@@ -52,17 +52,17 @@ const DOMAIN_LABEL: Record<string, string> = {
 const DOMAIN_COLOR: Record<string, string> = {
   "expense-claim": "bg-sky-50 text-sky-700 ring-1 ring-sky-200",
   "hiring": "bg-violet-50 text-violet-700 ring-1 ring-violet-200",
-  "invoice-p2p": "bg-slate-50 text-slate-600 ring-1 ring-slate-200",
+  "invoice-p2p": "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 ring-1 ring-slate-200 dark:ring-slate-700",
   "travel-preapproval": "bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200",
   "vendor-kyc": "bg-orange-50 text-orange-700 ring-1 ring-orange-200",
-  "employee-onboarding": "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+  "employee-onboarding": "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200",
   "it-access-request": "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200",
   "contract-renewal": "bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200",
   "perf-review": "bg-pink-50 text-pink-700 ring-1 ring-pink-200",
   "ap-invoice": "bg-stone-50 text-stone-700 ring-1 ring-stone-200",
   "purchase-order": "bg-teal-50 text-teal-700 ring-1 ring-teal-200",
-  "contract-review": "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
-  "privacy-dpia": "bg-red-50 text-red-700 ring-1 ring-red-200",
+  "contract-review": "bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 ring-1 ring-amber-200",
+  "privacy-dpia": "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 ring-1 ring-red-200",
   "treasury-fx": "bg-lime-50 text-lime-700 ring-1 ring-lime-200",
   "creative-campaign": "bg-fuchsia-50 text-fuchsia-700 ring-1 ring-fuchsia-200",
 };
@@ -100,24 +100,24 @@ export default function WorkflowCard({ w }: { w: Workflow }) {
   const sla = fmtSlaRemaining(w.slaDueAt);
   const hasException = !!w.activeExceptionId;
   const cardBorder = hasException
-    ? "border-amber-300 bg-amber-50/30"
+    ? "border-amber-300 bg-amber-50 dark:bg-amber-950/30/30"
     : sla?.warn
-    ? "border-red-200"
-    : "border-slate-200";
+    ? "border-red-200 dark:border-red-800"
+    : "border-slate-200 dark:border-slate-700";
 
   return (
     <Link
       to={`/workflows/${w.id}`}
-      className={`block bg-white border ${cardBorder} rounded-lg p-3 shadow-sm hover:border-blue-400 hover:shadow transition`}
+      className={`block bg-white dark:bg-slate-900 border ${cardBorder} rounded-lg p-3 shadow-sm hover:border-blue-400 hover:shadow transition`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <span
-            className={`text-[10px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${DOMAIN_COLOR[w.type] ?? "bg-slate-50 text-slate-600 ring-1 ring-slate-200"}`}
+            className={`text-[10px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${DOMAIN_COLOR[w.type] ?? "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 ring-1 ring-slate-200 dark:ring-slate-700"}`}
           >
             {DOMAIN_LABEL[w.type] ?? w.type}
           </span>
-          <div className="font-semibold text-sm text-slate-900 truncate">{w.id}</div>
+          <div className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">{w.id}</div>
         </div>
         <span
           className={`text-[10px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${STATUS_COLOR[w.status]}`}
@@ -125,14 +125,14 @@ export default function WorkflowCard({ w }: { w: Workflow }) {
           {STATUS_LABEL[w.status]}
         </span>
       </div>
-      <div className="text-xs text-slate-500 mt-0.5 truncate">{subtitle}</div>
+      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">{subtitle}</div>
       {amount && (
-        <div className="text-xs text-slate-700 mt-1 flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-slate-900">
+        <div className="text-xs text-slate-700 dark:text-slate-200 mt-1 flex items-center gap-2 flex-wrap">
+          <span className="font-semibold text-slate-900 dark:text-slate-100">
             {amount.currency} {amount.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
           {w.claim && (
-            <span className="text-[10px] text-slate-500 capitalize">{w.claim.category}</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 capitalize">{w.claim.category}</span>
           )}
           {w.verdict && (
             <span className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded font-medium ${VERDICT_COLOR[w.verdict]}`}>
@@ -142,15 +142,15 @@ export default function WorkflowCard({ w }: { w: Workflow }) {
         </div>
       )}
       <div className="mt-2 flex items-center justify-between gap-2">
-        <div className="text-[10px] text-slate-500 truncate">{w.currentPhase}</div>
+        <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{w.currentPhase}</div>
         {sla && (
-          <div className={`text-[10px] flex items-center gap-1 whitespace-nowrap ${sla.warn ? "text-red-600 font-medium" : "text-slate-500"}`}>
+          <div className={`text-[10px] flex items-center gap-1 whitespace-nowrap ${sla.warn ? "text-red-600 font-medium" : "text-slate-500 dark:text-slate-400"}`}>
             <Clock size={10} />
             {sla.text}
           </div>
         )}
       </div>
-      <div className="h-1 bg-slate-100 rounded mt-1">
+      <div className="h-1 bg-slate-100 dark:bg-slate-800 rounded mt-1">
         <div className={`h-1 rounded ${PROGRESS_BAR[w.status]}`} style={{ width: `${pct}%` }} />
       </div>
       {hasException && (

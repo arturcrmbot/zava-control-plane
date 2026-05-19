@@ -16,9 +16,9 @@ function slaHealth(w: Workflow): string {
 }
 
 const RISK_COLOR = {
-  low:    "text-emerald-700 bg-emerald-50 border-emerald-200",
-  medium: "text-amber-700 bg-amber-50 border-amber-200",
-  high:   "text-red-700 bg-red-50 border-red-200",
+  low:    "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800",
+  medium: "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800",
+  high:   "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800",
 };
 
 const STATUS_HUMAN: Record<Workflow["status"], string> = {
@@ -29,10 +29,10 @@ const STATUS_HUMAN: Record<Workflow["status"], string> = {
 };
 
 const STATUS_COLOR: Record<Workflow["status"], string> = {
-  in_progress: "text-blue-700 bg-blue-50 border-blue-200",
-  awaiting_hitl: "text-amber-700 bg-amber-50 border-amber-200",
-  completed: "text-emerald-700 bg-emerald-50 border-emerald-200",
-  failed: "text-red-700 bg-red-50 border-red-200",
+  in_progress: "text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800",
+  awaiting_hitl: "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800",
+  completed: "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800",
+  failed: "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800",
 };
 
 // Generic wait-kind labels — domain-agnostic. Domain-friendly copy
@@ -65,21 +65,21 @@ export default function WorkflowHeaderTiles({ workflow }: { workflow: Workflow }
           value: meta.rejected_at_phase
             ? `Rejected at ${meta.rejected_at_phase}`
             : "Rejected",
-          cls: "text-red-700 bg-red-50 border-red-200" }
+          cls: "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800" }
       : { label: "STATUS", value: "Completed",
-          cls: "text-emerald-700 bg-emerald-50 border-emerald-200" }
+          cls: "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800" }
     : stalled
-      ? { label: "STATUS · STALLED", value: `Exception at ${workflow.currentPhase}`, cls: "text-red-700 bg-red-50 border-red-200" }
+      ? { label: "STATUS · STALLED", value: `Exception at ${workflow.currentPhase}`, cls: "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800" }
       : waitLabel
         ? { label: "STATUS", value: waitLabel,
-            cls: isExternalWait ? "text-blue-700 bg-blue-50 border-blue-200"
-                                : "text-amber-700 bg-amber-50 border-amber-200" }
+            cls: isExternalWait ? "text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800"
+                                : "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800" }
         : { label: "STATUS", value: STATUS_HUMAN[workflow.status], cls: STATUS_COLOR[workflow.status] };
   return (
     <div className="grid grid-cols-3 gap-3" data-testid="workflow-header-tiles">
       {[
         statusTile,
-        { label: "SLA HEALTH", value: slaHealth(workflow), cls: "text-slate-700 bg-slate-50 border-slate-200" },
+        { label: "SLA HEALTH", value: slaHealth(workflow), cls: "text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700" },
         { label: "RISK FACTOR", value: risk.toUpperCase(), cls: RISK_COLOR[risk] },
       ].map(t => (
         <div key={t.label} className={`rounded-lg border p-3 ${t.cls}`}>

@@ -27,11 +27,11 @@ function StackedBar({ buckets, total, palette }: {
   palette: Record<string, string>;
 }) {
   if (total === 0) {
-    return <div className="text-xs text-slate-400 italic">no data yet</div>;
+    return <div className="text-xs text-slate-400 dark:text-slate-500 italic">no data yet</div>;
   }
   return (
     <div className="space-y-2">
-      <div className="flex h-3 rounded overflow-hidden bg-slate-100">
+      <div className="flex h-3 rounded overflow-hidden bg-slate-100 dark:bg-slate-800">
         {buckets.map(b => (
           <div
             key={b.key}
@@ -45,8 +45,8 @@ function StackedBar({ buckets, total, palette }: {
         {buckets.map(b => (
           <div key={b.key} className="flex items-center gap-1.5">
             <span className={`inline-block w-2 h-2 rounded-sm ${palette[b.key] ?? "bg-slate-300"}`} />
-            <span className="text-slate-600 capitalize">{b.key}</span>
-            <span className="ml-auto text-slate-900 font-medium tabular-nums">{b.n}</span>
+            <span className="text-slate-600 dark:text-slate-300 capitalize">{b.key}</span>
+            <span className="ml-auto text-slate-900 dark:text-slate-100 font-medium tabular-nums">{b.n}</span>
           </div>
         ))}
       </div>
@@ -125,16 +125,16 @@ export default function Analytics() {
   return (
     <div className="space-y-4">
       <div>
-        <div className="text-lg font-semibold text-slate-900">Analytics</div>
-        <div className="text-xs text-slate-500">Live fleet telemetry across {m.total} workflows</div>
+        <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">Analytics</div>
+        <div className="text-xs text-slate-500 dark:text-slate-400">Live fleet telemetry across {m.total} workflows</div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         {cards.map(c => (
           <div key={c.label} className="panel panel-body">
-            <div className="text-[11px] uppercase tracking-wide text-slate-500">{c.label}</div>
-            <div className="text-2xl font-semibold text-slate-900 mt-1 tabular-nums">{c.v}</div>
-            {c.sub && <div className="text-[11px] text-slate-500 mt-0.5">{c.sub}</div>}
+            <div className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">{c.label}</div>
+            <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mt-1 tabular-nums">{c.v}</div>
+            {c.sub && <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{c.sub}</div>}
           </div>
         ))}
       </div>

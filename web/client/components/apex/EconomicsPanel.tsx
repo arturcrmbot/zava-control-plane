@@ -24,13 +24,13 @@ export default function EconomicsPanel({ e }: { e: Economics }) {
       <div className="panel-header">Economics</div>
       <div className="panel-body space-y-2">
         {tiles.map(t => (
-          <div key={t.k} className="border border-slate-200 rounded px-2 py-1.5">
-            <div className="text-[10px] uppercase tracking-wide text-slate-500 leading-tight">{t.k}</div>
-            <div className="text-sm font-semibold text-slate-900 truncate">{t.v}</div>
+          <div key={t.k} className="border border-slate-200 dark:border-slate-700 rounded px-2 py-1.5">
+            <div className="text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400 leading-tight">{t.k}</div>
+            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{t.v}</div>
           </div>
         ))}
         {e.pricingSource && (
-          <div className="text-[10px] text-slate-400 pt-1" title="Source of per-million-token rates">
+          <div className="text-[10px] text-slate-400 dark:text-slate-500 pt-1" title="Source of per-million-token rates">
             pricing: {e.pricingSource}
           </div>
         )}

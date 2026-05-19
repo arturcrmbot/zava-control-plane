@@ -30,7 +30,7 @@ export default function CardList({
 
   if (items.length === 0) {
     return (
-      <div className="text-sm text-slate-500 italic px-2 py-8 text-center border border-dashed border-slate-200 rounded">
+      <div className="text-sm text-slate-500 dark:text-slate-400 italic px-2 py-8 text-center border border-dashed border-slate-200 dark:border-slate-700 rounded">
         Nothing here. Try switching to "All activity".
       </div>
     );
@@ -61,7 +61,7 @@ export default function CardList({
           <button
             type="button"
             onClick={() => setLimit((n) => n + PAGE)}
-            className="text-xs px-3 py-1.5 rounded bg-white text-slate-600 ring-1 ring-slate-300 hover:bg-slate-50"
+            className="text-xs px-3 py-1.5 rounded bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 ring-1 ring-slate-300 dark:ring-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800"
           >Show {Math.min(PAGE, items.length - visible.length)} older</button>
         </div>
       )}

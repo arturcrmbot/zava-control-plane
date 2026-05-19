@@ -18,11 +18,11 @@ const STATUS_LABEL: Record<DisplayStatus, string> = {
 };
 
 const STATUS_STYLE: Record<DisplayStatus, string> = {
-  completed: "text-emerald-700",
-  in_progress: "text-blue-700",
-  failed: "text-red-700",
-  pending: "text-slate-400",
-  not_started: "text-slate-400",
+  completed: "text-emerald-700 dark:text-emerald-400",
+  in_progress: "text-blue-700 dark:text-blue-300",
+  failed: "text-red-700 dark:text-red-400",
+  pending: "text-slate-400 dark:text-slate-500",
+  not_started: "text-slate-400 dark:text-slate-500",
 };
 
 export default function PhaseTimeline({ phases, workflowType }: {
@@ -38,11 +38,11 @@ export default function PhaseTimeline({ phases, workflowType }: {
         const duration = p?.startedAt && p?.completedAt ? Math.round(p.completedAt - p.startedAt) : null;
         const tools = p?.toolCalls.length ?? 0;
         return (
-          <div key={name} className="flex items-center gap-3 text-xs bg-white border border-slate-200 rounded px-3 py-2">
-            <div className={`w-32 font-medium ${p ? "text-slate-800" : "text-slate-400"}`}>{name}</div>
+          <div key={name} className="flex items-center gap-3 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-3 py-2">
+            <div className={`w-32 font-medium ${p ? "text-slate-800 dark:text-slate-100" : "text-slate-400 dark:text-slate-500"}`}>{name}</div>
             <div className={`text-[10px] uppercase tracking-wide font-medium ${STATUS_STYLE[status]}`}>{STATUS_LABEL[status]}</div>
-            {duration != null && <div className="text-slate-500">{duration} ms</div>}
-            <div className="ml-auto text-slate-500">{tools} tool{tools === 1 ? "" : "s"}</div>
+            {duration != null && <div className="text-slate-500 dark:text-slate-400">{duration} ms</div>}
+            <div className="ml-auto text-slate-500 dark:text-slate-400">{tools} tool{tools === 1 ? "" : "s"}</div>
           </div>
         );
       })}
