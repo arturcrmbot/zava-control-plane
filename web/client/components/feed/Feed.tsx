@@ -4,7 +4,7 @@
 // useFeedItems (which takes the role + filter). The role-default filter
 // can be overridden by URL param `?filter=hitl|exceptions|needs-you|all`
 // (used by the 301 redirects from /reviewer-queue and /exceptions).
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { RolePreset } from "@shared/roles";
 import { useFeedItems, type FilterState } from "@client/hooks/useFeedItems";
@@ -45,9 +45,6 @@ export default function Feed({
     search: "",
   }));
 
-  const items = useFeedItems(role, filter);
-  const buffer = useNewItemsBuffer(items);
-
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const toggleSelect = (id: string) =>
@@ -63,15 +60,48 @@ export default function Feed({
     [role.defaultDomains],
   );
 
+  // Facebook-style auto-insert: when scrolled to the top of the feed, new
+  // items appear in place. Once the operator has scrolled down to look at
+  // older items, new arrivals queue behind the "↑ N new" pill so the
+  // reading position doesn't jump under them.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [scrollTopPx, setScrollTopPx] = useState(0);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let rafId: number | null = null;
+    const onScroll = () => {
+      if (rafId != null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        setScrollTopPx(el.scrollTop);
+      });
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      if (rafId != null) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
+  const items = useFeedItems(role, filter);
+  const buffer = useNewItemsBuffer(items, {
+    autoInsertWhenAtTop: true,
+    scrollTopPx,
+    topThresholdPx: 80,
+  });
+
   return (
-    <div className="px-6 py-4 flex-1 min-w-0 overflow-y-auto">
-      <FilterBar
-        filter={filter}
-        onChange={setFilter}
-        selectMode={selectMode}
-        onSelectModeChange={(v) => { setSelectMode(v); if (!v) clearSelection(); }}
-        availableDomains={availableDomains}
-      />
+    <div ref={scrollRef} className="px-6 pb-4 flex-1 min-w-0 overflow-y-auto bg-slate-50">
+      <div className="sticky top-0 z-20 -mx-6 px-6 pt-4 pb-2 bg-slate-50">
+        <FilterBar
+          filter={filter}
+          onChange={setFilter}
+          selectMode={selectMode}
+          onSelectModeChange={(v) => { setSelectMode(v); if (!v) clearSelection(); }}
+          availableDomains={availableDomains}
+        />
+      </div>
       <NewItemsPill count={buffer.pendingCount} onPullIn={buffer.pullIn} />
       <CardList
         items={buffer.visible}

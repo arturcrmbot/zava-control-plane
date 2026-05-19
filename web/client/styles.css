@@ -41,3 +41,15 @@ body {
 .chip-warning { @apply inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 border border-amber-200; }
 .chip-danger  { @apply inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 border border-red-200; }
 .chip-info    { @apply inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-200; }
+
+/* Smooth entry animation for newly-mounted feed cards (Facebook-style). */
+@keyframes card-fade-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.card-fade-in {
+  animation: card-fade-in 220ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-fade-in { animation: none; }
+}

@@ -12,6 +12,7 @@ import { AlertTriangle } from "lucide-react";
 import type { HITLItem } from "@shared/feedItems";
 import CardShell from "../CardShell";
 import ReceiptThumb from "./ReceiptThumb";
+import { summariseWorkflow } from "./workflowSummary";
 import { useResolutionStore } from "@client/hooks/useResolutionStore";
 import { useToast } from "../Toast";
 
@@ -57,21 +58,16 @@ export default function HITLCard({
     }
   };
 
+  const summary = summariseWorkflow(w);
   const body = (
     <div className="flex gap-3 min-w-0">
       {w.claim ? (
         <ReceiptThumb claimId={w.claim.claimId} flavour={w.claim.receiptMismatchFlavour} />
       ) : null}
-      <div className="min-w-0 space-y-1">
-        <div className="text-sm font-medium text-slate-900 truncate">
-          {w.claim
-            ? `${w.claim.currency} ${w.claim.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })} · ${w.claim.vendor}`
-            : w.id}
-        </div>
-        {w.claim ? (
-          <div className="text-xs text-slate-500 truncate">
-            {w.claim.employeeId} · {w.claim.category} · {w.claim.market}
-          </div>
+      <div className="min-w-0 space-y-0.5">
+        <div className="text-sm font-medium text-slate-900 truncate">{summary.headline}</div>
+        {summary.subline ? (
+          <div className="text-xs text-slate-500 truncate">{summary.subline}</div>
         ) : null}
       </div>
     </div>

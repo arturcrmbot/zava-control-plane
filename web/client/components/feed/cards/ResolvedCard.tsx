@@ -36,24 +36,13 @@ export default function ResolvedCard({
     </div>
   );
 
-  const actions = (
-    <>
-      {undoable && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); setDidUndo(true); store.revert(item.origin.id); }}
-          className="text-xs px-3 py-1 rounded font-medium bg-white text-amber-700 ring-1 ring-amber-300 hover:bg-amber-50"
-        >Undo</button>
-      )}
-      {item.workflowId && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onOpenDrawer?.(item.workflowId!); }}
-          className="text-xs px-3 py-1 rounded font-medium bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50"
-        >Audit ↗</button>
-      )}
-    </>
-  );
+  const actions = undoable ? (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); setDidUndo(true); store.revert(item.origin.id); }}
+      className="text-xs px-3 py-1 rounded font-medium bg-white text-amber-700 ring-1 ring-amber-300 hover:bg-amber-50"
+    >Undo</button>
+  ) : null;
 
   return (
     <CardShell
@@ -64,6 +53,7 @@ export default function ResolvedCard({
       timestampSec={item.actedAt}
       body={body}
       actions={actions}
+      onPrimaryClick={item.workflowId && onOpenDrawer ? () => onOpenDrawer(item.workflowId!) : undefined}
     />
   );
 }

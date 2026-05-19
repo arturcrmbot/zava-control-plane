@@ -26,6 +26,7 @@ export interface HITLItem extends FeedItemBase {
 export interface ExceptionItem extends FeedItemBase {
   type: "exception";
   exception: Exception;
+  workflow?: Workflow;
 }
 
 export interface ExternalWaitItem extends FeedItemBase {
@@ -93,7 +94,11 @@ export function buildHITLCards(workflows: Workflow[]): HITLItem[] {
     }));
 }
 
-export function buildExceptionCards(exceptions: Exception[]): ExceptionItem[] {
+export function buildExceptionCards(
+  exceptions: Exception[],
+  workflows: Workflow[] = [],
+): ExceptionItem[] {
+  const byId = new Map(workflows.map((w) => [w.id, w]));
   return exceptions
     .filter((e) => !e.resolvedAt)
     .map((e) => ({
@@ -103,6 +108,7 @@ export function buildExceptionCards(exceptions: Exception[]): ExceptionItem[] {
       workflowId: e.workflowId,
       severity: e.severity,
       exception: e,
+      workflow: byId.get(e.workflowId),
     }));
 }
 

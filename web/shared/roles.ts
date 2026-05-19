@@ -70,7 +70,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     label: "Ops Reviewer",
     defaultFilter: "needs-you",
     defaultDomains: [],
-    visibleCardTypes: ["hitl", "exception", "external-wait", "resolved"],
+    visibleCardTypes: ["hitl", "exception", "external-wait", "milestone", "policy", "agent-event", "resolved"],
     hideActionButtons: false,
     defaultSavedViews: [
       { id: "ops-needs-you-critical", label: "Critical · needs you", filter: "needs-you", domains: [], severity: "critical" },

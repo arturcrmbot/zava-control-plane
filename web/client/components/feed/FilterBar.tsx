@@ -25,7 +25,7 @@ export default function FilterBar({
   const setSearch = (s: string) => onChange({ ...filter, search: s });
 
   return (
-    <div className="flex items-center gap-2 flex-wrap bg-white border border-slate-200 rounded-lg p-2 mb-3 sticky top-0 z-10">
+    <div className="flex items-center gap-2 flex-wrap bg-white border border-slate-200 rounded-lg p-2">
       <div className="inline-flex rounded-md border border-slate-200 overflow-hidden">
         <button
           type="button" onClick={() => setMode("needs-you")}

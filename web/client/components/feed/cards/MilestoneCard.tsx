@@ -34,18 +34,11 @@ export default function MilestoneCard({
   );
 
   const actions = hideActions ? null : (
-    <>
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); onOpenDrawer?.(w.id); }}
-        className="text-xs px-3 py-1.5 rounded font-medium bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
-      >Open</button>
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); setDismissed(true); onDismiss?.(item.id); }}
-        className="text-xs px-3 py-1.5 rounded font-medium bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50"
-      >Dismiss</button>
-    </>
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); setDismissed(true); onDismiss?.(item.id); }}
+      className="text-xs px-3 py-1.5 rounded font-medium bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50"
+    >Dismiss</button>
   );
 
   return (

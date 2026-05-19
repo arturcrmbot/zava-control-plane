@@ -60,7 +60,13 @@ export default function CardShell({
   return (
     <article
       data-testid={testId ?? `card-${workflowId}`}
-      className={`@container bg-white ${SEVERITY_BORDER[sevKey]} border border-slate-200 rounded-lg shadow-sm hover:border-slate-300 transition`}
+      onClick={onPrimaryClick}
+      onKeyDown={onKey}
+      role={onPrimaryClick ? "button" : undefined}
+      tabIndex={onPrimaryClick ? 0 : undefined}
+      className={`@container card-fade-in bg-white ${SEVERITY_BORDER[sevKey]} border border-slate-200 rounded-lg shadow-sm hover:border-slate-300 transition ${
+        onPrimaryClick ? "cursor-pointer hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-300" : ""
+      }`}
     >
       <div className="flex items-center gap-2 px-4 pt-3 text-xs text-slate-500">
         <span className={`h-1.5 w-1.5 rounded-full ${SEVERITY_DOT[sevKey]}`} aria-hidden />
@@ -73,16 +79,11 @@ export default function CardShell({
         <span className="ml-auto text-[11px] text-slate-400">{relativeTime(timestampSec)}</span>
       </div>
       <div className="px-4 py-3 flex flex-col @[720px]:flex-row @[720px]:items-start @[720px]:gap-4 gap-3">
+        <div className="flex-1 min-w-0">{body}</div>
         <div
-          className="flex-1 min-w-0"
-          onClick={onPrimaryClick}
-          onKeyDown={onKey}
-          role={onPrimaryClick ? "button" : undefined}
-          tabIndex={onPrimaryClick ? 0 : undefined}
+          className="flex flex-wrap gap-2 @[720px]:flex-nowrap @[720px]:justify-end shrink-0"
+          onClick={(e) => e.stopPropagation()}
         >
-          {body}
-        </div>
-        <div className="flex flex-wrap gap-2 @[720px]:flex-nowrap @[720px]:justify-end shrink-0">
           {actions}
         </div>
       </div>

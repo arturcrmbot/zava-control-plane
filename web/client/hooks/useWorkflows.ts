@@ -2,24 +2,21 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Workflow } from "@shared/types";
 import { useSSE } from "./useSSE";
+import { useThrottledFetch } from "./useThrottledFetch";
 
 export function useWorkflows() {
   const [items, setItems] = useState<Workflow[]>([]);
-
-  const refresh = useCallback(async () => {
-    const r = await fetch("/api/workflows");
-    setItems((await r.json()) as Workflow[]);
-  }, []);
+  const refresh = useThrottledFetch<Workflow[]>("/api/workflows", setItems, 750);
 
   useEffect(() => {
-    void refresh();
+    refresh();
   }, [refresh]);
 
   useSSE<{ type: string }>(
     "/api/stream/fleet",
     useCallback(
       (e) => {
-        if (e.type.startsWith("workflow.") || e.type === "otel.span.emitted") void refresh();
+        if (e.type.startsWith("workflow.") || e.type === "otel.span.emitted") refresh();
       },
       [refresh]
     )

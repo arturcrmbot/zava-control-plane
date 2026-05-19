@@ -2,23 +2,20 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Exception } from "@shared/types";
 import { useSSE } from "./useSSE";
+import { useThrottledFetch } from "./useThrottledFetch";
 
 export function useExceptions() {
   const [items, setItems] = useState<Exception[]>([]);
-
-  const refresh = useCallback(async () => {
-    const r = await fetch("/api/exceptions");
-    setItems((await r.json()) as Exception[]);
-  }, []);
+  const refresh = useThrottledFetch<Exception[]>("/api/exceptions", setItems, 750);
 
   useEffect(() => {
-    void refresh();
+    refresh();
   }, [refresh]);
 
   useSSE<{ type: string }>(
     "/api/stream/fleet",
     useCallback(() => {
-      void refresh();
+      refresh();
     }, [refresh])
   );
 

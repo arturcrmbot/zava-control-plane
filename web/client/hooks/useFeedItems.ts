@@ -43,9 +43,19 @@ export function useFeedItems(
   const resolutions = useResolutionStore();
 
   return useMemo(() => {
+    const exceptionWorkflowIds = new Set(
+      exceptions.filter((e) => !e.resolvedAt).map((e) => e.workflowId),
+    );
+    // De-dupe: when a workflow already has an open exception, drop its HITL
+    // card. The ExceptionCard is richer (carries summary, recommendation,
+    // severity, confidence, scenario context) and the HITL card for the
+    // same workflow would just stack on top of it as an empty duplicate.
+    const hitlCards = buildHITLCards(workflows).filter(
+      (i) => !exceptionWorkflowIds.has(i.workflowId),
+    );
     const items: FeedItem[] = [
-      ...buildHITLCards(workflows),
-      ...buildExceptionCards(exceptions),
+      ...hitlCards,
+      ...buildExceptionCards(exceptions, workflows),
       ...buildExternalWaitCards(workflows),
     ];
     if (filter.mode === "all-activity") {

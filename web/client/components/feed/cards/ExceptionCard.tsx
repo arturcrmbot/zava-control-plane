@@ -7,6 +7,7 @@ import { useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import type { ExceptionItem } from "@shared/feedItems";
 import CardShell from "../CardShell";
+import { summariseWorkflow } from "./workflowSummary";
 import { useResolutionStore } from "@client/hooks/useResolutionStore";
 import { useToast } from "../Toast";
 
@@ -57,11 +58,21 @@ export default function ExceptionCard({
 
   const body = (
     <div className="min-w-0 space-y-1">
-      <div className="text-sm font-medium text-slate-900">{e.summary}</div>
-      <div className="text-xs text-emerald-700">→ {e.recommendation}</div>
-      <div className="text-[11px] text-slate-500">
-        category: {e.category} · confidence {(e.confidence * 100).toFixed(0)}%
-      </div>
+      {item.workflow ? (
+        <div className="text-sm font-medium text-slate-900 truncate">
+          {summariseWorkflow(item.workflow).headline}
+        </div>
+      ) : (
+        <div className="text-sm font-medium text-slate-900">{e.summary}</div>
+      )}
+      <div className="text-xs text-slate-600 line-clamp-2">{e.recommendation}</div>
+      {item.workflow ? (
+        <div className="text-[11px] text-slate-500 truncate">
+          {summariseWorkflow(item.workflow).subline ?? e.category}
+        </div>
+      ) : (
+        <div className="text-[11px] text-slate-500">{e.category}</div>
+      )}
     </div>
   );
 
