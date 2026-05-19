@@ -19,11 +19,11 @@ export default function PolicyCard({
   if (ack) return null;
 
   const body = (
-    <div className="text-sm text-slate-700 min-w-0">
-      <div className="font-medium text-slate-900">{item.description}</div>
-      <div className="text-xs text-slate-500 mt-1">
-        current: <span className="font-medium text-slate-800">{String(item.currentValue)}</span>
-        {item.actor ? <> · by <span className="font-medium text-slate-700">{item.actor}</span></> : null}
+    <div className="text-sm text-slate-700 dark:text-slate-200 min-w-0">
+      <div className="font-medium text-slate-900 dark:text-slate-100">{item.description}</div>
+      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+        current: <span className="font-medium text-slate-800 dark:text-slate-100">{String(item.currentValue)}</span>
+        {item.actor ? <> · by <span className="font-medium text-slate-700 dark:text-slate-200">{item.actor}</span></> : null}
       </div>
     </div>
   );
@@ -33,12 +33,12 @@ export default function PolicyCard({
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setAck(true); }}
-        className="text-xs px-3 py-1.5 rounded font-medium bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
+        className="text-xs px-3 py-1.5 rounded font-medium bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 ring-1 ring-slate-300 dark:ring-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800"
       >Acknowledge</button>
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onOpenDrawer?.(item.policyId); }}
-        className="text-xs px-3 py-1.5 rounded font-medium bg-white text-blue-700 ring-1 ring-blue-300 hover:bg-blue-50"
+        className="text-xs px-3 py-1.5 rounded font-medium bg-white dark:bg-slate-900 text-blue-700 ring-1 ring-blue-300 hover:bg-blue-50"
       >View diff</button>
     </>
   );

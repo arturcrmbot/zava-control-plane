@@ -47,11 +47,11 @@ export default function ExternalWaitCard({
 
   const body = (
     <div className="min-w-0 space-y-1">
-      <div className="text-sm font-medium text-slate-900">Awaiting external party</div>
-      <div className="text-xs text-slate-600">
-        reason: <code className="bg-slate-100 px-1.5 py-0.5 rounded">{item.awaitingReason ?? "unspecified"}</code>
+      <div className="text-sm font-medium text-slate-900 dark:text-slate-100">Awaiting external party</div>
+      <div className="text-xs text-slate-600 dark:text-slate-300">
+        reason: <code className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{item.awaitingReason ?? "unspecified"}</code>
       </div>
-      <div className="text-[11px] text-slate-500">ages against their SLA, not yours</div>
+      <div className="text-[11px] text-slate-500 dark:text-slate-400">ages against their SLA, not yours</div>
     </div>
   );
 
@@ -65,12 +65,12 @@ export default function ExternalWaitCard({
       <button
         type="button" disabled={busy != null}
         onClick={(e) => { e.stopPropagation(); onOpenDrawer?.(item.workflowId); }}
-        className="text-xs px-3 py-1.5 rounded font-medium bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
+        className="text-xs px-3 py-1.5 rounded font-medium bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 ring-1 ring-slate-300 dark:ring-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800"
       >Reassign</button>
       <button
         type="button" disabled={busy != null}
         onClick={(e) => { e.stopPropagation(); onOpenDrawer?.(item.workflowId); }}
-        className="text-xs px-3 py-1.5 rounded font-medium bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50"
+        className="text-xs px-3 py-1.5 rounded font-medium bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 ring-1 ring-slate-300 dark:ring-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800"
       >View token</button>
     </>
   );

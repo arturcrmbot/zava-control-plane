@@ -18,9 +18,9 @@ function Accordion({ title, children, defaultOpen = false }: { title: string; ch
     <details
       open={open}
       onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
-      className="rounded border border-slate-200 bg-white"
+      className="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
     >
-      <summary className="cursor-pointer text-xs font-medium text-slate-700 px-3 py-2 hover:bg-slate-50">{title}</summary>
+      <summary className="cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-200 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800">{title}</summary>
       <div className="px-3 pb-3">{open ? children() : null}</div>
     </details>
   );
@@ -29,7 +29,7 @@ function Accordion({ title, children, defaultOpen = false }: { title: string; ch
 export default function DrawerAudit({ data }: { data: DrawerData }) {
   return (
     <section className="space-y-3">
-      <h2 className="text-[11px] uppercase tracking-wide font-semibold text-slate-500">Audit</h2>
+      <h2 className="text-[11px] uppercase tracking-wide font-semibold text-slate-500 dark:text-slate-400">Audit</h2>
       <Accordion title="Evidence">
         {() => <EvidencePanel workflowId={data.workflow.id} />}
       </Accordion>

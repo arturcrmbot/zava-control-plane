@@ -25,15 +25,15 @@ export default function FilterBar({
   const setSearch = (s: string) => onChange({ ...filter, search: s });
 
   return (
-    <div className="flex items-center gap-2 flex-wrap bg-white border border-slate-200 rounded-lg p-2">
-      <div className="inline-flex rounded-md border border-slate-200 overflow-hidden">
+    <div className="flex items-center gap-2 flex-wrap bg-white border border-slate-200 rounded-lg p-2 dark:bg-slate-900 dark:border-slate-700">
+      <div className="inline-flex rounded-md border border-slate-200 overflow-hidden dark:border-slate-700">
         <button
           type="button" onClick={() => setMode("needs-you")}
-          className={`text-xs px-3 py-1.5 font-medium ${filter.mode === "needs-you" ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+          className={`text-xs px-3 py-1.5 font-medium ${filter.mode === "needs-you" ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"}`}
         >● Needs you</button>
         <button
           type="button" onClick={() => setMode("all-activity")}
-          className={`text-xs px-3 py-1.5 font-medium border-l border-slate-200 ${filter.mode === "all-activity" ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+          className={`text-xs px-3 py-1.5 font-medium border-l border-slate-200 dark:border-slate-700 ${filter.mode === "all-activity" ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"}`}
         >All activity</button>
       </div>
 
@@ -45,7 +45,7 @@ export default function FilterBar({
               key={d}
               type="button"
               onClick={() => toggleDomain(d)}
-              className={`text-[11px] px-2 py-1 rounded font-medium ${active ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+              className={`text-[11px] px-2 py-1 rounded font-medium ${active ? "bg-slate-700 text-white dark:bg-slate-200 dark:text-slate-900" : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"}`}
             >{d}</button>
           );
         })}
@@ -55,7 +55,7 @@ export default function FilterBar({
         aria-label="Severity"
         value={filter.severity ?? ""}
         onChange={(e) => setSeverity((e.target.value || null) as FilterState["severity"])}
-        className="text-xs border border-slate-200 rounded px-2 py-1 bg-white text-slate-700"
+        className="text-xs border border-slate-200 rounded px-2 py-1 bg-white text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200"
       >
         {SEVERITY_CHOICES.map((s) => (
           <option key={s ?? ""} value={s ?? ""}>{s == null ? "any severity" : s}</option>
@@ -67,13 +67,13 @@ export default function FilterBar({
         placeholder="Search workflow id…"
         value={filter.search}
         onChange={(e) => setSearch(e.target.value)}
-        className="text-xs border border-slate-200 rounded px-2 py-1 bg-white text-slate-700 w-48"
+        className="text-xs border border-slate-200 rounded px-2 py-1 bg-white text-slate-700 w-48 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:placeholder-slate-500"
       />
 
       <button
         type="button"
         onClick={() => onSelectModeChange(!selectMode)}
-        className={`ml-auto text-xs px-3 py-1.5 rounded font-medium ${selectMode ? "bg-blue-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-300 hover:bg-slate-50"}`}
+        className={`ml-auto text-xs px-3 py-1.5 rounded font-medium ${selectMode ? "bg-blue-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-300 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-700"}`}
       >{selectMode ? "Done" : "Select"}</button>
     </div>
   );

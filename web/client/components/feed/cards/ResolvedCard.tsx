@@ -29,10 +29,10 @@ export default function ResolvedCard({
   const undoable = !didUndo && (r?.undoable ?? false);
 
   const body = (
-    <div className="text-sm text-slate-600 truncate">
+    <div className="text-sm text-slate-600 dark:text-slate-300 truncate">
       <CheckCircle2 size={14} className="inline-block text-emerald-600 mr-1.5 align-text-bottom" />
-      <span className="font-medium text-slate-800">{item.verb} by {item.actor}</span>
-      <span className="text-slate-400"> · {relativeTime(item.actedAt)}</span>
+      <span className="font-medium text-slate-800 dark:text-slate-100">{item.verb} by {item.actor}</span>
+      <span className="text-slate-400 dark:text-slate-500"> · {relativeTime(item.actedAt)}</span>
     </div>
   );
 
@@ -40,7 +40,7 @@ export default function ResolvedCard({
     <button
       type="button"
       onClick={(e) => { e.stopPropagation(); setDidUndo(true); store.revert(item.origin.id); }}
-      className="text-xs px-3 py-1 rounded font-medium bg-white text-amber-700 ring-1 ring-amber-300 hover:bg-amber-50"
+      className="text-xs px-3 py-1 rounded font-medium bg-white dark:bg-slate-900 text-amber-700 ring-1 ring-amber-300 hover:bg-amber-50"
     >Undo</button>
   ) : null;
 

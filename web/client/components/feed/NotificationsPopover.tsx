@@ -27,7 +27,7 @@ export default function NotificationsPopover({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label={`${count} unread`}
-        className="relative text-slate-500 hover:text-slate-800 px-1"
+        className="relative text-slate-500 dark:text-slate-400 hover:text-slate-800 px-1"
       >
         <Bell size={16} />
         {count > 0 && (
@@ -37,19 +37,19 @@ export default function NotificationsPopover({
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg w-80 max-h-96 overflow-auto py-1 z-50">
+        <div className="absolute right-0 top-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg w-80 max-h-96 overflow-auto py-1 z-50">
           {items.length === 0 && (
-            <div className="text-xs text-slate-500 px-3 py-3 italic">No unread items.</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 px-3 py-3 italic">No unread items.</div>
           )}
           {items.map((it) => (
             <button
               key={it.id}
               type="button"
               onClick={() => { onJumpTo(it.id); setOpen(false); }}
-              className="w-full text-left text-xs px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-b-0"
+              className="w-full text-left text-xs px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 border-b border-slate-100 last:border-b-0"
             >
-              <div className="font-mono text-slate-700">{it.workflowId ?? it.id}</div>
-              <div className="text-[11px] text-slate-500">{it.type} · {it.severity ?? "-"}</div>
+              <div className="font-mono text-slate-700 dark:text-slate-200">{it.workflowId ?? it.id}</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">{it.type} · {it.severity ?? "-"}</div>
             </button>
           ))}
         </div>

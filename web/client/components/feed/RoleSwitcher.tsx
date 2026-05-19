@@ -30,20 +30,20 @@ export default function RoleSwitcher({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="text-xs px-3 py-1.5 rounded font-medium bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 flex items-center gap-1"
+        className="text-xs px-3 py-1.5 rounded font-medium bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 ring-1 ring-slate-300 dark:ring-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-1"
       >
         role: <span className="font-semibold">{label}</span>
         <ChevronDown size={12} />
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg min-w-[200px] py-1 z-50">
+        <div role="menu" className="absolute right-0 top-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg min-w-[200px] py-1 z-50">
           {ROLE_PRESETS.map((r) => (
             <button
               key={r.id}
               role="menuitem"
               type="button"
               onClick={() => { onChange(r.id); setOpen(false); }}
-              className={`w-full text-left text-xs px-3 py-1.5 hover:bg-slate-50 ${r.id === current ? "font-semibold text-blue-700" : "text-slate-700"}`}
+              className={`w-full text-left text-xs px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 ${r.id === current ? "font-semibold text-blue-700" : "text-slate-700 dark:text-slate-200"}`}
             >{r.label}</button>
           ))}
         </div>

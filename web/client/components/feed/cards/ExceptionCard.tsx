@@ -13,10 +13,10 @@ import { useToast } from "../Toast";
 
 const ACTIONS = [
   { id: "approve",       label: "Approve",       cls: "bg-emerald-600 hover:bg-emerald-700 text-white",       verb: "Approved" },
-  { id: "request-info",  label: "Request docs",  cls: "bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50", verb: "Requested docs" },
-  { id: "escalate",      label: "Escalate L2",   cls: "bg-white text-amber-700 ring-1 ring-amber-300 hover:bg-amber-50", verb: "Escalated" },
-  { id: "reject",        label: "Reject",        cls: "bg-white text-red-700 ring-1 ring-red-300 hover:bg-red-50",       verb: "Rejected" },
-  { id: "snooze",        label: "Snooze 1h",     cls: "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50", verb: "Snoozed 1h" },
+  { id: "request-info",  label: "Request docs",  cls: "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 ring-1 ring-slate-300 dark:ring-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800", verb: "Requested docs" },
+  { id: "escalate",      label: "Escalate L2",   cls: "bg-white dark:bg-slate-900 text-amber-700 ring-1 ring-amber-300 hover:bg-amber-50", verb: "Escalated" },
+  { id: "reject",        label: "Reject",        cls: "bg-white dark:bg-slate-900 text-red-700 ring-1 ring-red-300 hover:bg-red-50",       verb: "Rejected" },
+  { id: "snooze",        label: "Snooze 1h",     cls: "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 ring-1 ring-slate-200 dark:ring-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800", verb: "Snoozed 1h" },
 ] as const;
 
 export default function ExceptionCard({
@@ -59,19 +59,19 @@ export default function ExceptionCard({
   const body = (
     <div className="min-w-0 space-y-1">
       {item.workflow ? (
-        <div className="text-sm font-medium text-slate-900 truncate">
+        <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
           {summariseWorkflow(item.workflow).headline}
         </div>
       ) : (
-        <div className="text-sm font-medium text-slate-900">{e.summary}</div>
+        <div className="text-sm font-medium text-slate-900 dark:text-slate-100">{e.summary}</div>
       )}
-      <div className="text-xs text-slate-600 line-clamp-2">{e.recommendation}</div>
+      <div className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">{e.recommendation}</div>
       {item.workflow ? (
-        <div className="text-[11px] text-slate-500 truncate">
+        <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
           {summariseWorkflow(item.workflow).subline ?? e.category}
         </div>
       ) : (
-        <div className="text-[11px] text-slate-500">{e.category}</div>
+        <div className="text-[11px] text-slate-500 dark:text-slate-400">{e.category}</div>
       )}
     </div>
   );

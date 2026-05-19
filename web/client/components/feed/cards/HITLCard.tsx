@@ -18,9 +18,9 @@ import { useToast } from "../Toast";
 
 const ACTIONS = [
   { id: "approve",       label: "Approve",      cls: "bg-emerald-600 hover:bg-emerald-700 text-white", verb: "Approved" },
-  { id: "request-info",  label: "Request docs", cls: "bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50", verb: "Requested docs" },
-  { id: "escalate",      label: "Escalate L2",  cls: "bg-white text-amber-700 ring-1 ring-amber-300 hover:bg-amber-50", verb: "Escalated" },
-  { id: "reject",        label: "Reject",       cls: "bg-white text-red-700 ring-1 ring-red-300 hover:bg-red-50", verb: "Rejected" },
+  { id: "request-info",  label: "Request docs", cls: "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 ring-1 ring-slate-300 dark:ring-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800", verb: "Requested docs" },
+  { id: "escalate",      label: "Escalate L2",  cls: "bg-white dark:bg-slate-900 text-amber-700 ring-1 ring-amber-300 hover:bg-amber-50", verb: "Escalated" },
+  { id: "reject",        label: "Reject",       cls: "bg-white dark:bg-slate-900 text-red-700 ring-1 ring-red-300 hover:bg-red-50", verb: "Rejected" },
 ] as const;
 
 export default function HITLCard({
@@ -65,9 +65,9 @@ export default function HITLCard({
         <ReceiptThumb claimId={w.claim.claimId} flavour={w.claim.receiptMismatchFlavour} />
       ) : null}
       <div className="min-w-0 space-y-0.5">
-        <div className="text-sm font-medium text-slate-900 truncate">{summary.headline}</div>
+        <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{summary.headline}</div>
         {summary.subline ? (
-          <div className="text-xs text-slate-500 truncate">{summary.subline}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{summary.subline}</div>
         ) : null}
       </div>
     </div>

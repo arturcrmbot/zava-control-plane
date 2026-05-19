@@ -12,15 +12,15 @@ import { useNow, formatRelative } from "@client/hooks/useNow";
 const SEVERITY_BORDER: Record<string, string> = {
   critical: "border-l-4 border-red-500",
   high: "border-l-4 border-amber-500",
-  medium: "border-l-4 border-slate-200",
-  null: "border-l-4 border-slate-200",
+  medium: "border-l-4 border-slate-200 dark:border-slate-700",
+  null: "border-l-4 border-slate-200 dark:border-slate-700",
 };
 
 const SEVERITY_DOT: Record<string, string> = {
   critical: "bg-red-500",
   high: "bg-amber-500",
-  medium: "bg-slate-300",
-  null: "bg-slate-200",
+  medium: "bg-slate-300 dark:bg-slate-600",
+  null: "bg-slate-200 dark:bg-slate-700",
 };
 
 export interface CardShellProps {
@@ -57,19 +57,19 @@ export default function CardShell({
       onKeyDown={onKey}
       role={onPrimaryClick ? "button" : undefined}
       tabIndex={onPrimaryClick ? 0 : undefined}
-      className={`@container card-fade-in bg-white ${SEVERITY_BORDER[sevKey]} border border-slate-200 rounded-lg shadow-sm hover:border-slate-300 transition ${
-        onPrimaryClick ? "cursor-pointer hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-300" : ""
+      className={`@container card-fade-in bg-white ${SEVERITY_BORDER[sevKey]} border border-slate-200 rounded-lg shadow-sm hover:border-slate-300 transition dark:bg-slate-900 dark:border-slate-700 dark:hover:border-slate-600 ${
+        onPrimaryClick ? "cursor-pointer hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-700" : ""
       }`}
     >
-      <div className="flex items-center gap-2 px-4 pt-3 text-xs text-slate-500">
+      <div className="flex items-center gap-2 px-4 pt-3 text-xs text-slate-500 dark:text-slate-400">
         <span className={`h-1.5 w-1.5 rounded-full ${SEVERITY_DOT[sevKey]}`} aria-hidden />
         {icon}
-        <span className="uppercase tracking-wide text-[10px] font-semibold text-slate-700">
+        <span className="uppercase tracking-wide text-[10px] font-semibold text-slate-700 dark:text-slate-300">
           {typeLabel}
         </span>
-        <span className="text-slate-300">·</span>
-        <span className="font-mono text-slate-700">{workflowId}</span>
-        <span className="ml-auto text-[11px] text-slate-400 tabular-nums">{formatRelative(timestampSec, now)}</span>
+        <span className="text-slate-300 dark:text-slate-600">·</span>
+        <span className="font-mono text-slate-700 dark:text-slate-300">{workflowId}</span>
+        <span className="ml-auto text-[11px] text-slate-400 dark:text-slate-500 tabular-nums">{formatRelative(timestampSec, now)}</span>
       </div>
       <div className="px-4 py-3 flex flex-col @[720px]:flex-row @[720px]:items-start @[720px]:gap-4 gap-3">
         <div className="flex-1 min-w-0">{body}</div>

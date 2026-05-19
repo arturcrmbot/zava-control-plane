@@ -27,9 +27,9 @@ export default function MilestoneCard({
     : <XCircle size={12} className="text-red-600" />;
 
   const body = (
-    <div className="text-sm text-slate-700">
-      <span className="font-semibold text-slate-900">{w.id}</span>
-      <span className="text-slate-500"> ({w.type})</span> {verb}.
+    <div className="text-sm text-slate-700 dark:text-slate-200">
+      <span className="font-semibold text-slate-900 dark:text-slate-100">{w.id}</span>
+      <span className="text-slate-500 dark:text-slate-400"> ({w.type})</span> {verb}.
     </div>
   );
 
@@ -37,7 +37,7 @@ export default function MilestoneCard({
     <button
       type="button"
       onClick={(e) => { e.stopPropagation(); setDismissed(true); onDismiss?.(item.id); }}
-      className="text-xs px-3 py-1.5 rounded font-medium bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50"
+      className="text-xs px-3 py-1.5 rounded font-medium bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 ring-1 ring-slate-200 dark:ring-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
     >Dismiss</button>
   );
 

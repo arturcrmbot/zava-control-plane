@@ -17,7 +17,7 @@ export default function ReceiptThumb({
   if (!claimId) {
     return (
       <div
-        className={`${dim} bg-slate-100 rounded border border-slate-200 flex items-center justify-center text-[9px] text-slate-400 text-center px-1`}
+        className={`${dim} bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 flex items-center justify-center text-[9px] text-slate-400 dark:text-slate-500 text-center px-1`}
         data-testid="receipt-thumb-placeholder"
       >
         no claim
@@ -39,7 +39,7 @@ export default function ReceiptThumb({
       src={`/api/receipts/${claimId}.png`}
       alt={`receipt ${claimId}`}
       onError={() => setErrored(true)}
-      className={`${dim} object-cover bg-white rounded border border-slate-200`}
+      className={`${dim} object-cover bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700`}
     />
   );
 }

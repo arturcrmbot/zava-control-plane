@@ -92,8 +92,8 @@ export default function Feed({
   });
 
   return (
-    <div ref={scrollRef} className="px-6 pb-4 flex-1 min-w-0 overflow-y-auto bg-slate-50">
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-4 pb-2 bg-slate-50">
+    <div ref={scrollRef} className="px-6 pb-4 flex-1 min-w-0 overflow-y-auto bg-slate-50 dark:bg-slate-950">
+      <div className="sticky top-0 z-20 -mx-6 px-6 pt-4 pb-2 bg-slate-50 dark:bg-slate-950">
         <FilterBar
           filter={filter}
           onChange={setFilter}

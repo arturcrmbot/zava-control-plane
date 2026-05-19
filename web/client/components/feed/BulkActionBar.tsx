@@ -16,8 +16,8 @@ function extractExceptionId(feedItemId: string): string | null {
 const ACTIONS = [
   { id: "approved", label: "Approve",      cls: "bg-emerald-600 hover:bg-emerald-700 text-white" },
   { id: "rejected", label: "Reject",       cls: "bg-red-600 hover:bg-red-700 text-white" },
-  { id: "request-info", label: "Request docs", cls: "bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50" },
-  { id: "escalate", label: "Escalate L2",  cls: "bg-white text-amber-700 ring-1 ring-amber-300 hover:bg-amber-50" },
+  { id: "request-info", label: "Request docs", cls: "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 ring-1 ring-slate-300 dark:ring-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800" },
+  { id: "escalate", label: "Escalate L2",  cls: "bg-white dark:bg-slate-900 text-amber-700 ring-1 ring-amber-300 hover:bg-amber-50" },
 ];
 
 export default function BulkActionBar({
@@ -50,7 +50,7 @@ export default function BulkActionBar({
   return (
     <div className="sticky bottom-3 z-20 mt-4 mx-auto max-w-3xl bg-slate-900 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3">
       <span className="text-xs">{selectedIds.length} selected</span>
-      <span className="text-xs text-slate-400">({exceptionIds.length} bulk-resolvable)</span>
+      <span className="text-xs text-slate-400 dark:text-slate-500">({exceptionIds.length} bulk-resolvable)</span>
       <div className="ml-auto flex gap-2">
         {ACTIONS.map((a) => (
           <button

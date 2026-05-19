@@ -1,7 +1,14 @@
 @import "tailwindcss";
 
+/* Use class-based dark mode so a toggle (not just OS preference) can flip
+   the theme. Adding `.dark` to <html> enables every `dark:` variant. */
+@variant dark (&:where(.dark, .dark *));
+
 :root {
   color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
 }
 
 html, body, #root {
@@ -9,7 +16,7 @@ html, body, #root {
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 font-sans antialiased;
+  @apply bg-slate-50 text-slate-900 font-sans antialiased dark:bg-slate-950 dark:text-slate-100;
 }
 
 /* Reusable surface utility for card-like panels */

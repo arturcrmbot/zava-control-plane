@@ -56,8 +56,8 @@ export default function Drawer({
 
   if (!d) {
     return (
-      <aside className="fixed inset-y-0 right-0 z-40 w-full lg:w-[65%] xl:w-[60%] 2xl:w-[50%] bg-white border-l border-slate-200 shadow-xl flex flex-col">
-        <div className="p-4 text-sm text-slate-500">loading…</div>
+      <aside className="fixed inset-y-0 right-0 z-40 w-full lg:w-[65%] xl:w-[60%] 2xl:w-[50%] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-xl flex flex-col">
+        <div className="p-4 text-sm text-slate-500 dark:text-slate-400">loading…</div>
       </aside>
     );
   }
@@ -76,12 +76,12 @@ export default function Drawer({
 
   return (
     <aside
-      className="fixed inset-y-0 right-0 z-40 w-full lg:w-[65%] xl:w-[60%] 2xl:w-[50%] bg-white border-l border-slate-200 shadow-xl flex flex-col"
+      className="fixed inset-y-0 right-0 z-40 w-full lg:w-[65%] xl:w-[60%] 2xl:w-[50%] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-xl flex flex-col"
       aria-label="Workflow detail drawer"
     >
-      <header className="flex items-center gap-3 px-5 h-14 border-b border-slate-200">
-        <div className="font-mono text-sm text-slate-900">{d.workflow.id}</div>
-        <span className="text-[10px] uppercase tracking-wide bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+      <header className="flex items-center gap-3 px-5 h-14 border-b border-slate-200 dark:border-slate-700">
+        <div className="font-mono text-sm text-slate-900 dark:text-slate-100">{d.workflow.id}</div>
+        <span className="text-[10px] uppercase tracking-wide bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded">
           {d.workflow.type}
         </span>
         <span className="text-[10px] uppercase tracking-wide bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">
@@ -92,7 +92,7 @@ export default function Drawer({
           type="button"
           onClick={onClose}
           aria-label="Close drawer"
-          className="ml-auto text-slate-400 hover:text-slate-700 text-lg px-2"
+          className="ml-auto text-slate-400 dark:text-slate-500 hover:text-slate-700 text-lg px-2"
         >✕</button>
       </header>
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">

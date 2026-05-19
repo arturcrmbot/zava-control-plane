@@ -16,9 +16,9 @@ import AgentDrivenComponent, { type AgentComponentSpec } from "@client/component
 
 const ACTIONS = [
   { id: "approve",      label: "Approve",      cls: "bg-emerald-600 hover:bg-emerald-700 text-white" },
-  { id: "request-info", label: "Request docs", cls: "bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50" },
-  { id: "escalate",     label: "Escalate L2",  cls: "bg-white text-amber-700 ring-1 ring-amber-300 hover:bg-amber-50" },
-  { id: "reject",       label: "Reject",       cls: "bg-white text-red-700 ring-1 ring-red-300 hover:bg-red-50" },
+  { id: "request-info", label: "Request docs", cls: "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 ring-1 ring-slate-300 dark:ring-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800" },
+  { id: "escalate",     label: "Escalate L2",  cls: "bg-white dark:bg-slate-900 text-amber-700 ring-1 ring-amber-300 hover:bg-amber-50" },
+  { id: "reject",       label: "Reject",       cls: "bg-white dark:bg-slate-900 text-red-700 ring-1 ring-red-300 hover:bg-red-50" },
 ];
 
 function ReceiptPanel({ claim }: { claim: ClaimData }) {
@@ -35,13 +35,13 @@ function ReceiptPanel({ claim }: { claim: ClaimData }) {
             src={`/api/receipts/${claim.claimId}.png`}
             alt={`receipt ${claim.claimId}`}
             onError={() => setErrored(true)}
-            className="w-32 h-40 object-contain bg-white rounded border border-slate-200"
+            className="w-32 h-40 object-contain bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700"
           />
         )}
-        <div className="text-xs text-slate-700 space-y-1">
-          <div><span className="text-slate-500">Vendor</span> <span className="font-medium">{claim.vendor}</span></div>
-          <div><span className="text-slate-500">Amount</span> <span className="font-semibold">{claim.currency} {claim.amount.toLocaleString()}</span></div>
-          <div><span className="text-slate-500">Category</span> <span className="font-medium capitalize">{claim.category}</span></div>
+        <div className="text-xs text-slate-700 dark:text-slate-200 space-y-1">
+          <div><span className="text-slate-500 dark:text-slate-400">Vendor</span> <span className="font-medium">{claim.vendor}</span></div>
+          <div><span className="text-slate-500 dark:text-slate-400">Amount</span> <span className="font-semibold">{claim.currency} {claim.amount.toLocaleString()}</span></div>
+          <div><span className="text-slate-500 dark:text-slate-400">Category</span> <span className="font-medium capitalize">{claim.category}</span></div>
         </div>
       </div>
     </div>
@@ -80,7 +80,7 @@ export default function DrawerDecision({
 
   return (
     <section className="space-y-4">
-      <h2 className="text-[11px] uppercase tracking-wide font-semibold text-slate-500">Decision</h2>
+      <h2 className="text-[11px] uppercase tracking-wide font-semibold text-slate-500 dark:text-slate-400">Decision</h2>
 
       {w.type === "hiring" && specs.length > 0 && (
         <div className="grid grid-cols-1 gap-3">
@@ -116,8 +116,8 @@ export default function DrawerDecision({
       )}
 
       <AuthorityCard workflow={w} />
-      <details className="rounded border border-slate-200 bg-white">
-        <summary className="cursor-pointer text-xs text-slate-700 px-3 py-2">Kill switch</summary>
+      <details className="rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+        <summary className="cursor-pointer text-xs text-slate-700 dark:text-slate-200 px-3 py-2">Kill switch</summary>
         <div className="px-3 pb-3"><KillSwitchPanel /></div>
       </details>
     </section>
