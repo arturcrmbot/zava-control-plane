@@ -337,6 +337,22 @@ async def run_agent_session(
     except Exception:
         pass
 
+    # Working memory capture (B1 Task 13). Passive subscriber to the
+    # agent.completed signal; never raises into the agent runtime so a
+    # backend outage on mem0 cannot break a hiring workflow.
+    try:
+        from api.server.services.lessons.working_memory_capture import (
+            get_default_capture,
+        )
+        get_default_capture().on_agent_completed(
+            workflow_id=workflow_id,
+            agent_skill=agent_name,
+            response_text=str(text or ""),
+            tool_calls=tool_calls_collected,
+        )
+    except Exception:
+        pass
+
     return parsed
 
 

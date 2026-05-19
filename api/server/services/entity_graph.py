@@ -431,6 +431,26 @@ _NODE_TABLES: tuple[tuple[str, str], ...] = (
         )
         """,
     ),
+    (
+        "Lesson",
+        """
+        CREATE NODE TABLE IF NOT EXISTS Lesson (
+            id STRING,
+            body STRING,
+            domain STRING,
+            persona_role STRING,
+            market STRING,
+            status STRING,
+            proposed_by STRING,
+            rubric_score_delta DOUBLE,
+            experiment_n INT64,
+            promoted_at TIMESTAMP,
+            supersedes STRING,
+            prune_reason STRING,
+            PRIMARY KEY (id)
+        )
+        """,
+    ),
 )
 
 _REL_TABLES: tuple[tuple[str, str], ...] = (
@@ -479,6 +499,10 @@ _REL_TABLES: tuple[tuple[str, str], ...] = (
     ("COSTED_TO_BRAND", "CREATE REL TABLE IF NOT EXISTS COSTED_TO_BRAND (FROM Money TO Brand, posted_at TIMESTAMP, decided_at TIMESTAMP)"),
     # Note: COSTED_TO targets CostCentre. A separate Money→Brand cost rel
     # is added in Phase 3 (Task 3.5) once Brand nodes exist.
+    # ----- lesson-store: dream-pass provenance edges -------------------
+    ("LESSON_FROM_RUN", "CREATE REL TABLE IF NOT EXISTS LESSON_FROM_RUN (FROM Lesson TO Workflow, recorded_at TIMESTAMP)"),
+    ("LESSON_ABOUT_PERSONA", "CREATE REL TABLE IF NOT EXISTS LESSON_ABOUT_PERSONA (FROM Lesson TO Person, recorded_at TIMESTAMP)"),
+    ("LESSON_SUPERSEDES", "CREATE REL TABLE IF NOT EXISTS LESSON_SUPERSEDES (FROM Lesson TO Lesson, recorded_at TIMESTAMP)"),
 )
 
 # Decision target kind → rel-table name. Keys must match :data:`_VALID_KINDS`
