@@ -16,6 +16,7 @@ import { useWorkflows } from "@client/hooks/useWorkflows";
 import { useExceptions } from "@client/hooks/useExceptions";
 import { useResolutionStore } from "@client/hooks/useResolutionStore";
 import { useNow } from "@client/hooks/useNow";
+import { usePersonaDecisions } from "@client/hooks/usePersonaDecisions";
 
 interface Tile {
   label: string;
@@ -46,6 +47,7 @@ export default function Dashboard() {
   const workflows = useWorkflows();
   const { items: exceptions } = useExceptions();
   const resolutions = useResolutionStore();
+  const personaDecisions = usePersonaDecisions({ limit: 200 });
 
   const stats = useMemo(() => {
     const openExceptions = exceptions.filter((e) => !e.resolvedAt);
@@ -103,6 +105,60 @@ export default function Dashboard() {
     return entries;
   }, [resolutions]);
 
+  // Merge persona Decision nodes with the operator's own resolutions into
+  // a single chronological list. The shape is intentionally narrow so the
+  // existing "Recent decisions" UI can render either source uniformly.
+  type MergedDecision =
+    | {
+        kind: "operator";
+        key: string;
+        verb: string;
+        actor: string;
+        target: string;
+        actedAt: number;
+      }
+    | {
+        kind: "persona";
+        key: string;
+        verb: string;
+        actor: string;
+        target: string;
+        actedAt: number;
+        phase: string;
+        reason: string;
+      };
+
+  const mergedRecentDecisions = useMemo<MergedDecision[]>(() => {
+    const operatorRows: MergedDecision[] = recentResolutions.map((r) => ({
+      kind: "operator",
+      key: `op:${r.itemId}`,
+      verb: r.verb,
+      actor: r.actor || "you",
+      target: r.itemId,
+      actedAt: r.actedAt,
+    }));
+    const personaRows: MergedDecision[] = personaDecisions.map((d) => ({
+      kind: "persona",
+      key: `ai:${d.id}`,
+      verb: d.verdict,
+      actor: d.personaRole,
+      target: d.workflowId,
+      actedAt: d.decidedAtSec,
+      phase: d.phase,
+      reason: d.reason,
+    }));
+    return [...operatorRows, ...personaRows]
+      .sort((a, b) => b.actedAt - a.actedAt)
+      .slice(0, 12);
+  }, [recentResolutions, personaDecisions]);
+
+  // KPI tile shows everything decided in the last hour (operator + persona),
+  // not just the lifetime operator click count.
+  const decisionsLastHour = useMemo(() => {
+    const cutoff = Date.now() / 1000 - 3600;
+    return mergedRecentDecisions.filter((d) => d.actedAt >= cutoff).length;
+  }, [mergedRecentDecisions]);
+
   return (
     <div className="flex-1 min-w-0 overflow-y-auto bg-slate-50 dark:bg-slate-950 p-6">
       <div className="max-w-5xl mx-auto space-y-6">
@@ -138,8 +194,8 @@ export default function Dashboard() {
           />
           <KpiTile
             label="Recent decisions"
-            value={recentResolutions.length}
-            sub="resolved by you this session"
+            value={decisionsLastHour}
+            sub="last hour · personas + operators"
             icon={<Users size={16} className="text-blue-600 dark:text-blue-400" />}
             accent="bg-blue-50 dark:bg-blue-950/30"
           />
@@ -211,21 +267,51 @@ export default function Dashboard() {
           )}
         </section>
 
-        {recentResolutions.length > 0 && (
+        {mergedRecentDecisions.length > 0 && (
           <section className="bg-white border border-slate-200 rounded-lg dark:bg-slate-900 dark:border-slate-700">
-            <header className="px-4 py-3 border-b border-slate-200 text-sm font-semibold text-slate-800 dark:border-slate-700 dark:text-slate-100">
-              Recent decisions (this session)
+            <header className="px-4 py-3 border-b border-slate-200 text-sm font-semibold text-slate-800 dark:border-slate-700 dark:text-slate-100 flex items-center justify-between">
+              <span>Recent decisions</span>
+              <span className="text-[10px] font-normal uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                personas + operators
+              </span>
             </header>
             <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-              {recentResolutions.map((r) => (
-                <li key={r.itemId} className="px-4 py-2 flex items-center gap-3 text-xs">
-                  <span className="font-medium text-slate-800 dark:text-slate-200 w-28 shrink-0">{r.verb}</span>
-                  <span className="font-mono text-slate-600 dark:text-slate-400 truncate">{r.itemId}</span>
-                  <span className="ml-auto text-slate-400 dark:text-slate-500 tabular-nums shrink-0">
-                    {new Date(r.actedAt * 1000).toLocaleTimeString()}
-                  </span>
-                </li>
-              ))}
+              {mergedRecentDecisions.map((r) => {
+                const isPersona = r.kind === "persona";
+                const badge = isPersona ? "persona" : "you";
+                const badgeClass = isPersona
+                  ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"
+                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300";
+                const phaseTag = isPersona && r.phase ? ` · ${r.phase}` : "";
+                return (
+                  <li
+                    key={r.key}
+                    className="px-4 py-2 flex items-center gap-3 text-xs"
+                    title={isPersona ? r.reason : undefined}
+                  >
+                    <span
+                      className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0 ${badgeClass}`}
+                    >
+                      {badge}
+                    </span>
+                    <span className="font-medium text-slate-800 dark:text-slate-200 w-20 shrink-0 truncate">
+                      {r.verb}
+                    </span>
+                    <span className="text-slate-600 dark:text-slate-400 w-32 shrink-0 truncate">
+                      {r.actor}
+                    </span>
+                    <span className="font-mono text-slate-600 dark:text-slate-400 truncate">
+                      {r.target}
+                      {phaseTag}
+                    </span>
+                    <span className="ml-auto text-slate-400 dark:text-slate-500 tabular-nums shrink-0">
+                      {r.actedAt > 0
+                        ? new Date(r.actedAt * 1000).toLocaleTimeString()
+                        : "—"}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           </section>
         )}
