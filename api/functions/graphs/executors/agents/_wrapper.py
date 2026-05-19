@@ -24,14 +24,10 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import subprocess
 import time
 import uuid
 from pathlib import Path
 
-from copilot import CopilotClient
-from copilot.client import SubprocessConfig
-from copilot.session import PermissionHandler
 from copilot.generated.session_events import SessionEventType
 from copilot.tools import Tool
 from opentelemetry import trace
@@ -40,6 +36,7 @@ from opentelemetry.trace import Status, StatusCode
 from api.server.state import app_state
 from api.shared.events import FleetEvent
 from api.server.services.governance.permission_handler import AGTPermissionHandler
+from api.functions.graphs.executors.agents.runtime import _get_runtime, LLMRuntimeResult
 
 
 _SKILLS_DIR = Path(__file__).resolve().parents[4] / "server" / "skills"
@@ -48,34 +45,23 @@ _tracer = trace.get_tracer("zava.agents.finance")
 _MAX_RESPONSE_EVENT_BYTES = 4096
 
 
-_gh_token_cache: str | None = None
-
-
-def _gh_token() -> str:
-    """Return the gh CLI auth token, cached for the lifetime of the process."""
-    global _gh_token_cache
-    if _gh_token_cache is None:
-        _gh_token_cache = subprocess.check_output(
-            ["gh", "auth", "token"], text=True,
-        ).strip()
-    return _gh_token_cache
-
-
 def _load_skill(skill_dir: Path) -> str:
     return (skill_dir / "SKILL.md").read_text(encoding="utf-8")
 
 
-def _install_session_otel_bridge(
-    session,
+def _make_session_otel_bridge(
     tool_calls_out: list[dict],
     *,
     workflow_id: str | None = None,
     skill_label: str | None = None,
 ) -> callable:
-    """Bridge GHCP session events -> OTEL child spans + collect a flat list of
-    completed tool calls into `tool_calls_out` for the eval payload + emit
-    per-tool `tool.invoked` webhooks so the observatory orbit lights up the
-    MCP nodes in near-real time.
+    """Build an OTEL bridge callable for GHCP session events.
+
+    Returns the `on_event(event)` callable; the runtime is responsible for
+    wiring it into `session.on(...)` and tearing it down. Collects completed
+    tool calls into `tool_calls_out` for the eval payload and emits
+    `tool.invoked` webhooks so the observatory orbit lights up MCP nodes
+    in near-real time.
 
     TOOL_EXECUTION_START opens a span keyed by tool_call_id, and fires a
     `tool.invoked` (stage=start) webhook so the page can flare the
@@ -167,7 +153,7 @@ def _install_session_otel_bridge(
         except Exception:
             pass
 
-    return session.on(on_event)
+    return on_event
 
 
 def _extract_json(text: str) -> dict:
@@ -239,69 +225,48 @@ async def run_agent_session(
         if attachments:
             span.set_attribute("gen_ai.attachments.count", len(attachments))
 
-        config = SubprocessConfig(github_token=_gh_token(), log_level="warning")
-        client = CopilotClient(config)
-        async with client:
-            # AGT pre-tool hook: per-skill capability gate via governance
-            # kernel when AGT_ENFORCE=1; rubber-stamp otherwise so dev
-            # behaviour is unchanged. See plan/refactor-substrate-
-            # agentic-segments-1.md TASK-002.
-            if os.environ.get("AGT_ENFORCE", "0").strip() in ("1", "true", "TRUE", "yes"):
-                permission_handler = AGTPermissionHandler(
-                    skill_label=agent_name,
-                    workflow_id=workflow_id,
-                )
-            else:
-                permission_handler = PermissionHandler.approve_all
-            session_kwargs: dict = {
-                "on_permission_request": permission_handler,
-                "model": model,
-                "tools": tools,
-            }
-            if skill_text:
-                session_kwargs["system_message"] = {"mode": "append", "content": skill_text}
-            if skill_dir:
-                session_kwargs["skill_directories"] = [str(skill_dir)]
-            session = await client.create_session(**session_kwargs)
-            unsub = _install_session_otel_bridge(
-                session,
-                tool_calls_collected,
+        # AGT pre-tool hook: per-skill capability gate via governance
+        # kernel when AGT_ENFORCE=1; rubber-stamp otherwise so dev
+        # behaviour is unchanged. See plan/refactor-substrate-
+        # agentic-segments-1.md TASK-002.
+        if os.environ.get("AGT_ENFORCE", "0").strip() in ("1", "true", "TRUE", "yes"):
+            permission_handler = AGTPermissionHandler(
+                skill_label=agent_name,
                 workflow_id=workflow_id,
-                skill_label=skill_label,
             )
-            try:
-                if attachments:
-                    response_event = await session.send_and_wait(
-                        prompt, attachments=attachments, timeout=120.0,
-                    )
-                else:
-                    response_event = await session.send_and_wait(prompt, timeout=120.0)
-            finally:
-                try:
-                    unsub()
-                except Exception:
-                    pass
-                try:
-                    await session.disconnect()
-                except Exception:
-                    pass
+        else:
+            permission_handler = None  # GHCPRuntime falls back to approve_all
 
-        text = ""
-        if response_event and getattr(response_event, "data", None):
-            text = getattr(response_event.data, "content", "") or ""
+        on_event = _make_session_otel_bridge(
+            tool_calls_collected,
+            workflow_id=workflow_id,
+            skill_label=skill_label,
+        )
+
+        runtime = _get_runtime()
+        result: LLMRuntimeResult = await runtime.run_session(
+            prompt=prompt,
+            system_message=skill_text,
+            skill_directories=[skill_dir] if skill_dir else None,
+            tools=tools,
+            permission_handler=permission_handler,
+            attachments=attachments,
+            model=model,
+            timeout_s=120.0,
+            event_subscriber=on_event,
+        )
+
+        text = result.text
+        in_tok = result.input_tokens
+        out_tok = result.output_tokens
 
         event_text = text[:_MAX_RESPONSE_EVENT_BYTES]
         span.add_event("gen_ai.response", {"gen_ai.response.text": event_text})
 
-        data = getattr(response_event, "data", None) if response_event else None
-        usage = getattr(data, "usage", None) if data is not None else None
-        if usage is not None:
-            in_tok = getattr(usage, "input_tokens", None) or getattr(usage, "prompt_tokens", None)
-            out_tok = getattr(usage, "output_tokens", None) or getattr(usage, "completion_tokens", None)
-            if in_tok is not None:
-                span.set_attribute("gen_ai.usage.input_tokens", int(in_tok))
-            if out_tok is not None:
-                span.set_attribute("gen_ai.usage.output_tokens", int(out_tok))
+        if in_tok is not None:
+            span.set_attribute("gen_ai.usage.input_tokens", int(in_tok))
+        if out_tok is not None:
+            span.set_attribute("gen_ai.usage.output_tokens", int(out_tok))
 
     # Note: the OTEL span above is recorded in this (Functions host) process.
     # The FastAPI process — which serves /api/fleet/economics — receives the

@@ -50,3 +50,16 @@ def test_get_runtime_dispatch_fake(monkeypatch: pytest.MonkeyPatch) -> None:
     from api.functions.graphs.executors.agents.runtime import _get_runtime
     from api.functions.graphs.executors.agents.runtime_fake import FakeRuntime
     assert isinstance(_get_runtime(), FakeRuntime)
+
+
+def test_ghcp_runtime_satisfies_protocol() -> None:
+    from api.functions.graphs.executors.agents.runtime import LLMRuntime
+    from api.functions.graphs.executors.agents.runtime_ghcp import GHCPRuntime
+    assert isinstance(GHCPRuntime(), LLMRuntime)
+
+
+def test_get_runtime_default_is_ghcp(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("LLM_RUNTIME", raising=False)
+    from api.functions.graphs.executors.agents.runtime import _get_runtime
+    from api.functions.graphs.executors.agents.runtime_ghcp import GHCPRuntime
+    assert isinstance(_get_runtime(), GHCPRuntime)
