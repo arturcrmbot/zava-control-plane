@@ -11,7 +11,7 @@
 
 Both stores expose a `LessonGovernor` / `WorkingMemoryGovernor` thin wrapper that calls `kernel().evaluate_tool_call()` and `AuditLogger.log()` for an AGT-signed ledger entry. Lesson provenance + scope metadata also lands in Kuzu as `Lesson` nodes linked to the runs that birthed them; the lesson body lives in Mem0. Working memory does **not** mirror to Kuzu — it is ephemeral by design, GC'd after the dream pass consolidates it.
 
-**Tech Stack:** Python 3.11, `mem0ai>=0.1.115` (+`[nlp]` extras), `kuzu>=0.6,<0.7`, existing AGT 3.4 governance kernel, existing GHCP runtime (`runtime_ghcp.py`) for the LLM, pytest 8.3.
+**Tech Stack:** Python 3.11, `mem0ai>=0.1.115,<0.2`, `kuzu>=0.6,<0.7`, existing AGT 3.4 governance kernel, existing GHCP runtime (`runtime_ghcp.py`) for the LLM, pytest 8.3.
 
 ---
 
@@ -34,7 +34,7 @@ Both stores expose a `LessonGovernor` / `WorkingMemoryGovernor` thin wrapper tha
 - `tests/api/services/lessons/conftest.py` — shared fixtures
 
 **Modified files:**
-- `pyproject.toml` — add `mem0ai[nlp]>=0.1.115,<0.2`
+- `pyproject.toml` — add `mem0ai>=0.1.115,<0.2` (install via `uv sync --prerelease=allow` due to `agent-framework-mem0` pre-release pinning)
 - `api/server/services/entity_graph.py` — extend `_NODE_TABLES` with `Lesson`, extend `_REL_TABLES` with `LESSON_FROM_RUN`, `LESSON_ABOUT_PERSONA`, `LESSON_SUPERSEDES`
 - `data/policies/tools.yaml` — register `lesson.write` and `lesson.prune` tools (initially `audit`-only, no enforce)
 
@@ -65,29 +65,35 @@ Expected: a line of the form `"kuzu>=0.6,<0.7",` showing the current dependency 
 Add this line immediately after the `kuzu` line in the `[project] dependencies` array:
 
 ```toml
-    "mem0ai[nlp]>=0.1.115,<0.2",
+    "mem0ai>=0.1.115,<0.2",
 ```
+
+> **Note:** the `[nlp]` extra documented in mem0ai's README does not exist in
+> `mem0ai==0.1.118` and is not needed — the `from mem0 import Memory` import
+> works without spaCy. If a future release reintroduces the extra and we need
+> entity extraction, add it back then.
 
 - [ ] **Step 3: Install the dependency**
 
-Run: `uv sync`
-Expected: `mem0ai` and its transitive deps (qdrant-client, spacy, etc.) install without error.
+Run: `uv sync --prerelease=allow`
+Expected: `mem0ai` and its transitive deps install without error.
 
-- [ ] **Step 4: Download the spaCy English model required by Mem0's NLP extras**
+> **Why `--prerelease=allow`:** `agent-framework-mem0` (a peer of
+> `agent-framework`, already in our dependency graph) currently publishes
+> pre-release-only versions. Without the flag, resolution fails. We pin the
+> allow at the command level rather than baking it into `[tool.uv]` to keep
+> the policy visible at install time.
 
-Run: `uv run python -m spacy download en_core_web_sm`
-Expected: model downloads to the venv site-packages.
-
-- [ ] **Step 5: Smoke-import to verify the package loads**
+- [ ] **Step 4: Smoke-import to verify the package loads**
 
 Run: `uv run python -c "from mem0 import Memory; print('ok')"`
 Expected: prints `ok`.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add pyproject.toml uv.lock
-git commit -m "chore(lessons): add mem0ai[nlp] dependency"
+git commit -m "chore(lessons): add mem0ai dependency"
 ```
 
 ---
