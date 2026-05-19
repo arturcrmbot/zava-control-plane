@@ -15,8 +15,9 @@ export function Composition() {
             This is what&apos;s in the substrate we&apos;ve built for our
             reference organisation. Around {data.counts.skills} small
             specialised skills, plus {data.counts.mcps} MCP adapters that
-            let those skills reach into outside systems like Workday, SAP
-            or a data warehouse. {liveDomainCount} workflows wired up
+            let those skills reach into outside systems like Workday HR,
+            Concur travel, a document intelligence service and the policy
+            and identity stack. {liveDomainCount} workflows wired up
             today. Tap or hover any tile to see what it composes.
           </p>
         </header>

@@ -16,7 +16,7 @@ const captions: { label: string; title: string; body: string }[] = [
     label: "03 · MCPs",
     title: "One adapter per system, shared across every agent.",
     body:
-      "Workday, SAP, Salesforce, Mediaocean, ServiceNow, Greenhouse, Graph, plus your third-party APIs, surfaced as MCP tools with negotiated auth, schemas and contracts. The MCP servers are not agents themselves; they expose capability that agents borrow when they need it.",
+      "Workday HR, Concur travel, the policy and audit ledger, the delegated-authority matrix, identity and calendar services, document intelligence, and third-party sources like contract repositories, market pricing, vendor and sanctions screening, all surfaced as MCP tools with negotiated auth, schemas and contracts. The MCP servers are not agents themselves; they expose capability that agents borrow when they need it.",
   },
   {
     label: "04 · The foundation",
