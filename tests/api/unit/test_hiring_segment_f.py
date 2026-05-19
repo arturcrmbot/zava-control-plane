@@ -111,3 +111,185 @@ def test_is_reversible_classifier():
     assert _is_reversible("avatar.render") is False
     assert _is_reversible(None) is True
     assert _is_reversible("") is True
+
+
+# --------------------------------------------------------------------------
+# Orchestrator branch tests (Phase 4 Task 4)
+# --------------------------------------------------------------------------
+from datetime import datetime, timezone
+from typing import Any, Iterable
+
+
+class _StubTimerEvent:
+    def __init__(self, fire_at):
+        self.fire_at = fire_at
+        self.cancelled = False
+
+    def cancel(self):
+        self.cancelled = True
+
+
+class _StubExternalEvent:
+    def __init__(self, name, result=None):
+        self.name = name
+        self.result = result
+
+
+class _SegmentFStubContext:
+    def __init__(
+        self,
+        *,
+        validator_replies: list[dict] | None = None,
+        segment_result: dict | None = None,
+        tool_call_summary: list[dict] | None = None,
+    ):
+        self.instance_id = "instance-segf-1"
+        self.current_utc_datetime = datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc)
+        self.calls: list[tuple[str, dict]] = []
+        self._validator_replies = list(validator_replies or [])
+        base = segment_result or {
+            "onboarding_kickoff_id": "ONB-1",
+            "avatar_video_url": "https://example.test/avatar.mp4",
+            "day1_calendar_id": "MS-INV-1",
+            "provisioning_steps": ["JML ticket SN-1234 raised"],
+        }
+        if tool_call_summary is not None:
+            base = {**base, "_tool_call_summary": tool_call_summary}
+        self._segment_result = base
+
+    def get_input(self):
+        return {"workflow_id": "HIRE-SEGF-1"}
+
+    def call_activity(self, name: str, payload: dict):
+        self.calls.append((name, payload))
+        if name == "hiring_segment_f_activity_trigger":
+            return self._segment_result
+        if name == "validate_segment_f_output_activity_trigger":
+            if self._validator_replies:
+                return self._validator_replies.pop(0)
+            return {"ok": True, "output": payload}
+        if name == "hiring_screening_activity_trigger":
+            return {"verdict": "borderline"}
+        if name == "issue_screen_link_activity_trigger":
+            return {"token": "tok-1", "portal_url": "http://x"}
+        return {}
+
+    def wait_for_external_event(self, name: str):
+        defaults = {
+            "budget_approval": {"decision": "approve"},
+            "offer_approval": {"decision": "approve"},
+            "voice_complete": {"score": 0.8, "duration_s": 120.0},
+            "interview_invite": {"decision": "invite"},
+            "interview_booked": {"slot": "2026-06-01T10:00Z"},
+            "offer_decision": {"decision": "offer", "level": "L4", "rating": 4},
+        }
+        return _StubExternalEvent(name, defaults.get(name, {}))
+
+    def create_timer(self, fire_at):
+        return _StubTimerEvent(fire_at)
+
+    def task_any(self, awaitables: Iterable):
+        for e in awaitables:
+            if isinstance(e, _StubExternalEvent):
+                return e
+        return list(awaitables)[-1]
+
+
+def _drive(ctx):
+    from api.functions.workflows.hiring import hiring_orchestration
+    gen = hiring_orchestration(ctx)  # type: ignore[arg-type]
+    sent: Any = None
+    while True:
+        try:
+            target = gen.send(sent) if sent is not None else next(gen)
+        except StopIteration as stop:
+            return stop.value
+        sent = target
+
+
+def test_orchestrator_segment_f_on_replaces_per_phase_activities(monkeypatch):
+    monkeypatch.setenv("HIRING_SEGMENT_MODE", "f")
+    ctx = _SegmentFStubContext()
+    _drive(ctx)
+    activities = [c[0] for c in ctx.calls]
+    assert "hiring_segment_f_activity_trigger" in activities
+    assert "validate_segment_f_output_activity_trigger" in activities
+    assert "hiring_onboarding_activity_trigger" not in activities, (
+        "Segment F should replace the onboarding activity"
+    )
+
+
+def test_orchestrator_segment_f_off_keeps_existing_path(monkeypatch):
+    monkeypatch.setenv("HIRING_SEGMENT_MODE", "off")
+    ctx = _SegmentFStubContext()
+    _drive(ctx)
+    activities = [c[0] for c in ctx.calls]
+    assert "hiring_onboarding_activity_trigger" in activities
+    assert "hiring_segment_f_activity_trigger" not in activities
+
+
+def test_orchestrator_segment_f_retry_on_validation_failure(monkeypatch):
+    monkeypatch.setenv("HIRING_SEGMENT_MODE", "f")
+    valid = {
+        "onboarding_kickoff_id": "ONB-1",
+        "avatar_video_url": "https://example.test/avatar.mp4",
+        "day1_calendar_id": "MS-INV-1",
+        "provisioning_steps": ["JML ticket SN-1234 raised"],
+    }
+    ctx = _SegmentFStubContext(
+        validator_replies=[
+            {"ok": False, "errors": ["bad provisioning"]},
+            {"ok": True, "output": valid},
+        ],
+    )
+    _drive(ctx)
+    activities = [c[0] for c in ctx.calls]
+    assert activities.count("hiring_segment_f_activity_trigger") == 2
+    assert activities.count("validate_segment_f_output_activity_trigger") == 2
+
+
+def test_orchestrator_segment_f_retry_exhaustion(monkeypatch):
+    monkeypatch.setenv("HIRING_SEGMENT_MODE", "f")
+    monkeypatch.setattr("api.functions.workflows.hiring.SEGMENT_MAX_RETRIES", 1)
+    ctx = _SegmentFStubContext(
+        validator_replies=[
+            {"ok": False, "errors": ["e1"]},
+            {"ok": False, "errors": ["e2"]},
+            {"ok": False, "errors": ["e3"]},
+        ],
+    )
+    with pytest.raises(RuntimeError, match="Segment F validation failed after"):
+        _drive(ctx)
+    failure_checkpoints = [
+        payload for (name, payload) in ctx.calls
+        if name == "checkpoint_activity_trigger"
+        and payload.get("kind") == "segment.failed"
+    ]
+    assert len(failure_checkpoints) == 1
+    assert failure_checkpoints[0]["segment"] == "f"
+
+
+def test_orchestrator_segment_f_skips_retry_after_irreversible_tool_call(monkeypatch):
+    monkeypatch.setenv("HIRING_SEGMENT_MODE", "f")
+    ctx = _SegmentFStubContext(
+        tool_call_summary=[
+            {"name": "servicenow.create_ticket", "reversible": False},
+        ],
+        validator_replies=[
+            {"ok": False, "errors": ["invalid onboarding output"]},
+        ],
+    )
+    with pytest.raises(RuntimeError, match="irreversible tool calls"):
+        _drive(ctx)
+    activities = [c[0] for c in ctx.calls]
+    # Exactly one segment activity yield — no retry after irreversible.
+    assert activities.count("hiring_segment_f_activity_trigger") == 1
+    assert activities.count("validate_segment_f_output_activity_trigger") == 1
+    irrev_checkpoints = [
+        payload for (name, payload) in ctx.calls
+        if name == "checkpoint_activity_trigger"
+        and payload.get("kind") == "segment.failed.irreversible"
+    ]
+    assert len(irrev_checkpoints) == 1
+    assert irrev_checkpoints[0]["segment"] == "f"
+    assert irrev_checkpoints[0]["irreversible_tools"] == ["servicenow.create_ticket"]

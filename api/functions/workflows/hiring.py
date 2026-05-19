@@ -317,9 +317,43 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
         "voice_transcript": (voice_payload or {}).get("transcript") or [],
         "voice_score": (voice_payload or {}).get("score"),
     }
-    yield context.call_activity(
-        "hiring_interview_recommender_activity_trigger", rec_input_gate1,
-    )
+    if _segment_enabled("d", _segments_enabled):
+        # --- Segment D: interview decisioning as one agentic loop ---
+        segment_input = {**rec_input_gate1, "workflow_id": context.instance_id}
+        segment_result_d: dict | None = None
+        validator_d: dict = {}
+        for attempt in range(SEGMENT_MAX_RETRIES + 1):
+            segment_result_d = yield context.call_activity(
+                "hiring_segment_d_activity_trigger", segment_input,
+            )
+            validator_d = yield context.call_activity(
+                "validate_segment_d_output_activity_trigger", segment_result_d,
+            )
+            if validator_d.get("ok"):
+                segment_result_d = validator_d["output"]
+                break
+            segment_input = {
+                **segment_input,
+                "prior_validator_error": repr(validator_d.get("errors")),
+            }
+        else:
+            yield context.call_activity("checkpoint_activity_trigger", {
+                "workflow_id": context.instance_id,
+                "kind": "segment.failed",
+                "segment": "d",
+                "errors": validator_d.get("errors"),
+            })
+            raise RuntimeError(
+                f"Segment D validation failed after {SEGMENT_MAX_RETRIES + 1} attempts"
+            )
+        enriched = {
+            **enriched,
+            "interview_recommendation": (segment_result_d or {}).get("interview_recommendation"),
+        }
+    else:
+        yield context.call_activity(
+            "hiring_interview_recommender_activity_trigger", rec_input_gate1,
+        )
 
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
@@ -458,9 +492,10 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
         **rec_input_gate1,
         "gate": "post_interview",
     }
-    yield context.call_activity(
-        "hiring_interview_recommender_activity_trigger", rec_input_gate3,
-    )
+    if not _segment_enabled("d", _segments_enabled):
+        yield context.call_activity(
+            "hiring_interview_recommender_activity_trigger", rec_input_gate3,
+        )
 
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
@@ -541,13 +576,53 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
                     "decision": "offer", "level": interview_result["level"]},
     })
 
-    # Phase 8: Compliance (jurisdiction-aware — USA / DE BetrVG)
-    compliance_result = yield context.call_activity("hiring_compliance_activity_trigger", enriched)
-    enriched = {**enriched, "compliance": compliance_result}
+    # Phase 8 + 9: Compliance + Offer
+    if _segment_enabled("e", _segments_enabled):
+        # --- Segment E: compliance + offer preparation as one agentic loop ---
+        segment_input = {**enriched, "workflow_id": context.instance_id}
+        segment_result_e: dict | None = None
+        validator_e: dict = {}
+        for attempt in range(SEGMENT_MAX_RETRIES + 1):
+            segment_result_e = yield context.call_activity(
+                "hiring_segment_e_activity_trigger", segment_input,
+            )
+            validator_e = yield context.call_activity(
+                "validate_segment_e_output_activity_trigger", segment_result_e,
+            )
+            if validator_e.get("ok"):
+                segment_result_e = validator_e["output"]
+                break
+            segment_input = {
+                **segment_input,
+                "prior_validator_error": repr(validator_e.get("errors")),
+            }
+        else:
+            yield context.call_activity("checkpoint_activity_trigger", {
+                "workflow_id": context.instance_id,
+                "kind": "segment.failed",
+                "segment": "e",
+                "errors": validator_e.get("errors"),
+            })
+            raise RuntimeError(
+                f"Segment E validation failed after {SEGMENT_MAX_RETRIES + 1} attempts"
+            )
+        compliance_result = {
+            "jurisdiction": (segment_result_e or {}).get("jurisdiction"),
+            "steps": (segment_result_e or {}).get("compliance_steps", []),
+            "citations": (segment_result_e or {}).get("policy_citations", []),
+        }
+        offer_result = {
+            "offer_letter_id": (segment_result_e or {}).get("offer_letter_id"),
+        }
+        enriched = {**enriched, "compliance": compliance_result, "offer": offer_result}
+    else:
+        # Phase 8: Compliance (jurisdiction-aware — USA / DE BetrVG)
+        compliance_result = yield context.call_activity("hiring_compliance_activity_trigger", enriched)
+        enriched = {**enriched, "compliance": compliance_result}
 
-    # Phase 9: Offer — HR BP HITL on the non-revocable offer-letter send.
-    offer_result = yield context.call_activity("hiring_offer_activity_trigger", enriched)
-    enriched = {**enriched, "offer": offer_result}
+        # Phase 9: Offer — HR BP HITL on the non-revocable offer-letter send.
+        offer_result = yield context.call_activity("hiring_offer_activity_trigger", enriched)
+        enriched = {**enriched, "offer": offer_result}
 
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
@@ -608,8 +683,60 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
     })
 
     # Phase 10: Onboarding (ServiceNow JML, HeyGen avatar, Graph invite)
-    onboarding_result = yield context.call_activity("hiring_onboarding_activity_trigger", enriched)
-    enriched = {**enriched, "onboarding": onboarding_result}
+    if _segment_enabled("f", _segments_enabled):
+        # --- Segment F: onboarding with irreversible-tool guard ---
+        segment_input = {**enriched, "workflow_id": context.instance_id}
+        segment_result_f: dict | None = None
+        validator_f: dict = {}
+        for attempt in range(SEGMENT_MAX_RETRIES + 1):
+            segment_result_f = yield context.call_activity(
+                "hiring_segment_f_activity_trigger", segment_input,
+            )
+            validator_f = yield context.call_activity(
+                "validate_segment_f_output_activity_trigger", segment_result_f,
+            )
+            if validator_f.get("ok"):
+                segment_result_f = validator_f["output"]
+                break
+            irreversibles = [
+                tc for tc in ((segment_result_f or {}).get("_tool_call_summary") or [])
+                if not tc.get("reversible")
+            ]
+            if irreversibles:
+                yield context.call_activity("checkpoint_activity_trigger", {
+                    "workflow_id": context.instance_id,
+                    "kind": "segment.failed.irreversible",
+                    "segment": "f",
+                    "irreversible_tools": [tc["name"] for tc in irreversibles],
+                    "errors": validator_f.get("errors"),
+                })
+                raise RuntimeError(
+                    "Segment F validation failed after irreversible tool calls; HITL required"
+                )
+            segment_input = {
+                **segment_input,
+                "prior_validator_error": repr(validator_f.get("errors")),
+            }
+        else:
+            yield context.call_activity("checkpoint_activity_trigger", {
+                "workflow_id": context.instance_id,
+                "kind": "segment.failed",
+                "segment": "f",
+                "errors": validator_f.get("errors"),
+            })
+            raise RuntimeError(
+                f"Segment F validation failed after {SEGMENT_MAX_RETRIES + 1} attempts"
+            )
+        onboarding_result = {
+            "onboarding_kickoff_id": (segment_result_f or {}).get("onboarding_kickoff_id"),
+            "avatar_video_url": (segment_result_f or {}).get("avatar_video_url"),
+            "day1_calendar_id": (segment_result_f or {}).get("day1_calendar_id"),
+            "provisioning_steps": (segment_result_f or {}).get("provisioning_steps", []),
+        }
+        enriched = {**enriched, "onboarding": onboarding_result}
+    else:
+        onboarding_result = yield context.call_activity("hiring_onboarding_activity_trigger", enriched)
+        enriched = {**enriched, "onboarding": onboarding_result}
 
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
