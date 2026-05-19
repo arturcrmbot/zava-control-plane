@@ -10,6 +10,7 @@ import type { FeedItem } from "@shared/feedItems";
 import type { Workflow } from "@shared/types";
 import { useNow } from "@client/hooks/useNow";
 import { useDarkMode } from "@client/hooks/useDarkMode";
+import { useSSEStatus } from "@client/hooks/useSSE";
 import RoleSwitcher from "./RoleSwitcher";
 import NotificationsPopover from "./NotificationsPopover";
 
@@ -60,6 +61,24 @@ function HeaderClock() {
   );
 }
 
+function ConnectionStatusDot() {
+  const status = useSSEStatus();
+  const map = {
+    open:       { cls: "bg-emerald-500", label: "Live — receiving updates" },
+    connecting: { cls: "bg-amber-400 animate-pulse", label: "Connecting…" },
+    error:      { cls: "bg-red-500 animate-pulse", label: "Offline — feed is stale" },
+  } as const;
+  const { cls, label } = map[status];
+  return (
+    <span
+      role="status"
+      aria-label={label}
+      title={label}
+      className={`h-2 w-2 rounded-full ${cls}`}
+    />
+  );
+}
+
 export default function Header({
   role, onRoleChange, unreadItems, onJumpTo, onSearch, workflows,
 }: {
@@ -102,6 +121,7 @@ export default function Header({
       </div>
       <div className="ml-auto flex items-center gap-3">
         <NotificationsPopover items={unreadItems} onJumpTo={onJumpTo} />
+        <ConnectionStatusDot />
         <HeaderClock />
         <TodayChip role={role} items={unreadItems} workflows={workflows} />
         <button
