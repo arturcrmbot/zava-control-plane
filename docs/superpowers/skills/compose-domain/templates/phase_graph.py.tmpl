@@ -4,10 +4,13 @@
 
 Per brief: {{PHASE_INTENT}}.
 
-NOTE: LEGACY / `kind: graph` ONLY. The default agent-phase shape under
-compose-domain v4+ is a SEGMENT activity (see `segment.py.tmpl` and
-`segment_activity_trigger.py.tmpl`). Use this template only for phases
-the brief explicitly marks `kind: graph` per the "When to use kind:graph"
+NOTE: LEGACY for agentic phases. Still the only template that emits a
+MAF graph file, so it is used for BOTH `kind: deterministic` (single
+deterministic executor wrapped in a graph) AND the opt-in `kind: graph`
+shape (agent → in-graph validator → terminal). NOT used for `kind: agent`
+— that default agent-phase shape is now a SEGMENT activity (see
+`segment.py.tmpl` and `segment_activity_trigger.py.tmpl`). Pick
+`kind: graph` only when the brief meets the "When to use kind:graph"
 criteria in `compose-domain/SKILL.md` (parallel fan-out with blind merge;
 agent → validator → agent inside a single activity; saga/compensation
 chains where Durable round-trips per node are unacceptable).

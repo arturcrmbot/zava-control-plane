@@ -56,6 +56,9 @@ properties:
       additionalProperties: true
       properties:
         name: { type: string, pattern: "^[a-z][a-z0-9_]*$" }
+        # Phase 4 IP4 (TASK-019): `sub_orchestrator` joins the original
+        # three. Sub-orchestrator phases compose existing fleet domains
+        # into a meta-workflow via Durable's `call_sub_orchestrator`.
         # Phase 5 (TASK-025): `graph` is the explicit opt-in for the
         # legacy MAF-graph shape (agent → in-graph validator → terminal,
         # in-process). Default for an agentic phase is `agent`, which

@@ -2,6 +2,10 @@
 #
 # Two activity triggers per segment. Patched into `function_app.py` by
 # `graduate.sh`. Mirrors function_app.py:156-241 (hiring segments B/D/E/F).
+#
+# NOTE: the validator trigger is prefixed with `{{WT_SNAKE}}` UNLIKE the
+# hiring canonical example (`validate_segment_b_output_activity_trigger`),
+# to avoid collisions across generated domains sharing `function_app.py`.
 
 @app.activity_trigger(input_name="input")
 async def {{WT_SNAKE}}_segment_{{SEGMENT_LETTER}}_activity_trigger(input: dict) -> dict:
