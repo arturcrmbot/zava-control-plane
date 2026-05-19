@@ -24,7 +24,11 @@ router = APIRouter(prefix="/api/dream-pass", tags=["dream-pass"])
 
 
 def _graph() -> EntityGraph:
-    return EntityGraph("data/portal/entity_graph.kuzu")
+    # Reuse the app-wide singleton so we don't fight for the Kuzu
+    # single-writer file lock. Tests patch _graph / _repo / _governor
+    # directly, so this import-at-call-time pattern is fine.
+    from api.server.state import app_state
+    return app_state.entities
 
 
 def _repo() -> FlaggedLessonRepo:
@@ -32,11 +36,6 @@ def _repo() -> FlaggedLessonRepo:
 
 
 def _governor() -> LessonGovernor:
-    # Note: uses InMemoryLessonStore for now — Mem0LessonStore lazily
-    # imports mem0 inside __init__ and requires the prerelease install.
-    # The approve flow only needs `store.add(...)`, which the in-memory
-    # store handles; production wiring should swap to Mem0LessonStore at
-    # app boot via a dependency provider.
     return LessonGovernor(
         store=InMemoryLessonStore(),
         kernel=kernel,
