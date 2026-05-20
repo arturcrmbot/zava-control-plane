@@ -45,7 +45,14 @@ class WorkingMemoryCapture:
         for tc in tool_calls:
             tool = str(tc.get("tool", "unknown"))
             latency = tc.get("latency_ms")
-            body = f"called {tool}" + (f" ({latency}ms)" if latency is not None else "")
+            args_summary = self._summarise_tool_value(tc.get("args"))
+            result_summary = self._summarise_tool_value(tc.get("result"))
+            header = f"called {tool}" + (f" ({latency}ms)" if latency is not None else "")
+            body = header
+            if args_summary:
+                body += f"\n  args: {args_summary}"
+            if result_summary:
+                body += f"\n  result: {result_summary}"
             self._store.add(WorkingNote(
                 id=f"WN-{uuid.uuid4()}",
                 workflow_id=workflow_id,
@@ -53,6 +60,28 @@ class WorkingMemoryCapture:
                 kind="tool_call",
                 body=body,
             ))
+
+    @staticmethod
+    def _summarise_tool_value(raw: Any, *, max_chars: int = 200) -> str:
+        """Compact a tool arg or result blob to a single line of at most max_chars.
+
+        Strings are JSON-quoted on a best-effort basis to surface structure;
+        dicts/lists are json.dumps'd; everything else is str()-ified. Trailing
+        truncation marker '…' so a proposer can tell when content was clipped.
+        """
+        if raw is None:
+            return ""
+        if isinstance(raw, (dict, list)):
+            try:
+                text = json.dumps(raw, separators=(",", ":"), default=str)
+            except Exception:
+                text = str(raw)
+        else:
+            text = str(raw)
+        text = text.replace("\n", " ").strip()
+        if len(text) > max_chars:
+            return text[: max_chars - 1] + "…"
+        return text
 
     @staticmethod
     def _summarise_decision(response_text: str) -> str:

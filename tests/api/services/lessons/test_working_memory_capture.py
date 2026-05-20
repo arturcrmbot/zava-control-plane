@@ -94,3 +94,67 @@ def test_set_default_capture_swaps_singleton() -> None:
     set_default_capture(custom)
     assert get_default_capture() is custom
     _reset_default_for_tests()
+
+
+def test_tool_call_note_uses_tool_key_and_enriches_with_args_and_result():
+    """Producer in _wrapper.py emits dicts with both 'name' and 'tool' keys
+    (legacy + capture-consumer contracts). Capture must surface the tool
+    name, args summary, and result summary in the note body so a proposer
+    can learn from it."""
+    store = InMemoryWorkingMemoryStore()
+    capture = WorkingMemoryCapture(store=store)
+    capture.on_agent_completed(
+        workflow_id="WF-1",
+        agent_skill="receipt-validator",
+        response_text='{"decision":"approve","rationale":"matched receipt to claim"}',
+        tool_calls=[
+            {
+                "name": "fetch_receipt",
+                "tool": "fetch_receipt",
+                "args": {"claim_id": "C-001"},
+                "result": {"vendor": "Acme", "total_gbp": 42.5},
+                "success": True,
+                "latency_ms": 87,
+            }
+        ],
+    )
+    notes = list(store._by_id.values())
+    tc_note = next(n for n in notes if n.kind == "tool_call")
+    assert "fetch_receipt" in tc_note.body
+    assert "C-001" in tc_note.body
+    assert "Acme" in tc_note.body
+    assert "87ms" in tc_note.body
+
+
+def test_tool_call_note_handles_missing_args_and_result_gracefully():
+    """A tool call with no args/result still produces a useful header."""
+    store = InMemoryWorkingMemoryStore()
+    capture = WorkingMemoryCapture(store=store)
+    capture.on_agent_completed(
+        workflow_id="WF-1",
+        agent_skill="anomaly-flagger",
+        response_text="ok",
+        tool_calls=[{"name": "ping", "tool": "ping", "latency_ms": 3}],
+    )
+    notes = list(store._by_id.values())
+    tc_note = next(n for n in notes if n.kind == "tool_call")
+    assert "called ping" in tc_note.body
+    assert "3ms" in tc_note.body
+    assert "args:" not in tc_note.body
+    assert "result:" not in tc_note.body
+
+
+def test_long_tool_args_are_truncated_with_marker():
+    store = InMemoryWorkingMemoryStore()
+    capture = WorkingMemoryCapture(store=store)
+    big = "x" * 1000
+    capture.on_agent_completed(
+        workflow_id="WF-1",
+        agent_skill="anomaly-flagger",
+        response_text="ok",
+        tool_calls=[{"name": "huge", "tool": "huge", "args": big, "latency_ms": 1}],
+    )
+    notes = list(store._by_id.values())
+    tc_note = next(n for n in notes if n.kind == "tool_call")
+    assert "x" in tc_note.body
+    assert "…" in tc_note.body

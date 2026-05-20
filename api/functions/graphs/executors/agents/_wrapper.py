@@ -144,6 +144,7 @@ def _make_session_otel_bridge(
                     latency_ms = int((time.monotonic() - meta["started_at"]) * 1000)
                     tool_calls_out.append({
                         "name": meta["name"],
+                        "tool": meta["name"],   # working_memory_capture reads this key; keep "name" for legacy readers.
                         "args": meta["args"],
                         "result": result_text,
                         "success": getattr(data, "success", True) is not False,
