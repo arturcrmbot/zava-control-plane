@@ -107,6 +107,46 @@ async def _fetch_active_lessons(domain: str) -> list[dict]:
         return []
 
 
+def _memory_recall_url() -> str:
+    """POST /api/memory/lessons/recall — top-K semantic retrieval."""
+    base = os.getenv("FASTAPI_WEBHOOK_URL", "http://localhost:3101/internal/durable-event")
+    from urllib.parse import urlsplit, urlunsplit
+    parts = urlsplit(base)
+    return urlunsplit((parts.scheme, parts.netloc, "/api/memory/lessons/recall", "", ""))
+
+
+async def _fetch_top_k_lessons(*, domain: str, query: str, top_k: int = 3) -> list[dict]:
+    """Top-K semantically-relevant lessons for ``query`` in ``domain``.
+    30s in-process cache keyed on (domain, query); tolerant of network
+    errors (returns [])."""
+    now = time.monotonic()
+    cache_key = f"{domain}::{query}"
+    cached = _lesson_cache.get(cache_key)
+    if cached is not None and now - cached[0] < _LESSON_CACHE_TTL_S:
+        return cached[1]
+    try:
+        async with httpx.AsyncClient() as c:
+            r = await c.post(
+                _memory_recall_url(),
+                json={"domain": domain, "query": query, "top_k": top_k},
+                timeout=3.0,
+            )
+            if r.status_code != 200:
+                _lesson_cache[cache_key] = (now, [])
+                return []
+            items = r.json().get("items") or []
+            slim = [
+                {"id": str(l.get("id")), "body": str(l.get("body") or ""),
+                 "score": float(l.get("score") or 0.0)}
+                for l in items[:top_k] if l.get("body")
+            ]
+            _lesson_cache[cache_key] = (now, slim)
+            return slim
+    except Exception:
+        _lesson_cache[cache_key] = (now, [])
+        return []
+
+
 def _prepend_lessons_to_skill_text(skill_text: str | None, lessons: list[dict]) -> str | None:
     """Prepend a '## Past lessons' section to the skill_text. Returns
     skill_text unchanged when lessons is empty."""
@@ -302,7 +342,16 @@ async def run_agent_session(
     # Phase B: pull active lessons for this skill's domain and prepend them
     # to the system message so the agent benefits from past learning.
     domain = _skill_to_domain(skill_label, skill_dir.name if skill_dir else None)
-    active_lessons: list[dict] = await _fetch_active_lessons(domain) if domain else []
+    if domain:
+        # Build a context query from what we know about this invocation.
+        # The prompt itself is the most direct signal; truncate so we
+        # don't send a 50KB system message as a search query.
+        query_seed = f"skill={skill_label or '?'} domain={domain} prompt={(prompt or '')[:240]}"
+        active_lessons: list[dict] = await _fetch_top_k_lessons(
+            domain=domain, query=query_seed, top_k=3,
+        )
+    else:
+        active_lessons = []
     skill_text = _prepend_lessons_to_skill_text(skill_text, active_lessons)
     # SDK skill auto-discovery uses the union of skill_dir (primary,
     # drives SKILL.md system-message loading + span tagging) and any

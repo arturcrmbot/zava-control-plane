@@ -109,3 +109,34 @@ def test_skill_to_domain_returns_hiring_for_hiring_skills():
 def test_skill_to_domain_returns_none_for_unknown_skill():
     assert _skill_to_domain("anomaly-flagger", None) is None
     assert _skill_to_domain(None, None) is None
+
+
+@pytest.mark.asyncio
+async def test_recall_top_k_lessons_uses_recall_endpoint_not_active():
+    """Phase B regression: agent runtime fetches via /lessons/recall
+    (semantic, top-K) and NOT /lessons/active (return-everything)."""
+    captured_urls: list[str] = []
+    class _FakeR:
+        status_code = 200
+        def json(self):
+            return {"items": [{"id": "L1", "body": "x", "score": 0.9}]}
+    class _FakeC:
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def post(self, url, *a, **kw):
+            captured_urls.append(url)
+            return _FakeR()
+        async def get(self, url, *a, **kw):
+            captured_urls.append(url)
+            return _FakeR()
+    from api.functions.graphs.executors.agents._wrapper import _fetch_top_k_lessons, _lesson_cache
+    _lesson_cache.clear()
+    with patch("api.functions.graphs.executors.agents._wrapper.httpx.AsyncClient", return_value=_FakeC()):
+        out = await _fetch_top_k_lessons(
+            domain="hiring",
+            query="senior data engineer USA",
+            top_k=3,
+        )
+    assert any("/api/memory/lessons/recall" in u for u in captured_urls)
+    assert not any("/api/memory/lessons/active" in u for u in captured_urls)
+    assert out == [{"id": "L1", "body": "x", "score": 0.9}]
