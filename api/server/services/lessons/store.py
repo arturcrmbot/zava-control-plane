@@ -30,6 +30,14 @@ class LessonStore(Protocol):
         top_k: int = 5,
     ) -> list[Lesson]: ...
 
+    def search_ranked(
+        self,
+        query: str,
+        *,
+        scope: LessonScope,
+        top_k: int = 5,
+    ) -> list[tuple[Lesson, float]]: ...
+
     def prune(self, lesson_id: str, *, reason: str) -> None: ...
 
 
@@ -59,6 +67,15 @@ class InMemoryLessonStore:
             if lesson.status == "active" and lesson.scope.matches(scope)
         ]
         return results[:top_k]
+
+    def search_ranked(
+        self,
+        query: str,
+        *,
+        scope: LessonScope,
+        top_k: int = 5,
+    ) -> list[tuple[Lesson, float]]:
+        return [(l, 1.0) for l in self.search(query, scope=scope, top_k=top_k)]
 
     def prune(self, lesson_id: str, *, reason: str) -> None:
         del reason

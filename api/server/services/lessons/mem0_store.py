@@ -196,6 +196,50 @@ class Mem0LessonStore:
             lessons.append(lesson)
         return lessons
 
+    def search_ranked(
+        self,
+        query: str,
+        *,
+        scope: LessonScope,
+        top_k: int = 5,
+    ) -> list[tuple[Lesson, float]]:
+        # Mirrors search() but carries Mem0's per-hit similarity score.
+        # get_all has no ranking — its hits are "all active in scope", so
+        # we surface 1.0 as a "matched but unscored" sentinel matching
+        # InMemoryLessonStore.search_ranked.
+        if query.strip():
+            results = self._memory.search(
+                query=query,
+                user_id=_USER_ID,
+                filters={"domain": scope.domain},
+                limit=top_k,
+            )
+            ranked = True
+        else:
+            results = self._memory.get_all(
+                user_id=_USER_ID,
+                filters={"domain": scope.domain},
+                limit=top_k,
+            )
+            ranked = False
+        out: list[tuple[Lesson, float]] = []
+        for result in (results or {}).get("results", []):
+            metadata = result.get("metadata") or {}
+            try:
+                lesson = _deserialise_lesson(metadata)
+            except (KeyError, json.JSONDecodeError):
+                continue
+            if lesson.status != "active":
+                continue
+            if not lesson.scope.matches(scope):
+                continue
+            if ranked:
+                score = float(result.get("score") or 0.0)
+            else:
+                score = 1.0
+            out.append((lesson, score))
+        return out
+
     def prune(self, lesson_id: str, *, reason: str) -> None:
         del reason
         self._memory.delete(memory_id=lesson_id)

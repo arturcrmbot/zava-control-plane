@@ -104,6 +104,56 @@ def test_prune_marks_via_mem0_update(make_lesson, fake_memory) -> None:
     fake_memory.delete.assert_called_once_with(memory_id=lesson.id)
 
 
+def test_search_ranked_carries_mem0_score(make_lesson, fake_memory) -> None:
+    """search_ranked must surface the per-hit similarity score returned
+    by Mem0 so /api/memory/lessons/recall can plumb a real score through
+    to the UI instead of the previous 1.0 placeholder."""
+    a = make_lesson()
+    b = make_lesson()
+    fake_memory.search.return_value = {
+        "results": [
+            {"metadata": _serialise(a), "score": 0.87},
+            {"metadata": _serialise(b), "score": 0.42},
+        ]
+    }
+
+    store = Mem0LessonStore(memory=fake_memory)
+    ranked = store.search_ranked("anything", scope=a.scope, top_k=5)
+
+    assert len(ranked) == 2
+    for item in ranked:
+        assert isinstance(item, tuple)
+        assert len(item) == 2
+        lesson, score = item
+        assert lesson.id in {a.id, b.id}
+        assert isinstance(score, float)
+    by_id = {l.id: s for l, s in ranked}
+    assert by_id[a.id] == 0.87
+    assert by_id[b.id] == 0.42
+
+
+def test_search_ranked_missing_score_defaults_to_zero(make_lesson, fake_memory) -> None:
+    a = make_lesson()
+    fake_memory.search.return_value = {
+        "results": [{"metadata": _serialise(a)}],
+    }
+    store = Mem0LessonStore(memory=fake_memory)
+    ranked = store.search_ranked("q", scope=a.scope, top_k=5)
+    assert ranked == [(ranked[0][0], 0.0)]
+
+
+def test_search_ranked_empty_query_uses_get_all_with_unit_score(
+    make_lesson, fake_memory
+) -> None:
+    a = make_lesson()
+    fake_memory.get_all.return_value = {"results": [{"metadata": _serialise(a)}]}
+    store = Mem0LessonStore(memory=fake_memory)
+    ranked = store.search_ranked("", scope=a.scope, top_k=5)
+    fake_memory.get_all.assert_called_once()
+    fake_memory.search.assert_not_called()
+    assert ranked[0][1] == 1.0
+
+
 def _serialise(lesson) -> dict[str, Any]:
     from api.server.services.lessons.mem0_store import _serialise_lesson
     return _serialise_lesson(lesson)

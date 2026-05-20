@@ -89,3 +89,69 @@ def test_active_lessons_no_domain_discovers_dream_pass_dirs(tmp_path, monkeypatc
     r = client.get("/api/memory/lessons/active")
     assert r.status_code == 200
     assert "items" in r.json()
+
+
+def test_recall_lessons_returns_topk_for_query(monkeypatch):
+    """POST /api/memory/lessons/recall returns up to top_k lessons
+    ranked by semantic similarity to the query string. The store is
+    mocked here so the test does not depend on Azure embeddings — the
+    real Mem0 path is covered by the @pytest.mark.foundry integration
+    tests."""
+    from datetime import datetime, timezone
+
+    from api.server.services.lessons.types import (
+        Lesson,
+        LessonProvenance,
+        LessonScope as _Scope,
+    )
+    from api.server.state import app_state
+
+    captured: dict = {}
+
+    def _fake_search_ranked(*, scope, query, top_k):
+        captured["scope"] = scope
+        captured["query"] = query
+        captured["top_k"] = top_k
+        l = Lesson(
+            id="recall-L1",
+            body="Senior data engineers with US visas need extra review.",
+            scope=_Scope(domain="hiring"),
+            provenance=LessonProvenance(
+                proposed_by="test",
+                run_ids=(),
+                rubric_score_delta=0.05,
+                experiment_n=10,
+                promoted_at=datetime.now(timezone.utc),
+            ),
+            status="active",
+        )
+        return [(l, 0.87)]
+
+    monkeypatch.setattr(
+        app_state.lesson_store, "search_ranked", _fake_search_ranked
+    )
+    r = client.post(
+        "/api/memory/lessons/recall",
+        json={"domain": "hiring", "query": "candidate with US visa needs review", "top_k": 3},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert "items" in body
+    assert isinstance(body["items"], list)
+    assert len(body["items"]) <= 3
+    assert captured["scope"].domain == "hiring"
+    assert captured["query"] == "candidate with US visa needs review"
+    assert captured["top_k"] == 3
+    for it in body["items"]:
+        assert "id" in it
+        assert "body" in it
+        assert "score" in it  # Mem0 returns a similarity score
+    assert body["items"][0]["score"] == 0.87  # real score plumbed through
+
+
+def test_recall_lessons_rejects_empty_query():
+    r = client.post(
+        "/api/memory/lessons/recall",
+        json={"domain": "hiring", "query": "", "top_k": 3},
+    )
+    assert r.status_code == 422

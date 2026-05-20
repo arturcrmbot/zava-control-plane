@@ -17,6 +17,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Query
+from pydantic import BaseModel, Field
 
 from api.server.services.lessons.working_memory_store import (
     InMemoryWorkingMemoryStore,
@@ -100,6 +101,40 @@ def lessons_active(
             log.exception("memory: lessons_active search failed for domain=%s", d)
             continue
         items.extend(_lesson_to_dict(l) for l in lessons)
+    return {"items": items}
+
+
+# ---------------------------------------------------------------------
+# Lesson recall (semantic top-K)
+# ---------------------------------------------------------------------
+
+class _RecallBody(BaseModel):
+    domain: str = Field(..., min_length=1)
+    query: str = Field(..., min_length=1)
+    top_k: int = Field(default=3, ge=1, le=10)
+
+
+@router.post("/lessons/recall")
+def lessons_recall(body: _RecallBody) -> dict[str, list[dict[str, Any]]]:
+    """Top-K relevant lessons for a query string. Backs the Functions-
+    process agent runtime: every LLM agent call POSTs the candidate
+    context (role title + jurisdiction + skill name + workflow id) as
+    `query`, gets the top 3 semantically-relevant lessons, and
+    prepends them as natural-language guidance to its prompt. This
+    replaces the prepend-everything pattern."""
+    from api.server.services.lessons.types import LessonScope
+    store = app_state.lesson_store
+    scope = LessonScope(domain=body.domain)
+    try:
+        ranked = store.search_ranked(query=body.query, scope=scope, top_k=body.top_k)
+    except Exception:
+        log.exception("memory: lessons_recall search failed")
+        return {"items": []}
+    items = []
+    for l, score in ranked:
+        d = _lesson_to_dict(l)
+        d["score"] = float(score)
+        items.append(d)
     return {"items": items}
 
 
