@@ -14,6 +14,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from typing import TYPE_CHECKING
+
 from api.server.services.event_bus import EventBus
 from api.server.services.state_store import StateStore
 from api.server.services.audit_logger import AuditLogger
@@ -21,6 +23,11 @@ from api.server.services.sse_hub import SSEHub
 from api.server.services.magic_link import MagicLinkStore
 from api.server.services.kpi_store import KpiStore
 from api.server.services.email_send import EmailSender
+from api.server.services.lessons.store import InMemoryLessonStore
+from api.server.services.lessons.working_memory_store import InMemoryWorkingMemoryStore
+
+if TYPE_CHECKING:
+    from api.server.services.dream_pass.orchestrator import DreamPassOrchestrator
 
 
 # Local artefact roots — magic-link sqlite, email outbox, blob fallback dir.
@@ -154,6 +161,47 @@ class AppState:
         # BlobStore: optional — only present when AZURE_STORAGE_CONNECTION_STRING
         # is set (Azurite locally, real Storage in cloud).
         self.blob_store = _build_blob_store()
+        # Dream-pass + lessons stack. The orchestrator writes to the
+        # in-memory lesson store + working memory store; the read-only
+        # memory route (Task 6) reads from the same singletons. Sharing
+        # the instances here keeps producer and consumer aligned without
+        # a round-trip through Kuzu for short-lived lesson state.
+        #
+        # Lesson stores are built eagerly. The orchestrator itself is
+        # built lazily via the `dream_pass_orchestrator` property — the
+        # dream_pass package's __init__ pulls in sandbox -> functions/
+        # graphs -> mcp_tools -> state.app_state, and importing wiring
+        # eagerly here would re-enter the dream_pass package mid-load
+        # and crash with a circular ImportError. See
+        # api/server/services/dream_pass/wiring.py for the rationale
+        # behind the demo defaults (stub experiment runner, etc.).
+        self.lesson_store = InMemoryLessonStore()
+        self.working_memory_store = InMemoryWorkingMemoryStore()
+        self._dream_pass_orchestrator: "DreamPassOrchestrator | None" = None
+
+    @property
+    def dream_pass_orchestrator(self) -> "DreamPassOrchestrator":
+        """Memoised, lazily-built dream-pass orchestrator wired to the
+        shared in-memory lesson + working-memory stores. The cache exists
+        so the orchestrator (producer) and the Task 6 memory routes
+        (consumer) operate on the same `lesson_store` / `working_memory_store`
+        singletons — rebuilding on every access would hand out a fresh
+        orchestrator with its own state and break that contract. Built on
+        first access to avoid a circular import at AppState construction
+        time (see the wiring comment in __init__)."""
+        if self._dream_pass_orchestrator is None:
+            from api.server.services.dream_pass.wiring import (
+                build_demo_orchestrator,
+            )
+
+            self._dream_pass_orchestrator = build_demo_orchestrator(
+                graph=self.entities if self._entity_plane_enabled else None,
+                bus=self.bus,
+                audit=self.audit,
+                lesson_store=self.lesson_store,
+                working_memory_store=self.working_memory_store,
+            )
+        return self._dream_pass_orchestrator
 
     async def aclose(self) -> None:
         """Release pooled / long-lived resources owned by this AppState.
