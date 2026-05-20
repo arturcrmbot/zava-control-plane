@@ -143,7 +143,6 @@ async def lifespan(app: FastAPI):
             heartbeat_seconds=_dream_cadence_secs,
             tick_seconds=int(os.getenv("DREAM_PASS_TICK_SECONDS", "15") or "15"),
             backlog_threshold=int(os.getenv("DREAM_PASS_TRIGGER_BACKLOG", "30") or "30"),
-            working_memory_store=app_state.working_memory_store,
             domain_memories=app_state.domain_memories,
             cost_budget=app_state.cost_budget,
         ))
@@ -340,7 +339,6 @@ from api.server.routes.audit import router as audit_router
 from api.server.routes.evals import router as evals_router
 from api.server.routes.orchestration import router as orchestration_router
 from api.server.routes.internal_durable_event import router as durable_event_router
-from api.server.routes.dream_pass_exceptions import router as dream_pass_exceptions_router
 from api.server.routes.dream_pass_run import router as dream_pass_run_router
 from api.server.routes.dream_pass_pause import router as dream_pass_pause_router
 from api.server.routes.fleet import router as fleet_router
@@ -396,10 +394,8 @@ from api.server.routes.demo_triggers import router as demo_triggers_router
 # Live decision/insight ticker — autonomous-domain-insights v1.1 Phase D1.
 from api.server.routes.ticker import router as ticker_router
 # Memory layer visualisation — read-only memory query API.
-from api.server.routes.memory import router as memory_router
 from api.server.routes.memory_v2 import router as memory_v2_router
 # Per-lesson observability — D1.
-from api.server.routes.memory_lesson_stats import router as memory_lesson_stats_router
 
 for r in (stream_router, workflows_router, exceptions_router, policy_router,
           simulator_router, audit_router, evals_router, orchestration_router,
@@ -429,11 +425,8 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           demo_triggers_router,
           ticker_router,
           foundry_router,
-          dream_pass_exceptions_router,
           dream_pass_run_router,
           dream_pass_pause_router,
-          memory_lesson_stats_router,
-          memory_router,
           memory_v2_router):
     app.include_router(r)
 

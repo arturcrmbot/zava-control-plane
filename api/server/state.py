@@ -23,8 +23,6 @@ from api.server.services.sse_hub import SSEHub
 from api.server.services.magic_link import MagicLinkStore
 from api.server.services.kpi_store import KpiStore
 from api.server.services.email_send import EmailSender
-from api.server.services.lessons.store import InMemoryLessonStore
-from api.server.services.lessons.working_memory_store import InMemoryWorkingMemoryStore
 
 if TYPE_CHECKING:
     from api.server.services.dream_pass.orchestrator import DreamPassOrchestrator
@@ -169,41 +167,16 @@ class AppState:
         # BlobStore: optional — only present when AZURE_STORAGE_CONNECTION_STRING
         # is set (Azurite locally, real Storage in cloud).
         self.blob_store = _build_blob_store()
-        # Dream-pass + lessons stack. The orchestrator writes to the
-        # in-memory lesson store + working memory store; the read-only
-        # memory route (Task 6) reads from the same singletons. Sharing
-        # the instances here keeps producer and consumer aligned without
-        # a round-trip through Kuzu for short-lived lesson state.
-        #
-        # Lesson stores are built eagerly. The orchestrator itself is
-        # built lazily via the `dream_pass_orchestrator` property — the
-        # dream_pass package's __init__ pulls in sandbox -> functions/
-        # graphs -> mcp_tools -> state.app_state, and importing wiring
-        # eagerly here would re-enter the dream_pass package mid-load
-        # and crash with a circular ImportError. See
-        # api/server/services/dream_pass/wiring.py for the rationale
-        # behind the demo defaults (stub experiment runner, etc.).
-        # Mem0-backed lesson store: persists across FastAPI restarts and
-        # supports semantic search via mem0.Memory(). Mem0 requires
-        # either MEM0_API_KEY (Mem0 cloud) or a local Qdrant at the
-        # default URL; if neither is present mem0.Memory() raises at
-        # construction. We fall back to InMemoryLessonStore in that
-        # case with a loud warning so operators know lessons will NOT
-        # survive a restart. Tests inject a MagicMock memory directly.
+        # Dream-pass memory stack. Domain memories are built eagerly; the
+        # orchestrator itself stays lazy to avoid circular imports during
+        # AppState construction.
         try:
-            from api.server.services.lessons.mem0_store import (
-                Mem0LessonStore, build_default_memory,
-            )
-
-            _mem0_backend = build_default_memory()
-            self.lesson_store = Mem0LessonStore(memory=_mem0_backend)
-            # Per-domain Mem0 memory stores — Anthropic-style two-tier
-            # architecture. Each domain gets its own logical partition
-            # within the shared Mem0 backend.
+            from api.server.services.lessons.mem0_store import build_default_memory
             from api.server.services.memory.domain_memory import (
                 DomainMemory, build_domain_memories,
             )
 
+            _mem0_backend = build_default_memory()
             _memory_domains = [
                 d.strip()
                 for d in os.getenv("MEMORY_DOMAINS", "hiring").split(",")
@@ -217,37 +190,19 @@ class AppState:
             import logging
 
             logging.getLogger(__name__).warning(
-                "Mem0 backend unavailable (%s); falling back to "
-                "InMemoryLessonStore. Lessons will NOT persist across "
-                "restarts until Mem0 is configured (MEM0_API_KEY or "
-                "local Qdrant); domain_memories will be empty. Agents "
-                "will run without memory.",
+                "Mem0 backend unavailable (%s); domain memories will be empty. "
+                "Agents will run without memory until Mem0 is configured.",
                 _mem0_ex,
             )
-            self.lesson_store = InMemoryLessonStore()
             self.domain_memories = {}
-        self.working_memory_store = InMemoryWorkingMemoryStore()
-        # Wire the agent-runtime working-memory capture singleton to our
-        # shared store so LLM agent completions (via run_agent_session)
-        # land in the same buffer the /memory page reads from. Without
-        # this, get_default_capture() lazily creates its own private
-        # store and every captured note is invisible to the Memory page.
-        from api.server.services.lessons.working_memory_capture import (
-            WorkingMemoryCapture, set_default_capture,
-        )
-        set_default_capture(WorkingMemoryCapture(store=self.working_memory_store))
         self._dream_pass_orchestrator: "DreamPassOrchestrator | None" = None
 
     @property
     def dream_pass_orchestrator(self) -> "DreamPassOrchestrator":
-        """Memoised, lazily-built dream-pass orchestrator wired to the
-        shared in-memory lesson + working-memory stores. The cache exists
-        so the orchestrator (producer) and the Task 6 memory routes
-        (consumer) operate on the same `lesson_store` / `working_memory_store`
-        singletons — rebuilding on every access would hand out a fresh
-        orchestrator with its own state and break that contract. Built on
-        first access to avoid a circular import at AppState construction
-        time (see the wiring comment in __init__)."""
+        """Memoised, lazily-built dream-pass orchestrator.
+
+        Built on first access to avoid a circular import at AppState
+        construction time (see the wiring comment in __init__)."""
         if self._dream_pass_orchestrator is None:
             from api.server.services.dream_pass.wiring import (
                 build_demo_orchestrator,
@@ -257,8 +212,6 @@ class AppState:
                 graph=self.entities if self._entity_plane_enabled else None,
                 bus=self.bus,
                 audit=self.audit,
-                lesson_store=self.lesson_store,
-                working_memory_store=self.working_memory_store,
             )
         return self._dream_pass_orchestrator
 
@@ -476,7 +429,6 @@ class AppState:
                         heartbeat_seconds=cadence_secs,
                         tick_seconds=tick_secs,
                         backlog_threshold=backlog_threshold,
-                        working_memory_store=self.working_memory_store,
                         domain_memories=self.domain_memories,
                     ))
                 )
@@ -539,7 +491,6 @@ async def _run_dream_pass_cadence(
     heartbeat_seconds: int,
     tick_seconds: int = 15,
     backlog_threshold: int = 30,
-    working_memory_store=None,
     domain_memories=None,
     cost_budget=None,
 ) -> None:

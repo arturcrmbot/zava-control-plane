@@ -1,13 +1,9 @@
-"""Phase B tests: _fetch_top_k_lessons + _prepend_lessons_to_skill_text + _skill_to_domain."""
+"""Memory prepend tests for the agent wrapper."""
 import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-from api.functions.graphs.executors.agents._wrapper import (
-    _lesson_cache,
-    _prepend_lessons_to_skill_text,
-    _skill_to_domain,
-)
+from api.functions.graphs.executors.agents._wrapper import _lesson_cache, _skill_to_domain
 
 
 @pytest.fixture(autouse=True)
@@ -15,29 +11,6 @@ def _clear_cache():
     _lesson_cache.clear()
     yield
     _lesson_cache.clear()
-
-
-def test_prepend_with_lessons_includes_header_and_bullets():
-    skill = "You are the receipt validator."
-    out = _prepend_lessons_to_skill_text(skill, [
-        {"id": "L1", "body": "first lesson body"},
-        {"id": "L2", "body": "second lesson body"},
-    ])
-    assert "## Past lessons" in out
-    assert "- first lesson body" in out
-    assert "- second lesson body" in out
-    assert out.endswith(skill)
-
-
-def test_prepend_with_empty_lessons_returns_skill_unchanged():
-    skill = "You are the receipt validator."
-    assert _prepend_lessons_to_skill_text(skill, []) == skill
-
-
-def test_prepend_with_none_skill_and_lessons_yields_header_only():
-    out = _prepend_lessons_to_skill_text(None, [{"id": "L1", "body": "x"}])
-    assert "## Past lessons" in out
-    assert "- x" in out
 
 
 def test_skill_to_domain_returns_hiring_for_hiring_skills():

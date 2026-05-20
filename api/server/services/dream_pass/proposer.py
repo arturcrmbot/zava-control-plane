@@ -8,15 +8,12 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from api.functions.graphs.executors.agents._wrapper import run_agent_session
-from api.server.services.dream_pass.types import DreamSkill
-from api.server.services.lessons.types import LessonCandidate, LessonScope
-from api.server.services.lessons.working_memory_types import WorkingNote
+from api.server.services.dream_pass.types import DreamSkill, LessonCandidate, LessonScope
 
 
 @dataclass(frozen=True)
 class ProposalContext:
     skill: DreamSkill
-    working_notes: list[WorkingNote]
     recent_runs: list[dict[str, Any]]
     active_lessons: list[dict[str, Any]]
 
@@ -86,19 +83,9 @@ class GHCPProposer:
 
     @staticmethod
     def _render_prompt(ctx: ProposalContext) -> str:
-        notes_payload = [
-            {
-                'workflow_id': note.workflow_id,
-                'kind': note.kind,
-                'body': note.body,
-            }
-            for note in ctx.working_notes
-        ]
         return (
             f"You are the dream-pass agent for the '{ctx.skill.domain}' domain.\n\n"
             f"Dream-skill body:\n{ctx.skill.body}\n\n"
-            f"Recent working notes ({len(notes_payload)}):\n"
-            f"```json\n{json.dumps(notes_payload, indent=2)}\n```\n\n"
             f"Recent run scores:\n```json\n{json.dumps(ctx.recent_runs, indent=2)}\n```\n\n"
             f"Active lessons (do not restate):\n"
             f"```json\n{json.dumps(ctx.active_lessons, indent=2)}\n```\n\n"

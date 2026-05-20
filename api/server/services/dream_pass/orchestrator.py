@@ -19,56 +19,55 @@ from api.shared.events import FleetEvent
 from api.server.services.dream_pass.partitioner import CorpusPartitioner
 from api.server.services.dream_pass.policy import PromotionPolicy
 from api.server.services.dream_pass.proposer import LessonProposer, ProposalContext
-from api.server.services.dream_pass.types import DreamPassResult, DreamSkill, Experiment
+from api.server.services.dream_pass.types import (
+    DreamPassResult,
+    DreamSkill,
+    Experiment,
+    Lesson,
+    LessonProvenance,
+)
 from api.server.services.entity_graph import EntityGraph
-from api.server.services.lessons import Lesson, LessonGovernor, LessonProvenance
-from api.server.services.lessons.working_memory_types import WorkingNote
 from api.server.services.scoring.types import Rubric
 
 
 class DreamPassOrchestrator:
-    """Closed-loop proposer -> experiment -> policy -> governor flow."""
+    """Closed-loop proposer -> experiment -> policy flow."""
 
     def __init__(
         self,
         *,
-        governor: LessonGovernor,
         proposer: LessonProposer,
         partitioner: CorpusPartitioner,
         experiment_runner: ExperimentRunner,
         policy: PromotionPolicy,
         list_persona_ids: Callable[[str], list[str]],
         load_cvs: Callable[[tuple[str, ...]], list[dict[str, Any]]],
-        load_active_lessons: Callable[[str], list[Any]],
         load_recent_runs: Callable[[str], list[dict[str, Any]]],
-        load_working_notes: Callable[[tuple[str, ...]], list[WorkingNote]],
         rubric: Rubric,
-        mark_working_note_consumed: Callable[[str, str], None] | None = None,
+        persist_promoted_lesson: Callable[[Lesson], None] | None = None,
+        persist_flagged_candidate: Callable[..., None] | None = None,
         graph: EntityGraph | None = None,
         bus: EventBus | None = None,
     ) -> None:
-        self._governor = governor
         self._proposer = proposer
         self._partitioner = partitioner
         self._experiment_runner = experiment_runner
         self._policy = policy
         self._list_persona_ids = list_persona_ids
         self._load_cvs = load_cvs
-        self._load_active_lessons = load_active_lessons
         self._load_recent_runs = load_recent_runs
-        self._load_working_notes = load_working_notes
         self._rubric = rubric
-        self._mark_working_note_consumed = mark_working_note_consumed
+        self._persist_promoted_lesson = persist_promoted_lesson
+        self._persist_flagged_candidate = persist_flagged_candidate
         self._graph = graph
         self._bus = bus
 
     def _emit(self, event_type: str, payload: dict[str, Any]) -> None:
-        """Fire-and-forget bus emit. Silent when no bus configured (tests)."""
         if self._bus is None:
             return
         try:
             self._bus.emit(FleetEvent(type=event_type, **payload))
-        except Exception:  # pragma: no cover — never let observability break the loop
+        except Exception:
             import logging
             logging.getLogger(__name__).warning(
                 "dream-pass: bus emit failed for %s", event_type, exc_info=True,
@@ -76,13 +75,11 @@ class DreamPassOrchestrator:
 
     async def run_pass(self, *, skill: DreamSkill, sample_size: int) -> DreamPassResult:
         dream_pass_id = f'dream-pass:{skill.domain}:{uuid.uuid4()}'
-        active_lessons = self._load_active_lessons(skill.domain)
         recent_runs = self._load_recent_runs(skill.domain)
-        working_notes = self._load_working_notes(('interview-recommender',))
+        active_lessons: list[Any] = []
         candidates = await self._propose(
             ProposalContext(
                 skill=skill,
-                working_notes=working_notes,
                 recent_runs=recent_runs,
                 active_lessons=[{'body': _lesson_body(item)} for item in active_lessons],
             )
@@ -178,7 +175,8 @@ class DreamPassOrchestrator:
                         promoted_at=datetime.now(timezone.utc),
                     ),
                 )
-                self._governor.write(lesson)
+                if self._persist_promoted_lesson is not None:
+                    self._persist_promoted_lesson(lesson)
                 promoted.append(candidate.id)
                 self._record_experiment(
                     dream_pass_id=dream_pass_id,
@@ -215,19 +213,20 @@ class DreamPassOrchestrator:
                     },
                 )
             elif decision.verdict == 'flagged':
-                self._governor.write_flagged_candidate(
-                    candidate=candidate,
-                    experiment_id=experiment.id,
-                    delta=experiment.delta,
-                    n=experiment.n_samples,
-                    flag_reason=decision.reason,
-                )
+                if self._persist_flagged_candidate is not None:
+                    self._persist_flagged_candidate(
+                        candidate=candidate,
+                        experiment_id=experiment.id,
+                        delta=experiment.delta,
+                        n=experiment.n_samples,
+                        flag_reason=decision.reason,
+                    )
                 flagged.append(candidate.id)
                 self._record_experiment(
                     dream_pass_id=dream_pass_id,
                     experiment=experiment,
                     verdict='flagged',
-                    lesson_id=None,
+                    lesson_id=candidate.id,
                 )
             else:
                 self._record_experiment(
@@ -236,10 +235,6 @@ class DreamPassOrchestrator:
                     verdict='inconclusive',
                     lesson_id=None,
                 )
-
-        if self._mark_working_note_consumed is not None:
-            for note in working_notes:
-                self._mark_working_note_consumed(note.id, dream_pass_id)
 
         self._record_dream_pass_complete(
             dream_pass_id=dream_pass_id,

@@ -9,6 +9,41 @@ ExperimentVerdict = Literal["promote", "reject", "inconclusive", "flagged"]
 
 
 @dataclass(frozen=True)
+class LessonScope:
+    domain: str
+    persona_role: str | None = None
+    market: str | None = None
+
+
+@dataclass(frozen=True)
+class LessonCandidate:
+    id: str
+    body: str
+    scope: LessonScope
+    proposed_by: str
+    rationale: str = ""
+
+
+@dataclass(frozen=True)
+class LessonProvenance:
+    proposed_by: str
+    run_ids: tuple[str, ...]
+    rubric_score_delta: float
+    experiment_n: int
+    promoted_at: datetime
+
+
+@dataclass(frozen=True)
+class Lesson:
+    id: str
+    body: str
+    scope: LessonScope
+    provenance: LessonProvenance
+    status: str = "active"
+    supersedes: str | None = None
+
+
+@dataclass(frozen=True)
 class DreamSkill:
     """Dream-pass skill metadata loaded from SKILL.md frontmatter."""
 

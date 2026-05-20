@@ -6,8 +6,7 @@ from typing import Any
 
 import yaml
 
-from api.server.services.dream_pass.types import Experiment, ExperimentVerdict
-from api.server.services.lessons.types import Lesson, LessonCandidate
+from api.server.services.dream_pass.types import Experiment, ExperimentVerdict, Lesson, LessonCandidate
 
 
 @dataclass(frozen=True)

@@ -1,16 +1,4 @@
-"""Single-call factory that constructs the dream-pass + lessons stack
-with sensible demo defaults. Used by AppState during startup and by
-on-demand routes that need to spin a pass against the live entity graph
-without rebuilding the wiring each call.
-
-Production wiring builds the REAL ExperimentRunner (sandboxed
-interview-recommender against the hiring rubric). If that construction
-fails the factory raises — the band-aid stub fallback was removed
-deliberately so the live system can't silently degrade to placeholder
-numbers. Unit tests that don't have a real Kuzu graph / candidate pool
-must inject a stub explicitly via the ``experiment_runner=`` kwarg
-(see ``tests/api/services/dream_pass/_stub_runner.py``).
-"""
+"""Single-call factory that constructs the remaining dream-pass stack."""
 from __future__ import annotations
 
 import uuid
@@ -24,15 +12,9 @@ from api.server.services.dream_pass.partitioner import CorpusPartitioner
 from api.server.services.dream_pass.policy import PromotionPolicy
 from api.server.services.dream_pass.proposer import StubProposer
 from api.server.services.dream_pass.sandbox import InterviewRecommenderSandbox
-from api.server.services.dream_pass.types import CorpusSplit
+from api.server.services.dream_pass.types import CorpusSplit, Lesson
 from api.server.services.entity_graph import EntityGraph
 from api.server.services.event_bus import EventBus
-from api.server.services.governance.kernel import kernel as get_kernel
-from api.server.services.lessons.governor import LessonGovernor
-from api.server.services.lessons.kuzu_provenance import KuzuLessonProvenance
-from api.server.services.lessons.store import InMemoryLessonStore
-from api.server.services.lessons.types import LessonScope
-from api.server.services.lessons.working_memory_store import InMemoryWorkingMemoryStore
 from api.server.services.scoring.ground_truth import HiringLabelsGroundTruth
 from api.server.services.scoring.rubric_loader import load_rubric
 from api.server.services.scoring.scorer import RunScorer
@@ -43,54 +25,19 @@ _REPO_ROOT = Path(__file__).resolve().parents[4]
 _HIRING_RUBRIC_YAML = _REPO_ROOT / "data" / "rubrics" / "hiring.yaml"
 _HIRING_LABELS_CSV = _REPO_ROOT / "data" / "synthetic" / "hiring" / "labels.csv"
 _DREAM_POLICY_YAML = _REPO_ROOT / "data" / "policies" / "dream-pass.policy.yaml"
+_DEMO_PARTITIONER_DOMAIN = "__demo__"
 
+_DEMO_RUBRIC = Rubric(
+    domain="__demo__",
+    promotion_threshold=0.0,
+    min_samples=1,
+    checks=(RubricCheck(name="placeholder", kind="rationale_present", weight=1.0),),
+)
 
-# Domain scoping for working-note feeds into the dream-pass proposer.
-# Notes whose agent_skill is NOT mapped to the requested domain are
-# excluded so a hiring proposer doesn't get bled-through patterns from
-# fleet-vendor-kyc or fleet-it-access-request. The set is intentionally
-# small: every entry MUST have a corresponding dream-pass SKILL.md
-# under api/server/skills/dream-passes/<domain>/.
-_DOMAIN_AGENT_SKILLS: dict[str, set[str]] = {
-    "hiring": {
-        # Legacy single-skill names
-        "cv-crystalliser",
-        "auto-shortlister",
-        "interview-recommender",
-        "interview_recommender",
-        "jd-drafter",
-        "voice-screener",
-        "betrvg-checker",
-        "sourcing-orchestrator",
-        "jurisdiction-router",
-        # Agentic-segments refactor — any segment of the hiring workflow
-        "hiring-segment-a",
-        "hiring-segment-b",
-        "hiring-segment-c",
-        "hiring-segment-d",
-        "hiring-segment-e",
-        "hiring-segment-f",
-        # Dream-pass agent itself (its own decisions become signal for the next pass)
-        "dream-pass-hiring",
-    },
-}
-
-
-def _agent_in_domain(agent_skill: str | None, domain: str) -> bool:
-    if not agent_skill:
-        return False
-    allowed = _DOMAIN_AGENT_SKILLS.get(domain)
-    if allowed is not None and agent_skill in allowed:
-        return True
-    # Substring fallback: catches generated-domain segments like
-    # hiring-segment-* that won't always be explicitly listed.
-    return domain in agent_skill
+_hiring_rubric_cache: dict[str, Any] = {"v": None}
 
 
 def _load_real_policy():
-    """Load data/policies/dream-pass.policy.yaml so promotion uses the
-    real thresholds (min_delta, min_samples, max_per_pass, flag rules)
-    instead of PromotionPolicy({}) defaults that promote everything."""
     try:
         return PromotionPolicy.from_file(_DREAM_POLICY_YAML)
     except Exception:
@@ -103,41 +50,11 @@ def _load_real_policy():
         return PromotionPolicy({})
 
 
-# Partitioner needs a domain at construction even though it only uses
-# it for log messages — using a sentinel keeps the shared instance
-# valid across all demo domains.
-_DEMO_PARTITIONER_DOMAIN = "__demo__"
-
-
-# Synthetic persona ids handed to the partitioner. The stub experiment
-# runner ignores their semantics; the partitioner just needs ids that
-# aren't already burned in Kuzu. CorpusPartitioner persists used ids to
-# Kuzu across calls, so we generate fresh UUID-keyed ids per pass to
-# guarantee no collision with prior runs — otherwise a fixed pool would
-# be exhausted after one or two passes and every subsequent dream-pass
-# would raise ValueError: insufficient unseen personas.
 def _fresh_demo_persona_ids() -> list[str]:
     return [f"P-DEMO-{uuid.uuid4().hex[:12]}" for _ in range(200)]
 
 
-# Last-resort fallback rubric if the hiring rubric YAML fails to load.
-# Promotion threshold 0.0 makes this obviously-placeholder — never wire
-# this rubric into the real runner.
-_DEMO_RUBRIC = Rubric(
-    domain="__demo__",
-    promotion_threshold=0.0,
-    min_samples=1,
-    checks=(
-        RubricCheck(name="placeholder", kind="rationale_present", weight=1.0),
-    ),
-)
-
-
-_hiring_rubric_cache: dict[str, Any] = {"v": None}
-
-
 def _load_hiring_rubric():
-    """Cached at module level — paid once at first import."""
     if _hiring_rubric_cache["v"] is None:
         try:
             _hiring_rubric_cache["v"] = load_rubric(_HIRING_RUBRIC_YAML)
@@ -147,18 +64,10 @@ def _load_hiring_rubric():
 
 
 def _build_real_hiring_runner(graph_for_scorer) -> ExperimentRunner:
-    """Construct a real ExperimentRunner for hiring.
-
-    Each call to .run() spins a fresh InterviewRecommenderSandbox in a
-    unique temp directory so concurrent passes don't fight for the
-    Kuzu single-writer lock. The scorer reads from the SANDBOX's
-    graph (not the live graph) because that's where the sandboxed
-    interview-recommender wrote its decisions.
-    """
     import tempfile
     import uuid as _uuid
 
-    del graph_for_scorer  # scorer reads from sandbox.graph, not the live graph
+    del graph_for_scorer
     ground_truth = HiringLabelsGroundTruth(_HIRING_LABELS_CSV)
 
     def sandbox_factory() -> InterviewRecommenderSandbox:
@@ -173,18 +82,15 @@ def _build_real_hiring_runner(graph_for_scorer) -> ExperimentRunner:
 
 _DEMO_PROPOSER_CANDIDATES: list[tuple[str, str]] = [
     (
-        "Trigger: candidate lacks recent leadership signal. "
-        "Action: down-weight when role grade is G5 or higher.",
+        "Trigger: candidate lacks recent leadership signal. Action: down-weight when role grade is G5 or higher.",
         "demo seed 1",
     ),
     (
-        "Trigger: jurisdiction is DE and Betriebsrat consultation missing. "
-        "Action: route to gc before any offer.",
+        "Trigger: jurisdiction is DE and Betriebsrat consultation missing. Action: route to gc before any offer.",
         "demo seed 2",
     ),
     (
-        "Trigger: budget already at 90% and headcount delta is positive. "
-        "Action: require finance_bp endorsement.",
+        "Trigger: budget already at 90% and headcount delta is positive. Action: require finance_bp endorsement.",
         "demo seed 3",
     ),
 ]
@@ -195,103 +101,126 @@ def build_demo_orchestrator(
     graph: EntityGraph | None,
     bus: EventBus,
     audit: AuditLogger,
-    lesson_store: InMemoryLessonStore | None = None,
-    working_memory_store: InMemoryWorkingMemoryStore | None = None,
     proposer: Any = None,
     experiment_runner: Any = None,
     rubric: Any = None,
 ) -> DreamPassOrchestrator:
-    """Wire dream-pass with in-memory stores + the default proposer +
-    the real hiring ExperimentRunner. Pass lesson_store /
-    working_memory_store to share singletons across the orchestrator
-    and the read-only memory route; omit them for unit tests and we'll
-    construct fresh ones. Tests without a real Kuzu graph should pass
-    ``experiment_runner=`` explicitly (see
-    ``tests/api/services/dream_pass/_stub_runner.py``)."""
-    lesson_store = lesson_store or InMemoryLessonStore()
-    working_store = working_memory_store or InMemoryWorkingMemoryStore()
-
-    if graph is not None:
-        provenance: Any = KuzuLessonProvenance(graph)
-        partitioner: Any = CorpusPartitioner(graph=graph, domain=_DEMO_PARTITIONER_DOMAIN)
-    else:
-        provenance = _NoopProvenance()
-        partitioner = _NoopPartitioner()
-
-    governor = LessonGovernor(
-        store=lesson_store,
-        kernel=get_kernel,
-        audit=audit,
-        provenance=provenance,
-        actor="operator:demo",
+    del audit
+    partitioner: Any = (
+        CorpusPartitioner(graph=graph, domain=_DEMO_PARTITIONER_DOMAIN)
+        if graph is not None
+        else _NoopPartitioner()
     )
     proposer = proposer if proposer is not None else _build_default_proposer()
-
     if experiment_runner is None:
         experiment_runner = _build_real_hiring_runner(graph)
     if rubric is None:
         rubric = _load_hiring_rubric()
 
-    def _load_active_lessons(domain: str):
-        scope = LessonScope(domain=domain)
-        return list(lesson_store.search(query="", scope=scope, top_k=100))
-
-    def _load_working_notes(agents):
-        # The orchestrator passes a narrow hardcoded ('interview-
-        # recommender',) tuple that doesn't match today's actual
-        # hiring-track LLM agent names. Ignore it and instead filter
-        # to notes whose agent_skill belongs to the "hiring" domain
-        # via _agent_in_domain. The proposer's prompt is scoped to a
-        # single domain at construction (only hiring has a dream-pass
-        # SKILL.md today) so this single-domain filter is sound until
-        # we generalise the orchestrator to thread domain through.
-        # TODO: once multi-domain dream passes ship, derive domain from
-        # skill.domain via the orchestrator API.
-        del agents
-        store = working_store
-        if not hasattr(store, "_by_id"):
-            return []
-        unconsumed = [
-            n for n in store._by_id.values()  # type: ignore[attr-defined]
-            if n.consumed_by_dream_pass is None
-            and _agent_in_domain(getattr(n, "agent_skill", None), "hiring")
-        ]
-        unconsumed.sort(key=lambda n: n.captured_at, reverse=True)
-        return unconsumed[:50]
-
     return DreamPassOrchestrator(
-        governor=governor,
         proposer=proposer,
         partitioner=partitioner,
         experiment_runner=experiment_runner,
         policy=_load_real_policy(),
         list_persona_ids=lambda domain: _fresh_demo_persona_ids(),
         load_cvs=lambda ids: [{"candidate_id": i} for i in ids],
-        load_active_lessons=_load_active_lessons,
         load_recent_runs=lambda domain: [],
-        load_working_notes=_load_working_notes,
         rubric=rubric,
-        mark_working_note_consumed=lambda note_id, dream_pass_id: working_store.mark_consumed(
-            note_id=note_id, dream_pass_id=dream_pass_id,
-        ),
+        persist_promoted_lesson=(lambda lesson: _record_lesson(graph, lesson)) if graph is not None else None,
+        persist_flagged_candidate=(
+            lambda **kwargs: _record_flagged_candidate(graph=graph, **kwargs)
+        ) if graph is not None else None,
         graph=graph,
         bus=bus,
     )
 
 
-def _build_default_proposer():
-    """Construct the runtime-default proposer.
+def _record_lesson(graph: EntityGraph, lesson: Lesson) -> None:
+    graph.query(
+        """
+        MERGE (l:Lesson {id: $id})
+        SET l.body = $body,
+            l.domain = $domain,
+            l.persona_role = $persona_role,
+            l.market = $market,
+            l.status = $status,
+            l.proposed_by = $proposed_by,
+            l.rubric_score_delta = $delta,
+            l.experiment_n = $n,
+            l.promoted_at = $promoted_at,
+            l.supersedes = $supersedes,
+            l.prune_reason = ''
+        """,
+        {
+            "id": lesson.id,
+            "body": lesson.body,
+            "domain": lesson.scope.domain,
+            "persona_role": lesson.scope.persona_role or "",
+            "market": lesson.scope.market or "",
+            "status": lesson.status,
+            "proposed_by": lesson.provenance.proposed_by,
+            "delta": lesson.provenance.rubric_score_delta,
+            "n": lesson.provenance.experiment_n,
+            "promoted_at": lesson.provenance.promoted_at,
+            "supersedes": lesson.supersedes or "",
+        },
+    )
 
-    Prefers GHCPProposer wired to the hiring dream-pass SKILL.md (real
-    LLM-driven candidate distillation). Falls back to StubProposer with
-    the demo seed candidates when GHCP isn't available (no gh auth,
-    sandboxed CI, etc.) so the loop still runs end-to-end with theatre
-    candidates instead of crashing.
-    """
+
+def _record_flagged_candidate(
+    *,
+    graph: EntityGraph,
+    candidate,
+    experiment_id: str,
+    delta: float,
+    n: int,
+    flag_reason: str,
+) -> None:
+    from datetime import datetime, timezone
+
+    graph.query(
+        """
+        MERGE (l:Lesson {id: $id})
+        SET l.body = $body,
+            l.domain = $domain,
+            l.persona_role = $persona_role,
+            l.market = $market,
+            l.status = 'candidate',
+            l.proposed_by = $proposed_by,
+            l.rubric_score_delta = $delta,
+            l.experiment_n = $n,
+            l.promoted_at = $now,
+            l.supersedes = '',
+            l.prune_reason = $flag_reason
+        """,
+        {
+            "id": candidate.id,
+            "body": candidate.body,
+            "domain": candidate.scope.domain,
+            "persona_role": candidate.scope.persona_role or "",
+            "market": candidate.scope.market or "",
+            "proposed_by": candidate.proposed_by,
+            "delta": delta,
+            "n": n,
+            "flag_reason": flag_reason,
+            "now": datetime.now(timezone.utc),
+        },
+    )
+    graph.query(
+        """
+        MERGE (e:Experiment {id: $eid})
+        WITH e
+        MATCH (l:Lesson {id: $lid})
+        CREATE (e)-[:EXPERIMENT_FOR_LESSON {recorded_at: $now}]->(l)
+        """,
+        {"eid": experiment_id, "lid": candidate.id, "now": datetime.now(timezone.utc)},
+    )
+
+
+def _build_default_proposer():
     try:
         from api.server.services.dream_pass.proposer import GHCPProposer
         from api.server.services.dream_pass.skill_loader import dream_skill_path
-        # GHCPProposer takes the *directory* containing SKILL.md.
         skill_path = dream_skill_path("hiring")
         skill_dir = skill_path.parent if hasattr(skill_path, "parent") else None
         if skill_dir is None or not (skill_dir / "SKILL.md").exists():
@@ -305,25 +234,6 @@ def _build_default_proposer():
             ex,
         )
         return StubProposer(candidates=list(_DEMO_PROPOSER_CANDIDATES))
-
-
-class _NoopProvenance:
-    """Used when graph is None (unit-test path). Mirrors every method
-    LessonGovernor calls on its provenance so the no-graph path can't
-    AttributeError if the policy ever flips a verdict to flagged/prune."""
-
-    def record(self, lesson) -> None:
-        del lesson
-
-    def mark_pruned(self, lesson_id: str, *, reason: str) -> None:
-        del lesson_id, reason
-
-    def record_candidate(self, **kwargs) -> None:
-        del kwargs
-
-    def fetch_candidate(self, lesson_id: str):
-        del lesson_id
-        return None
 
 
 class _NoopPartitioner:

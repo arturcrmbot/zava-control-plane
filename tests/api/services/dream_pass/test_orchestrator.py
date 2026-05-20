@@ -22,9 +22,9 @@ def skill() -> DreamSkill:
 
 @pytest.mark.asyncio
 async def test_full_pass_promotes_winners_and_rejects_losers(skill: DreamSkill) -> None:
-    governor = MagicMock()
     partitioner = MagicMock()
     partitioner.next_split.return_value = MagicMock(held_out_ids=('C-001', 'C-002'))
+    persisted: list[object] = []
 
     async def fake_run_experiment(*, experiment_id, candidate_lesson_id, candidate_body, cvs, active_lessons, rubric):
         if 'winner' in candidate_body:
@@ -54,17 +54,15 @@ async def test_full_pass_promotes_winners_and_rejects_losers(skill: DreamSkill) 
     )
 
     orchestrator = DreamPassOrchestrator(
-        governor=governor,
         proposer=proposer,
         partitioner=partitioner,
         experiment_runner=experiment_runner,
         policy=policy,
         list_persona_ids=lambda domain: ['C-001', 'C-002', 'C-003'],
         load_cvs=lambda ids: [{'candidate_id': candidate_id} for candidate_id in ids],
-        load_active_lessons=lambda domain: [],
         load_recent_runs=lambda domain: [{'workflow_id': 'WF-RECENT-1'}],
-        load_working_notes=lambda agents: [],
         rubric=MagicMock(min_samples=40),
+        persist_promoted_lesson=persisted.append,
     )
 
     result = await orchestrator.run_pass(skill=skill, sample_size=2)
@@ -73,8 +71,8 @@ async def test_full_pass_promotes_winners_and_rejects_losers(skill: DreamSkill) 
     assert len(result.experiments) == 2
     assert len(result.promoted_lesson_ids) == 1
     assert len(result.rejected_lesson_ids) == 1
-    governor.write.assert_called_once()
-    written = governor.write.call_args[0][0]
+    assert len(persisted) == 1
+    written = persisted[0]
     assert written.body == 'winner lesson'
     assert written.provenance.rubric_score_delta == pytest.approx(0.10)
     assert written.provenance.experiment_n == 40
@@ -82,7 +80,6 @@ async def test_full_pass_promotes_winners_and_rejects_losers(skill: DreamSkill) 
 
 @pytest.mark.asyncio
 async def test_skill_max_experiments_caps_loop(skill: DreamSkill) -> None:
-    governor = MagicMock()
     partitioner = MagicMock()
     partitioner.next_split.return_value = MagicMock(held_out_ids=('C-001',))
     experiment_runner = MagicMock()
@@ -108,16 +105,13 @@ async def test_skill_max_experiments_caps_loop(skill: DreamSkill) -> None:
     )
 
     orchestrator = DreamPassOrchestrator(
-        governor=governor,
         proposer=proposer,
         partitioner=partitioner,
         experiment_runner=experiment_runner,
         policy=policy,
         list_persona_ids=lambda domain: ['C-001', 'C-002', 'C-003'],
         load_cvs=lambda ids: [{'candidate_id': candidate_id} for candidate_id in ids],
-        load_active_lessons=lambda domain: [],
         load_recent_runs=lambda domain: [],
-        load_working_notes=lambda agents: [],
         rubric=MagicMock(min_samples=40),
     )
     result = await orchestrator.run_pass(skill=skill_capped, sample_size=1)

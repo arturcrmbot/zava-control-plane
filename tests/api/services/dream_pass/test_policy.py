@@ -6,7 +6,7 @@ import pytest
 
 from api.server.services.dream_pass.policy import PromotionPolicy
 from api.server.services.dream_pass.types import Experiment
-from api.server.services.lessons.types import LessonCandidate, LessonScope
+from api.server.services.dream_pass.types import LessonCandidate, LessonScope
 
 
 @pytest.fixture

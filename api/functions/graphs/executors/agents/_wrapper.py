@@ -80,59 +80,6 @@ def _memory_recall_url() -> str:
     return urlunsplit((parts.scheme, parts.netloc, "/api/memory/v2/recall", "", ""))
 
 
-async def _fetch_top_k_lessons(*, domain: str, query: str, top_k: int = 3) -> list[dict]:
-    """Top-K semantically-relevant lessons for ``query`` in ``domain``.
-    30s in-process cache keyed on (domain, query); tolerant of network
-    errors (returns [])."""
-    now = time.monotonic()
-    cache_key = f"{domain}::{query}"
-    cached = _lesson_cache.get(cache_key)
-    if cached is not None and now - cached[0] < _LESSON_CACHE_TTL_S:
-        return cached[1]
-    try:
-        async with httpx.AsyncClient() as c:
-            r = await c.post(
-                _memory_recall_url(),
-                json={"domain": domain, "query": query, "top_k": top_k},
-                timeout=3.0,
-            )
-            if r.status_code != 200:
-                _lesson_cache[cache_key] = (now, [])
-                return []
-            payload = r.json()
-            items = payload.get("items")
-            if items is None:
-                items = [
-                    {
-                        "id": str(m.get("id")),
-                        "body": str(m.get("memory") or ""),
-                        "score": float(m.get("score") or 0.0),
-                    }
-                    for m in (payload.get("memories") or [])
-                ]
-            slim = [
-                {"id": str(l.get("id")), "body": str(l.get("body") or ""),
-                 "score": float(l.get("score") or 0.0)}
-                for l in items[:top_k] if l.get("body")
-            ]
-            _lesson_cache[cache_key] = (now, slim)
-            return slim
-    except Exception:
-        _lesson_cache[cache_key] = (now, [])
-        return []
-
-
-def _prepend_lessons_to_skill_text(skill_text: str | None, lessons: list[dict]) -> str | None:
-    """Prepend a '## Past lessons' section to the skill_text. Returns
-    skill_text unchanged when lessons is empty."""
-    if not lessons:
-        return skill_text
-    header = "## Past lessons\n\n"
-    bullets = "\n".join(f"- {l['body']}" for l in lessons)
-    block = header + bullets + "\n\n---\n\n"
-    return block + (skill_text or "")
-
-
 def _prepend_memories_to_skill_text(skill_text: str | None, memories: list[dict]) -> str | None:
     """Prepend relevant memories to the agent's system prompt."""
     if not memories or not skill_text:
@@ -497,23 +444,6 @@ async def run_agent_session(
     try:
         from api.functions.webhook import emit as _webhook_emit
         await _webhook_emit(workflow_id or "?", workflow_id, "agent.completed", payload)
-    except Exception:
-        pass
-
-    # Working memory capture (B1 Task 13). Passive subscriber to the
-    # agent.completed signal; never raises into the agent runtime so a
-    # backend outage on mem0 cannot break a hiring workflow.
-    try:
-        from api.server.services.lessons.working_memory_capture import (
-            get_default_capture,
-        )
-        get_default_capture().on_agent_completed(
-            workflow_id=workflow_id,
-            agent_skill=agent_name,
-            response_text=str(text or ""),
-            tool_calls=tool_calls_collected,
-            used_lesson_ids=used_lesson_ids,
-        )
     except Exception:
         pass
 
