@@ -499,6 +499,45 @@ async def constellation_start():
 # === END constellation-mode ===
 
 
+@router.post("/dream-storm")
+async def dream_storm(
+    domains: str = "hiring",
+    runs: int = 3,
+    sample: int = 10,
+):
+    """Fire ``runs`` dream passes per domain in ``domains`` (comma-separated)
+    back-to-back. Demo-only: lets the operator fill the Memory page
+    timeline in seconds rather than waiting for the autonomous cadence.
+
+    Unknown domains do not 500 — they emit an ``error`` row in the
+    response so a partial multi-domain storm still completes.
+    """
+    from api.server.services.dream_pass.skill_loader import (
+        DreamSkillLoadError, dream_skill_path, load_dream_skill,
+    )
+    dom_list = [d.strip() for d in domains.split(",") if d.strip()]
+    passes: list[dict] = []
+    for dom in dom_list:
+        try:
+            skill = load_dream_skill(dream_skill_path(dom))
+        except (DreamSkillLoadError, FileNotFoundError) as ex:
+            passes.append({"domain": dom, "error": str(ex)})
+            continue
+        for _ in range(max(1, int(runs))):
+            result = await app_state.dream_pass_orchestrator.run_pass(
+                skill=skill, sample_size=sample,
+            )
+            passes.append({
+                "dream_pass_id": result.dream_pass_id,
+                "domain": result.domain,
+                "promoted": len(result.promoted_lesson_ids),
+                "rejected": len(result.rejected_lesson_ids),
+                "flagged": len(result.flagged_lesson_ids),
+                "experiments_run": len(result.experiments),
+            })
+    return {"ok": True, "count": len(passes), "passes": passes}
+
+
 # Ralph-loop helper — seed every function FM's KPIs with synthetic
 # values so the building's KPI tickers read as populated for the
 # demo / smoke. Idempotent. Safe to call repeatedly.
