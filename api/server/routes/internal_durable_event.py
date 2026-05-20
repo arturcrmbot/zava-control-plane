@@ -655,34 +655,38 @@ async def receive_durable_event(
             end_ms=end_ms,
             attributes=attrs,
         ))
-        # Working-memory capture bridge — see Memory Layer Visualisation
-        # plan. The Functions-host wrapper calls WorkingMemoryCapture
-        # locally too, but that writes into the Functions process's own
-        # _DEFAULT store, invisible to this process's /api/memory route.
-        # Re-capture here from the same payload so the FastAPI process's
-        # app_state.working_memory_store sees LLM agent activity.
+        skill_label = str(payload.get("agent_label") or "unknown")
+        domain = None
         try:
-            from api.server.services.lessons.working_memory_capture import (
-                WorkingMemoryCapture,
-            )
-            WorkingMemoryCapture(store=app_state.working_memory_store).on_agent_completed(
-                workflow_id=wid,
-                agent_skill=str(payload.get("agent_label") or "unknown"),
-                response_text=str(payload.get("response_text") or ""),
-                tool_calls=payload.get("tool_calls") or [],
-                used_lesson_ids=payload.get("used_lesson_ids") or [],
-            )
+            from api.functions.graphs.executors.agents._wrapper import _skill_to_domain
+
+            domain = _skill_to_domain(skill_label, skill_label.replace("_", "-"))
         except Exception:
-            log.exception("agent.completed: working-memory capture bridge failed")
+            log.exception("agent.completed: domain mapping failed")
+
+        # Memory capture — write agent output to the per-domain Mem0 store.
+        # Mem0's infer=True extracts what's worth remembering automatically.
+        try:
+            if domain and domain in app_state.domain_memories:
+                response = str(payload.get("response_text") or "")
+                tool_calls = payload.get("tool_calls") or []
+                tool_summary = "; ".join(
+                    f"called {tc.get('tool', '?')}" for tc in tool_calls[:5]
+                )
+                text = f"Agent {skill_label} (workflow {wid}): {response}"
+                if tool_summary:
+                    text += f"\nTools used: {tool_summary}"
+                app_state.domain_memories[domain].add(
+                    text=text,
+                    agent_skill=skill_label,
+                    workflow_id=wid,
+                )
+        except Exception:
+            log.exception("agent.completed: memory capture failed")
         # Cost-budget bridge: attribute token spend to the dream-pass
         # domain so the in-process hard stop can fire. Never raises —
         # cost accounting must not break the durable-event bridge.
         try:
-            from api.functions.graphs.executors.agents._wrapper import (
-                _skill_to_domain,
-            )
-            skill_label = payload.get("agent_label")
-            domain = _skill_to_domain(skill_label, skill_label)
             if domain and (int(in_tok) or int(out_tok)):
                 app_state.cost_budget.record(
                     domain=domain,
