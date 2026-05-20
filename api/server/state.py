@@ -177,6 +177,15 @@ class AppState:
         # behind the demo defaults (stub experiment runner, etc.).
         self.lesson_store = InMemoryLessonStore()
         self.working_memory_store = InMemoryWorkingMemoryStore()
+        # Wire the agent-runtime working-memory capture singleton to our
+        # shared store so LLM agent completions (via run_agent_session)
+        # land in the same buffer the /memory page reads from. Without
+        # this, get_default_capture() lazily creates its own private
+        # store and every captured note is invisible to the Memory page.
+        from api.server.services.lessons.working_memory_capture import (
+            WorkingMemoryCapture, set_default_capture,
+        )
+        set_default_capture(WorkingMemoryCapture(store=self.working_memory_store))
         self._dream_pass_orchestrator: "DreamPassOrchestrator | None" = None
 
     @property

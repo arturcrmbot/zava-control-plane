@@ -655,6 +655,24 @@ async def receive_durable_event(
             end_ms=end_ms,
             attributes=attrs,
         ))
+        # Working-memory capture bridge — see Memory Layer Visualisation
+        # plan. The Functions-host wrapper calls WorkingMemoryCapture
+        # locally too, but that writes into the Functions process's own
+        # _DEFAULT store, invisible to this process's /api/memory route.
+        # Re-capture here from the same payload so the FastAPI process's
+        # app_state.working_memory_store sees LLM agent activity.
+        try:
+            from api.server.services.lessons.working_memory_capture import (
+                WorkingMemoryCapture,
+            )
+            WorkingMemoryCapture(store=app_state.working_memory_store).on_agent_completed(
+                workflow_id=wid,
+                agent_skill=str(payload.get("agent_label") or "unknown"),
+                response_text=str(payload.get("response_text") or ""),
+                tool_calls=payload.get("tool_calls") or [],
+            )
+        except Exception:
+            log.exception("agent.completed: working-memory capture bridge failed")
         _emit("agent.completed", wid, **payload)
 
     elif body.kind == "workflow.completed":
