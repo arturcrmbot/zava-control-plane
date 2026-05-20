@@ -107,3 +107,73 @@ def test_prune_marks_via_mem0_update(make_lesson, fake_memory) -> None:
 def _serialise(lesson) -> dict[str, Any]:
     from api.server.services.lessons.mem0_store import _serialise_lesson
     return _serialise_lesson(lesson)
+
+
+def test_build_default_memory_raises_when_endpoint_missing(monkeypatch) -> None:
+    """When AZURE_OPENAI_ENDPOINT is unset, build_default_memory raises
+    RuntimeError. state.py catches and falls back to InMemoryLessonStore
+    so the substrate boots without persistence rather than crashing."""
+    from api.server.services.lessons.mem0_store import build_default_memory
+
+    monkeypatch.delenv("AZURE_OPENAI_ENDPOINT", raising=False)
+    monkeypatch.setenv("AZURE_OPENAI_EMBED_DEPLOYMENT", "text-embedding-3-large")
+    with pytest.raises(RuntimeError, match="AZURE_OPENAI_ENDPOINT"):
+        build_default_memory()
+
+
+def test_build_default_memory_raises_when_embed_deployment_missing(monkeypatch) -> None:
+    from api.server.services.lessons.mem0_store import build_default_memory
+
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com")
+    monkeypatch.delenv("AZURE_OPENAI_EMBED_DEPLOYMENT", raising=False)
+    with pytest.raises(RuntimeError, match="AZURE_OPENAI_EMBED_DEPLOYMENT"):
+        build_default_memory()
+
+
+def test_build_default_memory_assembles_azure_chroma_config(monkeypatch, tmp_path) -> None:
+    """The default Mem0 config wires Azure OpenAI for LLM + embedder and
+    file-backed Chroma for the vector store under data/portal/mem0/chroma/
+    (overridable via MEM0_CHROMA_DIR). We assert the dict shape passed to
+    Memory.from_config instead of constructing a real Memory — that needs
+    az login and is covered by the @pytest.mark.foundry integration test."""
+    from api.server.services.lessons import mem0_store
+
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com")
+    monkeypatch.setenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+    monkeypatch.setenv("AZURE_OPENAI_EMBED_DEPLOYMENT", "text-embedding-3-large")
+    monkeypatch.setenv("AZURE_OPENAI_API_VERSION", "2024-10-21")
+    monkeypatch.setenv("MEM0_CHROMA_DIR", str(tmp_path / "chroma"))
+
+    captured: dict[str, Any] = {}
+
+    class _FakeMemory:
+        @classmethod
+        def from_config(cls, config):
+            captured["config"] = config
+            return MagicMock(name="FakeMemory")
+
+    monkeypatch.setattr("mem0.Memory", _FakeMemory)
+
+    mem0_store.build_default_memory()
+
+    config = captured["config"]
+    assert config["llm"]["provider"] == "azure_openai"
+    assert config["llm"]["config"]["model"] == "gpt-4o"
+    assert config["llm"]["config"]["azure_kwargs"]["azure_deployment"] == "gpt-4o"
+    assert config["llm"]["config"]["azure_kwargs"]["azure_endpoint"] == (
+        "https://example.openai.azure.com"
+    )
+
+    assert config["embedder"]["provider"] == "azure_openai"
+    assert config["embedder"]["config"]["model"] == "text-embedding-3-large"
+    assert config["embedder"]["config"]["embedding_dims"] == 3072
+    assert config["embedder"]["config"]["azure_kwargs"]["azure_deployment"] == (
+        "text-embedding-3-large"
+    )
+
+    assert config["vector_store"]["provider"] == "chroma"
+    assert config["vector_store"]["config"]["collection_name"] == "lesson_store"
+    assert config["vector_store"]["config"]["path"] == str(tmp_path / "chroma")
+    # Directory should be created eagerly so a fresh checkout boots without
+    # needing the operator to mkdir first.
+    assert (tmp_path / "chroma").exists()

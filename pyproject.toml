@@ -69,6 +69,11 @@ dependencies = [
   # itself is pinned ==1.0.1 above so the prerelease flag cannot float it
   # forward into the broken 1.4.0 packaging.
   "mem0ai>=0.1.115,<0.2",
+  # chromadb — file-backed vector store used by Mem0LessonStore so lessons
+  # survive FastAPI restarts. We configure Mem0 with Azure OpenAI for the
+  # LLM/embedder and Chroma for persistence; see api/server/services/lessons/
+  # mem0_store.py:build_default_memory and data/portal/mem0/ on disk.
+  "chromadb>=0.5,<1.0",
   # Faker — synthetic Person names for the data fabric employee generator
   # (plan/feature-enterprise-pitch-readiness-1.md task pitch-b2). Used at
   # demo-data generation time only; no runtime dependency on user data.

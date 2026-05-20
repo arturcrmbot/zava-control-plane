@@ -7,8 +7,10 @@ from agent code.
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Protocol
 
 from api.server.services.lessons.types import (
@@ -18,6 +20,78 @@ from api.server.services.lessons.types import (
 )
 
 _USER_ID = "lesson-store"
+
+
+def build_default_memory() -> Any:
+    """Build a `mem0.Memory` wired to Azure OpenAI + file-backed Chroma.
+
+    - LLM: `azure_openai` pointing at AZURE_OPENAI_DEPLOYMENT (gpt-4o).
+      Only invoked if `infer=True`; this store always passes `infer=False`,
+      so the LLM client is constructed but never called.
+    - Embedder: `azure_openai` pointing at AZURE_OPENAI_EMBED_DEPLOYMENT
+      (text-embedding-3-large, 3072 dims).
+    - Vector store: `chroma`, persisted to `data/portal/mem0/chroma/` so
+      lessons survive `make down && make up`.
+    - Auth: when no `*_API_KEY` is set, mem0's Azure client falls back to
+      `DefaultAzureCredential` automatically (key-based auth is disabled
+      on our Cognitive Services account by tenant policy).
+
+    Raises:
+        RuntimeError if AZURE_OPENAI_ENDPOINT or AZURE_OPENAI_EMBED_DEPLOYMENT
+        are missing — caller (state.py) catches and falls back to
+        InMemoryLessonStore with a loud warning.
+    """
+    from mem0 import Memory
+
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+    llm_deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
+    embed_deployment = os.getenv("AZURE_OPENAI_EMBED_DEPLOYMENT")
+    api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21")
+    if not endpoint:
+        raise RuntimeError("AZURE_OPENAI_ENDPOINT not set")
+    if not embed_deployment:
+        raise RuntimeError("AZURE_OPENAI_EMBED_DEPLOYMENT not set")
+
+    chroma_dir = Path(os.getenv("MEM0_CHROMA_DIR", "data/portal/mem0/chroma"))
+    chroma_dir.mkdir(parents=True, exist_ok=True)
+
+    azure_kwargs = {
+        "azure_deployment": llm_deployment,
+        "azure_endpoint": endpoint,
+        "api_version": api_version,
+        "api_key": "",
+    }
+    embed_azure_kwargs = {
+        "azure_deployment": embed_deployment,
+        "azure_endpoint": endpoint,
+        "api_version": api_version,
+        "api_key": "",
+    }
+    config = {
+        "llm": {
+            "provider": "azure_openai",
+            "config": {
+                "model": llm_deployment,
+                "azure_kwargs": azure_kwargs,
+            },
+        },
+        "embedder": {
+            "provider": "azure_openai",
+            "config": {
+                "model": embed_deployment,
+                "embedding_dims": 3072,
+                "azure_kwargs": embed_azure_kwargs,
+            },
+        },
+        "vector_store": {
+            "provider": "chroma",
+            "config": {
+                "collection_name": "lesson_store",
+                "path": str(chroma_dir),
+            },
+        },
+    }
+    return Memory.from_config(config)
 
 
 class _MemoryLike(Protocol):
@@ -37,6 +111,13 @@ class _MemoryLike(Protocol):
         filters: dict[str, Any],
         limit: int,
     ) -> Any: ...
+    def get_all(
+        self,
+        *,
+        user_id: str,
+        filters: dict[str, Any],
+        limit: int,
+    ) -> Any: ...
     def delete(self, *, memory_id: str) -> Any: ...
 
 
@@ -50,8 +131,7 @@ class Mem0LessonStore:
 
     def __init__(self, *, memory: _MemoryLike | None = None) -> None:
         if memory is None:
-            from mem0 import Memory
-            memory = Memory()
+            memory = build_default_memory()
         self._memory = memory
 
     def add(self, lesson: Lesson) -> None:
@@ -83,12 +163,25 @@ class Mem0LessonStore:
         scope: LessonScope,
         top_k: int = 5,
     ) -> list[Lesson]:
-        results = self._memory.search(
-            query=query,
-            user_id=_USER_ID,
-            filters={"domain": scope.domain},
-            limit=top_k,
-        )
+        # Mem0.search runs the query through the embedder; Azure OpenAI
+        # rejects empty input strings with HTTP 400. Route "list all"
+        # calls (query="") through Memory.get_all instead, which does
+        # not invoke the embedder. Callers like /api/memory/lessons/active
+        # rely on this no-query path; semantic recall passes a real query
+        # and uses the normal search path.
+        if query.strip():
+            results = self._memory.search(
+                query=query,
+                user_id=_USER_ID,
+                filters={"domain": scope.domain},
+                limit=top_k,
+            )
+        else:
+            results = self._memory.get_all(
+                user_id=_USER_ID,
+                filters={"domain": scope.domain},
+                limit=top_k,
+            )
         lessons: list[Lesson] = []
         for result in (results or {}).get("results", []):
             metadata = result.get("metadata") or {}
