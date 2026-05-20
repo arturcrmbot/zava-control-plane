@@ -425,6 +425,7 @@ from api.server.routes.demo_triggers import router as demo_triggers_router
 from api.server.routes.ticker import router as ticker_router
 # Memory layer visualisation — read-only memory query API.
 from api.server.routes.memory import router as memory_router
+from api.server.routes.memory_v2 import router as memory_v2_router
 # Per-lesson observability — D1.
 from api.server.routes.memory_lesson_stats import router as memory_lesson_stats_router
 
@@ -460,7 +461,8 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           dream_pass_run_router,
           dream_pass_pause_router,
           memory_lesson_stats_router,
-          memory_router):
+          memory_router,
+          memory_v2_router):
     app.include_router(r)
 
 # Mount the built blueprint Vite bundle if present (production deploy).

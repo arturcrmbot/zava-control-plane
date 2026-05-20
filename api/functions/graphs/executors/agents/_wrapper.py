@@ -73,11 +73,11 @@ _lesson_cache: dict[str, tuple[float, list[dict]]] = {}
 
 
 def _memory_recall_url() -> str:
-    """POST /api/memory/lessons/recall — top-K semantic retrieval."""
+    """POST /api/memory/v2/recall — semantic memory retrieval."""
     base = os.getenv("FASTAPI_WEBHOOK_URL", "http://localhost:3101/internal/durable-event")
     from urllib.parse import urlsplit, urlunsplit
     parts = urlsplit(base)
-    return urlunsplit((parts.scheme, parts.netloc, "/api/memory/lessons/recall", "", ""))
+    return urlunsplit((parts.scheme, parts.netloc, "/api/memory/v2/recall", "", ""))
 
 
 async def _fetch_top_k_lessons(*, domain: str, query: str, top_k: int = 3) -> list[dict]:
@@ -99,7 +99,17 @@ async def _fetch_top_k_lessons(*, domain: str, query: str, top_k: int = 3) -> li
             if r.status_code != 200:
                 _lesson_cache[cache_key] = (now, [])
                 return []
-            items = r.json().get("items") or []
+            payload = r.json()
+            items = payload.get("items")
+            if items is None:
+                items = [
+                    {
+                        "id": str(m.get("id")),
+                        "body": str(m.get("memory") or ""),
+                        "score": float(m.get("score") or 0.0),
+                    }
+                    for m in (payload.get("memories") or [])
+                ]
             slim = [
                 {"id": str(l.get("id")), "body": str(l.get("body") or ""),
                  "score": float(l.get("score") or 0.0)}
@@ -121,6 +131,43 @@ def _prepend_lessons_to_skill_text(skill_text: str | None, lessons: list[dict]) 
     bullets = "\n".join(f"- {l['body']}" for l in lessons)
     block = header + bullets + "\n\n---\n\n"
     return block + (skill_text or "")
+
+
+def _prepend_memories_to_skill_text(skill_text: str | None, memories: list[dict]) -> str | None:
+    """Prepend relevant memories to the agent's system prompt."""
+    if not memories or not skill_text:
+        return skill_text
+    header = "## Relevant memories from prior cases\n\n"
+    lines = [f"- {m.get('memory', '')}" for m in memories if m.get("memory")]
+    if not lines:
+        return skill_text
+    return header + "\n".join(lines) + "\n\n---\n\n" + skill_text
+
+
+async def _fetch_memories(*, domain: str, query: str, top_k: int = 5) -> list[dict]:
+    """Fetch semantically-relevant memories for this agent invocation.
+    30s in-process cache keyed on (domain, query)."""
+    now = time.monotonic()
+    cache_key = f"{domain}::{query}"
+    cached = _lesson_cache.get(cache_key)
+    if cached is not None and now - cached[0] < _LESSON_CACHE_TTL_S:
+        return cached[1]
+    try:
+        async with httpx.AsyncClient() as c:
+            r = await c.post(
+                _memory_recall_url(),
+                json={"domain": domain, "query": query, "top_k": top_k},
+                timeout=3.0,
+            )
+            if r.status_code != 200:
+                _lesson_cache[cache_key] = (now, [])
+                return []
+            items = r.json().get("memories") or []
+            _lesson_cache[cache_key] = (now, items)
+            return items
+    except Exception:
+        _lesson_cache[cache_key] = (now, [])
+        return []
 
 
 def _skill_to_domain(skill_label: str | None, skill_dir_name: str | None) -> str | None:
@@ -308,16 +355,16 @@ async def run_agent_session(
     # to the system message so the agent benefits from past learning.
     domain = _skill_to_domain(skill_label, skill_dir.name if skill_dir else None)
     if domain:
-        # Build a context query from what we know about this invocation.
-        # The prompt itself is the most direct signal; truncate so we
-        # don't send a 50KB system message as a search query.
         query_seed = f"skill={skill_label or '?'} domain={domain} prompt={(prompt or '')[:240]}"
-        active_lessons: list[dict] = await _fetch_top_k_lessons(
-            domain=domain, query=query_seed, top_k=3,
-        )
+        memories = await _fetch_memories(domain=domain, query=query_seed, top_k=5)
     else:
-        active_lessons = []
-    skill_text = _prepend_lessons_to_skill_text(skill_text, active_lessons)
+        memories = []
+    skill_text = _prepend_memories_to_skill_text(skill_text, memories)
+    used_lesson_ids = [
+        (str(m.get("id")), str(m.get("memory") or "")[:80])
+        for m in memories
+        if m.get("id") and m.get("memory")
+    ]
     # SDK skill auto-discovery uses the union of skill_dir (primary,
     # drives SKILL.md system-message loading + span tagging) and any
     # extra skill_directories the caller passes. Dedup preserves order
@@ -440,7 +487,7 @@ async def run_agent_session(
         "model": model,
         "skill_chars": len(skill_text) if skill_text else 0,
         "attachment_count": len(attachments) if attachments else 0,
-        "used_lesson_ids": [(l["id"], l["body"][:80]) for l in active_lessons],
+        "used_lesson_ids": used_lesson_ids,
         "usage": {
             "input_tokens": int(in_tok) if in_tok is not None else None,
             "output_tokens": int(out_tok) if out_tok is not None else None,
@@ -465,7 +512,7 @@ async def run_agent_session(
             agent_skill=agent_name,
             response_text=str(text or ""),
             tool_calls=tool_calls_collected,
-            used_lesson_ids=[(l["id"], l["body"][:80]) for l in active_lessons],
+            used_lesson_ids=used_lesson_ids,
         )
     except Exception:
         pass
