@@ -19,7 +19,7 @@
     "demo:mcp:agency": "concurrently -k -n sfdc,mocean,prsma,knsso,sap,wday,dsign \"tsx mocks/salesforce-mcp/server.ts\" \"tsx mocks/mediaocean-mcp/server.ts\" \"tsx mocks/prisma-mcp/server.ts\" \"tsx mocks/kinesso-mcp/server.ts\" \"tsx mocks/sap-s4-finance-mcp/server.ts\" \"tsx mocks/workday-hcm-mcp/server.ts\" \"tsx mocks/docusign-mcp/server.ts\"",
     "demo:ui": "vite preview --host 0.0.0.0 --port 5273",
     "demo:portal": "npm --prefix web/portal run preview -- --host 0.0.0.0 --port 5274",
-    "demo:blueprint": "npm --prefix web/blueprint run preview -- --host 0.0.0.0 --port 5275",
+    "demo:blueprint": "npm --prefix web/blueprint run dev -- --host 0.0.0.0 --port 5275",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
