@@ -396,6 +396,26 @@ class AppState:
         except RuntimeError:
             pass
 
+        cadence_secs = int(os.getenv("DREAM_PASS_DEMO_CADENCE_SECONDS", "0") or "0")
+        cadence_domains = tuple(
+            d.strip() for d in os.getenv(
+                "DREAM_PASS_DEMO_CADENCE_DOMAINS", "hiring",
+            ).split(",") if d.strip()
+        )
+        if cadence_secs > 0:
+            try:
+                import asyncio as _asyncio
+                _asyncio.get_running_loop()
+                self._cadence_tasks.append(
+                    _asyncio.create_task(_run_dream_pass_cadence(
+                        self.dream_pass_orchestrator,
+                        domains=cadence_domains,
+                        interval_seconds=cadence_secs,
+                    ))
+                )
+            except RuntimeError:
+                pass
+
     async def _run_cadence(self, cadence) -> None:
         """One asyncio task per cadence — sleeps until next cron tick,
         dispatches to the named ambient agent, emits ``cadence.tick``
@@ -443,6 +463,42 @@ class AppState:
             except Exception as ex:  # pragma: no cover — defensive
                 log.warning("cadence %s loop error: %s", cadence.name, ex)
                 await _asyncio.sleep(1.0)
+
+
+async def _run_dream_pass_cadence(
+    orchestrator,
+    *,
+    domains: tuple[str, ...],
+    interval_seconds: int,
+) -> None:
+    """Optional autonomous loop firing one dream pass per domain on a
+    fixed wall-clock interval. Off unless ``DREAM_PASS_DEMO_CADENCE_SECONDS``
+    is a positive int. Sleeps cancel cleanly; failures of one domain do
+    not block the next or the next interval.
+    """
+    import asyncio as _asyncio
+    import logging as _log
+    if interval_seconds <= 0:
+        return
+    from api.server.services.dream_pass.skill_loader import (
+        DreamSkillLoadError, dream_skill_path, load_dream_skill,
+    )
+    log = _log.getLogger(__name__)
+    while True:
+        for dom in domains:
+            try:
+                skill = load_dream_skill(dream_skill_path(dom))
+            except (DreamSkillLoadError, FileNotFoundError) as ex:
+                log.warning("dream cadence: skill for %s missing (%s)", dom, ex)
+                continue
+            try:
+                await orchestrator.run_pass(skill=skill, sample_size=10)
+            except Exception:
+                log.exception("dream cadence: pass for %s failed", dom)
+        try:
+            await _asyncio.sleep(interval_seconds)
+        except _asyncio.CancelledError:
+            return
 
 
 app_state = AppState()
