@@ -6,6 +6,16 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 
 from api.server.services.dream_pass.experiment import ExperimentRunner
+from api.server.services.event_bus import EventBus
+from api.shared.dream_events import (
+    DREAM_EXPERIMENT_SCORED,
+    DREAM_LESSON_PROMOTED,
+    DREAM_LESSON_REJECTED,
+    DREAM_PASS_FINISHED,
+    DREAM_PASS_STARTED,
+    DREAM_PROPOSAL_GENERATED,
+)
+from api.shared.events import FleetEvent
 from api.server.services.dream_pass.partitioner import CorpusPartitioner
 from api.server.services.dream_pass.policy import PromotionPolicy
 from api.server.services.dream_pass.proposer import LessonProposer, ProposalContext
@@ -35,6 +45,7 @@ class DreamPassOrchestrator:
         rubric: Rubric,
         mark_working_note_consumed: Callable[[str, str], None] | None = None,
         graph: EntityGraph | None = None,
+        bus: EventBus | None = None,
     ) -> None:
         self._governor = governor
         self._proposer = proposer
@@ -49,6 +60,19 @@ class DreamPassOrchestrator:
         self._rubric = rubric
         self._mark_working_note_consumed = mark_working_note_consumed
         self._graph = graph
+        self._bus = bus
+
+    def _emit(self, event_type: str, payload: dict[str, Any]) -> None:
+        """Fire-and-forget bus emit. Silent when no bus configured (tests)."""
+        if self._bus is None:
+            return
+        try:
+            self._bus.emit(FleetEvent(type=event_type, **payload))
+        except Exception:  # pragma: no cover — never let observability break the loop
+            import logging
+            logging.getLogger(__name__).warning(
+                "dream-pass: bus emit failed for %s", event_type, exc_info=True,
+            )
 
     async def run_pass(self, *, skill: DreamSkill, sample_size: int) -> DreamPassResult:
         dream_pass_id = f'dream-pass:{skill.domain}:{uuid.uuid4()}'
@@ -74,8 +98,25 @@ class DreamPassOrchestrator:
             domain=skill.domain,
             skill_version=skill.version,
         )
+        self._emit(
+            DREAM_PASS_STARTED,
+            {
+                'workflow_id': dream_pass_id,
+                'domain': skill.domain,
+                'skill_version': skill.version,
+            },
+        )
 
         for candidate in candidates[: skill.max_candidates_per_pass]:
+            self._emit(
+                DREAM_PROPOSAL_GENERATED,
+                {
+                    'workflow_id': dream_pass_id,
+                    'domain': skill.domain,
+                    'candidate_lesson_id': candidate.id,
+                    'body_preview': candidate.body[:140],
+                },
+            )
             if len(experiments) >= skill.max_experiments_per_pass:
                 break
             try:
@@ -103,6 +144,19 @@ class DreamPassOrchestrator:
                 arm='treatment',
             )
             experiments.append(experiment)
+            self._emit(
+                DREAM_EXPERIMENT_SCORED,
+                {
+                    'workflow_id': dream_pass_id,
+                    'domain': skill.domain,
+                    'experiment_id': experiment.id,
+                    'candidate_lesson_id': experiment.candidate_lesson_id,
+                    'control_score': experiment.control_score,
+                    'treatment_score': experiment.treatment_score,
+                    'delta': experiment.delta,
+                    'n_samples': experiment.n_samples,
+                },
+            )
 
             decision = self._policy.evaluate(
                 domain=skill.domain,
@@ -132,6 +186,16 @@ class DreamPassOrchestrator:
                     verdict='promote',
                     lesson_id=lesson.id,
                 )
+                self._emit(
+                    DREAM_LESSON_PROMOTED,
+                    {
+                        'workflow_id': dream_pass_id,
+                        'domain': skill.domain,
+                        'lesson_id': lesson.id,
+                        'body_preview': lesson.body[:140],
+                        'delta': experiment.delta,
+                    },
+                )
             elif decision.verdict == 'reject':
                 rejected.append(candidate.id)
                 self._record_experiment(
@@ -139,6 +203,16 @@ class DreamPassOrchestrator:
                     experiment=experiment,
                     verdict='reject',
                     lesson_id=None,
+                )
+                self._emit(
+                    DREAM_LESSON_REJECTED,
+                    {
+                        'workflow_id': dream_pass_id,
+                        'domain': skill.domain,
+                        'candidate_lesson_id': candidate.id,
+                        'delta': experiment.delta,
+                        'reason': decision.reason,
+                    },
                 )
             elif decision.verdict == 'flagged':
                 self._governor.write_flagged_candidate(
@@ -171,6 +245,17 @@ class DreamPassOrchestrator:
             dream_pass_id=dream_pass_id,
             proposed=len(candidates[: skill.max_candidates_per_pass]),
             promoted=len(promoted),
+        )
+        self._emit(
+            DREAM_PASS_FINISHED,
+            {
+                'workflow_id': dream_pass_id,
+                'domain': skill.domain,
+                'candidates_proposed': len(candidates[: skill.max_candidates_per_pass]),
+                'lessons_promoted': len(promoted),
+                'lessons_rejected': len(rejected),
+                'lessons_flagged': len(flagged),
+            },
         )
         return DreamPassResult(
             dream_pass_id=dream_pass_id,
