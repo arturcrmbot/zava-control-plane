@@ -674,6 +674,23 @@ async def receive_durable_event(
             )
         except Exception:
             log.exception("agent.completed: working-memory capture bridge failed")
+        # Cost-budget bridge: attribute token spend to the dream-pass
+        # domain so the in-process hard stop can fire. Never raises —
+        # cost accounting must not break the durable-event bridge.
+        try:
+            from api.functions.graphs.executors.agents._wrapper import (
+                _skill_to_domain,
+            )
+            skill_label = payload.get("agent_label")
+            domain = _skill_to_domain(skill_label, skill_label)
+            if domain and (int(in_tok) or int(out_tok)):
+                app_state.cost_budget.record(
+                    domain=domain,
+                    input_tokens=int(in_tok),
+                    output_tokens=int(out_tok),
+                )
+        except Exception:
+            log.exception("agent.completed: cost-budget bridge failed")
         _emit("agent.completed", wid, **payload)
 
     elif body.kind == "workflow.completed":

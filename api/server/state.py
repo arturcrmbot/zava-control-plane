@@ -69,6 +69,14 @@ class AppState:
         self.store = StateStore()
         self.audit = AuditLogger()
 
+        # Dream-pass daily LLM cost budget — in-process per-domain hard
+        # stop. Resets implicitly per UTC day and on process restart;
+        # see api/server/services/lessons/cost_budget.py for rationale.
+        from api.server.services.lessons.cost_budget import CostBudget
+        self.cost_budget = CostBudget(
+            daily_budget_usd=float(os.getenv("DREAM_PASS_DAILY_LLM_BUDGET_USD", "5.0")),
+        )
+
         # Phase 1 sub-phase 4 + Phase 4 IP2 — the agentic-org entity plane
         # (KuzuDB graph + reflectors + KPI store) is single-writer per file.
         # In multi-process boot (FastAPI on :3101 + Azure Functions host on
@@ -557,6 +565,9 @@ async def _run_dream_pass_cadence(
             from api.server.routes.dream_pass_pause import is_paused as _is_paused
             if _is_paused(dom):
                 log.info("dream cadence: skipping %s — paused", dom)
+                continue
+            if app_state.cost_budget.is_over_budget(dom):
+                log.info("dream cadence: skipping %s — over daily LLM budget", dom)
                 continue
             now = _dt.datetime.now(_dt.timezone.utc)
             inputs = TriggerInputs(

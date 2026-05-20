@@ -40,6 +40,11 @@ async def run_dream_pass(
             status_code=423,
             detail=f"dream-pass for domain={domain} is paused (kill switch)",
         )
+    if app_state.cost_budget.is_over_budget(domain):
+        raise HTTPException(
+            status_code=429,
+            detail=f"dream-pass for domain={domain} exceeded daily LLM cost budget",
+        )
     try:
         skill = load_dream_skill(dream_skill_path(domain))
     except (DreamSkillLoadError, FileNotFoundError) as ex:

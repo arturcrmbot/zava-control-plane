@@ -522,6 +522,9 @@ async def dream_storm(
         if _is_paused(dom):
             passes.append({"domain": dom, "error": "paused (kill switch)"})
             continue
+        if app_state.cost_budget.is_over_budget(dom):
+            passes.append({"domain": dom, "error": "budget (daily LLM cost exceeded)"})
+            continue
         try:
             skill = load_dream_skill(dream_skill_path(dom))
         except (DreamSkillLoadError, FileNotFoundError) as ex:
