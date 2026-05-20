@@ -175,7 +175,26 @@ class AppState:
         # and crash with a circular ImportError. See
         # api/server/services/dream_pass/wiring.py for the rationale
         # behind the demo defaults (stub experiment runner, etc.).
-        self.lesson_store = InMemoryLessonStore()
+        # Mem0-backed lesson store: persists across FastAPI restarts and
+        # supports semantic search via mem0.Memory(). Mem0 requires
+        # either MEM0_API_KEY (Mem0 cloud) or a local Qdrant at the
+        # default URL; if neither is present mem0.Memory() raises at
+        # construction. We fall back to InMemoryLessonStore in that
+        # case with a loud warning so operators know lessons will NOT
+        # survive a restart. Tests inject a MagicMock memory directly.
+        try:
+            from api.server.services.lessons.mem0_store import Mem0LessonStore
+            self.lesson_store = Mem0LessonStore()
+        except Exception as _mem0_ex:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Mem0 backend unavailable (%s); falling back to "
+                "InMemoryLessonStore. Lessons will NOT persist across "
+                "restarts until Mem0 is configured (MEM0_API_KEY or "
+                "local Qdrant).",
+                _mem0_ex,
+            )
+            self.lesson_store = InMemoryLessonStore()
         self.working_memory_store = InMemoryWorkingMemoryStore()
         # Wire the agent-runtime working-memory capture singleton to our
         # shared store so LLM agent completions (via run_agent_session)

@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from api.server.services.dream_pass.orchestrator import DreamPassOrchestrator
 from api.server.services.lessons.store import InMemoryLessonStore
+from api.server.services.lessons.mem0_store import Mem0LessonStore
 from api.server.services.lessons.working_memory_store import InMemoryWorkingMemoryStore
 from api.server.services.lessons.types import (
     Lesson,
@@ -20,7 +21,7 @@ def test_app_state_exposes_dream_pass_orchestrator():
 
 def test_app_state_exposes_in_memory_lesson_store():
     from api.server.state import app_state
-    assert isinstance(app_state.lesson_store, InMemoryLessonStore)
+    assert isinstance(app_state.lesson_store, (Mem0LessonStore, InMemoryLessonStore))
 
 
 def test_app_state_exposes_in_memory_working_memory_store():
