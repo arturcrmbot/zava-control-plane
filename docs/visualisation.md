@@ -34,7 +34,7 @@ layer changes, edit here.
 ## 1. Surfaces today
 
 The blueprint microsite ([`web/blueprint/`](../web/blueprint/), `:5275`
-locally; Azure Container Apps in production) hosts five visualisation
+locally; Azure Container Apps in production) hosts six visualisation
 surfaces today. Routing is a single `?view=` switch in
 [`web/blueprint/src/App.tsx`](../web/blueprint/src/App.tsx); the
 editorial blueprint page is the default.
@@ -46,6 +46,7 @@ editorial blueprint page is the default.
 | Entities | `/?view=entities` | [`EntitiesPage.tsx`](../web/blueprint/src/pages/EntitiesPage.tsx) | 7 kind tiles (Person / Organisation / Asset / Money / Decision / Place / Period), kind-filtered entity table, recent-links pulse | `GET /api/entities/_stats` (5 s poll) | Day-to-day — entity inspector |
 | Functions | `/?view=functions` | [`FunctionsPage.tsx`](../web/blueprint/src/pages/FunctionsPage.tsx) | 9-tile grid of function FMs; tile expands inline to show owned domains + persona-hierarchy tree | `GET /api/functions` (5 s poll) | Drill — per-function detail |
 | Org-clone | `/?view=org-clone` | [`OrgClonePage.tsx`](../web/blueprint/src/pages/OrgClonePage.tsx) | Fan-out across entities, in-flight meta-workflows, ambient agents, function FMs, cadence schedule | 5 endpoints (entities/_stats, workflows, functions, functions/{n}/ambient, cadences); 8 s poll | Admin — single-page operator view |
+| Workflow run (drill-in) | `/?view=run&run_id=<id>` | [`WorkflowRunPage.tsx`](../web/blueprint/src/pages/WorkflowRunPage.tsx) | Per-run reasoning, tool calls, state, HITL interrupts — domain-agnostic | `GET /api/workflows/{run_id}/agui` (AG-UI SSE) | Day-to-day — single-run inspector |
 
 The Control Plane (`:5273`) and Candidate Portal (`:5274`) hold their
 own UIs; they are not visualisation surfaces and are out of scope here.
@@ -243,7 +244,23 @@ TASK-026 of the Org Building spec).
 
 ---
 
-## 7. Cross-references
+## 8. AG-UI per-run drill-in
+
+The workflow-run drill-in (`?view=run`) is the first surface that does
+**not** consume `/api/blueprint/stream` directly. Instead it consumes
+[`/api/workflows/{run_id}/agui`](../api/server/routes/workflow_agui.py),
+which translates substrate `FleetEvent`s through
+[`SubstrateToAGUI`](../api/server/services/substrate_to_agui.py) into
+the [AG-UI protocol](https://docs.ag-ui.com) event vocabulary. The
+benefit is that the same `RunPanel` renders every workflow type —
+hiring, expense-claim, vendor-kyc, future domains — without a
+per-domain frontend. To extend the drill-in (e.g. domain-specific
+widgets), prefer AG-UI generative-UI events over bespoke React
+components.
+
+---
+
+## 9. Cross-references
 
 - **Add a new visualisation layer** → §"Visualisation Contributor Guide" appended below
 - **The forward design** → [superpowers/specs/2026-05-09-org-building-design.md](superpowers/specs/2026-05-09-org-building-design.md)
@@ -560,7 +577,7 @@ does not reach the front-end.
 - **Do not break the `?view=constellation` URL contract.** The Org
   Building replaces the page at the same URL; bookmarks must keep
   working. Same for `?view=entities`, `?view=functions`,
-  `?view=org-clone`.
+  `?view=org-clone`, `?view=run`.
 
 ---
 
