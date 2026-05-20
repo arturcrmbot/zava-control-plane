@@ -515,9 +515,13 @@ async def dream_storm(
     from api.server.services.dream_pass.skill_loader import (
         DreamSkillLoadError, dream_skill_path, load_dream_skill,
     )
+    from api.server.routes.dream_pass_pause import is_paused as _is_paused
     dom_list = [d.strip() for d in domains.split(",") if d.strip()]
     passes: list[dict] = []
     for dom in dom_list:
+        if _is_paused(dom):
+            passes.append({"domain": dom, "error": "paused (kill switch)"})
+            continue
         try:
             skill = load_dream_skill(dream_skill_path(dom))
         except (DreamSkillLoadError, FileNotFoundError) as ex:

@@ -514,6 +514,12 @@ async def _run_dream_pass_cadence(
     log = _log.getLogger(__name__)
     while True:
         for dom in domains:
+            # Lazy import keeps state.py free of the route module at import
+            # time (route module is wired only by main.py).
+            from api.server.routes.dream_pass_pause import is_paused as _is_paused
+            if _is_paused(dom):
+                log.info("dream cadence: skipping %s — paused", dom)
+                continue
             try:
                 skill = load_dream_skill(dream_skill_path(dom))
             except (DreamSkillLoadError, FileNotFoundError) as ex:

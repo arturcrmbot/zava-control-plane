@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
+from api.server.routes.dream_pass_pause import is_paused
 from api.server.services.dream_pass.skill_loader import (
     DreamSkillLoadError,
     dream_skill_path,
@@ -34,6 +35,11 @@ async def run_dream_pass(
     Live progress is observable on the SSE stream `/api/stream/fleet`
     (event types `dream.*`). On unknown ``domain`` returns 422.
     """
+    if is_paused(domain):
+        raise HTTPException(
+            status_code=423,
+            detail=f"dream-pass for domain={domain} is paused (kill switch)",
+        )
     try:
         skill = load_dream_skill(dream_skill_path(domain))
     except (DreamSkillLoadError, FileNotFoundError) as ex:
