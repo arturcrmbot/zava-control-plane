@@ -34,6 +34,7 @@
     "nanoid": "^5.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-force-graph-2d": "^1.29.1",
     "react-router-dom": "^7.0.0",
     "recharts": "^2.12.0"
   },

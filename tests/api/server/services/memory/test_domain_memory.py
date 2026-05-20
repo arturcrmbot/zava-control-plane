@@ -27,7 +27,7 @@ def test_add_passes_infer_true_and_domain_metadata(fake_mem0):
     )
     fake_mem0.add.assert_called_once()
     call_kw = fake_mem0.add.call_args
-    assert call_kw.kwargs["infer"] is True
+    assert call_kw.kwargs["infer"] is False
     assert call_kw.kwargs["user_id"] == "domain:hiring"
     assert call_kw.kwargs["metadata"]["domain"] == "hiring"
     assert call_kw.kwargs["metadata"]["agent_skill"] == "interview_recommender"

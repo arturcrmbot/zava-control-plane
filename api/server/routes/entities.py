@@ -350,6 +350,62 @@ async def entities_pulse(actor: Actor = Depends(require_actor)):
     }
 
 
+@router.get("/_graph")
+async def entity_graph_snapshot(
+    limit: int = Query(400, ge=1, le=2000),
+    kind: str | None = None,
+    actor: Actor = Depends(require_actor),
+):
+    """Single-shot node+edge snapshot for the Knowledge force-graph view.
+
+    Returns ``{nodes: [{id, kind}], edges: [{src, dst, rel}]}`` where
+    ``nodes`` are derived from edge endpoints (orphans are intentionally
+    excluded — they add no graph signal). Names are NOT projected here:
+    Kuzu 0.6.1 rejects ``a.name`` against a label-less match because
+    several kinds (Money, Decision, Workflow, Asset) do not declare the
+    column. The frontend fetches a hovered/clicked entity's full payload
+    via ``GET /api/entities/{id}``.
+
+    ``kind`` (optional) restricts to edges where the source OR destination
+    is of that kind, so the operator can focus the view on one slice
+    (e.g. only Decision-touching edges).
+    """
+    base_cols = (
+        "RETURN a.id AS src, label(a) AS src_kind, "
+        "label(r) AS rel, b.id AS dst, label(b) AS dst_kind"
+    )
+    if kind is not None:
+        if kind not in _KINDS:
+            raise HTTPException(status_code=400, detail=f"unknown kind {kind!r}")
+        cypher = (
+            f"MATCH (a)-[r]->(b) WHERE label(a) = '{kind}' OR label(b) = '{kind}' "
+            f"{base_cols} LIMIT {int(limit)}"
+        )
+    else:
+        cypher = f"MATCH (a)-[r]->(b) {base_cols} LIMIT {int(limit)}"
+    try:
+        rows = app_state.entities.query(cypher)
+    except Exception as exc:
+        log.warning("entity _graph query failed: %s", exc)
+        rows = []
+    nodes_by_id: dict[str, dict] = {}
+    edges: list[dict] = []
+    for row in rows:
+        s, d = row.get("src"), row.get("dst")
+        if not (isinstance(s, str) and isinstance(d, str)):
+            continue
+        sk, dk = row.get("src_kind"), row.get("dst_kind")
+        if s not in nodes_by_id:
+            nodes_by_id[s] = {"id": s, "kind": sk}
+        if d not in nodes_by_id:
+            nodes_by_id[d] = {"id": d, "kind": dk}
+        edges.append({"src": s, "dst": d, "rel": row.get("rel")})
+    return project_for_role(
+        {"nodes": list(nodes_by_id.values()), "edges": edges},
+        actor.role,
+    )
+
+
 @router.get("/_kinds")
 async def entity_kinds_summary(actor: Actor = Depends(require_actor)):
     """Per-kind statistics for the "Org X-ray" panel (pitch-a7).

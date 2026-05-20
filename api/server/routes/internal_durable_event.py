@@ -685,6 +685,7 @@ async def receive_durable_event(
             else:
                 log.debug("memory capture: skipped skill=%s domain=%s (not in domain_memories=%s)", skill_label, domain, list(app_state.domain_memories.keys()))
         except Exception:
+            import traceback; traceback.print_exc()
             log.exception("agent.completed: memory capture failed")
         # Cost-budget bridge: attribute token spend to the dream-pass
         # domain so the in-process hard stop can fire. Never raises —

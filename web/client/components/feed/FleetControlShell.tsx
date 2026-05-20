@@ -24,6 +24,7 @@ import PolicyAndAutonomy from "@client/routes/PolicyAndAutonomy";
 import HiringManager from "@client/routes/HiringManager";
 import Dashboard from "@client/routes/Dashboard";
 import Memory from "@client/routes/Memory";
+import Knowledge from "@client/routes/Knowledge";
 
 function ShellBody() {
   const [roleId, setRoleId] = useLocalStorageState<RoleId>("fleetctl.role", "ops-reviewer");
@@ -122,6 +123,7 @@ function ShellInner({
             <Route path="/" element={<Feed key={role.id} role={role} onOpenDrawer={onOpenDrawer} />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/memory" element={<Memory />} />
+            <Route path="/knowledge" element={<Knowledge />} />
             <Route path="/fleet" element={<Navigate to="/" replace />} />
             <Route path="/exceptions" element={<Navigate to="/?filter=exceptions" replace />} />
             <Route path="/reviewer-queue" element={<Navigate to="/?filter=hitl" replace />} />

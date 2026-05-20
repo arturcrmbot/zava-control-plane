@@ -31,8 +31,13 @@ class DomainMemory:
         agent_skill: str = "",
         workflow_id: str = "",
     ) -> list[dict]:
-        """Write a memory with infer=True. Mem0's LLM decides what to
-        extract and store. Returns the list of created/updated memories."""
+        """Write a memory directly (infer=False). The raw agent output
+        is stored as-is; the dream consolidation pass is responsible for
+        deduplication, pruning, and crystallisation.
+
+        We use infer=False because Mem0's built-in inference rejects raw
+        agent log lines as 'no facts found'. Our dream pass handles the
+        intelligence layer instead."""
         result = self._mem.add(
             messages=text,
             user_id=self._user_id,
@@ -42,7 +47,7 @@ class DomainMemory:
                 "workflow_id": workflow_id,
                 "captured_at": datetime.now(timezone.utc).isoformat(),
             },
-            infer=True,
+            infer=False,
         )
         return (result or {}).get("results", [])
 
