@@ -72,41 +72,6 @@ _LESSON_CACHE_TTL_S = 30.0
 _lesson_cache: dict[str, tuple[float, list[dict]]] = {}
 
 
-def _memory_lessons_url(domain: str) -> str:
-    """Compute /api/memory/lessons/active?domain=X from the same base
-    URL the webhook uses. Falls back to localhost:3101 if env-unset."""
-    base = os.getenv("FASTAPI_WEBHOOK_URL", "http://localhost:3101/internal/durable-event")
-    from urllib.parse import urlsplit, urlunsplit
-    parts = urlsplit(base)
-    new_path = "/api/memory/lessons/active"
-    return urlunsplit((parts.scheme, parts.netloc, new_path, f"domain={domain}", ""))
-
-
-async def _fetch_active_lessons(domain: str) -> list[dict]:
-    """Pull active lessons for ``domain`` from the FastAPI memory route.
-    30s in-process cache; tolerant of network errors (returns [])."""
-    now = time.monotonic()
-    cached = _lesson_cache.get(domain)
-    if cached is not None and now - cached[0] < _LESSON_CACHE_TTL_S:
-        return cached[1]
-    try:
-        async with httpx.AsyncClient() as c:
-            r = await c.get(_memory_lessons_url(domain), timeout=2.0)
-            if r.status_code != 200:
-                _lesson_cache[domain] = (now, [])
-                return []
-            items = r.json().get("items") or []
-            slim = [
-                {"id": str(l.get("id")), "body": str(l.get("body") or "")}
-                for l in items[:8] if l.get("body")
-            ]
-            _lesson_cache[domain] = (now, slim)
-            return slim
-    except Exception:
-        _lesson_cache[domain] = (now, [])
-        return []
-
-
 def _memory_recall_url() -> str:
     """POST /api/memory/lessons/recall — top-K semantic retrieval."""
     base = os.getenv("FASTAPI_WEBHOOK_URL", "http://localhost:3101/internal/durable-event")

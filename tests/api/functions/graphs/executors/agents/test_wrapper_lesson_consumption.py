@@ -1,9 +1,8 @@
-"""Phase B tests: _fetch_active_lessons + _prepend_lessons_to_skill_text + _skill_to_domain."""
+"""Phase B tests: _fetch_top_k_lessons + _prepend_lessons_to_skill_text + _skill_to_domain."""
 import pytest
 from unittest.mock import patch
 
 from api.functions.graphs.executors.agents._wrapper import (
-    _fetch_active_lessons,
     _prepend_lessons_to_skill_text,
     _skill_to_domain,
     _lesson_cache,
@@ -15,67 +14,6 @@ def _clear_cache():
     _lesson_cache.clear()
     yield
     _lesson_cache.clear()
-
-
-@pytest.mark.asyncio
-async def test_fetch_returns_slim_items_on_200():
-    class _FakeR:
-        status_code = 200
-
-        def json(self):
-            return {"items": [{"id": "L1", "body": "lesson one"}, {"id": "L2", "body": "lesson two"}]}
-
-    class _FakeC:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-        async def get(self, *a, **kw):
-            return _FakeR()
-
-    with patch("api.functions.graphs.executors.agents._wrapper.httpx.AsyncClient", return_value=_FakeC()):
-        out = await _fetch_active_lessons("hiring")
-    assert out == [{"id": "L1", "body": "lesson one"}, {"id": "L2", "body": "lesson two"}]
-
-
-@pytest.mark.asyncio
-async def test_fetch_falls_back_to_empty_on_error():
-    with patch(
-        "api.functions.graphs.executors.agents._wrapper.httpx.AsyncClient",
-        side_effect=RuntimeError("boom"),
-    ):
-        out = await _fetch_active_lessons("hiring")
-    assert out == []
-
-
-@pytest.mark.asyncio
-async def test_fetch_caches_within_ttl():
-    """Second call within TTL must NOT issue another HTTP request."""
-    call_count = {"n": 0}
-
-    class _FakeR:
-        status_code = 200
-
-        def json(self):
-            return {"items": []}
-
-    class _FakeC:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-        async def get(self, *a, **kw):
-            call_count["n"] += 1
-            return _FakeR()
-
-    with patch("api.functions.graphs.executors.agents._wrapper.httpx.AsyncClient", return_value=_FakeC()):
-        await _fetch_active_lessons("hiring")
-        await _fetch_active_lessons("hiring")
-    assert call_count["n"] == 1
 
 
 def test_prepend_with_lessons_includes_header_and_bullets():
