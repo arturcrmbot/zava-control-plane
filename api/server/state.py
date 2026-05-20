@@ -431,6 +431,10 @@ class AppState:
             ).split(",") if d.strip()
         )
         if cadence_secs > 0:
+            tick_secs = int(os.getenv("DREAM_PASS_TICK_SECONDS", "15") or "15")
+            backlog_threshold = int(
+                os.getenv("DREAM_PASS_TRIGGER_BACKLOG", "30") or "30"
+            )
             try:
                 import asyncio as _asyncio
                 _asyncio.get_running_loop()
@@ -438,7 +442,10 @@ class AppState:
                     _asyncio.create_task(_run_dream_pass_cadence(
                         self.dream_pass_orchestrator,
                         domains=cadence_domains,
-                        interval_seconds=cadence_secs,
+                        heartbeat_seconds=cadence_secs,
+                        tick_seconds=tick_secs,
+                        backlog_threshold=backlog_threshold,
+                        working_memory_store=self.working_memory_store,
                     ))
                 )
             except RuntimeError:
@@ -497,21 +504,52 @@ async def _run_dream_pass_cadence(
     orchestrator,
     *,
     domains: tuple[str, ...],
-    interval_seconds: int,
+    heartbeat_seconds: int,
+    tick_seconds: int = 15,
+    backlog_threshold: int = 30,
+    working_memory_store=None,
 ) -> None:
-    """Optional autonomous loop firing one dream pass per domain on a
-    fixed wall-clock interval. Off unless ``DREAM_PASS_DEMO_CADENCE_SECONDS``
-    is a positive int. Sleeps cancel cleanly; failures of one domain do
-    not block the next or the next interval.
+    """Signal-driven autonomous loop firing one dream pass per domain.
+
+    Each ``tick_seconds`` we snapshot per-domain inputs (unconsumed
+    backlog + time since last pass) and ask ``should_trigger``. The
+    pass fires on either (a) backlog ≥ ``backlog_threshold`` or
+    (b) ``heartbeat_seconds`` elapsed since the previous pass.
+
+    Off entirely unless ``heartbeat_seconds`` > 0 (keeps the E1 manual-
+    only behaviour intact). Sleeps cancel cleanly; failures of one
+    domain do not block the next or the next tick.
     """
     import asyncio as _asyncio
+    import datetime as _dt
     import logging as _log
-    if interval_seconds <= 0:
+    if heartbeat_seconds <= 0:
         return
     from api.server.services.dream_pass.skill_loader import (
         DreamSkillLoadError, dream_skill_path, load_dream_skill,
     )
+    from api.server.services.lessons.decision_quality_signal import (
+        TriggerInputs, should_trigger,
+    )
+    from api.functions.graphs.executors.agents._wrapper import _skill_to_domain
+
     log = _log.getLogger(__name__)
+    last_pass_at: dict[str, _dt.datetime] = {}
+
+    def _backlog_for(dom: str) -> int:
+        if working_memory_store is None:
+            return 0
+        by_id = getattr(working_memory_store, "_by_id", None)
+        if by_id is None:
+            return 0
+        count = 0
+        for note in by_id.values():
+            if note.consumed_by_dream_pass is not None:
+                continue
+            if _skill_to_domain(note.agent_skill, note.agent_skill) == dom:
+                count += 1
+        return count
+
     while True:
         for dom in domains:
             # Lazy import keeps state.py free of the route module at import
@@ -520,17 +558,32 @@ async def _run_dream_pass_cadence(
             if _is_paused(dom):
                 log.info("dream cadence: skipping %s — paused", dom)
                 continue
+            now = _dt.datetime.now(_dt.timezone.utc)
+            inputs = TriggerInputs(
+                domain=dom,
+                unconsumed_backlog=_backlog_for(dom),
+                last_pass_at=last_pass_at.get(dom),
+                backlog_threshold=backlog_threshold,
+                heartbeat_seconds=heartbeat_seconds,
+                now=now,
+            )
+            fired, reason = should_trigger(inputs)
+            if not fired:
+                log.debug("dream cadence: %s no-fire (%s)", dom, reason)
+                continue
             try:
                 skill = load_dream_skill(dream_skill_path(dom))
             except (DreamSkillLoadError, FileNotFoundError) as ex:
                 log.warning("dream cadence: skill for %s missing (%s)", dom, ex)
                 continue
+            log.info("dream cadence: firing %s (%s)", dom, reason)
             try:
                 await orchestrator.run_pass(skill=skill, sample_size=10)
+                last_pass_at[dom] = now
             except Exception:
                 log.exception("dream cadence: pass for %s failed", dom)
         try:
-            await _asyncio.sleep(interval_seconds)
+            await _asyncio.sleep(tick_seconds)
         except _asyncio.CancelledError:
             return
 
