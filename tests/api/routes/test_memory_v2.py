@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 from fastapi.testclient import TestClient
 
 from api.server.main import app
@@ -59,3 +61,43 @@ def test_list_memories_returns_all_for_domain(monkeypatch):
     body = r.json()
     assert body["count"] == 2
     assert len(body["memories"]) == 2
+
+
+def test_trigger_dream_returns_result(monkeypatch):
+    """POST /api/memory/v2/dream triggers consolidation."""
+
+    class FakeDM:
+        domain = "hiring"
+        _mem = MagicMock()
+        _user_id = "domain:hiring"
+
+        def list_all(self, *, limit=500):
+            return [{"id": "m1", "memory": "test insight"}]
+
+        def delete(self, mid):
+            pass
+
+        def add_distilled(self, text, metadata=None):
+            return [{"id": "m2", "memory": text, "metadata": metadata or {}}]
+
+    monkeypatch.setattr(app_state, "domain_memories", {"hiring": FakeDM()})
+
+    import api.server.routes.memory_v2 as mv2
+
+    async def _fake_consolidate(texts):
+        return ["consolidated: " + "; ".join(texts)]
+
+    monkeypatch.setattr(mv2, "_build_llm_consolidator", lambda domain: _fake_consolidate)
+
+    r = client.post("/api/memory/v2/dream", json={"domain": "hiring"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["domain"] == "hiring"
+    assert body["input_count"] == 1
+    assert body["output_count"] == 1
+
+
+def test_trigger_dream_unknown_domain():
+    r = client.post("/api/memory/v2/dream", json={"domain": "nonexistent"})
+    assert r.status_code == 200
+    assert "error" in r.json()
