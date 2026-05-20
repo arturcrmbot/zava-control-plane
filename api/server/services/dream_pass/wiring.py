@@ -3,16 +3,16 @@ with sensible demo defaults. Used by AppState during startup and by
 on-demand routes that need to spin a pass against the live entity graph
 without rebuilding the wiring each call.
 
-Why a stub ExperimentRunner: the real ExperimentRunner runs the
-interview-recommender in an isolated Kuzu sandbox against held-out
-personas. That is slow, expensive, and tied to the hiring-specific
-recommender — fine for offline lesson research, wrong for a live
-visualisation demo. The stub returns deterministic numbers so the
-policy + governor + provenance + bus emit chain runs end-to-end.
+Production wiring builds the REAL ExperimentRunner (sandboxed
+interview-recommender against the hiring rubric). If that construction
+fails the factory raises — the band-aid stub fallback was removed
+deliberately so the live system can't silently degrade to placeholder
+numbers. Unit tests that don't have a real Kuzu graph / candidate pool
+must inject a stub explicitly via the ``experiment_runner=`` kwarg
+(see ``tests/api/services/dream_pass/_stub_runner.py``).
 """
 from __future__ import annotations
 
-import hashlib
 import uuid
 from pathlib import Path
 from typing import Any
@@ -24,7 +24,7 @@ from api.server.services.dream_pass.partitioner import CorpusPartitioner
 from api.server.services.dream_pass.policy import PromotionPolicy
 from api.server.services.dream_pass.proposer import StubProposer
 from api.server.services.dream_pass.sandbox import InterviewRecommenderSandbox
-from api.server.services.dream_pass.types import CorpusSplit, Experiment
+from api.server.services.dream_pass.types import CorpusSplit
 from api.server.services.entity_graph import EntityGraph
 from api.server.services.event_bus import EventBus
 from api.server.services.governance.kernel import kernel as get_kernel
@@ -120,7 +120,9 @@ def _fresh_demo_persona_ids() -> list[str]:
     return [f"P-DEMO-{uuid.uuid4().hex[:12]}" for _ in range(200)]
 
 
-# Only read by _StubExperimentRunner; the real runner builds its own rubric.
+# Last-resort fallback rubric if the hiring rubric YAML fails to load.
+# Promotion threshold 0.0 makes this obviously-placeholder — never wire
+# this rubric into the real runner.
 _DEMO_RUBRIC = Rubric(
     domain="__demo__",
     promotion_threshold=0.0,
@@ -169,46 +171,6 @@ def _build_real_hiring_runner(graph_for_scorer) -> ExperimentRunner:
     return ExperimentRunner(sandbox_factory=sandbox_factory, scorer_for=scorer_for)
 
 
-class _DomainDispatchingRunner:
-    """Picks the real experiment runner for hiring; stub for everything else.
-
-    The dream-pass orchestrator only accepts ONE experiment_runner instance
-    at construction. This wrapper inspects the rubric the orchestrator
-    passes through at run(...) time and forwards to the right backend.
-    Falls back to stub on any backend error so a transient GHCP failure
-    during a cadence tick doesn't crash the whole pass — the stub returns
-    a deterministic placeholder so the policy + governor + bus chain
-    still runs.
-    """
-
-    def __init__(self, *, real, stub):
-        self._real = real
-        self._stub = stub
-        self._log = __import__("logging").getLogger(__name__)
-
-    async def run(self, **kw):
-        try:
-            rubric = kw.get("rubric")
-            domain = getattr(rubric, "domain", "")
-            if domain == "hiring":
-                self._log.info(
-                    "dream-pass: routing experiment %s to REAL hiring sandbox",
-                    kw.get("experiment_id"),
-                )
-                return await self._real.run(**kw)
-            self._log.info(
-                "dream-pass: routing experiment %s to STUB (domain=%r)",
-                kw.get("experiment_id"), domain,
-            )
-            return await self._stub.run(**kw)
-        except Exception:
-            self._log.exception(
-                "dream-pass: real runner failed for experiment %s; falling back to STUB",
-                kw.get("experiment_id"),
-            )
-            return await self._stub.run(**kw)
-
-
 _DEMO_PROPOSER_CANDIDATES: list[tuple[str, str]] = [
     (
         "Trigger: candidate lacks recent leadership signal. "
@@ -239,10 +201,13 @@ def build_demo_orchestrator(
     experiment_runner: Any = None,
     rubric: Any = None,
 ) -> DreamPassOrchestrator:
-    """Wire dream-pass with in-memory stores + StubProposer +
-    _StubExperimentRunner. Pass lesson_store / working_memory_store to
-    share singletons across the orchestrator and the read-only memory
-    route; omit them for unit tests and we'll construct fresh ones."""
+    """Wire dream-pass with in-memory stores + the default proposer +
+    the real hiring ExperimentRunner. Pass lesson_store /
+    working_memory_store to share singletons across the orchestrator
+    and the read-only memory route; omit them for unit tests and we'll
+    construct fresh ones. Tests without a real Kuzu graph should pass
+    ``experiment_runner=`` explicitly (see
+    ``tests/api/services/dream_pass/_stub_runner.py``)."""
     lesson_store = lesson_store or InMemoryLessonStore()
     working_store = working_memory_store or InMemoryWorkingMemoryStore()
 
@@ -263,16 +228,7 @@ def build_demo_orchestrator(
     proposer = proposer if proposer is not None else _build_default_proposer()
 
     if experiment_runner is None:
-        try:
-            real = _build_real_hiring_runner(graph)
-            experiment_runner = _DomainDispatchingRunner(real=real, stub=_StubExperimentRunner())
-        except Exception:
-            import logging
-            logging.getLogger(__name__).warning(
-                "Real hiring experiment runner unavailable; using stub only.",
-                exc_info=True,
-            )
-            experiment_runner = _StubExperimentRunner()
+        experiment_runner = _build_real_hiring_runner(graph)
     if rubric is None:
         rubric = _load_hiring_rubric()
 
@@ -349,33 +305,6 @@ def _build_default_proposer():
             ex,
         )
         return StubProposer(candidates=list(_DEMO_PROPOSER_CANDIDATES))
-
-
-class _StubExperimentRunner:
-    """Demo-only ExperimentRunner stand-in. See module docstring."""
-
-    async def run(
-        self,
-        *,
-        experiment_id: str,
-        candidate_lesson_id: str,
-        candidate_body: str,
-        cvs: list[dict],
-        active_lessons: list[str],
-        rubric,
-    ) -> Experiment:
-        del candidate_body, active_lessons, rubric  # not used by the stub
-        h = int(hashlib.sha256(candidate_lesson_id.encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
-        treatment = 0.65 + 0.20 * h
-        control = 0.70
-        return Experiment(
-            id=experiment_id,
-            candidate_lesson_id=candidate_lesson_id,
-            control_score=control,
-            treatment_score=treatment,
-            n_samples=max(10, len(cvs)),
-            workflow_ids=tuple(c.get("candidate_id", "") for c in cvs if c.get("candidate_id")),
-        )
 
 
 class _NoopProvenance:

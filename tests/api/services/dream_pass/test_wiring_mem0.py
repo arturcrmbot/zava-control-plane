@@ -5,7 +5,8 @@ from api.server.services.event_bus import EventBus
 from api.server.services.lessons.mem0_store import Mem0LessonStore
 from api.server.services.dream_pass.wiring import build_demo_orchestrator
 from api.server.services.dream_pass.proposer import StubProposer
-from api.server.services.dream_pass.wiring import _StubExperimentRunner
+
+from tests.api.services.dream_pass._stub_runner import StubExperimentRunner
 
 
 def test_factory_uses_mem0_when_provided():
@@ -22,7 +23,7 @@ def test_factory_uses_mem0_when_provided():
         audit=AuditLogger(),
         lesson_store=mem0_store,
         proposer=StubProposer(candidates=[("body", "rationale")]),
-        experiment_runner=_StubExperimentRunner(),
+        experiment_runner=StubExperimentRunner(),
     )
     # Governor's private store IS the Mem0LessonStore we passed in.
     assert orchestrator._governor._store is mem0_store
