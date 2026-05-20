@@ -120,15 +120,21 @@ def _prepend_lessons_to_skill_text(skill_text: str | None, lessons: list[dict]) 
 
 def _skill_to_domain(skill_label: str | None, skill_dir_name: str | None) -> str | None:
     """Return the dream-pass domain for an agent skill, or None.
-    Checks skill_label first, then skill_dir name. Generated-domain
-    fleet-* skills follow the `<domain>-<purpose>` convention but
-    don't have dream-pass SKILL.md files yet, so we return None for
-    them until those exist."""
+    Checks skill_label first, then skill_dir name.
+
+    Any skill name containing the substring 'hiring' is treated as the
+    hiring domain. This covers the segmented hiring agents
+    (hiring-segment-a, hiring-segment-b, ...) plus the legacy
+    non-prefixed entries listed in _SKILL_TO_DOMAIN. Generated-domain
+    fleet-* skills don't have dream-pass SKILL.md files yet, so we
+    return None for them until those exist."""
     for s in (skill_label, skill_dir_name):
         if not s:
             continue
         if s in _SKILL_TO_DOMAIN:
             return _SKILL_TO_DOMAIN[s]
+        if "hiring" in s:
+            return "hiring"
         if s.startswith("fleet-"):
             return None
     return None

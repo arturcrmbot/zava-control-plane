@@ -212,9 +212,24 @@ def build_demo_orchestrator(
         return list(lesson_store.search(query="", scope=scope, top_k=100))
 
     def _load_working_notes(agents):
-        return list(working_store.list_recent_unconsumed(
-            domain_agents=tuple(agents), limit=20,
-        ))
+        # The orchestrator hardcodes ('interview-recommender',) as the
+        # only skill it asks for — that was wired for the
+        # original hiring-only sandbox. Today the hiring track fires
+        # cv-crystalliser, auto-shortlister, jurisdiction-router etc.,
+        # none of which match. Ignore the narrow arg and return ALL
+        # recent unconsumed notes; the GHCPProposer's prompt is already
+        # scoped to "the '<domain>' domain" so it filters semantically
+        # in the LLM rather than via agent_skill set membership.
+        del agents
+        store = working_store
+        if not hasattr(store, "_by_id"):
+            return []
+        unconsumed = [
+            n for n in store._by_id.values()  # type: ignore[attr-defined]
+            if n.consumed_by_dream_pass is None
+        ]
+        unconsumed.sort(key=lambda n: n.captured_at, reverse=True)
+        return unconsumed[:50]
 
     return DreamPassOrchestrator(
         governor=governor,
