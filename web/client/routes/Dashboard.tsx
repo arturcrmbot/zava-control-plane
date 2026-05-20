@@ -17,6 +17,7 @@ import { useExceptions } from "@client/hooks/useExceptions";
 import { useResolutionStore } from "@client/hooks/useResolutionStore";
 import { useNow } from "@client/hooks/useNow";
 import { usePersonaDecisions } from "@client/hooks/usePersonaDecisions";
+import MemoryTiles from "@client/components/dashboard/MemoryTiles";
 
 interface Tile {
   label: string;
@@ -200,6 +201,8 @@ export default function Dashboard() {
             accent="bg-blue-50 dark:bg-blue-950/30"
           />
         </div>
+
+        <MemoryTiles />
 
         <section className="bg-white border border-slate-200 rounded-lg dark:bg-slate-900 dark:border-slate-700">
           <header className="px-4 py-3 border-b border-slate-200 text-sm font-semibold text-slate-800 dark:border-slate-700 dark:text-slate-100">
