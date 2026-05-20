@@ -14,13 +14,16 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+from pathlib import Path
 from typing import Any
 
 from api.server.services.audit_logger import AuditLogger
+from api.server.services.dream_pass.experiment import ExperimentRunner
 from api.server.services.dream_pass.orchestrator import DreamPassOrchestrator
 from api.server.services.dream_pass.partitioner import CorpusPartitioner
 from api.server.services.dream_pass.policy import PromotionPolicy
 from api.server.services.dream_pass.proposer import StubProposer
+from api.server.services.dream_pass.sandbox import InterviewRecommenderSandbox
 from api.server.services.dream_pass.types import CorpusSplit, Experiment
 from api.server.services.entity_graph import EntityGraph
 from api.server.services.event_bus import EventBus
@@ -30,7 +33,15 @@ from api.server.services.lessons.kuzu_provenance import KuzuLessonProvenance
 from api.server.services.lessons.store import InMemoryLessonStore
 from api.server.services.lessons.types import LessonScope
 from api.server.services.lessons.working_memory_store import InMemoryWorkingMemoryStore
+from api.server.services.scoring.ground_truth import HiringLabelsGroundTruth
+from api.server.services.scoring.rubric_loader import load_rubric
+from api.server.services.scoring.scorer import RunScorer
 from api.server.services.scoring.types import Rubric, RubricCheck
+
+
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_HIRING_RUBRIC_YAML = _REPO_ROOT / "data" / "rubrics" / "hiring.yaml"
+_HIRING_LABELS_CSV = _REPO_ROOT / "data" / "synthetic" / "hiring" / "labels.csv"
 
 
 # Partitioner needs a domain at construction even though it only uses
@@ -61,6 +72,74 @@ _DEMO_RUBRIC = Rubric(
 )
 
 
+_hiring_rubric_cache: dict[str, Any] = {"v": None}
+
+
+def _load_hiring_rubric():
+    """Cached at module level — paid once at first import."""
+    if _hiring_rubric_cache["v"] is None:
+        try:
+            _hiring_rubric_cache["v"] = load_rubric(_HIRING_RUBRIC_YAML)
+        except Exception:
+            _hiring_rubric_cache["v"] = _DEMO_RUBRIC
+    return _hiring_rubric_cache["v"]
+
+
+def _build_real_hiring_runner(graph_for_scorer) -> ExperimentRunner:
+    """Construct a real ExperimentRunner for hiring.
+
+    Each call to .run() spins a fresh InterviewRecommenderSandbox in a
+    unique temp directory so concurrent passes don't fight for the
+    Kuzu single-writer lock. The scorer reads from the SANDBOX's
+    graph (not the live graph) because that's where the sandboxed
+    interview-recommender wrote its decisions.
+    """
+    import tempfile
+    import uuid as _uuid
+
+    del graph_for_scorer  # scorer reads from sandbox.graph, not the live graph
+    ground_truth = HiringLabelsGroundTruth(_HIRING_LABELS_CSV)
+
+    def sandbox_factory() -> InterviewRecommenderSandbox:
+        tmp = Path(tempfile.gettempdir()) / "zava-dream-sandbox" / _uuid.uuid4().hex
+        return InterviewRecommenderSandbox(kuzu_root=tmp)
+
+    def scorer_for(sandbox) -> RunScorer:
+        return RunScorer(graph=sandbox.graph, ground_truth=ground_truth)
+
+    return ExperimentRunner(sandbox_factory=sandbox_factory, scorer_for=scorer_for)
+
+
+class _DomainDispatchingRunner:
+    """Picks the real experiment runner for hiring; stub for everything else.
+
+    The dream-pass orchestrator only accepts ONE experiment_runner instance
+    at construction. This wrapper inspects the rubric the orchestrator
+    passes through at run(...) time and forwards to the right backend.
+    Falls back to stub on any backend error so a transient GHCP failure
+    during a cadence tick doesn't crash the whole pass — the stub returns
+    a deterministic placeholder so the policy + governor + bus chain
+    still runs.
+    """
+
+    def __init__(self, *, real, stub):
+        self._real = real
+        self._stub = stub
+
+    async def run(self, **kw):
+        try:
+            rubric = kw.get("rubric")
+            if rubric is not None and getattr(rubric, "domain", "") == "hiring":
+                return await self._real.run(**kw)
+            return await self._stub.run(**kw)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "experiment runner backend failed; falling back to stub for this call",
+            )
+            return await self._stub.run(**kw)
+
+
 _DEMO_PROPOSER_CANDIDATES: list[tuple[str, str]] = [
     (
         "Trigger: candidate lacks recent leadership signal. "
@@ -88,6 +167,8 @@ def build_demo_orchestrator(
     lesson_store: InMemoryLessonStore | None = None,
     working_memory_store: InMemoryWorkingMemoryStore | None = None,
     proposer: Any = None,
+    experiment_runner: Any = None,
+    rubric: Any = None,
 ) -> DreamPassOrchestrator:
     """Wire dream-pass with in-memory stores + StubProposer +
     _StubExperimentRunner. Pass lesson_store / working_memory_store to
@@ -112,6 +193,20 @@ def build_demo_orchestrator(
     )
     proposer = proposer if proposer is not None else _build_default_proposer()
 
+    if experiment_runner is None:
+        try:
+            real = _build_real_hiring_runner(graph)
+            experiment_runner = _DomainDispatchingRunner(real=real, stub=_StubExperimentRunner())
+        except Exception:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Real hiring experiment runner unavailable; using stub only.",
+                exc_info=True,
+            )
+            experiment_runner = _StubExperimentRunner()
+    if rubric is None:
+        rubric = _load_hiring_rubric()
+
     def _load_active_lessons(domain: str):
         scope = LessonScope(domain=domain)
         return list(lesson_store.search(query="", scope=scope, top_k=100))
@@ -125,14 +220,14 @@ def build_demo_orchestrator(
         governor=governor,
         proposer=proposer,
         partitioner=partitioner,
-        experiment_runner=_StubExperimentRunner(),
+        experiment_runner=experiment_runner,
         policy=PromotionPolicy({}),
         list_persona_ids=lambda domain: _fresh_demo_persona_ids(),
         load_cvs=lambda ids: [{"candidate_id": i} for i in ids],
         load_active_lessons=_load_active_lessons,
         load_recent_runs=lambda domain: [],
         load_working_notes=_load_working_notes,
-        rubric=_DEMO_RUBRIC,
+        rubric=rubric,
         mark_working_note_consumed=lambda note_id, dream_pass_id: working_store.mark_consumed(
             note_id=note_id, dream_pass_id=dream_pass_id,
         ),
