@@ -13,6 +13,7 @@ policy + governor + provenance + bus emit chain runs end-to-end.
 from __future__ import annotations
 
 import hashlib
+import uuid
 from typing import Any
 
 from api.server.services.audit_logger import AuditLogger
@@ -40,9 +41,13 @@ _DEMO_PARTITIONER_DOMAIN = "__demo__"
 
 # Synthetic persona ids handed to the partitioner. The stub experiment
 # runner ignores their semantics; the partitioner just needs ids that
-# aren't already burned in Kuzu. 50 entries is comfortable headroom
-# for repeat passes during a demo session.
-_DEMO_PERSONA_IDS = [f"P-DEMO-{i:03d}" for i in range(1, 51)]
+# aren't already burned in Kuzu. CorpusPartitioner persists used ids to
+# Kuzu across calls, so we generate fresh UUID-keyed ids per pass to
+# guarantee no collision with prior runs — otherwise a fixed pool would
+# be exhausted after one or two passes and every subsequent dream-pass
+# would raise ValueError: insufficient unseen personas.
+def _fresh_demo_persona_ids() -> list[str]:
+    return [f"P-DEMO-{uuid.uuid4().hex[:12]}" for _ in range(200)]
 
 
 # Only read by _StubExperimentRunner; the real runner builds its own rubric.
@@ -121,7 +126,7 @@ def build_demo_orchestrator(
         partitioner=partitioner,
         experiment_runner=_StubExperimentRunner(),
         policy=PromotionPolicy({}),
-        list_persona_ids=lambda domain: list(_DEMO_PERSONA_IDS),
+        list_persona_ids=lambda domain: _fresh_demo_persona_ids(),
         load_cvs=lambda ids: [{"candidate_id": i} for i in ids],
         load_active_lessons=_load_active_lessons,
         load_recent_runs=lambda domain: [],
