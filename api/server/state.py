@@ -191,18 +191,41 @@ class AppState:
         # case with a loud warning so operators know lessons will NOT
         # survive a restart. Tests inject a MagicMock memory directly.
         try:
-            from api.server.services.lessons.mem0_store import Mem0LessonStore
-            self.lesson_store = Mem0LessonStore()
+            from api.server.services.lessons.mem0_store import (
+                Mem0LessonStore, build_default_memory,
+            )
+
+            _mem0_backend = build_default_memory()
+            self.lesson_store = Mem0LessonStore(memory=_mem0_backend)
+            # Per-domain Mem0 memory stores — Anthropic-style two-tier
+            # architecture. Each domain gets its own logical partition
+            # within the shared Mem0 backend.
+            from api.server.services.memory.domain_memory import (
+                DomainMemory, build_domain_memories,
+            )
+
+            _memory_domains = [
+                d.strip()
+                for d in os.getenv("MEMORY_DOMAINS", "hiring").split(",")
+                if d.strip()
+            ]
+            self.domain_memories: dict[str, DomainMemory] = build_domain_memories(
+                domains=_memory_domains,
+                memory=_mem0_backend,
+            )
         except Exception as _mem0_ex:
             import logging
+
             logging.getLogger(__name__).warning(
                 "Mem0 backend unavailable (%s); falling back to "
                 "InMemoryLessonStore. Lessons will NOT persist across "
                 "restarts until Mem0 is configured (MEM0_API_KEY or "
-                "local Qdrant).",
+                "local Qdrant); domain_memories will be empty. Agents "
+                "will run without memory.",
                 _mem0_ex,
             )
             self.lesson_store = InMemoryLessonStore()
+            self.domain_memories = {}
         self.working_memory_store = InMemoryWorkingMemoryStore()
         # Wire the agent-runtime working-memory capture singleton to our
         # shared store so LLM agent completions (via run_agent_session)

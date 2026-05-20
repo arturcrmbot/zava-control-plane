@@ -65,3 +65,13 @@ def test_build_domain_memories_creates_one_per_domain():
     assert set(stores.keys()) == {"hiring", "vendor_kyc"}
     assert stores["hiring"].domain == "hiring"
     assert stores["vendor_kyc"].domain == "vendor_kyc"
+
+
+def test_appstate_has_domain_memories():
+    """AppState exposes domain_memories dict."""
+    from api.server.state import app_state
+
+    assert hasattr(app_state, "domain_memories")
+    assert isinstance(app_state.domain_memories, dict)
+    # At minimum, the default "hiring" domain should be present
+    # (or empty dict if Mem0 is unavailable — both are valid)
