@@ -21,6 +21,15 @@ from api.server.services.lessons.working_memory_types import WorkingNote
 class WorkingMemoryCapture:
     def __init__(self, *, store: WorkingMemoryStore) -> None:
         self._store = store
+        self._seen: set[str] = set()
+
+    def _dedup_add(self, note: WorkingNote) -> None:
+        """Add note only if we haven't seen this (workflow, kind, body) before."""
+        key = f"{note.workflow_id}:{note.kind}:{note.body[:80]}"
+        if key in self._seen:
+            return
+        self._seen.add(key)
+        self._store.add(note)
 
     def on_agent_completed(
         self,
@@ -35,7 +44,7 @@ class WorkingMemoryCapture:
             return
 
         decision_body = self._summarise_decision(response_text)
-        self._store.add(WorkingNote(
+        self._dedup_add(WorkingNote(
             id=f"WN-{uuid.uuid4()}",
             workflow_id=workflow_id,
             agent_skill=agent_skill,
@@ -54,7 +63,7 @@ class WorkingMemoryCapture:
                 body += f"\n  args: {args_summary}"
             if result_summary:
                 body += f"\n  result: {result_summary}"
-            self._store.add(WorkingNote(
+            self._dedup_add(WorkingNote(
                 id=f"WN-{uuid.uuid4()}",
                 workflow_id=workflow_id,
                 agent_skill=agent_skill,
@@ -63,7 +72,7 @@ class WorkingMemoryCapture:
             ))
 
         for lid, preview in (used_lesson_ids or []):
-            self._store.add(WorkingNote(
+            self._dedup_add(WorkingNote(
                 id=f"WN-{uuid.uuid4()}",
                 workflow_id=workflow_id,
                 agent_skill=agent_skill,
