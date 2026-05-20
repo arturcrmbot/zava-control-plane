@@ -87,6 +87,7 @@ def build_demo_orchestrator(
     audit: AuditLogger,
     lesson_store: InMemoryLessonStore | None = None,
     working_memory_store: InMemoryWorkingMemoryStore | None = None,
+    proposer: Any = None,
 ) -> DreamPassOrchestrator:
     """Wire dream-pass with in-memory stores + StubProposer +
     _StubExperimentRunner. Pass lesson_store / working_memory_store to
@@ -109,7 +110,7 @@ def build_demo_orchestrator(
         provenance=provenance,
         actor="operator:demo",
     )
-    proposer = StubProposer(candidates=list(_DEMO_PROPOSER_CANDIDATES))
+    proposer = proposer if proposer is not None else _build_default_proposer()
 
     def _load_active_lessons(domain: str):
         scope = LessonScope(domain=domain)
@@ -138,6 +139,34 @@ def build_demo_orchestrator(
         graph=graph,
         bus=bus,
     )
+
+
+def _build_default_proposer():
+    """Construct the runtime-default proposer.
+
+    Prefers GHCPProposer wired to the hiring dream-pass SKILL.md (real
+    LLM-driven candidate distillation). Falls back to StubProposer with
+    the demo seed candidates when GHCP isn't available (no gh auth,
+    sandboxed CI, etc.) so the loop still runs end-to-end with theatre
+    candidates instead of crashing.
+    """
+    try:
+        from api.server.services.dream_pass.proposer import GHCPProposer
+        from api.server.services.dream_pass.skill_loader import dream_skill_path
+        # GHCPProposer takes the *directory* containing SKILL.md.
+        skill_path = dream_skill_path("hiring")
+        skill_dir = skill_path.parent if hasattr(skill_path, "parent") else None
+        if skill_dir is None or not (skill_dir / "SKILL.md").exists():
+            raise RuntimeError(f"dream-pass SKILL.md missing at {skill_dir}")
+        return GHCPProposer(skill_dir=skill_dir)
+    except Exception as ex:
+        import logging
+        logging.getLogger(__name__).warning(
+            "GHCPProposer unavailable (%s); falling back to StubProposer with seed candidates. "
+            "Dream-pass candidates will be hardcoded until this is resolved.",
+            ex,
+        )
+        return StubProposer(candidates=list(_DEMO_PROPOSER_CANDIDATES))
 
 
 class _StubExperimentRunner:
