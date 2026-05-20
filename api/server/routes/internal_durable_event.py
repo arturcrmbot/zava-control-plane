@@ -676,11 +676,14 @@ async def receive_durable_event(
                 text = f"Agent {skill_label} (workflow {wid}): {response}"
                 if tool_summary:
                     text += f"\nTools used: {tool_summary}"
+                log.info("memory capture: domain=%s skill=%s wid=%s text_len=%d", domain, skill_label, wid, len(text))
                 app_state.domain_memories[domain].add(
                     text=text,
                     agent_skill=skill_label,
                     workflow_id=wid,
                 )
+            else:
+                log.debug("memory capture: skipped skill=%s domain=%s (not in domain_memories=%s)", skill_label, domain, list(app_state.domain_memories.keys()))
         except Exception:
             log.exception("agent.completed: memory capture failed")
         # Cost-budget bridge: attribute token spend to the dream-pass
