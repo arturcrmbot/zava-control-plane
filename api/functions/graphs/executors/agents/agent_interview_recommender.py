@@ -26,6 +26,7 @@ def _build_prompt(input: dict) -> str:
     role_title = input.get("role_title") or "Candidate"
     role_jurisdiction = input.get("role_jurisdiction") or "—"
     levels = levels_for(role_title)
+    lessons = input.get("lessons") or []
     payload = {
         "gate": gate,
         "role_title": role_title,
@@ -35,10 +36,27 @@ def _build_prompt(input: dict) -> str:
         "screening": input.get("screening") or {},
         "voice_transcript": input.get("voice_transcript") or [],
         "voice_score": input.get("voice_score"),
-        "lessons": input.get("lessons") or [],
         "working_notes": input.get("working_notes") or [],
     }
+    # Hoist lessons OUT of the JSON payload and into a natural-language
+    # preamble. Previously they were just one of many keys in the JSON
+    # blob and the LLM skimmed past them, producing identical
+    # recommendations with and without lessons (control == treatment,
+    # delta == 0 in every dream-pass experiment). The substrate's whole
+    # learning loop depends on lessons measurably moving the model's
+    # output — they have to be conspicuous, not buried.
+    lessons_preamble = ""
+    if lessons:
+        bullets = "\n".join(f"- {body}" for body in lessons)
+        lessons_preamble = (
+            "## Lessons from prior cases\n\n"
+            "Apply the following heuristics where they fit the candidate at hand. "
+            "Each bullet describes a trigger and an action — if the trigger matches, "
+            "weight your recommendation accordingly.\n\n"
+            f"{bullets}\n\n---\n\n"
+        )
     return (
+        f"{lessons_preamble}"
         f"Recommend at gate `{gate}` for `{role_title}`. "
         f"Context (JSON):\n```json\n{json.dumps(payload, indent=2)}\n```\n"
         f"Return ONLY the JSON object specified in your skill — no prose, "
