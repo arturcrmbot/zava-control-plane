@@ -3,7 +3,7 @@ domains:
   hiring:
     auto_promote:
       min_delta: 0.05
-      min_samples: 40
+      min_samples: 5
       max_per_pass: 3
     flag_for_review:
       - kind: scope_expansion
