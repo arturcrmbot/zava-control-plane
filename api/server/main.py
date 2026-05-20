@@ -361,6 +361,8 @@ from api.server.routes.insights import router as insights_router
 from api.server.routes.demo_triggers import router as demo_triggers_router
 # Live decision/insight ticker — autonomous-domain-insights v1.1 Phase D1.
 from api.server.routes.ticker import router as ticker_router
+# Memory layer visualisation — read-only memory query API.
+from api.server.routes.memory import router as memory_router
 
 for r in (stream_router, workflows_router, exceptions_router, policy_router,
           simulator_router, audit_router, evals_router, orchestration_router,
@@ -391,7 +393,8 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           ticker_router,
           foundry_router,
           dream_pass_exceptions_router,
-          dream_pass_run_router):
+          dream_pass_run_router,
+          memory_router):
     app.include_router(r)
 
 # Mount the built blueprint Vite bundle if present (production deploy).
