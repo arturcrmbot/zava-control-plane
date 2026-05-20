@@ -28,6 +28,7 @@ import time
 import uuid
 from pathlib import Path
 
+import httpx
 from copilot.generated.session_events import SessionEventType
 from copilot.tools import Tool
 from opentelemetry import trace
@@ -43,6 +44,94 @@ _SKILLS_DIR = Path(__file__).resolve().parents[4] / "server" / "skills"
 SKILLS_DIR = _SKILLS_DIR
 _tracer = trace.get_tracer("zava.agents.finance")
 _MAX_RESPONSE_EVENT_BYTES = 4096
+
+
+# Skill → dream-pass domain mapping. A skill belongs to at most one
+# dream-pass domain; that domain is what /api/memory/lessons/active
+# scopes against. Skills not in this dict get no lesson prepend.
+# Hiring-tagged skills came from the legacy hiring track (no
+# `hiring-` prefix). Future domain additions: vendor_kyc,
+# expense_claim, contract_renewal — add their dream-passes/<domain>/
+# SKILL.md first, then add entries here.
+_SKILL_TO_DOMAIN: dict[str, str] = {
+    "cv-crystalliser": "hiring",
+    "auto-shortlister": "hiring",
+    "interview-recommender": "hiring",
+    "jd-drafter": "hiring",
+    "voice-screener": "hiring",
+    "betrvg-checker": "hiring",
+    "sourcing-orchestrator": "hiring",
+    "jurisdiction-router": "hiring",
+}
+
+
+# In-process lesson cache. {(domain): (fetched_at, [{id, body}, ...])}.
+# 30s TTL so a workflow firing several agents in a row doesn't hammer
+# the FastAPI memory route.
+_LESSON_CACHE_TTL_S = 30.0
+_lesson_cache: dict[str, tuple[float, list[dict]]] = {}
+
+
+def _memory_lessons_url(domain: str) -> str:
+    """Compute /api/memory/lessons/active?domain=X from the same base
+    URL the webhook uses. Falls back to localhost:3101 if env-unset."""
+    base = os.getenv("FASTAPI_WEBHOOK_URL", "http://localhost:3101/internal/durable-event")
+    from urllib.parse import urlsplit, urlunsplit
+    parts = urlsplit(base)
+    new_path = "/api/memory/lessons/active"
+    return urlunsplit((parts.scheme, parts.netloc, new_path, f"domain={domain}", ""))
+
+
+async def _fetch_active_lessons(domain: str) -> list[dict]:
+    """Pull active lessons for ``domain`` from the FastAPI memory route.
+    30s in-process cache; tolerant of network errors (returns [])."""
+    now = time.monotonic()
+    cached = _lesson_cache.get(domain)
+    if cached is not None and now - cached[0] < _LESSON_CACHE_TTL_S:
+        return cached[1]
+    try:
+        async with httpx.AsyncClient() as c:
+            r = await c.get(_memory_lessons_url(domain), timeout=2.0)
+            if r.status_code != 200:
+                _lesson_cache[domain] = (now, [])
+                return []
+            items = r.json().get("items") or []
+            slim = [
+                {"id": str(l.get("id")), "body": str(l.get("body") or "")}
+                for l in items[:8] if l.get("body")
+            ]
+            _lesson_cache[domain] = (now, slim)
+            return slim
+    except Exception:
+        _lesson_cache[domain] = (now, [])
+        return []
+
+
+def _prepend_lessons_to_skill_text(skill_text: str | None, lessons: list[dict]) -> str | None:
+    """Prepend a '## Past lessons' section to the skill_text. Returns
+    skill_text unchanged when lessons is empty."""
+    if not lessons:
+        return skill_text
+    header = "## Past lessons\n\n"
+    bullets = "\n".join(f"- {l['body']}" for l in lessons)
+    block = header + bullets + "\n\n---\n\n"
+    return block + (skill_text or "")
+
+
+def _skill_to_domain(skill_label: str | None, skill_dir_name: str | None) -> str | None:
+    """Return the dream-pass domain for an agent skill, or None.
+    Checks skill_label first, then skill_dir name. Generated-domain
+    fleet-* skills follow the `<domain>-<purpose>` convention but
+    don't have dream-pass SKILL.md files yet, so we return None for
+    them until those exist."""
+    for s in (skill_label, skill_dir_name):
+        if not s:
+            continue
+        if s in _SKILL_TO_DOMAIN:
+            return _SKILL_TO_DOMAIN[s]
+        if s.startswith("fleet-"):
+            return None
+    return None
 
 
 def _load_skill(skill_dir: Path) -> str:
@@ -204,6 +293,11 @@ async def run_agent_session(
     """
     tools = tools or []
     skill_text = _load_skill(skill_dir) if skill_dir else None
+    # Phase B: pull active lessons for this skill's domain and prepend them
+    # to the system message so the agent benefits from past learning.
+    domain = _skill_to_domain(skill_label, skill_dir.name if skill_dir else None)
+    active_lessons: list[dict] = await _fetch_active_lessons(domain) if domain else []
+    skill_text = _prepend_lessons_to_skill_text(skill_text, active_lessons)
     # SDK skill auto-discovery uses the union of skill_dir (primary,
     # drives SKILL.md system-message loading + span tagging) and any
     # extra skill_directories the caller passes. Dedup preserves order
@@ -326,6 +420,7 @@ async def run_agent_session(
         "model": model,
         "skill_chars": len(skill_text) if skill_text else 0,
         "attachment_count": len(attachments) if attachments else 0,
+        "used_lesson_ids": [(l["id"], l["body"][:80]) for l in active_lessons],
         "usage": {
             "input_tokens": int(in_tok) if in_tok is not None else None,
             "output_tokens": int(out_tok) if out_tok is not None else None,
@@ -350,6 +445,7 @@ async def run_agent_session(
             agent_skill=agent_name,
             response_text=str(text or ""),
             tool_calls=tool_calls_collected,
+            used_lesson_ids=[(l["id"], l["body"][:80]) for l in active_lessons],
         )
     except Exception:
         pass

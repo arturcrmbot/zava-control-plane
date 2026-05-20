@@ -11,6 +11,7 @@ WorkingNoteKind = Literal[
     "decision",
     "tool_call",
     "surprise",
+    "lesson_used",   # emitted by _wrapper when an active lesson is included in the agent's system prompt
 ]
 
 

@@ -158,3 +158,36 @@ def test_long_tool_args_are_truncated_with_marker():
     tc_note = next(n for n in notes if n.kind == "tool_call")
     assert "x" in tc_note.body
     assert "…" in tc_note.body
+
+
+def test_on_agent_completed_emits_lesson_used_notes():
+    """Each lesson included in the prompt produces a WorkingNote tagged lesson_used."""
+    store = InMemoryWorkingMemoryStore()
+    capture = WorkingMemoryCapture(store=store)
+    capture.on_agent_completed(
+        workflow_id="WF-1",
+        agent_skill="cv-crystalliser",
+        response_text="ok",
+        tool_calls=[],
+        used_lesson_ids=[
+            ("L-abc", "Trigger: jurisdiction is DE..."),
+            ("L-def", "Trigger: budget at 90%..."),
+        ],
+    )
+    notes = [n for n in store._by_id.values() if n.kind == "lesson_used"]
+    assert len(notes) == 2
+    assert any("L-abc" in n.body for n in notes)
+    assert any("L-def" in n.body for n in notes)
+
+
+def test_on_agent_completed_without_used_lesson_ids_emits_no_lesson_used_notes():
+    store = InMemoryWorkingMemoryStore()
+    capture = WorkingMemoryCapture(store=store)
+    capture.on_agent_completed(
+        workflow_id="WF-1",
+        agent_skill="cv-crystalliser",
+        response_text="ok",
+        tool_calls=[],
+    )
+    notes = [n for n in store._by_id.values() if n.kind == "lesson_used"]
+    assert notes == []

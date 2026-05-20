@@ -29,6 +29,7 @@ class WorkingMemoryCapture:
         agent_skill: str,
         response_text: str,
         tool_calls: list[dict[str, Any]],
+        used_lesson_ids: list[tuple[str, str]] | None = None,
     ) -> None:
         if not workflow_id:
             return
@@ -59,6 +60,15 @@ class WorkingMemoryCapture:
                 agent_skill=agent_skill,
                 kind="tool_call",
                 body=body,
+            ))
+
+        for lid, preview in (used_lesson_ids or []):
+            self._store.add(WorkingNote(
+                id=f"WN-{uuid.uuid4()}",
+                workflow_id=workflow_id,
+                agent_skill=agent_skill,
+                kind="lesson_used",
+                body=f"used {lid}: {preview}",
             ))
 
     @staticmethod

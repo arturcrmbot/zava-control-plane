@@ -670,6 +670,7 @@ async def receive_durable_event(
                 agent_skill=str(payload.get("agent_label") or "unknown"),
                 response_text=str(payload.get("response_text") or ""),
                 tool_calls=payload.get("tool_calls") or [],
+                used_lesson_ids=payload.get("used_lesson_ids") or [],
             )
         except Exception:
             log.exception("agent.completed: working-memory capture bridge failed")

@@ -40,3 +40,14 @@ def test_working_note_mark_consumed_returns_new_instance() -> None:
     consumed = note.mark_consumed(dream_pass_id="DP-1")
     assert consumed.consumed_by_dream_pass == "DP-1"
     assert note.consumed_by_dream_pass is None
+
+
+def test_lesson_used_kind_accepted() -> None:
+    note = WorkingNote(
+        id="WN-1",
+        workflow_id="WF-1",
+        agent_skill="cv-crystalliser",
+        kind="lesson_used",
+        body="used L-abc: Trigger: jurisdiction is DE...",
+    )
+    assert note.kind == "lesson_used"
