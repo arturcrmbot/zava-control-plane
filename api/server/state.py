@@ -529,4 +529,79 @@ async def _run_dream_pass_cadence(
             return
 
 
+async def _run_lesson_lifecycle_sweep(
+    app_state: "AppState",
+    *,
+    domains: tuple[str, ...],
+    interval_seconds: int,
+    shadow_invocations_required: int = 50,
+    max_override_rate: float = 0.20,
+    retire_after_days: int = 30,
+) -> None:
+    """Periodic sweep that demotes / retires lessons via outcome metrics.
+
+    Built lazily so the heavy dream-pass orchestrator (and its kuzu /
+    governance wiring) is only constructed when the sweep actually runs.
+    Failures in one domain do not block the next or the next interval;
+    sleeps cancel cleanly on lifespan teardown.
+    """
+    import asyncio as _asyncio
+    import logging as _log
+
+    if interval_seconds <= 0:
+        return
+
+    from api.server.services.lessons.lesson_metrics import LessonMetrics
+
+    log = _log.getLogger(__name__)
+
+    def _exceptions_provider():
+        # Adapt StateStore.Exception objects to the dict-like shape
+        # LessonMetrics expects. We include resolved exceptions because
+        # the override-rate signal counts every workflow that ever hit
+        # an operator override, not just currently-open ones.
+        try:
+            store = app_state.store
+            return [
+                {"workflow_id": e.workflow_id}
+                for e in store.list_exceptions(include_resolved=True)
+                if getattr(e, "workflow_id", None)
+            ]
+        except Exception:
+            return []
+
+    while True:
+        for dom in domains:
+            try:
+                governor = app_state.dream_pass_orchestrator._governor
+            except Exception:
+                log.exception(
+                    "lifecycle sweep: governor unavailable for %s", dom,
+                )
+                continue
+            metrics = LessonMetrics(
+                working_memory_store=app_state.working_memory_store,
+                exceptions_provider=_exceptions_provider,
+            )
+            try:
+                transitions = governor.apply_lifecycle(
+                    domain=dom,
+                    metrics=metrics,
+                    shadow_invocations_required=shadow_invocations_required,
+                    max_override_rate=max_override_rate,
+                    retire_after_days=retire_after_days,
+                )
+                if transitions:
+                    log.info(
+                        "lifecycle sweep: %d transitions in %s: %s",
+                        len(transitions), dom, transitions,
+                    )
+            except Exception:
+                log.exception("lifecycle sweep: pass for %s failed", dom)
+        try:
+            await _asyncio.sleep(interval_seconds)
+        except _asyncio.CancelledError:
+            return
+
+
 app_state = AppState()

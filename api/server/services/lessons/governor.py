@@ -91,6 +91,72 @@ class LessonGovernor:
             details={"lesson_id": lesson_id, "reason": reason},
         )
 
+    def apply_lifecycle(
+        self,
+        *,
+        domain: str,
+        metrics,  # 'LessonMetrics' — avoid hard import
+        shadow_invocations_required: int,
+        max_override_rate: float,
+        retire_after_days: int,
+    ):
+        """Sweep lessons in ``domain``, compute next_status, apply transitions.
+
+        Returns ``list[(lesson_id, new_status)]``. DEMOTED and RETIRED both
+        currently route through ``self.prune`` (audit + provenance trail
+        preserved). ACTIVE/SHADOW transitions are not yet plumbed — they
+        require an UPDATE pathway on ``LessonStore`` (Phase C4 follow-up).
+        """
+        from datetime import datetime, timezone
+
+        from api.server.services.lessons.lesson_lifecycle import (
+            LessonOutcomeMetrics,
+            LessonStatus,
+            next_status,
+        )
+        from api.server.services.lessons.types import LessonScope
+
+        transitions: list[tuple[str, LessonStatus]] = []
+        lessons = self._store.search(
+            query="", scope=LessonScope(domain=domain), top_k=500,
+        )
+        for lesson in lessons:
+            # Normalise unexpected status values to ACTIVE so a future
+            # status escaping the enum doesn't crash the sweep.
+            try:
+                current = LessonStatus(lesson.status)
+            except ValueError:
+                current = LessonStatus.ACTIVE
+            m = LessonOutcomeMetrics(
+                status=current,
+                invocations=metrics.invocations(lesson.id),
+                hitl_override_count=metrics.hitl_override_count(lesson.id),
+                promoted_at=lesson.provenance.promoted_at,
+                # TODO: replace with real last_used signal once tracked.
+                last_used_at=datetime.now(timezone.utc),
+            )
+            new = next_status(
+                m,
+                shadow_invocations_required=shadow_invocations_required,
+                max_override_rate=max_override_rate,
+                retire_after_days=retire_after_days,
+            )
+            if new == current:
+                continue
+            if new == LessonStatus.RETIRED:
+                self.prune(
+                    lesson.id,
+                    reason=f"retired:unused>{retire_after_days}d",
+                )
+            elif new == LessonStatus.DEMOTED:
+                self.prune(
+                    lesson.id,
+                    reason=f"demoted:override_rate>{max_override_rate}",
+                )
+            # ACTIVE/SHADOW status updates: not yet plumbed (Phase C4).
+            transitions.append((lesson.id, new))
+        return transitions
+
     def _enforce(self, decision: Decision) -> None:
         if decision.allowed:
             return

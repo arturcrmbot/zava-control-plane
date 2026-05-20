@@ -148,6 +148,33 @@ async def lifespan(app: FastAPI):
         )
     else:
         dream_cadence_task = None
+
+    # Lesson lifecycle sweep — demotes lessons exceeding the HITL override
+    # rate, retires lessons that have gone unused. Always on; defaults to
+    # 300s. Scheduled in the lifespan (not AppState.__init__) for the same
+    # reason as dream-pass cadence: the event loop only exists once
+    # uvicorn starts.
+    from api.server.state import _run_lesson_lifecycle_sweep
+    _lifecycle_secs = int(
+        os.getenv("LESSON_LIFECYCLE_SWEEP_INTERVAL_SECONDS", "300") or "0"
+    )
+    _lifecycle_domains = tuple(
+        d.strip() for d in os.getenv(
+            "LESSON_LIFECYCLE_SWEEP_DOMAINS", "hiring",
+        ).split(",") if d.strip()
+    )
+    if _lifecycle_secs > 0 and _lifecycle_domains:
+        lifecycle_task = asyncio.create_task(_run_lesson_lifecycle_sweep(
+            app_state,
+            domains=_lifecycle_domains,
+            interval_seconds=_lifecycle_secs,
+        ))
+        print(
+            f"[server] lesson lifecycle sweep ON ({_lifecycle_secs}s, "
+            f"domains={_lifecycle_domains})"
+        )
+    else:
+        lifecycle_task = None
     from api.server.eval.online_subscriber import lifespan_register, lifespan_shutdown
     await lifespan_register(app)
     # Candidate-portal: subscribe the cv_crystalliser → magic-link + email
@@ -250,11 +277,13 @@ async def lifespan(app: FastAPI):
         seed_task.cancel()
         if dream_cadence_task is not None:
             dream_cadence_task.cancel()
+        if lifecycle_task is not None:
+            lifecycle_task.cancel()
         # Await the cancelled tasks so their teardown actually completes
         # before the lifespan returns. Without this, a partially-running
         # seed (which calls into the Functions host over HTTP) can leave
         # an open httpx connection or a half-scheduled orchestration.
-        for t in (ramp_task, seed_task, dream_cadence_task):
+        for t in (ramp_task, seed_task, dream_cadence_task, lifecycle_task):
             if t is None:
                 continue
             try:
