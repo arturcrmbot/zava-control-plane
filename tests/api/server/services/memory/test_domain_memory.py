@@ -34,6 +34,19 @@ def test_add_passes_infer_true_and_domain_metadata(fake_mem0):
     assert call_kw.kwargs["metadata"]["workflow_id"] == "WF-001"
 
 
+def test_add_distilled_passes_infer_false_and_domain_metadata(fake_mem0):
+    store = DomainMemory(domain="hiring", memory=fake_mem0)
+    store.add_distilled(
+        "When CV is empty and no other positive signals exist, decline the candidate.",
+        metadata={"source": "dream-consolidation", "domain": "override-attempt"},
+    )
+    call_kw = fake_mem0.add.call_args
+    assert call_kw.kwargs["infer"] is False
+    assert call_kw.kwargs["user_id"] == "domain:hiring"
+    assert call_kw.kwargs["metadata"]["domain"] == "hiring"
+    assert call_kw.kwargs["metadata"]["source"] == "dream-consolidation"
+
+
 def test_recall_searches_with_domain_filter(fake_mem0):
     store = DomainMemory(domain="hiring", memory=fake_mem0)
     results = store.recall(query="sparse CV handling", top_k=3)

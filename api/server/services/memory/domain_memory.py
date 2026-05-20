@@ -46,6 +46,24 @@ class DomainMemory:
         )
         return (result or {}).get("results", [])
 
+    def add_distilled(
+        self,
+        text: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+    ) -> list[dict]:
+        """Write a pre-distilled memory with infer=False."""
+        result = self._mem.add(
+            messages=text,
+            user_id=self._user_id,
+            metadata={
+                **(metadata or {}),
+                "domain": self.domain,
+            },
+            infer=False,
+        )
+        return (result or {}).get("results", [])
+
     def recall(self, query: str, *, top_k: int = 5) -> list[dict]:
         """Semantic search for top-K relevant memories."""
         results = self._mem.search(
