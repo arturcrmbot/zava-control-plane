@@ -140,7 +140,11 @@ async def lifespan(app: FastAPI):
         dream_cadence_task = asyncio.create_task(_run_dream_pass_cadence(
             app_state.dream_pass_orchestrator,
             domains=_dream_cadence_domains,
-            interval_seconds=_dream_cadence_secs,
+            heartbeat_seconds=_dream_cadence_secs,
+            tick_seconds=int(os.getenv("DREAM_PASS_TICK_SECONDS", "15") or "15"),
+            backlog_threshold=int(os.getenv("DREAM_PASS_TRIGGER_BACKLOG", "30") or "30"),
+            working_memory_store=app_state.working_memory_store,
+            cost_budget=app_state.cost_budget,
         ))
         print(
             f"[server] dream-pass cadence ON ({_dream_cadence_secs}s, "

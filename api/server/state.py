@@ -516,6 +516,7 @@ async def _run_dream_pass_cadence(
     tick_seconds: int = 15,
     backlog_threshold: int = 30,
     working_memory_store=None,
+    cost_budget=None,
 ) -> None:
     """Signal-driven autonomous loop firing one dream pass per domain.
 
@@ -566,7 +567,7 @@ async def _run_dream_pass_cadence(
             if _is_paused(dom):
                 log.info("dream cadence: skipping %s — paused", dom)
                 continue
-            if app_state.cost_budget.is_over_budget(dom):
+            if cost_budget is not None and cost_budget.is_over_budget(dom):
                 log.info("dream cadence: skipping %s — over daily LLM budget", dom)
                 continue
             now = _dt.datetime.now(_dt.timezone.utc)

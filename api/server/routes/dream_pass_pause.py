@@ -10,29 +10,36 @@ doesn't have to know — it imports is_paused() before each pass.
 """
 from __future__ import annotations
 
+import threading
+
 from fastapi import APIRouter, Query
 
 router = APIRouter(prefix="/api/dream-pass", tags=["dream-pass"])
 
+_lock = threading.Lock()
 _paused_domains: set[str] = set()
 
 
 def is_paused(domain: str) -> bool:
-    return domain in _paused_domains
+    with _lock:
+        return domain in _paused_domains
 
 
 @router.post("/pause")
 def pause(domain: str = Query(...)) -> dict:
-    _paused_domains.add(domain)
-    return {"ok": True, "paused": sorted(_paused_domains)}
+    with _lock:
+        _paused_domains.add(domain)
+        return {"ok": True, "paused": sorted(_paused_domains)}
 
 
 @router.delete("/pause")
 def unpause(domain: str = Query(...)) -> dict:
-    _paused_domains.discard(domain)
-    return {"ok": True, "paused": sorted(_paused_domains)}
+    with _lock:
+        _paused_domains.discard(domain)
+        return {"ok": True, "paused": sorted(_paused_domains)}
 
 
 @router.get("/pause")
 def list_paused() -> dict:
-    return {"paused": sorted(_paused_domains)}
+    with _lock:
+        return {"paused": sorted(_paused_domains)}
