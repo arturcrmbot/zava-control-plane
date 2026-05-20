@@ -42,6 +42,65 @@ from api.server.services.scoring.types import Rubric, RubricCheck
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _HIRING_RUBRIC_YAML = _REPO_ROOT / "data" / "rubrics" / "hiring.yaml"
 _HIRING_LABELS_CSV = _REPO_ROOT / "data" / "synthetic" / "hiring" / "labels.csv"
+_DREAM_POLICY_YAML = _REPO_ROOT / "data" / "policies" / "dream-pass.policy.yaml"
+
+
+# Domain scoping for working-note feeds into the dream-pass proposer.
+# Notes whose agent_skill is NOT mapped to the requested domain are
+# excluded so a hiring proposer doesn't get bled-through patterns from
+# fleet-vendor-kyc or fleet-it-access-request. The set is intentionally
+# small: every entry MUST have a corresponding dream-pass SKILL.md
+# under api/server/skills/dream-passes/<domain>/.
+_DOMAIN_AGENT_SKILLS: dict[str, set[str]] = {
+    "hiring": {
+        # Legacy single-skill names
+        "cv-crystalliser",
+        "auto-shortlister",
+        "interview-recommender",
+        "interview_recommender",
+        "jd-drafter",
+        "voice-screener",
+        "betrvg-checker",
+        "sourcing-orchestrator",
+        "jurisdiction-router",
+        # Agentic-segments refactor — any segment of the hiring workflow
+        "hiring-segment-a",
+        "hiring-segment-b",
+        "hiring-segment-c",
+        "hiring-segment-d",
+        "hiring-segment-e",
+        "hiring-segment-f",
+        # Dream-pass agent itself (its own decisions become signal for the next pass)
+        "dream-pass-hiring",
+    },
+}
+
+
+def _agent_in_domain(agent_skill: str | None, domain: str) -> bool:
+    if not agent_skill:
+        return False
+    allowed = _DOMAIN_AGENT_SKILLS.get(domain)
+    if allowed is not None and agent_skill in allowed:
+        return True
+    # Substring fallback: catches generated-domain segments like
+    # hiring-segment-* that won't always be explicitly listed.
+    return domain in agent_skill
+
+
+def _load_real_policy():
+    """Load data/policies/dream-pass.policy.yaml so promotion uses the
+    real thresholds (min_delta, min_samples, max_per_pass, flag rules)
+    instead of PromotionPolicy({}) defaults that promote everything."""
+    try:
+        return PromotionPolicy.from_file(_DREAM_POLICY_YAML)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).warning(
+            "real dream-pass policy YAML failed to load (%s); using empty defaults",
+            _DREAM_POLICY_YAML,
+            exc_info=True,
+        )
+        return PromotionPolicy({})
 
 
 # Partitioner needs a domain at construction even though it only uses
@@ -125,17 +184,27 @@ class _DomainDispatchingRunner:
     def __init__(self, *, real, stub):
         self._real = real
         self._stub = stub
+        self._log = __import__("logging").getLogger(__name__)
 
     async def run(self, **kw):
         try:
             rubric = kw.get("rubric")
-            if rubric is not None and getattr(rubric, "domain", "") == "hiring":
+            domain = getattr(rubric, "domain", "")
+            if domain == "hiring":
+                self._log.info(
+                    "dream-pass: routing experiment %s to REAL hiring sandbox",
+                    kw.get("experiment_id"),
+                )
                 return await self._real.run(**kw)
+            self._log.info(
+                "dream-pass: routing experiment %s to STUB (domain=%r)",
+                kw.get("experiment_id"), domain,
+            )
             return await self._stub.run(**kw)
         except Exception:
-            import logging
-            logging.getLogger(__name__).exception(
-                "experiment runner backend failed; falling back to stub for this call",
+            self._log.exception(
+                "dream-pass: real runner failed for experiment %s; falling back to STUB",
+                kw.get("experiment_id"),
             )
             return await self._stub.run(**kw)
 
@@ -212,14 +281,16 @@ def build_demo_orchestrator(
         return list(lesson_store.search(query="", scope=scope, top_k=100))
 
     def _load_working_notes(agents):
-        # The orchestrator hardcodes ('interview-recommender',) as the
-        # only skill it asks for — that was wired for the
-        # original hiring-only sandbox. Today the hiring track fires
-        # cv-crystalliser, auto-shortlister, jurisdiction-router etc.,
-        # none of which match. Ignore the narrow arg and return ALL
-        # recent unconsumed notes; the GHCPProposer's prompt is already
-        # scoped to "the '<domain>' domain" so it filters semantically
-        # in the LLM rather than via agent_skill set membership.
+        # The orchestrator passes a narrow hardcoded ('interview-
+        # recommender',) tuple that doesn't match today's actual
+        # hiring-track LLM agent names. Ignore it and instead filter
+        # to notes whose agent_skill belongs to the "hiring" domain
+        # via _agent_in_domain. The proposer's prompt is scoped to a
+        # single domain at construction (only hiring has a dream-pass
+        # SKILL.md today) so this single-domain filter is sound until
+        # we generalise the orchestrator to thread domain through.
+        # TODO: once multi-domain dream passes ship, derive domain from
+        # skill.domain via the orchestrator API.
         del agents
         store = working_store
         if not hasattr(store, "_by_id"):
@@ -227,6 +298,7 @@ def build_demo_orchestrator(
         unconsumed = [
             n for n in store._by_id.values()  # type: ignore[attr-defined]
             if n.consumed_by_dream_pass is None
+            and _agent_in_domain(getattr(n, "agent_skill", None), "hiring")
         ]
         unconsumed.sort(key=lambda n: n.captured_at, reverse=True)
         return unconsumed[:50]
@@ -236,7 +308,7 @@ def build_demo_orchestrator(
         proposer=proposer,
         partitioner=partitioner,
         experiment_runner=experiment_runner,
-        policy=PromotionPolicy({}),
+        policy=_load_real_policy(),
         list_persona_ids=lambda domain: _fresh_demo_persona_ids(),
         load_cvs=lambda ids: [{"candidate_id": i} for i in ids],
         load_active_lessons=_load_active_lessons,
