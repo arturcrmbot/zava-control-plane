@@ -477,6 +477,7 @@ class AppState:
                         tick_seconds=tick_secs,
                         backlog_threshold=backlog_threshold,
                         working_memory_store=self.working_memory_store,
+                        domain_memories=self.domain_memories,
                     ))
                 )
             except RuntimeError:
@@ -539,11 +540,12 @@ async def _run_dream_pass_cadence(
     tick_seconds: int = 15,
     backlog_threshold: int = 30,
     working_memory_store=None,
+    domain_memories=None,
     cost_budget=None,
 ) -> None:
     """Signal-driven autonomous loop firing one dream pass per domain.
 
-    Each ``tick_seconds`` we snapshot per-domain inputs (unconsumed
+    Each ``tick_seconds`` we snapshot per-domain inputs (memory-store
     backlog + time since last pass) and ask ``should_trigger``. The
     pass fires on either (a) backlog ≥ ``backlog_threshold`` or
     (b) ``heartbeat_seconds`` elapsed since the previous pass.
@@ -555,38 +557,34 @@ async def _run_dream_pass_cadence(
     import asyncio as _asyncio
     import datetime as _dt
     import logging as _log
+
     if heartbeat_seconds <= 0:
         return
-    from api.server.services.dream_pass.skill_loader import (
-        DreamSkillLoadError, dream_skill_path, load_dream_skill,
-    )
+
     from api.server.services.lessons.decision_quality_signal import (
         TriggerInputs, should_trigger,
     )
-    from api.functions.graphs.executors.agents._wrapper import _skill_to_domain
 
     log = _log.getLogger(__name__)
     last_pass_at: dict[str, _dt.datetime] = {}
 
     def _backlog_for(dom: str) -> int:
-        if working_memory_store is None:
+        if not domain_memories or dom not in domain_memories:
             return 0
-        by_id = getattr(working_memory_store, "_by_id", None)
-        if by_id is None:
+        try:
+            return domain_memories[dom].count()
+        except Exception:
+            log.exception("dream cadence: count for %s failed", dom)
             return 0
-        count = 0
-        for note in by_id.values():
-            if note.consumed_by_dream_pass is not None:
-                continue
-            if _skill_to_domain(note.agent_skill, note.agent_skill) == dom:
-                count += 1
-        return count
 
     while True:
         for dom in domains:
             # Lazy import keeps state.py free of the route module at import
             # time (route module is wired only by main.py).
             from api.server.routes.dream_pass_pause import is_paused as _is_paused
+            from api.server.routes.memory_v2 import _build_llm_consolidator, _dream_history
+            from api.server.services.memory.dream_consolidator import consolidate_memories
+
             if _is_paused(dom):
                 log.info("dream cadence: skipping %s — paused", dom)
                 continue
@@ -606,94 +604,28 @@ async def _run_dream_pass_cadence(
             if not fired:
                 log.debug("dream cadence: %s no-fire (%s)", dom, reason)
                 continue
-            try:
-                skill = load_dream_skill(dream_skill_path(dom))
-            except (DreamSkillLoadError, FileNotFoundError) as ex:
-                log.warning("dream cadence: skill for %s missing (%s)", dom, ex)
-                continue
             log.info("dream cadence: firing %s (%s)", dom, reason)
             try:
-                await orchestrator.run_pass(skill=skill, sample_size=10)
-                last_pass_at[dom] = now
+                domain_mem = None
+                if domain_memories and dom in domain_memories:
+                    domain_mem = domain_memories[dom]
+
+                if domain_mem:
+                    result = await consolidate_memories(
+                        domain_memory=domain_mem,
+                        llm_consolidate=_build_llm_consolidator(dom),
+                    )
+                    _dream_history.appendleft(result)
+                    log.info("dream cadence[%s]: %s", dom, result)
+                    last_pass_at[dom] = now
+                else:
+                    log.warning(
+                        "dream cadence[%s]: no domain memory store available", dom,
+                    )
             except Exception:
                 log.exception("dream cadence: pass for %s failed", dom)
         try:
             await _asyncio.sleep(tick_seconds)
-        except _asyncio.CancelledError:
-            return
-
-
-async def _run_lesson_lifecycle_sweep(
-    app_state: "AppState",
-    *,
-    domains: tuple[str, ...],
-    interval_seconds: int,
-    shadow_invocations_required: int = 50,
-    max_override_rate: float = 0.20,
-    retire_after_days: int = 30,
-) -> None:
-    """Periodic sweep that demotes / retires lessons via outcome metrics.
-
-    Built lazily so the heavy dream-pass orchestrator (and its kuzu /
-    governance wiring) is only constructed when the sweep actually runs.
-    Failures in one domain do not block the next or the next interval;
-    sleeps cancel cleanly on lifespan teardown.
-    """
-    import asyncio as _asyncio
-    import logging as _log
-
-    if interval_seconds <= 0:
-        return
-
-    from api.server.services.lessons.lesson_metrics import LessonMetrics
-
-    log = _log.getLogger(__name__)
-
-    def _exceptions_provider():
-        # Adapt StateStore.Exception objects to the dict-like shape
-        # LessonMetrics expects. We include resolved exceptions because
-        # the override-rate signal counts every workflow that ever hit
-        # an operator override, not just currently-open ones.
-        try:
-            store = app_state.store
-            return [
-                {"workflow_id": e.workflow_id}
-                for e in store.list_exceptions(include_resolved=True)
-                if getattr(e, "workflow_id", None)
-            ]
-        except Exception:
-            return []
-
-    while True:
-        for dom in domains:
-            try:
-                governor = app_state.dream_pass_orchestrator._governor
-            except Exception:
-                log.exception(
-                    "lifecycle sweep: governor unavailable for %s", dom,
-                )
-                continue
-            metrics = LessonMetrics(
-                working_memory_store=app_state.working_memory_store,
-                exceptions_provider=_exceptions_provider,
-            )
-            try:
-                transitions = governor.apply_lifecycle(
-                    domain=dom,
-                    metrics=metrics,
-                    shadow_invocations_required=shadow_invocations_required,
-                    max_override_rate=max_override_rate,
-                    retire_after_days=retire_after_days,
-                )
-                if transitions:
-                    log.info(
-                        "lifecycle sweep: %d transitions in %s: %s",
-                        len(transitions), dom, transitions,
-                    )
-            except Exception:
-                log.exception("lifecycle sweep: pass for %s failed", dom)
-        try:
-            await _asyncio.sleep(interval_seconds)
         except _asyncio.CancelledError:
             return
 
