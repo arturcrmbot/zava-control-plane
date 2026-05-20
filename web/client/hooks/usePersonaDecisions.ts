@@ -34,7 +34,15 @@ interface DecisionRow {
 
 function parseTimestamp(raw: string | undefined): number {
   if (!raw) return 0;
-  const t = Date.parse(raw);
+  // The server emits naive UTC ISO strings (e.g. "2026-05-20T08:32:42.554007"
+  // — no Z suffix) because Python's datetime.utcnow().isoformat() does not
+  // append a timezone marker. Date.parse treats unmarked strings as LOCAL
+  // time, which silently adds the operator's TZ offset to every decision
+  // age. In BST that pushes every decision past the "last hour" cutoff and
+  // the Dashboard's Recent-decisions tile reads 0. Force UTC interpretation
+  // by appending Z when no timezone is present.
+  const utc = /[Zz]|[+-]\d{2}:?\d{2}$/.test(raw) ? raw : raw + "Z";
+  const t = Date.parse(utc);
   if (Number.isFinite(t)) return t / 1000;
   return 0;
 }
