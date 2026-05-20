@@ -18,7 +18,6 @@ from typing import Any
 
 from fastapi import APIRouter, Query
 
-from api.server.services.lessons.store import InMemoryLessonStore
 from api.server.services.lessons.working_memory_store import (
     InMemoryWorkingMemoryStore,
 )
@@ -73,17 +72,35 @@ def working_notes(
 def lessons_active(
     domain: str | None = Query(None),
 ) -> dict[str, list[dict[str, Any]]]:
-    """Currently active (un-pruned) lessons. Optional domain filter."""
+    """Currently active (un-pruned) lessons.
+
+    Backed by LessonStore.search so it works against both
+    InMemoryLessonStore and Mem0LessonStore — the route is storage-
+    agnostic. A domain filter narrows the LessonScope; without one,
+    we fan out over the set of known dream-pass domains (today: just
+    'hiring', read from api/server/skills/dream-passes/).
+    """
+    from api.server.services.lessons.types import LessonScope
     store = app_state.lesson_store
-    if not isinstance(store, InMemoryLessonStore):
-        return {"items": []}
-    rows = [
-        lesson for lesson in store._by_id.values()  # type: ignore[attr-defined]
-        if lesson.status == "active"
-    ]
     if domain:
-        rows = [l for l in rows if l.scope.domain == domain]
-    return {"items": [_lesson_to_dict(l) for l in rows]}
+        domains = [domain]
+    else:
+        from pathlib import Path as _Path
+        dream_passes_dir = _Path(__file__).resolve().parents[1] / "skills" / "dream-passes"
+        domains = (
+            [p.name for p in dream_passes_dir.iterdir() if p.is_dir()]
+            if dream_passes_dir.exists()
+            else ["hiring"]
+        )
+    items: list[dict[str, Any]] = []
+    for d in domains:
+        try:
+            lessons = store.search(query="", scope=LessonScope(domain=d), top_k=200)
+        except Exception:
+            log.exception("memory: lessons_active search failed for domain=%s", d)
+            continue
+        items.extend(_lesson_to_dict(l) for l in lessons)
+    return {"items": items}
 
 
 # ---------------------------------------------------------------------
