@@ -1,12 +1,11 @@
 //
-// Three-column memory layer view + on-demand demo triggers.
-// Columns: Working memory (left) · Active lessons (centre) · Dream passes (right).
+// Two-column memory layer view + on-demand demo triggers.
+// Columns: Memories (left) · Dream passes (right).
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Sparkles } from "lucide-react";
 
-import WorkingMemoryColumn from "@client/components/memory/WorkingMemoryColumn";
-import ActiveLessonsColumn from "@client/components/memory/ActiveLessonsColumn";
+import MemoriesColumn from "@client/components/memory/MemoriesColumn";
 import DreamPassColumn from "@client/components/memory/DreamPassColumn";
 
 const DOMAINS = ["hiring", "vendor_kyc", "expense_claim"];
@@ -72,9 +71,8 @@ export default function Memory() {
             >Dream storm</button>
           </div>
         </header>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <WorkingMemoryColumn />
-          <ActiveLessonsColumn domain={domain} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <MemoriesColumn domain={domain} />
           <DreamPassColumn />
         </div>
       </div>

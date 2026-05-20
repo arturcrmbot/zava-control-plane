@@ -1,10 +1,10 @@
 // web/client/hooks/useMemoryQueries.ts
 //
-// Three React hooks that back the Fleet UI Memory page (/memory).
+// React hooks that back the Fleet UI Memory page (/memory).
 //
-// Each hook:
-//   1. Polls the relevant /api/memory endpoint via useThrottledFetch.
-//   2. Subscribes to /api/stream/fleet via useSSE; refresh on dream.* events.
+// Most hooks:
+//   1. Poll the relevant /api/memory endpoint via useThrottledFetch.
+//   2. Subscribe to /api/stream/fleet via useSSE; refresh on dream.* events.
 //
 // Mirrors useWorkflows / useExceptions: same throttled-fetch + SSE pattern,
 // same connection pool discipline.
@@ -45,8 +45,20 @@ export interface WorkingNote {
   consumed_by_dream_pass: string | null;
 }
 
+export interface MemoryRecord {
+  id?: string;
+  memory: string;
+  metadata?: {
+    agent_skill?: string;
+  };
+}
+
 interface Envelope<T> { items: T[] }
 
+interface MemoriesEnvelope {
+  memories: MemoryRecord[];
+  count: number;
+}
 
 function useMemoryEndpoint<T>(url: string, refreshOnTypes: readonly string[]): T[] {
   const [items, setItems] = useState<T[]>([]);
@@ -75,6 +87,48 @@ export function useActiveLessons(domain?: string): ActiveLesson[] {
     ? `/api/memory/lessons/active?domain=${encodeURIComponent(domain)}`
     : "/api/memory/lessons/active";
   return useMemoryEndpoint<ActiveLesson>(url, ["dream.lesson.promoted"]);
+}
+
+export function useMemories(domain: string): { memories: MemoryRecord[]; count: number; isLoading: boolean } {
+  const [memories, setMemories] = useState<MemoryRecord[]>([]);
+  const [count, setCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const url = `/api/memory/v2/memories?domain=${encodeURIComponent(domain)}`;
+
+  const refresh = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const r = await fetch(url);
+      if (!r.ok) {
+        setMemories([]);
+        setCount(0);
+        return;
+      }
+      const body = (await r.json()) as Partial<MemoriesEnvelope>;
+      setMemories(body.memories ?? []);
+      setCount(body.count ?? body.memories?.length ?? 0);
+    } catch {
+      setMemories([]);
+      setCount(0);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [url]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  useSSE<{ type: string }>(
+    "/api/stream/fleet",
+    useCallback((e) => {
+      if (e.type === "dream.pass.finished" || e.type === "dream.lesson.promoted") {
+        void refresh();
+      }
+    }, [refresh]),
+  );
+
+  return { memories, count, isLoading };
 }
 
 export function useDreamPassesRecent(limit = 20): DreamPassRow[] {

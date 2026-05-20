@@ -8,8 +8,8 @@ import MemoryTiles from "../MemoryTiles";
 beforeEach(() => {
   globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {
     const u = String(url);
-    if (u.includes("/api/memory/lessons/active")) {
-      return new Response(JSON.stringify({ items: [{ id: "L1" }, { id: "L2" }] }), { status: 200 });
+    if (u.includes("/api/memory/v2/memories?domain=hiring")) {
+      return new Response(JSON.stringify({ memories: [{ id: "M1" }, { id: "M2" }], count: 2 }), { status: 200 });
     }
     return new Response("{}", { status: 404 });
   }) as unknown as typeof fetch;
@@ -17,9 +17,9 @@ beforeEach(() => {
 
 
 describe("MemoryTiles", () => {
-  it("renders the Lessons active count from /api/memory/lessons/active", async () => {
+  it("renders the Memories count from /api/memory/v2/memories", async () => {
     render(<MemoryTiles />);
-    await waitFor(() => screen.getByText(/Lessons active/i));
+    await waitFor(() => screen.getByText(/Memories/i));
     await waitFor(() => screen.getByText("2"));
   });
 });
