@@ -747,3 +747,99 @@ def NewBusinessPipelineScrubOrchestrator(context: df.DurableOrchestrationContext
 def IntercompanyTalentTransferOrchestrator(context: df.DurableOrchestrationContext):
     return _strategic_stub_orchestration(context, domain="intercompany-talent-transfer")
 # === END pitch-c3: agency-specific pass-through orchestrators ===
+# === BEGIN compose-domain fleet-employee-transfer ===
+# Patched into `function_app.py` by graduate.sh. Mirrors the hiring
+# segment B/D/E/F block (function_app.py:156-241) for the two agentic
+# phases (eligibility_check, compensation_remap), plus per-phase
+# deterministic activity triggers for transfer_intake, employee_lookup
+# and identity_migration.
+
+from api.functions.workflows.fleet_employee_transfer import (
+    fleet_employee_transfer_orchestration,
+)
+from api.functions.workflows.fleet_employee_transfer_activities import (
+    fleet_employee_transfer_transfer_intake_activity,
+    fleet_employee_transfer_employee_lookup_activity,
+    fleet_employee_transfer_identity_migration_activity,
+)
+
+
+@app.orchestration_trigger(context_name="context")
+def FleetEmployeeTransferOrchestrator(context: df.DurableOrchestrationContext):
+    return fleet_employee_transfer_orchestration(context)
+
+
+# --- Deterministic phase activity triggers ---
+
+@app.activity_trigger(input_name="payload")
+def fleet_employee_transfer_transfer_intake_activity_trigger(payload: dict) -> dict:
+    return fleet_employee_transfer_transfer_intake_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_employee_transfer_employee_lookup_activity_trigger(payload: dict) -> dict:
+    return fleet_employee_transfer_employee_lookup_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_employee_transfer_identity_migration_activity_trigger(payload: dict) -> dict:
+    return fleet_employee_transfer_identity_migration_activity(payload)
+
+
+# --- Segment B (eligibility_check) — segments-by-default ---
+
+@app.activity_trigger(input_name="input")
+async def employee_transfer_segment_b_activity_trigger(input: dict) -> dict:
+    """Run the eligibility-check agentic segment.
+
+    The orchestrator wraps this with a retry loop driven by
+    validate_employee_transfer_segment_b_output."""
+    from api.functions.segments.employee_transfer_b import run_segment_b
+    return await run_segment_b(input)
+
+
+@app.activity_trigger(input_name="payload")
+def validate_employee_transfer_segment_b_output_activity_trigger(payload: dict) -> dict:
+    """Pydantic validation of the eligibility-check segment output.
+    Returns {ok: True, output} or {ok: False, errors}.
+
+    The errors list goes through ``json.loads(e.json())`` rather than
+    ``e.errors()`` because the latter returns dicts containing native
+    ``ValueError`` instances under ``ctx.error`` for custom-validator
+    failures, which Azure Durable Functions then rejects with
+    ``ValueError: activity trigger output must be json serializable``.
+    """
+    import json as _json
+    from api.functions.segments.employee_transfer_b import SegmentBOutput
+    from pydantic import ValidationError
+    try:
+        validated = SegmentBOutput.model_validate(payload)
+        return {"ok": True, "output": validated.model_dump()}
+    except ValidationError as e:
+        return {"ok": False, "errors": _json.loads(e.json())}
+
+
+# --- Segment D (compensation_remap) — segments-by-default ---
+
+@app.activity_trigger(input_name="input")
+async def employee_transfer_segment_d_activity_trigger(input: dict) -> dict:
+    """Run the compensation-remap agentic segment.
+
+    The orchestrator wraps this with a retry loop driven by
+    validate_employee_transfer_segment_d_output."""
+    from api.functions.segments.employee_transfer_d import run_segment_d
+    return await run_segment_d(input)
+
+
+@app.activity_trigger(input_name="payload")
+def validate_employee_transfer_segment_d_output_activity_trigger(payload: dict) -> dict:
+    """Pydantic validation of the compensation-remap segment output."""
+    import json as _json
+    from api.functions.segments.employee_transfer_d import SegmentDOutput
+    from pydantic import ValidationError
+    try:
+        validated = SegmentDOutput.model_validate(payload)
+        return {"ok": True, "output": validated.model_dump()}
+    except ValidationError as e:
+        return {"ok": False, "errors": _json.loads(e.json())}
+# === END compose-domain fleet-employee-transfer ===

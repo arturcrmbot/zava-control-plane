@@ -820,3 +820,35 @@ async def crisis_client_loss(body: CrisisClientLossBody):
         content={"spawned_workflow_ids": spawned_ids},
     )
 # === END pitch-h7: crisis injection ===
+
+
+# === BEGIN compose-domain fleet-employee-transfer ===
+from api.server.services.simulator_orchestrator import (  # noqa: E402
+    spawn_fleet_employee_transfer_workflow,
+)
+
+
+class EmployeeTransferBody(BaseModel):
+    employee_id: str | None = None
+    source_org_id: str | None = None
+    target_org_id: str | None = None
+    effective_date: str | None = None
+    target_role: str | None = None
+    business_reason: str | None = None
+    scenario: str | None = None
+
+
+@router.post("/fleet-employee-transfer")
+async def inject_fleet_employee_transfer(body: EmployeeTransferBody):
+    """Generated-domain simulator: spawn an Employee transfer between organisations workflow."""
+    workflow_id = await spawn_fleet_employee_transfer_workflow(
+        employee_id=body.employee_id,
+        source_org_id=body.source_org_id,
+        target_org_id=body.target_org_id,
+        effective_date=body.effective_date,
+        target_role=body.target_role,
+        business_reason=body.business_reason,
+        scenario=body.scenario,
+    )
+    return {"workflow_id": workflow_id}
+# === END compose-domain fleet-employee-transfer ===

@@ -1783,3 +1783,65 @@ async def spawn_intercompany_talent_transfer_workflow(scenario: str | None = Non
         orchestrator_name="IntercompanyTalentTransferOrchestrator", scenario=scenario,
     )
 # === END pitch-c3: agency-specific domain spawners ===
+
+
+# === BEGIN compose-domain fleet-employee-transfer ===
+_fet_seq = 0
+
+
+async def spawn_fleet_employee_transfer_workflow(
+    employee_id: str | None = None,
+    source_org_id: str | None = None,
+    target_org_id: str | None = None,
+    effective_date: str | None = None,
+    target_role: str | None = None,
+    business_reason: str | None = None,
+    scenario: str | None = None,
+) -> str:
+    """Spawn an Employee transfer between organisations workflow.
+
+    Mirrors the v3 fleet-* spawn helpers: builds a Workflow via the
+    synthetic-data factory, upserts it into app_state.store (so it shows
+    up in /api/workflows/* + the Feed UI), schedules the Durable
+    orchestration, and back-fills the instance id on completion.
+    """
+    from api.server.services.synthetic_data import build_fleet_employee_transfer_workflow
+
+    global _fet_seq
+    _fet_seq += 1
+    wid = f"EXF-{_fet_seq:04d}"
+    _emp_ids = ["EMP-1001", "EMP-1042", "EMP-1107", "EMP-1284", "EMP-1396"]
+    _source_orgs = ["ORG-HELIOS-UK", "ORG-NORTHWIND-DE", "ORG-MERIDIAN-FR"]
+    _target_orgs = ["ORG-NORTHWIND-DE", "ORG-AURORA-US", "ORG-HELIOS-UK"]
+    _dates = ["2026-07-01", "2026-08-01", "2026-09-01"]
+    _roles = ["Senior Planner", "Account Director", "Strategy Lead"]
+    transfer_seed = {
+        "employee_id": employee_id or _emp_ids[(_fet_seq * 7) % len(_emp_ids)],
+        "source_org_id": source_org_id or _source_orgs[(_fet_seq * 5) % len(_source_orgs)],
+        "target_org_id": target_org_id or _target_orgs[(_fet_seq * 3) % len(_target_orgs)],
+        "effective_date": effective_date or _dates[(_fet_seq * 2) % len(_dates)],
+        "target_role": target_role or _roles[(_fet_seq * 11) % len(_roles)],
+        "business_reason": business_reason or "Regional rebalance",
+    }
+    record = {"transfer": transfer_seed}
+    if scenario:
+        record["scenario"] = scenario
+    w = build_fleet_employee_transfer_workflow(wid, record=record)
+    app_state.store.upsert_workflow(w)
+    payload: dict = {
+        "workflow_id": wid,
+        "type": "employee-transfer",
+        "transfer": w.payload.get("transfer"),
+    }
+    if scenario or w.payload.get("scenario"):
+        payload["scenario"] = scenario or w.payload.get("scenario")
+    try:
+        result = await schedule_new_orchestration(
+            payload, function_name="FleetEmployeeTransferOrchestrator",
+        )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    return wid
+# === END compose-domain fleet-employee-transfer ===

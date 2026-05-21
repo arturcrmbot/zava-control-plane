@@ -332,6 +332,37 @@ DOMAINS: dict[str, Domain] = {
         spawn_fn="api.server.services.simulator_orchestrator.spawn_fleet_employee_onboarding_workflow",
         realistic_interval_seconds=86400,
     ),
+    "employee-transfer": Domain(
+        workflow_type="employee-transfer",
+        display_name="Employee transfer between organisations",
+        workflow_id_prefix="EMT",
+        orchestrator_name="FleetEmployeeTransferOrchestrator",
+        operator_surface="hr-bp",
+        phases=(
+            Phase("Transfer Intake", "deterministic"),
+            Phase("Employee Lookup", "deterministic"),
+            Phase("Eligibility Check", "agent"),
+            Phase("manager_approval", "hitl"),
+            Phase("Compensation Remap", "agent"),
+            Phase("hr_director_signoff", "hitl"),
+            Phase("Identity Migration", "deterministic"),
+        ),
+        hitl_gates=(
+            HitlGate("manager_approval", "manager_approval_decision",
+                     "line_manager", wait_probability=0.1),
+            HitlGate("hr_director_signoff", "hr_director_decision",
+                     "hr_director", wait_probability=0.25),
+        ),
+        skills=(
+            "fleet-employee-transfer-transfer-eligibility-checker",
+            "fleet-employee-transfer-compensation-remapper",
+        ),
+        wake_hints=(
+            WakeHint("hr.transfer.cross_border", "Cross-border transfer requires visa/work-permit review"),
+        ),
+        spawn_fn="api.server.services.simulator_orchestrator.spawn_fleet_employee_transfer_workflow",
+        realistic_interval_seconds=21600,
+    ),
     "it-access-request": Domain(
         workflow_type="it-access-request",
         display_name="IT access request",

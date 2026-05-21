@@ -101,6 +101,10 @@ _PHASE_ALIASES: dict[str, dict[str, str]] = {
         "fleet-perf-review-peer-feedback-aggregator": "Peer feedback aggregator",
         "fleet-perf-review-calibration-drafter": "Calibration drafter",
     },
+    "employee-transfer": {
+        "fleet-employee-transfer-transfer-eligibility-checker": "Eligibility check",
+        "fleet-employee-transfer-compensation-remapper": "Compensation remap",
+    },
 }
 
 

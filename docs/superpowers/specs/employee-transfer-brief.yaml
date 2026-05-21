@@ -1,0 +1,240 @@
+# Employee transfer between organisations — compose-domain v4 brief.
+#
+# Story: An employee of one Zava agency subsidiary (source org) is
+# being transferred to another subsidiary (target org) — for example
+# a senior planner moving from "Helios Creative UK" to "Northwind Data DE"
+# as part of a regional rebalance.
+#
+# This is the operational transfer workflow (NOT the existing 3-phase
+# `intercompany-talent-transfer` stub, which only carries a signoff).
+# Seven phases, two agent reasoning steps, two HITL gates, seven external
+# systems (workday_hr_employee, policy_search, delegated_authority,
+# vendor_registry, contract_repository, identity_provider, calendar_service).
+#
+# AGENT-CHOICE: the request did not pin a name; chose `employee-transfer`
+# to avoid colliding with the existing `intercompany-talent-transfer`
+# stub. Same business intent, richer surface.
+
+domain:
+  workflow_type: employee-transfer
+  prefix: fleet
+  display_name: Employee transfer between organisations
+  owner_role: hr_bp
+  description: |
+    An HR business partner proposes moving an employee from a source
+    Zava agency subsidiary to a target subsidiary. The orchestrator
+    captures the request (employee_id, source_org, target_org,
+    effective_date, target_role), reads the employee's current grade /
+    cost-centre / contract terms from Workday, reasons over transfer
+    eligibility (visa + notice period + delegated authority of both
+    managers + target legal entity standing), gets the releasing line
+    manager's sign-off, remaps compensation against the target entity's
+    comp band and generates a new contract, asks the HR director for
+    final compliance + cost sign-off, then provisions the new IdP
+    identity and books the handover meetings. All seven MCP tools
+    are deterministic in-memory stubs.
+
+phases:
+  - name: transfer_intake
+    intent: |
+      Capture the proposed transfer: employee_id, source_org_id,
+      target_org_id, effective_date, target_role, business_reason.
+      Pass forward.
+    kind: deterministic
+    external_systems: []
+
+  - name: employee_lookup
+    intent: |
+      Read the employee's current grade, cost-centre, agency and home
+      market from Workday HR. Pass forward into the eligibility check.
+    kind: deterministic
+    external_systems: [workday_hr]
+
+  - name: eligibility_check
+    intent: |
+      Reason about whether the transfer is eligible. Pull HR transfer-
+      policy clauses for the source→target market pair (visa rules,
+      minimum notice period, grade-floor for cross-entity moves).
+      Verify the source line manager has authority to release at the
+      employee's grade and the target line manager has authority to
+      receive. Confirm the target legal entity is in good registry
+      standing. Emit verdict in {"eligible","blocked"} with a one-
+      sentence reason naming the first failing gate.
+    kind: agent
+    agent_skill_name: transfer-eligibility-checker
+    external_systems: [policy_search, delegated_authority, vendor_registry]
+
+  - name: releasing_manager_approval
+    intent: |
+      The releasing (source) line manager approves or rejects the
+      release. Approve when eligibility_check.verdict == "eligible".
+      Otherwise reject naming the blocking gate in one sentence.
+    kind: hitl
+    persona: line_manager
+    # Match the existing line_manager persona's declared event name —
+    # workflow_type stamping on the suspended payload disambiguates
+    # this domain's gate from other domains sharing the same persona
+    # (e.g. travel-preapproval, purchase-card).
+    external_event: manager_approval_decision
+    external_systems: []
+
+  - name: compensation_remap
+    intent: |
+      Look up the target entity's comp band for the proposed grade
+      via Workday. Reconcile against the employee's current salary —
+      protect existing pay where target band ceiling permits, propose
+      a one-step uplift when target band floor exceeds current.
+      Generate the new employment contract draft for the target legal
+      entity via the contract repository. Emit proposed_salary,
+      contract_id, and a one-line rationale.
+    kind: agent
+    agent_skill_name: compensation-remapper
+    external_systems: [workday_hr, contract_repository]
+
+  - name: hr_director_signoff
+    intent: |
+      HR director gives final sign-off on cost + compliance. Approve
+      when compensation_remap.delta_pct ≤ 10 AND eligibility_check.verdict
+      == "eligible". Otherwise reject naming whether cost or compliance
+      drove the rejection.
+    kind: hitl
+    persona: hr_director
+    # Match the existing hr_director persona's declared event name.
+    external_event: hr_director_decision
+    external_systems: []
+
+  - name: identity_migration
+    intent: |
+      Provision the employee's identity in the target org's IdP tenant
+      with the new grade's standard entitlements, and book the
+      transition handover meetings on the agreed effective_date via
+      the calendar service.
+    kind: deterministic
+    external_systems: [identity_provider, calendar_service]
+
+personae:
+  - role: line_manager
+    decision_policy: |
+      Approve when eligibility_check.verdict == "eligible". Otherwise
+      reject in one sentence naming the blocking gate.
+    decision_code: |
+      elig = (context or {}).get("eligibility_check") or {}
+      verdict = elig.get("verdict")
+      if verdict == "eligible":
+          decision = "approve"
+          reason = "transfer eligible: visa, notice, authority and entity all clear"
+      else:
+          decision = "reject"
+          blocker = elig.get("blocker") or "unknown"
+          reason = f"transfer blocked by {blocker}"
+
+  - role: hr_director
+    decision_policy: |
+      Approve when compensation_remap.delta_pct is at most 10 AND
+      eligibility_check.verdict == "eligible". Otherwise reject in one
+      sentence naming whether cost or compliance drove the rejection.
+    decision_code: |
+      elig = (context or {}).get("eligibility_check") or {}
+      comp = (context or {}).get("compensation_remap") or {}
+      verdict = elig.get("verdict")
+      try:
+          delta = float(comp.get("delta_pct") or 0.0)
+      except (TypeError, ValueError):
+          delta = 0.0
+      if verdict != "eligible":
+          decision = "reject"
+          reason = "compliance: eligibility failed at " + str(elig.get("blocker") or "unknown")
+      elif delta > 10.0:
+          decision = "reject"
+          reason = "cost: proposed comp delta " + str(delta) + "% exceeds 10% threshold"
+      else:
+          decision = "approve"
+          reason = "comp delta within threshold and eligibility clear"
+
+external_systems:
+  - id: workday_hr
+    mcp_tool: workday_hr_employee
+    operations:
+      - get_employee
+  - id: policy_search
+    mcp_tool: policy_search
+    operations:
+      - search
+  - id: delegated_authority
+    mcp_tool: delegated_authority
+    operations:
+      - check_authority
+      - resolve_approver
+  - id: vendor_registry
+    mcp_tool: vendor_registry
+    operations:
+      - lookup_vendor
+  - id: contract_repository
+    mcp_tool: contract_repository
+    operations:
+      - draft_contract
+  - id: identity_provider
+    mcp_tool: identity_provider
+    operations:
+      - provision_identity
+  - id: calendar_service
+    mcp_tool: calendar_service
+    operations:
+      - find_availability
+
+# --------------------------------------------------------------------
+# v4 enrichment.
+# --------------------------------------------------------------------
+entities:
+  - kind: Person
+    source: transferee
+    ref_field: payload.employee_id
+    attributes:
+      department: payload.current_cost_centre
+  - kind: Organisation
+    source: source_org
+    ref_field: payload.source_org_id
+    attributes:
+      name: payload.source_org_name
+  - kind: Organisation
+    source: target_org
+    ref_field: payload.target_org_id
+    attributes:
+      name: payload.target_org_name
+  - kind: Period
+    source: transfer_window
+    ref_field: payload.effective_date
+    attributes:
+      starts: payload.effective_date
+
+decisions:
+  - phase: releasing_manager_approval
+    persona: line_manager
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.employee_id]
+    attributes_from_context:
+      employee_id: payload.employee_id
+      source_org_id: payload.source_org_id
+      target_org_id: payload.target_org_id
+      target_role: payload.target_role
+      effective_date: payload.effective_date
+
+  - phase: hr_director_signoff
+    persona: hr_director
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.employee_id, payload.target_org_id]
+    attributes_from_context:
+      employee_id: payload.employee_id
+      target_org_id: payload.target_org_id
+      effective_date: payload.effective_date
+
+function: hr
+
+ambient:
+  name: EmployeeTransferWatcher
+  function: hr
+  reasoning_skill: null
+  spawnable_workflow_types: [employee-transfer]
+  triggers:
+    - kind: bus
+      event_type: hr.transfer.proposed

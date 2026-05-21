@@ -22,3 +22,22 @@ MorningSweep = AmbientAgent(
     reasoning_skill="cross-function-daily-brief",
     spawnable_workflow_types=(),
 )
+# compose-domain:ambient:employee-transfer BEGIN
+# --------------------------------------------------------------------------
+# compose-domain v4 — fleet-employee-transfer EmployeeTransferWatcher
+# --------------------------------------------------------------------------
+# Bus-triggered ambient agent. Fires when `hr.transfer.proposed` lands on
+# the FleetEvent bus and dispatches a spawn of `employee-transfer`.
+# Module-level constant — mirrors the canonical live shape in
+# `api/server/services/ambient_agents/hr.py` (MorningSweep) and
+# `api/server/services/ambient_agents/finance.py` (BudgetVarianceWatcher,
+# VendorRiskWatcher, PeriodClose).
+# --------------------------------------------------------------------------
+EmployeeTransferWatcher = AmbientAgent(
+    name="employee-transfer-watcher",
+    function="hr",
+    triggers=(BusTrigger(event_type="hr.transfer.proposed"),),
+    reasoning_skill=None,
+    spawnable_workflow_types=("employee-transfer",),
+)
+# compose-domain:ambient:employee-transfer END

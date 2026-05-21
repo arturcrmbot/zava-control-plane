@@ -267,6 +267,36 @@ def build_fleet_employee_onboarding_workflow(
     )
 
 
+def build_fleet_employee_transfer_workflow(
+    workflow_id: str, record: dict | None = None,
+) -> Workflow:
+    """Employee transfer workflow record. `record` may carry a
+    pre-populated transfer dict (employee_id, source/target org, effective
+    date, target role, business reason); defaults are deterministic."""
+    r = record or {}
+    transfer = r.get("transfer") if "transfer" in r else r
+    transfer = transfer or {}
+    transfer = {
+        "employee_id": transfer.get("employee_id") or f"EMP-{random.randint(1000, 9999):04d}",
+        "source_org_id": transfer.get("source_org_id", "ORG-HELIOS-UK"),
+        "target_org_id": transfer.get("target_org_id", "ORG-NORTHWIND-DE"),
+        "effective_date": transfer.get("effective_date", "2026-07-01"),
+        "target_role": transfer.get("target_role", "Senior Planner"),
+        "business_reason": transfer.get("business_reason", "Regional rebalance"),
+    }
+    created_at, sla = _now_with_jitter()
+    return Workflow(
+        id=workflow_id,
+        type="employee-transfer",
+        current_phase="Transfer Intake",
+        created_at=created_at,
+        sla_due_at=sla,
+        jurisdiction="London-Zava",
+        agency="Zava",
+        payload={"transfer": transfer, "scenario": r.get("scenario")},
+    )
+
+
 def build_fleet_it_access_request_workflow(
     workflow_id: str, record: dict | None = None,
 ) -> Workflow:

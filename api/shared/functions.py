@@ -109,9 +109,11 @@ FUNCTIONS: dict[str, Function] = {
         operator_surface="hr-bp",
         owns_domains=("employee-onboarding", "perf-review", "travel-preapproval",
                       "hire-to-productive", "talent-redeployment",
-                      "freelancer-onboarding", "intercompany-talent-transfer"),
+                      "freelancer-onboarding", "intercompany-talent-transfer",
+                      "employee-transfer"),
         # Phase 4 IP1 (TASK-006b) adds ``morning-sweep`` (cadence-fired).
-        ambient_agents=("morning-sweep",),
+        # compose-domain v4 (fleet-employee-transfer) adds ``employee-transfer-watcher``.
+        ambient_agents=("morning-sweep", "employee-transfer-watcher"),
         kpis=("time-to-hire", "regrettable-attrition-pct",
               "engagement-score", "comp-ratio"),
         # D1 (pitch-d1): hr_director → regional_hr_lead → hr_bp tier.

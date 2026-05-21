@@ -92,6 +92,23 @@ function deriveMatrixRequest(w: Workflow): Derivation | null {
       : "standard_joiner";
     return { action: "employee_onboarding_access", category: cat };
   }
+  if (t === "employee-transfer") {
+    const p = (w.payload ?? {}) as {
+      transfer?: { source_org_id?: string; target_org_id?: string };
+      compensation_remap?: { delta_pct?: number };
+      scenario?: string;
+    };
+    const src = (p.transfer?.source_org_id ?? "").toUpperCase();
+    const dst = (p.transfer?.target_org_id ?? "").toUpperCase();
+    const srcCountry = src.split("-").pop();
+    const dstCountry = dst.split("-").pop();
+    const intl = !!(srcCountry && dstCountry && srcCountry !== dstCountry);
+    const delta = p.compensation_remap?.delta_pct ?? 0;
+    const cat = delta > 10 ? "comp_uplift_over_threshold"
+      : intl ? "international_transfer"
+      : "domestic_transfer";
+    return { action: "employee_transfer_signoff", category: cat };
+  }
   if (t === "perf-review") {
     const p = (w.payload ?? {}) as { scenario?: string };
     const cat = p.scenario?.startsWith("calibration-outlier") ? "calibration_outlier"

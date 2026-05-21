@@ -138,6 +138,7 @@ from . import creative_campaign     # noqa: E402  TASK-026
 from . import crisis_response       # noqa: E402  pitch-c2
 from . import data_clean_room_setup  # noqa: E402  pitch-c3
 from . import employee_onboarding   # noqa: E402  TASK-018
+from . import employee_transfer     # noqa: E402  compose-domain v4 (fleet-employee-transfer)
 from . import expense_claim         # noqa: E402  pitch-a4
 from . import freelancer_onboarding  # noqa: E402  pitch-c3
 from . import fy_close              # noqa: E402  pitch-c1
@@ -168,7 +169,7 @@ _DOMAIN_MODULES = (
     ap_invoice, board_prep, client_renewal,
     contract_renewal, contract_review, creative_awards_submission,
     creative_campaign, crisis_response, data_clean_room_setup,
-    employee_onboarding, expense_claim, freelancer_onboarding,
+    employee_onboarding, employee_transfer, expense_claim, freelancer_onboarding,
     fy_close, hire_to_productive, hiring,
     intercompany_recharge, intercompany_talent_transfer,
     it_access_request, lead_to_cash, m_and_a_integration,
