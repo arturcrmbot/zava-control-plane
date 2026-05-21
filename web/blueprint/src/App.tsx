@@ -4,6 +4,7 @@ import { Argument } from "./sections/Argument";
 import { Composition } from "./sections/Composition";
 import { Personae } from "./sections/Personae";
 import { Authority } from "./sections/Authority";
+import { Memory } from "./sections/Memory";
 import { MetaSkill } from "./sections/MetaSkill";
 import { Observatory } from "./sections/Observatory";
 import { Closing } from "./sections/Closing";
@@ -49,6 +50,8 @@ export default function App() {
       <Personae />
       <hr className="rule" />
       <Authority />
+      <hr className="rule" />
+      <Memory />
       <hr className="rule" />
       <MetaSkill />
       <hr className="rule" />
