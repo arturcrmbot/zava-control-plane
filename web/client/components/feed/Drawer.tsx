@@ -13,6 +13,7 @@ import type { RolePreset } from "@shared/roles";
 import DrawerDecision from "./DrawerDecision";
 import DrawerActivity from "./DrawerActivity";
 import DrawerAudit from "./DrawerAudit";
+import DrawerReasoning from "./DrawerReasoning";
 
 export interface DrawerData {
   workflow: Workflow;
@@ -65,6 +66,9 @@ export default function Drawer({
   const sections: Record<string, JSX.Element> = {
     decision: (
       <DrawerDecision data={d} role={role} onRefresh={refresh} />
+    ),
+    reasoning: (
+      <DrawerReasoning data={d} />
     ),
     activity: (
       <DrawerActivity data={d} />

@@ -23,7 +23,7 @@ export type CardType =
   | "resolved"
   | "workflow";
 
-export type DrawerSection = "decision" | "activity" | "audit";
+export type DrawerSection = "decision" | "activity" | "audit" | "reasoning";
 
 export type FilterMode = "needs-you" | "all-activity";
 
@@ -79,7 +79,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     ],
     moreOrder: ["/analytics", "/evals", "/economics", "/policy"],
     todayChip: "needs-you-count",
-    drawerSectionOrder: ["decision", "activity", "audit"],
+    drawerSectionOrder: ["decision", "reasoning", "activity", "audit"],
   },
   {
     id: "finance-controller",
@@ -95,7 +95,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     ],
     moreOrder: ["/economics", "/analytics", "/policy", "/evals"],
     todayChip: "money-saved",
-    drawerSectionOrder: ["decision", "activity", "audit"],
+    drawerSectionOrder: ["decision", "reasoning", "activity", "audit"],
   },
   {
     id: "hiring-manager",
@@ -109,7 +109,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     ],
     moreOrder: ["/analytics", "/evals", "/policy", "/economics"],
     todayChip: "hiring-summary",
-    drawerSectionOrder: ["decision", "activity", "audit"],
+    drawerSectionOrder: ["decision", "reasoning", "activity", "audit"],
   },
   {
     id: "sre",
@@ -124,7 +124,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     ],
     moreOrder: ["/evals", "/policy", "/analytics", "/economics"],
     todayChip: "fleet-health",
-    drawerSectionOrder: ["activity", "decision", "audit"],
+    drawerSectionOrder: ["activity", "reasoning", "decision", "audit"],
   },
   {
     id: "executive",
@@ -138,7 +138,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     ],
     moreOrder: ["/economics", "/analytics", "/policy", "/evals"],
     todayChip: "executive-summary",
-    drawerSectionOrder: ["audit", "activity", "decision"],
+    drawerSectionOrder: ["audit", "reasoning", "activity", "decision"],
   },
 ];
 

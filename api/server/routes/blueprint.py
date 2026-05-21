@@ -360,7 +360,7 @@ async def blueprint_stream(request: Request) -> EventSourceResponse:
 # --------------------------------------------------------------------------
 
 
-_WF = "HIRE-AGUI-DEMO"
+_WF = "HIRE-DEMO-01"
 _DEMO_SCRIPTS: dict[str, list[dict[str, Any]]] = {
     "hire-agui": [
         # ── workflow start ──────────────────────────────────────────
