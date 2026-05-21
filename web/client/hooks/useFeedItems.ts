@@ -137,7 +137,11 @@ export function useFeedItems(
         type: "resolved" as const,
         id: resolvedId,
         timestamp: r.actedAt,
-        workflowId: wf?.id ?? stripped,
+        // When the parent workflow has been evicted we deliberately leave
+        // workflowId undefined so the card renders non-clickable rather
+        // than deep-linking to a 404 drawer (the exception id is not a
+        // workflow id).
+        workflowId: wf?.id,
         domain: wf?.type,
         severity: null,
         originId: origId,
