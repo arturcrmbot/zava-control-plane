@@ -1,4 +1,3 @@
-import { HttpAgent } from "@ag-ui/client";
 import type { BaseEvent } from "@ag-ui/core";
 
 export interface RunSubscription {
@@ -7,45 +6,56 @@ export interface RunSubscription {
 }
 
 interface ConnectOpts {
-  agentFactory?: (runId: string) => { runAgent: HttpAgent["runAgent"] };
+  /** Override for testing — supply a fake that calls onEvent directly. */
+  agentFactory?: (runId: string) => { runAgent: (opts: any) => Promise<void> };
   baseUrl?: string;
 }
 
+/**
+ * Connect to the AG-UI SSE stream for a workflow run.
+ *
+ * In production, opens a native EventSource against
+ * `/api/workflows/{runId}/agui`. The backend emits SSE frames with
+ * `data: {json}` payloads that are parsed and forwarded to `onEvent`.
+ *
+ * For tests, pass `agentFactory` to inject a fake.
+ */
 export function connectWorkflowRun(
   runId: string,
   onEvent: (event: BaseEvent) => void,
   opts: ConnectOpts = {},
 ): RunSubscription {
-  const base = opts.baseUrl ?? "";
-  const factory =
-    opts.agentFactory ??
-    ((id: string) =>
-      new HttpAgent({ url: `${base}/api/workflows/${id}/agui` }));
-  const agent = factory(runId);
-  const abortController = new AbortController();
+  // Test path — allow injection of a fake agent.
+  if (opts.agentFactory) {
+    const agent = opts.agentFactory(runId);
+    const done = agent.runAgent({ threadId: runId, onEvent });
+    return { done, cancel: () => {} };
+  }
 
-  const subscriber = {
-    onEvent: ({ event }: { event: BaseEvent }) => onEvent(event),
+  // Production path — native EventSource (GET-based SSE).
+  const base = opts.baseUrl ?? "";
+  const url = `${base}/api/workflows/${runId}/agui`;
+  const es = new EventSource(url);
+  let resolveDone: () => void;
+  const done = new Promise<void>((resolve) => { resolveDone = resolve; });
+
+  es.onmessage = (msg) => {
+    try {
+      const ev = JSON.parse(msg.data) as BaseEvent;
+      onEvent(ev);
+      if (ev.type === "RUN_FINISHED" || ev.type === "RUN_ERROR") {
+        es.close();
+        resolveDone();
+      }
+    } catch { /* skip unparseable frames */ }
   };
 
-  const done = (async () => {
-    try {
-      await agent.runAgent(
-        {
-          runId,
-          threadId: runId,
-          abortController,
-          onEvent,
-          signal: abortController.signal,
-        } as any,
-        subscriber as any,
-      );
-    } catch (err) {
-      if (!(err instanceof DOMException && err.name === "AbortError")) {
-        throw err;
-      }
+  es.onerror = () => {
+    // EventSource auto-reconnects; close only if readyState is CLOSED.
+    if (es.readyState === EventSource.CLOSED) {
+      resolveDone();
     }
-  })();
+  };
 
-  return { done, cancel: () => abortController.abort() };
+  return { done, cancel: () => { es.close(); resolveDone(); } };
 }
