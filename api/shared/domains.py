@@ -363,6 +363,28 @@ DOMAINS: dict[str, Domain] = {
         spawn_fn="api.server.services.simulator_orchestrator.spawn_fleet_employee_transfer_workflow",
         realistic_interval_seconds=21600,
     ),
+    "training-request": Domain(
+        workflow_type="training-request",
+        display_name="Training request",
+        workflow_id_prefix="TRQ",
+        orchestrator_name="FleetTrainingRequestOrchestrator",
+        operator_surface="hr-director",
+        phases=(
+            Phase("Request Intake", "deterministic"),
+            Phase("Eligibility & Catalogue", "agent"),
+            Phase("hr_director_approval", "hitl"),
+            Phase("Book", "deterministic"),
+        ),
+        hitl_gates=(
+            HitlGate("hr_director_approval", "hr_director_decision",
+                     "hr_director", wait_probability=0.2),
+        ),
+        skills=(
+            "fleet-training-request-eligibility-and-catalogue-matcher",
+        ),
+        spawn_fn="api.server.services.simulator_orchestrator.spawn_fleet_training_request_workflow",
+        realistic_interval_seconds=7200,
+    ),
     "it-access-request": Domain(
         workflow_type="it-access-request",
         display_name="IT access request",

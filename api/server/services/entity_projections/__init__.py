@@ -158,6 +158,7 @@ from . import privacy_dpia          # noqa: E402  TASK-024
 from . import purchase_order        # noqa: E402  TASK-016
 from . import quarterly_creative_awards  # noqa: E402  pitch-c3
 from . import talent_redeployment   # noqa: E402  pitch-c2
+from . import training_request      # noqa: E402  compose-domain v4 (fleet-training-request)
 from . import travel_preapproval    # noqa: E402  TASK-020
 from . import treasury_fx           # noqa: E402  TASK-025
 from . import vendor_kyc            # noqa: E402  TASK-017
@@ -175,7 +176,7 @@ _DOMAIN_MODULES = (
     it_access_request, lead_to_cash, m_and_a_integration,
     media_pitch_to_win, monthly_client_pnl, new_business_pipeline_scrub,
     perf_review, policy_set, privacy_dpia, purchase_order, quarterly_creative_awards,
-    talent_redeployment, travel_preapproval, treasury_fx,
+    talent_redeployment, training_request, travel_preapproval, treasury_fx,
     vendor_kyc, vendor_risk_to_pay, weekly_pitch_review,
 )
 

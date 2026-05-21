@@ -105,6 +105,9 @@ _PHASE_ALIASES: dict[str, dict[str, str]] = {
         "fleet-employee-transfer-transfer-eligibility-checker": "Eligibility check",
         "fleet-employee-transfer-compensation-remapper": "Compensation remap",
     },
+    "training-request": {
+        "fleet-training-request-eligibility-and-catalogue-matcher": "Eligibility & catalogue",
+    },
 }
 
 

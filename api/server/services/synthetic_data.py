@@ -297,6 +297,45 @@ def build_fleet_employee_transfer_workflow(
     )
 
 
+def build_fleet_training_request_workflow(
+    workflow_id: str, record: dict | None = None,
+) -> Workflow:
+    """Training request workflow record. `record` may carry a
+    pre-populated request dict (employee_id, topic, requested_course,
+    estimated_cost_gbp, target_start_date); defaults are deterministic.
+
+    Payload is intentionally FLAT (no `request` nesting) so the
+    entity_projections.training_request module — which reads
+    `payload.employee_id`, `payload.estimated_cost_id`, etc — projects
+    cleanly without a wrapper.
+    """
+    r = record or {}
+    req = r.get("request") if "request" in r else r
+    req = req or {}
+    request = {
+        "employee_id": req.get("employee_id") or f"EMP-{random.randint(1000, 9999):04d}",
+        "topic": req.get("topic", "leadership"),
+        "requested_course": req.get("requested_course", "Influencing Without Authority"),
+        "estimated_cost_gbp": req.get("estimated_cost_gbp", 720.0),
+        "currency": req.get("currency", "GBP"),
+        "target_start_date": req.get("target_start_date", "2026-07-01"),
+        "target_end_date": req.get("target_end_date", "2026-07-03"),
+        "department": req.get("department", "Strategy"),
+        "estimated_cost_id": req.get("estimated_cost_id") or f"COST-{workflow_id}",
+    }
+    created_at, sla = _now_with_jitter()
+    return Workflow(
+        id=workflow_id,
+        type="training-request",
+        current_phase="Request Intake",
+        created_at=created_at,
+        sla_due_at=sla,
+        jurisdiction="London-Zava",
+        agency="Zava",
+        payload={**request, "scenario": r.get("scenario")},
+    )
+
+
 def build_fleet_it_access_request_workflow(
     workflow_id: str, record: dict | None = None,
 ) -> Workflow:

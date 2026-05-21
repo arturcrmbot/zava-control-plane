@@ -1542,5 +1542,39 @@
     "approver_role": "treasurer",
     "escalation_chain": [],
     "basis": "Treasurer is authorised to set FX hedging cap policies on high-exposure currency pairs in their domain."
+  },
+  {
+    "rule_id": "TRQ-001",
+    "action": "training_request_signoff",
+    "category": "standard_course",
+    "value_band_gbp": {
+      "min": 0,
+      "max": 1500
+    },
+    "business_unit": "*",
+    "geography": "*",
+    "requester_role": "*",
+    "approver_role": "hr_director",
+    "escalation_chain": [
+      "cfo"
+    ],
+    "basis": "Routine training course within HR L&D budget; hr_director may approve up to GBP 1500."
+  },
+  {
+    "rule_id": "TRQ-002",
+    "action": "training_request_signoff",
+    "category": "high_value_course",
+    "value_band_gbp": {
+      "min": 1500,
+      "max": null
+    },
+    "business_unit": "*",
+    "geography": "*",
+    "requester_role": "*",
+    "approver_role": "cfo",
+    "escalation_chain": [
+      "ceo"
+    ],
+    "basis": "Training course over GBP 1500 escalates to CFO for budget impact review."
   }
 ]

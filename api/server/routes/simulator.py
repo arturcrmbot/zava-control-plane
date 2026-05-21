@@ -852,3 +852,35 @@ async def inject_fleet_employee_transfer(body: EmployeeTransferBody):
     )
     return {"workflow_id": workflow_id}
 # === END compose-domain fleet-employee-transfer ===
+
+
+# === BEGIN compose-domain fleet-training-request ===
+from api.server.services.simulator_orchestrator import (  # noqa: E402
+    spawn_fleet_training_request_workflow,
+)
+
+
+class TrainingRequestBody(BaseModel):
+    employee_id: str | None = None
+    topic: str | None = None
+    requested_course: str | None = None
+    estimated_cost_gbp: float | None = None
+    target_start_date: str | None = None
+    department: str | None = None
+    scenario: str | None = None
+
+
+@router.post("/fleet-training-request")
+async def inject_fleet_training_request(body: TrainingRequestBody):
+    """Generated-domain simulator: spawn a Training request workflow."""
+    workflow_id = await spawn_fleet_training_request_workflow(
+        employee_id=body.employee_id,
+        topic=body.topic,
+        requested_course=body.requested_course,
+        estimated_cost_gbp=body.estimated_cost_gbp,
+        target_start_date=body.target_start_date,
+        department=body.department,
+        scenario=body.scenario,
+    )
+    return {"workflow_id": workflow_id}
+# === END compose-domain fleet-training-request ===

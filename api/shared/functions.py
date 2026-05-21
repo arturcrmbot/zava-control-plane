@@ -107,7 +107,7 @@ FUNCTIONS: dict[str, Function] = {
         name="hr",
         display="People & HR",
         operator_surface="hr-bp",
-        owns_domains=("employee-onboarding", "perf-review", "travel-preapproval",
+        owns_domains=("employee-onboarding", "perf-review", "travel-preapproval", "training-request",
                       "hire-to-productive", "talent-redeployment",
                       "freelancer-onboarding", "intercompany-talent-transfer",
                       "employee-transfer"),

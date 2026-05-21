@@ -116,6 +116,12 @@ function deriveMatrixRequest(w: Workflow): Derivation | null {
       : "on_track";
     return { action: "perf_calibration_signoff", category: cat };
   }
+  if (t === "training-request") {
+    const p = (w.payload ?? {}) as { estimated_cost_gbp?: number };
+    const cost = p.estimated_cost_gbp ?? 0;
+    const cat = cost > 1500 ? "high_value_course" : "standard_course";
+    return { action: "training_request_signoff", category: cat, value: cost };
+  }
   if (t === "ap-invoice") {
     const p = (w.payload ?? {}) as { invoice?: { amount_gbp?: number; category?: string } };
     return {

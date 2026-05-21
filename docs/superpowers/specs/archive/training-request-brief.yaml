@@ -1,0 +1,172 @@
+# Training request — compose-domain v4 brief.
+#
+# Story: an employee asks for a training course (topic, requested course
+# title, estimated cost, target start date). The orchestrator captures
+# the request, then an agent checks the employee's eligibility (tenure,
+# prior trainings, prerequisites) against Workday HR + employee history
+# and matches the request to a course in the L&D catalogue. The HR
+# director approves or rejects using the AGT authority matrix. On
+# approval, a deterministic step records the booking (vendor + seat
+# reservation + start date) on the payload.
+#
+# Substrate notes:
+#   - hr_director persona already exists at api/server/personae/hr_director/
+#     so we pin external_event verbatim (KR-2).
+#   - learning_catalogue is a NEW MCP tool stub (operations: match_course,
+#     reserve_seat) — compose-domain will generate it.
+#   - No ambient trigger; simulator-driven spawning only.
+#   - realistic_interval_seconds set to demo-friendly 7200 (warp-60 ⇒
+#     2-min spawn cadence; KR-A6 satisfied).
+
+domain:
+  workflow_type: training-request
+  prefix: fleet
+  display_name: Training request
+  owner_role: hr_director
+  description: |
+    An employee requests a training course. The orchestrator captures
+    the request, an agent checks eligibility (tenure, prior trainings)
+    and matches a course in the L&D catalogue, and the HR director
+    approves or rejects using the AGT authority matrix. On approval a
+    deterministic step records the booking (booking_id, vendor,
+    start_date) on the payload.
+
+phases:
+  - name: request_intake
+    kind: deterministic
+    intent: |
+      Capture the training request from the payload: employee_id,
+      topic, requested_course title, estimated_cost_gbp and
+      target_start_date. Normalise and pass forward.
+    external_systems: []
+
+  - name: eligibility_and_catalogue
+    kind: agent
+    agent_skill_name: eligibility-and-catalogue-matcher
+    intent: |
+      Look up the requesting employee in Workday HR (grade,
+      cost-centre, tenure) and their prior trainings via
+      employee_history. Match the requested course against the L&D
+      learning catalogue. Emit a structured verdict with
+      eligibility ("eligible" | "ineligible"), matched course_id,
+      vendor, confirmed_cost_gbp, course_start_date, and a one-line
+      rationale citing tenure / prior-training rules and the catalogue
+      hit. If no clean catalogue match is found, return the closest
+      alternative course_id with a "no exact match — closest is …"
+      rationale so the HR director can still decide.
+    external_systems:
+      - workday_hr
+      - employee_history
+      - learning_catalogue
+
+  - name: hr_director_approval
+    kind: hitl
+    persona: hr_director
+    # CRITICAL (KR-2): byte-matches the persona's SKILL.md frontmatter
+    # external_event. Without this, the orchestrator's
+    # wait_for_external_event(...) call never fires.
+    external_event: hr_director_decision
+    intent: |
+      The HR director approves the training request when the
+      eligibility verdict is "eligible" AND the matrix authority check
+      passes for the confirmed_cost_gbp value at category
+      "training-request". Otherwise reject with a one-line reason.
+
+  - name: book
+    kind: deterministic
+    intent: |
+      Record the booking on the workflow payload — booking_id, vendor,
+      course_id, course_start_date — derived from the catalogue match
+      stamped earlier. No external integration in v1.
+    external_systems: []
+
+personae:
+  - role: hr_director
+    decision_policy: |
+      Approve when the eligibility_and_catalogue verdict shows
+      eligibility == "eligible" AND the AGT matrix
+      authority_check(role="hr_director", action="training_request_signoff",
+      value=confirmed_cost_gbp, category="training-request") returns
+      allowed=True. Otherwise reject with a one-sentence reason naming
+      either the ineligibility ground or the matrix rule that blocked
+      it.
+    decision_code: |
+      eac = (context or {}).get("eligibility_and_catalogue") or {}
+      eligibility = (eac.get("eligibility") or "").lower()
+      try:
+          cost = float(eac.get("confirmed_cost_gbp") or 0)
+      except (TypeError, ValueError):
+          cost = 0.0
+      rationale = str(eac.get("rationale") or "")
+
+      if eligibility != "eligible":
+          decision = "reject"
+          reason = "employee ineligible: " + (rationale or "no rationale provided")
+      else:
+          auth = authority_check(
+              role="hr_director",
+              action="training_request_signoff",
+              value=cost,
+              category="training-request",
+          )
+          rule = str(auth.get("governing_rule_id") or "n/a")
+          if auth.get("allowed"):
+              decision = "approve"
+              reason = (
+                  "eligible and within hr_director delegation per matrix rule "
+                  + rule + " (GBP " + str(cost) + ")"
+              )
+          else:
+              decision = "escalate"
+              reason = (
+                  "eligible but outside hr_director delegation per matrix rule "
+                  + rule + " (GBP " + str(cost) + ") — "
+                  + str(auth.get("reason") or "")
+              )
+
+external_systems:
+  - id: workday_hr
+    mcp_tool: workday_hr_employee
+    operations:
+      - get_employee
+  - id: employee_history
+    mcp_tool: employee_history
+    operations:
+      - get_history
+  - id: learning_catalogue
+    mcp_tool: learning_catalogue
+    operations:
+      - match_course
+      - reserve_seat
+
+entities:
+  - kind: Person
+    source: requester
+    ref_field: payload.employee_id
+    attributes:
+      department: payload.department
+  - kind: Money
+    source: training-cost
+    ref_field: payload.estimated_cost_id
+    attributes:
+      currency: payload.currency
+  - kind: Period
+    source: training-window
+    ref_field: payload.target_start_date
+    attributes:
+      starts: payload.target_start_date
+      ends: payload.target_end_date
+
+decisions:
+  - phase: hr_director_approval
+    persona: hr_director
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.employee_id]
+    attributes_from_context:
+      employee_id: payload.employee_id
+      topic: payload.topic
+      requested_course: payload.requested_course
+      estimated_cost_gbp: payload.estimated_cost_gbp
+      target_start_date: payload.target_start_date
+
+function: hr

@@ -843,3 +843,67 @@ def validate_employee_transfer_segment_d_output_activity_trigger(payload: dict) 
     except ValidationError as e:
         return {"ok": False, "errors": _json.loads(e.json())}
 # === END compose-domain fleet-employee-transfer ===
+# === BEGIN compose-domain fleet-training-request ===
+# Patched into `function_app.py` by graduate.sh. Mirrors the hiring
+# segment block (function_app.py:156-241) for the one agentic phase
+# (eligibility_and_catalogue), plus per-phase deterministic activity
+# triggers for request_intake and book.
+
+from api.functions.workflows.fleet_training_request import (
+    fleet_training_request_orchestration,
+)
+from api.functions.workflows.fleet_training_request_activities import (
+    fleet_training_request_request_intake_activity,
+    fleet_training_request_book_activity,
+)
+
+
+@app.orchestration_trigger(context_name="context")
+def FleetTrainingRequestOrchestrator(context: df.DurableOrchestrationContext):
+    return fleet_training_request_orchestration(context)
+
+
+# --- Deterministic phase activity triggers ---
+
+@app.activity_trigger(input_name="payload")
+def fleet_training_request_request_intake_activity_trigger(payload: dict) -> dict:
+    return fleet_training_request_request_intake_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def fleet_training_request_book_activity_trigger(payload: dict) -> dict:
+    return fleet_training_request_book_activity(payload)
+
+
+# --- Segment B (eligibility_and_catalogue) — segments-by-default ---
+
+@app.activity_trigger(input_name="input")
+async def training_request_segment_b_activity_trigger(input: dict) -> dict:
+    """Run the eligibility-and-catalogue agentic segment.
+
+    The orchestrator wraps this with a retry loop driven by
+    validate_training_request_segment_b_output."""
+    from api.functions.segments.training_request_b import run_segment_b
+    return await run_segment_b(input)
+
+
+@app.activity_trigger(input_name="payload")
+def validate_training_request_segment_b_output_activity_trigger(payload: dict) -> dict:
+    """Pydantic validation of the eligibility-and-catalogue segment output.
+    Returns {ok: True, output} or {ok: False, errors}.
+
+    The errors list goes through ``json.loads(e.json())`` rather than
+    ``e.errors()`` because the latter returns dicts containing native
+    ``ValueError`` instances under ``ctx.error`` for custom-validator
+    failures, which Azure Durable Functions then rejects with
+    ``ValueError: activity trigger output must be json serializable``.
+    """
+    import json as _json
+    from api.functions.segments.training_request_b import SegmentBOutput
+    from pydantic import ValidationError
+    try:
+        validated = SegmentBOutput.model_validate(payload)
+        return {"ok": True, "output": validated.model_dump()}
+    except ValidationError as e:
+        return {"ok": False, "errors": _json.loads(e.json())}
+# === END compose-domain fleet-training-request ===

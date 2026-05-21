@@ -1845,3 +1845,76 @@ async def spawn_fleet_employee_transfer_workflow(
         print(f"[orchestrator] failed to schedule {wid}: {ex}")
     return wid
 # === END compose-domain fleet-employee-transfer ===
+
+
+# === BEGIN compose-domain fleet-training-request ===
+_ftr_seq = 0
+
+
+async def spawn_fleet_training_request_workflow(
+    employee_id: str | None = None,
+    topic: str | None = None,
+    requested_course: str | None = None,
+    estimated_cost_gbp: float | None = None,
+    target_start_date: str | None = None,
+    department: str | None = None,
+    scenario: str | None = None,
+) -> str:
+    """Spawn a Training request workflow.
+
+    Mirrors the v3 fleet-* spawn helpers: builds a Workflow via the
+    synthetic-data factory, upserts it into app_state.store (so it shows
+    up in /api/workflows/* + the Feed UI + AuthorityCard + HITL routing),
+    schedules the Durable orchestration, and back-fills the instance id
+    on completion. (KR-1 hand-patch applied.)
+    """
+    from api.server.services.synthetic_data import build_fleet_training_request_workflow
+
+    global _ftr_seq
+    _ftr_seq += 1
+    wid = f"TRQ-{_ftr_seq:04d}"
+    _emp_ids = ["EMP-1001", "EMP-1042", "EMP-1107", "EMP-1284", "EMP-1396"]
+    _topics = ["leadership", "data", "creative", "engineering", "compliance"]
+    _titles = [
+        "Influencing Without Authority",
+        "Advanced Data Storytelling",
+        "Creative Direction Fundamentals",
+        "Modern Engineering Practices",
+        "GDPR Refresher for People Managers",
+    ]
+    _depts = ["Strategy", "Data Science", "Creative", "Engineering", "Compliance"]
+    _dates = ["2026-07-01", "2026-08-01", "2026-09-01", "2026-10-01"]
+    _costs = [350.0, 720.0, 1100.0, 1800.0]
+    request_seed = {
+        "employee_id": employee_id or _emp_ids[(_ftr_seq * 7) % len(_emp_ids)],
+        "topic": topic or _topics[(_ftr_seq * 5) % len(_topics)],
+        "requested_course": requested_course or _titles[(_ftr_seq * 3) % len(_titles)],
+        "estimated_cost_gbp": (
+            estimated_cost_gbp if estimated_cost_gbp is not None
+            else _costs[(_ftr_seq * 11) % len(_costs)]
+        ),
+        "target_start_date": target_start_date or _dates[(_ftr_seq * 2) % len(_dates)],
+        "department": department or _depts[(_ftr_seq * 13) % len(_depts)],
+    }
+    record: dict = {"request": request_seed}
+    if scenario:
+        record["scenario"] = scenario
+    w = build_fleet_training_request_workflow(wid, record=record)
+    app_state.store.upsert_workflow(w)
+    payload: dict = {
+        "workflow_id": wid,
+        "type": "training-request",
+        **{k: v for k, v in w.payload.items() if k != "scenario"},
+    }
+    if scenario or w.payload.get("scenario"):
+        payload["scenario"] = scenario or w.payload.get("scenario")
+    try:
+        result = await schedule_new_orchestration(
+            payload, function_name="FleetTrainingRequestOrchestrator",
+        )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    return wid
+# === END compose-domain fleet-training-request ===
