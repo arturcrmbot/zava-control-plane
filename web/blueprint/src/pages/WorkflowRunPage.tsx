@@ -22,6 +22,15 @@ export function WorkflowRunPage() {
   useEffect(() => {
     if (!runId) return;
     const sub = connectWorkflowRun(runId, (ev) => dispatch(ev));
+
+    // Auto-trigger demo script if a ?demo= param is present.
+    const demo = new URLSearchParams(window.location.search).get("demo");
+    if (demo) {
+      fetch(`/api/blueprint/_demo_emit?script=${demo}&interval_ms=800`, {
+        method: "POST",
+      }).catch(() => {});
+    }
+
     return () => sub.cancel();
   }, [runId]);
 

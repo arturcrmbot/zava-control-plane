@@ -12,9 +12,12 @@ held-out persona slice the partitioner draws.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, HTTPException, Query
 
 from api.server.routes.dream_pass_pause import is_paused
+from api.server.routes.memory_v2 import _dream_history
 from api.server.services.dream_pass.skill_loader import (
     DreamSkillLoadError,
     dream_skill_path,
@@ -49,9 +52,21 @@ async def run_dream_pass(
         skill = load_dream_skill(dream_skill_path(domain))
     except (DreamSkillLoadError, FileNotFoundError) as ex:
         raise HTTPException(status_code=422, detail=str(ex))
+    started_at = datetime.now(timezone.utc)
     result = await app_state.dream_pass_orchestrator.run_pass(
         skill=skill, sample_size=sample,
     )
+    completed_at = datetime.now(timezone.utc)
+    _dream_history.appendleft({
+        "id": result.dream_pass_id,
+        "domain": result.domain,
+        "skill_version": skill.version,
+        "started_at": started_at.isoformat(),
+        "completed_at": completed_at.isoformat(),
+        "status": "completed",
+        "candidates_proposed": len(result.experiments),
+        "candidates_promoted": len(result.promoted_lesson_ids),
+    })
     return {
         "dream_pass_id": result.dream_pass_id,
         "domain": result.domain,
