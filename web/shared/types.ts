@@ -25,60 +25,20 @@ export type PhaseName =
   | "DPIA Intake"
   | "Op Lookup" | "Position Check";
 
-export const PHASE_ORDER: PhaseName[] = [
-  "Intake", "Validation", "Routing", "Approval", "Payment", "Reconciliation"
-];
-
-export const EXPENSE_PHASE_ORDER: PhaseName[] = [
-  "Intake", "Classify", "Validate Receipt", "Route", "Notify", "Arbitrate", "Audit"
-];
-
-export const HIRING_PHASE_ORDER: PhaseName[] = [
-  "Budget", "Job Design", "Sourcing", "Triage", "Screening",
-  "Voice", "Interview", "Compliance", "Offer", "Onboarding"
-];
-
-// Fleet/composed domains (per api/shared/domains.py registry).
-// HITL gate names use Title Case here to match what the orchestrator
-// emits via step.started; the orchestrator stamps snake_case `phase` on
-// suspended payloads (see fleet_*_orchestration generators) but the
-// store's current_phase tracks step.started's name.
-export const TRAVEL_PREAPPROVAL_PHASE_ORDER: PhaseName[] = [
-  "Employee Lookup", "Policy Fit Check", "Manager Approval",
-];
-export const VENDOR_KYC_PHASE_ORDER: PhaseName[] = [
-  "Vendor Intake", "KYC Diligence", "UBO Resolver", "Finance Signoff",
-];
-export const EMPLOYEE_ONBOARDING_PHASE_ORDER: PhaseName[] = [
-  "Employee Lookup", "Access Drafter", "IT Admin Approval", "Induction Planner",
-];
-export const IT_ACCESS_REQUEST_PHASE_ORDER: PhaseName[] = [
-  "Employee Lookup", "RBAC Resolver", "Risk Assessor",
-  "Line Manager Approval", "IT Admin Approval",
-];
-export const CONTRACT_RENEWAL_PHASE_ORDER: PhaseName[] = [
-  "Contract Lookup", "Market Benchmarker", "Renewal Terms Drafter",
-  "Finance Signoff", "Contract Owner Signoff",
-];
-export const PERF_REVIEW_PHASE_ORDER: PhaseName[] = [
-  "Employee Lookup", "Peer Feedback Aggregator", "Calibration Drafter",
-  "HR Calibration", "Line Manager Delivery",
-];
-export const AP_INVOICE_PHASE_ORDER: PhaseName[] = [
-  "Invoice Lookup", "Three-Way Match", "Authority Resolve",
-];
-export const PURCHASE_ORDER_PHASE_ORDER: PhaseName[] = [
-  "PO Lookup", "Supplier Check", "Authority Resolve",
-];
-export const CONTRACT_REVIEW_PHASE_ORDER: PhaseName[] = [
-  "Contract Intake", "Risk Classify", "Authority Resolve",
-];
-export const PRIVACY_DPIA_PHASE_ORDER: PhaseName[] = [
-  "DPIA Intake", "Risk Classify", "Authority Resolve",
-];
-export const TREASURY_FX_PHASE_ORDER: PhaseName[] = [
-  "Op Lookup", "Position Check", "Authority Resolve",
-];
+// All per-domain phase ordering now lives in api/shared/domains.py and is
+// served via /api/blueprint/composition (see
+// web/client/hooks/useDomainRegistry.ts). The constants that used to live
+// here — EXPENSE_PHASE_ORDER, HIRING_PHASE_ORDER, TRAVEL_PREAPPROVAL_…,
+// VENDOR_KYC_…, EMPLOYEE_ONBOARDING_…, EMPLOYEE_TRANSFER_…,
+// IT_ACCESS_REQUEST_…, CONTRACT_RENEWAL_…, PERF_REVIEW_…, AP_INVOICE_…,
+// PURCHASE_ORDER_…, CONTRACT_REVIEW_…, PRIVACY_DPIA_…, TREASURY_FX_… —
+// have been deleted to prevent the recurring "I added a domain to the
+// registry but the UI still shows the wrong phase order" failure mode.
+// New code: use usePhaseOrderFor(workflow_type) from useDomainRegistry.
+//
+// The PhaseName union below is retained because typed fixtures + tests
+// still reference some of these names; widening it to `string` is a
+// follow-up refactor.
 
 export type WorkflowStatus =
   | "in_progress" | "awaiting_hitl" | "completed" | "failed";

@@ -115,12 +115,20 @@ def _build_domain_manifest() -> list[dict[str, Any]]:
     from api.shared import domains as _registry
     out: list[dict[str, Any]] = []
     for d in _registry.DOMAINS.values():
+        # Phase display names + kinds, derived from the registry. Consumed
+        # by the Control Plane UI's PhaseRibbon / PhaseTimeline so a new
+        # compose-domain graduation auto-renders its real phase ordering
+        # — no per-domain hardcoded lists in web/shared/types.ts needed.
+        phases = [
+            {"name": p.name, "kind": p.kind} for p in d.phases
+        ]
         out.append({
             "name": d.display_name,
             "status": "live",
             "workflow_type": d.workflow_type,
             "skills": list(d.skills),
             "phase_aliases": _PHASE_ALIASES.get(d.workflow_type, {}),
+            "phases": phases,
         })
     # Legacy "Onboarding" surface — still rendered as a separate ring on
     # the mind-map even though it shares the hiring orchestrator.
@@ -430,6 +438,7 @@ def composition_tree() -> dict[str, Any]:
                 "workflow_type": domain.get("workflow_type"),
                 "skills": [s for s in domain["skills"] if s in skill_names],
                 "tools": sorted(domain_tools_raw),
+                "phases": domain.get("phases", []),
             }
         )
 

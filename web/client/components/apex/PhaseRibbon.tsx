@@ -1,33 +1,6 @@
-import {
-  PHASE_ORDER, EXPENSE_PHASE_ORDER, HIRING_PHASE_ORDER,
-  TRAVEL_PREAPPROVAL_PHASE_ORDER, VENDOR_KYC_PHASE_ORDER,
-  EMPLOYEE_ONBOARDING_PHASE_ORDER, IT_ACCESS_REQUEST_PHASE_ORDER,
-  CONTRACT_RENEWAL_PHASE_ORDER, PERF_REVIEW_PHASE_ORDER,
-  AP_INVOICE_PHASE_ORDER, PURCHASE_ORDER_PHASE_ORDER,
-  CONTRACT_REVIEW_PHASE_ORDER, PRIVACY_DPIA_PHASE_ORDER,
-  TREASURY_FX_PHASE_ORDER,
-  type Phase, type PhaseName, type Workflow,
-} from "@shared/types";
+import { type Phase, type Workflow } from "@shared/types";
 import { Check, Loader2, Ban, CircleDashed } from "lucide-react";
-
-function phaseOrderFor(type: Workflow["type"] | undefined): PhaseName[] {
-  switch (type) {
-    case "expense-claim":         return EXPENSE_PHASE_ORDER;
-    case "hiring":                return HIRING_PHASE_ORDER;
-    case "travel-preapproval":    return TRAVEL_PREAPPROVAL_PHASE_ORDER;
-    case "vendor-kyc":            return VENDOR_KYC_PHASE_ORDER;
-    case "employee-onboarding":   return EMPLOYEE_ONBOARDING_PHASE_ORDER;
-    case "it-access-request":     return IT_ACCESS_REQUEST_PHASE_ORDER;
-    case "contract-renewal":      return CONTRACT_RENEWAL_PHASE_ORDER;
-    case "perf-review":           return PERF_REVIEW_PHASE_ORDER;
-    case "ap-invoice":            return AP_INVOICE_PHASE_ORDER;
-    case "purchase-order":        return PURCHASE_ORDER_PHASE_ORDER;
-    case "contract-review":       return CONTRACT_REVIEW_PHASE_ORDER;
-    case "privacy-dpia":          return PRIVACY_DPIA_PHASE_ORDER;
-    case "treasury-fx":           return TREASURY_FX_PHASE_ORDER;
-    default:                      return PHASE_ORDER;     // legacy invoice-p2p
-  }
-}
+import { usePhaseOrderFor } from "@client/hooks/useDomainRegistry";
 
 type Status = "completed" | "in_progress" | "blocked" | "rejected" | "pending";
 
@@ -68,11 +41,15 @@ export default function PhaseRibbon({ workflow, phases }: {
 }) {
   const hasException = !!workflow.activeExceptionId;
   const isRejected = workflow.status === "failed";
-  const order = phaseOrderFor(workflow.type);
+  const orderFromRegistry = usePhaseOrderFor(workflow.type);
+  const phaseList = phases ?? [];
+  // Fallback to the workflow's own phase list if the registry hasn't
+  // loaded yet — never render the wrong hardcoded order.
+  const order = orderFromRegistry.length > 0 ? orderFromRegistry : phaseList.map(p => p.name);
   return (
     <div className="flex flex-wrap items-center gap-y-2 gap-x-1.5" data-testid="phase-ribbon">
       {order.map((name, i) => {
-        const s = classify(name, phases, workflow.currentPhase, hasException, isRejected);
+        const s = classify(name, phaseList, workflow.currentPhase, hasException, isRejected);
         return (
           <div key={name} className="flex items-center gap-1.5">
             <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border ${PILL[s]}`}>

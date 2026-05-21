@@ -1,8 +1,8 @@
 // src/client/components/WorkflowCard.tsx
 import type { Workflow } from "@shared/types";
 import { Link } from "react-router-dom";
-import { PHASE_ORDER, EXPENSE_PHASE_ORDER, HIRING_PHASE_ORDER } from "@shared/types";
 import { AlertTriangle, Clock } from "lucide-react";
+import { usePhaseOrderFor } from "@client/hooks/useDomainRegistry";
 
 const STATUS_COLOR: Record<Workflow["status"], string> = {
   in_progress: "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 ring-1 ring-blue-200",
@@ -85,12 +85,15 @@ function fmtSlaRemaining(slaDueAt: number): { text: string; warn: boolean } | nu
 }
 
 export default function WorkflowCard({ w }: { w: Workflow }) {
-  const phaseOrder =
-    w.type === "expense-claim" ? EXPENSE_PHASE_ORDER :
-    w.type === "hiring" ? HIRING_PHASE_ORDER :
-    PHASE_ORDER;
+  const phaseOrderFromRegistry = usePhaseOrderFor(w.type);
+  // Fallback: while the registry is loading or for unknown types,
+  // derive from the workflow's own currentPhase so the progress bar
+  // still renders (with a single-segment progress).
+  const phaseOrder = phaseOrderFromRegistry.length > 0
+    ? phaseOrderFromRegistry
+    : [w.currentPhase];
   const phaseIdx = phaseOrder.indexOf(w.currentPhase);
-  const pct = ((phaseIdx + 1) / phaseOrder.length) * 100;
+  const pct = ((Math.max(phaseIdx, 0) + 1) / phaseOrder.length) * 100;
   const subtitle = w.claim
     ? `${w.claim.employeeId} · ${w.claim.vendor}`
     : w.type === "hiring"

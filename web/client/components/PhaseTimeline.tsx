@@ -1,11 +1,6 @@
 // src/client/components/PhaseTimeline.tsx
-import { PHASE_ORDER, EXPENSE_PHASE_ORDER, HIRING_PHASE_ORDER, type Phase, type PhaseName, type Workflow } from "@shared/types";
-
-function phaseOrderFor(type: Workflow["type"] | undefined): PhaseName[] {
-  if (type === "expense-claim") return EXPENSE_PHASE_ORDER;
-  if (type === "hiring") return HIRING_PHASE_ORDER;
-  return PHASE_ORDER;
-}
+import { type Phase, type Workflow } from "@shared/types";
+import { usePhaseOrderFor } from "@client/hooks/useDomainRegistry";
 
 type DisplayStatus = Phase["status"] | "not_started";
 
@@ -28,11 +23,16 @@ const STATUS_STYLE: Record<DisplayStatus, string> = {
 export default function PhaseTimeline({ phases, workflowType }: {
   phases: Phase[]; workflowType?: Workflow["type"];
 }) {
-  const byName = new Map(phases.map(p => [p.name, p]));
-  const order = phaseOrderFor(workflowType);
+  const phaseList = phases ?? [];
+  const byName = new Map(phaseList.map(p => [p.name, p]));
+  const order = usePhaseOrderFor(workflowType);
+  // Fallback: if the registry hasn't loaded yet (or this workflow_type
+  // isn't in DOMAINS), render whatever phases the workflow itself
+  // carries — never the wrong hardcoded list.
+  const names = order.length > 0 ? order : phaseList.map(p => p.name);
   return (
     <div className="space-y-1.5">
-      {order.map(name => {
+      {names.map(name => {
         const p = byName.get(name);
         const status: DisplayStatus = p?.status ?? "not_started";
         const duration = p?.startedAt && p?.completedAt ? Math.round(p.completedAt - p.startedAt) : null;

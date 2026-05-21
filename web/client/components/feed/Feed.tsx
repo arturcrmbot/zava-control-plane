@@ -24,13 +24,7 @@ import CardList from "./CardList";
 import EmptyFeed from "./EmptyFeed";
 import BulkActionBar from "./BulkActionBar";
 import ShortcutHelp from "./ShortcutHelp";
-
-const KNOWN_DOMAINS = [
-  "expense-claim", "hiring", "invoice-p2p", "travel-preapproval", "vendor-kyc",
-  "employee-onboarding", "it-access-request", "contract-renewal", "perf-review",
-  "ap-invoice", "purchase-order", "contract-review", "privacy-dpia", "treasury-fx",
-  "creative-campaign",
-];
+import { useLiveWorkflowTypes } from "@client/hooks/useDomainRegistry";
 
 function filterFromUrl(rawMode: string | null): Partial<FilterState> | null {
   if (rawMode === "hitl") return { mode: "needs-you" };
@@ -133,9 +127,10 @@ export default function Feed({
     });
   const clearSelection = () => setSelected(new Set());
 
+  const liveDomains = useLiveWorkflowTypes();
   const availableDomains = useMemo(
-    () => (role.defaultDomains.length > 0 ? role.defaultDomains : KNOWN_DOMAINS),
-    [role.defaultDomains],
+    () => (role.defaultDomains.length > 0 ? role.defaultDomains : liveDomains),
+    [role.defaultDomains, liveDomains],
   );
 
   // Facebook-style auto-insert: when scrolled to the top of the feed, new
