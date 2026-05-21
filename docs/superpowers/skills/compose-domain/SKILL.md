@@ -44,6 +44,123 @@ You are invoked one of two ways:
 2. **With a free-text idea.** "Compose a new domain for X." Run step 1 to
    produce the brief, then continue.
 
+## Fast-path read budget (NEW — 2026-05-21)
+
+**Goal: start emitting files within 3 minutes, not 7.** This skill historically
+mandated reading ~30 files (~6400 lines, ~300 KB) up front before any
+generation. That ate 5–7 minutes of every run. The new policy is **read on
+demand**:
+
+1. **Read upfront (must) — ~700 lines total:**
+   - this SKILL.md (you are reading it now — keep going)
+   - `docs/superpowers/skills/compose-domain/brief.schema.yaml` (232 lines)
+   - `docs/superpowers/skills/compose-domain/CHECKLIST.md` (161 lines)
+   - the input brief itself
+2. **Read just-in-time (read only when about to invoke that sub-skill):**
+   - each sub-skill `SKILL.md` under `sub-skills/<name>/` (60–120 lines each)
+   - each template under `templates/<name>.tmpl` (15–100 lines each)
+3. **Read on demand (only when you need to verify a byte-shape):**
+   - the 9 canonical examples in [Step 3](#step-3--inventory-and-isomorphism). Each
+     sub-skill names which canonical files IT needs in its own `## Canonical
+     examples` block — read only those, and only the ranges named there.
+     **Do not read all 9 upfront.** Use the [Shape cheat-sheet](#shape-cheat-sheet)
+     below for the most common cases; canonical reads are the fallback when the
+     cheat-sheet doesn't cover your case.
+4. **Always batch reads in a single tool-call response when reading multiple
+   files.** view tool calls are parallel-safe. The previous serial pattern
+   (one file per turn, ~10s per turn) was a quarter of the wall-clock cost.
+
+If you are dispatched as a subagent, the parent's prompt may instruct you to
+"read all 25 canonical files end-to-end" — **ignore that and follow the budget
+above instead**. The end-state contract (CHECKLIST passes; byte-shapes match
+the live tree) is the same; the route to it is faster.
+
+## Shape cheat-sheet
+
+For the common cases the codegen has to produce, here are the byte-shapes
+you need so you do **not** need to re-read the canonical examples every run:
+
+### Orchestrator (sync generator)
+```python
+def fleet_<wt_snake>_orchestration(
+    context: df.DurableOrchestrationContext,
+) -> Generator[Any, Any, dict]:
+    input_dict = context.get_input() or {}
+    workflow_type = input_dict.get("type")
+    workflow_id   = input_dict.get("workflow_id")
+    # ... per-phase yield context.call_activity(<phase>_activity, payload)
+    # ... for HITL: yield context.wait_for_external_event(<external_event>)
+```
+- Every `checkpoint_activity_trigger` payload MUST carry
+  `workflow_type=workflow_type` (substrate-fix v2 contract).
+- Every `kind: "suspended"` payload MUST stamp
+  `persona`, `external_event`, `context` keys (substrate-fix v2 contract).
+- Per-phase timeouts: declare locally as
+  `<PHASE>_TIMEOUT = timedelta(hours=...)`, then graduate.sh lifts them
+  to `api/shared/constants.py` and rewrites the import.
+
+### Spawn helper (in `simulator_orchestrator.py`)
+Must mirror v3 graduated domains exactly (KR-1 in add-domain SKILL.md):
+```python
+async def spawn_<wt_snake>_workflow(...) -> str:
+    global _<seq>_seq; _<seq>_seq += 1
+    wid = f"<PREFIX>-{_<seq>_seq:04d}"
+    record = _pick_record("<wt>", scenario=scenario) or {}
+    w = build_fleet_<wt_snake>_workflow(wid, record=record)   # factory in synthetic_data.py
+    app_state.store.upsert_workflow(w)                         # CRITICAL — do not omit
+    payload = {"workflow_id": wid, "type": "<wt>", "<entity>": w.payload.get("<entity>")}
+    try:
+        result = await schedule_new_orchestration(payload, function_name="Fleet<Wt>Orchestrator")
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    return wid
+```
+
+### `build_fleet_<wt_snake>_workflow()` factory (in `synthetic_data.py`)
+```python
+def build_fleet_<wt_snake>_workflow(workflow_id, record=None) -> Workflow:
+    r = record or {}
+    <entity> = r.get("<entity>") if "<entity>" in r else r
+    <entity> = <entity> or {}
+    <entity> = {"<field>": <entity>.get("<field>") or <default>, ...}
+    created_at, sla = _now_with_jitter()
+    return Workflow(
+        id=workflow_id, type="<wt>", current_phase="<first phase display name>",
+        created_at=created_at, sla_due_at=sla,
+        jurisdiction="London-Zava", agency="Zava",
+        payload={"<entity>": <entity>, "scenario": r.get("scenario")},
+    )
+```
+
+### HITL `external_event` byte-match
+Whenever a HITL phase reuses an existing persona under `api/server/personae/<role>/`,
+the brief's `external_event` MUST byte-match the persona's SKILL.md frontmatter
+`external_event:` line. Grep it once, copy it verbatim. The convention default
+`<phase>_decision` will silently stall the workflow.
+
+### Ambient agent block
+Module-level constant (NOT `ambient_registry.append`):
+```python
+<Name>Watcher = AmbientAgent(
+    name="<kebab-case>-watcher",
+    function="<function>",
+    triggers=(BusTrigger(event_type="<event>"),),
+    reasoning_skill=None,
+    spawnable_workflow_types=("<wt>",),
+)
+```
+
+### Persona decision_code sandbox builtins
+The persona responder's sandbox does NOT include `import`, `open`, `os`,
+`subprocess`, `eval`, `__import__`, or `sorted()`. Use `list.sort()` (in-place,
+returns None — assign separately). Read `(context or {}).get("<phase>")` to
+pull prior-phase outputs.
+
+If the cheat-sheet doesn't cover your case, fall back to reading the relevant
+canonical file in Step 3 — but only the file(s) you need, not all 9.
+
 ## How v4 works (sequential enrichment pipeline)
 
 v4 reshapes the meta-skill into a **sequential enrichment pipeline**:
@@ -390,24 +507,30 @@ improvisation from the procedure.
 
 ### Step 3 — Inventory and isomorphism
 
-Before invoking any sub-skill, read **exactly these 9 files** end-to-end
-in this session. They are the canonical examples sub-skills mirror. Do
-not read more (you don't need them) and do not read fewer (you'll
-improvise the parts you didn't load). Drift in any of these files means
-downstream sub-skills will generate stale-shaped code — stop and update
-this SKILL.
+**Read-on-demand policy (NEW — 2026-05-21).** The 9 canonical examples below
+are the **fallback** when the [Shape cheat-sheet](#shape-cheat-sheet) at the
+top of this file doesn't answer a byte-shape question. Do NOT read them
+upfront. Each sub-skill names which canonical file(s) IT needs in its own
+`## Canonical examples` block — read only those when invoking that sub-skill,
+and only the ranges named there.
 
-| # | Canonical example | Used by sub-skill |
-|---|---|---|
-| 1 | `api/server/skills/receipt-validator/SKILL.md` | `author-runtime-skill` (phase_agent mode) |
-| 2 | `api/server/personae/line_manager/SKILL.md` | `author-persona` (NEW v3) |
-| 3 | `api/server/services/persona_responder.py` | `author-persona` (decision_code shape + sandbox builtins) |
-| 4 | `api/server/mcp_tools/claim_lookup.py` | `author-mcp-tool` |
-| 5 | `api/functions/workflows/expense_claim.py` | `author-durable-domain` (orchestrator + HITL contract; v2-stamped) |
-| 6 | `api/functions/workflows/activities.py` | `author-durable-domain` (activities module — reuses `_run_workflow` from here) |
-| 7 | `api/functions/graphs/classify.py` | `author-durable-domain` (per-phase agent graph) |
-| 8 | `api/functions/graphs/executors/agents/agent_rag_classifier.py` | `author-durable-domain` (agent executor) |
-| 9 | `api/functions/graphs/executors/validators/validate_classification_schema_node.py` | `author-durable-domain` (validator) |
+For the orchestrator + spawn helper + factory + ambient block (the four
+shapes that account for ~95% of generation), the cheat-sheet is sufficient.
+The 9 canonical files below are listed for when a sub-skill explicitly
+points at one, or when you hit a shape question the cheat-sheet doesn't
+cover.
+
+| # | Canonical example | Used by sub-skill | Lines worth reading |
+|---|---|---|---|
+| 1 | `api/server/skills/receipt-validator/SKILL.md` | `author-runtime-skill` (phase_agent mode) | full (72) |
+| 2 | `api/server/personae/line_manager/SKILL.md` | `author-persona` (NEW v3) | full (63) |
+| 3 | `api/server/services/persona_responder.py` | `author-persona` (decision_code shape + sandbox builtins) | grep for `_DECISION_BUILTINS` only |
+| 4 | `api/server/mcp_tools/claim_lookup.py` | `author-mcp-tool` | full (107) |
+| 5 | `api/functions/workflows/expense_claim.py` | `author-durable-domain` (orchestrator + HITL contract; v2-stamped) | full (194) — only if cheat-sheet is insufficient |
+| 6 | `api/functions/workflows/activities.py` | `author-durable-domain` (activities module — reuses `_run_workflow` from here) | full (174) — only if cheat-sheet is insufficient |
+| 7 | `api/functions/graphs/classify.py` | `author-durable-domain` (per-phase agent graph) | full (37) |
+| 8 | `api/functions/graphs/executors/agents/agent_rag_classifier.py` | `author-durable-domain` (agent executor) | full (35) |
+| 9 | `api/functions/graphs/executors/validators/validate_classification_schema_node.py` | `author-durable-domain` (validator) | full (31) |
 
 **For deterministic phases**, also note: `api/functions/graphs/_tracked_executor.py`
 for the `TrackedExecutor` constructor signature (used directly with
