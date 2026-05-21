@@ -42,7 +42,14 @@ class SubstrateToAGUI:
 
     def translate(self, event: FleetEvent) -> list[AGUIEvent]:
         data = event.model_dump()
-        if data.get("workflow_id") not in (self.run_id, None):
+        # Per-workflow AG-UI streams must be strictly scoped to their
+        # run_id. Previously this allowed `workflow_id is None` through,
+        # which let substrate-wide entity.upserted events (and any other
+        # un-scoped FleetEvent) leak into every per-workflow stream —
+        # producing "Live reasoning" panels that showed messages from
+        # other in-flight workflows and a STATE blob containing the
+        # entire substrate's Workflow registry.
+        if data.get("workflow_id") != self.run_id:
             return []
         handler = _HANDLERS.get(event.type)
         if handler is None:
