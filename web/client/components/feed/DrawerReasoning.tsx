@@ -73,11 +73,20 @@ function reducer(s: RunState, ev: Ev): RunState {
 
 // ── Component ───────────────────────────────────────────────────────
 
+// Module-level cache: survives drawer close/reopen within the same
+// browser session. Keyed by workflow_id.
+const _stateCache = new Map<string, RunState>();
+
 export default function DrawerReasoning({ data }: { data: DrawerData }) {
-  const [s, dispatch] = useReducer(reducer, undefined, initialState);
+  const wfId = data.workflow.id;
+  const [s, dispatch] = useReducer(reducer, undefined, () =>
+    _stateCache.get(wfId) ?? initialState());
+
+  // Persist reducer state to cache on every update.
+  useEffect(() => { _stateCache.set(wfId, s); }, [wfId, s]);
 
   useEffect(() => {
-    const es = new EventSource(`/api/workflows/${data.workflow.id}/agui`);
+    const es = new EventSource(`/api/workflows/${wfId}/agui`);
     es.onopen = () => dispatch({ type: "__CONNECTED" });
     es.onmessage = (msg) => {
       try { dispatch(JSON.parse(msg.data)); } catch { /* skip */ }
@@ -86,7 +95,7 @@ export default function DrawerReasoning({ data }: { data: DrawerData }) {
       if (es.readyState === EventSource.CLOSED) dispatch({ type: "__DISCONNECTED" });
     };
     return () => es.close();
-  }, [data.workflow.id]);
+  }, [wfId]);
 
   const hasContent = s.messages.length > 0 || s.toolCalls.length > 0 || Object.keys(s.state).length > 0;
 
