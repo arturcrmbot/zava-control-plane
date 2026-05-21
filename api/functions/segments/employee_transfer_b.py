@@ -6,7 +6,12 @@ the policy_search / delegated_authority / vendor_registry MCPs; the
 model picks the invocation order. The orchestrator owns segment
 boundaries, HITL gates, retry, and audit.
 
-Mirrors api/functions/segments/hiring_b.py (canonical example).
+Tool wiring follows the v3 fleet pattern (e.g.
+`api/functions/graphs/executors/agents/agent_fleet_employee_onboarding_access_drafter.py`):
+the `@define_tool`-decorated functions are imported here and passed
+explicitly via `tools=[...]`. The SDK does NOT auto-discover MCP tools
+from `skill_directories` (KR-5 in
+`docs/superpowers/plans/2026-05-21-compose-domain-findings-employee-transfer.md`).
 """
 from __future__ import annotations
 
@@ -15,14 +20,22 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from api.server.mcp_tools.policy_search import policy_search_tool
+from api.server.mcp_tools.delegated_authority import (
+    delegated_authority_check_authority_tool,
+    delegated_authority_resolve_approver_tool,
+)
+from api.server.mcp_tools.vendor_registry import vendor_registry_lookup_vendor_tool
+
 
 _SEGMENT_B_SKILLS: list[str] = [
     "fleet-employee-transfer-transfer-eligibility-checker",
 ]
 _SEGMENT_B_MCPS: list[str] = [
     "policy_search",
-    "delegated_authority",
-    "vendor_registry",
+    "delegated_authority_check_authority",
+    "delegated_authority_resolve_approver",
+    "vendor_registry_lookup_vendor",
 ]
 
 
@@ -110,7 +123,12 @@ async def run_segment_b(input: dict) -> dict:
 
     return await run_agent_session(
         prompt=prompt,
-        tools=[],
+        tools=[
+            policy_search_tool,
+            delegated_authority_check_authority_tool,
+            delegated_authority_resolve_approver_tool,
+            vendor_registry_lookup_vendor_tool,
+        ],
         skill_dir=skill_dirs[0],
         skill_directories=skill_dirs[1:],
         skill_label="employee-transfer-segment-b",

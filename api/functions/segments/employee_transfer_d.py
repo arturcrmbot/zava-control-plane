@@ -5,7 +5,13 @@ Opens ONE CopilotSession loaded with the compensation-remapper skill
 plus the workday_hr_employee / contract_repository MCPs; the model picks
 the invocation order.
 
-Mirrors api/functions/segments/hiring_b.py (canonical example).
+Tool wiring follows the v3 fleet pattern (e.g.
+`api/functions/graphs/executors/agents/agent_fleet_employee_onboarding_access_drafter.py`):
+the `@define_tool`-decorated functions are imported here and passed
+explicitly via `tools=[...]`. The SDK does NOT auto-discover MCP tools
+from `skill_directories`, contrary to the misleading comment in
+`hiring_b.py` (KR-5 from
+`docs/superpowers/plans/2026-05-21-compose-domain-findings-employee-transfer.md`).
 """
 from __future__ import annotations
 
@@ -13,13 +19,22 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field, field_validator
 
+from api.server.mcp_tools.workday_hr_employee import (
+    workday_hr_employee_get_employee_tool,
+)
+from api.server.mcp_tools.contract_repository import (
+    contract_repository_get_contract_tool,
+    contract_repository_find_similar_tool,
+)
+
 
 _SEGMENT_D_SKILLS: list[str] = [
     "fleet-employee-transfer-compensation-remapper",
 ]
 _SEGMENT_D_MCPS: list[str] = [
-    "workday_hr_employee",
-    "contract_repository",
+    "workday_hr_employee_get_employee",
+    "contract_repository_get_contract",
+    "contract_repository_find_similar",
 ]
 
 
@@ -109,7 +124,11 @@ async def run_segment_d(input: dict) -> dict:
 
     return await run_agent_session(
         prompt=prompt,
-        tools=[],
+        tools=[
+            workday_hr_employee_get_employee_tool,
+            contract_repository_get_contract_tool,
+            contract_repository_find_similar_tool,
+        ],
         skill_dir=skill_dirs[0],
         skill_directories=skill_dirs[1:],
         skill_label="employee-transfer-segment-d",

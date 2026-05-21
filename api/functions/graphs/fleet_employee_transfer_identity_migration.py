@@ -36,8 +36,9 @@ async def _identity_migration_execute(input: dict) -> dict:
     role_templates = list_role_templates(department=target_role, grade=grade)
     availability = find_availability(
         attendees=[employee_id, lookup.get("manager_id") or "unknown"],
-        date=effective_date,
         duration_minutes=60,
+        window_start=effective_date,
+        window_days=7,
     )
     return {
         "ok": True,
