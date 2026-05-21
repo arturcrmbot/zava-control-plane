@@ -69,5 +69,11 @@ export interface ObservatoryEvent {
   reason?: string | null;
   /** Human-readable phase label, mirrored from durable.step.* events. */
   phase_name?: string | null;
+  /** Dream-pass — count of memories going in. Only on dream.pass.* events. */
+  dream_input_count?: number | null;
+  /** Dream-pass — count of distilled lessons coming out. */
+  dream_output_count?: number | null;
+  /** Dream-pass — trigger reason string (heartbeat:* / backlog=N>=K / manual). */
+  dream_trigger?: string | null;
   ts: number;
 }

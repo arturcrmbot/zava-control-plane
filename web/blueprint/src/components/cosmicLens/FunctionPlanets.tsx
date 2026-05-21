@@ -8,6 +8,12 @@ import { usePersonaHues, type HueMap } from "./usePersonaHues";
 import { AtmosphereRim } from "./AtmosphereRim";
 import { AnamorphicFlare } from "./AnamorphicFlare";
 import { PlanetSurface, PlanetClouds } from "./PlanetSurface";
+import { useLiveMemory, type FunctionMemorySummary } from "../../lib/useLiveMemory";
+import {
+  LessonSatellites,
+  DreamPulse,
+  WorkingMemoryParticles,
+} from "./DreamPassViz";
 
 interface FunctionPlanetsProps {
   functions: FunctionMeta[];
@@ -46,15 +52,19 @@ function Planet({
   load,
   idle,
   onClick,
+  memory,
 }: {
   fnK: string;
   color: string;
   load: number;
   idle: boolean;
   onClick: () => void;
+  memory?: FunctionMemorySummary;
 }) {
   const planetScale = idle ? 0.7 : 1.0;
   const haloOpacity = idle ? 0.04 : 0.08 + Math.min(0.25, load / 50);
+  const lessonCount = memory?.lessons ?? 0;
+  const dreaming = !!memory?.dreaming;
 
   // Per-planet seed for the surface shader (continent layout) and rotation
   // rate. Hashing the function key gives stable distinct planets across
@@ -132,6 +142,19 @@ function Planet({
           size={3.4 + Math.min(1.6, load / 30)}
         />
       )}
+      {/* Dream-pass viz — orbits a small ring of lesson satellites
+          around the planet (one dot per distilled lesson, capped),
+          pulses a halo while a dream pass is in flight, and streams
+          working-memory particles inward during the pass. Renders
+          nothing when there's no memory data. */}
+      <LessonSatellites count={lessonCount} color={color} radius={PLANET_RADIUS} />
+      <DreamPulse active={dreaming} color={color} radius={PLANET_RADIUS} />
+      <WorkingMemoryParticles
+        active={dreaming}
+        count={memory?.working ?? 0}
+        color={color}
+        radius={PLANET_RADIUS}
+      />
     </>
   );
 }
@@ -153,6 +176,11 @@ export function FunctionPlanets({ functions, loadByFunction, onFunctionClick }: 
   // the palette fetch resolves, in which case planetColor falls back to
   // the existing function-family hue — no flash on first paint.
   const personaHues = usePersonaHues();
+  // Dream-pass live overlay: lessons/working memory per function + a
+  // per-function `dreaming` flag set while a pass is in flight. Polls
+  // /api/memory/per-persona every 5s and subscribes to
+  // /api/blueprint/stream for dream.pass.* events.
+  const { byFunction: memoryByFunction } = useLiveMemory();
   if (!visible.length) return null;
 
   return (
@@ -175,6 +203,7 @@ export function FunctionPlanets({ functions, loadByFunction, onFunctionClick }: 
               load={load}
               idle={idle}
               onClick={() => onFunctionClick?.(k, fn.display ?? fn.label ?? k)}
+              memory={memoryByFunction.get(k)}
             />
             {/* Orbital guide ring — subtle hint of where moons orbit */}
             <mesh rotation={[Math.PI / 2, 0, 0]}>
@@ -220,6 +249,46 @@ export function FunctionPlanets({ functions, loadByFunction, onFunctionClick }: 
                   · idle
                 </span>
               )}
+              {/* Dream-pass overlay — lesson count + dreaming pill so the
+                  loop is visible on the constellation without opening a
+                  drawer. */}
+              {(() => {
+                const mem = memoryByFunction.get(k);
+                if (!mem) return null;
+                return (
+                  <>
+                    {mem.lessons > 0 && (
+                      <span
+                        data-testid={`fn-${k}-lessons`}
+                        style={{
+                          color: color,
+                          fontWeight: 600,
+                          marginLeft: 8,
+                          opacity: 0.85,
+                          fontSize: 8,
+                        }}
+                      >
+                        · {mem.lessons}✦
+                      </span>
+                    )}
+                    {mem.dreaming && (
+                      <span
+                        data-testid={`fn-${k}-dreaming`}
+                        style={{
+                          color: "#fde68a",
+                          fontWeight: 700,
+                          marginLeft: 8,
+                          fontSize: 8,
+                          letterSpacing: 1.5,
+                          textShadow: `0 0 6px ${color}`,
+                        }}
+                      >
+                        · DREAMING
+                      </span>
+                    )}
+                  </>
+                );
+              })()}
             </Html>
           </OrbitingPlanetGroup>
         );

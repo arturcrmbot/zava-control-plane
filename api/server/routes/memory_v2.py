@@ -72,12 +72,104 @@ async def trigger_dream(body: _DreamBody) -> dict:
 
     from api.server.services.memory.dream_consolidator import consolidate_memories
 
+    # Emit dream.pass.started so the constellation can light up the
+    # planet while the consolidation runs.
+    try:
+        from api.shared.events import FleetEvent as _FE
+        app_state.bus.emit(_FE(
+            type="dream.pass.started",
+            payload={
+                "domain": body.domain,
+                "trigger": "manual",
+                "input_count": store.count_working() if hasattr(store, "count_working") else store.count(),
+            },
+        ))
+    except Exception:
+        log.debug("trigger_dream: started emit failed", exc_info=True)
+
+    # Prefer Azure OpenAI when configured, otherwise the deterministic
+    # fallback so the demo works without cloud creds.
+    import os as _os
+    if _os.getenv("AZURE_OPENAI_ENDPOINT"):
+        consolidator = _build_llm_consolidator(body.domain)
+    else:
+        from api.server.services.memory.fallback_consolidator import (
+            fallback_consolidate,
+        )
+
+        async def _fb(texts: list[str]) -> list[str]:
+            return fallback_consolidate(texts)
+
+        consolidator = _fb
+
     result = await consolidate_memories(
         domain_memory=store,
-        llm_consolidate=_build_llm_consolidator(body.domain),
+        llm_consolidate=consolidator,
     )
+    result.setdefault("trigger", "manual")
     _dream_history.appendleft(result)
+
+    # Emit bus events so the constellation can light up.
+    try:
+        from api.shared.events import FleetEvent as _FE
+        app_state.bus.emit(_FE(
+            type="dream.pass.finished",
+            payload={
+                "domain": body.domain,
+                "trigger": "manual",
+                "input_count": result.get("input_count", 0),
+                "output_count": result.get("output_count", 0),
+                "timestamp": result.get("timestamp"),
+            },
+        ))
+    except Exception:
+        log.debug("trigger_dream: bus emit failed", exc_info=True)
+
     return result
+
+
+class _SeedEntry(BaseModel):
+    role: str = Field(..., min_length=1)
+    verdict: str = Field(..., min_length=1)
+    gate: str = Field(..., min_length=1)
+    reason: str | None = None
+    signals: dict | None = None
+    workflow_id: str = ""
+
+
+class _SeedBody(BaseModel):
+    domain: str = Field(..., min_length=1)
+    entries: list[_SeedEntry]
+
+
+@router.post("/seed-demo")
+def seed_demo(body: _SeedBody) -> dict:
+    """Write demo working-memory entries so a downstream dream pass has
+    real signal to consolidate. Used by ``scripts/dream_pass_demo.py``
+    and the Playwright E2E.
+    """
+    store = app_state.domain_memories.get(body.domain)
+    if not store:
+        return {"error": f"unknown domain: {body.domain}", "written": 0}
+
+    from api.server.services.memory.working_memory_writer import (
+        write_decision_memory,
+    )
+
+    written = 0
+    for e in body.entries:
+        ok = write_decision_memory(
+            domain=body.domain,
+            persona_role=e.role,
+            verdict=e.verdict,
+            reason=e.reason,
+            workflow_id=e.workflow_id or None,
+            gate_phase=e.gate,
+            signals=e.signals,
+        )
+        if ok:
+            written += 1
+    return {"written": written, "domain": body.domain}
 
 
 @router.get("/dream/history")

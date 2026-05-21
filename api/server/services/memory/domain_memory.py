@@ -30,6 +30,8 @@ class DomainMemory:
         *,
         agent_skill: str = "",
         workflow_id: str = "",
+        kind: str = "working",
+        extra_metadata: dict[str, Any] | None = None,
     ) -> list[dict]:
         """Write a memory directly (infer=False). The raw agent output
         is stored as-is; the dream consolidation pass is responsible for
@@ -37,16 +39,24 @@ class DomainMemory:
 
         We use infer=False because Mem0's built-in inference rejects raw
         agent log lines as 'no facts found'. Our dream pass handles the
-        intelligence layer instead."""
+        intelligence layer instead.
+
+        ``kind`` defaults to ``"working"`` so the UI / consolidator can
+        distinguish raw working notes from already-distilled lessons.
+        """
+        metadata = {
+            "domain": self.domain,
+            "agent_skill": agent_skill,
+            "workflow_id": workflow_id,
+            "captured_at": datetime.now(timezone.utc).isoformat(),
+            "kind": kind,
+        }
+        if extra_metadata:
+            metadata.update(extra_metadata)
         result = self._mem.add(
             messages=text,
             user_id=self._user_id,
-            metadata={
-                "domain": self.domain,
-                "agent_skill": agent_skill,
-                "workflow_id": workflow_id,
-                "captured_at": datetime.now(timezone.utc).isoformat(),
-            },
+            metadata=metadata,
             infer=False,
         )
         return (result or {}).get("results", [])
@@ -58,13 +68,15 @@ class DomainMemory:
         metadata: dict[str, Any] | None = None,
     ) -> list[dict]:
         """Write a pre-distilled memory with infer=False."""
+        merged = {
+            **(metadata or {}),
+            "domain": self.domain,
+            "kind": "lesson",
+        }
         result = self._mem.add(
             messages=text,
             user_id=self._user_id,
-            metadata={
-                **(metadata or {}),
-                "domain": self.domain,
-            },
+            metadata=merged,
             infer=False,
         )
         return (result or {}).get("results", [])
@@ -86,9 +98,22 @@ class DomainMemory:
         results = self._mem.get_all(user_id=self._user_id, limit=limit)
         return (results or {}).get("results", [])
 
+    def list_by_kind(self, kind: str, *, limit: int = 200) -> list[dict]:
+        """Filter by metadata.kind — 'working' vs 'lesson'."""
+        out: list[dict] = []
+        for r in self.list_all(limit=limit):
+            md = r.get("metadata") or {}
+            if md.get("kind") == kind:
+                out.append(r)
+        return out
+
     def count(self) -> int:
         """Count of memories in this domain."""
         return len(self.list_all(limit=10000))
+
+    def count_working(self) -> int:
+        """Count of un-distilled working memories — the cadence-loop signal."""
+        return len(self.list_by_kind("working", limit=10000))
 
     def delete(self, memory_id: str) -> None:
         """Delete a single memory (used by dream consolidator)."""

@@ -66,6 +66,20 @@ async def consolidate_memories(
 
     log.info("dream[%s]: consolidating %d memories", domain, len(memory_texts))
 
+    # Capture the dominant agent_skill across the input batch so the
+    # output lessons can be attributed back to the right persona /
+    # function for the constellation viz. Without this, distilled
+    # lessons show up under '_unattributed' and the planet never
+    # gets credit for the consolidation.
+    from collections import Counter
+    _skills: Counter[str] = Counter()
+    for m in all_memories:
+        md = m.get("metadata") or {}
+        sk = (md.get("agent_skill") or "").strip()
+        if sk:
+            _skills[sk] += 1
+    dominant_skill = _skills.most_common(1)[0][0] if _skills else ""
+
     try:
         consolidated = await llm_consolidate(memory_texts)
     except Exception as e:
@@ -98,6 +112,9 @@ async def consolidate_memories(
                 metadata={
                     "source": "dream-consolidation",
                     "consolidated_at": datetime.now(timezone.utc).isoformat(),
+                    # Attribute the lesson to the dominant input persona
+                    # so the constellation viz lights up the right planet.
+                    "agent_skill": dominant_skill,
                 },
             )
             written += 1

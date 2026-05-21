@@ -1336,6 +1336,30 @@ async def _handle_hitl(event: FleetEvent) -> None:
     except Exception as ex:  # pragma: no cover — defensive only
         print(f"[persona_responder] persona_experience.record failed: {ex}")
 
+    # Dream-pass producer: write a working-memory entry for every
+    # persona decision so the cadence loop has signal to consolidate.
+    # Best-effort; never blocks the orchestration event.
+    try:
+        from api.server.services.memory.working_memory_writer import (
+            write_decision_memory,
+        )
+        signals: dict = {}
+        if isinstance(context, dict):
+            for k in ("voice_score", "cv_score", "amount", "risk", "country"):
+                if context.get(k) is not None:
+                    signals[k] = context.get(k)
+        write_decision_memory(
+            domain=_workflow_type_for(workflow_id),
+            persona_role=persona_role,
+            verdict=str(decision_str or ""),
+            reason=str(decision_payload.get("reason") or "") or None,
+            workflow_id=workflow_id,
+            gate_phase=gate_phase,
+            signals=signals or None,
+        )
+    except Exception as ex:  # pragma: no cover — defensive only
+        print(f"[persona_responder] write_decision_memory failed: {ex}")
+
     # pitch-j3: per-domain decision-latency trend. Compute the wall-time
     # between workflow.created_at and now (the moment we resolved the
     # gate) and record it into kpi_history under
@@ -1489,6 +1513,23 @@ async def _handle_summary_request(event: FleetEvent) -> None:
             apply_proposed_actions(role, list(proposed))
         except Exception as ex:  # pragma: no cover — defensive
             print(f"[persona_responder] apply_proposed_actions {role!r} raised: {ex}")
+
+    # Dream-pass producer: a persona summary is an observation. Write it
+    # to the working-memory store of the persona's domain so the cadence
+    # loop has signal. Domain is `persona.workflow_label` when set.
+    try:
+        from api.server.services.memory.working_memory_writer import (
+            write_summary_memory,
+        )
+        domain = persona.workflow_label or role
+        write_summary_memory(
+            domain=domain,
+            persona_role=role,
+            headline=str(out.get("headline", "") or "")[:512],
+            body=str(out.get("body", "") or "") or None,
+        )
+    except Exception as ex:  # pragma: no cover — defensive
+        print(f"[persona_responder] write_summary_memory {role!r} raised: {ex}")
 
 
 def _latest_insight_for_role(graph, role: str) -> dict | None:

@@ -190,11 +190,31 @@ class AppState:
             import logging
 
             logging.getLogger(__name__).warning(
-                "Mem0 backend unavailable (%s); domain memories will be empty. "
-                "Agents will run without memory until Mem0 is configured.",
+                "Mem0 backend unavailable (%s); using in-process FallbackMemory "
+                "so the dream-pass demo runs without Azure OpenAI / Chroma.",
                 _mem0_ex,
             )
-            self.domain_memories = {}
+            try:
+                from api.server.services.memory.domain_memory import (
+                    DomainMemory, build_domain_memories,
+                )
+                from api.server.services.memory.fallback_memory import (
+                    get_fallback_memory,
+                )
+                _memory_domains = [
+                    d.strip()
+                    for d in os.getenv("MEMORY_DOMAINS", "hiring").split(",")
+                    if d.strip()
+                ]
+                self.domain_memories: dict[str, DomainMemory] = build_domain_memories(
+                    domains=_memory_domains,
+                    memory=get_fallback_memory(),
+                )
+            except Exception:
+                logging.getLogger(__name__).exception(
+                    "FallbackMemory wiring failed; domain memories will be empty."
+                )
+                self.domain_memories = {}
         self._dream_pass_orchestrator: "DreamPassOrchestrator | None" = None
 
     @property
@@ -408,16 +428,16 @@ class AppState:
         except RuntimeError:
             pass
 
-        cadence_secs = int(os.getenv("DREAM_PASS_DEMO_CADENCE_SECONDS", "0") or "0")
+        cadence_secs = int(os.getenv("DREAM_PASS_DEMO_CADENCE_SECONDS", "120") or "120")
         cadence_domains = tuple(
             d.strip() for d in os.getenv(
                 "DREAM_PASS_DEMO_CADENCE_DOMAINS", "hiring",
             ).split(",") if d.strip()
         )
         if cadence_secs > 0:
-            tick_secs = int(os.getenv("DREAM_PASS_TICK_SECONDS", "15") or "15")
+            tick_secs = int(os.getenv("DREAM_PASS_TICK_SECONDS", "10") or "10")
             backlog_threshold = int(
-                os.getenv("DREAM_PASS_TRIGGER_BACKLOG", "30") or "30"
+                os.getenv("DREAM_PASS_TRIGGER_BACKLOG", "5") or "5"
             )
             try:
                 import asyncio as _asyncio
@@ -520,10 +540,16 @@ async def _run_dream_pass_cadence(
     last_pass_at: dict[str, _dt.datetime] = {}
 
     def _backlog_for(dom: str) -> int:
+        """Working-memory backlog — only un-distilled entries count
+        towards the trigger threshold. Distilled lessons already
+        survived a prior pass and shouldn't keep tripping it."""
         if not domain_memories or dom not in domain_memories:
             return 0
         try:
-            return domain_memories[dom].count()
+            store = domain_memories[dom]
+            if hasattr(store, "count_working"):
+                return store.count_working()
+            return store.count()
         except Exception:
             log.exception("dream cadence: count for %s failed", dom)
             return 0
@@ -562,13 +588,63 @@ async def _run_dream_pass_cadence(
                     domain_mem = domain_memories[dom]
 
                 if domain_mem:
+                    # Emit dream.pass.started so the constellation can
+                    # light the persona up in real time. Best-effort.
+                    try:
+                        from api.server.state import app_state as _app_state
+                        from api.shared.events import FleetEvent as _FE
+                        _app_state.bus.emit(_FE(
+                            type="dream.pass.started",
+                            payload={
+                                "domain": dom,
+                                "trigger": reason,
+                                "input_count": _backlog_for(dom),
+                            },
+                        ))
+                    except Exception:
+                        log.debug("dream cadence: started-event emit failed", exc_info=True)
+
+                    # Build the consolidator. Prefer Azure OpenAI when
+                    # configured, fall back to the deterministic
+                    # rule-based consolidator so the demo works on a
+                    # laptop with no cloud creds.
+                    import os as _os
+                    if _os.getenv("AZURE_OPENAI_ENDPOINT"):
+                        consolidator = _build_llm_consolidator(dom)
+                    else:
+                        from api.server.services.memory.fallback_consolidator import (
+                            fallback_consolidate,
+                        )
+
+                        async def _fb_consolidate(texts: list[str]) -> list[str]:
+                            return fallback_consolidate(texts)
+
+                        consolidator = _fb_consolidate
+
                     result = await consolidate_memories(
                         domain_memory=domain_mem,
-                        llm_consolidate=_build_llm_consolidator(dom),
+                        llm_consolidate=consolidator,
                     )
+                    result.setdefault("trigger", reason)
                     _dream_history.appendleft(result)
                     log.info("dream cadence[%s]: %s", dom, result)
                     last_pass_at[dom] = now
+
+                    try:
+                        from api.server.state import app_state as _app_state
+                        from api.shared.events import FleetEvent as _FE
+                        _app_state.bus.emit(_FE(
+                            type="dream.pass.finished",
+                            payload={
+                                "domain": dom,
+                                "trigger": reason,
+                                "input_count": result.get("input_count", 0),
+                                "output_count": result.get("output_count", 0),
+                                "timestamp": result.get("timestamp"),
+                            },
+                        ))
+                    except Exception:
+                        log.debug("dream cadence: finished-event emit failed", exc_info=True)
                 else:
                     log.warning(
                         "dream cadence[%s]: no domain memory store available", dom,

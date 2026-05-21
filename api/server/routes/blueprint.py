@@ -141,6 +141,14 @@ _OBSERVATORY_TYPES: set[str] = {
     "kpi.published",
     "entity.read",
     "workflow.failed",
+    # Dream-pass lifecycle — the constellation pulses the relevant
+    # persona / function planet during a pass and adds a lesson
+    # satellite when one completes.
+    "dream.pass.started",
+    "dream.pass.finished",
+    "dream.proposal.generated",
+    "dream.lesson.promoted",
+    "dream.lesson.rejected",
 }
 
 
@@ -184,6 +192,17 @@ def _normalise_event(event: FleetEvent) -> dict[str, Any] | None:
     )
     workflow_type = data.get("workflow_type") or data.get("workflowType")
     domain = _domain_from_workflow_type(workflow_type)
+    # Dream-pass events carry their domain in payload['domain']; surface
+    # it at the top level so the front-end constellation can route the
+    # pulse / satellite update without parsing the payload separately.
+    payload = data.get("payload") or {}
+    if isinstance(payload, dict):
+        if not domain and payload.get("domain"):
+            domain = payload.get("domain")
+        if event.type.startswith("dream."):
+            data.setdefault("dream_input_count", payload.get("input_count"))
+            data.setdefault("dream_output_count", payload.get("output_count"))
+            data.setdefault("dream_trigger", payload.get("trigger"))
 
     return {
         "type": event.type,
@@ -222,6 +241,10 @@ def _normalise_event(event: FleetEvent) -> dict[str, Any] | None:
         "verdict": data.get("verdict"),
         "phase_name": data.get("phase"),
         "decision_reason": data.get("reason") or data.get("decision_reason"),
+        # Dream-pass payload fields — only set on dream.* events.
+        "dream_input_count": data.get("dream_input_count"),
+        "dream_output_count": data.get("dream_output_count"),
+        "dream_trigger": data.get("dream_trigger"),
         "ts": data.get("ts") or time.time(),
     }
 
