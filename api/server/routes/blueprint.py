@@ -360,7 +360,89 @@ async def blueprint_stream(request: Request) -> EventSourceResponse:
 # --------------------------------------------------------------------------
 
 
+_WF = "HIRE-AGUI-DEMO"
 _DEMO_SCRIPTS: dict[str, list[dict[str, Any]]] = {
+    "hire-agui": [
+        # ── workflow start ──────────────────────────────────────────
+        {"type": "durable.workflow.started", "workflow_type": "hiring",
+         "workflow_id": _WF},
+        # ── screening stage ─────────────────────────────────────────
+        {"type": "durable.step.started", "stage": "screening",
+         "workflow_id": _WF},
+        {"type": "durable.executor.invoked", "skill": "cv_screener",
+         "workflow_id": _WF},
+        {"type": "agent.completed", "skill": "cv_screener",
+         "workflow_id": _WF,
+         "output": "Candidate Ada Lovelace has 8 years distributed-systems "
+                   "experience, strong Python (contributor to CPython), and "
+                   "led a team of 12 at Babbage Corp. Screening score: 0.94. "
+                   "Recommend proceeding to technical interview."},
+        # tool call: policy search
+        {"type": "durable.executor.invoked", "tool": "policy_search",
+         "workflow_id": _WF,
+         "args": {"query": "UK hiring compliance GDPR right-to-work"}},
+        # entity upserted: candidate
+        {"type": "entity.upserted", "workflow_id": _WF,
+         "entity_id": "cand-42", "entity_kind": "person",
+         "fields": {"name": "Ada Lovelace", "role": "Senior Engineer",
+                    "screening_score": 0.94, "source": "referral"}},
+        {"type": "durable.step.completed", "stage": "screening",
+         "workflow_id": _WF},
+        # ── interview stage ─────────────────────────────────────────
+        {"type": "durable.step.started", "stage": "interview",
+         "workflow_id": _WF},
+        {"type": "durable.executor.invoked", "skill": "interview_scheduler",
+         "workflow_id": _WF},
+        {"type": "agent.completed", "skill": "interview_scheduler",
+         "workflow_id": _WF,
+         "output": "Scheduled technical panel for 2026-05-22 14:00 UTC. "
+                   "Panel: Sarah Chen (Engineering Lead), James Wright "
+                   "(Staff Engineer). Sent calendar invites to all parties."},
+        # tool call: calendar lookup
+        {"type": "durable.executor.invoked", "tool": "calendar_availability",
+         "workflow_id": _WF,
+         "args": {"participants": ["sarah.chen", "james.wright"],
+                  "duration_mins": 60, "window_days": 5}},
+        # HITL: awaiting interview decision
+        {"type": "workflow.hitl.requested", "workflow_id": _WF,
+         "persona": "hiring_manager",
+         "reason": "awaiting_interview_decision"},
+        # resume after human approval
+        {"type": "durable.resumed", "workflow_id": _WF},
+        {"type": "durable.step.completed", "stage": "interview",
+         "workflow_id": _WF},
+        # ── offer stage ─────────────────────────────────────────────
+        {"type": "durable.step.started", "stage": "offer",
+         "workflow_id": _WF},
+        {"type": "durable.executor.invoked", "skill": "offer_personaliser",
+         "workflow_id": _WF},
+        {"type": "agent.completed", "skill": "offer_personaliser",
+         "workflow_id": _WF,
+         "output": "Generated offer letter for Ada Lovelace. Band L5 upper "
+                   "quartile (£145k base + 15% bonus + equity). Personalised "
+                   "with distributed-systems project highlights and flexible "
+                   "working clause per UK policy."},
+        # tool call: comp benchmark
+        {"type": "durable.executor.invoked", "tool": "comp_benchmark",
+         "workflow_id": _WF,
+         "args": {"role": "Senior Engineer", "location": "London",
+                  "band": "L5"}},
+        # decision recorded
+        {"type": "decision.recorded", "workflow_id": _WF,
+         "decision_id": "dec-offer-42",
+         "verdict": "approved",
+         "reason": "Unanimous panel recommendation. Exceptional candidate."},
+        # entity update: candidate status
+        {"type": "entity.upserted", "workflow_id": _WF,
+         "entity_id": "cand-42", "entity_kind": "person",
+         "fields": {"name": "Ada Lovelace", "role": "Senior Engineer",
+                    "status": "offer_sent", "offer_band": "L5",
+                    "offer_base": 145000}},
+        {"type": "durable.step.completed", "stage": "offer",
+         "workflow_id": _WF},
+        # ── workflow complete ───────────────────────────────────────
+        {"type": "durable.workflow.completed", "workflow_id": _WF},
+    ],
     "hire-walk": [
         {"type": "workflow.started", "workflow_type": "hiring", "workflow_id": "HIRE-DEMO-DRY"},
         {"type": "durable.step.started", "skill": "cv-crystalliser", "workflow_type": "hiring", "workflow_id": "HIRE-DEMO-DRY"},
