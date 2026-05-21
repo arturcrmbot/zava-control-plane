@@ -221,12 +221,6 @@ export interface AutonomyPolicy {
   updatedAt: number;
 }
 
-export function nextPhase(p: PhaseName): PhaseName | null {
-  const i = PHASE_ORDER.indexOf(p);
-  if (i === -1 || i === PHASE_ORDER.length - 1) return null;
-  return PHASE_ORDER[i + 1];
-}
-
 export interface McpCall {
   workflowId: string;
   timestamp: number;
