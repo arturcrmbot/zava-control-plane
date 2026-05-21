@@ -69,9 +69,11 @@ brief.yaml  ──►  author-domain-skeleton    (Domain row + Phase tuple + Hit
 
 The brief schema lives at
 [`docs/superpowers/skills/compose-domain/brief.schema.yaml`](superpowers/skills/compose-domain/brief.schema.yaml).
-Thirteen worked-example briefs ship in `docs/superpowers/specs/` —
-`fleet-purchase-card-brief.yaml` is the freshest top-down authoring
-example.
+Nineteen worked-example briefs ship in `docs/superpowers/specs/archive/`
+(they were moved there after graduation; new briefs are authored to
+`docs/superpowers/specs/<workflow_type>-brief.yaml` and archived after
+`graduate.sh` succeeds). `fleet-purchase-card-brief.yaml` is the
+freshest top-down authoring example.
 
 The v4 sub-skills:
 

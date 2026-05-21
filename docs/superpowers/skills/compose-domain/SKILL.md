@@ -598,14 +598,17 @@ within minutes of graduation. No synthetic templates needed.
 
 ## How to author a new domain brief (v4 worked example)
 
-The 13 briefs at `docs/superpowers/specs/*-brief.yaml` are the
-authoritative spec for every generated domain. To author a new one:
+The 19 briefs at `docs/superpowers/specs/archive/*-brief.yaml` are the
+authoritative spec for every generated domain (they live under
+`archive/` because they have already been graduated; new briefs are
+authored under `docs/superpowers/specs/` and archived after
+`graduate.sh` succeeds). To author a new one:
 
 1. **Pick a workflow_type** — kebab-case, lowercase, e.g.
    `purchase-card`. This name is stamped on every payload, every
    FleetEvent, and every Cypher file the codegens emit.
 2. **Copy the worked example.** The freshest brief —
-   `docs/superpowers/specs/fleet-purchase-card-brief.yaml` — was
+   `docs/superpowers/specs/archive/fleet-purchase-card-brief.yaml` — was
    authored top-down without a hand-written projection module. It
    exercises every section the v4 schema cares about (domain,
    phases, entities, decisions, function, ambient) at the smallest
