@@ -12,6 +12,8 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.server.middleware.replay_readonly import ReplayReadOnlyMiddleware
+from api.server.services.replay.mode import is_replay
 from api.server.state import app_state
 
 
@@ -350,6 +352,9 @@ app.add_middleware(
     allow_origins=_cors_allowed_origins(),
     allow_methods=["*"], allow_headers=["*"],
 )
+
+if is_replay():
+    app.add_middleware(ReplayReadOnlyMiddleware)
 
 
 @app.get("/api/health")
