@@ -43,7 +43,7 @@ class TapeLoader:
         try:
             # Extract tarball
             with tarfile.open(self.path, "r:gz") as tf:
-                tf.extractall(self._work_dir)
+                tf.extractall(self._work_dir, filter=tarfile.data_filter)
 
             # Parse meta
             meta_path = self._work_dir / META_NAME

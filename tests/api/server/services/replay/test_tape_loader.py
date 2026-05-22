@@ -327,3 +327,57 @@ class TestTapeLoader:
         assert events[1].t == 1.0
 
         loader.close()
+
+    def test_path_traversal_blocked_cve_2007_4559(self, tmp_path: Path) -> None:
+        """Test that path traversal attacks are blocked (CVE-2007-4559).
+
+        A malicious tape with members like '../escape.json' should not
+        be extracted outside the destination directory.
+        """
+        tape_path = tmp_path / "malicious.tape.tar.gz"
+        tape_path.parent.mkdir(parents=True, exist_ok=True)
+
+        meta = {
+            "tape_id": "test_tape",
+            "recorded_at": "2025-01-15T10:00:00+00:00",
+            "duration_s": 1.0,
+            "version": TAPE_FORMAT_VERSION,
+            "app_sha": "abc123",
+        }
+
+        with tarfile.open(tape_path, "w:gz") as tf:
+            import io
+
+            # Add meta
+            meta_bytes = json.dumps(meta).encode("utf-8")
+            meta_info = tarfile.TarInfo(name="./meta.json")
+            meta_info.size = len(meta_bytes)
+            tf.addfile(meta_info, io.BytesIO(meta_bytes))
+
+            # Add a malicious member with path traversal
+            # This would try to write to ../escape.json (outside destination)
+            escape_content = json.dumps({"evil": "payload"}).encode("utf-8")
+            escape_info = tarfile.TarInfo(name="../escape.json")
+            escape_info.size = len(escape_content)
+            tf.addfile(escape_info, io.BytesIO(escape_content))
+
+            # Add minimal files
+            events_info = tarfile.TarInfo(name="./events.ndjson")
+            events_info.size = 0
+            tf.addfile(events_info, io.BytesIO(b""))
+
+            mutations_info = tarfile.TarInfo(name="./mutations.ndjson")
+            mutations_info.size = 0
+            tf.addfile(mutations_info, io.BytesIO(b""))
+
+        # This should raise a FilterError (or subclass) due to the path traversal
+        loader = TapeLoader(tape_path)
+        with pytest.raises(tarfile.FilterError):
+            loader.load()
+
+        # Verify no escape file was created at tmp_path level
+        escape_path = tmp_path / "escape.json"
+        assert not escape_path.exists(), "Path traversal was not blocked!"
+
+        loader.close()
+
