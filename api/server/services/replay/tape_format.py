@@ -39,7 +39,17 @@ class MutationRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     t: float
-    op: Literal["upsert", "delete"]
-    kind: Literal["workflow", "exception", "memory", "lesson", "decision", "insight", "entity", "audit"]
+    op: Literal["upsert", "delete", "replace"]
+    kind: Literal[
+        "workflow",
+        "phases",
+        "exception",
+        "memory",
+        "lesson",
+        "decision",
+        "insight",
+        "entity",
+        "audit",
+    ]
     id: str
     patch: dict[str, Any]

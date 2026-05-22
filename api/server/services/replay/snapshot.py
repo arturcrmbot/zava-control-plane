@@ -170,11 +170,28 @@ def _snapshot_audit_summary() -> dict[str, Any]:
     }
 
 
+def _snapshot_phases() -> dict[str, list[dict[str, Any]]]:
+    """Capture per-workflow phase lists. The Workflow object only carries
+    `current_phase` as a string; the actual Phase objects live in
+    `store._phases[workflow_id]`. Without this snapshot the replay UI
+    would never see phase rows for workflows that were partway through
+    when the recording started."""
+    store = getattr(app_state, "store", None)
+    if store is None:
+        return {}
+    out: dict[str, list[dict[str, Any]]] = {}
+    phases_map = getattr(store, "_phases", {}) or {}
+    for wid, phases in phases_map.items():
+        out[wid] = [p.model_dump(by_alias=True, mode="json") for p in phases]
+    return out
+
+
 def take_snapshot(out_dir: Path) -> list[Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     payloads: list[tuple[str, Any]] = [
         ("workflows.json", _snapshot_workflows()),
+        ("phases.json", _snapshot_phases()),
         ("exceptions.json", _snapshot_exceptions()),
         ("personae.json", _snapshot_personae()),
         ("functions.json", _snapshot_functions()),

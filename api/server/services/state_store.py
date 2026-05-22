@@ -62,13 +62,27 @@ class StateStore:
 
     def append_phase(self, workflow_id: str, p: Phase) -> None:
         self._phases.setdefault(workflow_id, []).append(p)
+        self._emit_phases(workflow_id)
 
     def update_phase(self, workflow_id: str, name: str, **patch) -> None:
         for p in self._phases.get(workflow_id, []):
             if p.name == name:
                 for k, v in patch.items():
                     setattr(p, k, v)
+                self._emit_phases(workflow_id)
                 return
+
+    def _emit_phases(self, workflow_id: str) -> None:
+        """Emit the full per-workflow phase list as a replay mutation so
+        the Player can keep phase rows in sync. Recorded after every
+        phase append / update."""
+        phases = self._phases.get(workflow_id, [])
+        emit_mutation(
+            op="replace",
+            kind="phases",
+            id=workflow_id,
+            patch={"phases": [p.model_dump(by_alias=True, mode="json") for p in phases]},
+        )
 
     def get_phases(self, workflow_id: str) -> list[Phase]:
         return self._phases.get(workflow_id, [])
@@ -119,6 +133,14 @@ class StateStore:
         w = self._workflows.get(workflow_id)
         if w:
             w.action_ledger.append(entry)
+            # Ledger lives on the Workflow object; re-emit the workflow
+            # so the player picks up the new ledger entry.
+            emit_mutation(
+                op="upsert",
+                kind="workflow",
+                id=w.id,
+                patch=w.model_dump(by_alias=True, mode="json"),
+            )
 
     def upsert_policy(self, p: AutonomyPolicy) -> None:
         self._policies[p.id] = p
@@ -145,6 +167,12 @@ class StateStore:
         if w is None:
             return
         w.agent_outputs[agent] = output
+        emit_mutation(
+            op="upsert",
+            kind="workflow",
+            id=w.id,
+            patch=w.model_dump(by_alias=True, mode="json"),
+        )
 
     def get_agent_outputs(self, workflow_id: str) -> dict:
         w = self._workflows.get(workflow_id)
@@ -178,6 +206,12 @@ class StateStore:
                 # in tests so this is the conservative path.
                 w.__dict__["agent_reasoning"] = []
         w.agent_reasoning.append(entry)
+        emit_mutation(
+            op="upsert",
+            kind="workflow",
+            id=w.id,
+            patch=w.model_dump(by_alias=True, mode="json"),
+        )
 
     def get_agent_reasoning(self, workflow_id: str) -> list[dict]:
         w = self._workflows.get(workflow_id)

@@ -114,6 +114,7 @@ def test_take_snapshot_writes_expected_json_files(tmp_path: Path, isolated_app_s
 
     expected_names = [
         "workflows.json",
+        "phases.json",
         "exceptions.json",
         "personae.json",
         "functions.json",

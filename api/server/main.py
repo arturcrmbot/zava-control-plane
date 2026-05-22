@@ -68,6 +68,12 @@ async def lifespan(app: FastAPI):
 
         loader = TapeLoader(path).load()
         player = Player(loader)
+        # Fan replayed bus events to the SSEHub so /api/stream/fleet etc.
+        # surface them in the UI. Without this the player ticks silently
+        # and the feed looks frozen even though state mutates.
+        _replay_bus_to_hub_off = app_state.bus.on_any(
+            lambda e: app_state.hub.broadcast("fleet", e.model_dump())
+        )
         try:
             await player.start()
             set_active_player(player)
@@ -80,9 +86,17 @@ async def lifespan(app: FastAPI):
             finally:
                 set_active_player(None)
                 await player.stop()
+                try:
+                    _replay_bus_to_hub_off()
+                except Exception:
+                    pass
                 loader.close()
                 await app_state.aclose()
         except BaseException:
+            try:
+                _replay_bus_to_hub_off()
+            except Exception:
+                pass
             loader.close()
             await app_state.aclose()
             raise

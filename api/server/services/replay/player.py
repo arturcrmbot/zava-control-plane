@@ -123,6 +123,16 @@ class Player:
                 from api.shared.types import Exception_ as ExceptionModel
 
                 app_state.store.upsert_exception(ExceptionModel.model_validate(rec.patch))
+            elif rec.kind == "phases" and rec.op == "replace":
+                # Phases live in app_state.store._phases (a separate dict),
+                # not on the Workflow object. The recorder ships the full
+                # phase list per workflow_id; we replace wholesale.
+                from api.shared.types import Phase
+
+                phases = [Phase.model_validate(p) for p in rec.patch.get("phases", [])]
+                # Direct private-attr write: sibling-service path, same
+                # pattern hydrate uses for clearing the store at boot.
+                app_state.store._phases[rec.id] = phases
             else:
                 logger.debug("Skipping replay mutation kind=%s op=%s id=%s", rec.kind, rec.op, rec.id)
         except Exception:

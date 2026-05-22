@@ -5,7 +5,7 @@ from typing import Any
 from api.server.services.replay.mutation_bus import get_active_bus, set_active_bus
 from api.server.services.replay.tape_loader import TapeLoader
 from api.server.state import app_state
-from api.shared.types import Exception_, Workflow
+from api.shared.types import Exception_, Phase, Workflow
 
 
 def hydrate_from_snapshot(loader: TapeLoader) -> None:
@@ -16,6 +16,7 @@ def hydrate_from_snapshot(loader: TapeLoader) -> None:
         snapshot = loader.snapshot
         _clear_state_store(app_state.store)
         _hydrate_workflows(app_state.store, _snapshot_items(snapshot.get("workflows.json")))
+        _hydrate_phases(app_state.store, snapshot.get("phases.json") or {})
         _hydrate_exceptions(app_state.store, _snapshot_items(snapshot.get("exceptions.json")))
         _hydrate_memories(
             app_state.domain_memories,
@@ -53,6 +54,16 @@ def _clear_state_store(store: Any) -> None:
 def _hydrate_workflows(store: Any, dicts: list[dict[str, Any]]) -> None:
     for item in dicts:
         store.upsert_workflow(Workflow.model_validate(item))
+
+
+def _hydrate_phases(store: Any, by_workflow_id: dict[str, list[dict[str, Any]]]) -> None:
+    """Restore per-workflow phase lists from the snapshot."""
+    if not isinstance(by_workflow_id, dict):
+        return
+    for wid, phases in by_workflow_id.items():
+        if not isinstance(phases, list):
+            continue
+        store._phases[wid] = [Phase.model_validate(p) for p in phases]
 
 
 def _hydrate_exceptions(store: Any, dicts: list[dict[str, Any]]) -> None:
