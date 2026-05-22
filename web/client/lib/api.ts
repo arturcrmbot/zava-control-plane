@@ -28,8 +28,14 @@ export async function apiFetch(
     const body = await response.clone().json() as { error?: string; message?: string };
     if (body?.error !== "replay") return response;
 
+    // Fire the friendly toast via global event, but return the original
+    // 403 so callers' `!r.ok` paths run normally and any optimistic UI
+    // gets reverted. Previously we swapped this to a 204 ("no-op") which
+    // caused callers like HITLCard to treat the click as a SUCCESS and
+    // leave the optimistic "Approved" flip in place — visitors then saw
+    // a replay toast yet a fully-resolved card.
     dispatchReplayBlocked({ message: body.message ?? DEFAULT_REPLAY_MESSAGE });
-    return new Response(null, { status: 204, statusText: "No Content" });
+    return response;
   } catch {
     return response;
   }

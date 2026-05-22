@@ -74,7 +74,7 @@ export default function HITLCard({
       });
       if (!r.ok) {
         store.revert(item.id);
-        toast.show("Couldn't resolve — try again");
+        if (r.status !== 403) toast.show("Couldn't resolve — try again");
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") return;

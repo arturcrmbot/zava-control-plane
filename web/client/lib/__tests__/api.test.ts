@@ -23,8 +23,8 @@ describe("apiFetch", () => {
     expect((handler.mock.calls[0]?.[0] as CustomEvent<{ message: string }>).detail).toEqual({
       message: "test message",
     });
-    expect(response.ok).toBe(true);
-    expect(response.status).toBe(204);
+    expect(response.ok).toBe(false);
+    expect(response.status).toBe(403);
     window.removeEventListener(REPLAY_BLOCKED_EVENT, handler as EventListener);
   });
 
