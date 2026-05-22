@@ -29,10 +29,13 @@ def _all_domain_memories() -> dict:
 
 
 @router.get("/dream-passes/recent")
-def dream_passes_recent(limit: int = Query(20, ge=1, le=200)) -> dict:
+def dream_passes_recent(
+    limit: int = Query(20, ge=1, le=200),
+    domain: str | None = Query(None),
+) -> dict:
     items = [
         r for r in list(_dream_history)
-        if isinstance(r, dict)
+        if isinstance(r, dict) and (domain is None or r.get("domain") == domain)
     ][:limit]
     return {"items": items}
 

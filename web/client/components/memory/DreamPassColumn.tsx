@@ -1,8 +1,8 @@
 import { Sparkles } from "lucide-react";
 import { useDreamPassesRecent } from "@client/hooks/useMemoryQueries";
 
-export default function DreamPassColumn() {
-  const passes = useDreamPassesRecent(30);
+export default function DreamPassColumn({ domain }: { domain?: string }) {
+  const passes = useDreamPassesRecent(30, domain);
   return (
     <section className="flex-1 min-w-0 bg-white border border-slate-200 rounded-lg p-3 dark:bg-slate-900 dark:border-slate-700">
       <header className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100 mb-2">

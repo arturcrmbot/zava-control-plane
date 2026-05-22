@@ -101,7 +101,7 @@ export default function Memory() {
         </header>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <MemoriesColumn domain={domain} />
-          <DreamPassColumn />
+          <DreamPassColumn domain={domain} />
         </div>
       </div>
     </div>

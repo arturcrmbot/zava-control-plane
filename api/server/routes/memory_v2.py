@@ -102,12 +102,28 @@ async def trigger_dream(body: _DreamBody) -> dict:
 
         consolidator = _fb
 
+    from datetime import datetime as _dt, timezone as _tz
+    _started_at = _dt.now(_tz.utc).isoformat()
     result = await consolidate_memories(
         domain_memory=store,
         llm_consolidate=consolidator,
     )
     result.setdefault("trigger", "manual")
-    _dream_history.appendleft(result)
+    _completed_at = result.get("timestamp") or _dt.now(_tz.utc).isoformat()
+    _input_count = int(result.get("input_count", 0) or 0)
+    _output_count = int(result.get("output_count", 0) or 0)
+    _ui_record = {
+        "id": f"dream-{body.domain}-{_started_at}",
+        "domain": body.domain,
+        "skill_version": result.get("skill_version"),
+        "started_at": _started_at,
+        "completed_at": _completed_at,
+        "status": "completed" if _input_count > 0 else "empty",
+        "candidates_proposed": _input_count,
+        "candidates_promoted": _output_count,
+        "trigger": result.get("trigger", "manual"),
+    }
+    _dream_history.appendleft(_ui_record)
 
     # Emit bus events so the constellation can light up.
     try:

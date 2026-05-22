@@ -131,9 +131,12 @@ export function useMemories(domain: string): { memories: MemoryRecord[]; count: 
   return { memories, count, isLoading };
 }
 
-export function useDreamPassesRecent(limit = 20): DreamPassRow[] {
+export function useDreamPassesRecent(limit = 20, domain?: string): DreamPassRow[] {
+  const url = domain
+    ? `/api/memory/dream-passes/recent?limit=${limit}&domain=${encodeURIComponent(domain)}`
+    : `/api/memory/dream-passes/recent?limit=${limit}`;
   return useMemoryEndpoint<DreamPassRow>(
-    `/api/memory/dream-passes/recent?limit=${limit}`,
+    url,
     ["dream.pass.started", "dream.pass.finished"],
   );
 }
