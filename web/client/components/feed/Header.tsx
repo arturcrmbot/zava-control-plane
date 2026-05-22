@@ -14,6 +14,7 @@ import { useDensity } from "@client/hooks/useDensity";
 import { useSSEStatus } from "@client/hooks/useSSE";
 import RoleSwitcher from "./RoleSwitcher";
 import NotificationsPopover from "./NotificationsPopover";
+import { ReplayBadge } from "./ReplayBadge";
 
 function TodayChip({ role, items, workflows }: { role: RolePreset; items: FeedItem[]; workflows: Workflow[] }) {
   if (role.todayChip === "needs-you-count") {
@@ -118,6 +119,7 @@ export default function Header({
         >
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
         </button>
+        <ReplayBadge />
         <RoleSwitcher current={role.id} onChange={onRoleChange} />
         <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 text-xs flex items-center justify-center font-medium dark:bg-slate-700 dark:text-slate-200" aria-label="user avatar">A</div>
       </div>

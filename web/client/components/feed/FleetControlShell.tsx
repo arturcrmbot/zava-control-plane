@@ -15,6 +15,7 @@ import Header from "./Header";
 import LeftRail from "./LeftRail";
 import Feed from "./Feed";
 import Drawer from "./Drawer";
+import { RestartBanner } from "./RestartBanner";
 import { useWorkflows } from "@client/hooks/useWorkflows";
 import { useFeedItems, type FilterState } from "@client/hooks/useFeedItems";
 import Analytics from "@client/routes/Analytics";
@@ -36,6 +37,7 @@ function ShellBody() {
   return (
     <ToastProvider>
       <ResolutionProvider>
+        <RestartBanner />
         <ShellInner
           role={role}
           onRoleChange={setRoleId}
