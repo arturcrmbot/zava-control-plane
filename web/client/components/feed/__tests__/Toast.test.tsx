@@ -3,6 +3,7 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, cleanup, act } from "@testing-library/react";
 import { ToastProvider, useToast } from "@client/components/feed/Toast";
+import { REPLAY_BLOCKED_EVENT } from "@client/lib/api";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => { cleanup(); vi.useRealTimers(); });
@@ -18,5 +19,17 @@ describe("Toast", () => {
     expect(screen.getByText("hello")).toBeTruthy();
     act(() => { vi.advanceTimersByTime(4_001); });
     expect(screen.queryByText("hello")).toBeNull();
+  });
+
+  it("shows a neutral toast when a replay-blocked event is dispatched", () => {
+    render(<ToastProvider><div>child</div></ToastProvider>);
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(REPLAY_BLOCKED_EVENT, {
+        detail: { message: "blocked" },
+      }));
+    });
+
+    expect(screen.getByText("blocked")).toBeTruthy();
   });
 });

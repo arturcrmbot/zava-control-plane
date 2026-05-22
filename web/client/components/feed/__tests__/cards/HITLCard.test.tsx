@@ -28,11 +28,13 @@ const baseItem: HITLItem = {
 };
 
 beforeEach(() => {
+  vi.useFakeTimers();
   globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) } as Response);
 });
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 function renderWithProviders(item: HITLItem, opts: { hideActions?: boolean } = {}) {
@@ -84,6 +86,7 @@ describe("HITLCard", () => {
     await waitFor(() => {
       expect(screen.getByTestId("probe").textContent).toBe("Approved");
     });
+    await vi.advanceTimersByTimeAsync(5_001);
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe(
       "/api/exceptions/EXC-1/resolve",
     );
@@ -110,6 +113,10 @@ describe("HITLCard", () => {
       </MemoryRouter>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Approve/i }));
+    await waitFor(() => {
+      expect(screen.getByTestId("probe").textContent).toBe("Approved");
+    });
+    await vi.advanceTimersByTimeAsync(5_001);
     await waitFor(() => {
       expect(screen.getByTestId("probe").textContent).toBe("none");
     });

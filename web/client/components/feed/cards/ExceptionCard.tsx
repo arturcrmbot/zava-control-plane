@@ -9,6 +9,7 @@ import type { ExceptionItem } from "@shared/feedItems";
 import CardShell from "../CardShell";
 import { summariseWorkflow } from "./workflowSummary";
 import { useResolutionStore } from "@client/hooks/useResolutionStore";
+import { apiFetch } from "@client/lib/api";
 import { useToast } from "../Toast";
 
 const ACTIONS = [
@@ -68,7 +69,7 @@ export default function ExceptionCard({
       return;
     }
     try {
-      const r = await fetch(`/api/exceptions/${e.id}/resolve`, {
+      const r = await apiFetch(`/api/exceptions/${e.id}/resolve`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ resolution: id, resolvedBy: "reviewer@zava" }),

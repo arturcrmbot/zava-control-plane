@@ -7,6 +7,8 @@
 // hit).
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { REPLAY_BLOCKED_EVENT } from "@client/lib/api";
+import type { ReplayBlockedDetail } from "@client/lib/api";
 
 interface ToastAction {
   label: string;
@@ -22,6 +24,7 @@ interface ToastEntry {
 
 interface API {
   show(msg: string, ttlMs?: number): void;
+  showInfo(msg: string, ttlMs?: number): void;
   showWithAction(opts: { msg: string; action: ToastAction; ttlMs?: number; intent?: "neutral" | "danger" }): void;
 }
 
@@ -40,6 +43,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setTimeout(() => dismiss(id), ttlMs);
   }, [dismiss]);
 
+  const showInfo = useCallback((msg: string, ttlMs = 5_000) => {
+    const id = Date.now() + Math.random();
+    setItems((prev) => [...prev, { id, msg, intent: "neutral" }]);
+    setTimeout(() => dismiss(id), ttlMs);
+  }, [dismiss]);
+
   const showWithAction = useCallback(
     (opts: { msg: string; action: ToastAction; ttlMs?: number; intent?: "neutral" | "danger" }) => {
       const id = Date.now() + Math.random();
@@ -49,10 +58,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [dismiss],
   );
 
-  useEffect(() => () => setItems([]), []);
+  useEffect(() => {
+    const onReplayBlocked = (event: Event) => {
+      const detail = (event as CustomEvent<ReplayBlockedDetail>).detail;
+      if (detail?.message) showInfo(detail.message);
+    };
+
+    window.addEventListener(REPLAY_BLOCKED_EVENT, onReplayBlocked);
+    return () => {
+      window.removeEventListener(REPLAY_BLOCKED_EVENT, onReplayBlocked);
+      setItems([]);
+    };
+  }, [showInfo]);
 
   return (
-    <Ctx.Provider value={{ show, showWithAction }}>
+    <Ctx.Provider value={{ show, showInfo, showWithAction }}>
       {children}
       <div className="fixed top-3 right-3 z-50 space-y-2 pointer-events-none">
         {items.map((i) => (
