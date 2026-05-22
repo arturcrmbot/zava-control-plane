@@ -3,7 +3,7 @@
 **Status:** Draft — pending user approval before implementation
 
 ## What we're building
-A public always-on demo of the Zava Control Plane at the existing Azure Container Apps URL (`blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io`). Visitors land on the operator UI (the control plane on port 5273 today), watch a 2-hour recorded loop of the substrate doing its thing — workflows arriving, personae deciding, dream passes firing, lessons crystallising — and can drill into anything they see. No decision-making, no LLM cost, no abuse vector. A persistent badge tells them it's a replay.
+A public always-on demo of the Zava Control Plane at the existing Azure Container Apps URL (`blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io`). Visitors land on the operator UI (the control plane on port 5273 today), watch a 2-hour recorded loop of the substrate doing its thing — workflows arriving, personae deciding **on their own cadence** (visitor never needs to click), dream passes firing, lessons crystallising, **and the governance matrix mutating live as domain agents take ownership decisions** — and can drill into anything they see. No decision-making asked of the visitor, no LLM cost, no abuse vector. A persistent badge tells them it's a replay.
 
 ## Why a replay (not the real thing)
 The substrate has:
@@ -76,7 +76,30 @@ Tiny, additive:
 - On `playback.restart.pending` event over SSE, surface a 3 s overlay banner: `Replay restarting…`.
 - When a POST hits 403 with `error: "replay"`, the existing toast layer shows `This is a replay — actions are observed, not made.` Already toast-capable — just hook the 403 handler.
 
-### Deploy
+### Recording with personae fully autonomous
+The recording is captured with `DEMO_LOUD=1` so each persona's natural 2–8 s "thinking" window is preserved. From the visitor's perspective: a HITL gate appears with Approve/Reject buttons visible, the persona resolves it within a few seconds, the card flips to a resolved state, buttons gone. No new code needed — `persona_responder` already does this. The replayer simply ticks the resulting bus events at the recorded pace.
+
+### Governance surface — replace the existing `/policy` page
+The current `/policy` page lists synthetic autonomy policies (`expense.routing.amber_to_reviewer_threshold_usd`, etc.) which are demo-only. Replace it with a **live governance dashboard** sourced from the actual authority matrix the kernel already enforces: `data/synthetic/authority/matrix.json`.
+
+**Why this matters for the replay landing:** the visitor sees not just workflows flowing but the *rules themselves changing* as domain agents take ownership decisions — and every change is framed as a PR on this repo (because that's literally what it is: the matrix is checked-in and any persona-driven mutation lands as a `policy_set` Insight in the audit ledger).
+
+Concrete shape:
+- **New route `/governance`** (or rewrite `/policy` to point at this — equivalent). Beautiful table with one row per matrix rule:
+  - `Rule` — readable description (composed from `pattern`, `effect`, `governing_rule_id`).
+  - `Owner persona` — derived from the rule's function (CFO for `finance.*`, CTO for `tech.*`, CHRO for `hr.*`, etc.) via a tiny mapper built off `api/shared/functions.py:FUNCTIONS`.
+  - `Last changed` — `git log --format='%ai' -1 -- data/synthetic/authority/matrix.json` against the line range of that rule (or whole-file mtime as v1).
+  - `Effect` — Allow / Deny / Require-policy-set with a coloured chip.
+- **Live diff pulse** — when a `policy_set` event arrives over SSE (replay or live), the affected row flashes (3 s outline animation), a "Recent changes" panel at the top scrolls in a line: `CFO · 14:23 · raised budget cap for Verdaire campaign to $480k`.
+- **PR framing** — a tooltip on `Last changed` explains "Each row is a checked-in rule; every persona-driven mutation here would land as a PR. Sample audit-ledger entries linked below."
+- **Author col** — every change in the replay is attributed to the owning persona role (badge with the persona's hue from `usePersonaHues`).
+
+**Backend changes** (small):
+- New `GET /api/governance/matrix` — returns the parsed matrix.json rows enriched with `owner_persona`, `owner_function`, `last_changed_at`, `last_changed_by_sha`. Computed at boot via a single `git log` call cached on disk (`data/cache/matrix_blame.json`).
+- New `GET /api/governance/policy_changes/recent?limit=20` — recent `policy_set` Insights (already in Kuzu), enriched with which matrix rules they touched.
+- Wire `policy_set` events into the existing `/api/blueprint/stream` relay if not already there.
+
+**Recorder note:** the 2-hour recording should include several `policy_set` insights to make the live diff visible. The simulator + persona summary cadence already produces them on a long enough run; verify during the recording smoke test.
 Extend the existing `scripts/build-blueprint-image.sh` / `web/blueprint/Dockerfile` into a single multi-purpose image:
 - Layer 1: nginx serving `web/client/dist/` at `/`, `web/blueprint/dist/` at `/blueprint/`, `web/portal/dist/` at `/portal/`.
 - Layer 2: Python 3.11 + uv + the API package; uvicorn binds to `127.0.0.1:3101`.
@@ -105,10 +128,11 @@ A new GitHub Action `.github/workflows/deploy-replay.yml` rebuilds + redeploys o
 | 2. Replayer + bus event timing + state hydration | 1.5 |
 | 3. Read-only middleware + 403 toast handling | 0.5 |
 | 4. Replay badge in header + restart banner | 0.5 |
-| 5. Multi-process Container image + nginx config + deploy workflow | 1.0 |
-| 6. Record a real 2-h tape locally + smoke test | 0.5 |
-| 7. Cloud deploy + verification + DNS / TLS sanity | 0.5 |
-| **Total** | **~5.5 days** |
+| 5. **Governance dashboard** — `/api/governance/matrix` + `/api/governance/policy_changes/recent` + new `/governance` table with live diff pulse | 1.5 |
+| 6. Multi-process Container image + nginx config + deploy workflow | 1.0 |
+| 7. Record a real 2-h tape locally with DEMO_LOUD=1 + smoke test | 0.5 |
+| 8. Cloud deploy + verification + DNS / TLS sanity | 0.5 |
+| **Total** | **~7 days** |
 
 ## Verification
 - Replayer pytest sweep: snapshot → replay → assert REST + SSE match recorded shape at each tick.
