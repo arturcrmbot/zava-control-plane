@@ -12,6 +12,7 @@ import type { Workflow } from "@shared/types";
 import { useDarkMode } from "@client/hooks/useDarkMode";
 import { useDensity } from "@client/hooks/useDensity";
 import { useSSEStatus } from "@client/hooks/useSSE";
+import { useReplayMeta } from "@client/hooks/useReplayMeta";
 import RoleSwitcher from "./RoleSwitcher";
 import NotificationsPopover from "./NotificationsPopover";
 import { ReplayBadge } from "./ReplayBadge";
@@ -71,6 +72,9 @@ export default function Header({
     workflows.filter((w) => w.id.toLowerCase().includes(q.toLowerCase())).slice(0, 8);
   const { resolved: theme, toggle: toggleTheme } = useDarkMode();
   const { density, toggle: toggleDensity } = useDensity();
+  const replayMeta = useReplayMeta();
+  const ESSAY_URL = ((import.meta as any).env?.VITE_ESSAY_URL as string | undefined)
+    ?? "https://arturcrmbot.github.io/zava-control-plane/";
 
   return (
     <header className="flex items-center gap-4 px-6 h-12 border-b border-slate-200 bg-white sticky top-0 z-30 dark:bg-slate-900 dark:border-slate-700">
@@ -119,6 +123,16 @@ export default function Header({
         >
           {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
         </button>
+        {replayMeta?.mode === "replay" && (
+          <a
+            href={`${ESSAY_URL}${ESSAY_URL.includes("?") ? "&" : "?"}from=demo`}
+            className="text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 underline-offset-4 hover:underline"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Read the essay →
+          </a>
+        )}
         <ReplayBadge />
         <RoleSwitcher current={role.id} onChange={onRoleChange} />
         <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 text-xs flex items-center justify-center font-medium dark:bg-slate-700 dark:text-slate-200" aria-label="user avatar">A</div>

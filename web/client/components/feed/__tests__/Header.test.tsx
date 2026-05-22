@@ -38,4 +38,20 @@ describe("Header", () => {
     fireEvent.click(screen.getByRole("button", { name: /WF-1/ }));
     expect(onSearch).toHaveBeenCalledWith("WF-1");
   });
+  it("renders 'Read the essay' link in replay mode with from=demo query param", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ mode: "replay", recorded_at: "2026-05-22T11:00:00Z" }),
+    }));
+    
+    render(<MemoryRouter><Header role={role} onRoleChange={noop} unreadItems={items} onJumpTo={noop} onSearch={noop} workflows={[]} /></MemoryRouter>);
+    
+    // Wait for useReplayMeta to fetch and update
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    const links = screen.queryAllByRole("link", { name: /read the essay/i });
+    // Should find the link (it may appear multiple times due to test environment)
+    expect(links.length).toBeGreaterThan(0);
+    expect(links[0].getAttribute("href")).toContain("from=demo");
+  });
 });

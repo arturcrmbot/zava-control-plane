@@ -1,4 +1,7 @@
 export function Closing() {
+  const DEMO_URL = ((import.meta as any).env?.VITE_DEMO_URL as string | undefined)
+    ?? "https://blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io/";
+
   return (
     <section className="section closing">
       <div className="column--wide stack-lg">
@@ -40,6 +43,17 @@ export function Closing() {
 
         <p className="body" style={{ color: "var(--ink-mute)" }}>
           That is what we&apos;d like you to consider backing.
+        </p>
+
+        <p className="body">
+          <a
+            href={`${DEMO_URL}${DEMO_URL.includes("?") ? "&" : "?"}from=essay`}
+            className="closing__cta"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Watch it run →
+          </a>
         </p>
       </div>
     </section>
