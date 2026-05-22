@@ -154,3 +154,17 @@ def test_both_ops() -> None:
     
     assert bus.entries[0]["op"] == "upsert"
     assert bus.entries[1]["op"] == "delete"
+
+
+def test_drain_returns_entries_and_clears_buffer() -> None:
+    bus = MutationBus()
+    bus.emit(op="upsert", kind="workflow", id="w1", patch={"status": "active"})
+    bus.emit(op="delete", kind="memory", id="m1", patch={})
+
+    drained = bus.drain()
+
+    assert drained == [
+        {"op": "upsert", "kind": "workflow", "id": "w1", "patch": {"status": "active"}},
+        {"op": "delete", "kind": "memory", "id": "m1", "patch": {}},
+    ]
+    assert bus.entries == []

@@ -13,6 +13,12 @@ class MutationBus:
         """Record a mutation."""
         self.entries.append({"op": op, "kind": kind, "id": id, "patch": patch})
 
+    def drain(self) -> list[dict[str, Any]]:
+        """Return all pending entries and clear the internal buffer."""
+        drained = self.entries[:]
+        self.entries.clear()
+        return drained
+
 
 _active: MutationBus | None = None
 
