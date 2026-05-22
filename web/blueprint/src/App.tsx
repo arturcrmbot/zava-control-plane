@@ -21,20 +21,27 @@ export default function App() {
   // AccountsPage + extended EntitiesPage; main's 71f48b96 had removed
   // the routing primitive). Replace with React Router when convenient.
   //
-  // Gated to dev builds only: every ?view=... page fetches from the
+  // Gated to localhost only: every ?view=... page fetches from the
   // FastAPI control plane (/api/...), which doesn't exist in the
   // statically-hosted GitHub Pages bundle. In production we silently
   // fall through to the essay so a curious LinkedIn reader poking at
   // ?view=constellation doesn't land on a perpetually-loading shell.
-  if (import.meta.env.DEV && typeof window !== "undefined") {
-    const params = new URLSearchParams(window.location.search);
-    const view = params.get("view");
-    if (view === "constellation") return <ConstellationPage />;
-    if (view === "entities")      return <EntitiesPage />;
-    if (view === "accounts")      return <AccountsPage />;
-    if (view === "functions")     return <FunctionsPage />;
-    if (view === "org-clone")     return <OrgClonePage />;
-    if (view === "run")           return <WorkflowRunPage />;
+  // We gate by hostname (not DEV) so the production-built bundle
+  // served via `vite preview` on localhost still routes correctly —
+  // that's the path boot-demo.sh uses for live operator demos.
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    const isLocal = host === "localhost" || host === "127.0.0.1" || host.endsWith(".local");
+    if (isLocal || import.meta.env.DEV) {
+      const params = new URLSearchParams(window.location.search);
+      const view = params.get("view");
+      if (view === "constellation") return <ConstellationPage />;
+      if (view === "entities")      return <EntitiesPage />;
+      if (view === "accounts")      return <AccountsPage />;
+      if (view === "functions")     return <FunctionsPage />;
+      if (view === "org-clone")     return <OrgClonePage />;
+      if (view === "run")           return <WorkflowRunPage />;
+    }
   }
 
   return (

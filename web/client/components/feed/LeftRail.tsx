@@ -1,8 +1,8 @@
 // web/client/components/feed/LeftRail.tsx
 //
 // Collapsible sidebar (160–200px expanded → 44px collapsed). Houses role
-// saved views, user-added saved views, More ▾ submenu with the demoted
-// secondary routes, and the Constellation external link.
+// saved views, user-added saved views, and the More ▾ submenu with the
+// demoted secondary routes.
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { ChevronDown, ChevronsLeft, ChevronsRight, Plus, BarChart3, Brain, Network } from "lucide-react";
@@ -15,16 +15,6 @@ const ROUTE_LABEL: Record<string, string> = {
   "/economics": "Economics",
   "/policy": "Policy",
 };
-
-const VITE_PORTS = new Set(["5273", "5274", "5275"]);
-function constellationUrl(): string {
-  const fromEnv = (import.meta.env.VITE_BLUEPRINT_URL as string | undefined)?.trim();
-  if (fromEnv) return `${fromEnv.replace(/\/$/, "")}/?view=constellation&from=fleet`;
-  if (typeof window !== "undefined" && VITE_PORTS.has(window.location.port)) {
-    return `${window.location.protocol}//${window.location.hostname}:5275/?view=constellation&from=fleet`;
-  }
-  return "/?view=constellation&from=fleet";
-}
 
 export default function LeftRail({
   role, userViews, onSelectView, onSaveCurrent,
@@ -133,11 +123,6 @@ export default function LeftRail({
             ))}
           </div>
         )}
-        <a
-          href={constellationUrl()}
-          target="_blank" rel="noopener noreferrer"
-          className="block text-xs px-3 py-1.5 mt-1 rounded text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
-        >Constellation ↗</a>
       </div>
     </aside>
   );
