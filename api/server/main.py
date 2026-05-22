@@ -268,9 +268,36 @@ async def lifespan(app: FastAPI):
     # uvicorn --reload cycle ends with a single subscription.
     _whats_new_off = _whats_new_attach(app_state.bus)
 
+    # Optional in-process Recorder. Set ZAVA_RECORD_TO=/path/to/tape.tar.gz
+    # to capture every bus event + mutation that fires during this lifespan
+    # into a tape archive. Stopped + packed on teardown. Used by
+    # scripts/record_tape.sh to produce replay tapes against the same
+    # substrate that boot-demo.sh runs against.
+    _recorder = None
+    _record_to = os.environ.get("ZAVA_RECORD_TO")
+    if _record_to:
+        from pathlib import Path as _Path
+        from api.server.services.replay.recorder import Recorder
+        try:
+            _recorder = Recorder(
+                out_path=_Path(_record_to),
+                app_sha=os.environ.get("ZAVA_APP_SHA"),
+            )
+            await _recorder.start()
+            print(f"[server] recording → {_record_to}")
+        except Exception as ex:
+            print(f"[server] Recorder failed to start: {ex}")
+            _recorder = None
+
     try:
         yield
     finally:
+        if _recorder is not None:
+            try:
+                out = await _recorder.stop()
+                print(f"[server] tape finalised → {out}")
+            except Exception as ex:
+                print(f"[server] Recorder stop failed: {ex}")
         try:
             _whats_new_off()
         except Exception:
