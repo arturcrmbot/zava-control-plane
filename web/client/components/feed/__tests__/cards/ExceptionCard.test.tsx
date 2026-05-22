@@ -20,9 +20,10 @@ const baseItem: ExceptionItem = {
 };
 
 beforeEach(() => {
+  vi.useFakeTimers();
   globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) } as Response);
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe("ExceptionCard", () => {
   it("renders severity, summary, and recommendation", () => {
@@ -65,6 +66,7 @@ describe("ExceptionCard", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /Approve/i }));
     await waitFor(() => expect(screen.getByTestId("probe").textContent).toBe("Approved"));
+    await vi.advanceTimersByTimeAsync(5_001);
     expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe(
       "/api/exceptions/E-1/resolve",
     );

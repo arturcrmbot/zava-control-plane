@@ -3,6 +3,7 @@ from api.shared.types import (
     Workflow, Phase, OtelSpan, Exception_ as Exception, ActionLedgerEntry,
     AutonomyPolicy, SkillAmplification, McpCall
 )
+from api.server.services.replay.mutation_bus import emit_mutation
 
 
 class StateStore:
@@ -32,6 +33,12 @@ class StateStore:
         role_id = (w.metadata or {}).get("role_id") if hasattr(w, "metadata") else None
         if role_id:
             self._role_index[role_id] = w.id
+        emit_mutation(
+            op="upsert",
+            kind="workflow",
+            id=w.id,
+            patch=w.model_dump(by_alias=True, mode="json"),
+        )
 
     def get_workflow(self, id: str) -> Workflow | None:
         return self._workflows.get(id)
@@ -85,6 +92,12 @@ class StateStore:
         w = self._workflows.get(e.workflow_id)
         if w and not e.resolved_at:
             w.active_exception_id = e.id
+        emit_mutation(
+            op="upsert",
+            kind="exception",
+            id=e.id,
+            patch=e.model_dump(by_alias=True, mode="json"),
+        )
 
     def get_exception(self, id: str) -> Exception | None:
         return self._exceptions.get(id)

@@ -12,6 +12,8 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.server.middleware.replay_readonly import ReplayReadOnlyMiddleware
+from api.server.services.replay.mode import is_replay
 from api.server.state import app_state
 
 
@@ -53,7 +55,39 @@ async def lifespan(app: FastAPI):
     # enforcement_mode at boot. Phase 1: returns ALLOW for everything;
     # call sites are wired in Phase 2.
     from api.server.services.governance import init_governance
+    from api.server.services.replay.mode import is_replay, tape_path
+
     init_governance()
+    if is_replay():
+        from api.server.services.replay.player import Player, set_active_player
+        from api.server.services.replay.tape_loader import TapeLoader
+
+        path = tape_path()
+        if not path:
+            raise RuntimeError("ZAVA_MODE=replay requires ZAVA_TAPE_PATH")
+
+        loader = TapeLoader(path).load()
+        player = Player(loader)
+        try:
+            await player.start()
+            set_active_player(player)
+            print(
+                f"[server] replay mode ON, tape_id={loader.meta.tape_id} "
+                f"duration_s={loader.meta.duration_s}"
+            )
+            try:
+                yield
+            finally:
+                set_active_player(None)
+                await player.stop()
+                loader.close()
+                await app_state.aclose()
+        except BaseException:
+            loader.close()
+            await app_state.aclose()
+            raise
+        return
+
     try:
         await app_state.fm.start()
     except Exception as ex:
@@ -318,6 +352,9 @@ app.add_middleware(
     allow_origins=_cors_allowed_origins(),
     allow_methods=["*"], allow_headers=["*"],
 )
+
+if is_replay():
+    app.add_middleware(ReplayReadOnlyMiddleware)
 
 
 @app.get("/api/health")

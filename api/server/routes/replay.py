@@ -18,6 +18,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from api.server.state import app_state
+from api.server.services.replay.mode import is_replay
+from api.server.services.replay.player import current_player
 
 router = APIRouter(prefix="/api/replay")
 
@@ -156,4 +158,26 @@ def replay_snapshot(at: float = Query(..., description="Unix timestamp")) -> dic
         "in_flight_workflows": in_flight,
         "recent_events": recent,
         "kpis_at": _kpis_at(entities, in_flight, recent),
+    }
+
+
+@router.get("/meta")
+def replay_meta() -> dict[str, Any]:
+    """Tell the front-end whether this process is serving live data or a
+    replay tape. In replay mode, also expose tape_id / recorded_at /
+    duration_s / current_t for the badge + restart banner.
+    """
+    if not is_replay():
+        return {"mode": "live"}
+    player = current_player()
+    if player is None:
+        # Replay mode but no player active (boot race / teardown)
+        return {"mode": "replay"}
+    meta = player.meta
+    return {
+        "mode": "replay",
+        "tape_id": meta.tape_id,
+        "recorded_at": meta.recorded_at,
+        "duration_s": meta.duration_s,
+        "current_t": player.current_t(),
     }

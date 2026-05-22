@@ -14,6 +14,7 @@ import CardShell from "../CardShell";
 import ReceiptThumb from "./ReceiptThumb";
 import { summariseWorkflow } from "./workflowSummary";
 import { useResolutionStore } from "@client/hooks/useResolutionStore";
+import { apiFetch } from "@client/lib/api";
 import { useToast } from "../Toast";
 
 const ACTIONS = [
@@ -65,7 +66,7 @@ export default function HITLCard({
       return;
     }
     try {
-      const r = await fetch(`/api/exceptions/${exceptionId}/resolve`, {
+      const r = await apiFetch(`/api/exceptions/${exceptionId}/resolve`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ resolution: id, resolvedBy: "reviewer@zava" }),
