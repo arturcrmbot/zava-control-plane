@@ -5,17 +5,16 @@
 // fronted by a 3-view toggle.
 import { useState, useCallback } from "react";
 import type { DrawerData } from "./Drawer";
-import PhaseTimeline from "@client/components/PhaseTimeline";
 import OtelSpanTree from "@client/components/OtelSpanTree";
 import ExecutionTimelineTab from "@client/components/apex/ExecutionTimelineTab";
 import PhaseRibbon from "@client/components/apex/PhaseRibbon";
 import type { ActionLedgerEntry } from "@shared/types";
 
-const VIEWS = ["Phases", "Timeline", "Raw spans", "Ledger"] as const;
+const VIEWS = ["Timeline", "Spans", "Ledger"] as const;
 type View = typeof VIEWS[number];
 
 export default function DrawerActivity({ data }: { data: DrawerData }) {
-  const [view, setView] = useState<View>("Phases");
+  const [view, setView] = useState<View>("Timeline");
 
   const logAction = useCallback(async (action: string) => {
     await fetch("/internal/durable-event", {
@@ -43,13 +42,15 @@ export default function DrawerActivity({ data }: { data: DrawerData }) {
         </div>
       </div>
 
+      {/* Phase ribbon is the always-visible header for the section —
+          PhaseTimeline used to duplicate this in the now-removed
+          'Phases' tab. */}
       <PhaseRibbon workflow={data.workflow} phases={data.phases} />
 
-      {view === "Phases" && <PhaseTimeline phases={data.phases} workflowType={data.workflow.type} />}
       {view === "Timeline" && (
         <ExecutionTimelineTab mcpCalls={data.mcpCalls} workflowId={data.workflow.id} onLogAction={logAction} />
       )}
-      {view === "Raw spans" && <OtelSpanTree spans={data.spans} />}
+      {view === "Spans" && <OtelSpanTree spans={data.spans} />}
       {view === "Ledger" && (
         <div className="space-y-1 text-xs">
           {(data.workflow.actionLedger as ActionLedgerEntry[]).map((a, i) => (

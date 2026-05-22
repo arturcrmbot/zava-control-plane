@@ -1,7 +1,7 @@
 //
 // Two-column memory layer view + on-demand demo triggers.
 // Columns: Memories (left) · Dream passes (right).
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Sparkles } from "lucide-react";
 
@@ -13,6 +13,17 @@ const DOMAINS = ["hiring", "vendor_kyc", "expense_claim"];
 export default function Memory() {
   const [domain, setDomain] = useState<string>("hiring");
   const [busy, setBusy] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    window.addEventListener("mousedown", onClick);
+    return () => window.removeEventListener("mousedown", onClick);
+  }, [menuOpen]);
 
   async function triggerPass() {
     setBusy(true);
@@ -27,6 +38,7 @@ export default function Memory() {
   }
 
   async function dreamStorm() {
+    setMenuOpen(false);
     setBusy(true);
     try {
       await fetch(
@@ -62,13 +74,29 @@ export default function Memory() {
               disabled={busy}
               onClick={triggerPass}
               className="text-xs px-3 py-1.5 rounded font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 flex items-center gap-1"
-            ><Sparkles size={14} /> Trigger dream pass</button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={dreamStorm}
-              className="text-xs px-3 py-1.5 rounded font-medium bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60"
-            >Dream storm</button>
+            ><Sparkles size={14} /> Trigger pass</button>
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                aria-label="More actions"
+                disabled={busy}
+                onClick={() => setMenuOpen((o) => !o)}
+                className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white text-base px-2 py-1 rounded disabled:opacity-50 leading-none"
+              >⋯</button>
+              {menuOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-1 w-40 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow z-10"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={dreamStorm}
+                    className="block w-full text-left text-xs px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  >Dream storm (all domains)</button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

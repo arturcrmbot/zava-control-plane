@@ -38,12 +38,19 @@ describe("DrawerDecision", () => {
     render(<MemoryRouter><ResolutionProvider><DrawerDecision data={d} role={getRolePreset("ops-reviewer")} onRefresh={() => {}} /></ResolutionProvider></MemoryRouter>);
     expect(screen.getByText(/CL-1/)).toBeTruthy();
   });
-  it("renders the 4 action buttons", () => {
+  it("renders primary actions inline and overflow actions in a kebab menu", async () => {
+    const { waitFor, fireEvent } = await import("@testing-library/react");
     render(<MemoryRouter><ResolutionProvider><DrawerDecision data={d} role={getRolePreset("ops-reviewer")} onRefresh={() => {}} /></ResolutionProvider></MemoryRouter>);
-    expect(screen.getByRole("button", { name: /Approve/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Request docs/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Escalate/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Reject/i })).toBeTruthy();
+    // Primary inline buttons.
+    expect(screen.getByRole("button", { name: /^Approve$/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Reject$/ })).toBeTruthy();
+    // Overflow actions are hidden until the kebab is opened.
+    expect(screen.queryByRole("menuitem", { name: /Request docs/i })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /More actions/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("menuitem", { name: /Request docs/i })).toBeTruthy();
+    });
+    expect(screen.getByRole("menuitem", { name: /Escalate/i })).toBeTruthy();
   });
   it("hides actions for executive role", () => {
     render(<MemoryRouter><ResolutionProvider><DrawerDecision data={d} role={getRolePreset("executive")} onRefresh={() => {}} /></ResolutionProvider></MemoryRouter>);

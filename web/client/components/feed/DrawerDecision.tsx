@@ -3,7 +3,7 @@
 // First drawer section: receipt + recommendation + 4 actions + AuthorityCard
 // + KillSwitchPanel. Mirrors WorkflowDetail.tsx's Overview tab content but
 // laid out top-down inside the drawer.
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { RolePreset } from "@shared/roles";
 import type { DrawerData } from "./Drawer";
 import type { ClaimData } from "@shared/types";
@@ -14,11 +14,13 @@ import InterventionProtocols from "@client/components/apex/InterventionProtocols
 import CreativeCampaignArtefacts from "@client/components/apex/CreativeCampaignArtefacts";
 import AgentDrivenComponent, { type AgentComponentSpec } from "@client/components/AgentDrivenComponent";
 
-const ACTIONS = [
-  { id: "approve",      label: "Approve",      cls: "bg-emerald-600 hover:bg-emerald-700 text-white" },
-  { id: "request-info", label: "Request docs", cls: "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 ring-1 ring-slate-300 dark:ring-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800" },
-  { id: "escalate",     label: "Escalate L2",  cls: "bg-white dark:bg-slate-900 text-amber-700 ring-1 ring-amber-300 hover:bg-amber-50" },
-  { id: "reject",       label: "Reject",       cls: "bg-white dark:bg-slate-900 text-red-700 ring-1 ring-red-300 hover:bg-red-50" },
+const PRIMARY = [
+  { id: "approve", label: "Approve", cls: "bg-emerald-600 hover:bg-emerald-700 text-white" },
+  { id: "reject",  label: "Reject",  cls: "bg-white dark:bg-slate-900 text-red-700 ring-1 ring-red-300 hover:bg-red-50" },
+];
+const OVERFLOW = [
+  { id: "request-info", label: "Request docs" },
+  { id: "escalate",     label: "Escalate L2"  },
 ];
 
 function ReceiptPanel({ claim }: { claim: ClaimData }) {
@@ -102,17 +104,11 @@ export default function DrawerDecision({
       )}
 
       {!role.hideActionButtons && (
-        <div className="flex gap-2 flex-wrap">
-          {ACTIONS.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              disabled={busy != null || !exceptionId}
-              onClick={() => void act(a.id)}
-              className={`text-xs px-3 py-1.5 rounded font-medium disabled:opacity-50 ${a.cls}`}
-            >{busy === a.id ? "…" : a.label}</button>
-          ))}
-        </div>
+        <DecisionActions
+          busy={busy}
+          disabled={!exceptionId}
+          onAct={(id) => void act(id)}
+        />
       )}
 
       <AuthorityCard workflow={w} />
@@ -121,5 +117,62 @@ export default function DrawerDecision({
         <div className="px-3 pb-3"><KillSwitchPanel /></div>
       </details>
     </section>
+  );
+}
+
+function DecisionActions({
+  busy, disabled, onAct,
+}: {
+  busy: string | null;
+  disabled: boolean;
+  onAct: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", onDocClick);
+    return () => window.removeEventListener("mousedown", onDocClick);
+  }, [open]);
+  return (
+    <div className="flex gap-2 flex-wrap items-center">
+      {PRIMARY.map((a) => (
+        <button
+          key={a.id}
+          type="button"
+          disabled={busy != null || disabled}
+          onClick={() => onAct(a.id)}
+          className={`text-xs px-3 py-1.5 rounded font-medium disabled:opacity-50 ${a.cls}`}
+        >{busy === a.id ? "…" : a.label}</button>
+      ))}
+      <div className="relative" ref={ref}>
+        <button
+          type="button"
+          aria-label="More actions"
+          onClick={() => setOpen((o) => !o)}
+          className="text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-base px-2 py-1 rounded leading-none"
+        >⋯</button>
+        {open && (
+          <div
+            role="menu"
+            className="absolute right-0 mt-1 w-40 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow z-10"
+          >
+            {OVERFLOW.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                role="menuitem"
+                disabled={busy != null || disabled}
+                onClick={() => { setOpen(false); onAct(a.id); }}
+                className="block w-full text-left text-xs px-3 py-2 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50"
+              >{busy === a.id ? "…" : a.label}</button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

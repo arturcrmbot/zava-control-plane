@@ -10,7 +10,7 @@ function statusChip(code: number) {
   return <span className="chip-info">{code}</span>;
 }
 
-export default function ExecutionTimelineTab({ mcpCalls, workflowId, onLogAction }: {
+export default function ExecutionTimelineTab({ mcpCalls, workflowId: _workflowId, onLogAction }: {
   mcpCalls: McpCall[];
   workflowId: string;
   onLogAction: (action: string) => void;
@@ -20,12 +20,24 @@ export default function ExecutionTimelineTab({ mcpCalls, workflowId, onLogAction
   );
   const fmEvents = useFleetManagerStream();
   const sel = selected != null ? mcpCalls[selected] : null;
+  const empty = mcpCalls.length === 0;
+
+  // Empty state: just the explanatory line. Hide operator chrome
+  // (Run ID row, Rollback/Fork, the two right-rail panels) until
+  // there are MCP calls to act on.
+  if (empty) {
+    return (
+      <div className="panel panel-body text-xs text-slate-500 dark:text-slate-400" data-testid="execution-timeline">
+        Timeline populates as the orchestration fires MCP calls.
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-3 gap-4" data-testid="execution-timeline">
       <div className="col-span-2 space-y-2">
         <div className="flex items-center justify-between">
-          <div className="text-sm text-slate-600 dark:text-slate-300">Run ID: <span className="font-mono">{workflowId}</span></div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">{mcpCalls.length} step{mcpCalls.length === 1 ? "" : "s"}</div>
           <div className="flex gap-2">
             <button className="btn-secondary" data-testid="rollback-workflow"
                     onClick={() => onLogAction("workflow.rollback-requested")}>
@@ -33,15 +45,10 @@ export default function ExecutionTimelineTab({ mcpCalls, workflowId, onLogAction
             </button>
             <button className="btn-secondary" data-testid="fork-workflow"
                     onClick={() => onLogAction("workflow.fork-requested")}>
-              Fork Workflow
+              Fork
             </button>
           </div>
         </div>
-        {mcpCalls.length === 0 && (
-          <div className="panel panel-body text-xs text-slate-500 dark:text-slate-400">
-            Timeline populates as the orchestration fires MCP calls.
-          </div>
-        )}
         {mcpCalls.map((c, i) => {
           const failed = c.statusCode >= 400;
           return (
@@ -92,20 +99,24 @@ export default function ExecutionTimelineTab({ mcpCalls, workflowId, onLogAction
           </div>
         </div>
 
-        <div className="panel" data-testid="agent-thought-stream">
-          <div className="panel-header">Agent Thought Stream</div>
-          <div className="panel-body space-y-1.5">
-            {fmEvents.length === 0 && <div className="text-xs text-slate-500 dark:text-slate-400">no agent activity</div>}
-            {fmEvents.slice(-6).map((e, i) => (
-              <div key={i} className="text-xs">
-                <div className="text-slate-800 dark:text-slate-100 font-medium">{e.kind}</div>
-                <div className="text-slate-500 dark:text-slate-400 break-all">
-                  {e.data ? JSON.stringify(e.data).slice(0, 140) : ""}
+        {/* Agent thought stream is only useful when there's any
+            activity — hide the empty panel entirely so the drawer
+            stays calm during idle phases. */}
+        {fmEvents.length > 0 && (
+          <div className="panel" data-testid="agent-thought-stream">
+            <div className="panel-header">Agent Thought Stream</div>
+            <div className="panel-body space-y-1.5">
+              {fmEvents.slice(-6).map((e, i) => (
+                <div key={i} className="text-xs">
+                  <div className="text-slate-800 dark:text-slate-100 font-medium">{e.kind}</div>
+                  <div className="text-slate-500 dark:text-slate-400 break-all">
+                    {e.data ? JSON.stringify(e.data).slice(0, 140) : ""}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

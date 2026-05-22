@@ -117,10 +117,15 @@ export default function Analytics() {
     { label: "Workflows processed", v: m.total.toLocaleString() },
     { label: "Auto-completed", v: m.completed.toLocaleString(), sub: `${m.total ? Math.round((m.completed / m.total) * 100) : 0}% straight-through` },
     { label: "Human intervention rate", v: `${(m.interventionRate * 100).toFixed(1)}%` },
-    { label: "Avg resolution time", v: m.avgResolutionSec ? `${Math.round(m.avgResolutionSec)}s` : "—" },
-    { label: "Open exceptions", v: exceptions.length.toLocaleString(), sub: `${(m.exceptionRate * 100).toFixed(1)}% rate` },
     { label: "Spend under management", v: `$${Math.round(m.totalUsdEquivalent).toLocaleString()}`, sub: "USD equivalent" },
   ];
+  // Optional cards — only included when there's signal worth showing.
+  if (m.avgResolutionSec) {
+    cards.push({ label: "Avg resolution time", v: `${Math.round(m.avgResolutionSec)}s` });
+  }
+  if (exceptions.length > 0) {
+    cards.push({ label: "Open exceptions", v: exceptions.length.toLocaleString(), sub: `${(m.exceptionRate * 100).toFixed(1)}% rate` });
+  }
 
   return (
     <div className="space-y-4">
@@ -140,30 +145,38 @@ export default function Analytics() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <div className="panel">
-          <div className="panel-header">By category</div>
-          <div className="panel-body">
-            <StackedBar buckets={m.byCategory} total={m.byCategory.reduce((s, b) => s + b.n, 0)} palette={CATEGORY_COLOR} />
+        {m.byCategory.reduce((s, b) => s + b.n, 0) > 0 && (
+          <div className="panel">
+            <div className="panel-header">By category</div>
+            <div className="panel-body">
+              <StackedBar buckets={m.byCategory} total={m.byCategory.reduce((s, b) => s + b.n, 0)} palette={CATEGORY_COLOR} />
+            </div>
           </div>
-        </div>
-        <div className="panel">
-          <div className="panel-header">By phase</div>
-          <div className="panel-body">
-            <StackedBar buckets={m.byPhase} total={m.byPhase.reduce((s, b) => s + b.n, 0)} palette={PHASE_COLOR} />
+        )}
+        {m.byPhase.reduce((s, b) => s + b.n, 0) > 0 && (
+          <div className="panel">
+            <div className="panel-header">By phase</div>
+            <div className="panel-body">
+              <StackedBar buckets={m.byPhase} total={m.byPhase.reduce((s, b) => s + b.n, 0)} palette={PHASE_COLOR} />
+            </div>
           </div>
-        </div>
-        <div className="panel">
-          <div className="panel-header">By EMS source</div>
-          <div className="panel-body">
-            <StackedBar buckets={m.byEms} total={m.byEms.reduce((s, b) => s + b.n, 0)} palette={{ workday: "bg-blue-500", concur: "bg-emerald-500" }} />
+        )}
+        {m.byEms.reduce((s, b) => s + b.n, 0) > 0 && (
+          <div className="panel">
+            <div className="panel-header">By EMS source</div>
+            <div className="panel-body">
+              <StackedBar buckets={m.byEms} total={m.byEms.reduce((s, b) => s + b.n, 0)} palette={{ workday: "bg-blue-500", concur: "bg-emerald-500" }} />
+            </div>
           </div>
-        </div>
-        <div className="panel">
-          <div className="panel-header">By market</div>
-          <div className="panel-body">
-            <StackedBar buckets={m.byMarket} total={m.byMarket.reduce((s, b) => s + b.n, 0)} palette={{ UK: "bg-blue-500", US: "bg-red-500", DE: "bg-amber-500", IN: "bg-emerald-500" }} />
+        )}
+        {m.byMarket.reduce((s, b) => s + b.n, 0) > 0 && (
+          <div className="panel">
+            <div className="panel-header">By market</div>
+            <div className="panel-body">
+              <StackedBar buckets={m.byMarket} total={m.byMarket.reduce((s, b) => s + b.n, 0)} palette={{ UK: "bg-blue-500", US: "bg-red-500", DE: "bg-amber-500", IN: "bg-emerald-500" }} />
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

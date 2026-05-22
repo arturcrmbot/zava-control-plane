@@ -27,13 +27,13 @@ describe("DrawerActivity", () => {
   it("renders the Activity heading and the 3-view toggle", () => {
     render(<MemoryRouter><DrawerActivity data={d} /></MemoryRouter>);
     expect(screen.getByRole("heading", { name: /Activity/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^Phases$/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Timeline$/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /^Raw spans$/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Spans$/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Ledger$/i })).toBeTruthy();
   });
   it("switches view when a toggle is clicked", () => {
     render(<MemoryRouter><DrawerActivity data={d} /></MemoryRouter>);
-    fireEvent.click(screen.getByRole("button", { name: /Raw spans/i }));
-    expect(screen.getByRole("button", { name: /Raw spans/i }).className).toMatch(/bg-blue-600/);
+    fireEvent.click(screen.getByRole("button", { name: /^Spans$/i }));
+    expect(screen.getByRole("button", { name: /^Spans$/i }).className).toMatch(/bg-blue-600/);
   });
 });

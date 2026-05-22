@@ -204,33 +204,33 @@ export default function Dashboard() {
 
         <MemoryTiles />
 
-        <section className="bg-white border border-slate-200 rounded-lg dark:bg-slate-900 dark:border-slate-700">
-          <header className="px-4 py-3 border-b border-slate-200 text-sm font-semibold text-slate-800 dark:border-slate-700 dark:text-slate-100">
-            Exceptions arriving (last hour, 5-minute buckets)
-          </header>
-          <div className="p-4 flex items-end gap-1 h-32">
-            {stats.buckets.map((n, i) => (
-              <div
-                key={i}
-                title={`${n} arrivals · ${(11 - i) * 5}-${(12 - i) * 5} minutes ago`}
-                className="flex-1 bg-blue-500/70 dark:bg-blue-400/80 rounded-t"
-                style={{ height: `${Math.max(2, (n / stats.bucketMax) * 100)}%` }}
-              />
-            ))}
-          </div>
-          <div className="flex justify-between px-4 pb-3 text-[10px] text-slate-400 dark:text-slate-500">
-            <span>60m ago</span>
-            <span>now</span>
-          </div>
-        </section>
+        {stats.bucketMax > 0 && (
+          <section className="bg-white border border-slate-200 rounded-lg dark:bg-slate-900 dark:border-slate-700">
+            <header className="px-4 py-3 border-b border-slate-200 text-sm font-semibold text-slate-800 dark:border-slate-700 dark:text-slate-100">
+              Exceptions arriving (last hour, 5-minute buckets)
+            </header>
+            <div className="p-4 flex items-end gap-1 h-32">
+              {stats.buckets.map((n, i) => (
+                <div
+                  key={i}
+                  title={`${n} arrivals · ${(11 - i) * 5}-${(12 - i) * 5} minutes ago`}
+                  className="flex-1 bg-blue-500/70 dark:bg-blue-400/80 rounded-t"
+                  style={{ height: `${Math.max(2, (n / stats.bucketMax) * 100)}%` }}
+                />
+              ))}
+            </div>
+            <div className="flex justify-between px-4 pb-3 text-[10px] text-slate-400 dark:text-slate-500">
+              <span>60m ago</span>
+              <span>now</span>
+            </div>
+          </section>
+        )}
 
-        <section className="bg-white border border-slate-200 rounded-lg dark:bg-slate-900 dark:border-slate-700">
-          <header className="px-4 py-3 border-b border-slate-200 text-sm font-semibold text-slate-800 dark:border-slate-700 dark:text-slate-100">
-            Open exceptions by domain
-          </header>
-          {stats.domainRows.length === 0 ? (
-            <div className="p-6 text-center text-xs text-slate-500 dark:text-slate-400">No open exceptions.</div>
-          ) : (
+        {stats.domainRows.length > 0 && (
+          <section className="bg-white border border-slate-200 rounded-lg dark:bg-slate-900 dark:border-slate-700">
+            <header className="px-4 py-3 border-b border-slate-200 text-sm font-semibold text-slate-800 dark:border-slate-700 dark:text-slate-100">
+              Open exceptions by domain
+            </header>
             <table className="w-full text-xs">
               <thead className="text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
                 <tr>
@@ -267,8 +267,8 @@ export default function Dashboard() {
                 })}
               </tbody>
             </table>
-          )}
-        </section>
+          </section>
+        )}
 
         {mergedRecentDecisions.length > 0 && (
           <section className="bg-white border border-slate-200 rounded-lg dark:bg-slate-900 dark:border-slate-700">

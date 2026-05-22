@@ -1,14 +1,14 @@
 // web/client/components/feed/Header.tsx
 //
-// Sticky thin top row: brand · search · 🔔 · clock · Today chip · RoleSwitcher.
-// Today chip content is keyed off role.todayChip.
+// Sticky thin top row: brand · search · 🔔 · Today chip · RoleSwitcher.
+// Today chip content is keyed off role.todayChip. Clock removed — system
+// taskbar already shows it and the extra digits added clutter.
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Sun, Moon, Rows3, Rows4 } from "lucide-react";
 import type { RoleId, RolePreset } from "@shared/roles";
 import type { FeedItem } from "@shared/feedItems";
 import type { Workflow } from "@shared/types";
-import { useNow } from "@client/hooks/useNow";
 import { useDarkMode } from "@client/hooks/useDarkMode";
 import { useDensity } from "@client/hooks/useDensity";
 import { useSSEStatus } from "@client/hooks/useSSE";
@@ -35,31 +35,6 @@ function TodayChip({ role, items, workflows }: { role: RolePreset; items: FeedIt
     return <span className="text-xs text-slate-600 dark:text-slate-300">Throughput: {completed}</span>;
   }
   return null;
-}
-
-function HeaderClock() {
-  // 1s tick. Includes a stable TZ abbreviation derived once via Intl, so the
-  // operator knows whether the displayed time matches their wall clock.
-  const now = useNow(1000);
-  const d = new Date(now);
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  const ss = String(d.getSeconds()).padStart(2, "0");
-  let tz = "";
-  try {
-    const parts = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" }).formatToParts(d);
-    tz = parts.find((p) => p.type === "timeZoneName")?.value ?? "";
-  } catch {
-    tz = "";
-  }
-  return (
-    <span
-      className="text-xs font-mono tabular-nums text-slate-600 dark:text-slate-300"
-      title={d.toString()}
-    >
-      {hh}:{mm}:{ss}{tz && <span className="ml-1 text-slate-400 dark:text-slate-500">{tz}</span>}
-    </span>
-  );
 }
 
 function ConnectionStatusDot() {
@@ -124,7 +99,6 @@ export default function Header({
       <div className="ml-auto flex items-center gap-3">
         <NotificationsPopover roleId={role.id} items={unreadItems} onJumpTo={onJumpTo} />
         <ConnectionStatusDot />
-        <HeaderClock />
         <TodayChip role={role} items={unreadItems} workflows={workflows} />
         <button
           type="button"

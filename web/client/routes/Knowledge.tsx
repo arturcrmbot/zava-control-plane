@@ -212,19 +212,10 @@ export default function Knowledge() {
         </header>
 
         <section className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500 px-1">
-              Filter by kind
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500 px-1 mr-1">
+              Kind
             </h2>
-            {kindFilter && (
-              <button
-                type="button"
-                onClick={() => setKindFilter(null)}
-                className="text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-1"
-              ><X size={11} /> clear filter ({kindFilter})</button>
-            )}
-          </div>
-          <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2">
             {KINDS.map((k) => {
               const c = kindCounts[k] ?? 0;
               const active = k === kindFilter;
@@ -234,20 +225,25 @@ export default function Knowledge() {
                   type="button"
                   onClick={() => setKindFilter(active ? null : k)}
                   className={
-                    "text-left rounded border px-2 py-1.5 transition " +
+                    "text-[11px] px-2 py-1 rounded inline-flex items-center gap-1.5 transition border " +
                     (active
-                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-400"
-                      : "border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500")
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-400 text-slate-900 dark:text-slate-100"
+                      : "border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 text-slate-700 dark:text-slate-300")
                   }
                 >
-                  <div className="flex items-center gap-1.5">
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: colorForKind(k) }} />
-                    <span className="text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400">{k}</span>
-                  </div>
-                  <div className="text-base font-semibold text-slate-900 dark:text-slate-100 tabular-nums">{c}</div>
+                  <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: colorForKind(k) }} />
+                  <span>{k}</span>
+                  <span className="text-slate-400 dark:text-slate-500 tabular-nums">{c}</span>
                 </button>
               );
             })}
+            {kindFilter && (
+              <button
+                type="button"
+                onClick={() => setKindFilter(null)}
+                className="ml-1 text-[11px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-1"
+              ><X size={11} /> clear</button>
+            )}
           </div>
         </section>
 

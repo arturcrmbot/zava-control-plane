@@ -26,12 +26,14 @@ describe("DrawerAudit", () => {
     render(<MemoryRouter><DrawerAudit data={d} /></MemoryRouter>);
     expect(screen.getByRole("heading", { name: /Audit/i })).toBeTruthy();
   });
-  it("renders all five collapsed accordions by name", () => {
+  it("renders the three collapsed accordions by name", () => {
     render(<MemoryRouter><DrawerAudit data={d} /></MemoryRouter>);
     expect(screen.getByText(/Evidence/i)).toBeTruthy();
     expect(screen.getByText(/Audit trail/i)).toBeTruthy();
-    expect(screen.getByText(/Economics/i)).toBeTruthy();
     expect(screen.getByText(/Fleet assignment/i)).toBeTruthy();
-    expect(screen.getByText(/Skill amplification/i)).toBeTruthy();
+    // Economics + Skill amplification were removed — Economics lives on
+    // /economics and Skill amplification is an advanced surface.
+    expect(screen.queryByText(/Economics/i)).toBeNull();
+    expect(screen.queryByText(/Skill amplification/i)).toBeNull();
   });
 });

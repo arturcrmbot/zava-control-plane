@@ -134,7 +134,6 @@ export default function Drawer({
         <span className="text-[10px] uppercase tracking-wide bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">
           {d.workflow.status}
         </span>
-        <DomainDeepLink workflow={d.workflow} />
         <button
           type="button"
           onClick={onClose}
@@ -149,19 +148,4 @@ export default function Drawer({
       </div>
     </aside>
   );
-}
-
-function DomainDeepLink({ workflow }: { workflow: Workflow }) {
-  // Preserves cross-app deep-links carried over from WorkflowDetail.tsx.
-  const candidateId = (workflow.metadata as { candidate_id?: string } | undefined)?.candidate_id;
-  if (workflow.type === "hiring" && candidateId) {
-    return (
-      <a
-        href={`http://localhost:5274/recruiter/c/${encodeURIComponent(candidateId)}`}
-        target="_blank" rel="noreferrer"
-        className="text-xs text-blue-600 hover:underline"
-      >open in recruiter view ↗</a>
-    );
-  }
-  return null;
 }

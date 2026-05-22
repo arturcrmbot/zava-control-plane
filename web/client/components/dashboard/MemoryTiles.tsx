@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 export default function MemoryTiles() {
-  const [count, setCount] = useState<number>(0);
+  const [count, setCount] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,6 +25,11 @@ export default function MemoryTiles() {
       window.clearInterval(iv);
     };
   }, []);
+
+  // Hide entirely until we know we have memories — a zero tile on
+  // the dashboard is just noise. The /memory page still surfaces
+  // the same number contextually.
+  if (count == null || count === 0) return null;
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
