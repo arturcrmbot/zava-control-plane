@@ -23,6 +23,7 @@ from api.server.services.sse_hub import SSEHub
 from api.server.services.magic_link import MagicLinkStore
 from api.server.services.kpi_store import KpiStore
 from api.server.services.email_send import EmailSender
+from api.server.services.replay.mode import is_replay
 
 if TYPE_CHECKING:
     from api.server.services.dream_pass.orchestrator import DreamPassOrchestrator
@@ -396,12 +397,13 @@ class AppState:
         # so it requires a running event loop. Guard the call so unit
         # tests that construct AppState without a loop still work; the
         # FastAPI lifespan will re-call start() under uvicorn.
-        try:
-            import asyncio as _asyncio
-            _asyncio.get_running_loop()
-            self.ambient_dispatcher.start()
-        except RuntimeError:
-            pass
+        if not is_replay():
+            try:
+                import asyncio as _asyncio
+                _asyncio.get_running_loop()
+                self.ambient_dispatcher.start()
+            except RuntimeError:
+                pass
 
         # Phase 4 IP1 (TASK-004) — cadence loop. Loads cadence YAMLs
         # once at startup and starts one asyncio task per cadence. The
@@ -418,42 +420,43 @@ class AppState:
             )
             self.cadences = []
         self._cadence_tasks: list = []
-        try:
-            import asyncio as _asyncio
-            _asyncio.get_running_loop()
-            for cad in self.cadences:
-                self._cadence_tasks.append(
-                    _asyncio.create_task(self._run_cadence(cad))
-                )
-        except RuntimeError:
-            pass
-
-        cadence_secs = int(os.getenv("DREAM_PASS_DEMO_CADENCE_SECONDS", "120") or "120")
-        cadence_domains = tuple(
-            d.strip() for d in os.getenv(
-                "DREAM_PASS_DEMO_CADENCE_DOMAINS", "hiring",
-            ).split(",") if d.strip()
-        )
-        if cadence_secs > 0:
-            tick_secs = int(os.getenv("DREAM_PASS_TICK_SECONDS", "10") or "10")
-            backlog_threshold = int(
-                os.getenv("DREAM_PASS_TRIGGER_BACKLOG", "5") or "5"
-            )
+        if not is_replay():
             try:
                 import asyncio as _asyncio
                 _asyncio.get_running_loop()
-                self._cadence_tasks.append(
-                    _asyncio.create_task(_run_dream_pass_cadence(
-                        self.dream_pass_orchestrator,
-                        domains=cadence_domains,
-                        heartbeat_seconds=cadence_secs,
-                        tick_seconds=tick_secs,
-                        backlog_threshold=backlog_threshold,
-                        domain_memories=self.domain_memories,
-                    ))
-                )
+                for cad in self.cadences:
+                    self._cadence_tasks.append(
+                        _asyncio.create_task(self._run_cadence(cad))
+                    )
             except RuntimeError:
                 pass
+
+            cadence_secs = int(os.getenv("DREAM_PASS_DEMO_CADENCE_SECONDS", "120") or "120")
+            cadence_domains = tuple(
+                d.strip() for d in os.getenv(
+                    "DREAM_PASS_DEMO_CADENCE_DOMAINS", "hiring",
+                ).split(",") if d.strip()
+            )
+            if cadence_secs > 0:
+                tick_secs = int(os.getenv("DREAM_PASS_TICK_SECONDS", "10") or "10")
+                backlog_threshold = int(
+                    os.getenv("DREAM_PASS_TRIGGER_BACKLOG", "5") or "5"
+                )
+                try:
+                    import asyncio as _asyncio
+                    _asyncio.get_running_loop()
+                    self._cadence_tasks.append(
+                        _asyncio.create_task(_run_dream_pass_cadence(
+                            self.dream_pass_orchestrator,
+                            domains=cadence_domains,
+                            heartbeat_seconds=cadence_secs,
+                            tick_seconds=tick_secs,
+                            backlog_threshold=backlog_threshold,
+                            domain_memories=self.domain_memories,
+                        ))
+                    )
+                except RuntimeError:
+                    pass
 
     async def _run_cadence(self, cadence) -> None:
         """One asyncio task per cadence — sleeps until next cron tick,
