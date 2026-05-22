@@ -273,28 +273,50 @@ async def lifespan(app: FastAPI):
     # into a tape archive. Stopped + packed on teardown. Used by
     # scripts/record_tape.sh to produce replay tapes against the same
     # substrate that boot-demo.sh runs against.
-    _recorder = None
+    #
+    # ZAVA_RECORD_WARMUP_S (default 20) — sleep before taking the t=0
+    # snapshot so the simulator's ramp_loop + portal seed have time to
+    # spawn workflows. Without this the snapshot is bare and the replay
+    # UI starts empty until mutations slowly populate it over the loop.
+    _recorder_holder: list = [None]
     _record_to = os.environ.get("ZAVA_RECORD_TO")
     if _record_to:
         from pathlib import Path as _Path
         from api.server.services.replay.recorder import Recorder
-        try:
-            _recorder = Recorder(
-                out_path=_Path(_record_to),
-                app_sha=os.environ.get("ZAVA_APP_SHA"),
-            )
-            await _recorder.start()
-            print(f"[server] recording → {_record_to}")
-        except Exception as ex:
-            print(f"[server] Recorder failed to start: {ex}")
-            _recorder = None
+
+        async def _record_with_warmup() -> None:
+            warmup_s = float(os.environ.get("ZAVA_RECORD_WARMUP_S", "20"))
+            print(f"[server] recording → {_record_to} (warmup {warmup_s}s, then snapshot + capture)")
+            try:
+                await asyncio.sleep(warmup_s)
+                rec = Recorder(
+                    out_path=_Path(_record_to),
+                    app_sha=os.environ.get("ZAVA_APP_SHA"),
+                )
+                await rec.start()
+                _recorder_holder[0] = rec
+                print(f"[server] recorder armed; capturing now")
+            except asyncio.CancelledError:
+                raise
+            except Exception as ex:
+                print(f"[server] Recorder failed to start: {ex}")
+
+        _recorder_arm_task = asyncio.create_task(_record_with_warmup())
+    else:
+        _recorder_arm_task = None
 
     try:
         yield
     finally:
-        if _recorder is not None:
+        if _recorder_arm_task is not None and not _recorder_arm_task.done():
+            _recorder_arm_task.cancel()
             try:
-                out = await _recorder.stop()
+                await _recorder_arm_task
+            except (asyncio.CancelledError, Exception):
+                pass
+        if _recorder_holder[0] is not None:
+            try:
+                out = await _recorder_holder[0].stop()
                 print(f"[server] tape finalised → {out}")
             except Exception as ex:
                 print(f"[server] Recorder stop failed: {ex}")

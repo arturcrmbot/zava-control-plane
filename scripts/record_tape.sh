@@ -37,13 +37,19 @@ export DREAM_PASS_TRIGGER_BACKLOG=5
 export MEMORY_DOMAINS=hiring
 export ZAVA_APP_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 export ZAVA_RECORD_TO="$OUT"
+# Default 20s warmup so the t=0 snapshot has seeded workflows.
+export ZAVA_RECORD_WARMUP_S="${ZAVA_RECORD_WARMUP_S:-20}"
 
 mkdir -p "$(dirname "$OUT")"
 ABS_OUT="$(cd "$(dirname "$OUT")" && pwd)/$(basename "$OUT")"
 export ZAVA_RECORD_TO="$ABS_OUT"
 
-echo "[record_tape] DURATION=${DURATION} (${SECS}s) OUT=${ABS_OUT} APP_SHA=${ZAVA_APP_SHA}"
-echo "[record_tape] booting full demo stack with recorder attached..."
+# The recorder only arms AFTER warmup, so extend the boot-demo lifetime
+# so the user gets DURATION of actual captured activity.
+TOTAL_SECS=$(( SECS + ${ZAVA_RECORD_WARMUP_S%.*} + 5 ))
+
+echo "[record_tape] DURATION=${DURATION} (${SECS}s) WARMUP=${ZAVA_RECORD_WARMUP_S}s OUT=${ABS_OUT} APP_SHA=${ZAVA_APP_SHA}"
+echo "[record_tape] booting full demo stack with recorder attached (total runtime: ${TOTAL_SECS}s)..."
 
 # Run boot-demo in the background. boot-demo.sh already installs
 # `trap cleanup INT TERM EXIT` which kills every child it spawned
@@ -76,7 +82,7 @@ request_stop() {
 trap request_stop INT TERM
 
 # Wait the requested duration, then ask the demo stack to stop.
-sleep "$SECS" || true
+sleep "$TOTAL_SECS" || true
 echo "[record_tape] duration elapsed; signalling demo stack to finalise tape..."
 cleanup
 
