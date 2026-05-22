@@ -80,26 +80,50 @@ Tiny, additive:
 The recording is captured with `DEMO_LOUD=1` so each persona's natural 2–8 s "thinking" window is preserved. From the visitor's perspective: a HITL gate appears with Approve/Reject buttons visible, the persona resolves it within a few seconds, the card flips to a resolved state, buttons gone. No new code needed — `persona_responder` already does this. The replayer simply ticks the resulting bus events at the recorded pace.
 
 ### Governance surface — replace the existing `/policy` page
-The current `/policy` page lists synthetic autonomy policies (`expense.routing.amber_to_reviewer_threshold_usd`, etc.) which are demo-only. Replace it with a **live governance dashboard** sourced from the actual authority matrix the kernel already enforces: `data/synthetic/authority/matrix.json`.
+The current `/policy` page lists synthetic autonomy policies (`expense.routing.amber_to_reviewer_threshold_usd`, etc.) sourced from a **dead** parallel file `api/shared/policies.yaml`. AGT never sees that file — it's pure cosmetic UI data left over from the demo era. **The cleanup deletes it.** The actual governance surface AGT enforces is `data/synthetic/authority/matrix.json`; this rewrite makes the UI tell the same truth as the kernel.
 
-**Why this matters for the replay landing:** the visitor sees not just workflows flowing but the *rules themselves changing* as domain agents take ownership decisions — and every change is framed as a PR on this repo (because that's literally what it is: the matrix is checked-in and any persona-driven mutation lands as a `policy_set` Insight in the audit ledger).
+**Why this matters for the replay landing:** the visitor sees not just workflows flowing but the *rules themselves* (the matrix) AND the *operational decisions exercising those rules* in real time (`policy_set` Insights from the entity graph), with the link between them explicit via `governing_rule_id`.
 
-Concrete shape:
-- **New route `/governance`** (or rewrite `/policy` to point at this — equivalent). Beautiful table with one row per matrix rule:
-  - `Rule` — readable description (composed from `pattern`, `effect`, `governing_rule_id`).
-  - `Owner persona` — derived from the rule's function (CFO for `finance.*`, CTO for `tech.*`, CHRO for `hr.*`, etc.) via a tiny mapper built off `api/shared/functions.py:FUNCTIONS`.
-  - `Last changed` — `git log --format='%ai' -1 -- data/synthetic/authority/matrix.json` against the line range of that rule (or whole-file mtime as v1).
-  - `Effect` — Allow / Deny / Require-policy-set with a coloured chip.
-- **Live diff pulse** — when a `policy_set` event arrives over SSE (replay or live), the affected row flashes (3 s outline animation), a "Recent changes" panel at the top scrolls in a line: `CFO · 14:23 · raised budget cap for Verdaire campaign to $480k`.
-- **PR framing** — a tooltip on `Last changed` explains "Each row is a checked-in rule; every persona-driven mutation here would land as a PR. Sample audit-ledger entries linked below."
-- **Author col** — every change in the replay is attributed to the owning persona role (badge with the persona's hue from `usePersonaHues`).
+Two-panel layout:
+
+**Top panel — "Constitution" (the matrix.json rows)**
+- Beautiful table, one row per matrix rule, grouped by domain.
+- `Rule` — composed from `pattern`, `effect`, `governing_rule_id`.
+- `Owner persona` — derived from the rule's function (CFO for `finance.*`, CTO for `tech.*`, CHRO for `hr.*`, etc.) via a small mapper over `api/shared/functions.py:FUNCTIONS`.
+- `Last changed` — file-level `git log -1 --format='%ai %h %an'` against `matrix.json`. v1 is file-level; per-rule blame is a follow-up.
+- `Effect` — Allow / Deny / Require-policy-set with a coloured chip.
+- Click a row → modal with the raw JSON + a tooltip: *"This is the constitution — checked in at this commit. Every rule change is a PR. The running container hot-reloads the matrix within ~1 s of the file changing."*
+
+**Bottom panel — "Decisions under the constitution" (live stream)**
+- Pulls recent `policy_set` Decisions from the entity graph (the same `record_decision` path already wired by `policy_application.py`).
+- Each row carries `governing_rule_id` linking back to the corresponding matrix row above.
+- When a new `policy_set` arrives over SSE during the replay, the **matrix row referenced by `governing_rule_id` pulses for 3 s** and a new line slides in: *"CFO · 14:23 · approved `policy_set` for `verdaire_brand_budget` (rule EXP-031)"*.
 
 **Backend changes** (small):
-- New `GET /api/governance/matrix` — returns the parsed matrix.json rows enriched with `owner_persona`, `owner_function`, `last_changed_at`, `last_changed_by_sha`. Computed at boot via a single `git log` call cached on disk (`data/cache/matrix_blame.json`).
-- New `GET /api/governance/policy_changes/recent?limit=20` — recent `policy_set` Insights (already in Kuzu), enriched with which matrix rules they touched.
+- New `GET /api/governance/matrix` — returns parsed matrix.json rows enriched with `owner_persona`, `owner_function`, `last_changed_at`, `last_changed_by_sha`. Computed once at boot, refreshed on file change.
+- New `GET /api/governance/policy_changes/recent?limit=20` — recent `policy_set` Insights from the entity graph, enriched with the matrix rule they touched.
 - Wire `policy_set` events into the existing `/api/blueprint/stream` relay if not already there.
+- **Delete** `api/shared/policies.yaml`, the `AutonomyPolicy` model, `upsert_policy` / `list_policies` on `StateStore`, the old `/api/policy/dry-run` + `/api/policy/propose-change` routes. The old `/api/policy` route is rewritten to return the matrix shape.
 
 **Recorder note:** the 2-hour recording should include several `policy_set` insights to make the live diff visible. The simulator + persona summary cadence already produces them on a long enough run; verify during the recording smoke test.
+
+### Kernel hot-reload — matrix.json edits take effect within ~1 s
+AGT exposes `reload_policies()` on `AsyncPolicyEvaluator`; our `GovernanceKernel.__init__` calls `compile_bundle(...)` exactly once at boot and never again. This contradicts AGT's design intent and means the marketing claim *"PR on matrix.json → all agents immediately enforce the new rule"* is false today (matrix changes need a process restart).
+
+Fix: wire a tiny file-watcher into `GovernanceKernel`.
+
+- New `api/server/services/governance/reload_watcher.py` — `asyncio` task that polls `matrix.json` mtime + sha256 every 500 ms (or uses `watchdog` if already a dep — verify). On change: call `compile_bundle(...)` fresh → swap the in-memory `PolicyDocument` atomically → emit a `governance.matrix.reloaded` bus event with the new `policy_version` hash + the changed `rule_ids` diff.
+- Wired into the FastAPI lifespan alongside the existing kernel boot.
+- Behind `GOVERNANCE_HOT_RELOAD=1` (default on; off only for tests that assert deterministic policy_version).
+- Bus event surfaces in the dashboard top panel as a 3 s "constitution reloaded — 3 rules changed" banner.
+
+This is ~half a day's work, and it makes the dashboard story strictly true: visitors can read in the tooltip that the constitution is hot, and the architecture honours that claim.
+
+### Bidirectional essay ↔ live demo CTAs
+The public essay (deployed to GitHub Pages from `web/blueprint/`) and the live replay (deployed to the ACA URL) should know about each other:
+- Essay → adds a prominent **"Watch it run →"** CTA in the closing section, links to the ACA URL with a `?from=essay` query param.
+- Live replay → adds a **"Read the essay →"** link in the header (next to the replay badge), links to the GitHub Pages URL with a `?from=demo` query param.
+- Optional: the query param tweaks the welcome animation on the destination side (e.g. essay opens scrolled to the closing CTA if `from=demo`).
 Extend the existing `scripts/build-blueprint-image.sh` / `web/blueprint/Dockerfile` into a single multi-purpose image:
 - Layer 1: nginx serving `web/client/dist/` at `/`, `web/blueprint/dist/` at `/blueprint/`, `web/portal/dist/` at `/portal/`.
 - Layer 2: Python 3.11 + uv + the API package; uvicorn binds to `127.0.0.1:3101`.
@@ -124,15 +148,17 @@ A new GitHub Action `.github/workflows/deploy-replay.yml` rebuilds + redeploys o
 ## Effort estimate
 | Phase | Days |
 |---|---|
-| 1. Recorder + tape format + minimal CLI | 1.0 |
-| 2. Replayer + bus event timing + state hydration | 1.5 |
+| 0. **Delete dead policy surface** — `api/shared/policies.yaml`, `AutonomyPolicy` model, old `/api/policy` routes | 0.5 |
+| 1. Recorder + tape format + minimal CLI (incremental: 5 min smoke → 30 min → 2 h) | 1.0 |
+| 2. Replayer + bus event timing + state hydration + hard-reset loop | 1.5 |
 | 3. Read-only middleware + 403 toast handling | 0.5 |
-| 4. Replay badge in header + restart banner | 0.5 |
-| 5. **Governance dashboard** — `/api/governance/matrix` + `/api/governance/policy_changes/recent` + new `/governance` table with live diff pulse | 1.5 |
-| 6. Multi-process Container image + nginx config + deploy workflow | 1.0 |
-| 7. Record a real 2-h tape locally with DEMO_LOUD=1 + smoke test | 0.5 |
-| 8. Cloud deploy + verification + DNS / TLS sanity | 0.5 |
-| **Total** | **~7 days** |
+| 4. Replay badge in header + restart banner + essay↔demo CTAs | 0.5 |
+| 5. **Governance dashboard** — `/api/governance/matrix` + `/api/governance/policy_changes/recent` + new `/policy` table with live diff pulse | 1.5 |
+| 6. **Kernel hot-reload** — file-watcher + `reload_policies()` + `governance.matrix.reloaded` bus event + dashboard banner | 0.5 |
+| 7. Multi-process Container image + nginx config + deploy workflow | 1.0 |
+| 8. Record a real 2-h tape locally with DEMO_LOUD=1 + smoke test | 0.5 |
+| 9. Cloud deploy + verification + DNS / TLS sanity | 0.5 |
+| **Total** | **~7.5 days** |
 
 ## Verification
 - Replayer pytest sweep: snapshot → replay → assert REST + SSE match recorded shape at each tick.
