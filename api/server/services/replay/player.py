@@ -76,7 +76,10 @@ class Player:
             self._emit_restart_pending(app_state)
             if await self._sleep_until_or_stop(self._restart_pause_s):
                 break
-            hydrate_from_snapshot(self.loader)
+            try:
+                hydrate_from_snapshot(self.loader)
+            except Exception:
+                logger.exception("Failed to re-hydrate from snapshot between replay cycles; continuing")
 
     async def _sleep_until_or_stop(self, delay_s: float) -> bool:
         if delay_s <= 0:

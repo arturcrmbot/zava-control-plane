@@ -371,3 +371,55 @@ async def test_player_skips_unknown_mutation_kind_and_continues(
 
     assert [event.type for event in collected_events][:1] == ["workflow.started"]
     assert any(event.type == "workflow.started" for event in collected_events)
+
+
+async def test_player_continues_after_failed_in_loop_hydrate(
+    tmp_path: Path,
+    isolated_app_state,
+    collected_events,
+    monkeypatch,
+) -> None:
+    from api.server.services.replay import hydrate as hydrate_module
+    from api.server.services.replay.player import Player
+
+    loader = _build_tape(
+        tmp_path,
+        duration_s=1.0,
+        events=[
+            {"t": 0.5, "event": {"type": "workflow.started", "workflow_id": "wf-hydrate-fail"}},
+        ],
+    )
+    clock = FakeClock()
+    calls = {"n": 0}
+    real_hydrate = hydrate_module.hydrate_from_snapshot
+
+    def flaky(loader):
+        calls["n"] += 1
+        if calls["n"] >= 2:
+            raise RuntimeError("boom")
+        return real_hydrate(loader)
+
+    monkeypatch.setattr(hydrate_module, "hydrate_from_snapshot", flaky)
+
+    restart_pending_seen = asyncio.Event()
+
+    def collector(event) -> None:
+        if event.type == "playback.restart.pending":
+            restart_pending_seen.set()
+
+    off = app_state.bus.on_any(collector)
+    try:
+        player = Player(
+            loader,
+            restart_pause_s=0.1,
+            sleep_fn=clock.sleep,
+            clock_fn=clock,
+        )
+        await player.start()
+        await asyncio.wait_for(restart_pending_seen.wait(), timeout=1.0)
+        await asyncio.sleep(0.05)
+        assert not player._task.done(), "Player task should still be running after failed in-loop hydrate"
+        await player.stop()
+    finally:
+        off()
+        loader.close()
