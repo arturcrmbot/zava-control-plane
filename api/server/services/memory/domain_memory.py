@@ -15,6 +15,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from api.server.services.replay.mutation_bus import emit_mutation
+
 
 class DomainMemory:
     """Thin wrapper over mem0.Memory scoped to one domain."""
@@ -59,7 +61,23 @@ class DomainMemory:
             metadata=metadata,
             infer=False,
         )
-        return (result or {}).get("results", [])
+        results = (result or {}).get("results", [])
+        mutation_kind = "lesson" if kind == "lesson" else "memory"
+        for entry in results:
+            emit_mutation(
+                op="upsert",
+                kind=mutation_kind,
+                id=entry["id"],
+                patch={
+                    "domain": self.domain,
+                    "text": text,
+                    "metadata": metadata,
+                    "kind": kind,
+                    "agent_skill": agent_skill,
+                    "workflow_id": workflow_id,
+                },
+            )
+        return results
 
     def add_distilled(
         self,
@@ -79,7 +97,20 @@ class DomainMemory:
             metadata=merged,
             infer=False,
         )
-        return (result or {}).get("results", [])
+        results = (result or {}).get("results", [])
+        for entry in results:
+            emit_mutation(
+                op="upsert",
+                kind="lesson",
+                id=entry["id"],
+                patch={
+                    "domain": self.domain,
+                    "text": text,
+                    "metadata": merged,
+                    "kind": "lesson",
+                },
+            )
+        return results
 
     def recall(self, query: str, *, top_k: int = 5) -> list[dict]:
         """Semantic search for top-K relevant memories."""
@@ -118,6 +149,12 @@ class DomainMemory:
     def delete(self, memory_id: str) -> None:
         """Delete a single memory (used by dream consolidator)."""
         self._mem.delete(memory_id=memory_id)
+        emit_mutation(
+            op="delete",
+            kind="memory",
+            id=memory_id,
+            patch={"domain": self.domain},
+        )
 
     def update(self, memory_id: str, data: str) -> None:
         """Update a memory's content (used by dream consolidator)."""
