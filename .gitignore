@@ -90,6 +90,9 @@ data/.eval/
 # Snapshot bundles created by scripts/zava-snapshot.py — large + regenerable.
 data/snapshots/
 
+# Replay tape recordings — local smoke/manual artefacts, not source.
+/tapes/
+
 # api/ runtime artefacts (mirror of `data/` for code that runs out of api/).
 # Currently created by api/server/services/portal_orchestration.py when run from
 # inside api/.
