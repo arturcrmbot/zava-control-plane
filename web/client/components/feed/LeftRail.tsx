@@ -5,7 +5,7 @@
 // demoted secondary routes.
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { ChevronDown, ChevronsLeft, ChevronsRight, Plus, BarChart3, Brain, Network } from "lucide-react";
+import { ChevronDown, ChevronsLeft, ChevronsRight, Plus, BarChart3, Brain, Network, Sparkles } from "lucide-react";
 import type { RolePreset, SavedView } from "@shared/roles";
 import { useLocalStorageState } from "@client/hooks/useLocalStorageState";
 
@@ -15,6 +15,16 @@ const ROUTE_LABEL: Record<string, string> = {
   "/economics": "Economics",
   "/policy": "Policy",
 };
+
+const VITE_PORTS = new Set(["5273", "5274", "5275"]);
+function constellationUrl(): string {
+  const fromEnv = (import.meta.env.VITE_BLUEPRINT_URL as string | undefined)?.trim();
+  if (fromEnv) return `${fromEnv.replace(/\/$/, "")}/?view=constellation&from=fleet`;
+  if (typeof window !== "undefined" && VITE_PORTS.has(window.location.port)) {
+    return `${window.location.protocol}//${window.location.hostname}:5275/?view=constellation&from=fleet`;
+  }
+  return "/?view=constellation&from=fleet";
+}
 
 export default function LeftRail({
   role, userViews, onSelectView, onSaveCurrent,
@@ -100,6 +110,13 @@ export default function LeftRail({
           `flex items-center gap-2 text-xs px-3 py-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"}`
         }
       ><Network size={14} /> Knowledge</NavLink>
+
+      <a
+        href={constellationUrl()}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-2 text-xs px-3 py-1.5 rounded text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+      ><Sparkles size={14} /> Constellation ↗</a>
 
       <div className="mt-auto">
         <button

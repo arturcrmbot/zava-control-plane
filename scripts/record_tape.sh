@@ -19,7 +19,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-DURATION="${DURATION:-5m}"
+DURATION="${DURATION:-30m}"
 OUT="${OUT:?OUT=path/to/tape.tar.gz required}"
 
 case "$DURATION" in
@@ -33,6 +33,12 @@ cd "$REPO_ROOT"
 
 export DEMO_LOUD=1
 export DREAM_PASS_DEMO_CADENCE_SECONDS=180
+# Richer simulation defaults for replay recording: faster cadence so
+# the tape has many more workflow.started / step.completed /
+# workflow.completed events per minute — rockets in the constellation
+# need those step.completed events to visibly orbit between planets.
+# Override via env if you want a sparser tape.
+export SIMULATOR_RAMP_AVG_INTERVAL_SECONDS="${SIMULATOR_RAMP_AVG_INTERVAL_SECONDS:-25}"
 # IMPORTANT: the dream-pass auto-consolidator DELETES working memories
 # when backlog >= threshold. Setting a high threshold so seeded
 # memories survive long enough to land in the t=0 snapshot — we
@@ -150,6 +156,29 @@ seed_memories() {
   echo ""
 }
 seed_memories &
+
+# HITL auto-resolver: every 8s, ask the persona-responder to sweep all
+# pending HITL gates. Without this, every workflow parks at the first
+# human gate (line-manager/HR-director/recruiter) and the constellation
+# never sees workflow.completed → rockets sit idle "at a planet". With
+# the sweep running, the deterministic policy heads on each persona
+# decide the gate, durable.step.completed fires, the next phase runs,
+# and we get a continuous river of completions in the tape.
+auto_resolve_hitl() {
+  sleep "$(( ${ZAVA_RECORD_WARMUP_S%.*} + 10 ))" || return 0
+  for _ in $(seq 1 30); do
+    if curl -s -o /dev/null -w "%{http_code}" http://localhost:3101/api/replay/meta 2>/dev/null | grep -q "^200$"; then
+      break
+    fi
+    sleep 1
+  done
+  echo "[record_tape] HITL auto-resolver armed; sweeping every 8s..."
+  while kill -0 "$BOOT_PID" 2>/dev/null; do
+    curl -sS -X POST http://localhost:3101/api/personas/sweep -m 15 > /dev/null 2>&1 || true
+    sleep 8
+  done
+}
+auto_resolve_hitl &
 
 # Wait the requested duration, then ask the demo stack to stop.
 sleep "$TOTAL_SECS" || true

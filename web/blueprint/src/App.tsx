@@ -32,7 +32,12 @@ export default function App() {
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
     const isLocal = host === "localhost" || host === "127.0.0.1" || host.endsWith(".local");
-    if (isLocal || import.meta.env.DEV) {
+    // Azure Container Apps replay deploy also serves the operator
+    // surface (NOT the essay). Allow ?view=* routes through there so
+    // visitors can reach the Constellation, Entities, Workflow detail
+    // pages on the public replay FQDN.
+    const isContainerApps = host.endsWith(".azurecontainerapps.io");
+    if (isLocal || isContainerApps || import.meta.env.DEV) {
       const params = new URLSearchParams(window.location.search);
       const view = params.get("view");
       if (view === "constellation") return <ConstellationPage />;

@@ -1,6 +1,6 @@
 export function Closing() {
   const DEMO_URL = ((import.meta as any).env?.VITE_DEMO_URL as string | undefined)
-    ?? "https://blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io/";
+    ?? "https://zava-zava-verify.wonderfulocean-b02d74da.swedencentral.azurecontainerapps.io/?from=essay";
 
   return (
     <section className="section closing">

@@ -31,6 +31,13 @@ param personaAutoClose string = ''
 @allowed(['fake', 'azure'])
 param llmRuntime string = 'fake'
 
+@description('Set to "replay" to boot the container against a baked tape (no live workers, no Functions host, no LLM calls). Anything else boots live mode.')
+@allowed(['live', 'replay'])
+param zavaMode string = 'live'
+
+@description('Path inside the container to the baked tape archive. Only used when zavaMode=replay.')
+param zavaTapePath string = '/app/tape/tape.tar.gz'
+
 @description('Shared secret for the Functions worker → FastAPI /internal/durable-event callback. If empty, callbacks fail 401 and workflows stall.')
 @secure()
 param durableEventSecret string = ''
@@ -93,6 +100,13 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
             { name: 'AZURE_CLIENT_ID', value: reference(userAssignedIdentityId, '2023-01-31').clientId }
 
+            // Replay mode toggles. When ZAVA_MODE=replay the entrypoint
+            // skips the Functions host, the FastAPI lifespan boots the
+            // Player against ZAVA_TAPE_PATH, and the read-only middleware
+            // 403s every write.
+            { name: 'ZAVA_MODE', value: zavaMode }
+            { name: 'ZAVA_TAPE_PATH', value: zavaTapePath }
+
             { name: 'AZURE_OPENAI_ENDPOINT', value: azureOpenAiEndpoint }
             { name: 'AZURE_OPENAI_DEPLOYMENT', value: azureOpenAiDeployment }
             { name: 'AZURE_OPENAI_EMBED_DEPLOYMENT', value: azureOpenAiEmbedDeployment }
@@ -102,6 +116,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
 
             { name: 'SIMULATOR_RAMP_ENABLED', value: '1' }
             { name: 'SIMULATOR_RAMP_DOMAINS', value: simulatorRampDomains }
+            { name: 'MEMORY_DOMAINS', value: 'expense-claim,hiring,fleet-vendor-kyc,fleet-travel-preapproval,fleet-purchase-order' }
             { name: 'PERSONA_AUTO_CLOSE', value: personaAutoClose }
             { name: 'DEMO_TIME_WARP_FACTOR', value: '3600' }
 

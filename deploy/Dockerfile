@@ -103,6 +103,12 @@ COPY --from=spa-build /src/web/blueprint/dist    /app/static/blueprint
 # Persist KuzuDB to a mounted Azure Files share at /data
 RUN mkdir -p /data && chmod 0777 /data
 
+# Bake the replay tape into the image. ACA replay mode reads this path
+# via ZAVA_TAPE_PATH (set in infra/modules/aca-app.bicep). Keep .gitignored
+# tapes out of the build context via .dockerignore; explicitly copy the
+# named tape file we want to ship.
+COPY tapes/demo.tar.gz /app/tape/tape.tar.gz
+
 # Production marker — main.py loads static_production.py when this is set
 ENV ZAVA_STATIC_BUNDLE_DIR=/app/static \
     PYTHONUNBUFFERED=1 \

@@ -59,6 +59,10 @@ param personaAutoClose string = ''
 @allowed(['fake', 'azure'])
 param llmRuntime string = 'fake'
 
+@description('Container boot mode: "live" boots the full FastAPI + Functions stack; "replay" boots only FastAPI + Player against a baked tape (no LLM, no Functions host).')
+@allowed(['live', 'replay'])
+param zavaMode string = 'live'
+
 @description('Shared secret for Functions worker → FastAPI /internal/durable-event callback. Generate with: openssl rand -hex 32')
 @secure()
 param durableEventSecret string = ''
@@ -133,6 +137,7 @@ module acaApp 'modules/aca-app.bicep' = {
     simulatorRampDomains: simulatorRampDomains
     personaAutoClose: personaAutoClose
     llmRuntime: llmRuntime
+    zavaMode: zavaMode
     durableEventSecret: durableEventSecret
     funcStorageAccountName: storage.outputs.accountName
   }

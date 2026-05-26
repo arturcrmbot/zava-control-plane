@@ -10,6 +10,17 @@ set -euo pipefail
 FUNC_PORT="${FUNC_PORT:-7071}"
 PORT="${PORT:-80}"
 
+# In replay mode the Durable orchestrator never fires — every workflow
+# event is replayed from the baked tape. Skip the Functions host
+# entirely so the container is leaner and there's no AzureWebJobsStorage
+# dependency at runtime.
+if [[ "${ZAVA_MODE:-live}" == "replay" ]]; then
+  echo "[entrypoint] ZAVA_MODE=replay → skipping Functions host"
+  echo "[entrypoint] ZAVA_TAPE_PATH=${ZAVA_TAPE_PATH:-/app/tape/tape.tar.gz}"
+  echo "[entrypoint] starting uvicorn on :${PORT}"
+  exec uvicorn api.server.main:app --host 0.0.0.0 --port "${PORT}" --workers 1
+fi
+
 # Stream both processes' output to container stdout/stderr.
 echo "[entrypoint] starting Azure Functions host on :${FUNC_PORT}"
 # Kuzu (entity graph) holds an exclusive file lock per process. uvicorn

@@ -1,5 +1,6 @@
 import type { CosmicMode, PersonaState, WorkflowMoonData } from "../lib/types";
 import { PanelPicker } from "./PanelPicker";
+import { useReplayMode } from "../../../lib/useReplayMode";
 
 interface VitalSignsBarProps {
   inFlight: WorkflowMoonData[];
@@ -30,6 +31,7 @@ export function VitalSignsBar(props: VitalSignsBarProps) {
   // access to flashesRef. Pass via prop.
   const throughput = props.throughputPerMin ?? 0;
 
+  const replay = useReplayMode();
   const pendingDecisions = personas.reduce(
     (sum, p) => sum + (p.pending_count ?? 0),
     0,
@@ -71,11 +73,13 @@ export function VitalSignsBar(props: VitalSignsBarProps) {
 
       <div style={{ flex: 1 }} />
 
-      <StatusPill status={status} />
+      <StatusPill status={status} replay={replay.isReplay} recordedAt={replay.recordedAt} />
 
-      <button onClick={onBurst} style={btnStyle("primary")} title="Inject 8 varied workflows">
-        ⚡ Spawn 8 cases
-      </button>
+      {!replay.isReplay && (
+        <button onClick={onBurst} style={btnStyle("primary")} title="Inject 8 varied workflows">
+          ⚡ Spawn 8 cases
+        </button>
+      )}
 
       <ModeToggle mode={mode} setMode={setMode} />
 
@@ -128,11 +132,19 @@ function Divider() {
   );
 }
 
-function StatusPill({ status }: { status: string }) {
-  const color =
-    status === "watching" ? "#4ade80" : status === "connecting" ? "#fb923c" : "#ef4444";
-  const label =
-    status === "watching" ? "Live" : status === "connecting" ? "Connecting…" : "Disconnected";
+function StatusPill({ status, replay, recordedAt }: { status: string; replay?: boolean; recordedAt?: string }) {
+  let color: string;
+  let label: string;
+  if (replay) {
+    color = "#a78bfa";
+    const stamp = recordedAt ? new Date(recordedAt).toLocaleDateString() : "";
+    label = stamp ? `Replay · ${stamp}` : "Replay";
+  } else {
+    color =
+      status === "watching" ? "#4ade80" : status === "connecting" ? "#fb923c" : "#ef4444";
+    label =
+      status === "watching" ? "Live" : status === "connecting" ? "Connecting…" : "Disconnected";
+  }
   return (
     <div
       style={{
