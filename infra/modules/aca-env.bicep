@@ -3,10 +3,11 @@
 
 param name string
 param location string
-param storageAccountName string
+param persistData bool = true
+param storageAccountName string = ''
 @secure()
-param storageAccountKey string
-param fileShareName string
+param storageAccountKey string = ''
+param fileShareName string = ''
 param storageMountName string = 'zava-data'
 @secure()
 param appInsightsConnectionString string = ''
@@ -36,7 +37,7 @@ resource env 'Microsoft.App/managedEnvironments@2024-03-01' = {
   }
 }
 
-resource storageMount 'Microsoft.App/managedEnvironments/storages@2024-03-01' = {
+resource storageMount 'Microsoft.App/managedEnvironments/storages@2024-03-01' = if (persistData) {
   parent: env
   name: storageMountName
   properties: {

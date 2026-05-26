@@ -15,6 +15,7 @@
     "fleetManagerModel": { "value": "${FLEET_MANAGER_MODEL=gpt-4.1}" },
     "simulatorRampDomains": { "value": "${SIMULATOR_RAMP_DOMAINS=expense-claim}" },
     "personaAutoClose": { "value": "${PERSONA_AUTO_CLOSE=}" },
-    "llmRuntime": { "value": "${LLM_RUNTIME=fake}" }
+    "llmRuntime": { "value": "${LLM_RUNTIME=fake}" },
+    "persistData": { "value": "${PERSIST_DATA=false}" }
   }
 }

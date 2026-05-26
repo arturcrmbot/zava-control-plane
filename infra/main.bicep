@@ -59,6 +59,9 @@ param personaAutoClose string = ''
 @allowed(['fake', 'azure'])
 param llmRuntime string = 'fake'
 
+@description('Provision Azure Files share + mount for KuzuDB persistence. Set false in tenants where Azure Policy disables shared-key access on Storage accounts (ACA SMB mount requires the key).')
+param persistData bool = false
+
 // ── Resource group ────────────────────────────────────────────────────
 resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: 'rg-${environmentName}'
@@ -79,7 +82,7 @@ module uami 'modules/uami.bicep' = {
   }
 }
 
-module storage 'modules/storage.bicep' = {
+module storage 'modules/storage.bicep' = if (persistData) {
   scope: rg
   name: 'storage'
   params: {
@@ -95,9 +98,10 @@ module acaEnv 'modules/aca-env.bicep' = {
   params: {
     name: 'cae-${environmentName}'
     location: location
-    storageAccountName: storage.outputs.accountName
-    storageAccountKey: storage.outputs.accountKey
-    fileShareName: storage.outputs.fileShareName
+    persistData: persistData
+    storageAccountName: persistData ? storage.outputs.accountName : ''
+    storageAccountKey: persistData ? storage.outputs.accountKey : ''
+    fileShareName: persistData ? storage.outputs.fileShareName : ''
     storageMountName: 'zava-data'
     appInsightsConnectionString: appInsightsConnectionString
   }
@@ -112,6 +116,7 @@ module acaApp 'modules/aca-app.bicep' = {
     environmentId: acaEnv.outputs.environmentId
     userAssignedIdentityId: uami.outputs.id
     acrLoginServer: acrLoginServer
+    persistData: persistData
     storageMountName: 'zava-data'
     appInsightsConnectionString: appInsightsConnectionString
     azureOpenAiEndpoint: azureOpenAiEndpoint

@@ -16,6 +16,7 @@ param location string
 param environmentId string
 param userAssignedIdentityId string
 param acrLoginServer string
+param persistData bool = true
 param storageMountName string = 'zava-data'
 
 @secure()
@@ -96,12 +97,12 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             // No AUTHORITY_MCP_URL → /api/authority/* uses the in-process
             // kernel and /api/authority/health reports backend=in-process.
           ]
-          volumeMounts: [
+          volumeMounts: persistData ? [
             {
               volumeName: 'zava-data'
               mountPath: '/data'
             }
-          ]
+          ] : []
           probes: [
             {
               type: 'Liveness'
@@ -146,13 +147,13 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         minReplicas: 1
         maxReplicas: 1
       }
-      volumes: [
+      volumes: persistData ? [
         {
           name: 'zava-data'
           storageType: 'AzureFile'
           storageName: storageMountName
         }
-      ]
+      ] : []
     }
   }
 }
