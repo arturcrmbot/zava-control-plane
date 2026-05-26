@@ -13,7 +13,7 @@
 // navigation still work.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { RolePreset } from "@shared/roles";
+import type { RolePreset, FilterMode } from "@shared/roles";
 import { useFeedItems, type FilterState } from "@client/hooks/useFeedItems";
 import { useNewItemsBuffer } from "@client/hooks/useNewItemsBuffer";
 import { useLocalStorageState } from "@client/hooks/useLocalStorageState";
@@ -32,6 +32,17 @@ function filterFromUrl(rawMode: string | null): Partial<FilterState> | null {
   if (rawMode === "needs-you") return { mode: "needs-you" };
   if (rawMode === "all") return { mode: "all-activity" };
   return null;
+}
+
+// Replay deployments (ACA) have nothing actionable for the role — every
+// HITL is auto-resolved during recording, so "Needs you" is permanently
+// empty and a first-time visitor sees a wasteland. Default to the busy
+// view instead so the demo lands on something alive.
+function defaultFilterMode(role: RolePreset): FilterMode {
+  if (typeof window !== "undefined" && window.location.hostname.endsWith(".azurecontainerapps.io")) {
+    return "all-activity";
+  }
+  return role.defaultFilter;
 }
 
 export default function Feed({
@@ -55,9 +66,10 @@ export default function Feed({
   const [filter, setFilterRaw] = useState<FilterState>(() => {
     // Explicit URL params win over persisted state. If no URL params, hydrate
     // from localStorage. Otherwise fall back to role defaults.
+    const fallbackMode = defaultFilterMode(role);
     if (initialUrl || urlDomains || urlSearch || urlSeverity || urlMine) {
       return {
-        mode: initialUrl?.mode ?? role.defaultFilter,
+        mode: initialUrl?.mode ?? fallbackMode,
         domains: urlDomains ? urlDomains.split(",").filter(Boolean) : role.defaultDomains,
         severity: urlSeverity ?? null,
         search: urlSearch ?? "",
@@ -66,7 +78,7 @@ export default function Feed({
     }
     if (persisted) return persisted;
     return {
-      mode: role.defaultFilter,
+      mode: fallbackMode,
       domains: role.defaultDomains,
       severity: null,
       search: "",
@@ -85,7 +97,7 @@ export default function Feed({
     const urlFromUrl = filterFromUrl(params.get("filter"));
     const dom = params.get("domains");
     const next: FilterState = {
-      mode: urlFromUrl?.mode ?? role.defaultFilter,
+      mode: urlFromUrl?.mode ?? defaultFilterMode(role),
       domains: dom ? dom.split(",").filter(Boolean) : role.defaultDomains,
       severity: (params.get("severity") as FilterState["severity"]) ?? null,
       search: params.get("q") ?? "",

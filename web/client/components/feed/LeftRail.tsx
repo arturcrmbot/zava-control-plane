@@ -23,7 +23,10 @@ function constellationUrl(): string {
   if (typeof window !== "undefined" && VITE_PORTS.has(window.location.port)) {
     return `${window.location.protocol}//${window.location.hostname}:5275/?view=constellation&from=fleet`;
   }
-  return "/?view=constellation&from=fleet";
+  // Production: blueprint SPA is mounted under /blueprint/. Without that
+  // prefix the operator UI handles the request and silently ignores
+  // ?view=constellation, dumping the user back onto the feed dashboard.
+  return "/blueprint/?view=constellation&from=fleet";
 }
 
 export default function LeftRail({
