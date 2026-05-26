@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import asyncio
 import os
+import random
+import time
 from pathlib import Path
 from typing import Any, Callable
 
@@ -30,6 +32,14 @@ from api.functions.graphs.executors.agents.runtime import LLMRuntimeResult
 
 
 _DEFAULT_API_VERSION = "2024-10-21"
+
+# Retry budget for transient 429 (rate-limit) / 500-class errors. The AOAI
+# deployment in zava-verify runs with a low per-minute quota (40 RPM / 40K
+# TPM) and the simulator can burst above that. Without retry the orchestrator
+# bails on the first 429 and the workflow is stuck in Intake forever.
+_RETRY_MAX_ATTEMPTS = 6
+_RETRY_BASE_DELAY_S = 2.0
+_RETRY_MAX_DELAY_S = 30.0
 
 
 def _build_client() -> Any:
@@ -100,8 +110,38 @@ class AOAIRuntime:
                 timeout=timeout_s,
             )
 
+        def _call_with_retry() -> Any:
+            from openai import APIStatusError, RateLimitError
+
+            attempt = 0
+            while True:
+                attempt += 1
+                try:
+                    return _call()
+                except (RateLimitError, APIStatusError) as exc:
+                    status = getattr(exc, "status_code", None)
+                    is_retryable = isinstance(exc, RateLimitError) or (
+                        status is not None and status >= 500
+                    )
+                    if not is_retryable or attempt >= _RETRY_MAX_ATTEMPTS:
+                        raise
+                    # exponential backoff + jitter, honor Retry-After if present
+                    retry_after = None
+                    resp = getattr(exc, "response", None)
+                    if resp is not None:
+                        try:
+                            retry_after = float(resp.headers.get("retry-after", "") or 0)
+                        except (ValueError, AttributeError):
+                            retry_after = None
+                    if retry_after and retry_after > 0:
+                        delay = min(retry_after, _RETRY_MAX_DELAY_S)
+                    else:
+                        delay = min(_RETRY_BASE_DELAY_S * (2 ** (attempt - 1)), _RETRY_MAX_DELAY_S)
+                    delay += random.uniform(0, 0.5)
+                    time.sleep(delay)
+
         # openai SDK is sync; run in thread so we don't block the worker loop.
-        response = await asyncio.to_thread(_call)
+        response = await asyncio.to_thread(_call_with_retry)
 
         text = ""
         in_tok = out_tok = None
