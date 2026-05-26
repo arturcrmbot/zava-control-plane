@@ -62,9 +62,6 @@ web/portal
 
 # --- Tests / docs / fixtures we don't need in the image ------------------
 tests
-mocks
-data/synthetic
-data/portal
 docs
 screenshots
 tools/scratch
