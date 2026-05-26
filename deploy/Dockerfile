@@ -19,7 +19,11 @@ COPY web ./web
 RUN npm ci --no-audit --no-fund
 
 # Build root operator UI → /src/dist
-RUN npm run build
+# Note: root `npm run build` runs `tsc --noEmit && vite build`, but root tsconfig
+# sweeps `web/blueprint` + `web/portal` (which have their own tsconfigs + their own
+# noUnusedLocals-strict TS that root npm install doesn't provide deps for).
+# Use `npx vite build` directly — matches scripts/boot-demo.sh's local invocation.
+RUN npx vite build
 
 # Build portal → /src/web/portal/dist
 RUN npm --prefix web/portal install --no-audit --no-fund \
