@@ -33,12 +33,24 @@ cd "$REPO_ROOT"
 
 export DEMO_LOUD=1
 export DREAM_PASS_DEMO_CADENCE_SECONDS=180
-export DREAM_PASS_TRIGGER_BACKLOG=5
+# IMPORTANT: the dream-pass auto-consolidator DELETES working memories
+# when backlog >= threshold. Setting a high threshold so seeded
+# memories survive long enough to land in the t=0 snapshot — we
+# trigger ONE explicit dream pass below to also produce lessons.
+export DREAM_PASS_TRIGGER_BACKLOG=999
 export MEMORY_DOMAINS=hiring
 export ZAVA_APP_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 export ZAVA_RECORD_TO="$OUT"
-# Default 20s warmup so the t=0 snapshot has seeded workflows.
-export ZAVA_RECORD_WARMUP_S="${ZAVA_RECORD_WARMUP_S:-20}"
+# Default 40s warmup so the t=0 snapshot has seeded workflows AND the
+# memory seed batches + explicit dream pass complete BEFORE snapshot.
+export ZAVA_RECORD_WARMUP_S="${ZAVA_RECORD_WARMUP_S:-40}"
+# Force in-memory FallbackMemory during recording so seeded working
+# memories persist even if the Azure OpenAI / GitHub Copilot quota is
+# exhausted (Mem0 silently drops writes when its LLM embed calls
+# fail). Exported empty so .env's load_dotenv (default override=False)
+# leaves it blank rather than re-reading the real endpoint.
+export AZURE_OPENAI_ENDPOINT=""
+export AZURE_OPENAI_EMBED_DEPLOYMENT=""
 
 mkdir -p "$(dirname "$OUT")"
 ABS_OUT="$(cd "$(dirname "$OUT")" && pwd)/$(basename "$OUT")"
@@ -80,6 +92,64 @@ request_stop() {
   cleanup
 }
 trap request_stop INT TERM
+
+# After the warmup period, seed realistic working memories so the
+# Memory page in replay shows entries even when the LLM-driven agents
+# can't run (e.g. GitHub Copilot rate-limited). Uses the same /seed-demo
+# endpoint that the dream-pass Playwright E2E uses. Backgrounded so the
+# main loop continues the duration countdown.
+seed_memories() {
+  # Wait for warmup + 3s grace so the Recorder is armed and listening
+  # on the bus when memory mutations land.
+  sleep "$(( ${ZAVA_RECORD_WARMUP_S%.*} + 3 ))" || return 0
+  # Wait for the FastAPI port to actually accept connections.
+  for _ in $(seq 1 30); do
+    if curl -s -o /dev/null -w "%{http_code}" http://localhost:3101/api/replay/meta 2>/dev/null | grep -q "^200$"; then
+      break
+    fi
+    sleep 1
+  done
+
+  # Round 1: seed batch (will be consumed by the explicit dream pass)
+  echo "[record_tape] seeding round 1 memories (for consolidation)..."
+  curl -s -X POST http://localhost:3101/api/memory/v2/seed-demo \
+    -H "content-type: application/json" \
+    -d '{
+      "domain": "hiring",
+      "entries": [
+        {"role":"recruiter","verdict":"reject","gate":"cv_screen","reason":"voice signal weak","signals":{"voice_score":1.2,"cv_score":2},"workflow_id":"W-CV-001"},
+        {"role":"recruiter","verdict":"reject","gate":"cv_screen","reason":"voice signal weak","signals":{"voice_score":1.4,"cv_score":1},"workflow_id":"W-CV-002"},
+        {"role":"recruiter","verdict":"reject","gate":"cv_screen","reason":"voice signal weak","signals":{"voice_score":1.8,"cv_score":2},"workflow_id":"W-CV-003"},
+        {"role":"recruiter","verdict":"reject","gate":"cv_screen","reason":"voice signal weak","signals":{"voice_score":1.1,"cv_score":3},"workflow_id":"W-CV-004"},
+        {"role":"recruiter","verdict":"reject","gate":"cv_screen","reason":"voice signal weak","signals":{"voice_score":1.0,"cv_score":2},"workflow_id":"W-CV-005"},
+        {"role":"hiring_manager","verdict":"approve","gate":"offer_decision","reason":"strong all-round","signals":{"voice_score":4.5,"cv_score":5},"workflow_id":"W-OFF-101"},
+        {"role":"hiring_manager","verdict":"approve","gate":"offer_decision","reason":"strong all-round","signals":{"voice_score":4.7,"cv_score":5},"workflow_id":"W-OFF-102"}
+      ]
+    }' 2>&1 | head -1
+  echo ""
+
+  # Trigger one explicit dream pass to produce lessons
+  sleep 2
+  echo "[record_tape] triggering dream pass..."
+  curl -s -X POST "http://localhost:3101/api/dream-pass/run?domain=hiring" 2>&1 | head -1
+  echo ""
+
+  # Round 2: fresh working notes that the consolidator hasn't eaten
+  sleep 3
+  echo "[record_tape] seeding round 2 memories (fresh working notes)..."
+  curl -s -X POST http://localhost:3101/api/memory/v2/seed-demo \
+    -H "content-type: application/json" \
+    -d '{
+      "domain": "hiring",
+      "entries": [
+        {"role":"recruiter","verdict":"approve","gate":"cv_screen","reason":"strong portfolio","signals":{"voice_score":4.3,"cv_score":5},"workflow_id":"W-CV-LIVE-1"},
+        {"role":"talent_lead","verdict":"escalate","gate":"panel_review","reason":"unusual background needs review","signals":{"cv_score":3},"workflow_id":"W-PNL-201"},
+        {"role":"hiring_manager","verdict":"approve","gate":"offer_decision","reason":"strong all-round","signals":{"voice_score":4.2,"cv_score":4},"workflow_id":"W-OFF-LIVE-1"}
+      ]
+    }' 2>&1 | head -1
+  echo ""
+}
+seed_memories &
 
 # Wait the requested duration, then ask the demo stack to stop.
 sleep "$TOTAL_SECS" || true
