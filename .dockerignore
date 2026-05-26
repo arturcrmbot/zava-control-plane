@@ -37,11 +37,10 @@ local.settings.json
 *.log
 logs/
 
-# Bulky source not needed by the runtime image
+# --- Bulky source not needed by the runtime image
 .azure/
 .azurite/
 *.pptx
-*.pdf
 .playwright-cli/
 .playwright-mcp/
 .playwright/
@@ -79,6 +78,14 @@ tools/scratch
 # served by the page. Other PNGs are local artefacts.
 **/*.png
 !web/blueprint/public/gutenberg.png
+# Synthetic expense-claim receipts: required at runtime by the
+# expense-claim orchestrator (api/server/mcp_tools/claim_get_receipt.py)
+# and the receipt-serving FastAPI route. Without these, every claim
+# fails Intake with `FileNotFoundError: receipt 'CLM-XXXX.png' not found`.
+!data/synthetic/receipts/*.png
+# Synthetic CV PDFs: required at runtime by the hiring orchestrator's
+# ocr_extract tool and the portal route that streams candidate CVs.
+!data/synthetic/hiring/cv-pdfs/*.pdf
 
 # Re-include the entire built blueprint bundle (must come AFTER the
 # **/*.png exclude above, otherwise dist/*.png gets dropped).
