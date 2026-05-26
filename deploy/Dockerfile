@@ -58,6 +58,11 @@ COPY api ./api
 COPY mocks ./mocks
 COPY data ./data
 COPY scripts ./scripts
+# Functions v2 programming model: function_app.py + host.json MUST live at
+# the func project root (which is /app — we run `func host start` from /app
+# in deploy/entrypoint.sh). Without these, the host reports "No job functions
+# found" and every workflow spawn returns 404.
+COPY function_app.py host.json ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 

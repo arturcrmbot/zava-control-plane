@@ -13,8 +13,8 @@ PORT="${PORT:-80}"
 # Stream both processes' output to container stdout/stderr.
 echo "[entrypoint] starting Azure Functions host on :${FUNC_PORT}"
 (
-  cd /app/api/functions
-  # PYTHONPATH=/app so worker can import `api.*` modules.
+  # function_app.py + host.json live at /app (the func project root).
+  cd /app
   PYTHONPATH=/app exec func host start --port "${FUNC_PORT}" --no-build 2>&1 \
     | sed -u 's/^/[func] /'
 ) &
