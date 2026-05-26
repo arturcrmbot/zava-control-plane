@@ -37,7 +37,7 @@ RUN npm --prefix web/blueprint install --no-audit --no-fund \
 ############################
 # Stage 2 — Python deps via uv
 ############################
-FROM python:3.11-slim AS py-build
+FROM python:3.11-slim-bookworm AS py-build
 
 # uv from official multi-stage image
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
@@ -65,7 +65,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 ############################
 # Stage 3 — runtime
 ############################
-FROM python:3.11-slim AS runtime
+FROM python:3.11-slim-bookworm AS runtime
 
 # Minimal runtime; tini for clean PID-1 signalling + Azure Functions Core Tools v4
 # for the Durable orchestrator host (started alongside uvicorn — see entrypoint.sh).
