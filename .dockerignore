@@ -56,10 +56,6 @@ api/functions/
 .devcontainer/
 .ipynb_checkpoints/
 
-# --- Other Vite apps we don't deploy here --------------------------------
-web/client
-web/portal
-
 # --- Tests / docs / fixtures we don't need in the image ------------------
 tests
 docs
