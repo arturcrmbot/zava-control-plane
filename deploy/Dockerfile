@@ -67,9 +67,19 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 ############################
 FROM python:3.11-slim AS runtime
 
-# Minimal runtime; tini for clean PID-1 signalling
+# Minimal runtime; tini for clean PID-1 signalling + Azure Functions Core Tools v4
+# for the Durable orchestrator host (started alongside uvicorn — see entrypoint.sh).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends tini ca-certificates curl \
+    && apt-get install -y --no-install-recommends \
+        tini ca-certificates curl gnupg apt-transport-https lsb-release \
+    && curl -sSL https://packages.microsoft.com/keys/microsoft.asc \
+        | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" \
+        > /etc/apt/sources.list.d/dotnetdev.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends azure-functions-core-tools-4 \
+    && apt-get purge -y gnupg apt-transport-https lsb-release \
+    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -92,12 +102,19 @@ ENV ZAVA_STATIC_BUNDLE_DIR=/app/static \
     PATH="/app/.venv/bin:${PATH}" \
     PORT=80
 
+# Container entrypoint: backgrounds `func host start` (Durable orchestrator
+# on :7071) then exec's uvicorn (:80). See deploy/entrypoint.sh.
+COPY deploy/entrypoint.sh /usr/local/bin/zava-entrypoint
+RUN chmod +x /usr/local/bin/zava-entrypoint
+
 EXPOSE 80
 
 # Probes hit /healthz directly (it's a pure JSON route, defined BEFORE
 # any StaticFiles mount in main.py so it can never be shadowed).
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+# Increased start-period from 20s → 90s because func host needs ~30-60s
+# to discover Python triggers and bind :7071 on a cold replica.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=5 \
     CMD curl -fsS http://127.0.0.1:80/healthz || exit 1
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["uvicorn", "api.server.main:app", "--host", "0.0.0.0", "--port", "80", "--workers", "1"]
+CMD ["/usr/local/bin/zava-entrypoint"]

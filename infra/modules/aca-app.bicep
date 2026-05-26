@@ -31,6 +31,9 @@ param personaAutoClose string = ''
 @allowed(['fake', 'azure'])
 param llmRuntime string = 'fake'
 
+@description('Storage account name for identity-based AzureWebJobsStorage (Functions Durable host).')
+param funcStorageAccountName string
+
 var placeholderImage = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 resource app 'Microsoft.App/containerApps@2024-03-01' = {
@@ -93,6 +96,16 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'DEMO_TIME_WARP_FACTOR', value: '3600' }
 
             { name: 'ENTITY_PLANE_ENABLED', value: '1' }
+
+            // Azure Functions host (Durable orchestrator on :7071, started
+            // alongside uvicorn by deploy/entrypoint.sh). Identity-based
+            // AzureWebJobsStorage avoids the MCAPS shared-key policy.
+            { name: 'AzureWebJobsStorage__accountName', value: funcStorageAccountName }
+            { name: 'AzureWebJobsStorage__credential', value: 'managedidentity' }
+            { name: 'AzureWebJobsStorage__clientId', value: reference(userAssignedIdentityId, '2023-01-31').clientId }
+            { name: 'FUNCTIONS_WORKER_RUNTIME', value: 'python' }
+            { name: 'PYTHON_ISOLATE_WORKER_DEPENDENCIES', value: '0' }
+            { name: 'FASTAPI_WEBHOOK_URL', value: 'http://localhost:80/internal/durable-event' }
 
             // No AUTHORITY_MCP_URL → /api/authority/* uses the in-process
             // kernel and /api/authority/health reports backend=in-process.

@@ -82,13 +82,15 @@ module uami 'modules/uami.bicep' = {
   }
 }
 
-module storage 'modules/storage.bicep' = if (persistData) {
+module storage 'modules/storage.bicep' = {
   scope: rg
   name: 'storage'
   params: {
     name: 'st${take(replace(toLower(environmentName), '-', ''), 12)}${take(prefix, 6)}'
     location: location
     fileShareName: 'zava-data'
+    createFileShare: persistData
+    uamiPrincipalId: uami.outputs.principalId
   }
 }
 
@@ -127,6 +129,7 @@ module acaApp 'modules/aca-app.bicep' = {
     simulatorRampDomains: simulatorRampDomains
     personaAutoClose: personaAutoClose
     llmRuntime: llmRuntime
+    funcStorageAccountName: storage.outputs.accountName
   }
 }
 
