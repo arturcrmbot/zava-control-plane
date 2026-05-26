@@ -64,6 +64,9 @@ def _get_runtime() -> LLMRuntime:
     if name == "ghcp":
         from api.functions.graphs.executors.agents.runtime_ghcp import GHCPRuntime
         return GHCPRuntime()
+    if name in ("aoai", "azure", "azure_openai"):
+        from api.functions.graphs.executors.agents.runtime_aoai import AOAIRuntime
+        return AOAIRuntime()
     raise ValueError(
-        f"LLM_RUNTIME={name!r} not recognised. Supported: 'ghcp', 'fake'."
+        f"LLM_RUNTIME={name!r} not recognised. Supported: 'ghcp', 'aoai', 'fake'."
     )
