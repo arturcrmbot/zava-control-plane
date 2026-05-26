@@ -12,10 +12,19 @@ PORT="${PORT:-80}"
 
 # Stream both processes' output to container stdout/stderr.
 echo "[entrypoint] starting Azure Functions host on :${FUNC_PORT}"
+# Kuzu (entity graph) holds an exclusive file lock per process. uvicorn
+# opens data/portal/entity_graph.kuzu first, so the func worker — which
+# imports the same substrate module-tree via function_app.py — would
+# crash with "Could not set lock on file". Give the func worker its own
+# isolated PORTAL_DATA_DIR; activities that need shared state call back
+# into FastAPI via FASTAPI_WEBHOOK_URL (http://localhost:80).
+FUNC_PORTAL_DATA_DIR="${FUNC_PORTAL_DATA_DIR:-/tmp/zava-func-portal}"
+mkdir -p "${FUNC_PORTAL_DATA_DIR}"
 (
   # function_app.py + host.json live at /app (the func project root).
   cd /app
-  PYTHONPATH=/app exec func host start --port "${FUNC_PORT}" --no-build 2>&1 \
+  PYTHONPATH=/app PORTAL_DATA_DIR="${FUNC_PORTAL_DATA_DIR}" \
+    exec func host start --port "${FUNC_PORT}" --no-build 2>&1 \
     | sed -u 's/^/[func] /'
 ) &
 FUNC_PID=$!
