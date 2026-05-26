@@ -63,16 +63,48 @@ class _CheckBody(BaseModel):
 
 @router.get("/health")
 async def authority_health() -> dict[str, Any]:
-    """Proxy the MCP /health so any UI can render a single status badge."""
+    """Report authority backend liveness.
+
+    Backends (mirrors :func:`api.server.mcp_tools.delegated_authority._http_fallback_enabled`):
+
+    - **In-process kernel** (default): when ``AUTHORITY_MCP_URL`` is unset,
+      ``resolve``/``check`` route through the governance kernel. There is
+      no HTTP hop to probe — instead we report green when the kernel has
+      loaded a non-empty matrix.
+    - **HTTP MCP** (engagement-POC swap-in): when ``AUTHORITY_MCP_URL`` is
+      set, we proxy ``GET <url>/health`` so the UI can render a single
+      status badge.
+    """
+    from api.server.mcp_tools.delegated_authority import _http_fallback_enabled
+
+    if not _http_fallback_enabled():
+        from api.server.services.governance.kernel import kernel
+
+        try:
+            rule_count = len(kernel()._matrix)
+        except Exception as ex:  # pragma: no cover - defensive
+            raise HTTPException(
+                status_code=503,
+                detail=f"in-process authority kernel unavailable: {ex}",
+            )
+        return {
+            "ok": rule_count > 0,
+            "backend": "in-process",
+            "rule_count": rule_count,
+        }
+
     try:
         resp = httpx.get(f"{_base_url()}/health", timeout=3.0)
         resp.raise_for_status()
-        return resp.json()
+        payload = resp.json()
     except httpx.HTTPError as ex:
         raise HTTPException(
             status_code=503,
             detail=f"authority MCP unreachable at {_base_url()}: {ex}",
         )
+    if isinstance(payload, dict):
+        payload.setdefault("backend", "http")
+    return payload
 
 
 @router.post("/resolve")

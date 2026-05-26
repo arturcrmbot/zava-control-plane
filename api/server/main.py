@@ -425,6 +425,11 @@ async def health():
     return {"ok": True}
 
 
+@app.get("/healthz")
+async def healthz():
+    return {"ok": True}
+
+
 # Bus -> hub fan-out is wired inside the lifespan (see above) so each app
 # instance owns exactly one subscription. Do not subscribe at import time;
 # under uvicorn --reload that accumulates one extra listener per reload.
