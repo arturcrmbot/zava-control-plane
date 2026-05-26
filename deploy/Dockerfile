@@ -71,7 +71,7 @@ FROM python:3.11-slim AS runtime
 # for the Durable orchestrator host (started alongside uvicorn — see entrypoint.sh).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        tini ca-certificates curl gnupg apt-transport-https lsb-release \
+        tini ca-certificates curl gnupg apt-transport-https lsb-release libicu72 \
     && curl -sSL https://packages.microsoft.com/keys/microsoft.asc \
         | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" \
