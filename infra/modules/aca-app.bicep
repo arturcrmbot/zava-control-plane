@@ -31,6 +31,10 @@ param personaAutoClose string = ''
 @allowed(['fake', 'azure'])
 param llmRuntime string = 'fake'
 
+@description('Shared secret for the Functions worker → FastAPI /internal/durable-event callback. If empty, callbacks fail 401 and workflows stall.')
+@secure()
+param durableEventSecret string = ''
+
 @description('Storage account name for identity-based AzureWebJobsStorage (Functions Durable host).')
 param funcStorageAccountName string
 
@@ -67,6 +71,12 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         {
           server: acrLoginServer
           identity: userAssignedIdentityId
+        }
+      ]
+      secrets: [
+        {
+          name: 'durable-event-secret'
+          value: durableEventSecret
         }
       ]
     }
@@ -106,6 +116,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'FUNCTIONS_WORKER_RUNTIME', value: 'python' }
             { name: 'PYTHON_ISOLATE_WORKER_DEPENDENCIES', value: '0' }
             { name: 'FASTAPI_WEBHOOK_URL', value: 'http://localhost:80/internal/durable-event' }
+            { name: 'DURABLE_EVENT_SECRET', secretRef: 'durable-event-secret' }
 
             // No AUTHORITY_MCP_URL → /api/authority/* uses the in-process
             // kernel and /api/authority/health reports backend=in-process.

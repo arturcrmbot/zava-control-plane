@@ -59,6 +59,10 @@ param personaAutoClose string = ''
 @allowed(['fake', 'azure'])
 param llmRuntime string = 'fake'
 
+@description('Shared secret for Functions worker → FastAPI /internal/durable-event callback. Generate with: openssl rand -hex 32')
+@secure()
+param durableEventSecret string = ''
+
 @description('Provision Azure Files share + mount for KuzuDB persistence. Set false in tenants where Azure Policy disables shared-key access on Storage accounts (ACA SMB mount requires the key).')
 param persistData bool = false
 
@@ -129,6 +133,7 @@ module acaApp 'modules/aca-app.bicep' = {
     simulatorRampDomains: simulatorRampDomains
     personaAutoClose: personaAutoClose
     llmRuntime: llmRuntime
+    durableEventSecret: durableEventSecret
     funcStorageAccountName: storage.outputs.accountName
   }
 }

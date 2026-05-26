@@ -26,12 +26,15 @@ RUN npm ci --no-audit --no-fund
 RUN npx vite build
 
 # Build portal → /src/web/portal/dist
+# BASE_PATH=/portal/ so emitted asset URLs match the /portal mount in
+# api/server/static_production.py (otherwise index.html references /assets/*
+# which collides with the root SPA's asset mount and 404s).
 RUN npm --prefix web/portal install --no-audit --no-fund \
-    && npm --prefix web/portal run build
+    && BASE_PATH=/portal/ npm --prefix web/portal run build
 
 # Build blueprint → /src/web/blueprint/dist
 RUN npm --prefix web/blueprint install --no-audit --no-fund \
-    && npm --prefix web/blueprint run build
+    && BASE_PATH=/blueprint/ npm --prefix web/blueprint run build
 
 
 ############################
