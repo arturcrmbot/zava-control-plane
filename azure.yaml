@@ -1,0 +1,16 @@
+# Azure Developer CLI (azd) project definition for the Zava control plane.
+#
+# Single ACA container — uvicorn serves FastAPI + 3 React SPAs on port 80.
+# Build path: deploy/Dockerfile (multi-stage: node → python → runtime).
+
+name: zava-control-plane
+metadata:
+  template: zava-control-plane@1.0
+services:
+  zava:
+    host: containerapp
+    project: .
+    language: docker
+    docker:
+      path: deploy/Dockerfile
+      context: .

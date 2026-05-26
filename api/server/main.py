@@ -539,10 +539,22 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           workflow_agui_router):
     app.include_router(r)
 
-# Mount the built blueprint Vite bundle if present (production deploy).
-# No-op in dev when web/blueprint/dist/ doesn't exist (Vite serves the
-# page directly on :5275 and proxies /api back here).
-from api.server.static_blueprint import mount_blueprint_static
-_blueprint_mounted = mount_blueprint_static(app)
-if _blueprint_mounted:
-    print("[server] mounted blueprint bundle from web/blueprint/dist/")
+# --- Production multi-SPA mount (full Zava container) -----------------
+# When ZAVA_STATIC_BUNDLE_DIR is set (production deploy via deploy/Dockerfile)
+# this mounts /portal, /blueprint and / from the baked SPA bundles, and
+# installs an /api/{rest:path} 404 catch-all so the root SPA can never
+# silently swallow misrouted API requests. No-op in dev (env var unset).
+from api.server.static_production import mount_production_static
+_production_mounted = mount_production_static(app)
+if _production_mounted:
+    print("[server] mounted production SPA bundles from ZAVA_STATIC_BUNDLE_DIR")
+
+# Mount the built blueprint Vite bundle if present (single-bundle deploy).
+# Skipped when the production multi-SPA mount above is active, because that
+# already serves the blueprint at /blueprint/ and would conflict with this
+# module's root-level mount.
+if not _production_mounted:
+    from api.server.static_blueprint import mount_blueprint_static
+    _blueprint_mounted = mount_blueprint_static(app)
+    if _blueprint_mounted:
+        print("[server] mounted blueprint bundle from web/blueprint/dist/")
