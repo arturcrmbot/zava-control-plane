@@ -38,7 +38,6 @@ local.settings.json
 logs/
 
 # Bulky source not needed by the runtime image
-api/functions/
 .azure/
 .azurite/
 *.pptx
