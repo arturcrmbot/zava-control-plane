@@ -8,6 +8,7 @@ import { Memory } from "./sections/Memory";
 import { MetaSkill } from "./sections/MetaSkill";
 import { Observatory } from "./sections/Observatory";
 import { Closing } from "./sections/Closing";
+import { TopBar } from "./components/TopBar";
 import { ConstellationPage } from "./pages/ConstellationPage";
 import { EntitiesPage } from "./pages/EntitiesPage";
 import { AccountsPage } from "./pages/AccountsPage";
@@ -51,6 +52,7 @@ export default function App() {
 
   return (
     <div className="page">
+      <TopBar />
       <Opening />
       <hr className="rule" />
       <Analogy />

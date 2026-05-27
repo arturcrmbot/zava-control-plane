@@ -1,5 +1,6 @@
 import { useComposition } from "../lib/useComposition";
 import { useReplayObservatory } from "../lib/useReplayObservatory";
+import { getDemoUrl } from "../lib/useDemoUrl";
 import { MindMap } from "../components/MindMap";
 
 export function Observatory() {
@@ -60,6 +61,38 @@ export function Observatory() {
         <div className="mindmap__frame">
           <MindMap events={events} status={status} composition={composition} />
         </div>
+
+        <p className="body">
+          The visualisation above is one panel of the control plane,
+          embedded into this essay. The complete application is a web
+          interface for operating the substrate, with dashboards for
+          entities and accounts, a constellation view that maps every
+          workflow domain, and a detail page for each workflow run that
+          lets you open the reasoning of each agent as it executed. It is
+          deployed to Azure Container Apps and the URL is open to
+          visitors.
+        </p>
+
+        <p className="body">
+          When you open it, you see the same recording that drives the
+          visualisation on this page, presented through the full operator
+          interface. You can navigate between pages, select a workflow to
+          inspect its events in sequence, and open the side drawer to
+          read each agent&apos;s reasoning. The system behaves the way it
+          did when the workflows originally ran. Refreshing the page
+          restarts the replay from the beginning of the recording.
+        </p>
+
+        <p className="body">
+          <a
+            className="observatory__cta"
+            href={getDemoUrl("observatory")}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open the replay →
+          </a>
+        </p>
       </div>
     </section>
   );
