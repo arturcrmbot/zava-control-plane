@@ -1,7 +1,6 @@
-export function Closing() {
-  const DEMO_URL = ((import.meta as any).env?.VITE_DEMO_URL as string | undefined)
-    ?? "https://zava-zava-verify.wonderfulocean-b02d74da.swedencentral.azurecontainerapps.io/?from=essay";
+import { getDemoUrl } from "../lib/useDemoUrl";
 
+export function Closing() {
   return (
     <section className="section closing">
       <div className="column--wide stack-lg">
@@ -47,7 +46,7 @@ export function Closing() {
 
         <p className="body">
           <a
-            href={`${DEMO_URL}${DEMO_URL.includes("?") ? "&" : "?"}from=essay`}
+            href={getDemoUrl("closing")}
             className="closing__cta"
             rel="noopener noreferrer"
             target="_blank"
