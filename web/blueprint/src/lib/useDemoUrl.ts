@@ -9,7 +9,7 @@
 // hero, observatory inline).
 export function getDemoUrl(source: string = "essay"): string {
   const base = ((import.meta as any).env?.VITE_DEMO_URL as string | undefined)
-    ?? "https://zava-zava-verify.wonderfulocean-b02d74da.swedencentral.azurecontainerapps.io/";
+    ?? "https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/";
   const sep = base.includes("?") ? "&" : "?";
   return `${base}${sep}from=${encodeURIComponent(source)}`;
 }
