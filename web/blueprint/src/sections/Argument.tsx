@@ -57,8 +57,8 @@ export function Argument() {
         </ol>
 
         <p className="body">
-          Identity, audit and policy enforcement for agents is a known
-          problem. Microsoft&apos;s open-source{" "}
+          That identity, audit and policy layer is Microsoft&apos;s
+          open-source{" "}
           <a
             className="footer__link"
             href="https://github.com/microsoft/agent-governance-toolkit"
@@ -66,8 +66,8 @@ export function Argument() {
             rel="noopener noreferrer"
           >
             Agent Governance Toolkit
-          </a>{" "}
-          is the reference for doing it in production.
+          </a>
+          , wired in as the substrate&apos;s governance kernel.
         </p>
 
         <p className="body">
