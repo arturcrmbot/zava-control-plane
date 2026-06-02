@@ -42,7 +42,7 @@ export function Closing() {
         </p>
 
         <p className="body" style={{ color: "var(--ink-mute)" }}>
-          That is what we&apos;d like you to consider backing.
+          That is what I&apos;d like you to consider backing.
         </p>
 
         <ul className="closing__cta-list">
@@ -56,7 +56,7 @@ export function Closing() {
               Let&apos;s talk →
             </a>
             <span className="closing__cta-note">
-              Half an hour, no slides. We&apos;ll walk through your
+              Half an hour, no slides. I&apos;ll walk through your
               ambition and what it would take to stand a substrate of
               your own up.
             </span>

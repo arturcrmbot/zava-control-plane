@@ -62,7 +62,7 @@ export function Personae() {
             is plugged in, every persona is a simulated agent. When you
             replace one with a real person, the workflows behave the same
             way. The routing logic, authority resolution and MCP calls all
-            stay the same. That&apos;s why we treat the persona as the
+            stay the same. That&apos;s why I treat the persona as the
             boundary between the simulated organisation and a real one.
           </p>
         </header>
