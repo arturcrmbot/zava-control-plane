@@ -16,13 +16,13 @@ const captions: { label: string; title: string; body: string }[] = [
     label: "03 · MCPs",
     title: "One adapter per system, shared across every agent.",
     body:
-      "Workday HR, Concur travel, the policy and audit ledger, the delegated-authority matrix, identity and calendar services, document intelligence, and third-party sources like contract repositories, market pricing, vendor and sanctions screening, all surfaced as MCP tools with negotiated auth, schemas and contracts. The MCP servers are not agents themselves; they expose capability that agents borrow when they need it.",
+      "Workday HR, Concur travel, the policy and audit ledger, the delegated-authority matrix, identity and calendar services, document intelligence, and third-party sources like contract repositories, market pricing, vendor and sanctions screening, all surfaced as MCP tools with a shared way of authenticating and a shared shape for their inputs and outputs. The MCP servers are not agents themselves; they expose capability that agents borrow when they need it.",
   },
   {
     label: "04 · The foundation",
     title: "Identity, validation, audit and policy, built into the substrate once.",
     body:
-      "Each skill runs under its own agent identity: a stable agent id and a per-skill Ed25519 signing key the substrate issues itself. Every MCP tool call is gated by an allow-list (the AGT capability set) checked at call time by a pre-tool hook, and denials surface to the model as a tool error. After each segment, a paired validator activity Pydantic-checks the output before the workflow moves on. Every MCP call, including AGT denials, is written to an audit ledger signed with the calling skill's key. Policy lives in YAML so compliance can edit the rules directly. To be honest about what this is: there is no Entra Agent ID and no per-skill Entra identity in this substrate today; the identity, the signing key and the allow-list are all issued and enforced inside the substrate itself.",
+      "Each agent has its own identity, its own signing key, and an allow-list of tools it's permitted to call. Every tool call is checked against that allow-list before it runs, every output is structurally validated before the workflow continues, and every call gets written to a tamper-evident audit log signed by the calling skill. Policy lives in a YAML file that compliance can edit directly. Today, the identity, the keys and the allow-list are all issued and enforced inside the substrate itself — no external identity provider is plugged in yet.",
   },
 ];
 

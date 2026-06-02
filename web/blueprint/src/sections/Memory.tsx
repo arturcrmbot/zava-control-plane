@@ -10,7 +10,7 @@ const pieces: { label: string; title: string; body: string }[] = [
     label: "02 · Dreaming",
     title: "The system consolidates what it has learned in the quiet hours.",
     body:
-      "Recall on its own gives you echoes of individual past cases. That's not enough. So at intervals — usually when the load is low — the substrate runs a consolidation pass over recent runs and asks a slower, more reflective model to look at them as a set. What worked, what didn't, where the persona hesitated, where the rule said one thing and the right answer turned out to be another. The patterns it finds get written back into the memory store as new entries, often replacing the raw runs they were distilled from. By the next morning, recall on a similar prompt returns the lesson rather than the noise. I call this a dream pass. It is the part of the substrate that turns activity into improvement without anyone retraining a model.",
+      "Pulling individual past cases back at decision time is useful, but it leaves the agent reading one anecdote at a time. So at intervals — usually when the load is low — the substrate runs a consolidation pass over recent runs and asks a slower, more reflective model to look at them as a set. What worked, what didn't, where the persona hesitated, where the rule said one thing and the right answer turned out to be another. The patterns it finds get written back into the memory store as new entries, often replacing the raw runs they were distilled from. By the next morning, recall on a similar prompt returns the lesson rather than the noise. I call this a dream pass. It is the part of the substrate that turns activity into improvement without anyone retraining a model.",
   },
   {
     label: "03 · The knowledge graph",
