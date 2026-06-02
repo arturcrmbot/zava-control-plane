@@ -39,8 +39,8 @@ export function Argument() {
             A substrate is the ground layer every agent runs on: who an agent
             is, what it&apos;s allowed to do, where its actions get recorded,
             which policies apply. Build it once and every domain you put on
-            top inherits all of it. That&apos;s what makes the next domain
-            cheap.
+            top inherits all of it. That&apos;s what makes the cost of the
+            next domain drop sharply.
           </p>
         </header>
 
