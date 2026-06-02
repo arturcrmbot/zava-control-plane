@@ -39,7 +39,12 @@ export function MetaSkill() {
                 zava-constellation
               </a>
               {" "}for the companion pipeline that uses the same approach to
-              fork a branded substrate from a company name). Brainstorming turns a brief into a structured
+              fork a branded substrate from a company name). One skill turns
+              a brief into a structured spec. Another turns the spec into
+              a numbered implementation plan. A third scaffolds the
+              workflow or the approver from that plan. A fourth cleans up
+              the prose so the result doesn&apos;t read like a model wrote
+              it. Brainstorming turns a brief into a structured
               spec.{" "}
               <code className="mono">writing-plans</code> turns the spec
               into a numbered implementation plan.{" "}
@@ -58,7 +63,7 @@ export function MetaSkill() {
             </p>
             <p className="body">
               The skill-builder learns from every implementation it builds
-              against the same primitives. The same identity, the same
+              against the same foundation. The same identity, the same
               audit ledger, the same MCPs. That feedback loop only closes
               inside a single substrate. If a third-party agent runs
               alongside it on its own foundation, the loop doesn&apos;t
