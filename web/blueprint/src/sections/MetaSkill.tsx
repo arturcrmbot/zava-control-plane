@@ -28,17 +28,18 @@ export function MetaSkill() {
             <h3 className="passage-title">The skills that author skills.</h3>
             <p className="body">
               The substrate ships with a small library of design-time skills
-              (
+              that an agent uses while it&apos;s building the runtime
+              skills above (see{" "}
               <a
                 className="footer__link"
-                href="https://github.com/arturcrmbot/zava-design-skills"
+                href="https://aiappsgbb.github.io/zava-constellation/"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                zava-design-skills
+                zava-constellation
               </a>
-              ) that an agent uses while it&apos;s building the runtime
-              skills above. Brainstorming turns a brief into a structured
+              {" "}for the companion pipeline that uses the same approach to
+              fork a branded substrate from a company name). Brainstorming turns a brief into a structured
               spec.{" "}
               <code className="mono">writing-plans</code> turns the spec
               into a numbered implementation plan.{" "}
