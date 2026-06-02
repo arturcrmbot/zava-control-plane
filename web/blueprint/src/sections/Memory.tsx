@@ -4,19 +4,19 @@ const pieces: { label: string; title: string; body: string }[] = [
     label: "01 · Memory",
     title: "Every run leaves a trace the next run gets to read.",
     body:
-      "Every decision an agent makes, every approval a persona gives, every tool call against an MCP — all of it gets written to a structured store, organised by domain. When the next workflow opens an agent session for that same domain, the substrate looks at the prompt, finds the handful of past entries most similar to what's being asked now, and quietly splices them into the system message before the model sees it. The agent doesn't have to know that memory exists. It just acts as if it has been doing this job for a long time, because in aggregate it has.",
+      "Every decision an agent makes, every approval a persona gives, every tool call against an MCP gets written to a structured store, organised by domain. When the next workflow opens an agent session for that domain, the substrate finds the past entries most similar to the prompt and splices them into the system message before the model sees it. The agent acts as if it has been doing this job for a long time, because in aggregate it has.",
   },
   {
     label: "02 · Dreaming",
     title: "The system consolidates what it has learned in the quiet hours.",
     body:
-      "Recall on its own gives the agent one anecdote at a time. So at quiet intervals the substrate runs a consolidation pass over recent runs and asks a slower model to look at them as a set: what worked, what didn't, where the rule said one thing and the right answer turned out to be another. The patterns get written back as new memory entries, often replacing the raw runs they were distilled from. By the next morning, recall on a similar prompt returns the lesson rather than the noise. Anthropic invented this; they call it dreaming.",
+      "Recall on its own gives the agent one anecdote at a time. So at quiet intervals the substrate runs a consolidation pass over recent runs and asks a slower model to look at them as a set: what worked, what didn't, where the rule said one thing and the right answer turned out to be another. The patterns get written back as new memory entries, replacing the raw runs they were distilled from. Anthropic invented this; they call it dreaming.",
   },
   {
     label: "03 · The knowledge graph",
     title: "People, money, decisions and time, in one connected picture.",
     body:
-      "Memory is per-domain prose. The graph is the structured spine underneath it. Every workflow projects the entities it touches — requester, approver, amount, cost centre, decision — onto a single graph shared across every domain. When an HR director opens a training request, the substrate already knows which previous trainings that person has approved, which precedents apply, and what came of them. The approver's UI cards and the agents' recall both read from it.",
+      "Memory is per-domain prose. The graph is the structured spine underneath it, shared across every domain. Every workflow projects the entities it touches — requester, approver, amount, cost centre, decision — onto that graph. When an HR director opens a training request, the substrate already knows which previous trainings that person has approved, which precedents apply, and what came of them.",
   },
 ];
 
@@ -24,15 +24,11 @@ export function Memory() {
   return (
     <section className="section">
       <div className="column--wide stack-xl">
-        <header className="argument__intro stack">
+        <header className="stack">
           <p className="subtitle">How the substrate gets better at its job</p>
           <h2 className="section-title">
             The institution that remembers itself.
           </h2>
-          <p className="body">
-            Memory — and the graph underneath it, and the consolidation
-            loop on top.
-          </p>
         </header>
 
         <ol className="argument__list">
