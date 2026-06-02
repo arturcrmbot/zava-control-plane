@@ -57,6 +57,22 @@ export function Argument() {
         </ol>
 
         <p className="body">
+          Identity, audit and policy enforcement for agents is a known
+          problem with an open-source reference: Microsoft&apos;s{" "}
+          <a
+            className="footer__link"
+            href="https://github.com/microsoft/agent-governance-toolkit"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Agent Governance Toolkit
+          </a>{" "}
+          covers this ground in production. The substrate here implements
+          the same primitives directly so the model in this article stands
+          on its own.
+        </p>
+
+        <p className="body">
           Each new domain is composed from existing parts: a new orchestrator
           plus a small number of new skills, against the same MCPs, identity
           and governance the first one used.
