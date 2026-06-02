@@ -33,7 +33,7 @@ export function Argument() {
         <header className="argument__intro stack">
           <p className="subtitle">The architecture</p>
           <h2 className="section-title">
-            What you ought to be using instead, and we&apos;ve built it.
+            What you ought to be using instead.
           </h2>
           <p className="body">
             A substrate is the ground layer that every agent runs on. It holds
