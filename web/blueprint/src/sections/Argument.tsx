@@ -58,7 +58,7 @@ export function Argument() {
 
         <p className="body">
           Identity, audit and policy enforcement for agents is a known
-          problem with an open-source reference: Microsoft&apos;s{" "}
+          problem. Microsoft&apos;s open-source{" "}
           <a
             className="footer__link"
             href="https://github.com/microsoft/agent-governance-toolkit"
@@ -67,9 +67,7 @@ export function Argument() {
           >
             Agent Governance Toolkit
           </a>{" "}
-          covers this ground in production. The substrate here implements
-          the same primitives directly so the model in this article stands
-          on its own.
+          is the reference for doing it in production.
         </p>
 
         <p className="body">
