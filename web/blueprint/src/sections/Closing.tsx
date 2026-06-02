@@ -24,11 +24,6 @@ export function Closing() {
         </p>
 
         <p className="body">
-          Each subsequent piece of work is cheaper because the shape is
-          already in place and you&apos;re composing on top of it.
-        </p>
-
-        <p className="body">
           We hand it over as it stands today. Then a week with you, working
           out your real ambition (one workflow or fifty), and getting one
           of those workflows running against your real systems before we

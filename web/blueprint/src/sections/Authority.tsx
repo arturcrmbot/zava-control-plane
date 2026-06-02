@@ -31,8 +31,7 @@ export function Authority() {
             The delegated-authority matrix.
           </h2>
           <p className="body">
-            Identity, audit, validators, policy. Together they make up the
-            substrate&apos;s agent governance toolkit, which sits in{" "}
+            The substrate&apos;s agent governance toolkit sits in{" "}
             <a
               className="footer__link"
               href="https://github.com/arturcrmbot/zava-control-plane/tree/main/api/server/services/governance"

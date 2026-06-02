@@ -24,18 +24,15 @@ export function Opening() {
           <p className="lede">
             Two reasons. The first is that humans cannot realistically build,
             train and govern AI initiatives one-by-one fast enough to keep up.
-            The use-case surface is too wide; the implement → train → onboard →
-            change loop is too slow. By the time the first one lands, the rest
-            of the organisation has adopted three other tools.
+            By the time the first one lands, the rest of the organisation
+            has adopted three other tools.
           </p>
 
           <p className="lede">
             The second reason is less commonly named. Most organisations are
             running several different frameworks for building agents at the
-            same time. None of them strengthen each other. Every team picks
-            its own, every implementation is a private effort, and nothing
-            accumulates, because none of the implementations share a
-            foundation that would let them.
+            same time. None of them strengthen each other. Nothing
+            accumulates.
           </p>
         </div>
 

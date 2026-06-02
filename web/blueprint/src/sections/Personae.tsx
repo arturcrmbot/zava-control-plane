@@ -37,12 +37,10 @@ export function Personae() {
           </h2>
           <p className="body">
             The substrate runs as a simulated organisation. Workflows need
-            approvers. They need someone to confirm a budget, sign off a
-            contract, escalate an exception, attest to access. That requires
-            people. Sometimes the person is a real human pulling a message
-            into their inbox; sometimes it&apos;s an agent acting on
-            someone&apos;s behalf, and the orchestrator works the same way
-            either way.
+            approvers. Sometimes the person is a real human pulling a
+            message into their inbox; sometimes it&apos;s an agent acting
+            on someone&apos;s behalf, and the orchestrator works the same
+            way either way.
           </p>
           <p className="body">
             A persona is the abstraction that makes that work. It says who
