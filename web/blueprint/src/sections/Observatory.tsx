@@ -63,11 +63,12 @@ export function Observatory() {
         </div>
 
         <p className="body">
-          The visualisation above is one panel of a full operator
-          dashboard. Open it via the link below and you&apos;ll see the
-          same recording, plus a workflow detail page and a side drawer
-          that lets you read each agent&apos;s reasoning. Refresh to
-          restart the replay.
+          The visualisation above is one panel from a larger operator
+          dashboard. The link below opens that dashboard in a new tab,
+          where the same recording plays through the full interface, with
+          a workflow detail page and a side drawer that shows each
+          agent&apos;s reasoning as it ran. Refreshing the page restarts
+          the replay from the beginning of the recording.
         </p>
 
         <p className="body observatory__note">
