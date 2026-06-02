@@ -14,13 +14,16 @@ export function Vision() {
           A simulated organisation that runs itself.
         </h2>
         <p className="body">
-          Nine workflows wired up end to end. Dozens of personas approving
-          and escalating. A delegated-authority matrix compliance can
-          edit. Agents that learn overnight. Not a deck — an organisation
-          you can poke at right now.
+          The substrate runs a simulated organisation. Nine workflows are
+          wired into it end-to-end today, with dozens of personas
+          approving and escalating decisions, a delegated-authority
+          matrix that compliance can edit directly, and a shared memory
+          the agents read from and add to overnight.
         </p>
         <p className="body">
-          The rest of this essay is how it works.
+          It is a model of what a company looks like once enough of its
+          routine decisions are made by agents operating under one set
+          of rules and one audit trail.
         </p>
       </div>
     </section>
