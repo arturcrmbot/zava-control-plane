@@ -16,7 +16,7 @@ const captions: { label: string; title: string; body: string }[] = [
     label: "03 · MCPs",
     title: "One adapter per system, shared across every agent.",
     body:
-      "Workday HR, Concur travel, the policy and audit ledger, the delegated-authority matrix, identity and calendar services, document intelligence, and third-party sources like contract repositories, market pricing, vendor and sanctions screening, all surfaced as MCP tools with a shared way of authenticating and a shared shape for their inputs and outputs. The MCP servers are not agents themselves; they expose capability that agents borrow when they need it.",
+      "The outside systems the workflows depend on — Workday, Concur, the policy and audit ledger, the delegated-authority matrix, identity, document intelligence, and external sources like contract repositories and market pricing — are all surfaced as MCP tools with a shared way of authenticating and a shared shape for their inputs and outputs. Every agent uses the same adapter for the same system.",
   },
   {
     label: "04 · The foundation",
@@ -36,12 +36,11 @@ export function Argument() {
             What you ought to be using instead.
           </h2>
           <p className="body">
-            A substrate is the ground layer that every agent runs on. It holds
-            the things you don&apos;t want each project to re-invent: who an
-            agent is, what it&apos;s allowed to do, where its actions get
-            recorded, which policies apply. Build the substrate once and every
-            domain you put on top inherits all of it for free. This is what
-            makes the cost of the next domain drop sharply.
+            A substrate is the ground layer every agent runs on: who an agent
+            is, what it&apos;s allowed to do, where its actions get recorded,
+            which policies apply. Build it once and every domain you put on
+            top inherits all of it. That&apos;s what makes the next domain
+            cheap.
           </p>
         </header>
 
@@ -58,10 +57,9 @@ export function Argument() {
         </ol>
 
         <p className="body">
-          The result is that new work is composed from existing parts rather
-          than constructed from scratch. Operators don&apos;t need separate
-          training for each new agent because they&apos;re all running on
-          the same substrate.
+          Each new domain is composed from existing parts: a new orchestrator
+          plus a small number of new skills, against the same MCPs, identity
+          and governance the first one used.
         </p>
       </div>
     </section>
