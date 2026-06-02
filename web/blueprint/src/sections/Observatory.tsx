@@ -63,24 +63,11 @@ export function Observatory() {
         </div>
 
         <p className="body">
-          The visualisation above is one panel of the control plane,
-          embedded into this essay. The complete application is a web
-          interface for operating the substrate, with dashboards for
-          entities and accounts, a constellation view that maps every
-          workflow domain, and a detail page for each workflow run that
-          lets you open the reasoning of each agent as it executed. It is
-          deployed to Azure Container Apps and the URL is open to
-          visitors.
-        </p>
-
-        <p className="body">
-          When you open it, you see the same recording that drives the
-          visualisation on this page, presented through the full operator
-          interface. You can navigate between pages, select a workflow to
-          inspect its events in sequence, and open the side drawer to
-          read each agent&apos;s reasoning. The system behaves the way it
-          did when the workflows originally ran. Refreshing the page
-          restarts the replay from the beginning of the recording.
+          The visualisation above is one panel of a full operator
+          dashboard. Open it via the link below and you&apos;ll see the
+          same recording, plus a workflow detail page and a side drawer
+          that lets you read each agent&apos;s reasoning. Refresh to
+          restart the replay.
         </p>
 
         <p className="body observatory__note">

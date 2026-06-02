@@ -1,5 +1,6 @@
 import { Opening } from "./sections/Opening";
 import { Analogy } from "./sections/Analogy";
+import { Vision } from "./sections/Vision";
 import { Argument } from "./sections/Argument";
 import { Composition } from "./sections/Composition";
 import { Personae } from "./sections/Personae";
@@ -56,6 +57,8 @@ export default function App() {
       <Opening />
       <hr className="rule" />
       <Analogy />
+      <hr className="rule" />
+      <Vision />
       <hr className="rule" />
       <Argument />
       <hr className="rule" />
