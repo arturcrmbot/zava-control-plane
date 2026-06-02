@@ -1,5 +1,3 @@
-import { getDemoUrl } from "../lib/useDemoUrl";
-
 export function Opening() {
   return (
     <section className="section opening">
@@ -11,23 +9,6 @@ export function Opening() {
             isn&apos;t moving the needle.
           </h1>
           <p className="subhead">And what we think actually does.</p>
-        </div>
-
-        <div className="opening__cta-block">
-          <a
-            className="opening__cta"
-            href={getDemoUrl("hero")}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Watch it run →
-          </a>
-          <p className="opening__cta-note">
-            The control plane is deployed and accessible at a public URL.
-            It is running a recorded replay of workflows that previously
-            executed against the substrate, using synthetic data and
-            stubbed external systems.
-          </p>
         </div>
 
         <div className="stack-lg">

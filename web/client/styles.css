@@ -77,3 +77,143 @@ body {
 }
 .density-compact .space-y-3 > * + *                { margin-top: 0.375rem !important; }
 .density-compact .space-y-3 article.card-fade-in   { border-radius: 0.375rem; }
+
+/* ---------- Dark mode: warm near-black + amber palette --------------------
+ *
+ * Mirrors the essay's design tokens (web/blueprint/src/styles.css):
+ *   warm near-black bg, warm off-white ink, single amber accent.
+ *
+ * We remap Tailwind v4's color tokens INSIDE .dark so every existing
+ * `slate-*`, `zinc-*`, `gray-*` (neutrals) and `blue-*`, `indigo-*`,
+ * `violet-*`, `purple-*`, `sky-*` (cool accents) class automatically picks
+ * up the warm palette in dark mode — no component edits required.
+ *
+ * Light mode is untouched. Semantic colors (emerald=success, red=danger,
+ * amber=warning) are left alone because they carry meaning.
+ * ------------------------------------------------------------------------ */
+.dark {
+  /* --- Neutrals → warm near-black (essay --bg #0a0a0c → --ink #e9e7e3) -- */
+  --color-slate-950: #0a0a0c;
+  --color-slate-900: #111114;
+  --color-slate-800: #18181b;
+  --color-slate-700: #25252a;
+  --color-slate-600: #3a3a40;
+  --color-slate-500: #5a5853;
+  --color-slate-400: #7e7c76;
+  --color-slate-300: #9c9994;
+  --color-slate-200: #b6b3ac;
+  --color-slate-100: #e9e7e3;
+  --color-slate-50:  #f4f2ee;
+
+  --color-zinc-950: #0a0a0c;
+  --color-zinc-900: #111114;
+  --color-zinc-800: #18181b;
+  --color-zinc-700: #25252a;
+  --color-zinc-600: #3a3a40;
+  --color-zinc-500: #5a5853;
+  --color-zinc-400: #7e7c76;
+  --color-zinc-300: #9c9994;
+  --color-zinc-200: #b6b3ac;
+  --color-zinc-100: #e9e7e3;
+  --color-zinc-50:  #f4f2ee;
+
+  --color-gray-950: #0a0a0c;
+  --color-gray-900: #111114;
+  --color-gray-800: #18181b;
+  --color-gray-700: #25252a;
+  --color-gray-600: #3a3a40;
+  --color-gray-500: #5a5853;
+  --color-gray-400: #7e7c76;
+  --color-gray-300: #9c9994;
+  --color-gray-200: #b6b3ac;
+  --color-gray-100: #e9e7e3;
+  --color-gray-50:  #f4f2ee;
+
+  --color-neutral-950: #0a0a0c;
+  --color-neutral-900: #111114;
+  --color-neutral-800: #18181b;
+  --color-neutral-700: #25252a;
+  --color-neutral-600: #3a3a40;
+  --color-neutral-500: #5a5853;
+  --color-neutral-400: #7e7c76;
+  --color-neutral-300: #9c9994;
+  --color-neutral-200: #b6b3ac;
+  --color-neutral-100: #e9e7e3;
+  --color-neutral-50:  #f4f2ee;
+
+  --color-stone-950: #0a0a0c;
+  --color-stone-900: #111114;
+  --color-stone-800: #18181b;
+  --color-stone-700: #25252a;
+  --color-stone-600: #3a3a40;
+  --color-stone-500: #5a5853;
+  --color-stone-400: #7e7c76;
+  --color-stone-300: #9c9994;
+  --color-stone-200: #b6b3ac;
+  --color-stone-100: #e9e7e3;
+  --color-stone-50:  #f4f2ee;
+
+  /* --- Cool accents → amber (essay --accent #f4a300) ------------------- */
+  --color-blue-950: #2a1d00;
+  --color-blue-900: #4a3300;
+  --color-blue-800: #6b4900;
+  --color-blue-700: #d68f00;
+  --color-blue-600: #f4a300;
+  --color-blue-500: #ffb733;
+  --color-blue-400: #ffc04d;
+  --color-blue-300: #ffd180;
+  --color-blue-200: #ffe0a3;
+  --color-blue-100: #fff0cc;
+  --color-blue-50:  #fff8e6;
+
+  --color-indigo-950: #2a1d00;
+  --color-indigo-900: #4a3300;
+  --color-indigo-800: #6b4900;
+  --color-indigo-700: #d68f00;
+  --color-indigo-600: #f4a300;
+  --color-indigo-500: #ffb733;
+  --color-indigo-400: #ffc04d;
+  --color-indigo-300: #ffd180;
+  --color-indigo-200: #ffe0a3;
+  --color-indigo-100: #fff0cc;
+  --color-indigo-50:  #fff8e6;
+
+  --color-violet-950: #2a1d00;
+  --color-violet-900: #4a3300;
+  --color-violet-800: #6b4900;
+  --color-violet-700: #d68f00;
+  --color-violet-600: #f4a300;
+  --color-violet-500: #ffb733;
+  --color-violet-400: #ffc04d;
+  --color-violet-300: #ffd180;
+  --color-violet-200: #ffe0a3;
+  --color-violet-100: #fff0cc;
+  --color-violet-50:  #fff8e6;
+
+  --color-purple-950: #2a1d00;
+  --color-purple-900: #4a3300;
+  --color-purple-800: #6b4900;
+  --color-purple-700: #d68f00;
+  --color-purple-600: #f4a300;
+  --color-purple-500: #ffb733;
+  --color-purple-400: #ffc04d;
+  --color-purple-300: #ffd180;
+  --color-purple-200: #ffe0a3;
+  --color-purple-100: #fff0cc;
+  --color-purple-50:  #fff8e6;
+
+  --color-sky-950: #2a1d00;
+  --color-sky-900: #4a3300;
+  --color-sky-800: #6b4900;
+  --color-sky-700: #d68f00;
+  --color-sky-600: #f4a300;
+  --color-sky-500: #ffb733;
+  --color-sky-400: #ffc04d;
+  --color-sky-300: #ffd180;
+  --color-sky-200: #ffe0a3;
+  --color-sky-100: #fff0cc;
+  --color-sky-50:  #fff8e6;
+}
+
+/* Warm amber selection highlight in dark mode, matching the essay. */
+.dark ::selection { background: #f4a300; color: #0a0a0c; }

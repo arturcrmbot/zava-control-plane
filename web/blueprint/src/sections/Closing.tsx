@@ -1,4 +1,5 @@
 import { getDemoUrl } from "../lib/useDemoUrl";
+import { BOOKING_URL, ZAVA_CONSTELLATION_URL } from "../lib/links";
 
 export function Closing() {
   return (
@@ -44,16 +45,55 @@ export function Closing() {
           That is what we&apos;d like you to consider backing.
         </p>
 
-        <p className="body">
-          <a
-            href={getDemoUrl("closing")}
-            className="closing__cta"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            Watch it run →
-          </a>
-        </p>
+        <ul className="closing__cta-list">
+          <li>
+            <a
+              href={BOOKING_URL}
+              className="closing__cta"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              Let&apos;s talk →
+            </a>
+            <span className="closing__cta-note">
+              Half an hour, no slides. We&apos;ll walk through your
+              ambition and what it would take to stand a substrate of
+              your own up.
+            </span>
+          </li>
+          <li>
+            <a
+              href={getDemoUrl("closing")}
+              className="closing__cta"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              Watch it run →
+            </a>
+            <span className="closing__cta-note">
+              The control plane is deployed at a public URL, replaying
+              workflows that previously executed against the substrate
+              with synthetic data and stubbed external systems.
+            </span>
+          </li>
+          <li>
+            <a
+              href={ZAVA_CONSTELLATION_URL}
+              className="closing__cta"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              Build this for your own organisation →
+            </a>
+            <span className="closing__cta-note">
+              The companion pipeline (<code className="mono">research-company</code>,{" "}
+              <code className="mono">compose-org</code>,{" "}
+              <code className="mono">zava-workspace-deploy</code>) takes a
+              company name and produces a branded fork of this substrate,
+              deployed to your Azure in a single session.
+            </span>
+          </li>
+        </ul>
       </div>
     </section>
   );

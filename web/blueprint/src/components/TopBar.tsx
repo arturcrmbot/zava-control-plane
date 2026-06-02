@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getDemoUrl } from "../lib/useDemoUrl";
+import { BOOKING_URL } from "../lib/links";
 
 // Thin sticky bar that appears once the reader scrolls past the Opening
 // section. Restrained on purpose: no logo, no shadow, just the essay
@@ -38,11 +38,11 @@ export function TopBar() {
         </span>
         <a
           className="topbar__cta"
-          href={getDemoUrl("topbar")}
+          href={BOOKING_URL}
           target="_blank"
           rel="noopener noreferrer"
         >
-          Watch it run →
+          Let&apos;s talk →
         </a>
       </div>
     </div>

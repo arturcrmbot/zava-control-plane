@@ -83,6 +83,12 @@ export function Observatory() {
           restarts the replay from the beginning of the recording.
         </p>
 
+        <p className="body observatory__note">
+          The link below opens the operator dashboard in a new tab. The
+          replay is already running when you arrive; give it a few
+          seconds to populate, then drill into any workflow row.
+        </p>
+
         <p className="body">
           <a
             className="observatory__cta"
