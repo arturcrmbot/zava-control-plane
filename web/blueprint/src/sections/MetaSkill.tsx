@@ -28,8 +28,14 @@ export function MetaSkill() {
             <h3 className="passage-title">The skills that author skills.</h3>
             <p className="body">
               The substrate ships with a small library of design-time skills
-              that an agent uses while it&apos;s building the runtime
-              skills above (see{" "}
+              that an agent uses while it&apos;s building the runtime skills
+              above. One turns a brief into a spec, another turns the spec
+              into a numbered plan, a third scaffolds the workflow or the
+              approver from that plan, a fourth cleans up the prose so the
+              result doesn&apos;t read like a model wrote it. This Copilot
+              session is using them right now, while we build out the article
+              you&apos;re reading. The same library is what your team uses to
+              extend the substrate after we leave (see{" "}
               <a
                 className="footer__link"
                 href="https://aiappsgbb.github.io/zava-constellation/"
@@ -38,37 +44,7 @@ export function MetaSkill() {
               >
                 zava-constellation
               </a>
-              {" "}for the companion pipeline that uses the same approach to
-              fork a branded substrate from a company name). One skill turns
-              a brief into a structured spec. Another turns the spec into
-              a numbered implementation plan. A third scaffolds the
-              workflow or the approver from that plan. A fourth cleans up
-              the prose so the result doesn&apos;t read like a model wrote
-              it. Brainstorming turns a brief into a structured
-              spec.{" "}
-              <code className="mono">writing-plans</code> turns the spec
-              into a numbered implementation plan.{" "}
-              <code className="mono">compose-domain</code> and{" "}
-              <code className="mono">compose-persona</code> scaffold a new
-              workflow or a new approver from that plan. Humanizer cleans
-              up the prose so the result doesn&apos;t read like a model
-              wrote it.
-            </p>
-            <p className="body">
-              This Copilot session is using those skills right now, while
-              we build out the article you&apos;re reading. The same
-              skill library is what we use to build the runtime skills.
-              And it&apos;s what your team uses to extend the substrate
-              after we leave.
-            </p>
-            <p className="body">
-              The skill-builder learns from every implementation it builds
-              against the same foundation. The same identity, the same
-              audit ledger, the same MCPs. That feedback loop only closes
-              inside a single substrate. If a third-party agent runs
-              alongside it on its own foundation, the loop doesn&apos;t
-              close, because there&apos;s no shared ground for the
-              skill-builder to learn against.
+              {" "}for the companion pipeline).
             </p>
           </div>
 

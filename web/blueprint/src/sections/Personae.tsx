@@ -37,31 +37,26 @@ export function Personae() {
           </h2>
           <p className="body">
             The substrate runs as a simulated organisation. Workflows need
-            approvers. Sometimes the person is a real human pulling a
-            message into their inbox; sometimes it&apos;s an agent acting
-            on someone&apos;s behalf, and the orchestrator works the same
-            way either way.
+            approvers, reviewers and delegates. Sometimes the actor is a
+            real person pulling a message into their inbox; sometimes
+            it&apos;s an agent acting on someone&apos;s behalf. The
+            orchestrator works the same way either way.
           </p>
           <p className="body">
             A persona is the abstraction that makes that work. It says who
             the actor is, what function they belong to, what they&apos;re
             authorised to approve. The substrate has {data.total} of them
-            today, drawn from four archetypes: approver, subject, reviewer,
-            delegate. Every workflow draws its cast from that registry.
-          </p>
-          <p className="body">
-            One of them, the AP controller, looks like this:
+            today. One, the AP controller, looks like this:
           </p>
 
           <pre className="snippet">{curatedJson(example, SHOWN_FIELDS)}</pre>
 
           <p className="body">
-            While the substrate is running end-to-end and no real customer
-            is plugged in, every persona is a simulated agent. When you
-            replace one with a real person, the workflows behave the same
-            way. The routing logic, authority resolution and MCP calls all
-            stay the same. That&apos;s why I treat the persona as the
-            boundary between the simulated organisation and a real one.
+            Every persona is a simulated agent today. Replace one with a
+            real person and the workflows behave the same way: same
+            routing, same authority resolution, same MCP calls. The persona
+            is the boundary between the simulated organisation and a real
+            one.
           </p>
         </header>
       </div>
