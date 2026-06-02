@@ -8,7 +8,7 @@ export function Opening() {
             <br />
             isn&apos;t moving the needle.
           </h1>
-          <p className="subhead">And what we think actually does.</p>
+          <p className="subhead">And what I think actually does.</p>
         </div>
 
         <div className="stack-lg">
