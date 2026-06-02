@@ -52,11 +52,11 @@ export function Personae() {
           <pre className="snippet">{curatedJson(example, SHOWN_FIELDS)}</pre>
 
           <p className="body">
-            Every persona is a simulated agent today. Replace one with a
-            real person and the workflows behave the same way: same
-            routing, same authority resolution, same MCP calls. The persona
-            is the boundary between the simulated organisation and a real
-            one.
+            Every persona is a simulated agent today. When you replace one
+            with a real person, the workflows behave the same way: the same
+            routing, the same authority resolution, the same MCP calls. The
+            persona is the boundary between the simulated organisation and
+            a real one.
           </p>
         </header>
       </div>
