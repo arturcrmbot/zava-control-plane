@@ -30,10 +30,8 @@ export function Memory() {
             The institution that remembers itself.
           </h2>
           <p className="body">
-            The four pillars above tell you how a single workflow runs end-to-end
-            today. They don&apos;t yet tell you why next month&apos;s workflows
-            will be better than this month&apos;s. That part is memory — and the
-            graph underneath it, and the consolidation loop on top.
+            Memory — and the graph underneath it, and the consolidation
+            loop on top.
           </p>
         </header>
 

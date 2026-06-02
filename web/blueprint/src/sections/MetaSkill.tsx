@@ -77,12 +77,6 @@ export function MetaSkill() {
             <div className="meta__sidebar-list">
               {DESIGN_TIME_SKILLS.join(" · ")}
             </div>
-            <p>
-              Used by the agent that talks to the customer (this Copilot
-              session, in fact), and lives outside the customer environment.
-              It&apos;s already built, and it&apos;s what we use to produce
-              the runtime skills above.
-            </p>
           </aside>
         </div>
       </div>

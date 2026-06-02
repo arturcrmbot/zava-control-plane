@@ -4,7 +4,7 @@ const captions: { label: string; title: string; body: string }[] = [
     label: "01 · The harness",
     title: "Agentic segments inside deterministic workflows.",
     body:
-      "A workflow is a sequence of segments. Each segment opens one short-lived agent session with a bounded set of skills and MCP tools, runs to a checkpoint, and closes. The segment boundaries, the order of segments, the human approval gates and the retry rules all live in orchestrator code that the model never sees. The model picks the next tool inside a segment; the orchestrator picks everything else.",
+      "A workflow is a sequence of segments. Each segment opens a short-lived agent session, runs to a checkpoint, and closes. The model picks the next tool inside a segment; the orchestrator picks everything else.",
   },
   {
     label: "02 · Skills",
@@ -22,7 +22,7 @@ const captions: { label: string; title: string; body: string }[] = [
     label: "04 · The foundation",
     title: "Identity, validation, audit and policy, built into the substrate once.",
     body:
-      "Each agent has its own identity, its own signing key, and an allow-list of tools it's permitted to call. Every tool call is checked against that allow-list before it runs, every output is structurally validated before the workflow continues, and every call gets written to a tamper-evident audit log signed by the calling skill. Policy lives in a YAML file that compliance can edit directly. Today, the identity, the keys and the allow-list are all issued and enforced inside the substrate itself — no external identity provider is plugged in yet.",
+      "Each agent has its own identity, its own signing key, and an allow-list of tools it's permitted to call. Every tool call is checked against that allow-list before it runs, every output is structurally validated before the workflow continues, and every call gets written to a tamper-evident audit log signed by the calling skill. Policy lives in a YAML file that compliance can edit directly.",
   },
 ];
 
@@ -36,20 +36,12 @@ export function Argument() {
             What you ought to be using instead, and we&apos;ve built it.
           </h2>
           <p className="body">
-            None of the four pieces below are revolutionary. Skills are recent.
-            MCPs have been around but aren&apos;t widely used yet. The harness
-            is the newest piece of the four. Together, and only together, they
-            form a substrate.
-          </p>
-          <p className="body">
             A substrate is the ground layer that every agent runs on. It holds
             the things you don&apos;t want each project to re-invent: who an
             agent is, what it&apos;s allowed to do, where its actions get
             recorded, which policies apply. Build the substrate once and every
             domain you put on top inherits all of it for free. This is what
-            makes the cost of the next domain drop sharply. It isn&apos;t any
-            single piece; it&apos;s the four of them operating together as one
-            ground layer.
+            makes the cost of the next domain drop sharply.
           </p>
         </header>
 
@@ -67,11 +59,9 @@ export function Argument() {
 
         <p className="body">
           The result is that new work is composed from existing parts rather
-          than constructed from scratch. Each new domain is a new
-          orchestrator class plus a small number of new skills, composed
-          against the same MCPs, identity and governance that were built for
-          the first one. Operators don&apos;t need separate training for each
-          new agent because they&apos;re all running on the same substrate.
+          than constructed from scratch. Operators don&apos;t need separate
+          training for each new agent because they&apos;re all running on
+          the same substrate.
         </p>
       </div>
     </section>

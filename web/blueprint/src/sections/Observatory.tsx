@@ -84,9 +84,8 @@ export function Observatory() {
         </p>
 
         <p className="body observatory__note">
-          The link below opens the operator dashboard in a new tab. The
-          replay is already running when you arrive; give it a few
-          seconds to populate, then drill into any workflow row.
+          The link below opens the operator dashboard in a new tab — give
+          it a few seconds to populate, then drill into any workflow row.
         </p>
 
         <p className="body">
