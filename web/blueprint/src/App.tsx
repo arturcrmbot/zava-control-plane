@@ -91,34 +91,7 @@ export default function App() {
         >
           GitHub Copilot SDK
         </a>
-        {". Source: "}
-        <a
-          href="https://github.com/arturcrmbot/zava-control-plane"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="footer__link"
-        >
-          zava-control-plane
-        </a>
-        {" · "}
-        <a
-          href="https://github.com/arturcrmbot/zava-design-skills"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="footer__link"
-        >
-          zava-design-skills
-        </a>
-        {" · "}
-        <a
-          href="https://aiappsgbb.github.io/zava-constellation/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="footer__link"
-        >
-          zava-constellation
-        </a>
-        {" · 2026"}
+        {" · May 2026"}
       </footer>
     </div>
   );
