@@ -91,12 +91,24 @@ class StateStore:
         wid = s.attributes.get("workflow.id")
         if wid:
             self._spans.setdefault(wid, []).append(s)
+            emit_mutation(
+                op="append",
+                kind="span",
+                id=wid,
+                patch=s.model_dump(by_alias=True, mode="json"),
+            )
 
     def get_spans(self, workflow_id: str) -> list[OtelSpan]:
         return self._spans.get(workflow_id, [])
 
     def append_mcp_call(self, c: McpCall) -> None:
         self._mcp_calls.setdefault(c.workflow_id, []).append(c)
+        emit_mutation(
+            op="append",
+            kind="mcp_call",
+            id=c.workflow_id,
+            patch=c.model_dump(by_alias=True, mode="json"),
+        )
 
     def get_mcp_calls(self, workflow_id: str) -> list[McpCall]:
         return self._mcp_calls.get(workflow_id, [])
