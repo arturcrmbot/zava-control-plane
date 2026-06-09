@@ -953,3 +953,152 @@ Spec: [`docs/superpowers/specs/2026-05-12-autonomous-domain-insights-design.md`]
 Plan: [`docs/superpowers/plans/archive/2026-05-12-autonomous-domain-insights-v1.md`](superpowers/plans/archive/2026-05-12-autonomous-domain-insights-v1.md).
 Merges: `2baf956a` (v1.0), `993a30f3` (v1.1), `9038a4ab` (v1.2),
 `ad4b9b73` (v1.3).
+
+---
+
+## 14. Replay mode — recorder, player, public deploy
+
+The substrate ships a **read-only replay mode** so the full operator UI
+can be safely shown to a public audience without the per-process
+single-tenant state, unauthenticated write surfaces, or LLM cost that
+the live stack carries. Spec:
+[`docs/superpowers/specs/2026-05-22-public-replay-landing-design.md`](superpowers/specs/2026-05-22-public-replay-landing-design.md).
+The verify deployment at
+`https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/`
+runs in this mode.
+
+### 14.1 Three modes, one codebase
+
+Selected via `ZAVA_MODE`:
+
+| Mode | Boots | Used for |
+|---|---|---|
+| `live` (default) | Full stack: governance, FM, ambient dispatcher, simulator, persona responder, durable callbacks. | Local dev (`make up`). |
+| `record` (implicit) | Same as `live` plus the `Recorder` is attached via `ZAVA_RECORD_TO=/path/to/tape.tar.gz`. Driven by [`scripts/record_tape.sh`](../scripts/record_tape.sh). | Capturing a tape. |
+| `replay` | Lifespan branches into `Player` + read-only middleware; FM / dispatcher / cadence loops / persona responder all skipped. Requires `ZAVA_TAPE_PATH`. | Public verify deploy. |
+
+[`api/server/services/replay/mode.py`](../api/server/services/replay/mode.py)
+is the only consumer of those env vars; `api/server/main.py:67` raises
+on `ZAVA_MODE=replay` without a tape path.
+
+### 14.2 Tape format
+
+Gzipped tar produced by the recorder:
+
+```
+tape.tar.gz
+├── meta.json                 # tape_id, recorded_at, duration_s, version, app_sha
+├── snapshot_t0/              # full REST-shaped initial state
+│   ├── workflows.json
+│   ├── phases.json
+│   ├── exceptions.json
+│   ├── candidates.json
+│   ├── memories.json
+│   ├── audit_summary.json
+│   ├── audit_entries.json
+│   ├── dream_history.json
+│   ├── spans.json            # per-workflow OTel spans (for /economics)
+│   └── mcp_calls.json        # per-workflow MCP/tool calls
+├── events.ndjson             # one bus event per line, "t": seconds-since-t0
+└── mutations.ndjson          # state deltas (op, kind, id, patch), same time base
+```
+
+The schema lives in
+[`api/server/services/replay/tape_format.py`](../api/server/services/replay/tape_format.py).
+Tapes shipped today: `tapes/landing-2h-20260522-1710.tar.gz` (the 4MB
+2-hour landing tape baked into the verify image) plus rolling
+`demo.tar.gz` and shorter `smoke-*.tar.gz` test tapes.
+
+### 14.3 Recorder
+
+[`api/server/services/replay/recorder.py`](../api/server/services/replay/recorder.py),
+attached to the FastAPI lifespan when `ZAVA_RECORD_TO` is set
+([`main.py` ~line 285](../api/server/main.py)):
+
+1. Warms up the live stack so the t=0 snapshot is populated (so the
+   visitor doesn't land on an empty UI).
+2. Snapshots REST-shaped state via
+   [`snapshot.py`](../api/server/services/replay/snapshot.py) — one
+   writer per file in the tape layout above.
+3. Tees every `bus.emit(...)` into `events.ndjson` with the time offset.
+4. Tees every `StateStore` mutation (workflow / phase / span / MCP
+   call) into `mutations.ndjson` via the in-process `mutation_bus`
+   ([`mutation_bus.py`](../api/server/services/replay/mutation_bus.py)).
+5. On graceful shutdown, tars everything under
+   `ZAVA_RECORD_TO`.
+
+### 14.4 Player
+
+[`api/server/services/replay/player.py`](../api/server/services/replay/player.py)
+runs at startup when `is_replay()`:
+
+1. `TapeLoader` reads `tape.tar.gz`, parses `meta.json`, and exposes
+   `snapshot_t0/` as a `dict[name → list[dict]]`.
+2. [`hydrate.py`](../api/server/services/replay/hydrate.py)
+   reconstructs `app_state.store` (workflows, phases, exceptions,
+   candidates, memories, audit chain, dream history, OTel spans, MCP
+   calls). `store._policies` is deliberately **not** cleared — it's
+   seeded from `api/shared/policies.yaml` at import time and is not
+   part of the mutable tape state.
+3. An asyncio task ticks at wall-clock pace, advancing through
+   `events.ndjson` + `mutations.ndjson` in order. Events are re-emitted
+   onto the bus; mutations are applied directly to the state store.
+4. At EOT (`duration_s` reached): re-snapshot t=0 in-memory and reset
+   the clock — the loop is hands-free.
+
+### 14.5 Read-only middleware
+
+[`api/server/middleware/replay_readonly.py`](../api/server/middleware/replay_readonly.py)
+rejects every `POST` / `PUT` / `PATCH` / `DELETE` with a 403 JSON
+`{ "error": "replay", "message": "This is a replay — actions are
+observed, not made." }`. The middleware is unconditional in `replay`
+mode; cards in the operator UI revert optimistic UI on a 403 and the
+existing toast layer surfaces the message.
+
+### 14.6 Public surface added in replay mode
+
+| Mount | Module | Purpose |
+|---|---|---|
+| `GET /api/replay/meta` | [`routes/replay.py`](../api/server/routes/replay.py) | Returns `{ mode, tape_id, recorded_at, duration_s, current_t }`. Drives the `ReplayBadge` + `RestartBanner` in `web/client`. Always present, so live-mode clients can ask "am I in replay?". |
+| `GET /api/replay/snapshot?at=<unix>` | same | Reconstructs a point-in-time view of the org by replaying audit entries up to `at` (last-write-wins). The cosmic lens HUD's time-scrub uses it. |
+| `GET /healthz` | inline in `main.py` | Liveness probe for ACA (added by PR #22). |
+
+### 14.7 Deploy shape
+
+One Azure Container App, one image
+([`deploy/Dockerfile`](../deploy/Dockerfile)), three SPA bundles served
+under one nginx. Multi-stage build: Node 20 builds `web/client/dist`
++ `web/portal/dist` + `web/blueprint/dist`; Python 3.11-slim runtime
+copies the venv, the SPA bundles, the baked-in tape
+(`/app/tape/tape.tar.gz`), and starts uvicorn alongside nginx via
+[`entrypoint.sh`](../deploy/entrypoint.sh). nginx routes `/` → client,
+`/blueprint/` → essay, `/portal/` → portal, `/api/*` + `/internal/*` →
+uvicorn on `127.0.0.1:80`. Env defaults set in the image:
+`ZAVA_MODE=replay`, `ZAVA_TAPE_PATH=/app/tape/tape.tar.gz`,
+`LLM_RUNTIME=fake`, `PERSIST_DATA=false`.
+
+Infra: [`infra/main.bicep`](../infra/main.bicep) + modules; deployed
+with `azd up` against the `zava-verify-fruocco` environment. The bicep
+supports two RBAC paths — the standard `AcrPull` assignment via UAMI,
+and a Contributor-only fallback that uses ACR admin credentials when
+the deploying principal can't grant role assignments.
+
+### 14.8 Why this layout
+
+A read-only replay sidesteps everything the
+[deployment gate in README](../README.md#-safe-to-clone--run-locally--gated-for-public-deploy)
+lists — there's no policy `exec()` to harden because the persona
+responder is disabled, no `find_entities` Cypher injection vector
+because KuzuDB isn't loaded, no webhook auth to enforce because no
+writes are accepted at all. The substrate stays single-tenant and
+single-process (no horizontal scaling needed because there's no shared
+write state), and the deployment footprint stays at one image instead
+of nginx + FastAPI + Functions + Azurite + KuzuDB.
+
+### 14.9 Provenance
+
+Spec: [`docs/superpowers/specs/2026-05-22-public-replay-landing-design.md`](superpowers/specs/2026-05-22-public-replay-landing-design.md).
+Plans: [`docs/superpowers/plans/2026-05-22-replay-recorder-and-player.md`](superpowers/plans/2026-05-22-replay-recorder-and-player.md),
+[`docs/superpowers/plans/2026-05-22-public-cloud-deploy.md`](superpowers/plans/2026-05-22-public-cloud-deploy.md).
+Branches: replay code lives on `main`; the long-lived `demo-deploy`
+branch off `main` carries the Azure deploy artefacts (`infra/`, `deploy/Dockerfile`, baked tape) that build the verify container.

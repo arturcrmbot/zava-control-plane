@@ -122,6 +122,10 @@ def test_take_snapshot_writes_expected_json_files(tmp_path: Path, isolated_app_s
         "lessons.json",
         "kpis.json",
         "audit_summary.json",
+        "audit_entries.json",
+        "dream_history.json",
+        "spans.json",
+        "mcp_calls.json",
     ]
     assert [path.name for path in written] == expected_names
 

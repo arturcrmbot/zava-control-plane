@@ -127,7 +127,6 @@ def test_hydrate_from_snapshot_restores_workflows_and_domain_memories(
     )
     app_state.store.upsert_workflow(workflow)
     app_state.store.upsert_candidate({"id": "candidate-stale", "name": "Stale Candidate"})
-    app_state.store._mcp_calls["wf-stale"] = [{"tool": "stale"}]
     app_state.domain_memories["hiring"].add(
         "Controller asked for supporting evidence.",
         agent_skill="persona:controller",
@@ -141,6 +140,10 @@ def test_hydrate_from_snapshot_restores_workflows_and_domain_memories(
     snapshot_dir = tmp_path / "snapshot_t0"
     take_snapshot(snapshot_dir)
 
+    # Stale per-workflow mcp_calls that exist ONLY post-snapshot get
+    # wiped by hydrate's clear pass (and aren't restored since they're
+    # not in the snapshot).
+    app_state.store._mcp_calls["wf-stale"] = [{"tool": "stale"}]
     app_state.store._workflows.clear()
     app_state.store._phases.clear()
     app_state.store._spans.clear()
@@ -290,3 +293,71 @@ def test_hydrate_from_snapshot_restores_bus_after_failure(
         loader.close()
 
     assert get_active_bus() is bus
+
+
+def test_hydrate_audit_entries_rehydrates_kernel_decision_registry(
+    tmp_path: Path,
+    isolated_app_state,
+) -> None:
+    """Replay-mode pods boot with an empty in-process governance kernel
+    registry, so every audit entry that carries a ``decision_id`` would
+    show up as ``decisions_resolvable=False`` in the EvidencePanel.
+    Hydration must replay each entry's decision_id back into the kernel
+    so the green chip stays green after restart."""
+    from api.server.routes.memory_v2 import _dream_history
+    from api.server.services.governance import kernel as _gov_kernel
+
+    k = _gov_kernel()
+    decision_id = "11111111-2222-3333-4444-555555555555"
+    policy_version = "abcdef012345"
+
+    assert k.resolve_decision(decision_id) is None
+
+    audit_entries_payload = {
+        "entries": [
+            {
+                "action": "decision.recorded",
+                "details": {
+                    "governance": {
+                        "decision_id": decision_id,
+                        "policy_version": policy_version,
+                    }
+                },
+            }
+        ]
+    }
+    dream_history_payload = {
+        "items": [
+            {"id": "d1", "domain": "hiring", "input_count": 4, "output_count": 1},
+            {"id": "d2", "domain": "hiring", "input_count": 2, "output_count": 1},
+        ]
+    }
+
+    loader = _make_loader(tmp_path)
+    loader.snapshot["audit_entries.json"] = audit_entries_payload
+    loader.snapshot["dream_history.json"] = dream_history_payload
+
+    hydrate_from_snapshot(loader)
+
+    decision = k.resolve_decision(decision_id)
+    assert decision is not None
+    assert decision.policy_version == policy_version
+
+    assert len(app_state.audit.list()) == 1
+    assert app_state.audit.list()[0]["action"] == "decision.recorded"
+
+    assert [r["id"] for r in _dream_history] == ["d1", "d2"]
+
+
+def test_hydrate_tolerates_missing_audit_and_dream_payloads(
+    tmp_path: Path,
+    isolated_app_state,
+) -> None:
+    """Older tapes recorded before the new snapshot fields exist must
+    still hydrate cleanly (forward compatibility)."""
+    loader = _make_loader(tmp_path)
+    # Strip the new keys to simulate an old tape.
+    loader.snapshot.pop("audit_entries.json", None)
+    loader.snapshot.pop("dream_history.json", None)
+
+    hydrate_from_snapshot(loader)  # must not raise

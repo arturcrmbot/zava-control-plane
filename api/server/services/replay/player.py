@@ -133,6 +133,14 @@ class Player:
                 # Direct private-attr write: sibling-service path, same
                 # pattern hydrate uses for clearing the store at boot.
                 app_state.store._phases[rec.id] = phases
+            elif rec.kind == "span" and rec.op == "append":
+                from api.shared.types import OtelSpan
+
+                app_state.store.append_span(OtelSpan.model_validate(rec.patch))
+            elif rec.kind == "mcp_call" and rec.op == "append":
+                from api.shared.types import McpCall
+
+                app_state.store.append_mcp_call(McpCall.model_validate(rec.patch))
             else:
                 logger.debug("Skipping replay mutation kind=%s op=%s id=%s", rec.kind, rec.op, rec.id)
         except Exception:

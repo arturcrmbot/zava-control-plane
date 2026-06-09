@@ -152,6 +152,38 @@ def _snapshot_kpis() -> dict[str, Any]:
     return {"values": kpi_store.query()}
 
 
+def _snapshot_audit_entries() -> dict[str, list[dict[str, Any]]]:
+    """Capture the full audit chain (``AuditLogger._entries`` via
+    :meth:`AuditLogger.list`) so a replay tape can rehydrate the
+    governance kernel's decision registry on boot.
+
+    The blob is in-memory-only in the deployed env (see
+    ``/api/foundry/health``), so without this snapshot every
+    ``decision_id`` referenced by an AGT-emitted entry becomes
+    unresolvable after pod restart and the EvidencePanel paints those
+    rows red. ``audit_summary.json`` is kept alongside for backwards
+    compatibility with tapes recorded before this addition.
+    """
+    audit = getattr(app_state, "audit", None)
+    if audit is None or not hasattr(audit, "list"):
+        return {"entries": []}
+    return {"entries": list(audit.list())}
+
+
+def _snapshot_dream_history() -> dict[str, list[dict[str, Any]]]:
+    """Capture the in-process ``_dream_history`` deque used by
+    ``/api/memory/dream-passes/recent`` and ``/api/memory/experiments/recent``.
+    Without this snapshot the Memory page renders empty after a tape boot
+    because the deque is module-state, not store-state, and nothing else
+    repopulates it.
+    """
+    try:
+        from api.server.routes.memory_v2 import _dream_history
+    except Exception:
+        return {"items": []}
+    return {"items": [dict(r) for r in _dream_history if isinstance(r, dict)]}
+
+
 def _snapshot_audit_summary() -> dict[str, Any]:
     audit = getattr(app_state, "audit", None)
     if audit is None or not hasattr(audit, "list"):
@@ -186,6 +218,47 @@ def _snapshot_phases() -> dict[str, list[dict[str, Any]]]:
     return out
 
 
+def _snapshot_spans() -> dict[str, list[dict[str, Any]]]:
+    """Capture per-workflow OTel spans so /economics + the per-workflow
+    Timeline tab render real numbers in replay. Spans live in
+    ``store._spans`` and are populated by POST handlers
+    (``/internal/durable-event``) at record time; replay only emits bus
+    events, so without this snapshot the spans store stays empty and
+    economics returns $0 across the board."""
+    store = getattr(app_state, "store", None)
+    if store is None:
+        return {}
+    out: dict[str, list[dict[str, Any]]] = {}
+    spans_map = getattr(store, "_spans", {}) or {}
+    for wid, spans in spans_map.items():
+        out[wid] = [_to_jsonable(s) for s in spans]
+    return out
+
+
+def _snapshot_mcp_calls() -> dict[str, list[dict[str, Any]]]:
+    """Capture per-workflow MCP/tool call records. Same root cause as
+    :func:`_snapshot_spans`: populated by POST handlers at record time,
+    invisible to replay otherwise."""
+    store = getattr(app_state, "store", None)
+    if store is None:
+        return {}
+    out: dict[str, list[dict[str, Any]]] = {}
+    mcp_map = getattr(store, "_mcp_calls", {}) or {}
+    for wid, calls in mcp_map.items():
+        out[wid] = [_to_jsonable(c) for c in calls]
+    return out
+
+
+def _to_jsonable(item: Any) -> dict[str, Any]:
+    """Tolerate either a pydantic model (production) or a plain dict
+    (some tests seed the store with dicts directly)."""
+    if hasattr(item, "model_dump"):
+        return item.model_dump(by_alias=True, mode="json")
+    if isinstance(item, dict):
+        return item
+    return dict(item)
+
+
 def take_snapshot(out_dir: Path) -> list[Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -199,6 +272,10 @@ def take_snapshot(out_dir: Path) -> list[Path]:
         ("lessons.json", _snapshot_lessons()),
         ("kpis.json", _snapshot_kpis()),
         ("audit_summary.json", _snapshot_audit_summary()),
+        ("audit_entries.json", _snapshot_audit_entries()),
+        ("dream_history.json", _snapshot_dream_history()),
+        ("spans.json", _snapshot_spans()),
+        ("mcp_calls.json", _snapshot_mcp_calls()),
     ]
 
     written: list[Path] = []

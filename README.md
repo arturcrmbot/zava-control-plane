@@ -59,8 +59,21 @@ hard-coded literals.
 
 The pitch behind this is captured in [docs/archive/blueprint.md](docs/archive/blueprint.md);
 the live editorial microsite that visualises the substrate is
-[`web/blueprint/`](web/blueprint/) (deployed to Azure Container Apps —
-see the [contributor guide](docs/blueprint-microsite-contributor-guide.md)).
+[`web/blueprint/`](web/blueprint/), shipped two ways:
+
+- **Editorial essay** (static, fixture-driven) — auto-published to
+  GitHub Pages on every push to `main`:
+  https://arturcrmbot.github.io/zava-control-plane/
+- **Full operator UI on a recorded tape** (`ZAVA_MODE=replay`) — the
+  whole substrate in one Azure Container App, serving the operator UI
+  at `/`, the essay at `/blueprint/`, the candidate portal at
+  `/portal/`, and a read-only `/api/*` whose state advances against a
+  2-hour tape that loops every ~15 minutes:
+  https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/
+
+See [`docs/blueprint-microsite-contributor-guide.md`](docs/blueprint-microsite-contributor-guide.md)
+for the editorial deploy and §14 of [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#14-replay-mode--recorder-player-public-deploy)
+for the replay deploy.
 
 **Stack**
 - Python 3.11 (Functions worker) + 3.13 (FastAPI) · FastAPI · Azure Durable Functions · MAF · GHCP SDK Python

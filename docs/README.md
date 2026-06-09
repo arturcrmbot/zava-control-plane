@@ -10,6 +10,7 @@ in `superpowers/`, or has been retired to `archive/`.
 | How to run / hack on this locally | [DEVELOPMENT.md](DEVELOPMENT.md) |
 | How the cosmic-lens visualisation works (and how to extend it) | [visualisation.md](visualisation.md) |
 | How to ship the public blueprint microsite | [blueprint-microsite-contributor-guide.md](blueprint-microsite-contributor-guide.md) |
+| How replay mode works (recorder + player + public verify deploy) | [ARCHITECTURE.md §14](ARCHITECTURE.md#14-replay-mode--recorder-player-public-deploy) |
 | The compose-domain meta-skill (the one a coding agent runs to add a domain) | [superpowers/skills/compose-domain/SKILL.md](superpowers/skills/compose-domain/SKILL.md) |
 
 ## What's NOT a doc
