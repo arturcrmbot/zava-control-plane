@@ -2917,3 +2917,62 @@ body.constellation-page-body {
   font-style: italic;
   padding: var(--space-4) var(--space-5);
 }
+
+/* Workflow run page empty state — shown when /?view=run is hit with no run_id. */
+.run-page--empty {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: var(--bg);
+  color: var(--ink);
+}
+.run-page__empty-card {
+  max-width: 32rem;
+  text-align: center;
+  background: var(--bg-elev);
+  border: 1px solid rgba(244, 163, 0, 0.18);
+  border-radius: 12px;
+  padding: 2rem 2.25rem;
+}
+.run-page__empty-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0 0 0.6rem;
+  color: var(--ink);
+}
+.run-page__empty-body {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: rgba(233, 231, 227, 0.78);
+  margin: 0 0 1.25rem;
+}
+.run-page__empty-body code {
+  font-size: 0.82em;
+  background: rgba(244, 163, 0, 0.08);
+  color: var(--accent);
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+}
+.run-page__empty-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.run-page__empty-link {
+  display: inline-block;
+  padding: 0.45rem 0.95rem;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #0a0a0c;
+  font-size: 0.85rem;
+  text-decoration: none;
+  font-weight: 500;
+}
+.run-page__empty-link:hover { opacity: 0.9; }
+.run-page__empty-link--ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid rgba(233, 231, 227, 0.22);
+}
