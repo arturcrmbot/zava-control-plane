@@ -285,6 +285,16 @@ def _self_heal_kernel_decisions(details: Any) -> None:
     refs = _extract_decision_refs(details)
     if not refs:
         return
+    # Only self-heal under replay/record. Outside those modes a missing
+    # decision_id is a real bug or a test asserting the negative case
+    # (e.g. ``test_verify_chain_flags_unknown_decision_id``) and we must
+    # not paper over it.
+    try:
+        from api.server.services.replay.mode import is_replay
+        if not is_replay():
+            return
+    except Exception:
+        return
     try:
         from api.server.services.governance import kernel as _gov_kernel
         from api.server.services.governance.kernel import Decision
