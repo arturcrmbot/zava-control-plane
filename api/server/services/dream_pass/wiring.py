@@ -127,9 +127,6 @@ def build_demo_orchestrator(
         load_recent_runs=lambda domain: [],
         rubric=rubric,
         persist_promoted_lesson=(lambda lesson: _record_lesson(graph, lesson)) if graph is not None else None,
-        persist_flagged_candidate=(
-            lambda **kwargs: _record_flagged_candidate(graph=graph, **kwargs)
-        ) if graph is not None else None,
         graph=graph,
         bus=bus,
     )
@@ -164,56 +161,6 @@ def _record_lesson(graph: EntityGraph, lesson: Lesson) -> None:
             "promoted_at": lesson.provenance.promoted_at,
             "supersedes": lesson.supersedes or "",
         },
-    )
-
-
-def _record_flagged_candidate(
-    *,
-    graph: EntityGraph,
-    candidate,
-    experiment_id: str,
-    delta: float,
-    n: int,
-    flag_reason: str,
-) -> None:
-    from datetime import datetime, timezone
-
-    graph.query(
-        """
-        MERGE (l:Lesson {id: $id})
-        SET l.body = $body,
-            l.domain = $domain,
-            l.persona_role = $persona_role,
-            l.market = $market,
-            l.status = 'candidate',
-            l.proposed_by = $proposed_by,
-            l.rubric_score_delta = $delta,
-            l.experiment_n = $n,
-            l.promoted_at = $now,
-            l.supersedes = '',
-            l.prune_reason = $flag_reason
-        """,
-        {
-            "id": candidate.id,
-            "body": candidate.body,
-            "domain": candidate.scope.domain,
-            "persona_role": candidate.scope.persona_role or "",
-            "market": candidate.scope.market or "",
-            "proposed_by": candidate.proposed_by,
-            "delta": delta,
-            "n": n,
-            "flag_reason": flag_reason,
-            "now": datetime.now(timezone.utc),
-        },
-    )
-    graph.query(
-        """
-        MERGE (e:Experiment {id: $eid})
-        WITH e
-        MATCH (l:Lesson {id: $lid})
-        CREATE (e)-[:EXPERIMENT_FOR_LESSON {recorded_at: $now}]->(l)
-        """,
-        {"eid": experiment_id, "lid": candidate.id, "now": datetime.now(timezone.utc)},
     )
 
 

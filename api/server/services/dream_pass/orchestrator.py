@@ -45,7 +45,6 @@ class DreamPassOrchestrator:
         load_recent_runs: Callable[[str], list[dict[str, Any]]],
         rubric: Rubric,
         persist_promoted_lesson: Callable[[Lesson], None] | None = None,
-        persist_flagged_candidate: Callable[..., None] | None = None,
         graph: EntityGraph | None = None,
         bus: EventBus | None = None,
     ) -> None:
@@ -58,7 +57,6 @@ class DreamPassOrchestrator:
         self._load_recent_runs = load_recent_runs
         self._rubric = rubric
         self._persist_promoted_lesson = persist_promoted_lesson
-        self._persist_flagged_candidate = persist_flagged_candidate
         self._graph = graph
         self._bus = bus
 
@@ -88,7 +86,6 @@ class DreamPassOrchestrator:
         experiments: list[Experiment] = []
         promoted: list[str] = []
         rejected: list[str] = []
-        flagged: list[str] = []
 
         self._record_dream_pass_start(
             dream_pass_id=dream_pass_id,
@@ -212,22 +209,6 @@ class DreamPassOrchestrator:
                         'reason': decision.reason,
                     },
                 )
-            elif decision.verdict == 'flagged':
-                if self._persist_flagged_candidate is not None:
-                    self._persist_flagged_candidate(
-                        candidate=candidate,
-                        experiment_id=experiment.id,
-                        delta=experiment.delta,
-                        n=experiment.n_samples,
-                        flag_reason=decision.reason,
-                    )
-                flagged.append(candidate.id)
-                self._record_experiment(
-                    dream_pass_id=dream_pass_id,
-                    experiment=experiment,
-                    verdict='flagged',
-                    lesson_id=candidate.id,
-                )
             else:
                 self._record_experiment(
                     dream_pass_id=dream_pass_id,
@@ -249,7 +230,9 @@ class DreamPassOrchestrator:
                 'candidates_proposed': len(candidates[: skill.max_candidates_per_pass]),
                 'lessons_promoted': len(promoted),
                 'lessons_rejected': len(rejected),
-                'lessons_flagged': len(flagged),
+                # Kept at 0 after the flagged→reject collapse for one cycle
+                # of back-compat with SSE consumers that may destructure this.
+                'lessons_flagged': 0,
             },
         )
         return DreamPassResult(
@@ -258,7 +241,6 @@ class DreamPassOrchestrator:
             experiments=tuple(experiments),
             promoted_lesson_ids=tuple(promoted),
             rejected_lesson_ids=tuple(rejected),
-            flagged_lesson_ids=tuple(flagged),
         )
 
     async def _propose(self, ctx: ProposalContext):

@@ -46,5 +46,4 @@ def test_experiment_verdict_values() -> None:
     valid = 'promote'
     valid = 'reject'
     valid = 'inconclusive'
-    valid = 'flagged'
-    assert valid == 'flagged'
+    assert valid == 'inconclusive'

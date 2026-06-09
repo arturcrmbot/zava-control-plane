@@ -42,11 +42,11 @@ class PromotionPolicy:
         reject_below = float((cfg.get('reject') or {}).get('when_delta_below', 0.0))
 
         if candidate.scope.domain != domain:
-            return PromotionDecision('flagged', 'scope_expansion: candidate domain differs from pass domain')
+            return PromotionDecision('reject', 'flagged_scope_expansion: candidate domain differs from pass domain')
         if experiment.delta > 0.20:
-            return PromotionDecision('flagged', 'implausible_delta: delta exceeds review threshold')
+            return PromotionDecision('reject', 'flagged_implausible_delta: delta exceeds review threshold')
         if _contradicts_active(candidate.body, active_lessons):
-            return PromotionDecision('flagged', 'contradicts_active: candidate duplicates or conflicts with an active lesson')
+            return PromotionDecision('reject', 'flagged_contradicts_active: candidate duplicates or conflicts with an active lesson')
         if promoted_this_pass >= max_per_pass:
             return PromotionDecision('inconclusive', 'max_per_pass reached for this dream pass')
         if experiment.n_samples < min_samples:

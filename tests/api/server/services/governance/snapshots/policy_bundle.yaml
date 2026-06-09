@@ -315,27 +315,9 @@ policy:
     condition:
       field: tool
       operator: eq
-      value: lesson.approve_flagged
-    message: tool lesson.approve_flagged (reversible=True, requires_authority=False, scope=shared)
-    name: tool:lesson.approve_flagged
-    override: false
-    priority: 30
-  - action: audit
-    condition:
-      field: tool
-      operator: eq
       value: lesson.prune
     message: tool lesson.prune (reversible=True, requires_authority=False, scope=shared)
     name: tool:lesson.prune
-    override: false
-    priority: 30
-  - action: audit
-    condition:
-      field: tool
-      operator: eq
-      value: lesson.reject_flagged
-    message: tool lesson.reject_flagged (reversible=True, requires_authority=False, scope=shared)
-    name: tool:lesson.reject_flagged
     override: false
     priority: 30
   - action: audit
