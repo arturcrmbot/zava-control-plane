@@ -65,14 +65,21 @@ export default function Evaluations() {
       <div className="space-y-4">
         <div>
           <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">Continuous Evaluation</div>
-        </div>
-        <div className="panel panel-body">
-          <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">Foundry evaluation is not configured.</div>
-          <div className="text-xs text-slate-600 dark:text-slate-300">
-            Set <code className="text-xs">AZURE_FOUNDRY_PROJECT_ENDPOINT</code> and{" "}
-            <code className="text-xs">AZURE_FOUNDRY_JUDGE_MODEL_DEPLOYMENT</code> to enable.
+          <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            What this page shows when AI Foundry is configured.
           </div>
-          {summary.reason ? <div className="text-xs text-slate-500 dark:text-slate-400 mt-2">{summary.reason}</div> : null}
+        </div>
+        <div className="panel panel-body space-y-2">
+          <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            Evaluation pipeline is not configured.
+          </div>
+          <div className="text-xs text-slate-600 dark:text-slate-300">
+            With AI Foundry wired up, this page streams scores from Azure AI Foundry&apos;s online evaluators — task adherence, safety, and tool accuracy — for every agent invocation across the fleet, with per-agent breakdowns and links into the Foundry portal for each run.
+          </div>
+          <div className="text-xs text-slate-600 dark:text-slate-300">
+            To enable, set <code className="text-xs">AZURE_FOUNDRY_PROJECT_ENDPOINT</code> and <code className="text-xs">AZURE_FOUNDRY_JUDGE_MODEL_DEPLOYMENT</code> in the environment and restart the API.
+          </div>
+          {summary.reason ? <div className="text-[11px] text-slate-400 dark:text-slate-500 italic">{summary.reason}</div> : null}
         </div>
         <AccuracyReport />
       </div>

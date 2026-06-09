@@ -19,6 +19,13 @@ type Report = {
   }>;
 };
 
+type NotConfigured = { configured: false; reason?: string };
+type ReportEnvelope = Report | NotConfigured;
+
+function _isNotConfigured(r: ReportEnvelope | null | undefined): r is NotConfigured {
+  return !!r && (r as NotConfigured).configured === false;
+}
+
 type AccuracyEvent = {
   type?: string;
   index?: number;
@@ -28,7 +35,7 @@ type AccuracyEvent = {
 const LABELS = ["green", "amber", "red"] as const;
 
 export function AccuracyReport() {
-  const [report, setReport] = useState<Report | null | undefined>(undefined);
+  const [report, setReport] = useState<ReportEnvelope | null | undefined>(undefined);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ index: number; total: number } | null>(null);
   const [drillCell, setDrillCell] = useState<{ gold: string; pred: string } | null>(null);
@@ -66,6 +73,21 @@ export function AccuracyReport() {
   }
 
   if (report === undefined) return <div className="p-4">Loading…</div>;
+
+  if (_isNotConfigured(report)) {
+    return (
+      <div className="panel panel-body space-y-1">
+        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">R/A/G Classifier Accuracy</div>
+        <div className="text-xs text-slate-600 dark:text-slate-300">
+          The accuracy harness runs the live RAG classifier against a labelled corpus and scores it via Foundry <code>evaluate()</code>.
+        </div>
+        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          Disabled because no AI Foundry project is configured. Set <code className="text-xs">AZURE_FOUNDRY_PROJECT_ENDPOINT</code> (and <code className="text-xs">AZURE_FOUNDRY_JUDGE_MODEL_DEPLOYMENT</code>) and restart to enable.
+        </div>
+        {report.reason ? <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 italic">{report.reason}</div> : null}
+      </div>
+    );
+  }
 
   const drillRows =
     drillCell && report

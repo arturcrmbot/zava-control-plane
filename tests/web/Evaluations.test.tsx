@@ -39,8 +39,9 @@ describe("Evaluations.tsx", () => {
       "/api/accuracy/last": { __status: 404 },
     }) as any;
     render(<Evaluations />);
-    await waitFor(() => expect(screen.getByText(/Foundry evaluation is not configured/i)).toBeTruthy());
-    expect(screen.queryByText(/Task adherence/i)).toBeNull();
+    await waitFor(() => expect(screen.getByText(/Evaluation pipeline is not configured/i)).toBeTruthy());
+    expect(screen.queryByRole("heading", { name: /Task adherence/i })).toBeNull();
+    expect(document.querySelector(".grid.grid-cols-3")).toBeNull();
   });
 
   it("renders three tiles with real values when configured + data", async () => {
