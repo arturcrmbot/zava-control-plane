@@ -4,6 +4,10 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Status: PoC — runs on a laptop](https://img.shields.io/badge/status-PoC%20%E2%80%94%20runs%20on%20a%20laptop-blue)](#-safe-to-clone--run-locally--gated-for-public-deploy)
 
+**Walkthrough video (3:42).** What the substrate is, a workflow in flight, the authority matrix, agent memory, and the knowledge graph.
+
+[![Explainer video poster](docs/media/explainer-poster.jpg)](docs/media/agentic-blueprint-explainer.mp4)
+
 A composable agentic substrate (skills + MCP tools + harness + governance)
 running on a single laptop, with multiple business domains composed on
 top of it. Production-shaped — [Microsoft Agent Framework](https://learn.microsoft.com/agent-framework)
