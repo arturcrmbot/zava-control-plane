@@ -154,7 +154,6 @@ def main() -> None:
         print(f'proposed:    {len(result.experiments)}')
         print(f'rejected:    {len(result.rejected_lesson_ids)}')
         print(f'promoted:    {len(result.promoted_lesson_ids)} {list(result.promoted_lesson_ids)}')
-        print(f'flagged:     {len(result.flagged_lesson_ids)} {list(result.flagged_lesson_ids)}')
         for experiment in result.experiments:
             print(f'  EXP {experiment.id} delta={experiment.delta:+.3f} n={experiment.n_samples}')
     finally:

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 
-ExperimentVerdict = Literal["promote", "reject", "inconclusive", "flagged"]
+ExperimentVerdict = Literal["promote", "reject", "inconclusive"]
 
 
 @dataclass(frozen=True)
@@ -96,4 +96,6 @@ class DreamPassResult:
     experiments: tuple[Experiment, ...]
     promoted_lesson_ids: tuple[str, ...]
     rejected_lesson_ids: tuple[str, ...]
-    flagged_lesson_ids: tuple[str, ...]
+    # Always () after the flagged→reject collapse (kept as zero-length tuple
+    # for API back-compat with existing clients that destructure this field).
+    flagged_lesson_ids: tuple[str, ...] = ()

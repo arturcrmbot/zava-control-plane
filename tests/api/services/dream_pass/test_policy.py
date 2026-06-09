@@ -67,7 +67,7 @@ def test_inconclusive_when_n_too_small(policy: PromotionPolicy) -> None:
     assert decision.verdict == 'inconclusive'
 
 
-def test_flag_when_implausible_delta(policy: PromotionPolicy) -> None:
+def test_reject_when_implausible_delta(policy: PromotionPolicy) -> None:
     decision = policy.evaluate(
         domain='hiring',
         candidate=_candidate(),
@@ -75,8 +75,8 @@ def test_flag_when_implausible_delta(policy: PromotionPolicy) -> None:
         active_lessons=[],
         promoted_this_pass=0,
     )
-    assert decision.verdict == 'flagged'
-    assert 'implausible_delta' in decision.reason
+    assert decision.verdict == 'reject'
+    assert 'flagged_implausible_delta' in decision.reason
 
 
 def test_inconclusive_when_max_per_pass_reached(policy: PromotionPolicy) -> None:

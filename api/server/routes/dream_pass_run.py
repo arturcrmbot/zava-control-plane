@@ -74,11 +74,12 @@ async def run_dream_pass(
         "verdict_counts": {
             "promoted": len(result.promoted_lesson_ids),
             "rejected": len(result.rejected_lesson_ids),
-            "flagged": len(result.flagged_lesson_ids),
+            # Kept at 0 after flagged→reject collapse for one cycle.
+            "flagged": 0,
         },
         "promoted_lesson_ids": list(result.promoted_lesson_ids),
         "rejected_lesson_ids": list(result.rejected_lesson_ids),
-        "flagged_lesson_ids": list(result.flagged_lesson_ids),
+        "flagged_lesson_ids": [],
         "experiments": [
             {
                 "id": e.id,

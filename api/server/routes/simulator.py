@@ -539,7 +539,7 @@ async def dream_storm(
                 "domain": result.domain,
                 "promoted": len(result.promoted_lesson_ids),
                 "rejected": len(result.rejected_lesson_ids),
-                "flagged": len(result.flagged_lesson_ids),
+                "flagged": 0,
                 "experiments_run": len(result.experiments),
             })
     return {"ok": True, "count": len(passes), "passes": passes}

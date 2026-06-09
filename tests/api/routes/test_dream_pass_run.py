@@ -13,6 +13,10 @@ def test_run_endpoint_returns_pass_summary():
     assert "dream_pass_id" in body
     assert body["experiments_run"] >= 0
     assert set(body["verdict_counts"].keys()) == {"promoted", "rejected", "flagged"}
+    # `flagged` key is kept at 0 for one cycle of back-compat after the
+    # flagged→reject collapse (see dream_pass orchestrator change-log).
+    assert body["verdict_counts"]["flagged"] == 0
+    assert body["flagged_lesson_ids"] == []
     assert isinstance(body["promoted_lesson_ids"], list)
     assert isinstance(body["rejected_lesson_ids"], list)
     assert isinstance(body["experiments"], list)
