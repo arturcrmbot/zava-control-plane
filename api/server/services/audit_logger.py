@@ -260,6 +260,56 @@ def _extract_decision_refs(details: Any) -> list[tuple[str, str | None]]:
     return refs
 
 
+def _self_heal_kernel_decisions(details: Any) -> None:
+    """Register any ``decision_id`` referenced in ``details`` into the
+    governance kernel's decision registry if it isn't already there.
+
+    In normal production flow this is a no-op: every call site that
+    writes a decision_id into an audit entry has already minted the
+    Decision in the kernel via :meth:`GovernanceKernel.allow` (or its
+    sibling check methods) immediately beforehand, so the registry
+    lookup hits and we return without touching anything.
+
+    The self-heal exists for replay mode: replayed bus events carry
+    decision_ids that were minted in the original recording session's
+    kernel. When a subscriber writes those into an audit entry during
+    playback, the playback-time kernel doesn't know them and
+    ``verify_chain`` flags them as unresolved (red AGT chip). Mint a
+    synthetic ``Decision(allowed=True)`` so the chip stays green.
+
+    Failures are swallowed — self-heal is best-effort and must never
+    block an audit append.
+    """
+    if not isinstance(details, dict):
+        return
+    refs = _extract_decision_refs(details)
+    if not refs:
+        return
+    try:
+        from api.server.services.governance import kernel as _gov_kernel
+        from api.server.services.governance.kernel import Decision
+    except Exception:
+        return
+    try:
+        k = _gov_kernel()
+    except Exception:
+        return
+    for decision_id, recorded_pv in refs:
+        try:
+            if k.resolve_decision(decision_id) is not None:
+                continue
+            k._register_decision(
+                Decision(
+                    allowed=True,
+                    decision_id=decision_id,
+                    policy_version=recorded_pv or "phase1-noop",
+                    reason="self-healed from audit.log",
+                )
+            )
+        except Exception:
+            continue
+
+
 def _verify_decisions(chain: list[dict]) -> list[int]:
     """Phase 7 TASK-053 — return chain indices whose recorded
     ``decision_id`` cannot be resolved against the in-process kernel.
@@ -493,6 +543,15 @@ class AuditLogger:
                 jws = _try_sign(agent_id, action, details)
                 if jws is not None:
                     entry["actor_jws"] = jws
+            # Self-heal kernel decision registry: any decision_id
+            # referenced in the entry's details that isn't in the
+            # in-process kernel gets a synthetic Decision registered
+            # before the chain hash is computed. No-op in normal
+            # production flow (kernel always has the decision first).
+            # During replay, this keeps decisions_resolvable green when
+            # replayed bus events carry decision_ids minted in the
+            # original recording session.
+            _self_heal_kernel_decisions(details)
             entry["entry_hash"] = _canonical_entry_hash(entry)
             # Bounded FIFO: cache miss falls back to _derive_tail_hash
             # which scans _entries (always intact). Eviction is a

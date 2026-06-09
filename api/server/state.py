@@ -177,6 +177,17 @@ class AppState:
                 DomainMemory, build_domain_memories,
             )
 
+            # In replay mode the tape carries the working notes / lessons
+            # that hydrate writes via memory_store.add(). Routing those
+            # writes through a real Mem0 + Chroma + Azure-OpenAI-embed
+            # stack is pointless (the data is already authoritative on
+            # the tape) and frequently silently drops entries when the
+            # embed endpoint rate-limits — leaving the Memory page
+            # blank. Force in-process FallbackMemory in replay so
+            # hydrate writes land where list_by_kind reads them.
+            if is_replay():
+                raise RuntimeError("replay mode → using FallbackMemory for tape hydration")
+
             _mem0_backend = build_default_memory()
             _memory_domains = [
                 d.strip()
