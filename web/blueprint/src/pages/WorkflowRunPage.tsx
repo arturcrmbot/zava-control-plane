@@ -35,9 +35,22 @@ export function WorkflowRunPage() {
   }, [runId]);
 
   if (!runId) {
-    return <div className="run-page run-page--empty">
-      Missing <code>run_id</code> query parameter.
-    </div>;
+    return (
+      <div className="run-page run-page--empty">
+        <div className="run-page__empty-card">
+          <h2 className="run-page__empty-title">No workflow run selected</h2>
+          <p className="run-page__empty-body">
+            This view drills into a single in-flight workflow. Pick one from the
+            constellation or operator console first — the URL needs a
+            <code> ?run_id=…</code> parameter to load.
+          </p>
+          <div className="run-page__empty-actions">
+            <a href="/?view=constellation" className="run-page__empty-link">Open constellation</a>
+            <a href="/" className="run-page__empty-link run-page__empty-link--ghost">Back to essay</a>
+          </div>
+        </div>
+      </div>
+    );
   }
   return <div className="run-page"><RunPanel runId={runId} state={state} /></div>;
 }

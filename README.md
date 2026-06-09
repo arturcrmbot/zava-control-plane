@@ -10,8 +10,11 @@ top of it. Production-shaped — [Microsoft Agent Framework](https://learn.micro
 durable workflows for orchestration, GHCP SDK Python for agent identities,
 a long-lived Fleet Manager session supervising exceptions in real time.
 
-**37 live domains in `main`** — all spawnable at runtime (the
-previously-stubbed CEO meta-workflows were filled in by the v1.x wave).
+**38 live domains** (+ the generic `policy_set` shim = 39 total in
+[`api/shared/domains.py`](api/shared/domains.py)) — all spawnable at
+runtime (the previously-stubbed CEO meta-workflows were filled in by
+the v1.x wave; `employee-transfer` and `training-request` were the
+most recent additions, both via the `compose-domain` meta-skill).
 Two were hand-built (POC1 finance expense-claim, POC2 hiring); the rest
 were graduated end-to-end by the
 [`compose-domain`](docs/superpowers/skills/compose-domain/SKILL.md) v4
@@ -154,7 +157,7 @@ make up                                        # boots azurite + POC1 mocks + Fa
 
 UI at http://localhost:5273, candidate portal at http://localhost:5274.
 The simulator's domain-aware ramp loop trickles real workflows from
-all 37 live domains into the dashboard automatically when the substrate
+all 38 live domains into the dashboard automatically when the substrate
 is up, each at its own realistic cadence (AP-invoice ~every 30s of demo,
 hiring ~every 24min, perf-review effectively dormant — see
 [`api/shared/domains.py`](api/shared/domains.py); tune via

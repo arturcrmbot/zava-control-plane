@@ -26,6 +26,7 @@ import HiringManager from "@client/routes/HiringManager";
 import Dashboard from "@client/routes/Dashboard";
 import Memory from "@client/routes/Memory";
 import Knowledge from "@client/routes/Knowledge";
+import NotFound from "@client/routes/NotFound";
 
 function ShellBody() {
   const [roleId, setRoleId] = useLocalStorageState<RoleId>("fleetctl.role", "ops-reviewer");
@@ -137,6 +138,7 @@ function ShellInner({
             <Route path="/economics" element={<Economics />} />
             <Route path="/policy" element={<PolicyAndAutonomy />} />
             <Route path="/hiring-manager/:workflowId?" element={<HiringManager />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
       </div>

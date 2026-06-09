@@ -114,15 +114,18 @@ wake_hints, spawn_fn, realistic_interval_seconds, function)`. The
 `get`, `by_prefix`, `resolve_external_event`, `all_wake_hints`,
 `all_personae`, and `live_domains()` (filter on `phases != ()`).
 
-**As of May 2026: 37 registered domains** — all live (`phases != ()`)
-since the v1.x wave filled in the previously-stubbed CEO meta-workflows.
-Verified via `from api.shared.functions import _; from api.shared.domains import DOMAINS, live_domains`.
+**As of June 2026: 39 registered domains, 38 live** (`phases != ()`;
+the 39th is the generic `policy_set` shim with empty phases — see
+below). Verified via `from api.shared.functions import _; from
+api.shared.domains import DOMAINS, live_domains`. The two newest
+domains since the v1.x wave are `employee-transfer` (HR) and
+`training-request` (HR), both graduated via `compose-domain` v4.
 
 | Function | Live domains |
 |---|---|
 | `legacy` | `expense-claim`, `hiring` |
 | `finance` | `annual-budget-setting`, `ap-invoice`, `contract-renewal`, `intercompany-recharge`, `monthly-client-pnl`, `purchase-order`, `treasury-fx`, `vendor-kyc`, `vendor-risk-to-pay` |
-| `hr` | `employee-onboarding`, `freelancer-onboarding`, `hire-to-productive`, `intercompany-talent-transfer`, `perf-review`, `talent-redeployment`, `travel-preapproval` |
+| `hr` | `employee-onboarding`, `employee-transfer`, `freelancer-onboarding`, `hire-to-productive`, `intercompany-talent-transfer`, `perf-review`, `talent-redeployment`, `training-request`, `travel-preapproval` |
 | `revenue` | `account-onboarding`, `client-renewal`, `lead-to-cash`, `new-business-pipeline-scrub` |
 | `marketing` | `creative-awards-submission`, `creative-campaign`, `media-pitch-to-win`, `quarterly-creative-awards`, `weekly-pitch-review` |
 | `legal` | `contract-review`, `privacy-dpia` |
@@ -268,16 +271,19 @@ through per-domain projection functions registered in
 mirrors `workflow.sub_spawned` events into a `Workflow → Workflow`
 self-relation so meta-workflow trees are queryable.
 
-**As of May 2026: 37 projections** registered via auto-import in
-`entity_projections/__init__.py`. The original 12 cover the POC live
-domains; the rest were added with the agency-pitch wave plus
-ramp-up workflows. The most recent is `policy_set` (v1.1) — records a
-`Decision` with `phase="policy_set"` whenever an operator approves a
-persona's proposed action via the new approve route (§12). The
-projection canonicalises `verdict` (so `"frozen"` → `"freeze"`) and
-links the Decision to every node id in `decided_on` via the matching
-`DECIDED_<KIND>` rel (Brand, Money, Organisation, Person, Period,
-Place, Asset, Subsidiary, Campaign, Pitch, MediaPlan).
+**As of June 2026: 39 projections** registered via auto-import in
+`entity_projections/__init__.py` — one per registered domain, so the
+count tracks `len(DOMAINS)`. The original 12 cover the POC live
+domains; the rest were added with the agency-pitch wave plus the
+ramp-up workflows. The most recent additions are `employee-transfer`
+and `training-request` (both HR, graduated via `compose-domain` v4).
+The `policy_set` projection (v1.1) records a `Decision` with
+`phase="policy_set"` whenever an operator approves a persona's
+proposed action via the approve route (§12); it canonicalises
+`verdict` (so `"frozen"` → `"freeze"`) and links the Decision to
+every node id in `decided_on` via the matching `DECIDED_<KIND>` rel
+(Brand, Money, Organisation, Person, Period, Place, Asset,
+Subsidiary, Campaign, Pitch, MediaPlan).
 
 | # | Projection | File |
 |---|---|---|
@@ -295,15 +301,16 @@ Place, Asset, Subsidiary, Campaign, Pitch, MediaPlan).
 | 12 | `vendor-kyc` | [`vendor_kyc.py`](../api/server/services/entity_projections/vendor_kyc.py) |
 | 13 | `policy_set` (v1.1) | [`policy_set.py`](../api/server/services/entity_projections/policy_set.py) — records a `Decision` with `phase="policy_set"` + the proposed verdict. |
 
-(The other 24 — `account-onboarding`, `agency-network-roll-up`,
+(The other 26 — `account-onboarding`, `agency-network-roll-up`,
 `annual-budget-setting`, `board-prep`, `client-renewal`,
 `creative-awards-submission`, `crisis-response`,
-`data-clean-room-setup`, `expense-claim`, `freelancer-onboarding`,
-`fy-close`, `hire-to-productive`, `hiring`, `intercompany-recharge`,
-`intercompany-talent-transfer`, `lead-to-cash`, `m-and-a-integration`,
-`media-pitch-to-win`, `monthly-client-pnl`,
-`new-business-pipeline-scrub`, `quarterly-creative-awards`,
-`talent-redeployment`, `vendor-risk-to-pay`, `weekly-pitch-review`
+`data-clean-room-setup`, `employee-transfer`, `expense-claim`,
+`freelancer-onboarding`, `fy-close`, `hire-to-productive`, `hiring`,
+`intercompany-recharge`, `intercompany-talent-transfer`,
+`lead-to-cash`, `m-and-a-integration`, `media-pitch-to-win`,
+`monthly-client-pnl`, `new-business-pipeline-scrub`,
+`quarterly-creative-awards`, `talent-redeployment`,
+`training-request`, `vendor-risk-to-pay`, `weekly-pitch-review`
 — ship under `api/server/services/entity_projections/` with the
 same auto-registration shape.)
 
