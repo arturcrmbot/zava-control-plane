@@ -112,7 +112,8 @@ jobs:
         # forward-compatibility once we hand-author Phase 6's
         # data/policies/agents.policy.yaml. For now lint-policy is a
         # no-op that succeeds; CI keeps the wiring warm.
-        run: uv run agt lint-policy data/policies || echo "lint-policy: nothing to lint"
+        run: |
+          uv run agt lint-policy data/policies || echo "lint-policy: nothing to lint"
 
   agt-test-suite:
     name: governance test suite
