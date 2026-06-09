@@ -3,11 +3,16 @@ policy:
   defaults:
     action: allow
     confidence_threshold: 0.8
+    max_cpu: null
+    max_memory_mb: null
     max_tokens: 4096
     max_tool_calls: 10
+    network_default: deny
+    timeout_seconds: null
   description: Compiled from data/synthetic/authority/matrix.json + data/policies/tools.yaml. See plan/feature-agent-governance-toolkit-1.md (TASK-012).
   inherit: true
   name: apex-substrate
+  network_allowlist: []
   rules:
   - action: audit
     condition:
@@ -304,6 +309,42 @@ policy:
       value: invoice_repository.get_invoice
     message: tool invoice_repository.get_invoice (reversible=True, requires_authority=False, scope=finance)
     name: tool:invoice_repository.get_invoice
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: lesson.approve_flagged
+    message: tool lesson.approve_flagged (reversible=True, requires_authority=False, scope=shared)
+    name: tool:lesson.approve_flagged
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: lesson.prune
+    message: tool lesson.prune (reversible=True, requires_authority=False, scope=shared)
+    name: tool:lesson.prune
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: lesson.reject_flagged
+    message: tool lesson.reject_flagged (reversible=True, requires_authority=False, scope=shared)
+    name: tool:lesson.reject_flagged
+    override: false
+    priority: 30
+  - action: audit
+    condition:
+      field: tool
+      operator: eq
+      value: lesson.write
+    message: tool lesson.write (reversible=True, requires_authority=False, scope=shared)
+    name: tool:lesson.write
     override: false
     priority: 30
   - action: audit
@@ -709,6 +750,33 @@ policy:
       value: privacy_dpia_signoff
     message: 'matrix:DPIA-003-EMEA action=privacy_dpia_signoff approver=dpo band=(None,None) basis=''EMEA high-risk DPIA: GDPR Art. 35 path; DPO + GC (CISO consulted but not required).'''
     name: matrix:DPIA-003-EMEA
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: employee_transfer_signoff
+    message: matrix:EXF-001 action=employee_transfer_signoff approver=hr_director band=(None,None) basis='Same-country inter-subsidiary transfer; HR Director signs off on cost + compliance after the releasing line manager approves.'
+    name: matrix:EXF-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: employee_transfer_signoff
+    message: matrix:EXF-002 action=employee_transfer_signoff approver=hr_director band=(None,None) basis='Cross-border transfer; visa/work-permit + payroll-entity switch; HR Director signs off, regional HR lead and CPO escalate on edge cases.'
+    name: matrix:EXF-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: employee_transfer_signoff
+    message: matrix:EXF-003 action=employee_transfer_signoff approver=cpo band=(None,None) basis='Transfer comp delta exceeds 10%; CPO sign-off required, CEO escalation for executive grades.'
+    name: matrix:EXF-003
     override: false
     priority: 20
   - action: audit
@@ -1228,6 +1296,24 @@ policy:
     condition:
       field: action
       operator: eq
+      value: training_request_signoff
+    message: matrix:TRQ-001 action=training_request_signoff approver=hr_director band=(0,1500) basis='Routine training course within HR L&D budget; hr_director may approve up to GBP 1500.'
+    name: matrix:TRQ-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: training_request_signoff
+    message: matrix:TRQ-002 action=training_request_signoff approver=cfo band=(1500,None) basis='Training course over GBP 1500 escalates to CFO for budget impact review.'
+    name: matrix:TRQ-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
       value: travel_preapproval
     message: matrix:TRV-001 action=travel_preapproval approver=auto band=(0,1500) basis='Domestic trip within standard band; auto-approved.'
     name: matrix:TRV-001
@@ -1315,4 +1401,5 @@ policy:
     override: false
     priority: 20
   scope: null
+  tool_allowlist: []
   version: '1.0'
