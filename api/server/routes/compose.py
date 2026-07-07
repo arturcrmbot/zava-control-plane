@@ -9,12 +9,13 @@ from __future__ import annotations
 import json
 import uuid
 
-from fastapi import APIRouter, Form, Request, UploadFile
+from fastapi import APIRouter, Body, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from api.server.services.compose import registry
+from api.server.services.compose import intake, registry
 from api.server.services.compose.bridge import ComposeBridge
 from api.server.services.compose.session import ComposeSession
+from api.shared import compose_config
 
 router = APIRouter()
 
@@ -39,18 +40,23 @@ def _is_loopback(request: Request) -> bool:
     return host in _LOOPBACK
 
 
+def _guard(request: Request) -> bool:
+    return _is_loopback(request) and compose_config.poc_safety_ok()
+
+
 @router.post("/api/compose/session")
 async def create_session(
     request: Request,
     text: str | None = Form(default=None),
     file: UploadFile | None = None,
 ):
-    if not _is_loopback(request):
+    if not _guard(request):
         return JSONResponse({"error": "forbidden: localhost only"}, status_code=403)
 
     document_text = text or ""
     if file is not None:
-        document_text = (await file.read()).decode("utf-8", "ignore")
+        raw = await file.read()
+        document_text = intake.extract_text(file.filename or "", raw)
     if not document_text.strip():
         return JSONResponse({"error": "empty document"}, status_code=422)
 
@@ -94,3 +100,31 @@ async def get_session(cid: str):
         return JSONResponse({"error": "not found"}, status_code=404)
     return {"compose_id": cid, "stage": session.stage,
             "done": session.done, "events": session.events}
+
+
+async def resolve_answer(cid: str, payload: dict) -> dict:
+    session = registry.get(cid)
+    if session is None:
+        return {"ok": False, "error": "not found"}
+    ok = session.resolve(payload["request_id"], payload.get("answer", ""))
+    return {"ok": ok}
+
+
+async def resolve_brief(cid: str, payload: dict) -> dict:
+    session = registry.get(cid)
+    if session is None:
+        return {"ok": False, "error": "not found"}
+    ok = session.resolve(payload["request_id"],
+                         {"approved": bool(payload.get("approved", True)),
+                          "yaml": payload.get("yaml", "")})
+    return {"ok": ok}
+
+
+@router.post("/api/compose/{cid}/answer")
+async def answer(cid: str, payload: dict = Body(...)):
+    return await resolve_answer(cid, payload)
+
+
+@router.post("/api/compose/{cid}/brief")
+async def brief(cid: str, payload: dict = Body(...)):
+    return await resolve_brief(cid, payload)
