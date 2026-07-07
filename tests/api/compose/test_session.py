@@ -48,3 +48,14 @@ async def test_pending_future_resolves():
 def test_resolve_unknown_request_is_noop():
     s = ComposeSession("cid")
     s.resolve("nope", {"x": 1})  # must not raise
+
+
+def test_timeline_records_events_with_offsets():
+    s = ComposeSession("cid")
+    s.emit({"type": "thought", "text": "a"})
+    s.emit({"type": "narration", "text": "b"})
+    assert len(s.timeline) == 2
+    assert s.timeline[0]["event"]["text"] == "a"
+    assert s.timeline[0]["ts_offset_ms"] == 0
+    assert s.timeline[1]["ts_offset_ms"] >= 0
+    assert all(set(e.keys()) == {"ts_offset_ms", "event"} for e in s.timeline)

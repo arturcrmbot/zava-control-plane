@@ -5,6 +5,7 @@ that connects mid-run still sees the whole story so far.
 from __future__ import annotations
 
 import asyncio
+import time
 
 _MAX_BUFFER = 2000
 
@@ -17,6 +18,8 @@ class ComposeSession:
         self.events: list[dict] = []
         self._subscribers: set[asyncio.Queue] = set()
         self.pending: dict[str, asyncio.Future] = {}
+        self._t0 = time.monotonic()
+        self.timeline: list[dict] = []
 
     def subscribe(self) -> asyncio.Queue:
         q: asyncio.Queue = asyncio.Queue()
@@ -34,6 +37,12 @@ class ComposeSession:
         self.events.append(event)
         if len(self.events) > _MAX_BUFFER:
             self.events = self.events[-_MAX_BUFFER:]
+        if not self.timeline:
+            self._t0 = time.monotonic()
+        self.timeline.append({
+            "ts_offset_ms": int((time.monotonic() - self._t0) * 1000),
+            "event": event,
+        })
         for q in list(self._subscribers):
             q.put_nowait(event)
 
