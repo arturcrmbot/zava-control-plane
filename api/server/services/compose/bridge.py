@@ -18,7 +18,9 @@ from . import tape as compose_tape
 from .translate import translate_update
 
 COMPOSE_MCP_URL = os.getenv(
-    "COMPOSE_MCP_URL", "http://127.0.0.1:3101/api/compose/mcp")
+    # FastMCP's streamable-HTTP app serves the MCP endpoint at `/mcp` inside the
+    # sub-app mounted at /api/compose/mcp, so the agent must target /mcp/mcp.
+    "COMPOSE_MCP_URL", "http://127.0.0.1:3101/api/compose/mcp/mcp")
 COMPOSE_MODEL = os.getenv("COMPOSE_MODEL", "claude-sonnet-4.6")
 
 
