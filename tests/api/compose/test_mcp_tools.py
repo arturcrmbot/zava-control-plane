@@ -1,7 +1,13 @@
 import asyncio
+from pathlib import Path
+
 import pytest
 from api.server.services.compose import registry, mcp_server
 from api.server.services.compose.session import ComposeSession
+
+
+ROOT = Path(__file__).resolve().parents[3]
+BRIEF = ROOT / "docs/superpowers/specs/capex-approval-brief.yaml"
 
 
 def _fresh_session():
@@ -43,9 +49,24 @@ async def test_ask_operator_blocks_until_answer():
 async def test_present_brief_blocks_until_review():
     s = _fresh_session()
     q = s.subscribe()
-    task = asyncio.create_task(mcp_server._present_brief_impl("domain: x"))
+    yaml = BRIEF.read_text()
+    task = asyncio.create_task(mcp_server._present_brief_impl(yaml))
     await asyncio.sleep(0.05)
     event = q.get_nowait()
-    assert event["type"] == "brief" and event["yaml"] == "domain: x"
+    assert event["type"] == "brief" and event["yaml"] == yaml
+    assert event["parsed"]["workflowType"] == "capex-approval"
+    assert len(event["parsed"]["steps"]) == 4
     s.resolve(event["request_id"], {"approved": True, "yaml": "domain: x-edited"})
     assert await asyncio.wait_for(task, timeout=1) == {"approved": True, "yaml": "domain: x-edited"}
+
+
+@pytest.mark.asyncio
+async def test_present_brief_emits_none_parsed_for_malformed_yaml():
+    s = _fresh_session()
+    q = s.subscribe()
+    task = asyncio.create_task(mcp_server._present_brief_impl("domain: ["))
+    await asyncio.sleep(0.05)
+    event = q.get_nowait()
+    assert event["type"] == "brief" and event["parsed"] is None
+    s.resolve(event["request_id"], {"approved": False, "yaml": "domain: ["})
+    assert await asyncio.wait_for(task, timeout=1) == {"approved": False, "yaml": "domain: ["}

@@ -10,8 +10,22 @@ from __future__ import annotations
 import asyncio
 import uuid
 
+from .brief_model import compose_summary
+
 _MAX_GAP_S = 2.5  # compress long "thinking" pauses so a 10-min run replays fast
 _HITL_TIMEOUT_S = 300
+
+
+def _enrich(event: dict) -> dict:
+    """Backfill the projected `parsed` composition on replayed brief events so a
+    tape recorded before the projection existed still drives the canvas — keeps
+    replay output identical to a live run."""
+    if event.get("type") == "brief" and not event.get("parsed") and event.get("yaml"):
+        try:
+            event["parsed"] = compose_summary(event["yaml"])
+        except Exception:
+            event["parsed"] = None
+    return event
 
 
 class ReplayBridge:
@@ -36,7 +50,7 @@ class ReplayBridge:
                     await asyncio.sleep(min(gap, _MAX_GAP_S))
                 prev = entry.get("ts_offset_ms", prev)
 
-                event = dict(entry.get("event") or {})
+                event = _enrich(dict(entry.get("event") or {}))
                 if self.pause_on_hitl and event.get("type") in ("question", "brief"):
                     rid = uuid.uuid4().hex
                     event["request_id"] = rid

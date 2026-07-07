@@ -1,0 +1,200 @@
+# Capital Expenditure (CapEx) approval — compose-domain v4 brief.
+#
+# Story: an employee requests funding for a capital asset (equipment,
+# machinery, IT hardware, fit-out) costing >= £1,000 with a useful life
+# over one year. Intake captures the request (rejecting sub-£1,000 OpEx);
+# a deterministic budget check pulls the cost-centre's remaining annual
+# CapEx budget + YTD spend from the ERP stub and decides fit; an analyst
+# agent reviews the request against the capitalisation policy, confirms
+# the asset is genuinely capital, validates the depreciation schedule,
+# assigns a risk band, and flags anything to reclassify as OpEx; the
+# CapEx approver signs off; on approval a deterministic step registers the
+# asset in the fixed-asset register and notifies Procurement.
+#
+# One agent phase (capitalisation-reviewer), one HITL gate
+# (capex_approval). The >£50k senior sign-off is expressed the
+# substrate-native way — through the AGT authority matrix value bands
+# (<=£50k -> capex_approver; >£50k -> cfo) rather than a second gate.
+# Function owner: finance.
+
+domain:
+  # v4 fields.
+  workflow_type: capex-approval
+  prefix: fleet
+  # v3 back-compat (v3 generators still consume `name` / `owner_role`).
+  name: fleet-capex-approval
+  display_name: CapEx approval
+  owner_role: capex_approver
+  description: |
+    An employee requests capital funding for a single asset costing
+    £1,000 or more with an expected useful life over one year. The
+    orchestrator captures the request and rejects sub-£1,000 amounts as
+    operating expense. A deterministic budget check looks up the
+    requesting cost-centre's remaining annual CapEx budget and
+    year-to-date spend and decides whether the request fits. A
+    capitalisation-reviewer agent checks the request against the
+    capitalisation policy: confirms the category is genuinely capital
+    (not a disguised operating cost), validates the useful-life and
+    depreciation schedule, assigns a risk band (low / medium / high),
+    and flags anything to reclassify as OpEx. The CapEx approver then
+    approves (in-budget, correctly capitalised, low/medium risk) or
+    rejects (over budget, mis-classified, or high risk) with a one-line
+    reason. On approval a deterministic step creates the fixed-asset
+    register record and notifies Procurement to raise the purchase
+    order. The £50,000 senior sign-off threshold is enforced by the
+    authority matrix (>£50k escalates to the CFO). All external systems
+    are deterministic in-memory stubs.
+
+phases:
+  - name: capex_intake
+    intent: |
+      Capture the CapEx request: requester name, department, cost
+      centre, asset description + category, requested amount (GBP),
+      business justification, and expected in-service date. Reject
+      immediately if the amount is under £1,000 (that is operating
+      expense, handled elsewhere). Pass forward.
+    kind: deterministic
+    external_systems: []
+
+  - name: budget_check
+    intent: |
+      Look up the requesting cost-centre's remaining annual CapEx budget
+      in the finance/ERP system and pull the department's year-to-date
+      CapEx spend for context. Determine whether the requested amount
+      fits within the remaining budget for the current fiscal year.
+      # AGENT-CHOICE: modelled as deterministic (a budget lookup +
+      # comparison, no reasoning) with no external_systems — there is no
+      # budget/ERP MCP tool in api/server/mcp_tools/, so the fit + YTD
+      # figures come from the payload stub, consistent with the other
+      # deterministic-lookup phases in the substrate.
+    kind: deterministic
+    external_systems: []
+
+  - name: capitalisation_review
+    intent: |
+      Check the request against the capitalisation policy. Confirm the
+      asset category is genuinely capital (not a disguised operating
+      cost). Confirm the useful-life and depreciation schedule are
+      correct for the category. Assign a risk band (low / medium / high)
+      based on amount, category, and whether it exceeds the remaining
+      budget. Flag anything that should be reclassified as OpEx.
+    kind: agent
+    agent_skill_name: capitalisation-reviewer
+    external_systems: [capitalisation_policy]
+
+  - name: capex_approval
+    intent: |
+      The CapEx approver reviews budget fit, policy compliance, and risk
+      band, then approves or rejects. Approve when the request is
+      in-budget, correctly capitalised, and low or medium risk. Reject
+      (with a one-line reason) when it is over budget, mis-classified, or
+      high risk. Requests above £50,000 route to the CFO via the
+      authority matrix before approval is final.
+    kind: hitl
+    persona: capex_approver
+    external_event: capex_approval_decision
+
+  - name: asset_registration
+    intent: |
+      On approval, create the asset record in the fixed-asset register
+      (asset ID, category, cost, cost centre, depreciation schedule,
+      in-service date) and notify Procurement to raise the purchase
+      order.
+    kind: deterministic
+    external_systems: []
+
+personae:
+  - role: capex_approver
+    workflow_label: CapEx approval
+    decision_policy: |
+      Approve when the request is in-budget, correctly capitalised, and
+      the risk band is low or medium. Reject (with a one-sentence
+      reason) when the capitalisation review flags the item for
+      reclassification to OpEx, when it is over the cost-centre's
+      remaining CapEx budget, or when the risk band is high. Requests
+      above £50,000 are routed to the CFO by the authority matrix; this
+      gate captures the first-line CapEx approver's decision on the
+      merits.
+    decision_code: |
+      budget = (context or {}).get("budget_check") or {}
+      cap = (context or {}).get("capitalisation_review") or {}
+      in_budget = bool(budget.get("in_budget"))
+      risk_band = (cap.get("risk_band") or "").lower()
+      reclassify = bool(cap.get("reclassify_to_opex"))
+      is_capital = bool(cap.get("is_capital", True))
+      if reclassify or not is_capital:
+          decision = "reject"
+          reason = "mis-classified: should be reclassified as OpEx"
+      elif not in_budget:
+          decision = "reject"
+          reason = "over the cost-centre's remaining CapEx budget"
+      elif risk_band == "high":
+          decision = "reject"
+          reason = "high risk band requires rework before approval"
+      else:
+          decision = "approve"
+          reason = "in-budget, correctly capitalised, {} risk".format(
+              risk_band or "low"
+          )
+
+external_systems:
+  - id: capitalisation_policy
+    mcp_tool: policy_search
+    operations:
+      - search
+
+# --------------------------------------------------------------------
+# v4 enrichment.
+# Person (requester) OWNS the capital Asset; the CapEx Money is
+# COSTED_TO the requesting CostCentre.
+# --------------------------------------------------------------------
+entities:
+  - kind: Person
+    source: requester
+    ref_field: payload.requester_id
+    attributes:
+      department: payload.department
+    relations:
+      - kind: OWNS
+        target_ref: payload.asset_id
+  - kind: Money
+    source: capex-request
+    ref_field: payload.request_id
+    attributes:
+      currency: payload.currency
+      category: payload.asset_category
+    relations:
+      - kind: COSTED_TO
+        target_ref: payload.cost_centre
+  - kind: Asset
+    source: capital-asset
+    ref_field: payload.asset_id
+    attributes:
+      category: payload.asset_category
+  - kind: CostCentre
+    source: cost-centre
+    ref_field: payload.cost_centre
+    attributes:
+      name: payload.cost_centre
+
+decisions:
+  - phase: capex_approval
+    persona: capex_approver
+    source_event: workflow.hitl.requested
+    decided_on_entities: [payload.request_id]
+    attributes_from_context:
+      request_id: payload.request_id
+      amount_gbp: payload.amount_gbp
+      cost_centre: payload.cost_centre
+      asset_category: payload.asset_category
+
+function: finance
+
+ambient:
+  name: CapexRequestWatcher
+  function: finance
+  reasoning_skill: null
+  spawnable_workflow_types: [capex-approval]
+  triggers:
+    - kind: bus
+      event_type: capex.request.submitted

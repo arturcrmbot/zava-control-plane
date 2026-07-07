@@ -12,6 +12,7 @@ import uuid
 from mcp.server.fastmcp import FastMCP
 
 from . import registry
+from .brief_model import compose_summary
 
 mcp = FastMCP("compose-bridge")
 
@@ -53,8 +54,15 @@ async def _ask_operator_impl(question: str, options: list[str] | None = None) ->
 
 
 async def _present_brief_impl(yaml: str) -> dict:
+    def brief_event(request_id: str) -> dict:
+        try:
+            parsed = compose_summary(yaml)
+        except Exception:
+            parsed = None
+        return {"type": "brief", "request_id": request_id, "yaml": yaml, "parsed": parsed}
+
     return await _hitl(
-        lambda rid: {"type": "brief", "request_id": rid, "yaml": yaml},
+        brief_event,
         default={"approved": True, "yaml": yaml},
     )
 

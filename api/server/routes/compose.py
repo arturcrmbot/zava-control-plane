@@ -171,7 +171,11 @@ async def brief(cid: str, payload: dict = Body(...)):
 
 
 @router.post("/api/compose/{cid}/ignite")
-async def ignite(cid: str):
+async def ignite(cid: str, request: Request):
+    # Ignite runs a shell supervisor (repo mutation + restart) — same posture as
+    # create_session: loopback + .poc-safety only, never a public caller.
+    if not _guard(request):
+        return JSONResponse({"error": "forbidden: localhost only"}, status_code=403)
     session = _require_session(cid)
     session.emit({"type": "stage", "stage": "ready", "label": "Igniting — re-arming the substrate"})
     script = str(compose_config.repo_root() / "scripts" / "compose-ignite.sh")

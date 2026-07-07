@@ -47,3 +47,32 @@ async def test_pause_on_hitl_waits_for_answer():
     s.resolve(rid, "CFO")
     nxt = await asyncio.wait_for(q.get(), timeout=2)
     assert nxt["type"] == "narration"
+
+
+@pytest.mark.asyncio
+async def test_replay_backfills_parsed_on_brief_events():
+    """A tape recorded before the projection existed should still drive the
+    canvas: replay derives `parsed` from the brief yaml."""
+    yaml = (
+        "domain:\n"
+        "  workflow_type: demo-flow\n"
+        "  display_name: Demo flow\n"
+        "phases:\n"
+        "  - name: intake\n"
+        "    intent: Capture it.\n"
+        "    kind: deterministic\n"
+        "function: ops\n"
+    )
+    tape = [{"ts_offset_ms": 0, "event": {"type": "brief", "yaml": yaml}}]
+    s = ComposeSession("cid")
+    q = s.subscribe()
+    await ReplayBridge(s, tape, speed=1000.0).start()
+    brief = None
+    for _ in range(10):
+        ev = await asyncio.wait_for(q.get(), timeout=2)
+        if ev.get("type") == "brief":
+            brief = ev
+            break
+    assert brief is not None
+    assert brief["parsed"]["workflowType"] == "demo-flow"
+    assert brief["parsed"]["steps"][0]["name"] == "Intake"

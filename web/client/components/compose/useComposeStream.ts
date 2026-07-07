@@ -1,10 +1,12 @@
 import { useEffect, useReducer, useRef } from "react";
-import { composeReducer, initialState, type ComposeEvent } from "./reducer";
+import { composeReducer, initialState, type ComposeEvent, type CockpitState } from "./reducer";
 import { postAnswer, postBrief, postIgnite } from "./api";
 
 export function useComposeStream(cid: string | null) {
   const [state, dispatch] = useReducer(composeReducer, undefined, initialState);
   const esRef = useRef<EventSource | null>(null);
+  const stateRef = useRef<CockpitState>(state);
+  stateRef.current = state;
 
   useEffect(() => {
     if (!cid) return;
@@ -21,6 +23,8 @@ export function useComposeStream(cid: string | null) {
     state,
     async answer(request_id: string, value: string) {
       if (!cid) return;
+      const q = stateRef.current.question;
+      if (q?.request_id === request_id) dispatch({ type: "decision", question: q.text, answer: value });
       await postAnswer(cid, request_id, value);
       dispatch({ type: "question_cleared", request_id });
     },

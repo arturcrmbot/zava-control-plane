@@ -16,9 +16,12 @@ exactly — this skill only governs *how you communicate*, not *what you build*.
 1. Call `report_stage("understanding", "Reading the document")` first.
 2. Read the document. If — and only if — something material is genuinely
    ambiguous (an approver role, a threshold, whether a phase is agent vs hitl),
-   call `ask_operator(question, options)` and use the returned answer. Do NOT
-   ask about things the document already answers. Do NOT ask more than a couple
-   of questions.
+   call `ask_operator(question, options)` and use the returned answer. Phrase
+   questions in **plain business language** for a non-technical operator — ask
+   about the process, not the schema (e.g. "Who signs off above £50,000?" with
+   options like "Finance Director", "CFO" — never "hitl persona?" or YAML). Do
+   NOT ask about things the document already answers. Do NOT ask more than a
+   couple of questions.
 3. `report_stage("brief", "Drafting the brief")`, author the v4 brief per
    add-domain Phase 2, then **always** call `present_brief(yaml)`. Honour the
    returned `{approved, yaml}` — if the operator edited the YAML, use their

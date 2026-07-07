@@ -8,6 +8,10 @@ export type ToolItem = {
   output?: string;
 };
 
+import type { Composition } from "./studio/types";
+
+export type Decision = { question: string; answer: string };
+
 export type ComposeEvent =
   | { type: "stage"; stage: string; label?: string }
   | { type: "thought"; text: string; partial?: boolean }
@@ -16,31 +20,35 @@ export type ComposeEvent =
   | { type: "plan"; entries: { title: string; status: string }[] }
   | { type: "question"; request_id: string; text: string; options?: string[] }
   | { type: "question_cleared"; request_id: string }
-  | { type: "brief"; request_id: string; yaml: string }
+  | { type: "decision"; question: string; answer: string }
+  | { type: "brief"; request_id: string; yaml: string; parsed?: Composition | null }
   | { type: "brief_cleared"; request_id: string }
   | { type: "done"; workflow_type: string; display_name: string }
   | { type: "error"; message: string; fatal?: boolean };
 
 export type CockpitState = {
   stage: string;
+  stageLabel: string;
   thoughts: string;
   narration: string;
   tools: ToolItem[];
   plan: { title: string; status: string }[];
   question?: { request_id: string; text: string; options: string[] };
   brief?: { request_id: string; yaml: string };
+  composition?: Composition; // retained across brief_cleared — drives the canvas
+  decisions: Decision[];
   done?: { workflow_type: string; display_name: string };
   error?: string;
 };
 
 export function initialState(): CockpitState {
-  return { stage: "intake", thoughts: "", narration: "", tools: [], plan: [] };
+  return { stage: "intake", stageLabel: "", thoughts: "", narration: "", tools: [], plan: [], decisions: [] };
 }
 
 export function composeReducer(state: CockpitState, ev: ComposeEvent): CockpitState {
   switch (ev.type) {
     case "stage":
-      return { ...state, stage: ev.stage };
+      return { ...state, stage: ev.stage, stageLabel: ev.label ?? state.stageLabel };
     case "thought":
       return { ...state, thoughts: state.thoughts + ev.text };
     case "narration":
@@ -59,8 +67,14 @@ export function composeReducer(state: CockpitState, ev: ComposeEvent): CockpitSt
       return { ...state, question: { request_id: ev.request_id, text: ev.text, options: ev.options ?? [] } };
     case "question_cleared":
       return state.question?.request_id === ev.request_id ? { ...state, question: undefined } : state;
+    case "decision":
+      return { ...state, decisions: [...state.decisions, { question: ev.question, answer: ev.answer }] };
     case "brief":
-      return { ...state, brief: { request_id: ev.request_id, yaml: ev.yaml } };
+      return {
+        ...state,
+        brief: { request_id: ev.request_id, yaml: ev.yaml },
+        composition: ev.parsed ?? state.composition,
+      };
     case "brief_cleared":
       return state.brief?.request_id === ev.request_id ? { ...state, brief: undefined } : state;
     case "done":

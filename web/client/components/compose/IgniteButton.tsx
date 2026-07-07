@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Rocket } from "lucide-react";
+import { Rocket, Loader2, PartyPopper, CheckCircle2 } from "lucide-react";
 import { pollComposition } from "./api";
 
 const VITE_PORTS = new Set(["5273", "5274", "5275"]);
@@ -19,6 +19,7 @@ export function IgniteButton({
   onIgnite: () => Promise<void>;
 }) {
   const [phase, setPhase] = useState<"idle" | "rearming" | "live">("idle");
+
   async function go() {
     setPhase("rearming");
     await onIgnite();
@@ -29,12 +30,38 @@ export function IgniteButton({
       window.open(url, "_blank");
     }
   }
-  if (phase === "rearming")
-    return <div className="text-sm text-amber-700 dark:text-amber-300">Re-arming the substrate…</div>;
+
   return (
-    <button onClick={go}
-      className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-5 py-3 text-base font-semibold text-white shadow-lg">
-      <Rocket size={18} /> Ignite "{done.display_name}"
-    </button>
+    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+      <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-emerald-50 dark:bg-emerald-950/40">
+        {phase === "live" ? (
+          <PartyPopper size={24} className="text-emerald-600 dark:text-emerald-400" />
+        ) : phase === "rearming" ? (
+          <Loader2 size={24} className="animate-spin text-emerald-600 dark:text-emerald-400" />
+        ) : (
+          <CheckCircle2 size={24} className="text-emerald-600 dark:text-emerald-400" />
+        )}
+      </div>
+
+      <h3 className="mt-3 text-[17px] font-bold tracking-tight text-slate-900 dark:text-slate-100">
+        {phase === "live" ? "You're live!" : phase === "rearming" ? "Bringing your process online…" : "Your process is ready"}
+      </h3>
+      <p className="mx-auto mt-1 max-w-xs text-[13px] leading-relaxed text-slate-500 dark:text-slate-400">
+        {phase === "live"
+          ? `“${done.display_name}” is now running. Opening it in your live process view.`
+          : phase === "rearming"
+          ? "This takes a moment while I switch it on."
+          : `I'll switch on “${done.display_name}” and open it in your live process view.`}
+      </p>
+
+      {phase === "idle" && (
+        <button
+          onClick={go}
+          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-[15px] font-semibold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-500"
+        >
+          <Rocket size={18} /> Go live
+        </button>
+      )}
+    </div>
   );
 }

@@ -47,4 +47,25 @@ describe("composeReducer", () => {
     const e = run([{ type: "error", message: "boom", fatal: true }]);
     expect(e.error).toBe("boom");
   });
+
+  it("retains parsed composition across brief_cleared", () => {
+    const parsed = { title: "Capex", workflowType: "capex", function: "finance", steps: [], entities: [], counts: { steps: 0, personae: 0, skills: 0, tools: 0, entities: 0, rules: 0 } };
+    let s = run([{ type: "brief", request_id: "b1", yaml: "domain: {}", parsed } as ComposeEvent]);
+    expect(s.brief).toMatchObject({ request_id: "b1" });
+    expect(s.composition).toEqual(parsed);
+    // approving clears the review modal but the canvas keeps the composition
+    s = composeReducer(s, { type: "brief_cleared", request_id: "b1" });
+    expect(s.brief).toBeUndefined();
+    expect(s.composition).toEqual(parsed);
+  });
+
+  it("records a decision from an answered question", () => {
+    const s = run([
+      { type: "question", request_id: "r1", text: "Who signs off?", options: ["CFO"] },
+      { type: "decision", question: "Who signs off?", answer: "CFO" },
+      { type: "question_cleared", request_id: "r1" },
+    ]);
+    expect(s.decisions).toEqual([{ question: "Who signs off?", answer: "CFO" }]);
+    expect(s.question).toBeUndefined();
+  });
 });
