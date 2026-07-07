@@ -14,6 +14,9 @@ from .session import ComposeSession
 from .translate import translate_update
 
 REPO_ROOT = os.getenv("ZAVA_REPO_ROOT", os.getcwd())
+COMPOSE_MCP_URL = os.getenv(
+    "COMPOSE_MCP_URL", "http://127.0.0.1:3101/api/compose/mcp")
+COMPOSE_MODEL = os.getenv("COMPOSE_MODEL", "claude-sonnet-4.6")
 
 
 def _default_copilot_cmd() -> list[str]:
@@ -44,8 +47,14 @@ class ComposeBridge:
             "protocolVersion": 1,
             "clientCapabilities": {"fs": {"readTextFile": False, "writeTextFile": False}},
         })
-        res = await self.client.request(
-            "session/new", {"cwd": self.repo_root, "mcpServers": []})
+        res = await self.client.request("session/new", {
+            "cwd": self.repo_root,
+            "mcpServers": [{
+                "name": "compose-bridge",
+                "type": "http",
+                "url": COMPOSE_MCP_URL,
+            }],
+        })
         self._acp_session_id = res.get("sessionId")
         self.session.emit({"type": "stage", "stage": "understanding",
                            "label": "Reading the document"})
@@ -66,10 +75,13 @@ class ComposeBridge:
 
     def _build_prompt(self) -> str:
         return (
-            "Compose a new Zava domain from the following process document by "
-            "running the add-domain skill. Ask clarifying questions only if the "
-            "document is genuinely ambiguous; always present the drafted brief "
-            "before composing.\n\n---\n" + self.document_text + "\n---"
+            "Use the `compose-domain-live` skill to compose a new Zava domain "
+            "from the process document below. Route ALL progress through the "
+            "compose-bridge MCP tools: call `report_stage` at each phase, "
+            "`ask_operator` only when the document is genuinely ambiguous, "
+            "always `present_brief` before composing, and `composition_complete` "
+            "after graduate.sh + verification pass.\n\n"
+            "--- DOCUMENT ---\n" + self.document_text + "\n--- END DOCUMENT ---"
         )
 
     async def _on_notify(self, method: str, params: dict) -> None:
