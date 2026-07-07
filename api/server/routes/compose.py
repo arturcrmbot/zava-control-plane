@@ -14,7 +14,9 @@ from fastapi import APIRouter, Body, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from api.server.services.compose import intake, registry
+from api.server.services.compose import tape as compose_tape
 from api.server.services.compose.bridge import ComposeBridge
+from api.server.services.compose.replay_bridge import ReplayBridge
 from api.server.services.compose.session import ComposeSession
 from api.shared import compose_config
 
@@ -92,6 +94,32 @@ async def stream(cid: str):
             session.unsubscribe(q)
 
     return StreamingResponse(gen(), media_type="text/event-stream")
+
+
+@router.get("/api/compose/tapes")
+async def tapes():
+    return {"tapes": compose_tape.list_tapes()}
+
+
+@router.post("/api/compose/replay")
+async def replay(payload: dict = Body(...)):
+    name = payload.get("tape")
+    if not name:
+        return JSONResponse({"error": "tape required"}, status_code=422)
+    try:
+        loaded = compose_tape.load_tape(name)
+    except FileNotFoundError:
+        return JSONResponse({"error": "tape not found"}, status_code=404)
+    cid = uuid.uuid4().hex
+    session = ComposeSession(cid)
+    registry.register(session)
+    bridge = ReplayBridge(
+        session, loaded,
+        speed=float(payload.get("speed", 8.0)),
+        pause_on_hitl=bool(payload.get("pause_on_hitl", False)),
+    )
+    await bridge.start()
+    return {"compose_id": cid}
 
 
 @router.get("/api/compose/{cid}")

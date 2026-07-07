@@ -12,6 +12,7 @@ def _app() -> FastAPI:
 
 
 def test_create_session_and_stream(monkeypatch):
+    monkeypatch.setenv("COMPOSE_RECORD", "0")
     monkeypatch.setenv("FAKE_ACP_TRACE", "tests/api/compose/fixtures/basic_trace.jsonl")
     set_copilot_cmd_for_tests([sys.executable, "tests/api/compose/fake_acp_agent.py"])
     client = TestClient(_app())

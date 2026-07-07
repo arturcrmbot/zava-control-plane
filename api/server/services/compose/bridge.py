@@ -11,6 +11,7 @@ import os
 
 from .acp_client import AcpClient
 from .session import ComposeSession
+from . import tape as compose_tape
 from .translate import translate_update
 
 REPO_ROOT = os.getenv("ZAVA_REPO_ROOT", os.getcwd())
@@ -71,6 +72,13 @@ class ComposeBridge:
         finally:
             self.session.done = True
             self.session.emit({"type": "stage", "stage": "ready", "label": "Run complete"})
+            if os.getenv("COMPOSE_RECORD", "1") == "1":
+                wt = next((e.get("workflow_type") for e in reversed(self.session.events)
+                           if e.get("type") == "done"), "compose")
+                try:
+                    compose_tape.save_tape(self.session, wt)
+                except Exception as ex:
+                    print(f"[compose] tape save failed: {ex}")
             await self.client.stop()
 
     def _build_prompt(self) -> str:

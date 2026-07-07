@@ -9,6 +9,7 @@ FAKE = ["tests/api/compose/fake_acp_agent.py"]
 
 @pytest.mark.asyncio
 async def test_bridge_streams_translated_events_then_ready(monkeypatch):
+    monkeypatch.setenv("COMPOSE_RECORD", "0")
     monkeypatch.setenv("FAKE_ACP_TRACE", "tests/api/compose/fixtures/basic_trace.jsonl")
     session = ComposeSession("cid1")
     bridge = ComposeBridge(

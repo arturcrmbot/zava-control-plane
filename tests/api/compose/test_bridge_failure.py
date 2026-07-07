@@ -9,6 +9,7 @@ FAKE = ["tests/api/compose/fake_acp_agent.py"]
 
 @pytest.mark.asyncio
 async def test_agent_exit_midprompt_surfaces_error_not_hang(monkeypatch):
+    monkeypatch.setenv("COMPOSE_RECORD", "0")
     monkeypatch.setenv("FAKE_ACP_TRACE", "tests/api/compose/fixtures/basic_trace.jsonl")
     monkeypatch.setenv("FAKE_ACP_EXIT_MIDPROMPT", "1")
     session = ComposeSession("cid")
