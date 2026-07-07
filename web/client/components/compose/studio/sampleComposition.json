@@ -1,0 +1,61 @@
+{
+  "title": "Capital expenditure approval",
+  "workflowType": "capex-approval",
+  "function": "finance",
+  "steps": [
+    {
+      "id": "capex_intake",
+      "name": "Capex intake",
+      "kind": "deterministic",
+      "lane": "automatic",
+      "intent": "Capture the CapEx request: requester name, department, cost centre, asset description + category, requested amount (GBP), business justification, and expected in-service date. Reject immediately if the amount is under GBP 1,000 (that is an operating expense, handled elsewhere).",
+      "components": [
+        { "type": "entity", "name": "Requester", "canonical": "Person", "attributes": [{ "k": "department", "v": "payload.department" }], "relations": [{ "kind": "OWNS", "target": "payload.asset_id" }] },
+        { "type": "entity", "name": "Capital asset", "canonical": "Asset", "attributes": [{ "k": "identifier", "v": "payload.asset_description" }, { "k": "status", "v": "payload.category" }], "relations": [] },
+        { "type": "entity", "name": "Capex request", "canonical": "Money", "attributes": [{ "k": "currency", "v": "payload.currency" }, { "k": "kind", "v": "payload.category" }], "relations": [{ "kind": "COSTED_TO", "target": "payload.cost_centre" }] },
+        { "type": "entity", "name": "Cost centre", "canonical": "CostCentre", "attributes": [{ "k": "name", "v": "payload.department" }], "relations": [] }
+      ]
+    },
+    {
+      "id": "budget_check",
+      "name": "Budget check",
+      "kind": "deterministic",
+      "lane": "automatic",
+      "intent": "Look up the requesting cost centre's remaining annual CapEx budget in the finance/ERP system for the current fiscal year and decide whether the requested amount fits within it. Also pull the department's year-to-date CapEx spend for context. Pass forward an in_budget flag, remaining_budget_gbp, and ytd_spend_gbp.",
+      "components": []
+    },
+    {
+      "id": "capitalisation_review",
+      "name": "Capitalisation review",
+      "kind": "agent",
+      "lane": "analysis",
+      "intent": "Check the request against the capitalisation policy. Confirm the asset category is genuinely capital (not a disguised operating cost), confirm the useful-life and depreciation schedule are correct for the category, and assign a risk band (low / medium / high) based on amount, category, and whether it exceeds the remaining budget. Flag anything that should be reclassified as OpEx. Emit is_capital, reclassify_opex, depreciation_years, and risk_band.",
+      "components": [
+        { "type": "skill", "name": "capitalisation-reviewer", "phase": "capitalisation_review" },
+        { "type": "tool", "name": "policy_search", "system": "capitalisation_policy", "operations": ["policy_search"] }
+      ]
+    },
+    {
+      "id": "capex_approval",
+      "name": "Capex approval",
+      "kind": "hitl",
+      "lane": "human",
+      "intent": "Finance Controller reviews budget fit, policy compliance, and risk band, then approves or rejects. Approve when the request is in-budget, correctly capitalised, and low or medium risk. Reject with a one-line reason when it is over budget, mis-classified, or high risk. Requests above GBP 50,000 escalate to the CFO via the authority matrix before the approval is final.",
+      "components": [
+        { "type": "persona", "role": "capex_finance_controller", "name": "Capex Finance Controller", "decisionPolicy": "Approve when the request is in-budget, the asset is correctly capitalised (not flagged for OpEx reclassification), and the risk band is low or medium. Reject with a one-line reason when it is over budget, mis-classified as capital, or high risk. Requests above GBP 50,000 require CFO sign-off, handled by the authority matrix escalation chain." },
+        { "type": "authority", "source": "Requests above GBP 50,000 require CFO sign-off, handled by the authority matrix escalation chain.", "threshold": "GBP 50,000", "tiers": [
+            { "band": "< GBP 50,000", "approver": "Capex Finance Controller", "cosign": null, "escalatesIf": null },
+            { "band": "\u2265 GBP 50,000", "approver": "Capex Finance Controller", "cosign": "CFO", "escalatesIf": "amount \u2265 GBP 50,000" }
+          ], "chain": ["Capex Finance Controller", "CFO"] }
+      ]
+    }
+  ],
+  "entities": [
+    { "type": "entity", "name": "Requester", "canonical": "Person", "attributes": [{ "k": "department", "v": "payload.department" }], "relations": [{ "kind": "OWNS", "target": "payload.asset_id" }] },
+    { "type": "entity", "name": "Capital asset", "canonical": "Asset", "attributes": [{ "k": "identifier", "v": "payload.asset_description" }, { "k": "status", "v": "payload.category" }], "relations": [] },
+    { "type": "entity", "name": "Capex request", "canonical": "Money", "attributes": [{ "k": "currency", "v": "payload.currency" }, { "k": "kind", "v": "payload.category" }], "relations": [{ "kind": "COSTED_TO", "target": "payload.cost_centre" }] },
+    { "type": "entity", "name": "Cost centre", "canonical": "CostCentre", "attributes": [{ "k": "name", "v": "payload.department" }], "relations": [] }
+  ],
+  "ambient": { "name": "CapexRequestWatcher", "trigger": "capex.request.submitted" },
+  "counts": { "steps": 4, "personae": 1, "skills": 1, "tools": 1, "entities": 4, "rules": 2 }
+}

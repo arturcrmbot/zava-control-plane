@@ -29,6 +29,7 @@ def _cors_allowed_origins() -> list[str]:
 from api.server.services.fleet_manager_service import FleetManagerService
 from api.server.services import simulator_orchestrator
 from api.shared.otel import init_otel
+from api.server.services.compose.mcp_server import mcp as compose_mcp
 
 
 def _on_live(ev: dict):
@@ -320,7 +321,8 @@ async def lifespan(app: FastAPI):
         _recorder_arm_task = None
 
     try:
-        yield
+        async with compose_mcp.session_manager.run():
+            yield
     finally:
         if _recorder_arm_task is not None and not _recorder_arm_task.done():
             _recorder_arm_task.cancel()
@@ -502,6 +504,8 @@ from api.server.routes.ticker import router as ticker_router
 from api.server.routes.memory_v2 import router as memory_v2_router
 from api.server.routes.memory import router as memory_router
 from api.server.routes.workflow_agui import router as workflow_agui_router
+# Visual Domain Composer — phase 1: session create + SSE stream.
+from api.server.routes.compose import router as compose_router
 # Per-lesson observability — D1.
 
 for r in (stream_router, workflows_router, exceptions_router, policy_router,
@@ -536,8 +540,11 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           dream_pass_pause_router,
           memory_v2_router,
           memory_router,
-          workflow_agui_router):
+          workflow_agui_router,
+          compose_router):
     app.include_router(r)
+
+app.mount("/api/compose/mcp", compose_mcp.streamable_http_app())
 
 # --- Production multi-SPA mount (full Zava container) -----------------
 # When ZAVA_STATIC_BUNDLE_DIR is set (production deploy via deploy/Dockerfile)

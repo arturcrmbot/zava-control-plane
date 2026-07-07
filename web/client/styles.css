@@ -49,6 +49,15 @@ body {
 .chip-danger  { @apply inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 border border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-800; }
 .chip-info    { @apply inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800; }
 
+/* Document "scan" sweep used by the Compose studio doc panel while reading. */
+@keyframes scan {
+  0%   { transform: translateY(0); }
+  100% { transform: translateY(240px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[scan_3s_ease-in-out_infinite\] { animation: none; }
+}
+
 /* Smooth entry animation for newly-mounted feed cards (Facebook-style). */
 @keyframes card-fade-in {
   from { opacity: 0; transform: translateY(-6px); }
