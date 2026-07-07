@@ -12,12 +12,12 @@ import uuid
 from fastapi import APIRouter, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from api.server.services.compose import registry
 from api.server.services.compose.bridge import ComposeBridge
 from api.server.services.compose.session import ComposeSession
 
 router = APIRouter()
 
-_SESSIONS: dict[str, ComposeSession] = {}
 _COPILOT_CMD_OVERRIDE: list[str] | None = None
 
 _LOOPBACK = {"127.0.0.1", "::1", "localhost"}
@@ -61,13 +61,13 @@ async def create_session(
         await bridge.start()
     except Exception as ex:
         return JSONResponse({"error": f"failed to start compose agent: {ex}"}, status_code=500)
-    _SESSIONS[cid] = session
+    registry.register(session)
     return {"compose_id": cid}
 
 
 @router.get("/api/compose/{cid}/stream")
 async def stream(cid: str):
-    session = _SESSIONS.get(cid)
+    session = registry.get(cid)
     if session is None:
         return JSONResponse({"error": "not found"}, status_code=404)
 
@@ -89,7 +89,7 @@ async def stream(cid: str):
 
 @router.get("/api/compose/{cid}")
 async def get_session(cid: str):
-    session = _SESSIONS.get(cid)
+    session = registry.get(cid)
     if session is None:
         return JSONResponse({"error": "not found"}, status_code=404)
     return {"compose_id": cid, "stage": session.stage,
