@@ -56,6 +56,7 @@ class ComposeBridge:
                 "name": "compose-bridge",
                 "type": "http",
                 "url": COMPOSE_MCP_URL,
+                "headers": [],
             }],
         })
         self._acp_session_id = res.get("sessionId")
