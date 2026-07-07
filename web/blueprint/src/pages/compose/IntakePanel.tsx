@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { UploadCloud } from "lucide-react";
 import { createSession } from "./api";
+import { ReplayPicker } from "./ReplayPicker";
 
 export function IntakePanel({ onStarted }: { onStarted: (cid: string) => void }) {
   const [text, setText] = useState("");
@@ -30,6 +31,7 @@ export function IntakePanel({ onStarted }: { onStarted: (cid: string) => void })
         placeholder="…or paste a process description" value={text} onChange={(e) => setText(e.target.value)} />
       <button className="mt-3 rounded-md bg-sky-600 px-4 py-2 font-medium text-white disabled:opacity-50"
         disabled={busy || !text.trim()} onClick={() => void start({ text })}>Compose</button>
+      <ReplayPicker onStarted={onStarted} />
     </div>
   );
 }

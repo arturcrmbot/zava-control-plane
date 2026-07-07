@@ -39,3 +39,18 @@ export async function pollComposition(workflowType: string, timeoutMs = 120000):
   }
   return false;
 }
+
+export async function listTapes(): Promise<string[]> {
+  const r = await fetch("/api/compose/tapes");
+  if (!r.ok) return [];
+  return (await r.json()).tapes ?? [];
+}
+
+export async function startReplay(input: { tape: string; speed?: number; pause_on_hitl?: boolean }): Promise<string> {
+  const r = await fetch("/api/compose/replay", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) throw new Error(`replay failed: ${r.status}`);
+  return (await r.json()).compose_id as string;
+}
