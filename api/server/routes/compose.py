@@ -7,6 +7,7 @@ document intake (PDF/docx), and the answer/brief/permission/ignite endpoints.
 from __future__ import annotations
 
 import json
+import subprocess
 import uuid
 
 from fastapi import APIRouter, Body, Form, Request, UploadFile
@@ -128,3 +129,21 @@ async def answer(cid: str, payload: dict = Body(...)):
 @router.post("/api/compose/{cid}/brief")
 async def brief(cid: str, payload: dict = Body(...)):
     return await resolve_brief(cid, payload)
+
+
+@router.post("/api/compose/{cid}/ignite")
+async def ignite(cid: str):
+    session = registry.get(cid)
+    if session is None:
+        return {"ok": False, "error": "not found"}
+    session.emit({"type": "stage", "stage": "ready", "label": "Igniting — re-arming the substrate"})
+    script = str(compose_config.repo_root() / "scripts" / "compose-ignite.sh")
+    # Detached so it survives the API restart it performs.
+    subprocess.Popen(
+        ["bash", script],
+        cwd=str(compose_config.repo_root()),
+        start_new_session=True,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    return {"ok": True}
+

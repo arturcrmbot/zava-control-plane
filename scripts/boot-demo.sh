@@ -16,6 +16,8 @@ set -u
 cd "$(dirname "$0")/.."  # repo root
 [[ -f .env ]] || cp .env.example .env
 
+source scripts/lib/compose-start.sh
+
 pids=()
 cleanup() {
   echo ""
@@ -87,8 +89,8 @@ if [[ -n "${BOOT_DEMO_SNAPSHOT:-}" ]]; then
 fi
 
 echo "==> fastapi + fleet manager (no reload)"
-uv run uvicorn api.server.main:app --port 3101 &
-pids+=($!)
+start_api
+[ -f "$PIDDIR/api.pid" ] && pids+=($(cat "$PIDDIR/api.pid"))
 
 echo "==> vite preview (static)"
 npm run demo:ui &
@@ -111,20 +113,9 @@ npm run demo:blueprint &
 pids+=($!)
 
 launch_func() {
-  case "$(uname -s)" in
-    MINGW*|MSYS*|CYGWIN*)
-      NPM_BIN="$(cygpath -u "$APPDATA")/npm"
-      source .funcvenv/Scripts/activate
-      ENTITY_PLANE_ENABLED=0 PATH="$NPM_BIN:$PATH" PYTHONUTF8=1 PYTHONIOENCODING=utf-8 PYTHONPATH="$(pwd)" \
-        func start --port 7071 &
-      ;;
-    *)
-      source .venv/bin/activate
-      ENTITY_PLANE_ENABLED=0 PYTHONPATH="$(pwd)" func start --port 7071 &
-      ;;
-  esac
-  FUNC_PID=$!
-  pids+=($FUNC_PID)
+  start_func
+  [ -f "$PIDDIR/func.pid" ] && FUNC_PID=$(cat "$PIDDIR/func.pid")
+  [ -n "${FUNC_PID:-}" ] && pids+=($FUNC_PID)
 }
 
 if [[ "${BOOT_DEMO_SKIP_FUNC:-0}" == "1" ]]; then
