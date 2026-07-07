@@ -15,7 +15,6 @@ import { AccountsPage } from "./pages/AccountsPage";
 import { FunctionsPage } from "./pages/FunctionsPage";
 import { OrgClonePage } from "./pages/OrgClonePage";
 import { WorkflowRunPage } from "./pages/WorkflowRunPage";
-import { ComposePage } from "./pages/ComposePage";
 
 export default function App() {
   // Standalone full-screen page views, addressable via ?view=...
@@ -48,7 +47,6 @@ export default function App() {
       if (view === "functions")     return <FunctionsPage />;
       if (view === "org-clone")     return <OrgClonePage />;
       if (view === "run")           return <WorkflowRunPage />;
-      if (view === "compose")       return <ComposePage />;
     }
   }
 

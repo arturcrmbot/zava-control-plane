@@ -137,3 +137,6 @@ data/kpi_history.sqlite-shm
 
 # Local agent scratch (entity-audit dumps, ad-hoc analysis)
 /tmp/
+
+# Composer runtime state (server logs + pidfiles written by boot-demo/compose-ignite)
+.compose/

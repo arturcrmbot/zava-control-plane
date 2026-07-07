@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { IntakePanel } from "./compose/IntakePanel";
-import { Cockpit } from "./compose/Cockpit";
-import { startReplay } from "./compose/api";
+import { IntakePanel } from "@client/components/compose/IntakePanel";
+import { Cockpit } from "@client/components/compose/Cockpit";
+import { startReplay } from "@client/components/compose/api";
 
-export function ComposePage() {
+export default function Compose() {
   const [cid, setCid] = useState<string | null>(null);
   useEffect(() => {
     const tape = new URLSearchParams(window.location.search).get("replay");
