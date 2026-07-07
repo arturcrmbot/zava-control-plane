@@ -502,6 +502,8 @@ from api.server.routes.ticker import router as ticker_router
 from api.server.routes.memory_v2 import router as memory_v2_router
 from api.server.routes.memory import router as memory_router
 from api.server.routes.workflow_agui import router as workflow_agui_router
+# Visual Domain Composer — phase 1: session create + SSE stream.
+from api.server.routes.compose import router as compose_router
 # Per-lesson observability — D1.
 
 for r in (stream_router, workflows_router, exceptions_router, policy_router,
@@ -536,7 +538,8 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           dream_pass_pause_router,
           memory_v2_router,
           memory_router,
-          workflow_agui_router):
+          workflow_agui_router,
+          compose_router):
     app.include_router(r)
 
 # --- Production multi-SPA mount (full Zava container) -----------------
