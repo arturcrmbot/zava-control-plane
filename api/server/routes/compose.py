@@ -1,8 +1,8 @@
-"""Visual Domain Composer HTTP surface (Phase 1: create + SSE stream).
+"""Visual Domain Composer HTTP surface: create a run, stream its normalized
+events (SSE), resolve HITL prompts, list/replay tapes, and ignite the result.
 
-LOCALHOST-ONLY: this endpoint drives a coding agent that edits the repo. It
-refuses non-loopback callers. Phase 2 adds the `.poc-safety` marker check,
-document intake (PDF/docx), and the answer/brief/permission/ignite endpoints.
+LOCALHOST-ONLY: `create_session` drives a coding agent that edits the repo, so
+it refuses non-loopback callers and requires the `.poc-safety` marker.
 """
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import json
 import subprocess
 import uuid
 
-from fastapi import APIRouter, Body, Form, Request, UploadFile
+from fastapi import APIRouter, Body, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from api.server.services.compose import intake, registry
@@ -47,6 +47,13 @@ def _guard(request: Request) -> bool:
     return _is_loopback(request) and compose_config.poc_safety_ok()
 
 
+def _require_session(cid: str) -> ComposeSession:
+    session = registry.get(cid)
+    if session is None:
+        raise HTTPException(status_code=404, detail="not found")
+    return session
+
+
 @router.post("/api/compose/session")
 async def create_session(
     request: Request,
@@ -76,9 +83,7 @@ async def create_session(
 
 @router.get("/api/compose/{cid}/stream")
 async def stream(cid: str):
-    session = registry.get(cid)
-    if session is None:
-        return JSONResponse({"error": "not found"}, status_code=404)
+    session = _require_session(cid)
 
     async def gen():
         q = session.subscribe()
@@ -119,14 +124,13 @@ async def replay(payload: dict = Body(...)):
         pause_on_hitl=bool(payload.get("pause_on_hitl", False)),
     )
     await bridge.start()
+    registry.register(session)
     return {"compose_id": cid}
 
 
 @router.get("/api/compose/{cid}")
 async def get_session(cid: str):
-    session = registry.get(cid)
-    if session is None:
-        return JSONResponse({"error": "not found"}, status_code=404)
+    session = _require_session(cid)
     return {"compose_id": cid, "stage": session.stage,
             "done": session.done, "events": session.events}
 
@@ -135,7 +139,10 @@ async def resolve_answer(cid: str, payload: dict) -> dict:
     session = registry.get(cid)
     if session is None:
         return {"ok": False, "error": "not found"}
-    ok = session.resolve(payload["request_id"], payload.get("answer", ""))
+    request_id = payload["request_id"]
+    ok = session.resolve(request_id, payload.get("answer", ""))
+    if ok:
+        session.emit({"type": "question_cleared", "request_id": request_id})
     return {"ok": ok}
 
 
@@ -143,27 +150,29 @@ async def resolve_brief(cid: str, payload: dict) -> dict:
     session = registry.get(cid)
     if session is None:
         return {"ok": False, "error": "not found"}
-    ok = session.resolve(payload["request_id"],
-                         {"approved": bool(payload.get("approved", True)),
-                          "yaml": payload.get("yaml", "")})
+    request_id = payload["request_id"]
+    ok = session.resolve(request_id, {"approved": bool(payload.get("approved", True)),
+                                      "yaml": payload.get("yaml", "")})
+    if ok:
+        session.emit({"type": "brief_cleared", "request_id": request_id})
     return {"ok": ok}
 
 
 @router.post("/api/compose/{cid}/answer")
 async def answer(cid: str, payload: dict = Body(...)):
+    _require_session(cid)
     return await resolve_answer(cid, payload)
 
 
 @router.post("/api/compose/{cid}/brief")
 async def brief(cid: str, payload: dict = Body(...)):
+    _require_session(cid)
     return await resolve_brief(cid, payload)
 
 
 @router.post("/api/compose/{cid}/ignite")
 async def ignite(cid: str):
-    session = registry.get(cid)
-    if session is None:
-        return {"ok": False, "error": "not found"}
+    session = _require_session(cid)
     session.emit({"type": "stage", "stage": "ready", "label": "Igniting — re-arming the substrate"})
     script = str(compose_config.repo_root() / "scripts" / "compose-ignite.sh")
     # Detached so it survives the API restart it performs.

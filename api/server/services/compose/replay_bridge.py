@@ -21,9 +21,11 @@ class ReplayBridge:
         self.tape = tape
         self.speed = max(speed, 0.1)
         self.pause_on_hitl = pause_on_hitl
+        self._task: asyncio.Task | None = None
 
     async def start(self) -> None:
-        asyncio.create_task(self._run())
+        # Retain the handle so the task can't be garbage-collected mid-run.
+        self._task = asyncio.create_task(self._run())
 
     async def _run(self) -> None:
         prev = 0
@@ -47,5 +49,4 @@ class ReplayBridge:
                 else:
                     self.session.emit(event)
         finally:
-            self.session.done = True
-            self.session.emit({"type": "stage", "stage": "ready", "label": "Replay complete"})
+            self.session.finish("Replay complete")

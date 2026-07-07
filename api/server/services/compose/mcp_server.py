@@ -1,7 +1,6 @@
 """compose-bridge MCP server: the structured HITL + progress channel the
-compose agent calls. Mounted at /api/compose/mcp (streamable HTTP) in a later
-task. v1 resolves the target session via the registry's `active` pointer
-(one run at a time).
+compose agent calls. Mounted at /api/compose/mcp (streamable HTTP). Resolves
+the target session via the registry's `active` pointer (one run at a time).
 
 The `_impl` functions hold the logic and are unit-tested directly; the FastMCP
 `@mcp.tool()` wrappers just delegate to them.
@@ -33,25 +32,31 @@ def _composition_complete_impl(workflow_type: str, display_name: str) -> str:
     return "ok"
 
 
-async def _ask_operator_impl(question: str, options: list[str] | None = None) -> str:
+async def _hitl(make_event, default):
+    """Emit a HITL event and block on its pending future until the UI resolves
+    it. Returns `default` when there is no active session."""
     session = registry.active()
     if session is None:
-        return ""
+        return default
     request_id = uuid.uuid4().hex
     fut = session.new_pending(request_id)
-    session.emit({"type": "question", "request_id": request_id,
-                  "text": question, "options": options or []})
+    session.emit(make_event(request_id))
     return await fut
+
+
+async def _ask_operator_impl(question: str, options: list[str] | None = None) -> str:
+    return await _hitl(
+        lambda rid: {"type": "question", "request_id": rid,
+                     "text": question, "options": options or []},
+        default="",
+    )
 
 
 async def _present_brief_impl(yaml: str) -> dict:
-    session = registry.active()
-    if session is None:
-        return {"approved": True, "yaml": yaml}
-    request_id = uuid.uuid4().hex
-    fut = session.new_pending(request_id)
-    session.emit({"type": "brief", "request_id": request_id, "yaml": yaml})
-    return await fut
+    return await _hitl(
+        lambda rid: {"type": "brief", "request_id": rid, "yaml": yaml},
+        default={"approved": True, "yaml": yaml},
+    )
 
 
 @mcp.tool()

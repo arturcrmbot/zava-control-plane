@@ -57,3 +57,8 @@ class ComposeSession:
             fut.set_result(value)
             return True
         return False
+
+    def finish(self, label: str = "Run complete") -> None:
+        """Mark the run over and emit the terminal `ready` stage."""
+        self.done = True
+        self.emit({"type": "stage", "stage": "ready", "label": label})

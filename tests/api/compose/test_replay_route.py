@@ -1,7 +1,13 @@
 import json
-import sys
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from api.server.routes.compose import router
+
+
+def _app() -> FastAPI:
+    app = FastAPI()
+    app.include_router(router)
+    return app
 
 
 def _write_tape(tmp_path):
@@ -19,17 +25,7 @@ def test_list_and_replay(tmp_path, monkeypatch):
     monkeypatch.setenv("ZAVA_REPO_ROOT", str(tmp_path))
     (tmp_path / ".poc-safety").write_text("POC_UNSAFE_FOR_PUBLIC_DEPLOY=1\n")
     name = _write_tape(tmp_path)
-    
-    # Clear cached imports to force fresh load
-    for mod in list(sys.modules.keys()):
-        if 'api.server.routes.compose' in mod:
-            del sys.modules[mod]
-    
-    # Import router AFTER setting env vars and clearing cache
-    from api.server.routes.compose import router
-    app = FastAPI()
-    app.include_router(router)
-    client = TestClient(app)
+    client = TestClient(_app())
 
     r = client.get("/api/compose/tapes")
     assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text}"

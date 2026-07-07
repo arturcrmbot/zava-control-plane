@@ -1,20 +1,22 @@
 """ComposeBridge: drive one `copilot --acp` run and stream normalized events.
 
-Phase 1 uses a simplified prompt and no MCP tools; the real add-domain prompt,
-the compose-bridge MCP, document intake, and the safety guard land in Phase 2.
-The `copilot_cmd` seam lets tests inject a fake ACP agent.
+Spawns the agent, runs the ACP handshake with the compose-bridge MCP attached,
+sends the composition prompt, and folds `session/update` notifications into the
+session's normalized event stream. The `copilot_cmd` seam lets tests inject a
+fake ACP agent.
 """
 from __future__ import annotations
 
 import asyncio
 import os
 
+from api.shared import compose_config
+
 from .acp_client import AcpClient
 from .session import ComposeSession
 from . import tape as compose_tape
 from .translate import translate_update
 
-REPO_ROOT = os.getenv("ZAVA_REPO_ROOT", os.getcwd())
 COMPOSE_MCP_URL = os.getenv(
     "COMPOSE_MCP_URL", "http://127.0.0.1:3101/api/compose/mcp")
 COMPOSE_MODEL = os.getenv("COMPOSE_MODEL", "claude-sonnet-4.6")
@@ -34,7 +36,7 @@ class ComposeBridge:
     ) -> None:
         self.session = session
         self.document_text = document_text
-        self.repo_root = repo_root or REPO_ROOT
+        self.repo_root = repo_root or str(compose_config.repo_root())
         self._copilot_cmd = copilot_cmd or _default_copilot_cmd()
         self.client = AcpClient(self._on_notify, self._on_request)
         self._acp_session_id: str | None = None
@@ -70,8 +72,7 @@ class ComposeBridge:
         except Exception as ex:  # surface, never stall silently
             self.session.emit({"type": "error", "message": str(ex), "fatal": True})
         finally:
-            self.session.done = True
-            self.session.emit({"type": "stage", "stage": "ready", "label": "Run complete"})
+            self.session.finish()
             if os.getenv("COMPOSE_RECORD", "1") == "1":
                 wt = next((e.get("workflow_type") for e in reversed(self.session.events)
                            if e.get("type") == "done"), "compose")
@@ -98,8 +99,8 @@ class ComposeBridge:
                 self.session.emit(event)
 
     async def _on_request(self, method: str, params: dict) -> dict:
-        # Phase 1 runs with --allow-all so permission requests should not fire;
-        # auto-approve defensively if they do.
+        # --allow-all means permission requests should not fire; auto-approve
+        # defensively if they do.
         if method == "session/request_permission":
             opts = params.get("options") or []
             allow = next(
