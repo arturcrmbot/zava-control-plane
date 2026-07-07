@@ -9,9 +9,9 @@ output shape so downstream phases (and the personae) can read the
 contract's current annual value, category and region from a single dict.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.server.mcp_tools.contract_repository import get_contract
 
 
@@ -39,15 +39,6 @@ async def _contract_lookup_execute(input: dict) -> dict:
 
 
 def build_fleet_contract_renewal_contract_lookup_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="contract_lookup",
-        name="deterministic_contract_lookup",
-        executor_type="deterministic",
-        fn=_contract_lookup_execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("contract_lookup", "deterministic_contract_lookup", "deterministic", _contract_lookup_execute),
+    ])

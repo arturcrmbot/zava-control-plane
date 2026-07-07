@@ -9,30 +9,15 @@ Validator guardrails the agent payload to the spec shape so downstream
 phases can rely on a stable schema.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.agents import agent_fleet_it_access_request_rbac_resolver
 from api.functions.graphs.executors.validators import validate_fleet_it_access_request_rbac_resolver_schema
 
 
 def build_fleet_it_access_request_rbac_resolver_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="rbac_resolver",
-        name="agent_rbac_resolver",
-        executor_type="agent",
-        fn=agent_fleet_it_access_request_rbac_resolver.execute,
-    )
-    n2 = TrackedExecutor(
-        id="val_rbac_resolver",
-        name="validate_fleet_it_access_request_rbac_resolver_schema",
-        executor_type="validator",
-        fn=validate_fleet_it_access_request_rbac_resolver_schema.execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, n2)
-        .add_edge(n2, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("rbac_resolver", "agent_rbac_resolver", "agent", agent_fleet_it_access_request_rbac_resolver.execute),
+        ("val_rbac_resolver", "validate_fleet_it_access_request_rbac_resolver_schema", "validator", validate_fleet_it_access_request_rbac_resolver_schema.execute),
+    ])

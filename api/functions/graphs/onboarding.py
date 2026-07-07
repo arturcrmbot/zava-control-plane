@@ -8,30 +8,15 @@ calendar) per spec §4.5 + §4.13. The avatar render result lands on
 it. Hook-gated for the JML send (deferred to subsequent stream).
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.agents import agent_onboarding
 from api.functions.graphs.executors.validators import validate_hiring_stub
 
 
 def build_hiring_onboarding_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="hiring_onboarding",
-        name="agent_onboarding_buddy",
-        executor_type="agent",
-        fn=agent_onboarding.execute,
-    )
-    n2 = TrackedExecutor(
-        id="val_onboarding",
-        name="validate_onboarding_schema",
-        executor_type="validator",
-        fn=validate_hiring_stub.execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, n2)
-        .add_edge(n2, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("hiring_onboarding", "agent_onboarding_buddy", "agent", agent_onboarding.execute),
+        ("val_onboarding", "validate_onboarding_schema", "validator", validate_hiring_stub.execute),
+    ])

@@ -9,30 +9,15 @@ accept-justification / require-repayment / issue-warning / escalate
 with a cited precedent.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.agents import agent_arbitration
 from api.functions.graphs.executors.validators import validate_arbitration_schema
 
 
 def build_arbitrate_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="arbitration",
-        name="agent_arbitration",
-        executor_type="agent",
-        fn=agent_arbitration.execute,
-    )
-    n2 = TrackedExecutor(
-        id="val_arb_schema",
-        name="validate_arbitration_schema",
-        executor_type="validator",
-        fn=validate_arbitration_schema.execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, n2)
-        .add_edge(n2, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("arbitration", "agent_arbitration", "agent", agent_arbitration.execute),
+        ("val_arb_schema", "validate_arbitration_schema", "validator", validate_arbitration_schema.execute),
+    ])

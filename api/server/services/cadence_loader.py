@@ -17,7 +17,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Awaitable, Callable
+from typing import Callable
 
 import yaml
 from croniter import croniter
@@ -167,33 +167,3 @@ async def _default_spawn_workflow(workflow_type: str) -> str | None:
         return None
     spawn = _resolve_spawner(domain)
     return await spawn()
-
-
-async def run_cadenced_rituals_loop(
-    *,
-    interval_seconds: float = 60.0,
-    spawn_fn: Callable[[str], Awaitable[object]] | None = None,
-) -> None:
-    """Forever loop: tick every ``interval_seconds`` and spawn due rituals.
-
-    Wire-up helper for the FastAPI lifespan to schedule as a background
-    task. Kept thin so the testable surface lives in
-    :func:`tick_cadenced_rituals`.
-    """
-    import asyncio
-
-    spawn_async = spawn_fn or _default_spawn_workflow
-
-    pending: list[asyncio.Task] = []
-
-    def _schedule(workflow_type: str) -> None:
-        pending.append(asyncio.create_task(spawn_async(workflow_type)))
-
-    while True:
-        try:
-            tick_cadenced_rituals(spawn_fn=_schedule)
-        except Exception as ex:  # pragma: no cover — defensive
-            _log.warning("cadenced rituals tick failed: %s", ex)
-        # Drain finished tasks so they don't accumulate.
-        pending[:] = [t for t in pending if not t.done()]
-        await asyncio.sleep(interval_seconds)

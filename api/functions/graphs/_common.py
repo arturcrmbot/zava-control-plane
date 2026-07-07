@@ -5,19 +5,7 @@ import time
 import httpx
 
 
-WORKDAY_URL = os.getenv("WORKDAY_MCP_URL", "http://localhost:4101")
 D365_URL = os.getenv("D365_MCP_URL", "http://localhost:4102")
-MACONOMY_URL = os.getenv("MACONOMY_MCP_URL", "http://localhost:4103")
-PAYMENT_URL = os.getenv("PAYMENT_MCP_URL", "http://localhost:4104")
-
-# POC2 hiring MCP mocks (canonical port range 4201-4207, see docs/archive/poc2-status.md §2)
-GREENHOUSE_URL = os.getenv("GREENHOUSE_MCP_URL", "http://localhost:4201")
-LINKEDIN_URL = os.getenv("LINKEDIN_MCP_URL", "http://localhost:4202")
-WORKDAY_HR_URL = os.getenv("WORKDAY_HR_MCP_URL", "http://localhost:4203")
-GRAPH_URL = os.getenv("GRAPH_MCP_URL", "http://localhost:4204")
-SERVICENOW_URL = os.getenv("SERVICENOW_MCP_URL", "http://localhost:4205")
-ACS_URL = os.getenv("ACS_MCP_URL", "http://localhost:4206")
-HEYGEN_URL = os.getenv("HEYGEN_MCP_URL", "http://localhost:4207")
 
 
 async def call_mcp(
@@ -93,7 +81,3 @@ async def call_mcp(
     if status_code >= 400:
         raise RuntimeError(f"mcp {tool} failed: {status_code}")
     return resp_json
-
-
-def now_ms() -> int:
-    return int(time.time() * 1000)

@@ -1,0 +1,120 @@
+{
+  "voice": "en-US-Grant:MAI-Voice-2",
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "essay_url": "https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/blueprint/",
+  "operator_url": "https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/",
+  "operator_workflow_url": "https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/workflows/API-0004",
+  "scenes": [
+    {
+      "id": "scene-01",
+      "label": "Cold open",
+      "text": "This is the page at aka dot M S slash agentic blueprint. It's an essay arguing that the way most organisations are buying AI is why none of it is compounding. And it's backed by a working substrate I built to show what compounding looks like.",
+      "audio_ms": 19792,
+      "stage": {
+        "page": "essay",
+        "after_navigate_wait_ms": 800,
+        "scroll_to_selector": null
+      }
+    },
+    {
+      "id": "scene-02",
+      "label": "Why nothing compounds",
+      "text": "The argument is simple. Sponsor an initiative, the demo works, contracts get signed, something ships. The next one starts over with new tech, new prompts, new vendor. Nothing carries. Two reasons. First, humans cannot realistically build, train and govern initiatives one at a time fast enough. By the time the first lands, the organisation has adopted three other tools. Second, most organisations are running several agent frameworks in parallel. None of them strengthen each other. Nothing accumulates because none of them share a foundation that would let them.",
+      "audio_ms": 39600,
+      "stage": {
+        "page": "essay",
+        "scroll_to_text": "Each of these initiatives is a hand-copied manuscript",
+        "scroll_align": "center"
+      }
+    },
+    {
+      "id": "scene-03a",
+      "label": "Harness",
+      "text": "The substrate is four things together. First, the harness. It runs agentic segments inside otherwise deterministic workflows. The model picks the next tool inside a segment. The orchestrator picks everything else.",
+      "audio_ms": 16656,
+      "stage": {
+        "page": "essay",
+        "scroll_to_text": "What you ought to be using instead",
+        "scroll_align": "start",
+        "highlight_card_index": 0
+      }
+    },
+    {
+      "id": "scene-03b",
+      "label": "Skills",
+      "text": "Second, skills. A skill is a markdown file with a system prompt, an allow-list of tools, and a model choice. Replacing one is a file edit.",
+      "audio_ms": 11400,
+      "stage": {
+        "page": "essay",
+        "highlight_card_index": 1
+      }
+    },
+    {
+      "id": "scene-03c",
+      "label": "MCPs",
+      "text": "Third, MCPs. One adapter per outside system, shared by every agent. Workday, Concur, the authority matrix, the policy ledger.",
+      "audio_ms": 12848,
+      "stage": {
+        "page": "essay",
+        "highlight_card_index": 2
+      }
+    },
+    {
+      "id": "scene-03d",
+      "label": "Foundation",
+      "text": "Fourth, the foundation. Per-agent signing keys, tool allow-lists checked before every call, structural validation on every output, and a tamper-evident audit log. Policy lives in a YAML file compliance can edit directly.",
+      "audio_ms": 18512,
+      "stage": {
+        "page": "essay",
+        "highlight_card_index": 3
+      }
+    },
+    {
+      "id": "scene-04",
+      "label": "Reference organisation",
+      "text": "On top of this I built a reference organisation. Around 35 skills, 23 MCP adapters, 10 workflows wired up end to end. Each tile is a domain. The skills and MCPs aren't owned by any single workflow. They're cast once and shared across all of them.",
+      "audio_ms": 18480,
+      "stage": {
+        "page": "essay",
+        "scroll_to_text": "What we have already cast",
+        "scroll_align": "start"
+      }
+    },
+    {
+      "id": "scene-05",
+      "label": "Observatory loop",
+      "text": "This is the substrate actually running. The visualisation in the middle plots one workflow at a time. Domain at the centre, the skills the agents picked up around it, the MCP calls travelling out to the rim. Each blink is a real event. None of it is animation. The counters track the substrate as a whole. Workflows started, skills run, MCP calls, validators blocked, workflows completed. They go up as agents work. What you're watching is real telemetry. The workflows ran on my laptop against the same orchestrator, skills and MCPs described above. Every event was captured. We're replaying the recording so it reads continuously instead of waiting for live traffic.",
+      "audio_ms": 52816,
+      "stage": {
+        "page": "essay",
+        "scroll_to_text": "And here is what it looks like when it runs",
+        "scroll_align": "start"
+      }
+    },
+    {
+      "id": "scene-06",
+      "label": "One iteration",
+      "text": "This is the operator dashboard. Pick a workflow that's mid-flight. This AP invoice from Globex for two hundred and ninety five thousand pounds. The drawer shows what the agent did. Invoice lookup ran, three-way match ran, then the workflow suspended for human approval because the amount sits outside the regional controller's delegation per the authority matrix. The reasoning, the matched authority rule, the state snapshot, the audit trail. All of it on one page. That's one iteration of the loop.",
+      "audio_ms": 33840,
+      "stage": {
+        "page": "operator_workflow",
+        "after_navigate_wait_ms": 4000,
+        "scroll_to_selector": null
+      }
+    },
+    {
+      "id": "scene-07",
+      "label": "Why this compounds",
+      "text": "The reason this compounds isn't that the model got smarter. It's structural. Each new domain reuses the same identity, audit, operator surface and orchestrator. The first one I built took fifteen days. The recent ones took hours.",
+      "audio_ms": 15664,
+      "stage": {
+        "page": "essay",
+        "scroll_to_text": "what does it look like when this organisation",
+        "scroll_align": "start"
+      }
+    }
+  ]
+}

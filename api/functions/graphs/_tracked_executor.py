@@ -10,7 +10,7 @@ emission so the UI can render type-specific icons.
 from __future__ import annotations
 import time
 from typing import Awaitable, Callable
-from agent_framework import Executor, WorkflowContext, handler
+from agent_framework import Executor, Workflow, WorkflowBuilder, WorkflowContext, handler
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 from api.functions.webhook import emit
@@ -94,3 +94,25 @@ class TerminalExecutor(Executor):
     @handler(input=dict, workflow_output=dict)
     async def process(self, input: dict, ctx: WorkflowContext) -> None:
         await ctx.yield_output(input)
+
+
+def build_linear_workflow(
+    nodes: list[tuple[str, str, str, ExecuteFn]],
+    *,
+    terminal_id: str = "terminal",
+) -> Workflow:
+    """Build a linear graph: ``nodes[0] -> nodes[1] -> ... -> terminal``.
+
+    Each node is ``(id, name, executor_type, fn)``. Collapses the
+    TrackedExecutor + WorkflowBuilder boilerplate that every graph builder
+    in this package otherwise repeats by hand.
+    """
+    chain: list[Executor] = [
+        TrackedExecutor(id=node_id, name=name, executor_type=executor_type, fn=fn)
+        for node_id, name, executor_type, fn in nodes
+    ]
+    chain.append(TerminalExecutor(id=terminal_id))
+    builder = WorkflowBuilder(start_executor=chain[0])
+    for src, dst in zip(chain, chain[1:]):
+        builder = builder.add_edge(src, dst)
+    return builder.build()

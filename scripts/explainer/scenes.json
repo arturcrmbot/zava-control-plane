@@ -1,0 +1,160 @@
+{
+  "voice": "en-US-Grant:MAI-Voice-2",
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "essay_url": "https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/blueprint/",
+  "operator_url": "https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/",
+  "operator_workflow_url": "https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/workflows/API-0004",
+  "operator_memory_url": "https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/memory",
+  "operator_knowledge_url": "https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/knowledge",
+  "constellation_view_url": "https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/blueprint/?view=constellation",
+  "constellation_site_url": "https://aiappsgbb.github.io/zava-constellation/",
+  "scenes": [
+    {
+      "id": "scene-01",
+      "label": "Hook + setup",
+      "text": "This is a piece I wrote about why most agent strategies aren't compounding. Every new initiative rebuilds the same plumbing from scratch: skills, adapters, audit, governance. After a year, instead of a platform, you have a graveyard of prototypes. The alternative is a shared substrate every initiative inherits.",
+      "audio_ms": 18500,
+      "stage": {
+        "page": "essay",
+        "after_navigate_wait_ms": 1500,
+        "scroll_sequence": [
+          {
+            "to_text": "Each of these initiatives is a hand-copied manuscript",
+            "align": "center",
+            "wait_ms": 3500
+          },
+          {
+            "to_text": "What we have already cast",
+            "align": "start",
+            "wait_ms": 0
+          }
+        ],
+        "chyron": {
+          "text": "aka.ms/agenticblueprint"
+        }
+      }
+    },
+    {
+      "id": "scene-02",
+      "label": "What's in the substrate",
+      "text": "So what's actually in this substrate. [BREAK:400] Four pieces. [BREAK:300] The harness keeps your code deterministic, and only calls the model inside narrow, supervised bands. So you never bet a whole workflow on the model behaving. [BREAK:500] Skills sit on top. Just markdown files, owned by one team, that any workflow can pull in. [BREAK:500] MCPs are adapters to your real outside systems. You connect once, and every agent in every workflow inherits it. [BREAK:500] And underneath, one YAML file for identity, audit, validation, and policy. Compliance ends up with one surface to look at, not one per project.",
+      "audio_ms": 35099,
+      "stage": {
+        "page": "essay",
+        "scroll_sequence": [
+          {
+            "to_text": "What you ought to be using instead",
+            "align": "start",
+            "wait_ms": 1500
+          }
+        ],
+        "card_highlight_sequence": [
+          {
+            "index": 0,
+            "after_ms": 6000
+          },
+          {
+            "index": 1,
+            "after_ms": 14000
+          },
+          {
+            "index": 2,
+            "after_ms": 22000
+          },
+          {
+            "index": 3,
+            "after_ms": 32000
+          }
+        ]
+      }
+    },
+    {
+      "id": "scene-03",
+      "label": "Workflow in flight",
+      "text": "Here's one of those workflows in flight. [BREAK:400] Accounts payable invoice from a supplier called Globex. Two hundred and ninety five thousand pounds. [BREAK:500] The agent has worked through it, looked the supplier up, matched it against the purchase order, and got as far as it could. [BREAK:400] But the amount is over the threshold of the person who'd normally counter-sign, so it's paused, waiting on her. [BREAK:600] What you're looking at is the agent's decision, the authority rule it consulted, its reasoning, and the audit trail. All on one page. [BREAK:400] All replayed from a real run that happened against the substrate I just described.",
+      "audio_ms": 40857,
+      "stage": {
+        "page": "operator_workflow",
+        "after_navigate_wait_ms": 4500,
+        "dark_mode": true,
+        "mid_actions": [
+          {
+            "after_ms": 14000,
+            "scroll_drawer_to_text": "Live reasoning"
+          },
+          {
+            "after_ms": 28000,
+            "scroll_drawer_to_text": "Audit trail"
+          }
+        ]
+      }
+    },
+    {
+      "id": "scene-04",
+      "label": "Authority matrix",
+      "text": "One thing worth flagging while we're here. [BREAK:400] All those approval calls. Who can sign off, at what amount, who they escalate to when they can't. [BREAK:500] That's a real matrix that exists in your organisation today. The substrate makes it machine-readable, so the agents look up the same rules your humans do. [BREAK:500] They never decide on their own. They route the work to whoever owns it, and the matched rule lands in the audit log alongside their reasoning.",
+      "audio_ms": 26255,
+      "stage": {
+        "page": "essay",
+        "scroll_to_text": "The delegated-authority matrix",
+        "scroll_align": "start"
+      }
+    },
+    {
+      "id": "scene-05",
+      "label": "Memory",
+      "text": "This is the substrate's memory. [BREAK:400] Every run leaves a trace, organised by domain. [BREAK:300] These are real hiring cases the substrate has processed. What the agent recommended, who signed off, the signals that drove the call. [BREAK:600] When the next hiring case opens, the substrate pulls the relevant past entries into the agent's context. [BREAK:400] After enough runs, the agent acts like it's been doing this job for years. Because in aggregate, it has.",
+      "audio_ms": 26505,
+      "stage": {
+        "page": "operator_memory",
+        "after_navigate_wait_ms": 4500,
+        "dark_mode": true,
+        "mid_actions": [
+          {
+            "after_ms": 11000,
+            "scroll_page_by": 400
+          },
+          {
+            "after_ms": 18000,
+            "scroll_page_by": 400
+          }
+        ]
+      }
+    },
+    {
+      "id": "scene-06",
+      "label": "Constellation + knowledge graph",
+      "text": "This is the whole organisation in one view. [BREAK:500] Each ring is a department. Each city inside that ring is a domain. And the rockets you can see flying between them, those aren't decorative. Each one is an actual workflow in flight, right now, against the substrate. [BREAK:700] Now watch when I flip over to the entities side. [BREAK:600] Now you can see what those workflows are actually touching. People, money, decisions, suppliers, all in one connected graph. [BREAK:500] Every workflow projects what it touches onto this graph. So the next agent that picks up a case finds the history already there. The substrate compounds.",
+      "audio_ms": 40982,
+      "stage": {
+        "page": "constellation_view",
+        "after_navigate_wait_ms": 5500,
+        "mid_actions": [
+          {
+            "after_ms": 17000,
+            "click_text": "Entities"
+          }
+        ]
+      }
+    },
+    {
+      "id": "scene-07",
+      "label": "Closing",
+      "text": "That's the substrate. [BREAK:500] Everything you've just seen, the harness, the skills, the operator, the constellation view, all of it is built and runs the same way. Every piece is a skill the agent can read and extend. [BREAK:700] If you want to look at it yourself, the whole piece is at this URL. There's a Let's talk link at the bottom of the article that puts thirty minutes on my calendar. No slides, no pitch. [BREAK:500] Thank you for your time.",
+      "audio_ms": 23847,
+      "stage": {
+        "page": "essay",
+        "after_navigate_wait_ms": 2000,
+        "scroll_to_text": "Let's talk",
+        "scroll_align": "center",
+        "chyron": {
+          "text": "aka.ms/agenticblueprint"
+        },
+        "highlight_text": "Let's talk"
+      }
+    }
+  ]
+}

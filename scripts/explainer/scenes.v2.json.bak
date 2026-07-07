@@ -1,0 +1,123 @@
+{
+  "voice": "en-US-Grant:MAI-Voice-2",
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "essay_url": "https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/blueprint/",
+  "operator_url": "https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/",
+  "operator_workflow_url": "https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/workflows/API-0004",
+  "scenes": [
+    {
+      "id": "scene-01",
+      "label": "Hook + setup",
+      "text": "This is a piece I wrote about why most agent strategies aren't compounding. Every new initiative rebuilds the same plumbing from scratch: skills, adapters, audit, governance. After a year, instead of a platform, you have a graveyard of prototypes. The alternative is a shared substrate every initiative inherits.",
+      "audio_ms": 19198,
+      "stage": {
+        "page": "essay",
+        "after_navigate_wait_ms": 1500,
+        "scroll_sequence": [
+          {
+            "to_text": "Each of these initiatives is a hand-copied manuscript",
+            "align": "center",
+            "wait_ms": 3500
+          },
+          {
+            "to_text": "What we have already cast",
+            "align": "start",
+            "wait_ms": 0
+          }
+        ],
+        "chyron": {
+          "text": "aka.ms/agenticblueprint",
+          "persist": true
+        }
+      }
+    },
+    {
+      "id": "scene-03a",
+      "label": "Harness",
+      "text": "Four pieces. The harness. Determinism where it matters, agents only inside narrow segments. You don't bet a workflow on the model behaving.",
+      "audio_ms": 10915,
+      "stage": {
+        "page": "essay",
+        "scroll_to_text": "What you ought to be using instead",
+        "scroll_align": "start",
+        "highlight_card_index": 0
+      }
+    },
+    {
+      "id": "scene-03b",
+      "label": "Skills",
+      "text": "Skills. Markdown files. One team owns them, every workflow uses them.",
+      "audio_ms": 7007,
+      "stage": {
+        "page": "essay",
+        "highlight_card_index": 1
+      }
+    },
+    {
+      "id": "scene-03c",
+      "label": "MCPs",
+      "text": "MCPs. One adapter per system, shared across every agent. Connect once, every agent inherits it.",
+      "audio_ms": 7776,
+      "stage": {
+        "page": "essay",
+        "highlight_card_index": 2
+      }
+    },
+    {
+      "id": "scene-03d",
+      "label": "Foundation",
+      "text": "And the foundation. Identity, audit, validation, policy in a YAML file. Compliance gets one surface, not one per project.",
+      "audio_ms": 9523,
+      "stage": {
+        "page": "essay",
+        "highlight_card_index": 3
+      }
+    },
+    {
+      "id": "scene-04",
+      "label": "Reference org",
+      "text": "Built it out as a reference organisation. Around 35 skills, 23 adapters, 10 workflows wired end to end. None of them owned by a single workflow.",
+      "audio_ms": 11793,
+      "stage": {
+        "page": "essay",
+        "scroll_to_text": "What we have already cast",
+        "scroll_align": "start"
+      }
+    },
+    {
+      "id": "scene-05",
+      "label": "Observatory",
+      "text": "And this is the substrate running. The graph in the middle plots one workflow at a time. Domain at the centre, skills around it, MCP calls out to the rim. Each blink is a real event. Counters track the whole substrate. Workflows started, skills run, MCP calls, validators blocked, workflows completed. It's replayed telemetry from real runs on my laptop, against the same orchestrator described above.",
+      "audio_ms": 24852,
+      "stage": {
+        "page": "essay",
+        "scroll_to_text": "And here is what it looks like when it runs",
+        "scroll_align": "start"
+      }
+    },
+    {
+      "id": "scene-06",
+      "label": "One iteration",
+      "text": "Operator dashboard. Pick a workflow that's mid-flight. AP invoice from Globex, two hundred and ninety five thousand pounds. The drawer shows what the agent did, why it suspended for human approval, and which authority rule applied. Reasoning, the matched rule, the state snapshot, the audit trail. All on one page.",
+      "audio_ms": 23224,
+      "stage": {
+        "page": "operator_workflow",
+        "after_navigate_wait_ms": 4000
+      }
+    },
+    {
+      "id": "scene-07",
+      "label": "Why this compounds",
+      "text": "Why this compounds isn't a smarter model. It's structural. Each new domain reuses the same identity, audit, operator surface, orchestrator. The first one took fifteen days. The recent ones took hours.",
+      "audio_ms": 17175,
+      "stage": {
+        "page": "essay",
+        "scroll_to_text": "what does it look like when this organisation",
+        "scroll_align": "start"
+      }
+    }
+  ]
+}

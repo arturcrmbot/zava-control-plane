@@ -1,20 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Protocol
 
 from api.server.services.dream_pass.sandbox import SandboxRunner
 from api.server.services.dream_pass.types import Experiment
 from api.server.services.scoring import RunScorer
 from api.server.services.scoring.types import Rubric
-
-
-class _SandboxFactory(Protocol):
-    def __call__(self) -> SandboxRunner: ...
-
-
-class _ScorerFactory(Protocol):
-    def __call__(self, sandbox: SandboxRunner) -> RunScorer: ...
 
 
 class ExperimentRunner:

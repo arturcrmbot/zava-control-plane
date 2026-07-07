@@ -8,9 +8,9 @@ just a deterministic call producing the canonical phase output shape so
 downstream phases can read the invoice's amount + category from a single dict.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.server.mcp_tools.invoice_repository import get_invoice
 
 
@@ -38,15 +38,6 @@ async def _invoice_lookup_execute(input: dict) -> dict:
 
 
 def build_fleet_ap_invoice_invoice_lookup_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="invoice_lookup",
-        name="deterministic_invoice_lookup",
-        executor_type="deterministic",
-        fn=_invoice_lookup_execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("invoice_lookup", "deterministic_invoice_lookup", "deterministic", _invoice_lookup_execute),
+    ])

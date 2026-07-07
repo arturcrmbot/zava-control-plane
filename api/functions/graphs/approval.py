@@ -7,9 +7,9 @@ The `requires_hitl` flag in the output drives the orchestration generator (Phase
 to either proceed or pause via wait_for_external_event.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.deterministic import load_authority_policy, apply_threshold_routing
 
 
@@ -22,9 +22,7 @@ async def wrap_policy(input: dict) -> dict:
 
 
 def build_approval_workflow() -> Workflow:
-    n1 = TrackedExecutor(id="load_policy", name="load_authority_policy",
-                         executor_type="deterministic", fn=wrap_policy)
-    n2 = TrackedExecutor(id="threshold", name="apply_threshold_routing",
-                         executor_type="deterministic", fn=apply_threshold_routing.execute)
-    term = TerminalExecutor(id="terminal")
-    return WorkflowBuilder(start_executor=n1).add_edge(n1, n2).add_edge(n2, term).build()
+    return build_linear_workflow([
+        ("load_policy", "load_authority_policy", "deterministic", wrap_policy),
+        ("threshold", "apply_threshold_routing", "deterministic", apply_threshold_routing.execute),
+    ])

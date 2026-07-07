@@ -6,9 +6,9 @@ Reads `purchase_order.po_id` from the orchestrator payload and returns the
 canonical record. Pure pass-through of the synthetic seed corpus.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 
 
 async def _po_lookup_execute(input: dict) -> dict:
@@ -27,15 +27,6 @@ async def _po_lookup_execute(input: dict) -> dict:
 
 
 def build_fleet_purchase_order_po_lookup_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="po_lookup",
-        name="deterministic_po_lookup",
-        executor_type="deterministic",
-        fn=_po_lookup_execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("po_lookup", "deterministic_po_lookup", "deterministic", _po_lookup_execute),
+    ])

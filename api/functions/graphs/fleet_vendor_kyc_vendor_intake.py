@@ -7,9 +7,9 @@ proposing agency. Pass forward. No agent, no validator — just a deterministic
 function that produces the canonical phase output shape.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 
 
 async def _vendor_intake_execute(input: dict) -> dict:
@@ -37,15 +37,6 @@ async def _vendor_intake_execute(input: dict) -> dict:
 
 
 def build_fleet_vendor_kyc_vendor_intake_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="vendor_intake",
-        name="deterministic_vendor_intake",
-        executor_type="deterministic",
-        fn=_vendor_intake_execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("vendor_intake", "deterministic_vendor_intake", "deterministic", _vendor_intake_execute),
+    ])

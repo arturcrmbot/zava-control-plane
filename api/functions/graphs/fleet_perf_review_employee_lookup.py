@@ -9,9 +9,9 @@ downstream phases (and the personae) can read the reviewee's grade and
 home market from a single dict.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.server.mcp_tools.workday_hr_employee import get_employee
 
 
@@ -36,15 +36,6 @@ async def _employee_lookup_execute(input: dict) -> dict:
 
 
 def build_fleet_perf_review_employee_lookup_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="employee_lookup",
-        name="deterministic_employee_lookup",
-        executor_type="deterministic",
-        fn=_employee_lookup_execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("employee_lookup", "deterministic_employee_lookup", "deterministic", _employee_lookup_execute),
+    ])

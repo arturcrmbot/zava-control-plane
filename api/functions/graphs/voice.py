@@ -20,30 +20,15 @@ the legacy `acs-mcp` mock is retained only for `VOICE_TRANSPORT=canned`
 demo robustness.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.agents import agent_hiring_stub
 from api.functions.graphs.executors.validators import validate_hiring_stub
 
 
 def build_hiring_voice_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="hiring_voice",
-        name="agent_voice_screener",
-        executor_type="agent",
-        fn=agent_hiring_stub.execute,
-    )
-    n2 = TrackedExecutor(
-        id="val_voice",
-        name="validate_voice_transcript_schema",
-        executor_type="validator",
-        fn=validate_hiring_stub.execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, n2)
-        .add_edge(n2, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("hiring_voice", "agent_voice_screener", "agent", agent_hiring_stub.execute),
+        ("val_voice", "validate_voice_transcript_schema", "validator", validate_hiring_stub.execute),
+    ])

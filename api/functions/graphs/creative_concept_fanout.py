@@ -20,30 +20,15 @@ Followed by HITL gate ◆2 (concept_lock) where the CD picks the
 winning route — see `creative_director` persona's `decision_policy`.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.agents import agent_creative_stub
 from api.functions.graphs.executors.validators import validate_brand_guardian
 
 
 def build_creative_concept_fanout_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="concept_fanout",
-        name="agent_concept_curator",
-        executor_type="agent",
-        fn=agent_creative_stub.execute,
-    )
-    n2 = TrackedExecutor(
-        id="val_brand_guardian_concept",
-        name="agent_brand_guardian",
-        executor_type="agent",
-        fn=validate_brand_guardian.execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, n2)
-        .add_edge(n2, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("concept_fanout", "agent_concept_curator", "agent", agent_creative_stub.execute),
+        ("val_brand_guardian_concept", "agent_brand_guardian", "agent", validate_brand_guardian.execute),
+    ])

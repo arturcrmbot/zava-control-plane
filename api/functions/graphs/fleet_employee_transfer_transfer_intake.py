@@ -8,9 +8,9 @@ No agent, no validator — just a deterministic pass-through that produces
 the canonical phase output shape.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 
 
 async def _transfer_intake_execute(input: dict) -> dict:
@@ -42,15 +42,6 @@ async def _transfer_intake_execute(input: dict) -> dict:
 
 
 def build_fleet_employee_transfer_transfer_intake_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="transfer_intake",
-        name="deterministic_transfer_intake",
-        executor_type="deterministic",
-        fn=_transfer_intake_execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("transfer_intake", "deterministic_transfer_intake", "deterministic", _transfer_intake_execute),
+    ])

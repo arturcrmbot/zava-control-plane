@@ -6,9 +6,9 @@ on the currency pair. Returns a flags list the persona reads.
 from __future__ import annotations
 import hashlib
 
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.validators import validate_fleet_treasury_fx_position_check_schema
 
 
@@ -40,22 +40,7 @@ async def _position_check_execute(input: dict) -> dict:
 
 
 def build_fleet_treasury_fx_position_check_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="position_check",
-        name="deterministic_position_check",
-        executor_type="deterministic",
-        fn=_position_check_execute,
-    )
-    n2 = TrackedExecutor(
-        id="val_position_check",
-        name="validate_position_check_schema",
-        executor_type="validator",
-        fn=validate_fleet_treasury_fx_position_check_schema.execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, n2)
-        .add_edge(n2, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("position_check", "deterministic_position_check", "deterministic", _position_check_execute),
+        ("val_position_check", "validate_position_check_schema", "validator", validate_fleet_treasury_fx_position_check_schema.execute),
+    ])

@@ -1,8 +1,8 @@
 """Phase 1 (Op Lookup) graph for Treasury FX domain."""
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 
 
 async def _op_lookup_execute(input: dict) -> dict:
@@ -20,15 +20,6 @@ async def _op_lookup_execute(input: dict) -> dict:
 
 
 def build_fleet_treasury_fx_op_lookup_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="op_lookup",
-        name="deterministic_op_lookup",
-        executor_type="deterministic",
-        fn=_op_lookup_execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("op_lookup", "deterministic_op_lookup", "deterministic", _op_lookup_execute),
+    ])

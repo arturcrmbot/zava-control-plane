@@ -1,8 +1,8 @@
 """Phase 2 (Risk Classify) graph for Privacy DPIA domain."""
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.validators import validate_fleet_privacy_dpia_risk_classify_schema
 
 
@@ -26,22 +26,7 @@ async def _risk_classify_execute(input: dict) -> dict:
 
 
 def build_fleet_privacy_dpia_risk_classify_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="risk_classify",
-        name="deterministic_risk_classify",
-        executor_type="deterministic",
-        fn=_risk_classify_execute,
-    )
-    n2 = TrackedExecutor(
-        id="val_risk_classify",
-        name="validate_risk_classify_schema",
-        executor_type="validator",
-        fn=validate_fleet_privacy_dpia_risk_classify_schema.execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, n2)
-        .add_edge(n2, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("risk_classify", "deterministic_risk_classify", "deterministic", _risk_classify_execute),
+        ("val_risk_classify", "validate_risk_classify_schema", "validator", validate_fleet_privacy_dpia_risk_classify_schema.execute),
+    ])

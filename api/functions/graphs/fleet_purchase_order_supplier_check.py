@@ -6,9 +6,9 @@ Validates: supplier on approved list, value > 0, category set. Outputs an
 `ok` flag + `flags` list the persona reads.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.validators import validate_fleet_purchase_order_supplier_check_schema
 
 
@@ -31,22 +31,7 @@ async def _supplier_check_execute(input: dict) -> dict:
 
 
 def build_fleet_purchase_order_supplier_check_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="supplier_check",
-        name="deterministic_supplier_check",
-        executor_type="deterministic",
-        fn=_supplier_check_execute,
-    )
-    n2 = TrackedExecutor(
-        id="val_supplier_check",
-        name="validate_supplier_check_schema",
-        executor_type="validator",
-        fn=validate_fleet_purchase_order_supplier_check_schema.execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, n2)
-        .add_edge(n2, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("supplier_check", "deterministic_supplier_check", "deterministic", _supplier_check_execute),
+        ("val_supplier_check", "validate_supplier_check_schema", "validator", validate_fleet_purchase_order_supplier_check_schema.execute),
+    ])

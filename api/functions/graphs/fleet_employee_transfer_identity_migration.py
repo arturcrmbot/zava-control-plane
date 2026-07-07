@@ -8,9 +8,9 @@ transition handover meetings on the agreed effective_date via the
 calendar service.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.server.mcp_tools.identity_provider import list_role_templates
 from api.server.mcp_tools.calendar_service import find_availability
 
@@ -53,15 +53,6 @@ async def _identity_migration_execute(input: dict) -> dict:
 
 
 def build_fleet_employee_transfer_identity_migration_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="identity_migration",
-        name="deterministic_identity_migration",
-        executor_type="deterministic",
-        fn=_identity_migration_execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("identity_migration", "deterministic_identity_migration", "deterministic", _identity_migration_execute),
+    ])

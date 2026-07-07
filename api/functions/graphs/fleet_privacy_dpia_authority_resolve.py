@@ -1,8 +1,8 @@
 """Phase 3 (Authority Resolve) graph for Privacy DPIA domain."""
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.server.mcp_tools.delegated_authority import resolve_approver
 
 
@@ -36,15 +36,6 @@ async def _authority_resolve_execute(input: dict) -> dict:
 
 
 def build_fleet_privacy_dpia_authority_resolve_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="authority_resolve",
-        name="deterministic_authority_resolve",
-        executor_type="deterministic",
-        fn=_authority_resolve_execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("authority_resolve", "deterministic_authority_resolve", "deterministic", _authority_resolve_execute),
+    ])

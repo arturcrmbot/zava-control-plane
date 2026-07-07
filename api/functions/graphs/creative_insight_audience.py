@@ -10,30 +10,15 @@ so downstream phases have something to read. No HITL gate on this phase
 Real fan-out lands in Phase 4 of plan/feature-poc3-ai-agency-1.md.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.agents import agent_creative_stub
 from api.functions.graphs.executors.validators import validate_creative_stub
 
 
 def build_creative_insight_audience_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="insight_audience",
-        name="agent_insight_audience",
-        executor_type="agent",
-        fn=agent_creative_stub.execute,
-    )
-    n2 = TrackedExecutor(
-        id="val_insight_audience",
-        name="validate_insight_audience_schema",
-        executor_type="validator",
-        fn=validate_creative_stub.execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, n2)
-        .add_edge(n2, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("insight_audience", "agent_insight_audience", "agent", agent_creative_stub.execute),
+        ("val_insight_audience", "validate_insight_audience_schema", "validator", validate_creative_stub.execute),
+    ])

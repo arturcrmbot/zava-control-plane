@@ -8,30 +8,15 @@ the joiner's home office, and books the event. Validator guardrails the
 agent payload to the spec shape.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.agents import agent_fleet_employee_onboarding_induction_planner
 from api.functions.graphs.executors.validators import validate_fleet_employee_onboarding_induction_planner_schema
 
 
 def build_fleet_employee_onboarding_induction_planner_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="induction_planner",
-        name="agent_induction_planner",
-        executor_type="agent",
-        fn=agent_fleet_employee_onboarding_induction_planner.execute,
-    )
-    n2 = TrackedExecutor(
-        id="val_induction_planner",
-        name="validate_fleet_employee_onboarding_induction_planner_schema",
-        executor_type="validator",
-        fn=validate_fleet_employee_onboarding_induction_planner_schema.execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, n2)
-        .add_edge(n2, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("induction_planner", "agent_induction_planner", "agent", agent_fleet_employee_onboarding_induction_planner.execute),
+        ("val_induction_planner", "validate_fleet_employee_onboarding_induction_planner_schema", "validator", validate_fleet_employee_onboarding_induction_planner_schema.execute),
+    ])

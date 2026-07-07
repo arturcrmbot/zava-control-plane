@@ -10,30 +10,15 @@ no-op on green. The deterministic router uses verdict + tier to pick the
 downstream path, with optional runtime override from the policy page.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.agents import agent_escalation
 from api.functions.graphs.executors.deterministic import apply_verdict_routing
 
 
 def build_route_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="escalation_advisor",
-        name="agent_escalation",
-        executor_type="agent",
-        fn=agent_escalation.execute,
-    )
-    n2 = TrackedExecutor(
-        id="route_by_verdict",
-        name="apply_verdict_routing",
-        executor_type="deterministic",
-        fn=apply_verdict_routing.execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, n2)
-        .add_edge(n2, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("escalation_advisor", "agent_escalation", "agent", agent_escalation.execute),
+        ("route_by_verdict", "apply_verdict_routing", "deterministic", apply_verdict_routing.execute),
+    ])

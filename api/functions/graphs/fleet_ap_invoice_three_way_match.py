@@ -11,9 +11,9 @@ deterministic by definition. The full LLM pipeline graduation happens in
 the engagement POC where line-item-level reasoning matters.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.validators import validate_fleet_ap_invoice_three_way_match_schema
 from api.server.mcp_tools.invoice_repository import find_three_way_match
 
@@ -49,22 +49,7 @@ async def _three_way_match_execute(input: dict) -> dict:
 
 
 def build_fleet_ap_invoice_three_way_match_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="three_way_match",
-        name="deterministic_three_way_match",
-        executor_type="deterministic",
-        fn=_three_way_match_execute,
-    )
-    n2 = TrackedExecutor(
-        id="val_three_way_match",
-        name="validate_three_way_match_schema",
-        executor_type="validator",
-        fn=validate_fleet_ap_invoice_three_way_match_schema.execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, n2)
-        .add_edge(n2, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("three_way_match", "deterministic_three_way_match", "deterministic", _three_way_match_execute),
+        ("val_three_way_match", "validate_three_way_match_schema", "validator", validate_fleet_ap_invoice_three_way_match_schema.execute),
+    ])

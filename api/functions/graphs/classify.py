@@ -8,30 +8,15 @@ expense-claim record + retrieved policy context, then guardrail the
 classifier payload to spec shape.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.agents import agent_rag_classifier
 from api.functions.graphs.executors.validators import validate_classification_schema_node
 
 
 def build_classify_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="rag_classifier",
-        name="agent_rag_classifier",
-        executor_type="agent",
-        fn=agent_rag_classifier.execute,
-    )
-    n2 = TrackedExecutor(
-        id="val_schema",
-        name="validate_classification_schema",
-        executor_type="validator",
-        fn=validate_classification_schema_node.execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, n2)
-        .add_edge(n2, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("rag_classifier", "agent_rag_classifier", "agent", agent_rag_classifier.execute),
+        ("val_schema", "validate_classification_schema", "validator", validate_classification_schema_node.execute),
+    ])

@@ -1,8 +1,8 @@
 """Phase 1 (DPIA Intake) graph for Privacy DPIA domain."""
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 
 
 async def _dpia_intake_execute(input: dict) -> dict:
@@ -20,15 +20,6 @@ async def _dpia_intake_execute(input: dict) -> dict:
 
 
 def build_fleet_privacy_dpia_dpia_intake_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="dpia_intake",
-        name="deterministic_dpia_intake",
-        executor_type="deterministic",
-        fn=_dpia_intake_execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("dpia_intake", "deterministic_dpia_intake", "deterministic", _dpia_intake_execute),
+    ])

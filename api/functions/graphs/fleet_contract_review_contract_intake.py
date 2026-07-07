@@ -1,8 +1,8 @@
 """Phase 1 (Contract Intake) graph for Contract Review domain."""
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 
 
 async def _contract_intake_execute(input: dict) -> dict:
@@ -21,15 +21,6 @@ async def _contract_intake_execute(input: dict) -> dict:
 
 
 def build_fleet_contract_review_contract_intake_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="contract_intake",
-        name="deterministic_contract_intake",
-        executor_type="deterministic",
-        fn=_contract_intake_execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("contract_intake", "deterministic_contract_intake", "deterministic", _contract_intake_execute),
+    ])

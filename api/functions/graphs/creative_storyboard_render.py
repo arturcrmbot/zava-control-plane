@@ -11,30 +11,15 @@ route + brief, generates 6 storyboard frame prompts, then calls
 Followed by HITL gate ◆3 (storyboard_approval) and ◆4 (final_signoff).
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.agents import agent_creative_stub
 from api.functions.graphs.executors.validators import validate_creative_stub
 
 
 def build_creative_storyboard_render_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="storyboard_render",
-        name="agent_storyboard_curator",
-        executor_type="agent",
-        fn=agent_creative_stub.execute,
-    )
-    n2 = TrackedExecutor(
-        id="val_storyboard_render",
-        name="validate_storyboard_render_schema",
-        executor_type="validator",
-        fn=validate_creative_stub.execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, n2)
-        .add_edge(n2, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("storyboard_render", "agent_storyboard_curator", "agent", agent_creative_stub.execute),
+        ("val_storyboard_render", "validate_storyboard_render_schema", "validator", validate_creative_stub.execute),
+    ])

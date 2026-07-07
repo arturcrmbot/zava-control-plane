@@ -8,9 +8,9 @@ stamped in Phase 2. Uses the learning_catalogue.reserve_seat stub to
 mint a deterministic booking_id.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.server.mcp_tools.learning_catalogue import reserve_seat
 
 
@@ -46,15 +46,6 @@ async def _book_execute(input: dict) -> dict:
 
 
 def build_fleet_training_request_book_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="book",
-        name="deterministic_book",
-        executor_type="deterministic",
-        fn=_book_execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("book", "deterministic_book", "deterministic", _book_execute),
+    ])

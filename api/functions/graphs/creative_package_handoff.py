@@ -10,30 +10,15 @@ file, then the orchestrator stamps the real Figma page URL onto
 `workflow.payload.figma_file_url`.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.agents import agent_creative_stub
 from api.functions.graphs.executors.validators import validate_creative_stub
 
 
 def build_creative_package_handoff_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="package_handoff",
-        name="agent_package_handoff",
-        executor_type="agent",
-        fn=agent_creative_stub.execute,
-    )
-    n2 = TrackedExecutor(
-        id="val_package_handoff",
-        name="validate_package_handoff_schema",
-        executor_type="validator",
-        fn=validate_creative_stub.execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, n2)
-        .add_edge(n2, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("package_handoff", "agent_package_handoff", "agent", agent_creative_stub.execute),
+        ("val_package_handoff", "validate_package_handoff_schema", "validator", validate_creative_stub.execute),
+    ])

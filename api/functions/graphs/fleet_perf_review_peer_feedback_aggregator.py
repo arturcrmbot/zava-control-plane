@@ -9,30 +9,15 @@ the agent payload to the spec shape so Phase 3 (and the HR persona) can
 rely on a stable peer_review_count.
 """
 from __future__ import annotations
-from agent_framework import Workflow, WorkflowBuilder
+from agent_framework import Workflow
 
-from api.functions.graphs._tracked_executor import TrackedExecutor, TerminalExecutor
+from api.functions.graphs._tracked_executor import build_linear_workflow
 from api.functions.graphs.executors.agents import agent_fleet_perf_review_peer_feedback_aggregator
 from api.functions.graphs.executors.validators import validate_fleet_perf_review_peer_feedback_aggregator_schema
 
 
 def build_fleet_perf_review_peer_feedback_aggregator_workflow() -> Workflow:
-    n1 = TrackedExecutor(
-        id="peer_feedback_aggregator",
-        name="agent_peer_feedback_aggregator",
-        executor_type="agent",
-        fn=agent_fleet_perf_review_peer_feedback_aggregator.execute,
-    )
-    n2 = TrackedExecutor(
-        id="val_peer_feedback_aggregator",
-        name="validate_fleet_perf_review_peer_feedback_aggregator_schema",
-        executor_type="validator",
-        fn=validate_fleet_perf_review_peer_feedback_aggregator_schema.execute,
-    )
-    term = TerminalExecutor(id="terminal")
-    return (
-        WorkflowBuilder(start_executor=n1)
-        .add_edge(n1, n2)
-        .add_edge(n2, term)
-        .build()
-    )
+    return build_linear_workflow([
+        ("peer_feedback_aggregator", "agent_peer_feedback_aggregator", "agent", agent_fleet_perf_review_peer_feedback_aggregator.execute),
+        ("val_peer_feedback_aggregator", "validate_fleet_perf_review_peer_feedback_aggregator_schema", "validator", validate_fleet_perf_review_peer_feedback_aggregator_schema.execute),
+    ])
