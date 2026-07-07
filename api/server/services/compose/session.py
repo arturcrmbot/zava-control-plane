@@ -16,6 +16,7 @@ class ComposeSession:
         self.done = False
         self.events: list[dict] = []
         self._subscribers: set[asyncio.Queue] = set()
+        self.pending: dict[str, asyncio.Future] = {}
 
     def subscribe(self) -> asyncio.Queue:
         q: asyncio.Queue = asyncio.Queue()
@@ -35,3 +36,15 @@ class ComposeSession:
             self.events = self.events[-_MAX_BUFFER:]
         for q in list(self._subscribers):
             q.put_nowait(event)
+
+    def new_pending(self, request_id: str) -> asyncio.Future:
+        fut: asyncio.Future = asyncio.get_running_loop().create_future()
+        self.pending[request_id] = fut
+        return fut
+
+    def resolve(self, request_id: str, value) -> bool:
+        fut = self.pending.pop(request_id, None)
+        if fut and not fut.done():
+            fut.set_result(value)
+            return True
+        return False

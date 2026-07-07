@@ -34,3 +34,17 @@ async def test_unsubscribe_stops_delivery():
     s.emit({"type": "thought", "text": "ignored"})
     with pytest.raises(asyncio.TimeoutError):
         await asyncio.wait_for(q.get(), timeout=0.2)
+
+
+@pytest.mark.asyncio
+async def test_pending_future_resolves():
+    s = ComposeSession("cid")
+    fut = s.new_pending("req1")
+    assert not fut.done()
+    s.resolve("req1", {"answer": "CFO"})
+    assert await asyncio.wait_for(fut, timeout=1) == {"answer": "CFO"}
+
+
+def test_resolve_unknown_request_is_noop():
+    s = ComposeSession("cid")
+    s.resolve("nope", {"x": 1})  # must not raise
