@@ -6,7 +6,9 @@ PIDDIR="${ZAVA_REPO_ROOT:-$PWD}/.compose"
 mkdir -p "$PIDDIR"
 
 start_api() {
-  ( uv run uvicorn api.server.main:app --port 3101 >>"$PIDDIR/api.log" 2>&1 &
+  # --frozen --no-sync: use the committed lockfile + existing venv. A fresh
+  # re-resolve fails on the pre-existing agent-framework/py-3.14 lock conflict.
+  ( uv run --frozen --no-sync uvicorn api.server.main:app --port 3101 >>"$PIDDIR/api.log" 2>&1 &
     echo $! >"$PIDDIR/api.pid" )
 }
 
