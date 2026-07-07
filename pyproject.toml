@@ -78,6 +78,8 @@ dependencies = [
   # (plan/feature-enterprise-pitch-readiness-1.md task pitch-b2). Used at
   # demo-data generation time only; no runtime dependency on user data.
   "faker>=20.0",
+  "pypdf",
+  "python-docx",
 ]
 
 [dependency-groups]
