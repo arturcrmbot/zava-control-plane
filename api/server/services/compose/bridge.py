@@ -34,6 +34,7 @@ class ComposeBridge:
         self._copilot_cmd = copilot_cmd or _default_copilot_cmd()
         self.client = AcpClient(self._on_notify, self._on_request)
         self._acp_session_id: str | None = None
+        self._prompt_task: asyncio.Task | None = None
 
     async def start(self) -> None:
         cmd = [*self._copilot_cmd, "--acp", "-C", self.repo_root,
@@ -48,7 +49,7 @@ class ComposeBridge:
         self._acp_session_id = res.get("sessionId")
         self.session.emit({"type": "stage", "stage": "understanding",
                            "label": "Reading the document"})
-        asyncio.create_task(self._run_prompt())
+        self._prompt_task = asyncio.create_task(self._run_prompt())
 
     async def _run_prompt(self) -> None:
         try:

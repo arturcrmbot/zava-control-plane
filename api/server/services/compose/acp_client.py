@@ -23,6 +23,12 @@ class AcpClient:
         self._pending: dict[int, asyncio.Future] = {}
         self._next_id = 0
 
+    def _fail_pending(self, exc: BaseException) -> None:
+        for fut in self._pending.values():
+            if not fut.done():
+                fut.set_exception(exc)
+        self._pending.clear()
+
     async def start(self, cmd: list[str], cwd: str) -> None:
         self._proc = await asyncio.create_subprocess_exec(
             *cmd, cwd=cwd,
@@ -34,18 +40,21 @@ class AcpClient:
 
     async def _read_loop(self) -> None:
         assert self._proc and self._proc.stdout
-        while True:
-            raw = await self._proc.stdout.readline()
-            if not raw:
-                break
-            line = raw.decode("utf-8", "ignore").strip()
-            if not line:
-                continue
-            try:
-                msg = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            await self._dispatch(msg)
+        try:
+            while True:
+                raw = await self._proc.stdout.readline()
+                if not raw:
+                    break
+                line = raw.decode("utf-8", "ignore").strip()
+                if not line:
+                    continue
+                try:
+                    msg = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                await self._dispatch(msg)
+        finally:
+            self._fail_pending(ConnectionError("ACP transport closed"))
 
     async def _dispatch(self, msg: dict) -> None:
         if "id" in msg and ("result" in msg or "error" in msg):
@@ -78,11 +87,23 @@ class AcpClient:
         await self._write({"jsonrpc": "2.0", "method": method, "params": params})
 
     async def stop(self) -> None:
-        if self._reader:
-            self._reader.cancel()
         if self._proc and self._proc.returncode is None:
             try:
                 self._proc.terminate()
                 await asyncio.wait_for(self._proc.wait(), timeout=5)
-            except (ProcessLookupError, asyncio.TimeoutError):
+            except asyncio.TimeoutError:
+                try:
+                    self._proc.kill()
+                except ProcessLookupError:
+                    pass
+            except ProcessLookupError:
                 pass
+        if self._proc and self._proc.stdin and not self._proc.stdin.is_closing():
+            self._proc.stdin.close()
+        if self._reader:
+            self._reader.cancel()
+            try:
+                await self._reader
+            except asyncio.CancelledError:
+                pass
+        self._fail_pending(ConnectionError("ACP client stopped"))

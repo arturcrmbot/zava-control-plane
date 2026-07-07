@@ -20,7 +20,7 @@ router = APIRouter()
 _SESSIONS: dict[str, ComposeSession] = {}
 _COPILOT_CMD_OVERRIDE: list[str] | None = None
 
-_LOOPBACK = {"127.0.0.1", "::1", "localhost", "testclient"}
+_LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 
 
 def set_copilot_cmd_for_tests(cmd: list[str] | None) -> None:
@@ -34,6 +34,8 @@ def _is_loopback(request: Request) -> bool:
     if request.headers.get("x-forwarded-for"):
         return False
     host = request.client.host if request.client else ""
+    if host == "testclient" and _COPILOT_CMD_OVERRIDE is not None:
+        return True
     return host in _LOOPBACK
 
 
@@ -54,9 +56,12 @@ async def create_session(
 
     cid = uuid.uuid4().hex
     session = ComposeSession(cid)
-    _SESSIONS[cid] = session
     bridge = ComposeBridge(session, document_text, copilot_cmd=_COPILOT_CMD_OVERRIDE)
-    await bridge.start()
+    try:
+        await bridge.start()
+    except Exception as ex:
+        return JSONResponse({"error": f"failed to start compose agent: {ex}"}, status_code=500)
+    _SESSIONS[cid] = session
     return {"compose_id": cid}
 
 
@@ -72,7 +77,9 @@ async def stream(cid: str):
             while True:
                 event = await q.get()
                 yield f"data: {json.dumps(event)}\n\n"
-                if event.get("type") in ("stage",) and event.get("stage") in ("ready", "error"):
+                if event.get("type") == "error" or (
+                    event.get("type") == "stage" and event.get("stage") == "ready"
+                ):
                     break
         finally:
             session.unsubscribe(q)

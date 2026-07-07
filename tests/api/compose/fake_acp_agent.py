@@ -40,6 +40,12 @@ def main() -> None:
                    "result": {"sessionId": "fake-session",
                               "models": {"availableModels": []}}})
         elif method == "session/prompt":
+            if os.environ.get("FAKE_ACP_EXIT_MIDPROMPT") == "1":
+                # emit one update, then exit WITHOUT sending the prompt result
+                if updates:
+                    _send({"jsonrpc": "2.0", "method": "session/update",
+                           "params": {"sessionId": "fake-session", "update": updates[0]}})
+                return
             for upd in updates:
                 _send({"jsonrpc": "2.0", "method": "session/update",
                        "params": {"sessionId": "fake-session", "update": upd}})
