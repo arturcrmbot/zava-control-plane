@@ -28,7 +28,7 @@ export type DrawerSection = "decision" | "activity" | "audit" | "reasoning";
 export type FilterMode = "needs-you" | "all-activity";
 
 export type TodayChipKind =
-  | "needs-you-count"          // Ops Reviewer: "Today: N · M crit"
+  | "needs-you-count"          // System Admin: "Today: N · M crit"
   | "money-saved"              // Finance: "$ saved today: $XXX"
   | "hiring-summary"           // Hiring: "Open roles: N · Candidates today: M"
   | "fleet-health"             // SRE: "Fleet health: green · 14ms p95"
@@ -68,7 +68,7 @@ const FINANCE_DOMAINS = [
 export const ROLE_PRESETS: RolePreset[] = [
   {
     id: "ops-reviewer",
-    label: "Ops Reviewer",
+    label: "System Admin",
     defaultFilter: "needs-you",
     defaultDomains: [],
     visibleCardTypes: ["hitl", "exception", "external-wait", "milestone", "policy", "agent-event", "resolved", "workflow"],

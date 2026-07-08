@@ -35,7 +35,7 @@ export default function App() {
         </Routes>
       </main>
       <footer className="text-center text-xs text-slate-400 py-4 border-t border-slate-200 bg-white/60">
-        Project Apex · Candidate Portal · Powered by Microsoft Azure
+        Project Zava · Candidate Portal · Powered by Microsoft Azure
       </footer>
     </div>
   );

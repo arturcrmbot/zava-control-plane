@@ -36,7 +36,7 @@ describe("FleetControlShell — integration", () => {
   it("lands on feed showing the HITL card and the header", async () => {
     render(<MemoryRouter initialEntries={["/"]}><FleetControlShell /></MemoryRouter>);
     await waitFor(() => expect(screen.getAllByText("WF-1").length).toBeGreaterThan(0));
-    expect(screen.getByText(/Apex/)).toBeTruthy();
+    expect(screen.getByText(/Zava/)).toBeTruthy();
   });
 
   it("deep-link /workflows/:id opens the drawer over the feed on cold land", async () => {
@@ -46,8 +46,8 @@ describe("FleetControlShell — integration", () => {
 
   it("switching role via header re-mounts the feed with new defaults", async () => {
     render(<MemoryRouter initialEntries={["/"]}><FleetControlShell /></MemoryRouter>);
-    await waitFor(() => screen.getByText(/Ops Reviewer/));
-    fireEvent.click(screen.getByRole("button", { name: /Ops Reviewer/ }));
+    await waitFor(() => screen.getByText(/System Admin/));
+    fireEvent.click(screen.getByRole("button", { name: /System Admin/ }));
     fireEvent.click(screen.getByRole("menuitem", { name: /Executive/i }));
     await waitFor(() => expect(screen.getByText(/Executive/)).toBeTruthy());
     expect(localStorage.getItem("fleetctl.role")).toBe(JSON.stringify("executive"));

@@ -206,7 +206,7 @@ function ComponentDetail({ comp, step, composition, onClose, onNavigate }: { com
     <>
       <Header palette={p} tag="Entity · projection" title={comp.name} onClose={onClose} />
       <div className="grid gap-3.5 px-6 py-4">
-        <Row k="Maps to">Apex canonical <b>{comp.canonical}</b>.</Row>
+        <Row k="Maps to">Zava canonical <b>{comp.canonical}</b>.</Row>
         {comp.attributes.length > 0 && (
           <Row k="Fields">
             <div className="grid grid-cols-2 gap-2">

@@ -10,7 +10,7 @@ const MILESTONES: { key: string; label: string }[] = [
   { key: "understanding", label: "Reading your document" },
   { key: "brief", label: "Designing the process" },
   { key: "composing", label: "Building the components" },
-  { key: "graduating", label: "Wiring it into Apex" },
+  { key: "graduating", label: "Wiring it into Zava" },
   { key: "verifying", label: "Checking it all works" },
   { key: "ready", label: "Ready to go live" },
 ];

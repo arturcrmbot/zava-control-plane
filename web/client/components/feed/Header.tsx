@@ -78,7 +78,7 @@ export default function Header({
 
   return (
     <header className="flex items-center gap-4 px-6 h-12 border-b border-slate-200 bg-white sticky top-0 z-30 dark:bg-slate-900 dark:border-slate-700">
-      <Link to="/" className="font-semibold text-slate-900 dark:text-slate-100">Apex</Link>
+      <Link to="/" className="font-semibold text-slate-900 dark:text-slate-100">Zava</Link>
       <span className="text-slate-300 dark:text-slate-600">·</span>
       <div className="relative">
         <input
