@@ -10,12 +10,12 @@ afterEach(cleanup);
 describe("RoleSwitcher", () => {
   it("renders the current role label", () => {
     render(<RoleSwitcher current="ops-reviewer" onChange={() => {}} />);
-    expect(screen.getByText(/Ops Reviewer/i)).toBeTruthy();
+    expect(screen.getByText(/System Admin/i)).toBeTruthy();
   });
   it("lists all 5 roles when opened and fires onChange on select", () => {
     const onChange = vi.fn();
     render(<RoleSwitcher current="ops-reviewer" onChange={onChange} />);
-    fireEvent.click(screen.getByRole("button", { name: /Ops Reviewer/i }));
+    fireEvent.click(screen.getByRole("button", { name: /System Admin/i }));
     for (const r of ROLE_PRESETS) {
       expect(screen.getAllByText(new RegExp(r.label)).length).toBeGreaterThan(0);
     }

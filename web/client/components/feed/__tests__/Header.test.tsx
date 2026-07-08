@@ -14,9 +14,9 @@ const items: FeedItem[] = [];
 const role = getRolePreset("ops-reviewer");
 
 describe("Header", () => {
-  it("renders the Apex brand link", () => {
+  it("renders the Zava brand link", () => {
     render(<MemoryRouter><Header role={role} onRoleChange={noop} unreadItems={items} onJumpTo={noop} onSearch={noop} workflows={[]} /></MemoryRouter>);
-    expect(screen.getByText(/Apex/i)).toBeTruthy();
+    expect(screen.getByText(/Zava/i)).toBeTruthy();
   });
   it("renders Today chip per role (ops-reviewer flavour)", () => {
     render(<MemoryRouter><Header role={role} onRoleChange={noop} unreadItems={items} onJumpTo={noop} onSearch={noop} workflows={[]} /></MemoryRouter>);
