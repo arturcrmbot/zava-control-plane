@@ -27,14 +27,22 @@ exactly — this skill only governs *how you communicate*, not *what you build*.
    returned `{approved, yaml}` — if the operator edited the YAML, use their
    version; if `approved` is false, revise and present again.
 4. `report_stage("composing", ...)` then run compose-domain (add-domain Phase 3)
-   into the sandbox.
+   into the sandbox. Run compose-domain **inline in this session** — do NOT
+   dispatch a subagent/Task to do it (nested dispatch fails silently here and
+   leaves no sandbox). This is the long critical-path step; do it yourself and
+   wait for it to finish.
 5. `report_stage("graduating", ...)` then run graduate.sh + the Phase-4b/4c
    hand-stitches (domains.py, entity_projections/__init__.py, AGT matrix, etc.).
 6. `report_stage("verifying", ...)` then run add-domain Phase 4d verification.
    If a check fails, fix it and re-verify — narrate what you're doing.
-7. On success call
-   `composition_complete(workflow_type, display_name)`. Do not restart the
-   server yourself — the UI's Ignite control handles the restart.
+7. **Only after you have verified the domain is really graduated** — the
+   compose-domain sandbox exists under `tools/scratch/compose-domain/`, the new
+   `workflow_type` appears in `api/shared/domains.py`, and verification passed —
+   call `composition_complete(workflow_type, display_name)`. If compose-domain
+   produced no sandbox, or any step failed, that is a FAILURE: narrate the exact
+   error and stop. NEVER report "ready" / call composition_complete unless the
+   domain was actually built. Do not restart the server yourself — the UI's
+   Ignite control handles the restart.
 
 Narrate briefly as you go (your normal assistant messages appear in the UI as
 the agent's "voice"). Think out loud — your reasoning is shown as the thought
