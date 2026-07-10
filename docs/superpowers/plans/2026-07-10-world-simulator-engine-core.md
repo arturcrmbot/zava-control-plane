@@ -759,7 +759,7 @@ Expected: PASS (all world tests green).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add api/server/world/__init__.py api/server/world/packs
+git add api/server/world/__init__.py api/server/world/packs tests/api/world/test_wiring.py
 git commit -m "feat(world): neutral toy pack + ZAVA_WORLD loader + lifespan entry" -m "Co-authored-by: Copilot App <223556219+Copilot@users.noreply.github.com>"
 ```
 
@@ -788,9 +788,23 @@ Add immediately after it:
         print(f"[server] world engine ON (ZAVA_WORLD={os.getenv('ZAVA_WORLD')})")
 ```
 
-- [ ] **Step 2: Add `world_task` to the shutdown cancel loop**
+- [ ] **Step 2: Cancel `world_task` on shutdown**
 
-Find (around line 360):
+The shutdown block cancels tasks and then awaits them. The engine's `run()` loops until cancelled, so it needs an explicit `.cancel()` (adding it only to the await loop would hang). Find (around line 354):
+
+```python
+        if dream_cadence_task is not None:
+            dream_cadence_task.cancel()
+```
+
+Add immediately after it:
+
+```python
+        if world_task is not None:
+            world_task.cancel()
+```
+
+Then find (around line 360):
 
 ```python
         for t in (ramp_task, seed_task, dream_cadence_task):
