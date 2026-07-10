@@ -14,6 +14,10 @@ from api.functions.workflows.fleet_travel_preapproval_activities import (
     fleet_travel_preapproval_employee_lookup_activity,
     fleet_travel_preapproval_policy_fit_check_activity,
 )
+from api.functions.workflows.surge_staffing import surge_staffing_orchestration
+from api.functions.workflows.surge_staffing_activities import (
+    surge_staffing_decide_activity,
+)
 from api.functions.workflows.activities import (
     intake_activity,
     classify_activity,
@@ -69,6 +73,14 @@ def HiringOrchestrator(context: df.DurableOrchestrationContext):
 @app.orchestration_trigger(context_name="context")
 def FleetTravelPreapprovalOrchestrator(context: df.DurableOrchestrationContext):
     return fleet_travel_preapproval_orchestration(context)
+
+
+# Orchestrator — surge-staffing: the world-simulator's Durable responder.
+# Triggered by the world engine's sensor (via world_bridge), decides staffing
+# from live world data, and its outcome feeds back into the simulated world.
+@app.orchestration_trigger(context_name="context")
+def SurgeStaffingOrchestrator(context: df.DurableOrchestrationContext):
+    return surge_staffing_orchestration(context)
 
 
 # Activity registrations — Azure DF requires each as a decorated function in function_app.py
@@ -251,6 +263,11 @@ def fleet_travel_preapproval_employee_lookup_activity_trigger(payload: dict) -> 
 @app.activity_trigger(input_name="payload")
 def fleet_travel_preapproval_policy_fit_check_activity_trigger(payload: dict) -> dict:
     return fleet_travel_preapproval_policy_fit_check_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def surge_staffing_decide_activity_trigger(payload: dict) -> dict:
+    return surge_staffing_decide_activity(payload)
 
 
 # HTTP trigger to start a new orchestration. Used by FastAPI's simulator route.

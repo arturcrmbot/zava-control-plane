@@ -25,10 +25,17 @@ def load_pack(name: str) -> WorldPack:
     return pack
 
 
-def maybe_start_world(bus, **run_kwargs) -> "asyncio.Task | None":
-    """Start the engine iff ZAVA_WORLD is set; else return None."""
+def maybe_start_world(bus, *, on_engine=None, **run_kwargs) -> "asyncio.Task | None":
+    """Start the engine iff ZAVA_WORLD is set; else return None.
+
+    `on_engine`, if given, is called with the WorldEngine before the run loop
+    starts — the FastAPI lifespan uses it to stash the handle on app_state so
+    the world_bridge and the /api/world routes can reach live state.
+    """
     name = active_world_name()
     if not name:
         return None
     engine = WorldEngine(load_pack(name), bus)
+    if on_engine is not None:
+        on_engine(engine)
     return asyncio.create_task(engine.run(**run_kwargs))
