@@ -173,6 +173,11 @@ async def lifespan(app: FastAPI):
         print(f"[server] kpi_history_recorder failed to start: {ex}")
     # Start the simulator ramp loop (spawns workflows via the AF Durable host)
     ramp_task = asyncio.create_task(simulator_orchestrator.ramp_loop())
+    # World simulator engine — off unless ZAVA_WORLD names a pack (spec 2026-07-10).
+    from api.server.world import maybe_start_world
+    world_task = maybe_start_world(app_state.bus)
+    if world_task is not None:
+        print(f"[server] world engine ON (ZAVA_WORLD={os.getenv('ZAVA_WORLD')})")
     # Optional dream-pass cadence. Off unless DREAM_PASS_DEMO_CADENCE_SECONDS
     # is set. Scheduled here (not in AppState.__init__) because
     # AppState is constructed at module import time, before uvicorn has
@@ -353,11 +358,13 @@ async def lifespan(app: FastAPI):
         seed_task.cancel()
         if dream_cadence_task is not None:
             dream_cadence_task.cancel()
+        if world_task is not None:
+            world_task.cancel()
         # Await the cancelled tasks so their teardown actually completes
         # before the lifespan returns. Without this, a partially-running
         # seed (which calls into the Functions host over HTTP) can leave
         # an open httpx connection or a half-scheduled orchestration.
-        for t in (ramp_task, seed_task, dream_cadence_task):
+        for t in (ramp_task, seed_task, dream_cadence_task, world_task):
             if t is None:
                 continue
             try:
