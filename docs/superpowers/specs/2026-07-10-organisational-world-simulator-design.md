@@ -1,7 +1,7 @@
 # Organisational World Simulator — Design Spec
 
 **Date:** 2026-07-10
-**Status:** Approved design (spine). Industry-independent core agreed; per-industry packs (telco first) and the hard implementation choices in §12 are deferred to detail review + planning.
+**Status:** Approved design (spine). Industry-independent core agreed. The first proving substrate is a deliberately **minimal, purpose-built telco slice** (~4 processes, §11.1) — *not* a retrofit of the existing 30+ agency domains (too much surface to model while the engine is new), and *not* the full telco vertical. Later verticals and the hard implementation choices in §12 are deferred to detail review + planning.
 **Source of truth for:** a new **world-model layer** that turns the Zava substrate from a *workflow-spawner* into a *closed-loop living organisation*. A generic, tick-driven **stock-and-flow engine** advances a simulated world; **sensors** spawn work when the world hits a condition; **actuators** feed workflow outcomes back into the world. Any industry is supplied as a declarative, pluggable **world pack** — the engine itself contains zero industry knowledge.
 
 **Read this first** in any session that picks up this work. It builds on, and does not replace:
@@ -15,7 +15,7 @@
 
 ## 0. Why this exists (one paragraph)
 
-Today Zava's "world" is **static** — a seeded snapshot of an organisation (`data_fabric/`) — and a **timer** (`simulator_orchestrator.ramp_loop`) spawns workflow instances onto it. Work exists because the clock said so; nothing evolves on its own; a workflow's payload is coherent but its *existence* is not caused by anything. That means the substrate's cleverest asset — an org of agents deciding things — is reacting to a scheduler, not to a world. The Organisational World Simulator inverts this: it introduces a **living world that ticks forward by itself** and **work that emerges as a consequence of the world's condition**, then closes the loop by writing decision outcomes back into the world. The result is a genuine *organisational simulator*: cross-function cascades and resource contention **emerge** rather than being scripted, anomaly-style domains detect conditions **nobody drew for them**, and every run is different. Crucially it is built as a **generic engine + declarative industry packs**, so it is industry-independent and adapts to any vertical (telco is the intended first proving ground, specced separately).
+Today Zava's "world" is **static** — a seeded snapshot of an organisation (`data_fabric/`) — and a **timer** (`simulator_orchestrator.ramp_loop`) spawns workflow instances onto it. Work exists because the clock said so; nothing evolves on its own; a workflow's payload is coherent but its *existence* is not caused by anything. That means the substrate's cleverest asset — an org of agents deciding things — is reacting to a scheduler, not to a world. The Organisational World Simulator inverts this: it introduces a **living world that ticks forward by itself** and **work that emerges as a consequence of the world's condition**, then closes the loop by writing decision outcomes back into the world. The result is a genuine *organisational simulator*: cross-function cascades and resource contention **emerge** rather than being scripted, anomaly-style domains detect conditions **nobody drew for them**, and every run is different. Crucially it is built as a **generic engine + declarative industry packs**, so it is industry-independent and adapts to any vertical. The first proving ground is a deliberately **minimal telco slice** (~4 processes, §11.1) chosen to exercise every primitive at the smallest honest scale; the *full* telco world and any agency retrofit are later, separate work.
 
 ---
 
@@ -57,7 +57,8 @@ The entire design is one loop. Everything else is detail.
 
 **Non-goals (deferred / out of scope here):**
 
-- **The telco world pack.** Telco is the intended first vehicle but its stocks/signals/functions/domains get their **own follow-on spec + plan**. This spec must not bake telco nouns into the engine.
+- **The full telco vertical.** This spec defines a deliberately **minimal telco slice** (~4 processes, §11.1) as the first proving substrate. The *full* telco world — its complete function set, domain catalogue, and signal taxonomy — is a follow-on spec + plan. Either way the engine must never bake in telco nouns; the slice lives entirely in a pack under `world/packs/telco/`.
+- **Simulating the existing 30+ agency domains.** Explicitly out of scope as a first move: modelling a large interacting world *and* debugging a new engine at once, on top of the live flagship, is the wrong risk profile. A small agency retrofit is a *later, optional* commercial pack (§7, §12).
 - **Rewriting the substrate.** The engine is *additive*. Durable workflows, personae, projections, governance (AGT), the cosmic lens, and the Visual Domain Composer are reused unchanged except for the additive signals stream.
 - **Retiring the current ramp loop immediately.** The ramp loop coexists behind the flag until at least one world pack proves the model (§7).
 - **Public deploy changes.** The engine is in-process and localhost-first; it introduces no new external ingress and does not alter the `.poc-safety` posture (§9).
@@ -195,7 +196,7 @@ From Zava's point of view the world is simply a new **publisher + subscriber** o
 The current `simulator_orchestrator.ramp_loop` spawns each live domain on a time-warped Poisson timer, with a few `cadenced_rituals`. Under the world model that becomes a special case: **"advance the world; work emerges."** Migration posture:
 
 - **Coexistence behind the flag.** With `ZAVA_WORLD` unset, the ramp loop runs exactly as today. With a pack active, the engine drives emergence and the ramp loop is disabled for that pack's domains.
-- **The `data_fabric` seeders generalise** into per-pack seed modules; the agency world can optionally be retrofitted as a pack later (not required for v1).
+- **The first substrate is a new, small pack — not the agency world.** The minimal telco slice (§11.1) is authored fresh under `world/packs/telco/`; the existing agency substrate stays on the ramp loop, untouched. The `data_fabric` seeders generalise into per-pack seed modules, so a *small* agency slice can optionally be retrofitted as a commercial pack **later** (not required to prove the engine, and never the full 30+ domains up front).
 - **No behavioural regression** for the existing 38 agency domains while the flag is unset — protected by the registry-consistency tests plus new engine-off tests.
 
 ---
@@ -234,20 +235,40 @@ Zava prizes deterministic seeding + replay tapes (`ZAVA_MODE=replay`, the compos
 
 - A **toy pack** end-to-end: perturbation → stock change → signal crosses threshold → sensor emits → (stub) workflow-completion event → actuator restores the stock. Asserts the full loop over the real bus with no industry nouns.
 
-**Prove-the-waist (design-validation gate, §11 M4):** express **two structurally different industries** (one operational, one commercial) against the contract with **no engine edits**. If both fit cleanly, the narrow waist is validated; if either needs an engine change, revise the contract before building further.
+**Prove-the-waist (design-validation gate):** the contract must carry **two structurally different packs with no engine edits** — the neutral **toy pack** (generic support-org, slow stocks; lives permanently in the engine's unit tests) and the **minimal telco slice** (§11.1; fast signals + resource contention). If both fit cleanly, the narrow waist is validated against genuinely different shapes; if either forces an engine change, revise the contract before growing any vertical. (A real agency pack later would be a third, commercial confirmation.)
 
 ---
 
 ## 11. Milestones (the plan will sequence these)
 
-1. **Contract + engine core** — `world/contract.py` (the seven primitives) + integrator + signal evaluator + shared sandbox. Unit-tested against a toy pack. No bus, no UI.
+1. **Contract + engine core** — `world/contract.py` (the seven primitives) + integrator + signal evaluator + shared sandbox, unit-tested against a neutral **toy pack** (support-queue). No bus, no UI. The toy pack stays as the engine's permanent industry-neutral guard.
 2. **Perturbations + sensors + actuators** — the scheduler and the two runtimes; the full loop proven over the real EventBus with a stub responder.
 3. **Pack loader + `ZAVA_WORLD` flag + lifespan wiring** — discover a pack folder, start/stop the engine, engine-off default verified.
-4. **Prove the waist** — author two industry-neutral packs (operational + commercial) against the contract; revise the contract if anything leaks into the engine. *Gate before vertical work.*
-5. **Cosmic-lens signals stream** — `world.tick` SSE channel + minimal lens rendering of live signals/stocks.
-6. **Telco pack (separate spec/plan)** — the first real vertical: telco stocks/signals/functions/domains, authored (in part) via compose-domain / the Visual Domain Composer.
+4. **Minimal telco slice — the first working substrate** *(the "make sure it works" gate)*. A deliberately small, purpose-built pack (§11.1): ~4 processes across 2 functions, exercising every primitive incl. fast signals, resource contention, and feedback. Passing it validates the narrow waist against a genuinely different shape from the toy pack. Its response half (domains/personae/projections) is authored via compose-domain / the Visual Domain Composer.
+5. **Cosmic-lens signals stream** — `world.tick` SSE channel + minimal lens rendering of the slice's live signals/stocks (the mast-fault→recovery cascade made visible).
+6. **Grow / later (separate specs/plans)** — expand the slice toward a full telco world; wire the Visual Domain Composer to author the *world half*; optionally retrofit a small agency slice as a commercial pack for the flagship upgrade. None of these is required to prove the engine.
 
-Beyond the milestones: retrofit the agency world as a pack; wire the Visual Domain Composer to author the *world half*; a two-tier work router tuned from real load; richer integrators only if a pack demands them.
+Beyond the milestones: a two-tier work router tuned from real load; richer integrators only if a pack demands them.
+
+### 11.1 The minimal telco slice (M4 target)
+
+The smallest telco organism that still exercises every primitive — the concrete target for the first working substrate:
+
+```
+Functions (2):   Network Operations  ·  Customer Care
+Stocks:          network_health · call_queue_depth · open_incidents
+Resource:        field_tech_pool          ← finite; simultaneous incidents contend for it
+Signals:         dropped_call_rate · avg_hold_time · sla_breach
+Perturbations:   mast_fault (manual + rare poisson) · demand_surge
+Sensors:         dropped_call_rate > X → incident.requested
+                 call_queue_depth   > Y → care_surge.requested
+Processes (~4):  network-incident · field-dispatch · care-surge-staffing · churn-save
+Actuators:       incident resolved → restore network_health
+                 dispatch done     → release a field tech
+                 surge-staffing    → raise care capacity
+```
+
+One clean cascade — *mast fault → dropped calls ↑ → call-queue spike → incident ignites → field-dispatch (techs contended) → recovery, with churn-risk as a side-effect* — touches stocks, flows, a shared resource, perturbations, sensors, actuators, and feedback. Four processes, not thirty; fully in our control; zero flagship risk; and it grows straight into the full telco vertical. Exact stock equations, thresholds, and process phases are pinned during planning.
 
 ---
 
@@ -256,6 +277,6 @@ Beyond the milestones: retrofit the agency world as a pack; wire the Visual Doma
 - **Time-series storage for fast state.** Kuzu is a graph, not a metrics store. Options: in-memory ring buffers (simplest, demo-sufficient) vs. a lightweight sqlite history for scrubbing/replay. Lean ring-buffer + optional sqlite; decide in planning.
 - **Two-tier work routing rule.** What makes a tripped sensor a cheap in-process *reaction* vs. a Durable *process*? Likely a per-sensor `tier` field; needs a concrete rule and load testing.
 - **How much of the world is agent-driven vs. authored physics.** Recommendation stands: authored, legible dynamics for the *environment*; agentic intelligence in the *responders*. Revisit only if a pack needs endogenous agents driving the world itself.
-- **Retrofit the agency world as a pack, or leave it on the ramp loop?** Not required for v1; decide once the telco pack validates the model.
+- **Retrofit the agency world as a pack?** *Resolved:* not first. The first substrate is a new minimal telco slice (§11.1), not an agency retrofit — the 30+ existing processes are too much surface to model while the engine is new. A *small* agency slice is a later, optional commercial pack for the flagship upgrade.
 - **Contract expressivity edges.** Do delays/pipelines (a change that takes N ticks to bite) and simple queues need first-class primitives, or do stocks-of-stocks express them? Settle during "prove the waist" (M4).
-- **Telco specifics** — stocks, signals, function set, and the first interoperating loop — are entirely deferred to the telco follow-on spec.
+- **Full telco specifics** — the complete function set, domain catalogue, and signal taxonomy of a full telco world remain deferred to the telco follow-on spec. The *minimal* slice's shape is pinned in §11.1; only its exact equations, thresholds, and process phases await planning.
