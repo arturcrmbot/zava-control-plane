@@ -77,3 +77,91 @@ def test_sensor_fires_once_on_rising_edge():
     engine.tick()                 # backlog 50 -> breach 50/90 > 0.5 -> fire
     engine.tick()                 # still hot -> latched, no refire
     assert len(fired) == 1 and fired[0].sensor == "hot"
+
+
+import asyncio
+import contextlib
+import pytest
+from api.shared.events import FleetEvent
+from api.server.world.contract import Actuator, WorldPack, Stock, Resource
+
+
+def _feedback_pack():
+    return WorldPack(
+        name="fb",
+        resources=(Resource("agents", capacity=20.0),),
+        actuators=(
+            Actuator("hire", on="surge-staffing.completed", target="agents",
+                     effect=lambda ev: ev.get("hired", 0)),
+        ),
+    )
+
+
+def test_actuator_applies_delta_from_completion_event():
+    engine = WorldEngine(_feedback_pack(), EventBus())
+    engine.attach()
+    engine.bus.emit(FleetEvent(type="surge-staffing.completed", hired=15))
+    assert engine.state.resources["agents"] == 35.0
+
+
+def test_actuator_ignores_unrelated_and_malformed_events():
+    engine = WorldEngine(_feedback_pack(), EventBus())
+    engine.attach()
+    engine.bus.emit(FleetEvent(type="something.else", hired=15))     # not subscribed
+    engine.bus.emit(FleetEvent(type="surge-staffing.completed"))     # no 'hired' -> 0
+    assert engine.state.resources["agents"] == 20.0
+
+
+@pytest.mark.asyncio
+async def test_run_loop_ticks_until_stopped():
+    engine = WorldEngine(_pack(), EventBus())
+    ticks = []
+    engine.bus.on("world.tick", lambda e: ticks.append(e))
+    task = asyncio.create_task(engine.run(tick_seconds=0.0))
+    await asyncio.sleep(0.02)
+    engine.stop()
+    with contextlib.suppress(asyncio.CancelledError):
+        await asyncio.wait_for(task, timeout=1.0)
+    assert len(ticks) >= 1
+
+
+def test_closed_loop_surge_triggers_hiring_then_recovers():
+    # Toy-shaped pack with the full loop: surge -> sensor -> (stub responder) -> actuator -> drain.
+    pack = WorldPack(
+        name="loop",
+        stocks=(Stock("backlog", initial=0.0, min=0.0, max=None),),
+        resources=(Resource("agents", capacity=20.0),),
+        inputs={"arrival": 30.0},
+        constants={"HANDLE": 2.0},
+        flows=(
+            Flow(into="backlog", rate=lambda w: w["arrival"]),
+            Flow(into="backlog", rate=lambda w: -(w["agents"] * w["HANDLE"])),
+        ),
+        signals=(Signal("breach", lambda w: w["backlog"] / max(w["backlog"] + w["agents"] * w["HANDLE"], 1)),),
+        perturbations=(Perturbation("surge", target="arrival", magnitude=60.0, duration_ticks=3),),
+        sensors=(Sensor("hot", when=lambda w: w["breach"] > 0.5, emit="ops.surge_staffing.requested"),),
+        actuators=(Actuator("hire", on="surge-staffing.completed", target="agents",
+                            effect=lambda ev: ev.get("hired", 0)),),
+    )
+    bus = EventBus()
+    fired = []
+    bus.on("ops.surge_staffing.requested", lambda e: fired.append(e))
+    # Stub responder: a surge request "hires" 60 agent-capacity.
+    bus.on("ops.surge_staffing.requested",
+           lambda e: bus.emit(FleetEvent(type="surge-staffing.completed", hired=60)))
+
+    engine = WorldEngine(pack, bus)
+    engine.attach()
+    for _ in range(3):
+        engine.tick()
+    assert engine.state.stocks["backlog"] == 0.0 and fired == []
+
+    engine.inject("surge")
+    for _ in range(4):
+        engine.tick()
+    assert len(fired) >= 1
+    assert engine.state.resources["agents"] >= 80.0     # 20 + 60 hired
+
+    for _ in range(10):
+        engine.tick()
+    assert engine.state.stocks["backlog"] == 0.0        # extra capacity drained it

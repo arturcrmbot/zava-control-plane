@@ -114,3 +114,29 @@ class WorldEngine:
                 del self._active[pert.name]
             else:
                 self._active[pert.name] = remaining - 1
+
+    def attach(self) -> None:
+        if self._attached:
+            return
+        for actuator in self.pack.actuators:
+            self.bus.on(actuator.on, self._make_actuator(actuator))
+        self._attached = True
+
+    def _make_actuator(self, actuator):
+        def handle(event: FleetEvent) -> None:
+            try:
+                delta = float(actuator.effect(event.model_dump()))
+                self.state.add(actuator.target, delta)
+            except Exception:
+                pass
+        return handle
+
+    async def run(self, tick_seconds: float = 1.0, dt_hours: float = 1.0) -> None:
+        self.attach()
+        self._running = True
+        while self._running:
+            self.tick(dt_hours)
+            await asyncio.sleep(tick_seconds)
+
+    def stop(self) -> None:
+        self._running = False
