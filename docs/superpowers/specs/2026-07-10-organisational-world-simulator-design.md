@@ -48,7 +48,7 @@ The entire design is one loop. Everything else is detail.
 
 **In scope (this spec — the industry-independent core):**
 
-- A generic **World Model engine** (`world/engine/`): tick loop, stock integrator, signal evaluator, resource allocator, perturbation scheduler, sensor + actuator runtime, and the sandboxed-expression evaluator they share.
+- A generic **World Model engine** (`world/engine.py`): tick loop, stock integrator, signal evaluator, perturbation handling, and sensor + actuator runtimes — one cohesive `WorldEngine` whose job is "advance the world".
 - The **narrow-waist contract** (`world/contract.py`): the seven primitive types every pack conforms to (§3).
 - **World packs** (`world/packs/<industry>/`): the declarative content shape + a boot-time loader, selected one-at-a-time by a `ZAVA_WORLD` flag (§5).
 - **Coupling to Zava** through the two existing seams only — the EventBus and the entity graph (§6).
@@ -82,7 +82,7 @@ The make-or-break decision: the engine defines a **small, fixed vocabulary of pr
 
 **Why this set is genuinely universal:** it is precisely how operations-research / system-dynamics modelling represents *any* organisation — hospital, bank, telco, agency. Stocks + flows + finite resources + exogenous shocks + condition-driven responses + feedback is the general grammar of an operating organisation, not a telco-specific one.
 
-`world/contract.py` declares these as typed, frozen dataclasses. The math/logic-bearing fields (a Flow's rate, a Signal's formula, a Sensor's condition, an Actuator's effect) are **sandboxed expression strings**, evaluated as described in §4.4.
+`world/contract.py` declares these as typed, frozen dataclasses. The math/logic-bearing fields (a Flow's rate, a Signal's formula, a Sensor's condition, an Actuator's effect) are **plain Python callables** over the world state (e.g. `rate=lambda w: -(w["agents"] * w["HANDLE"])`), because packs are authored as Python modules (§5). No string-eval, no sandbox: a pack author writes Python either way, so there is no trust boundary to guard — and a callable is type-checkable, debuggable (real tracebacks), and faster. (A future *data*-authored pack format for the Visual Composer would reintroduce string expressions + a sandbox **scoped to that untrusted path only**; out of scope here — see §9.)
 
 ---
 
@@ -110,9 +110,9 @@ Holds the mutable stock vector. Applies flows with explicit-Euler integration (a
 
 Computes each `Signal` formula from the current stock vector + injected read-only helpers (entity-graph counts, resource utilisation). Pure; no side effects.
 
-### 4.4 Sandboxed expression evaluator (shared)
+### 4.4 Expression callables
 
-The rate/formula/condition/effect fields are evaluated in a **locked-down namespace** — the *exact* mechanism Zava already uses for persona `decision_policy` blocks (`compile()` + a curated builtins whitelist; see [`persona_responder.py`](../../../api/server/services/persona_responder.py) `_DECISION_BUILTINS`). Injected reads: `stocks`, `signals`, `resources`, `graph` (read-only), plus safe math. No `import`, no file/network, no reflection. A bad expression raises at load/compile time and disables *that instance* only, never the engine. Reusing this runtime keeps one sandbox story across personae and world packs.
+The rate/formula/condition/effect fields are **plain Python callables** the pack supplies, invoked with a lightweight world view supporting `w["name"]` lookups across stocks / inputs / resources / constants / signals. A rate/formula returns a float, a sensor condition returns a bool, an actuator effect takes the event payload dict and returns a float delta. A callable that raises is caught and disables *that one instance* for the tick, never the engine. No `compile()`, no `eval`, no builtins-whitelist ceremony — packs are Python, so the author already has full power and there is nothing to sandbox them from.
 
 ### 4.5 Perturbation scheduler
 
@@ -124,7 +124,7 @@ Each tick, evaluates every `Sensor.condition`. On a rising edge (false→true) a
 
 ### 4.7 Actuator runtime
 
-Subscribes to the bus for the responder-completion events named in each `Actuator.on`. When one fires, evaluates the actuator's `effect` in the sandbox with the event outcome injected, and applies the resulting delta to world state (e.g. `resources.agents.capacity += outcome.hired`). This is the feedback path; without it the world is a one-way feed.
+Subscribes to the bus for the responder-completion events named in each `Actuator.on`. When one fires, calls the actuator's `effect` callable with the event payload and applies the returned delta to world state (e.g. `agents += event["hired"]`). This is the feedback path; without it the world is a one-way feed.
 
 ### 4.8 Lifecycle
 
@@ -214,7 +214,7 @@ Zava prizes deterministic seeding + replay tapes (`ZAVA_MODE=replay`, the compos
 ## 9. Safety
 
 - **No new external surface.** The engine is in-process (FastAPI). Its only inbound operator control (manual perturbation injection) rides the existing demo-trigger route, subject to the existing read/route auth posture. `.poc-safety` is unchanged; nothing here binds a public interface.
-- **Sandbox for pack expressions.** Pack-authored expressions run in the persona-grade sandbox (§4.4) — no `import`, file, network, or reflection — so a world pack cannot escalate beyond arithmetic over injected state.
+- **Packs are trusted Python, not runtime input.** A world pack is a Python module in the repo, loaded at boot and requiring a server restart to change — the same trust level as any other source file. Its expression callables therefore need no sandbox (§4.4). *If* a later data-authored (YAML/JSON) pack format is added for the Visual Composer, string expressions + a persona-grade sandbox get added **on that path only**; the Python-pack path stays sandbox-free.
 - **Single active pack + single writer.** One pack at a time; the engine runs only in the FastAPI process (mirrors `ENTITY_PLANE_ENABLED=0` in the worker), preserving Kuzu's single-writer discipline.
 
 ---
@@ -241,7 +241,7 @@ Zava prizes deterministic seeding + replay tapes (`ZAVA_MODE=replay`, the compos
 
 ## 11. Milestones (the plan will sequence these)
 
-1. **Contract + engine core** — `world/contract.py` (the seven primitives) + integrator + signal evaluator + shared sandbox, unit-tested against a neutral **toy pack** (support-queue). No bus, no UI. The toy pack stays as the engine's permanent industry-neutral guard.
+1. **Contract + engine core** — `world/contract.py` (the seven primitives, expression fields typed as callables) + a single cohesive `world/engine.py` (state, integrate, signals, perturbations, sensors, actuators), unit-tested against a neutral **toy pack** (support-queue). No sandbox, no UI. The toy pack stays as the engine's permanent industry-neutral guard.
 2. **Perturbations + sensors + actuators** — the scheduler and the two runtimes; the full loop proven over the real EventBus with a stub responder.
 3. **Pack loader + `ZAVA_WORLD` flag + lifespan wiring** — discover a pack folder, start/stop the engine, engine-off default verified.
 4. **Minimal telco slice — the first working substrate** *(the "make sure it works" gate)*. A deliberately small, purpose-built pack (§11.1): ~4 processes across 2 functions, exercising every primitive incl. fast signals, resource contention, and feedback. Passing it validates the narrow waist against a genuinely different shape from the toy pack. Its response half (domains/personae/projections) is authored via compose-domain / the Visual Domain Composer.
