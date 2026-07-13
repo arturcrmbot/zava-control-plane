@@ -25,6 +25,7 @@ import { VitalSignsBar } from "./HUD/VitalSignsBar";
 import { ActivityRail } from "./HUD/ActivityRail";
 import { WorkflowDrawer, type DrawerView } from "./HUD/WorkflowDrawer";
 import { KnowledgePulse } from "./HUD/KnowledgePulse";
+import { WorldSignalsPanel } from "./HUD/WorldSignalsPanel";
 import { NarrativeArcs } from "./HUD/NarrativeArcs";
 import { TimeScrub, type ReplaySnapshot } from "./HUD/TimeScrub";
 
@@ -577,6 +578,9 @@ export function CosmicLens({ embed: _embed }: CosmicLensProps) {
           onOpenEntity={(id) => setDrawer({ type: "entity", id })}
         />
       )}
+
+      {/* World simulator live readout — self-hides when the engine is off. */}
+      <WorldSignalsPanel />
 
       {/* Back-to-overview button — visible whenever camera is focused. */}
       {focus && (
