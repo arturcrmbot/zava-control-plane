@@ -173,20 +173,42 @@ async def lifespan(app: FastAPI):
         print(f"[server] kpi_history_recorder failed to start: {ex}")
     # Start the simulator ramp loop (spawns workflows via the AF Durable host)
     ramp_task = asyncio.create_task(simulator_orchestrator.ramp_loop())
-    # World simulator engine — off unless ZAVA_WORLD names a pack (spec 2026-07-10).
-    from api.server.world import maybe_start_world
-    world_task = maybe_start_world(
-        app_state.bus,
-        on_engine=lambda e: setattr(app_state, "world_engine", e),
-    )
-    if world_task is not None:
-        # Arm the world↔Durable bridge: the engine's sensor event drives a REAL
-        # SurgeStaffingOrchestrator on the func host, whose outcome feeds back
-        # into world state via the engine's actuator (services/world_bridge.py).
+    # World simulator — exactly one authority at a time, selected by
+    # ZAVA_WORLD. `support` runs the live actor-world service (spec
+    # 2026-07-13) and arms the actor WorldBridge, which schedules a REAL
+    # SurgeStaffingOrchestrator on the func host and applies its typed
+    # command back through the service. Any other value falls back to the
+    # aggregate toy engine (spec 2026-07-10), kept for regression only — its
+    # actuators are wired internally via WorldEngine.attach(), so no
+    # WorldBridge is armed there (the bridge only understands actor
+    # observations/commands, not aggregate stocks/signals).
+    world_task = None
+    world_bridge = None
+    world_name = os.getenv("ZAVA_WORLD")
+    if world_name == "support":
         from api.server.services.world_bridge import WorldBridge
-        app_state.world_bridge = WorldBridge(app_state)
-        app_state.world_bridge.start()
-        print(f"[server] world engine ON (ZAVA_WORLD={os.getenv('ZAVA_WORLD')}) + bridge armed")
+        from api.server.world.service import ActorWorldService
+
+        world_service = ActorWorldService.support(
+            seed=int(os.getenv("WORLD_SEED", "42")),
+            bus=app_state.bus,
+            minutes_per_second=float(os.getenv("WORLD_MINUTES_PER_SECOND", "10")),
+        )
+        app_state.world_service = world_service
+        world_task = asyncio.create_task(world_service.run())
+        world_bridge = WorldBridge(app_state)
+        world_bridge.start()
+        app_state.world_bridge = world_bridge
+        print(f"[server] actor world ON (ZAVA_WORLD={world_name}) + bridge armed")
+    elif world_name:
+        from api.server.world import maybe_start_world
+
+        world_task = maybe_start_world(
+            app_state.bus,
+            on_engine=lambda e: setattr(app_state, "world_engine", e),
+        )
+        if world_task is not None:
+            print(f"[server] world engine ON (ZAVA_WORLD={world_name}, aggregate toy fallback)")
     # Optional dream-pass cadence. Off unless DREAM_PASS_DEMO_CADENCE_SECONDS
     # is set. Scheduled here (not in AppState.__init__) because
     # AppState is constructed at module import time, before uvicorn has
@@ -367,6 +389,13 @@ async def lifespan(app: FastAPI):
         seed_task.cancel()
         if dream_cadence_task is not None:
             dream_cadence_task.cancel()
+        # Disarm the world bridge and stop the live service (if any) before
+        # cancelling world_task, so neither is left mid-drive.
+        if world_bridge is not None:
+            world_bridge.stop()
+        world_service = getattr(app_state, "world_service", None)
+        if world_service is not None:
+            world_service.stop()
         if world_task is not None:
             world_task.cancel()
         # Await the cancelled tasks so their teardown actually completes
@@ -380,6 +409,11 @@ async def lifespan(app: FastAPI):
                 await t
             except (asyncio.CancelledError, Exception):
                 pass
+        # Clear the world authority attrs so a stale handle never survives
+        # into the next lifespan (e.g. repeated TestClient(app) cycles).
+        app_state.world_service = None
+        app_state.world_engine = None
+        app_state.world_bridge = None
         try:
             _portal_orch_off()
         except Exception:
@@ -522,7 +556,8 @@ from api.server.routes.memory import router as memory_router
 from api.server.routes.workflow_agui import router as workflow_agui_router
 # Visual Domain Composer — phase 1: session create + SSE stream.
 from api.server.routes.compose import router as compose_router
-# World simulator — internal control/observe (JSON only; spec 2026-07-10).
+# World simulator — internal state/events/inject (JSON only; specs
+# 2026-07-10 aggregate + 2026-07-13 actor).
 from api.server.routes.world import router as world_router
 # Per-lesson observability — D1.
 

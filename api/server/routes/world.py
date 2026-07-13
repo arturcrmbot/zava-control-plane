@@ -1,26 +1,54 @@
-"""Internal control + observability for the world simulator (JSON only — not UX).
+"""Internal state/events/inject surfaces for the world simulator (JSON only —
+not UX).
 
-Two endpoints, in the spirit of the existing internal/demo routes
+Two authorities can back these routes, never both at once (see the lifespan
+wiring in ``api/server/main.py``):
+
+  - ``app_state.world_service`` — the live ``ActorWorldService`` (spec
+    2026-07-13, ``ZAVA_WORLD=support``): an explicit-actor SimPy simulation
+    with a causal event journal. This is the primary authority.
+  - ``app_state.world_engine`` — the aggregate ``WorldEngine`` (spec
+    2026-07-10, ``ZAVA_WORLD=toy``): retained as a regression-only fallback
+    when the actor service isn't active.
+
+Routes, in the spirit of the existing internal/demo routes
 (``routes/demo_triggers.py``, ``routes/internal_durable_event.py``):
 
-  GET  /api/world/state        — snapshot of live world state (stocks, resources,
-                                 signals, inputs) + the last Durable responder run.
-  POST /api/world/inject/{name}— inject a named perturbation into the running world.
+  GET  /api/world/state                — snapshot of live world state + the
+                                          last Durable responder run.
+  GET  /api/world/events?after=<seq>   — journal catch-up (actor world only).
+  POST /api/world/inject/demand_surge  — inject a demand surge.
 
-These exist so a proof driver (or an operator) can drive and observe the world
-engine that runs inside the FastAPI process. No frontend, no rendering.
+Per the ponytail amendment to the Plan 2 spec, pause/resume/step/restart,
+SSE streaming and the generic ``/control``/``/inject/{name}`` surfaces are
+cut from this plan and deferred to Plan 3 (viewer). These exist so a proof
+driver (or an operator) can drive and observe the world that runs inside the
+FastAPI process. No frontend, no rendering.
 """
 from __future__ import annotations
 
 from fastapi import APIRouter
+from pydantic import BaseModel, Field
 
 from api.server.state import app_state
 
 router = APIRouter(prefix="/api/world", tags=["world"])
 
 
+class DemandSurgeRequest(BaseModel):
+    """Body for ``POST /inject/demand_surge``. Every field is optional."""
+
+    multiplier: float = Field(default=4, gt=1, allow_inf_nan=False)
+    duration_minutes: float = Field(default=90, gt=0, allow_inf_nan=False)
+
+
 @router.get("/state")
 async def world_state() -> dict:
+    service = getattr(app_state, "world_service", None)
+    if service is not None:
+        snapshot = service.snapshot()
+        snapshot["last_response"] = getattr(app_state, "world_last_response", None)
+        return snapshot
     engine = getattr(app_state, "world_engine", None)
     if engine is None:
         return {"enabled": False}
@@ -36,10 +64,32 @@ async def world_state() -> dict:
     }
 
 
-@router.post("/inject/{name}")
-async def world_inject(name: str) -> dict:
+@router.get("/events")
+async def world_events(after: int = 0) -> dict:
+    """Actor-world journal catch-up. Disabled unless the actor service runs."""
+    service = getattr(app_state, "world_service", None)
+    if service is None:
+        return {"enabled": False, "latest_seq": 0, "events": []}
+    return {
+        "enabled": True,
+        "latest_seq": len(service.runtime.journal),
+        "events": service.events_after(after),
+    }
+
+
+@router.post("/inject/demand_surge")
+async def inject_demand_surge(body: DemandSurgeRequest = DemandSurgeRequest()) -> dict:
+    service = getattr(app_state, "world_service", None)
+    if service is not None:
+        service.inject_demand_surge(body.multiplier, body.duration_minutes)
+        return {
+            "ok": True,
+            "sim_time": service.runtime.now,
+            "multiplier": body.multiplier,
+            "duration_minutes": body.duration_minutes,
+        }
     engine = getattr(app_state, "world_engine", None)
-    if engine is None:
-        return {"ok": False, "error": "world engine not enabled (set ZAVA_WORLD)"}
-    engine.inject(name)
-    return {"ok": True, "injected": name}
+    if engine is not None:
+        engine.inject("demand_surge")
+        return {"ok": True, "injected": "demand_surge"}
+    return {"ok": False, "error": "world engine not enabled (set ZAVA_WORLD)"}
