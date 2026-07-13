@@ -1,48 +1,55 @@
-"""World ↔ Durable bridge — closes the world-simulator loop across processes.
+"""World ↔ Durable bridge — closes the actor-simulation loop across processes.
 
-This is the substrate glue that connects the (industry-generic) world engine to
-a REAL Azure Durable Functions orchestration. It lives on the FastAPI side (it
-imports the Durable client), keeping ``api/server/world/`` free of any Durable
-dependency, exactly as the spec's "couple only via the bus" seam requires.
+This is the substrate glue that connects the live actor world (see
+``api/server/world/service.py``) to a REAL Azure Durable Functions
+orchestration. It lives on the FastAPI side (it imports the Durable client),
+keeping ``api/server/world/`` free of any Durable dependency, exactly as the
+spec's "couple only via the bus" seam requires.
 
 Flow:
-  1. Subscribe to the world engine's sensor event ``ops.surge_staffing.requested``.
-  2. On fire: snapshot world state and schedule the ``SurgeStaffingOrchestrator``
-     on the func host (:7071) with that snapshot as input.
-  3. Await the orchestration's completion and read the agent's decision (hired).
-  4. Emit ``surge-staffing.completed(hired=N)`` on the bus — the world engine's
-     actuator consumes it and raises agent capacity, so the simulated backlog
-     drains. The world has been changed by a real Durable workflow.
+  1. Subscribe to the actor world's sensor event ``world.sensor.tripped``.
+  2. On fire: extract the nested ``simulation_event``, build an observation
+     from the live actor world, and journal ``responder.requested``.
+  3. Schedule the ``SurgeStaffingOrchestrator`` on the func host (:7071) with
+     the trace ID and observation as input.
+  4. Await the orchestration's completion and read its typed command.
+  5. No command: journal ``responder.deferred`` — the world is unchanged. A
+     command: journal ``responder.decided`` and apply it through
+     ``world_service.apply_command`` — the world has been changed by a real
+     Durable workflow. Any failure/timeout journals ``responder.failed`` and
+     the simulation keeps running.
+
+One in-flight response is tracked per sensor trace (not a single global
+flag), so independent trace firings never block each other.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
-import time
 
 import httpx
 
 from api.shared.events import FleetEvent
 from api.server.services.durable_client import schedule_new_orchestration
+from api.server.world.model import SimulationCommand
 
 log = logging.getLogger("world_bridge")
 
-SENSOR_EVENT = "ops.surge_staffing.requested"
+SENSOR_EVENT = "world.sensor.tripped"
 ORCHESTRATOR = "SurgeStaffingOrchestrator"
-COMPLETION_EVENT = "surge-staffing.completed"
 
 _TERMINAL_OK = "Completed"
 _TERMINAL_BAD = {"Failed", "Terminated", "Canceled"}
 
 
 class WorldBridge:
-    """Drives one Durable orchestration per sensor firing (serialised)."""
+    """Drives one Durable orchestration per sensor trace (never overlaps a trace)."""
 
     def __init__(self, app_state, *, poll_timeout: float = 90.0) -> None:
         self._app = app_state
         self._bus = app_state.bus
         self._poll_timeout = poll_timeout
-        self._in_flight = False
+        self._in_flight_traces: set[str] = set()
         self._off = None
 
     def start(self) -> None:
@@ -53,53 +60,109 @@ class WorldBridge:
         if self._off is not None:
             self._off()
             self._off = None
+        self._in_flight_traces.clear()
 
     def _on_sensor(self, event: FleetEvent) -> None:
-        # Sensor is edge-latched, but guard against overlapping episodes anyway.
-        if self._in_flight:
+        simulation_event = getattr(event, "simulation_event", None)
+        if not isinstance(simulation_event, dict):
+            log.error("world_bridge: sensor event missing simulation_event: %s", event)
             return
-        self._in_flight = True
-        asyncio.create_task(self._drive(event))
+        trace_id = simulation_event.get("trace_id")
+        if not trace_id:
+            log.error("world_bridge: sensor event missing trace_id: %s", simulation_event)
+            return
+        # Latched synchronously (before the task even runs) so a second sensor
+        # firing for the same trace is suppressed while the first is in flight.
+        if trace_id in self._in_flight_traces:
+            return
+        self._in_flight_traces.add(trace_id)
+        asyncio.create_task(self._drive(simulation_event))
 
-    async def _drive(self, event: FleetEvent) -> None:
+    async def _drive(self, simulation_event: dict) -> None:
+        trace_id = simulation_event.get("trace_id")
+        service = None
+        requested = None
         try:
-            snapshot = self._snapshot()
-            workflow_id = f"surge-{int(time.time() * 1000)}"
-            payload = {"workflow_id": workflow_id, "type": "surge-staffing", "world": snapshot}
+            service = self._app.world_service
+            observation = service.build_observation(simulation_event)
+            requested = service.record_external(
+                "responder.requested",
+                trace_id=trace_id,
+                cause_event_id=simulation_event.get("event_id"),
+                payload={"observation": observation},
+            )
 
+            payload = {
+                "workflow_id": f"surge-{trace_id}",
+                "type": "surge-staffing",
+                "trace_id": trace_id,
+                "observation": observation,
+            }
             resp = await schedule_new_orchestration(payload, ORCHESTRATOR)
             instance_id = resp.get("id")
             status_uri = resp.get("statusQueryGetUri")
-            log.info("world_bridge: scheduled %s instance=%s world=%s",
-                     ORCHESTRATOR, instance_id, snapshot)
+            log.info("world_bridge: scheduled %s instance=%s trace=%s",
+                     ORCHESTRATOR, instance_id, trace_id)
 
             output = await self._await_output(instance_id, status_uri)
-            hired = float(output.get("hired", 0.0)) if isinstance(output, dict) else 0.0
+            if not isinstance(output, dict):
+                service.record_external(
+                    "responder.failed",
+                    trace_id=trace_id,
+                    cause_event_id=requested.event_id,
+                    payload={"instance_id": instance_id, "error": "no orchestration output"},
+                )
+                log.error("world_bridge: %s produced no output for trace=%s", instance_id, trace_id)
+                return
+
+            command_data = output.get("command")
+            reasoning = output.get("reasoning")
+            if command_data is None:
+                service.record_external(
+                    "responder.deferred",
+                    trace_id=trace_id,
+                    cause_event_id=requested.event_id,
+                    payload={"instance_id": instance_id, "reasoning": reasoning},
+                )
+                log.info("world_bridge: %s deferred trace=%s reasoning=%s",
+                         instance_id, trace_id, reasoning)
+                return
+
+            service.record_external(
+                "responder.decided",
+                trace_id=trace_id,
+                cause_event_id=requested.event_id,
+                payload={"instance_id": instance_id, "command": command_data, "reasoning": reasoning},
+            )
+            command = SimulationCommand(**command_data)
+            result = service.apply_command(command)
 
             self._app.world_last_response = {
                 "instance_id": instance_id,
-                "snapshot": snapshot,
+                "observation": observation,
                 "output": output,
-                "hired": hired,
-                "at": time.time(),
+                "command": command_data,
+                "result_event_id": result.event_id,
+                "result_type": result.type,
             }
-            self._bus.emit(FleetEvent(type=COMPLETION_EVENT, hired=hired, instance_id=instance_id))
-            log.info("world_bridge: %s Completed hired=%s -> emitted %s",
-                     instance_id, hired, COMPLETION_EVENT)
-        except Exception as ex:  # noqa: BLE001 — bridge must never crash the loop
-            log.exception("world_bridge: drive failed: %s", ex)
+            log.info("world_bridge: %s applied command=%s trace=%s",
+                     instance_id, command.type, trace_id)
+        except Exception as ex:  # noqa: BLE001 — bridge must never crash the simulation
+            log.exception("world_bridge: drive failed for trace=%s: %s", trace_id, ex)
+            if service is not None and trace_id:
+                try:
+                    service.record_external(
+                        "responder.failed",
+                        trace_id=trace_id,
+                        cause_event_id=requested.event_id if requested is not None else None,
+                        payload={"error": str(ex)},
+                    )
+                except Exception:  # noqa: BLE001 — never let failure-reporting itself crash
+                    log.exception(
+                        "world_bridge: failed to record responder.failed for trace=%s", trace_id
+                    )
         finally:
-            self._in_flight = False
-
-    def _snapshot(self) -> dict:
-        engine = getattr(self._app, "world_engine", None)
-        st = engine.state
-        return {
-            "backlog": round(st.stocks.get("support_backlog", 0.0), 2),
-            "arrival": round(st.inputs.get("ticket_arrival_rate", 0.0), 2),
-            "agents": round(st.resources.get("agents", 0.0), 2),
-            "handle": st.constants.get("HANDLE", 1.0),
-        }
+            self._in_flight_traces.discard(trace_id)
 
     async def _await_output(self, instance_id, status_uri):
         """Poll the Durable status endpoint until the orchestration is terminal."""
