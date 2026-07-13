@@ -43,3 +43,47 @@ def test_overloaded_actor_world_trips_sensor_with_real_ticket_ids():
     assert sensor.payload["actor_ids"]
     assert all(actor_id in scenario.tickets for actor_id in sensor.payload["actor_ids"])
     assert sensor.cause_event_id is not None
+
+
+def test_live_queue_index_matches_authoritative_ticket_state():
+    scenario = run_support(
+        seed=23,
+        config=SupportConfig(
+            customer_count=150,
+            worker_count=6,
+            arrival_rate_per_hour=120,
+            simulation_minutes=120,
+            sensor_backlog_threshold=10_000,
+            sensor_recovery_threshold=5_000,
+        ),
+    )
+    expected = [
+        ticket.id for ticket in scenario.tickets.values() if ticket.status == "queued"
+    ]
+    assert list(scenario.queued_ticket_ids) == expected
+
+
+def test_sensor_does_not_full_project_until_an_edge(monkeypatch):
+    import api.server.world.projection as projection_module
+
+    calls = 0
+    original = projection_module.project_support
+
+    def counted(scenario):
+        nonlocal calls
+        calls += 1
+        return original(scenario)
+
+    monkeypatch.setattr(projection_module, "project_support", counted)
+    run_support(
+        seed=24,
+        config=SupportConfig(
+            customer_count=150,
+            worker_count=9,
+            arrival_rate_per_hour=45,
+            simulation_minutes=180,
+            sensor_backlog_threshold=10_000,
+            sensor_recovery_threshold=5_000,
+        ),
+    )
+    assert calls == 0

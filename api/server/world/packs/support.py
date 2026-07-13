@@ -92,6 +92,7 @@ class SupportScenario:
         self._ticket_seq = 0
         self._customer_ids: list[str] = []
         self._sensor_latched = False
+        self.queued_ticket_ids: dict[str, None] = {}
 
     def install(self) -> None:
         self.runtime.emit(
@@ -206,6 +207,7 @@ class SupportScenario:
             payload={"required_skill": required_skill},
         )
         ticket.last_event_id = queued.event_id
+        self.queued_ticket_ids[ticket.id] = None
         self.queue.put(ticket)
         self.runtime.process(self._sla_watch(ticket))
         self.runtime.process(self._abandon_watch(ticket))
@@ -217,6 +219,7 @@ class SupportScenario:
             )
             if ticket.status != "queued":
                 continue
+            self.queued_ticket_ids.pop(ticket.id, None)
             worker.status = "busy"
             worker.current_ticket_id = ticket.id
             ticket.status = "in_service"
@@ -297,6 +300,7 @@ class SupportScenario:
         if ticket.status != "queued":
             return
         yield self.queue.get(lambda item: item.id == ticket.id)
+        self.queued_ticket_ids.pop(ticket.id, None)
         ticket.status = "abandoned"
         ticket.abandoned_at = self.runtime.now
         customer.active_ticket_ids.discard(ticket.id)
@@ -313,20 +317,17 @@ class SupportScenario:
         ticket.last_event_id = abandoned.event_id
 
     def _sensor_loop(self):
-        from api.server.world.projection import project_support
-
+        threshold = self.config.sensor_backlog_threshold
+        recovery = self.config.sensor_recovery_threshold
+        latched = False
         while self.runtime.now < self.config.simulation_minutes:
             yield self.runtime.env.timeout(1)
-            projection = project_support(self)
-            if (
-                projection.support_backlog >= self.config.sensor_backlog_threshold
-                and not self._sensor_latched
-            ):
-                queued_ids = [
-                    ticket.id
-                    for ticket in self.tickets.values()
-                    if ticket.status == "queued"
-                ][:20]
+            backlog = len(self.queued_ticket_ids)
+            if backlog >= threshold and not latched:
+                from api.server.world.projection import project_support
+
+                projection = project_support(self)
+                queued_ids = list(self.queued_ticket_ids)[:20]
                 cause = next(
                     (
                         event.event_id
@@ -350,18 +351,17 @@ class SupportScenario:
                         },
                     },
                 )
+                latched = True
                 self._sensor_latched = True
-            elif (
-                projection.support_backlog <= self.config.sensor_recovery_threshold
-                and self._sensor_latched
-            ):
+            elif backlog <= recovery and latched:
                 self.runtime.emit(
                     "sensor.recovered",
                     actor_id="sensor:support_pressure",
                     target_id="queue:support",
                     trace_id=f"support-pressure-recovery-{int(self.runtime.now)}",
-                    payload={"support_backlog": projection.support_backlog},
+                    payload={"support_backlog": backlog},
                 )
+                latched = False
                 self._sensor_latched = False
 
     def _surge_process(self, surge: DemandSurge):
