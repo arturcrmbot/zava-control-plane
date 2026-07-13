@@ -4,7 +4,9 @@ Canonical reference for how the codebase hangs together as of `HEAD` on
 `main`. Counts and file paths in this document were verified against the
 source tree at write time; if you change a registry, refresh this doc.
 
-The system has four cooperating planes, plus a fifth **autonomous-domain-insights** loop layered on top of them (added in v1.0–v1.3, May 2026 — see §12):
+The system has four cooperating planes, plus two optional closed loops layered
+on top: **autonomous-domain-insights** (§12) and the **observable actor world**
+(§15):
 
 1. **Control plane** — a FastAPI app that owns the singleton Fleet
    Manager, per-function Fleet Managers, the EventBus, the persona
@@ -24,6 +26,11 @@ The system has four cooperating planes, plus a fifth **autonomous-domain-insight
    proposed actions; the resulting `policy_set` Decisions feed back
    into other personae's `decision_policy` blocks via
    `active_policies_for()`, closing the loop.
+6. **Observable actor world** (§15) — an opt-in SimPy discrete-event
+   simulation (`ZAVA_WORLD=support`) with explicit customers, tickets,
+   workers and teams. Actor-backed pressure events trigger a real Durable
+   responder; its typed command moves actual workers and is journalled back
+   into the same causal world.
 
 ```mermaid
 flowchart LR
@@ -1102,3 +1109,79 @@ Plans: [`docs/superpowers/plans/2026-05-22-replay-recorder-and-player.md`](super
 [`docs/superpowers/plans/2026-05-22-public-cloud-deploy.md`](superpowers/plans/2026-05-22-public-cloud-deploy.md).
 Branches: replay code lives on `main`; the long-lived `demo-deploy`
 branch off `main` carries the Azure deploy artefacts (`infra/`, `deploy/Dockerfile`, baked tape) that build the verify container.
+
+---
+
+## 15. Observable actor world (July 2026)
+
+The stock-and-flow simulator spike was replaced for implementation by an
+explicit-actor discrete-event model under
+[`api/server/world/`](../api/server/world/):
+
+| Module | Role |
+|---|---|
+| [`model.py`](../api/server/world/model.py) | Immutable causal events and typed simulation commands. |
+| [`runtime.py`](../api/server/world/runtime.py) | Seeded SimPy environment, logical stepping and NDJSON journal. |
+| [`packs/support.py`](../api/server/world/packs/support.py) | Customers, tickets, workers, teams, queues, SLA, abandonment, demand surges and worker reallocation. |
+| [`projection.py`](../api/server/world/projection.py) | Aggregate signals derived from actor state. |
+| [`service.py`](../api/server/world/service.py) | Live pacing, EventBus publication, snapshots, observations and command application. |
+| [`services/world_bridge.py`](../api/server/services/world_bridge.py) | Actor sensor → real Durable orchestration → typed command loop. |
+| [`routes/world.py`](../api/server/routes/world.py) | JSON state, causal event catch-up and demand-surge injection. |
+
+### 15.1 Authority and data flow
+
+`ActorWorldService` is the sole state writer when `ZAVA_WORLD=support`.
+Every actor transition appends a `SimulationEvent` with stable sequence,
+logical time, actor/target IDs, `cause_event_id` and `trace_id`.
+
+```text
+ticket events → actor-derived pressure sensor → EventBus
+  → WorldBridge → SurgeStaffingOrchestrator (:7071)
+  → reallocate_workers command → validation/idempotency
+  → real reserve Worker actors move to TEAM-SUPPORT
+  → later ticket events reflect the changed capacity
+```
+
+The Durable activity receives a bounded actor observation: real queued ticket
+IDs and skills, active/support workers, reserve workers and the authoritative
+projection. It sizes the intervention from total backlog, ranks reserve
+workers by skill pressure, and returns worker IDs rather than an aggregate
+capacity number.
+
+`ZAVA_WORLD=toy` retains the earlier aggregate spike for regression only.
+The two authorities are never started together.
+
+### 15.2 Proven real loop
+
+[`tools/actor_world_e2e_proof.sh`](../tools/actor_world_e2e_proof.sh)
+boots fresh Azurite, the Functions host and FastAPI, then runs assertion
+driver [`actor_world_e2e_proof.py`](../tools/actor_world_e2e_proof.py).
+
+Latest proof after backlog-sizing hardening:
+
+- actor trace: `support-pressure-14`
+- real Durable instance: `1dbaed8aacf94434b7e1df702ce326ee`
+- observed backlog: 26 (20 representative ticket details)
+- command: reallocate `WRK-0035` and `WRK-0040`
+- both actors moved from `TEAM-RESERVE` to `TEAM-SUPPORT`
+- a later `ticket.resolved` event occurred after `command.accepted`
+- causal chain:
+  `sensor.tripped → responder.requested → responder.decided →
+  command.accepted → worker.reallocated`
+
+The proof queries the Durable runtime directly, checks actor IDs against
+baseline/final snapshots, validates causal links, writes evidence under
+`tmp/actor-world-e2e-proof/`, and tears down only its recorded PIDs.
+
+### 15.3 Deliberate deferrals
+
+The live API is intentionally minimal: state, event catch-up and typed demand
+surge injection. Pause/step/restart, SSE subscriber queues and the dedicated
+actor viewer belong to the next viewer plan. The temporary constellation
+stats panel is not the target visualisation and will be removed when that
+viewer lands.
+
+Design: [`docs/superpowers/specs/2026-07-13-observable-actor-simulator-design.md`](superpowers/specs/2026-07-13-observable-actor-simulator-design.md).  
+Plans:
+[`actor kernel + support world`](superpowers/plans/2026-07-13-actor-simulator-kernel-support-world.md),
+[`Durable command loop + APIs`](superpowers/plans/2026-07-13-actor-durable-command-loop-apis.md).
