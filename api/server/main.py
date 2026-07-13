@@ -173,6 +173,20 @@ async def lifespan(app: FastAPI):
         print(f"[server] kpi_history_recorder failed to start: {ex}")
     # Start the simulator ramp loop (spawns workflows via the AF Durable host)
     ramp_task = asyncio.create_task(simulator_orchestrator.ramp_loop())
+    # World simulator engine — off unless ZAVA_WORLD names a pack (spec 2026-07-10).
+    from api.server.world import maybe_start_world
+    world_task = maybe_start_world(
+        app_state.bus,
+        on_engine=lambda e: setattr(app_state, "world_engine", e),
+    )
+    if world_task is not None:
+        # Arm the world↔Durable bridge: the engine's sensor event drives a REAL
+        # SurgeStaffingOrchestrator on the func host, whose outcome feeds back
+        # into world state via the engine's actuator (services/world_bridge.py).
+        from api.server.services.world_bridge import WorldBridge
+        app_state.world_bridge = WorldBridge(app_state)
+        app_state.world_bridge.start()
+        print(f"[server] world engine ON (ZAVA_WORLD={os.getenv('ZAVA_WORLD')}) + bridge armed")
     # Optional dream-pass cadence. Off unless DREAM_PASS_DEMO_CADENCE_SECONDS
     # is set. Scheduled here (not in AppState.__init__) because
     # AppState is constructed at module import time, before uvicorn has
@@ -353,11 +367,13 @@ async def lifespan(app: FastAPI):
         seed_task.cancel()
         if dream_cadence_task is not None:
             dream_cadence_task.cancel()
+        if world_task is not None:
+            world_task.cancel()
         # Await the cancelled tasks so their teardown actually completes
         # before the lifespan returns. Without this, a partially-running
         # seed (which calls into the Functions host over HTTP) can leave
         # an open httpx connection or a half-scheduled orchestration.
-        for t in (ramp_task, seed_task, dream_cadence_task):
+        for t in (ramp_task, seed_task, dream_cadence_task, world_task):
             if t is None:
                 continue
             try:
@@ -506,6 +522,8 @@ from api.server.routes.memory import router as memory_router
 from api.server.routes.workflow_agui import router as workflow_agui_router
 # Visual Domain Composer — phase 1: session create + SSE stream.
 from api.server.routes.compose import router as compose_router
+# World simulator — internal control/observe (JSON only; spec 2026-07-10).
+from api.server.routes.world import router as world_router
 # Per-lesson observability — D1.
 
 for r in (stream_router, workflows_router, exceptions_router, policy_router,
@@ -541,7 +559,8 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           memory_v2_router,
           memory_router,
           workflow_agui_router,
-          compose_router):
+          compose_router,
+          world_router):
     app.include_router(r)
 
 app.mount("/api/compose/mcp", compose_mcp.streamable_http_app())

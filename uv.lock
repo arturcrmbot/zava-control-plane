@@ -1,8 +1,7 @@
 version = 1
 revision = 3
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 resolution-markers = [
-    "python_full_version >= '3.14'",
     "python_full_version == '3.13.*'",
     "python_full_version == '3.12.*'",
     "python_full_version < '3.12'",
@@ -5032,6 +5031,14 @@ wheels = [
 ]
 
 [[package]]
+name = "simpy"
+version = "4.1.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4a/38/fb393d1a5c2f35b65609e8d3c39d1508ada6a767c7e624ffa16ed3e84ffd/simpy-4.1.2.tar.gz", hash = "sha256:76ef36b71e0436ba94e55febc001c78879e493a323f045bbcfbb0b216e9b1fbc", size = 410129, upload-time = "2025-10-29T00:00:00.000Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ee/ed/07a1e054922c16b2c18ca3598771936c344d52337b8aaf0f1e3ed8b223dc/simpy-4.1.2-py3-none-any.whl", hash = "sha256:43071f84b6512c9b4fcb33ef057f240ccb1d1f3b263f9b4f9229d072e310b372", size = 27375, upload-time = "2025-10-29T00:00:00.000Z" },
+]
+[[package]]
 name = "six"
 version = "1.17.0"
 source = { registry = "https://pypi.org/simple" }
@@ -5904,6 +5911,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "reportlab" },
     { name = "sentence-transformers" },
+    { name = "simpy" },
     { name = "sse-starlette" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "weasyprint" },
@@ -5949,6 +5957,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "reportlab", specifier = ">=4.5.0" },
     { name = "sentence-transformers", specifier = ">=3.0" },
+    { name = "simpy", specifier = ">=4.1,<5" },
     { name = "sse-starlette", specifier = ">=2.1" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
     { name = "weasyprint", specifier = ">=68.1" },
