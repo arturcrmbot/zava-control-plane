@@ -5,8 +5,7 @@
 // pulse and the Durable intervention strip are driven by the causal journal.
 // Backed entirely by useWorldSimulation — no chart lib, canvas or store.
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Globe2, Zap, AlertTriangle } from "lucide-react";
+import { Globe2, Zap, AlertTriangle } from "lucide-react";
 import {
   useWorldSimulation,
   type WorldEvent,
@@ -116,7 +115,12 @@ export default function World() {
 
   const journalEvents = useMemo(() => {
     const source = selectedActor
-      ? events.filter((e) => e.actor_id === selectedActor || e.target_id === selectedActor)
+      ? events.filter(
+        (e) =>
+          e.actor_id === selectedActor ||
+          e.target_id === selectedActor ||
+          e.trace_id === selectedActor,
+      )
       : events;
     return source.slice(-JOURNAL_CAP).reverse();
   }, [events, selectedActor]);
@@ -148,11 +152,6 @@ export default function World() {
     >
       <style>{PULSE_CSS}</style>
       <div className="max-w-[1400px] mx-auto space-y-4">
-        <Link
-          to="/"
-          className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 dark:text-slate-400 dark:hover:text-slate-100 w-fit"
-        ><ArrowLeft size={14} /> Back to feed</Link>
-
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Globe2 size={20} className="text-blue-600 dark:text-blue-400" />

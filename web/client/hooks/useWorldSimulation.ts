@@ -19,20 +19,6 @@ const SURGE_DURATION_MINUTES = 90;
 
 // -- wire types: mirror api/server/routes/world.py + world/packs/support.py ---
 
-export interface WorldProjection {
-  support_backlog: number;
-  tickets_in_service: number;
-  tickets_resolved: number;
-  tickets_abandoned: number;
-  tickets_opened: number;
-  workers_idle: number;
-  workers_busy: number;
-  sla_breach_pct: number;
-  average_wait_minutes: number;
-  customer_sentiment: number;
-  customer_churn_risk: number;
-}
-
 export type TicketStatus = "queued" | "in_service" | "resolved" | "abandoned";
 
 export interface WorldTicket {
@@ -60,29 +46,6 @@ export interface WorldWorker {
   current_ticket_id: string | null;
 }
 
-export interface WorldTeam {
-  id: string;
-  name: string;
-  worker_ids: string[];
-}
-
-export interface WorldCustomer {
-  id: string;
-  segment: string;
-  value_band: string;
-  sentiment: number;
-  churn_risk: number;
-  active_ticket_ids: string[];
-}
-
-export interface WorldLastResponse {
-  instance_id?: string;
-  command?: Record<string, unknown> | null;
-  result_event_id?: string;
-  result_type?: string;
-  [key: string]: unknown;
-}
-
 export interface WorldState {
   enabled: boolean;
   scenario?: string;
@@ -91,12 +54,9 @@ export interface WorldState {
   sim_time?: number;
   speed?: number;
   latest_seq?: number;
-  projection?: WorldProjection;
-  customers?: WorldCustomer[];
+  customers?: Array<{ id: string }>;
   tickets?: WorldTicket[];
   workers?: WorldWorker[];
-  teams?: WorldTeam[];
-  last_response?: WorldLastResponse | null;
 }
 
 export interface WorldEvent {
@@ -146,8 +106,12 @@ export function useWorldSimulation(): UseWorldSimulationResult {
   const [error, setError] = useState<string | null>(null);
   const cursorRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const stateInFlight = useRef(false);
+  const eventsInFlight = useRef(false);
 
   const fetchState = useCallback(async (): Promise<void> => {
+    if (stateInFlight.current) return;
+    stateInFlight.current = true;
     try {
       const r = await fetch("/api/world/state", { signal: abortRef.current?.signal });
       if (!r.ok) throw new Error(`world state HTTP ${r.status}`);
@@ -158,24 +122,31 @@ export function useWorldSimulation(): UseWorldSimulationResult {
       if (isAbort(err)) return;
       setError((err as Error).message || "failed to load world state");
     } finally {
+      stateInFlight.current = false;
       setLoading(false);
     }
   }, []);
 
   const fetchEvents = useCallback(async (): Promise<void> => {
+    if (eventsInFlight.current) return;
+    eventsInFlight.current = true;
     try {
       const r = await fetch(`/api/world/events?after=${cursorRef.current}`, {
         signal: abortRef.current?.signal,
       });
       if (!r.ok) throw new Error(`world events HTTP ${r.status}`);
       const body = (await r.json()) as WorldEventsResponse;
-      if (typeof body.latest_seq === "number") cursorRef.current = body.latest_seq;
+      if (typeof body.latest_seq === "number") {
+        cursorRef.current = Math.max(cursorRef.current, body.latest_seq);
+      }
       if (body.events && body.events.length > 0) {
         setEvents((prev) => mergeEvents(prev, body.events));
       }
     } catch (err) {
       if (isAbort(err)) return;
       // Transient events failure: keep the last journal, let the next tick retry.
+    } finally {
+      eventsInFlight.current = false;
     }
   }, []);
 
