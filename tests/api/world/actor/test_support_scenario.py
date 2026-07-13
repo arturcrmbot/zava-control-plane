@@ -70,3 +70,12 @@ def test_every_causal_reference_points_to_an_earlier_event():
     for event in scenario.runtime.journal:
         if event.cause_event_id:
             assert positions[event.cause_event_id] < event.seq
+
+
+def test_sla_observation_does_not_hijack_lifecycle_cause():
+    scenario = run_support(seed=13, config=_small_config())
+    by_id = {event.event_id: event for event in scenario.runtime.journal}
+    lifecycle_types = {"ticket.assigned", "ticket.resolved", "ticket.abandoned"}
+    for event in scenario.runtime.journal:
+        if event.type in lifecycle_types and event.cause_event_id:
+            assert by_id[event.cause_event_id].type != "ticket.sla_breached"

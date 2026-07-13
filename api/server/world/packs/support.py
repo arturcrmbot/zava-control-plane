@@ -280,7 +280,7 @@ class SupportScenario:
         customer = self.customers[ticket.customer_id]
         customer.sentiment = max(0.0, customer.sentiment - 0.15)
         customer.churn_risk = min(1.0, customer.churn_risk + 0.10)
-        breached = self.runtime.emit(
+        self.runtime.emit(
             "ticket.sla_breached",
             actor_id=ticket.id,
             target_id=customer.id,
@@ -288,7 +288,6 @@ class SupportScenario:
             trace_id=ticket.trace_id,
             payload={"status": ticket.status, "customer_id": customer.id},
         )
-        ticket.last_event_id = breached.event_id
 
     def _abandon_watch(self, ticket: Ticket):
         customer = self.customers[ticket.customer_id]
