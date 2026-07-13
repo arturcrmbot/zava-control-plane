@@ -209,6 +209,16 @@ class ActorWorldService:
 
     # -- read surfaces ---------------------------------------------------------
 
+    @staticmethod
+    def _customer_wire(d: dict[str, Any]) -> dict[str, Any]:
+        d["active_ticket_ids"] = sorted(d["active_ticket_ids"])
+        return d
+
+    @staticmethod
+    def _worker_wire(d: dict[str, Any]) -> dict[str, Any]:
+        d["skills"] = list(d["skills"])
+        return d
+
     def snapshot(self) -> dict[str, Any]:
         scenario = self.scenario
         return {
@@ -220,9 +230,9 @@ class ActorWorldService:
             "speed": self.minutes_per_second,
             "latest_seq": len(self.runtime.journal),
             "projection": asdict(project_support(scenario)),
-            "customers": [asdict(customer) for customer in scenario.customers.values()],
+            "customers": [self._customer_wire(asdict(c)) for c in scenario.customers.values()],
             "tickets": [asdict(ticket) for ticket in scenario.tickets.values()],
-            "workers": [asdict(worker) for worker in scenario.workers.values()],
+            "workers": [self._worker_wire(asdict(w)) for w in scenario.workers.values()],
             "teams": [asdict(team) for team in scenario.teams.values()],
         }
 
@@ -237,9 +247,9 @@ class ActorWorldService:
             queued_tickets.append(
                 {
                     "id": ticket.id,
-                    "customer": ticket.customer_id,
+                    "customer_id": ticket.customer_id,
                     "severity": ticket.severity,
-                    "skill": ticket.required_skill,
+                    "required_skill": ticket.required_skill,
                     "status": ticket.status,
                     "queued_at": ticket.queued_at,
                     "sla_deadline": ticket.sla_deadline,
@@ -252,8 +262,8 @@ class ActorWorldService:
                 "id": worker.id,
                 "skills": list(worker.skills),
                 "status": worker.status,
-                "team": worker.team_id,
-                "current_ticket": worker.current_ticket_id,
+                "team_id": worker.team_id,
+                "current_ticket_id": worker.current_ticket_id,
             }
 
         support_workers = [

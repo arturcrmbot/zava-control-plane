@@ -5,6 +5,7 @@ subscribers, and exposes snapshot/observation/control/command surfaces.
 from __future__ import annotations
 
 import asyncio
+import json
 
 import pytest
 
@@ -26,6 +27,9 @@ def test_snapshot_contains_actual_actor_state_and_projection():
     assert len(snapshot["workers"]) == 40
     assert snapshot["projection"]["tickets_opened"] == 0
     assert snapshot["latest_seq"] == len(world.runtime.journal)
+    json.dumps(snapshot)  # must not raise
+    assert isinstance(snapshot["customers"][0]["active_ticket_ids"], list)
+    assert isinstance(snapshot["workers"][0]["skills"], list)
 
 
 def test_events_after_returns_causal_journal_tail():
@@ -185,9 +189,9 @@ def test_build_observation_reports_real_reserve_ids_and_ticket_details():
     assert observation["queued_tickets"] == [
         {
             "id": "TKT-000001",
-            "customer": "CUS-00001",
+            "customer_id": "CUS-00001",
             "severity": "high",
-            "skill": "technical",
+            "required_skill": "technical",
             "status": "queued",
             "queued_at": 0.0,
             "sla_deadline": 30.0,
@@ -200,3 +204,13 @@ def test_build_observation_reports_real_reserve_ids_and_ticket_details():
     assert all(w["status"] == "reserve" for w in observation["reserve_workers"])
     assert {w["id"] for w in observation["support_workers"]} == support_ids
     assert observation["allowed_commands"] == ["reallocate_workers"]
+    # exact worker keys
+    for w in observation["support_workers"] + observation["reserve_workers"]:
+        assert set(w.keys()) == {"id", "skills", "status", "team_id", "current_ticket_id"}
+        assert isinstance(w["skills"], list)
+    # old keys must be absent from tickets and workers
+    qt = observation["queued_tickets"][0]
+    assert "customer" not in qt
+    assert "skill" not in qt
+    assert "team" not in observation["support_workers"][0]
+    assert "current_ticket" not in observation["support_workers"][0]
