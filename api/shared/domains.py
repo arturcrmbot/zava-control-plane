@@ -1127,6 +1127,31 @@ DOMAINS: dict[str, Domain] = {
         spawn_fn="api.server.services.simulator_orchestrator.spawn_intercompany_talent_transfer_workflow",
         realistic_interval_seconds=1209600,
     ),
+    # ----- telco: network-incident response (actor-world scenario) -----
+    # Autonomous, reversible mitigation — NO HITL gate by explicit design
+    # (see docs/superpowers/specs/network-incident-brief.yaml). The primary
+    # live trigger is the actor-world network.anomaly sensor bridged to
+    # NetworkIncidentOrchestrator; the spawn_fn lets the simulator schedule
+    # it too. Owned by the ops function (incident-rate KPI).
+    "network-incident": Domain(
+        workflow_type="network-incident",
+        display_name="Network Incident Response",
+        workflow_id_prefix="NIR",
+        orchestrator_name="NetworkIncidentOrchestrator",
+        operator_surface="network-operations",
+        phases=(
+            Phase("Telemetry Correlation", "deterministic"),
+            Phase("Impact Diagnosis", "agent"),
+            Phase("Reroute Execution", "agent"),
+            Phase("Recovery Verification", "deterministic"),
+        ),
+        hitl_gates=(),
+        skills=("impact_diagnosis", "reroute_execution"),
+        spawn_fn="api.server.services.simulator_orchestrator.spawn_network_incident_workflow",
+        # Cell-site incidents are frequent in a large RAN — cap at every
+        # 900s (15 min) of demo-warped time.
+        realistic_interval_seconds=900,
+    ),
     # ----- autonomous-domain-insights v1 (Phase 5.1) -----
     # Generic one-shot workflow spawned by persona action approvals.
     # Not driven by the simulator (no spawn_fn); the route in Task 6.3

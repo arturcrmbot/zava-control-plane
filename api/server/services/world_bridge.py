@@ -10,8 +10,9 @@ Flow:
   1. Subscribe to the actor world's sensor event ``world.sensor.tripped``.
   2. On fire: extract the nested ``simulation_event``, build an observation
      from the live actor world, and journal ``responder.requested``.
-  3. Schedule the ``SurgeStaffingOrchestrator`` on the func host (:7071) with
-     the trace ID and observation as input.
+  3. Schedule the scenario's Durable responder on the func host (:7071) with
+     the trace ID and observation as input (``SurgeStaffingOrchestrator`` for
+     support, ``NetworkIncidentOrchestrator`` for telco).
   4. Await the orchestration's completion and read its typed command.
   5. No command: journal ``responder.deferred`` — the world is unchanged. A
      command: journal ``responder.decided`` and apply it through
@@ -36,7 +37,23 @@ from api.server.world.model import SimulationCommand
 log = logging.getLogger("world_bridge")
 
 SENSOR_EVENT = "world.sensor.tripped"
-ORCHESTRATOR = "SurgeStaffingOrchestrator"
+
+# One Durable responder per live scenario. Exactly one world is active per
+# process (selected by ZAVA_WORLD in main.py); the bridge picks the responder
+# from the service's ``scenario_name`` (defaulting to support so any service
+# stand-in without the attribute keeps the original behaviour).
+_RESPONDERS: dict[str, dict[str, str]] = {
+    "support": {
+        "orchestrator": "SurgeStaffingOrchestrator",
+        "type": "surge-staffing",
+        "prefix": "surge",
+    },
+    "telco": {
+        "orchestrator": "NetworkIncidentOrchestrator",
+        "type": "network-incident",
+        "prefix": "incident",
+    },
+}
 
 _TERMINAL_OK = "Completed"
 _TERMINAL_BAD = {"Failed", "Terminated", "Canceled"}
@@ -92,17 +109,21 @@ class WorldBridge:
                 payload={"observation": observation},
             )
 
+            responder = _RESPONDERS.get(
+                getattr(service, "scenario_name", "support"), _RESPONDERS["support"]
+            )
+            orchestrator = responder["orchestrator"]
             payload = {
-                "workflow_id": f"surge-{trace_id}",
-                "type": "surge-staffing",
+                "workflow_id": f"{responder['prefix']}-{trace_id}",
+                "type": responder["type"],
                 "trace_id": trace_id,
                 "observation": observation,
             }
-            resp = await schedule_new_orchestration(payload, ORCHESTRATOR)
+            resp = await schedule_new_orchestration(payload, orchestrator)
             instance_id = resp.get("id")
             status_uri = resp.get("statusQueryGetUri")
             log.info("world_bridge: scheduled %s instance=%s trace=%s",
-                     ORCHESTRATOR, instance_id, trace_id)
+                     orchestrator, instance_id, trace_id)
 
             output = await self._await_output(instance_id, status_uri)
             if not isinstance(output, dict):

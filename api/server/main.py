@@ -185,11 +185,12 @@ async def lifespan(app: FastAPI):
     world_task = None
     world_bridge = None
     world_name = os.getenv("ZAVA_WORLD")
-    if world_name == "support":
+    if world_name in ("support", "telco"):
         from api.server.services.world_bridge import WorldBridge
         from api.server.world.service import ActorWorldService
 
-        world_service = ActorWorldService.support(
+        builder = ActorWorldService.telco if world_name == "telco" else ActorWorldService.support
+        world_service = builder(
             seed=int(os.getenv("WORLD_SEED", "42")),
             bus=app_state.bus,
             minutes_per_second=float(os.getenv("WORLD_MINUTES_PER_SECOND", "10")),

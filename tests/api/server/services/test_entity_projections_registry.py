@@ -24,6 +24,7 @@ EXPECTED_KEYS = frozenset({
     "crisis-response",        # pitch-c2
     "data-clean-room-setup",   # pitch-c3
     "employee-onboarding",
+    "employee-transfer",       # fleet compose-domain v4
     "expense-claim",       # legacy, wired by pitch-a4
     "freelancer-onboarding",   # pitch-c3
     "fy-close",              # pitch-c1
@@ -36,12 +37,15 @@ EXPECTED_KEYS = frozenset({
     "m-and-a-integration",    # pitch-c2
     "media-pitch-to-win",     # pitch-c2
     "monthly-client-pnl",      # pitch-c3
+    "network-incident",        # telco actor-world domain
     "new-business-pipeline-scrub",  # pitch-c3
     "perf-review",
+    "policy_set",              # fleet policy-set domain
     "privacy-dpia",
     "purchase-order",
     "quarterly-creative-awards",  # pitch-c3
     "talent-redeployment",    # pitch-c2
+    "training-request",        # fleet compose-domain v4
     "travel-preapproval",
     "treasury-fx",
     "vendor-kyc",

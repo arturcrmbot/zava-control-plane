@@ -1602,6 +1602,48 @@ async def spawn_crisis_response_workflow(scenario: str | None = None) -> str:
 # === END pitch-c2: cross-domain meta-workflow spawners ===
 
 
+# === BEGIN telco: network-incident spawner ===
+# Secondary trigger only. The authoritative live trigger is the actor-world
+# ``network.anomaly`` sensor bridged to NetworkIncidentOrchestrator (see
+# api/server/services/world_bridge.py). This lets the simulator ramp loop
+# schedule the same orchestrator with a synthetic single-site observation;
+# with no affected sessions supplied the decision activity defers, so a
+# ramp-spawned instance never mutates the live world.
+_nir_seq = 0
+
+
+async def spawn_network_incident_workflow(scenario: str | None = None) -> str:
+    """Spawn a network-incident workflow (simulator secondary trigger)."""
+    global _nir_seq
+    _nir_seq += 1
+    wid = f"NIR-{_nir_seq:04d}"
+    observation = {
+        "incident_site": {"id": "SITE-01", "status": "failed"},
+        "neighbor_sites": [],
+        "affected_sessions": [],
+    }
+    data = {"incident": observation, **({"scenario": scenario} if scenario else {})}
+    w = _build_strategic_workflow(wid, "network-incident", "incident", data)
+    app_state.store.upsert_workflow(w)
+    payload: dict = {
+        "workflow_id": wid,
+        "type": "network-incident",
+        "trace_id": wid,
+        "observation": observation,
+    }
+    try:
+        result = await schedule_new_orchestration(
+            payload, function_name="NetworkIncidentOrchestrator",
+        )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    _apply_business_time_to_workflow("network-incident", wid)
+    return wid
+# === END telco: network-incident spawner ===
+
+
 # === BEGIN pitch-c3: agency-specific domain spawners ===
 # Ten domains scoped to agency operations. Each shares the
 # _build_strategic_workflow factory and is a thin spawn wrapper.

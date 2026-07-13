@@ -38,6 +38,15 @@ AZ_PORTS=(10000 10001 10002)
 FUNC_PORT=7071
 API_PORT=3101
 
+# Scenario knobs. Defaults reproduce the original support proof exactly, so the
+# support proofs keep booting an identical stack. The telco proof overrides
+# these via the environment (ZAVA_WORLD=telco, its own orchestrator name) so a
+# single shared boot library serves both scenarios — no copied stack.
+PROOF_WORLD="${PROOF_WORLD:-support}"
+PROOF_SEED="${PROOF_SEED:-42}"
+PROOF_MPS="${PROOF_MPS:-10}"
+PROOF_ORCHESTRATOR_GREP="${PROOF_ORCHESTRATOR_GREP:-SurgeStaffingOrchestrator}"
+
 AZ_PID=""
 FUNC_PID=""
 API_PID=""
@@ -158,21 +167,21 @@ start_functions_host() {
       err "Functions host exited early; log tail:"; tail -n 30 "$FUNC_LOG" >&2; exit 4
     fi
     # Ready only when the host has indexed our orchestrator AND serves HTTP.
-    if grep -q "SurgeStaffingOrchestrator" "$FUNC_LOG" 2>/dev/null \
+    if grep -q "$PROOF_ORCHESTRATOR_GREP" "$FUNC_LOG" 2>/dev/null \
        && curl -s -o /dev/null http://127.0.0.1:"$FUNC_PORT"/admin/host/status 2>/dev/null; then
       ready=1; break
     fi
     sleep 2
   done
-  [ -n "$ready" ] || { err "Functions host never indexed SurgeStaffingOrchestrator"; tail -n 40 "$FUNC_LOG" >&2; exit 4; }
-  log "Functions host ready; SurgeStaffingOrchestrator indexed (pid $FUNC_PID)"
+  [ -n "$ready" ] || { err "Functions host never indexed $PROOF_ORCHESTRATOR_GREP"; tail -n 40 "$FUNC_LOG" >&2; exit 4; }
+  log "Functions host ready; $PROOF_ORCHESTRATOR_GREP indexed (pid $FUNC_PID)"
 }
 
 # -- FastAPI (live actor world) ----------------------------------------------
 start_fastapi() {
-  log "starting FastAPI (:$API_PORT, ZAVA_WORLD=support seed=42 mps=10)"
+  log "starting FastAPI (:$API_PORT, ZAVA_WORLD=$PROOF_WORLD seed=$PROOF_SEED mps=$PROOF_MPS)"
   ( cd "$ROOT" \
-      && exec env ZAVA_WORLD=support WORLD_SEED=42 WORLD_MINUTES_PER_SECOND=10 \
+      && exec env ZAVA_WORLD="$PROOF_WORLD" WORLD_SEED="$PROOF_SEED" WORLD_MINUTES_PER_SECOND="$PROOF_MPS" \
            FUNCTIONS_HOST="http://127.0.0.1:$FUNC_PORT" \
            uv run --frozen --no-sync uvicorn api.server.main:app \
              --host 127.0.0.1 --port "$API_PORT" ) \
@@ -188,9 +197,9 @@ start_fastapi() {
     local health
     health="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:"$API_PORT"/healthz 2>/dev/null)"
     if [ "$health" = "200" ]; then
-      # Health is up; require the actor world to actually be enabled + support.
+      # Health is up; require the actor world to actually be enabled + scenario.
       if curl -s http://127.0.0.1:"$API_PORT"/api/world/state 2>/dev/null \
-           | grep -q '"scenario": *"support"'; then
+           | grep -q "\"scenario\": *\"$PROOF_WORLD\""; then
         ready=1; break
       fi
     fi

@@ -108,6 +108,10 @@ _PHASE_ALIASES: dict[str, dict[str, str]] = {
     "training-request": {
         "fleet-training-request-eligibility-and-catalogue-matcher": "Eligibility & catalogue",
     },
+    "network-incident": {
+        "impact_diagnosis": "Impact diagnosis",
+        "reroute_execution": "Reroute execution",
+    },
 }
 
 

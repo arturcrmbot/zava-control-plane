@@ -12,6 +12,7 @@ import {
   type WorldTicket,
   type WorldWorker,
 } from "@client/hooks/useWorldSimulation";
+import TelcoWorld from "@client/routes/TelcoWorld";
 
 const WAITING_CAP = 40;
 const IN_SERVICE_CAP = 40;
@@ -50,7 +51,7 @@ function round(n: number | undefined): number {
 }
 
 export default function World() {
-  const { state, events, loading, error, injectSurge } = useWorldSimulation();
+  const { state, events, loading, error, injectSurge, injectSiteFailure } = useWorldSimulation();
   const [selectedActor, setSelectedActor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -144,6 +145,21 @@ export default function World() {
   }
 
   const enabled = state?.enabled === true;
+
+  // Scenario-aware surface: the telco pack renders a cell-site floor. All the
+  // hooks above run unconditionally (support memos are cheap on empty lists),
+  // so this branch respects the rules of hooks.
+  if (state?.scenario === "telco") {
+    return (
+      <TelcoWorld
+        state={state}
+        events={events}
+        loading={loading}
+        error={error}
+        onFailSite={injectSiteFailure}
+      />
+    );
+  }
 
   return (
     <div

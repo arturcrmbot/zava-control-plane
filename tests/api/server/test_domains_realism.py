@@ -7,11 +7,11 @@ from api.shared.domains import DOMAINS, Domain, live_domains
 def test_live_domains_excludes_stubs() -> None:
     live = live_domains()
     assert all(not d.stub for d in live)
-    # 36 live domains as of 2026-05-11 (Wave 4b promoted 5 stubs via
-    # pitch-c1 0873322c, added 7 cross-domain meta-workflows via
-    # pitch-c2 043f6655, and added 10 agency-specific domains via
-    # pitch-c3 87429420). Was 14 originally.
-    assert len(live) == 36
+    # 39 live domains: the pitch-c1/c2/c3 waves brought the count to 36,
+    # then fleet compose-domain v4 added employee-transfer + training-request
+    # (38), and the telco actor-world pack added network-incident (39).
+    # Was 14 originally.
+    assert len(live) == 39
 
 
 def test_every_live_domain_has_spawn_fn() -> None:

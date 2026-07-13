@@ -56,7 +56,10 @@ viewer at `/world`, inventoried in §1.1.
 ### 1.1 Control Plane world viewer (`/world`)
 
 The observable actor world (ARCHITECTURE.md §15) ships a first-class
-viewer in the Control Plane, not the blueprint microsite.
+viewer in the Control Plane, not the blueprint microsite. The `/world`
+route is **scenario-aware**: it renders this support view when
+`ZAVA_WORLD=support` and the telco view (§1.2) when `ZAVA_WORLD=telco`,
+switching on `state.scenario`. Support is unchanged by the telco work.
 
 | Surface | URL | Component | What it shows | Data source | Role |
 |---|---|---|---|---|---|
@@ -85,6 +88,39 @@ viewer in the Control Plane, not the blueprint microsite.
 Proven in a real browser against the unmocked stack by
 [`tools/actor_world_viewer_proof.sh`](../tools/actor_world_viewer_proof.sh)
 (see ARCHITECTURE.md §15.3).
+
+### 1.2 Control Plane world viewer (telco)
+
+When `ZAVA_WORLD=telco`, the same `/world` route renders
+[`TelcoWorld.tsx`](../web/client/routes/TelcoWorld.tsx) instead — the
+network-incident actor world (ARCHITECTURE.md §15.4). Same hook, same
+polling, same "real actor or journal event, never decoration" rule.
+
+| Surface | URL | Component | What it shows | Data source | Role |
+|---|---|---|---|---|---|
+| World (telco) | `/world` | [`TelcoWorld.tsx`](../web/client/routes/TelcoWorld.tsx) + [`useWorldSimulation`](../web/client/hooks/useWorldSimulation.ts) | Real cell-site cards laid out by region/status/utilisation; real active/degraded/rerouted/dropped session tokens; the incident site + its neighbours; the Durable causal intervention strip; a recent-events journal | Polls `GET /api/world/state` (1 s) + `GET /api/world/events?after=` (300 ms) | Live network-incident operations view |
+
+**Every visual is a real actor or a journal event:**
+
+- Each site card is a real `CellSite` ID; its status ring, utilisation
+  bar and packet-loss come straight from the snapshot. The failed site
+  is marked from the journal `site.failed` (persisted, so the incident
+  highlight survives the fast auto-recovery) and its neighbours are
+  highlighted from that site's `neighbor_ids`.
+- Session tokens are real `NetworkSession` IDs bucketed by their actual
+  `status` (active / degraded / rerouted / dropped). Token lists are
+  DOM-capped but each lane header states the **true total**.
+- The **Durable intervention** strip renders one causal chain from a
+  single `network-anomaly` journal `trace_id`: `Anomaly detected →
+  Responder requested → Durable decided → Command accepted → N sessions
+  rerouted → Site recovered`, each step carrying the real event id.
+- The only write control shipped is **Fail site**
+  (`POST /api/world/inject/site_failure`, deterministic default site).
+  No pause/step/restart, no map/chart library, no aggregate KPI panel.
+
+Proven in a real browser against the unmocked stack by
+[`tools/telco_world_e2e_proof.sh`](../tools/telco_world_e2e_proof.sh)
+(see ARCHITECTURE.md §15.4).
 
 ---
 

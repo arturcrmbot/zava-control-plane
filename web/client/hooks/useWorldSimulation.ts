@@ -46,6 +46,40 @@ export interface WorldWorker {
   current_ticket_id: string | null;
 }
 
+// -- telco wire types: mirror world/packs/telco.py render_state() -----------
+
+export type SessionStatus = "active" | "degraded" | "dropped" | "rerouted";
+
+export interface WorldSite {
+  id: string;
+  region: string;
+  status: string;
+  capacity_mbps: number;
+  traffic_mbps: number;
+  utilization: number;
+  packet_loss_pct: number;
+  latency_ms: number;
+  session_count: number;
+  neighbor_ids: string[];
+}
+
+export interface WorldSession {
+  id: string;
+  subscriber_id: string;
+  site_id: string;
+  origin_site_id: string;
+  kind: "voice" | "data" | "video";
+  demand_mbps: number;
+  status: SessionStatus;
+}
+
+export interface WorldSubscriber {
+  id: string;
+  home_site_id: string;
+  tier: string;
+  session_count: number;
+}
+
 export interface WorldState {
   enabled: boolean;
   scenario?: string;
@@ -57,6 +91,10 @@ export interface WorldState {
   customers?: Array<{ id: string }>;
   tickets?: WorldTicket[];
   workers?: WorldWorker[];
+  // telco scenario fields
+  sites?: WorldSite[];
+  sessions?: WorldSession[];
+  subscribers?: WorldSubscriber[];
 }
 
 export interface WorldEvent {
@@ -83,6 +121,7 @@ export interface UseWorldSimulationResult {
   loading: boolean;
   error: string | null;
   injectSurge: () => Promise<void>;
+  injectSiteFailure: () => Promise<void>;
 }
 
 function isAbort(err: unknown): boolean {
@@ -170,6 +209,23 @@ export function useWorldSimulation(): UseWorldSimulationResult {
     await Promise.all([fetchState(), fetchEvents()]);
   }, [fetchState, fetchEvents]);
 
+  const injectSiteFailure = useCallback(async (): Promise<void> => {
+    try {
+      const r = await fetch("/api/world/inject/site_failure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+        signal: abortRef.current?.signal,
+      });
+      if (!r.ok) throw new Error(`inject site failure HTTP ${r.status}`);
+    } catch (err) {
+      if (isAbort(err)) return;
+      setError((err as Error).message || "failed to inject site failure");
+      return;
+    }
+    await Promise.all([fetchState(), fetchEvents()]);
+  }, [fetchState, fetchEvents]);
+
   useEffect(() => {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -184,5 +240,5 @@ export function useWorldSimulation(): UseWorldSimulationResult {
     };
   }, [fetchState, fetchEvents]);
 
-  return { state, events, loading, error, injectSurge };
+  return { state, events, loading, error, injectSurge, injectSiteFailure };
 }

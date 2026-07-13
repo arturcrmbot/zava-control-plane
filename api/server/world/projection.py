@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from api.server.world.packs.support import SupportScenario
+    from api.server.world.packs.telco import NetworkScenario
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,4 +51,41 @@ def project_support(scenario: "SupportScenario") -> SupportProjection:
             sum(customer.churn_risk for customer in customers) / len(customers)
             if customers else 0.0
         ),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class NetworkProjection:
+    sites_total: int
+    sites_healthy: int
+    sites_failed: int
+    subscribers_total: int
+    sessions_total: int
+    sessions_active: int
+    sessions_degraded: int
+    sessions_rerouted: int
+    sessions_dropped: int
+    total_demand_mbps: float
+    average_utilization: float
+    max_packet_loss_pct: float
+
+
+def project_network(scenario: "NetworkScenario") -> NetworkProjection:
+    sites = list(scenario.sites.values())
+    sessions = list(scenario.sessions.values())
+    healthy = [site for site in sites if site.status == "healthy"]
+    utilisations = [site.utilization for site in healthy]
+    return NetworkProjection(
+        sites_total=len(sites),
+        sites_healthy=len(healthy),
+        sites_failed=sum(site.status == "failed" for site in sites),
+        subscribers_total=len(scenario.subscribers),
+        sessions_total=len(sessions),
+        sessions_active=sum(s.status == "active" for s in sessions),
+        sessions_degraded=sum(s.status == "degraded" for s in sessions),
+        sessions_rerouted=sum(s.status == "rerouted" for s in sessions),
+        sessions_dropped=sum(s.status == "dropped" for s in sessions),
+        total_demand_mbps=round(sum(site.traffic_mbps for site in sites), 3),
+        average_utilization=round(sum(utilisations) / len(utilisations), 4) if utilisations else 0.0,
+        max_packet_loss_pct=round(max((site.packet_loss for site in sites), default=0.0) * 100.0, 3),
     )

@@ -1,0 +1,121 @@
+# Network incident response — telco actor-world domain (Level-0 manual brief).
+#
+# Story: A radio-access cell site in the Zava telco estate fails (power /
+# transport fault). Live voice/data/video NetworkSession actors anchored on
+# that site are dropped or degraded; neighbouring sites absorb reattach load
+# and their packet loss climbs. An actor-backed `network.anomaly` sensor
+# trips with the real failed-site + affected-session IDs, and an autonomous
+# orchestrator reroutes the affected sessions onto healthy neighbours with
+# spare capacity — voice first (call continuity), then deterministically by
+# session ID — restoring the site to a healthy, zero-load state.
+#
+# This brief is authored MANUALLY at Level-0 (the compose-domain skill is
+# unavailable in this runtime). It is intentionally thinner than a full
+# compose-domain v4 brief: the live authority for this domain is the
+# actor-world simulation journal + the NetworkIncidentOrchestrator Durable
+# function, NOT a seven-phase MCP pipeline. The brief exists so the registry
+# (domains.py / functions.py / entity_projections) stays internally
+# consistent and the domain/projection parity tests pass.
+#
+# AGENT-CHOICE: this process is AUTONOMOUS and REVERSIBLE, so it deliberately
+# has NO HITL gate, NO persona, and NO authority-matrix entry. Rerouting a
+# session to a neighbouring cell is a safe, idempotent, self-healing control
+# action that a human operator would never be asked to hand-approve in the
+# seconds-scale incident loop — gating it would defeat the purpose. The two
+# reasoning phases (impact_diagnosis, reroute_execution) are agent steps; the
+# bracketing phases (telemetry_correlation, recovery_verification) are
+# deterministic. This mirrors the real "self-organising network" (SON)
+# closed-loop pattern.
+#
+# AGENT-CHOICE: `network-incident` chosen as the workflow_type (no collision
+# with any existing domain). Owner function is `ops` (network operations).
+
+domain:
+  workflow_type: network-incident
+  prefix: telco
+  display_name: Network incident response
+  owner_role: ops
+  operator_surface: network-operations
+  hitl_gates: []          # AGENT-CHOICE: autonomous + reversible → no gate
+  personas: []            # AGENT-CHOICE: no persona / authority matrix
+  realistic_interval_seconds: 900
+  description: |
+    A cell site fails in the live actor-world telco simulation. The
+    orchestrator observes the failed site, its healthy neighbours and
+    their spare capacity, and the set of degraded sessions anchored on
+    the failed site. It greedily assigns each degraded session to the
+    healthiest neighbour that still fits (voice sessions first for call
+    continuity, then deterministic by session ID), emits a typed
+    `reroute_sessions` SimulationCommand, and the live ActorWorldService
+    applies it atomically + idempotently — moving the real session actors
+    onto real neighbour sites and recovering the failed site to zero load.
+
+phases:
+  - name: telemetry_correlation
+    intent: |
+      Deterministic. Correlate the `network.anomaly` sensor trip with the
+      failed cell site and the affected NetworkSession actor IDs from the
+      live journal. No reasoning — pure gather.
+    kind: deterministic
+    external_systems: []
+
+  - name: impact_diagnosis
+    intent: |
+      Agent. Read the failed site, the neighbouring sites and their spare
+      capacity, and the affected session set (id, type, demand_mbps).
+      Diagnose the blast radius: which sessions are degraded, which
+      neighbours can absorb them.
+    kind: agent
+    agent_skill_name: impact_diagnosis
+    external_systems: []
+
+  - name: reroute_execution
+    intent: |
+      Agent. Greedily assign each affected session to the healthiest
+      neighbour with spare capacity — voice first, then deterministic by
+      session ID. Emit a typed `reroute_sessions` command whose payload is
+      {incident_site_id, assignments:[{session_id, to_site_id}]}. The live
+      service validates all assignments atomically (rejects the whole
+      command if any target would exceed capacity) and idempotently.
+    kind: agent
+    agent_skill_name: reroute_execution
+    external_systems: []
+
+  - name: recovery_verification
+    intent: |
+      Deterministic. Confirm the journal recorded `command.accepted`,
+      one `session.rerouted` per assignment, neighbour `site.metrics`
+      updates and `site.recovered` for the incident site (load back to 0,
+      reattach congestion cleared).
+    kind: deterministic
+    external_systems: []
+
+# Entity projection (schema-additive; existing kinds only).
+entities:
+  - kind: Workflow
+    source: network_incident
+    ref_field: workflow.id
+  - kind: Asset
+    source: incident_site
+    ref_field: payload.incident.incident_site.id
+    attributes:
+      region: payload.incident.incident_site.region
+      status: payload.incident.incident_site.status
+
+# AGENT-CHOICE: no `decisions:` persona block — the reroute Decision is
+# agent-authored (source_event world.responder.decided), not persona-gated.
+
+function: ops
+
+# Primary live trigger is the actor-world sensor bridge (network.anomaly →
+# WorldBridge → NetworkIncidentOrchestrator). The ambient spawner below is a
+# SECONDARY scheduling path only, kept for registry spawn_fn resolvability.
+ambient:
+  name: NetworkIncidentWatcher
+  function: ops
+  reasoning_skill: null
+  spawnable_workflow_types: [network-incident]
+  spawn_fn: api.server.services.simulator_orchestrator.spawn_network_incident_workflow
+  triggers:
+    - kind: sensor
+      event_type: network.anomaly

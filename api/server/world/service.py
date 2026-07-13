@@ -1,14 +1,15 @@
-"""ActorWorldService: a focused async adapter over SimulationRuntime/SupportScenario.
+"""ActorWorldService: a focused async adapter over SimulationRuntime scenarios.
 
-Owns one authoritative actor world, paces SimPy one event at a time inside an
-asyncio task, and publishes journal events to the EventBus. Provides the read
-surfaces (snapshot/events_after/build_observation) and write surfaces
-(apply_command/record_external) the world bridge, routes and Durable
-responder need, plus inject_demand_surge.
+Owns one authoritative actor world (support *or* telco), paces SimPy one event
+at a time inside an asyncio task, and publishes journal events to the EventBus.
+Provides the read surfaces (snapshot/events_after/build_observation) and write
+surfaces (apply_command/record_external) the world bridge, routes and Durable
+responder need, plus the scenario perturbation injectors.
 
-Viewer-era controls (pause/resume/step_once/restart/set_speed) and SSE
-subscriber plumbing are deferred to Plan 3; this service is state/events/
-inject only.
+The service is scenario-agnostic: it holds a ``build_scenario`` factory and a
+``scenario_name``, and delegates every scenario-specific projection to the
+scenario object (``render_state`` / ``build_observation``). Exactly one
+scenario is live per process, selected in ``main.py`` via ``ZAVA_WORLD``.
 
 Single-threaded asyncio only: every method is synchronous and runs to
 completion atomically except `run()`, which is the sole place that awaits
@@ -18,13 +19,13 @@ from __future__ import annotations
 
 import asyncio
 import math
-from dataclasses import asdict
+from collections.abc import Callable
 from typing import Any
 
 from api.server.services.event_bus import EventBus
 from api.server.world.model import SimulationCommand, SimulationEvent
-from api.server.world.packs.support import DemandSurge, SupportConfig, SupportScenario, Worker
-from api.server.world.projection import project_support
+from api.server.world.packs.support import SupportConfig, SupportScenario
+from api.server.world.packs.telco import NetworkConfig, NetworkScenario
 from api.server.world.runtime import SimulationRuntime
 from api.shared.events import FleetEvent
 
@@ -47,13 +48,14 @@ class ActorWorldService:
         self,
         *,
         seed: int,
-        config: SupportConfig,
         bus: EventBus,
+        scenario_name: str,
+        build_scenario: Callable[[SimulationRuntime], Any],
         minutes_per_second: float = 10,
     ) -> None:
-        self.config = config
         self.bus = bus
-        self.scenario_name = "support"
+        self.scenario_name = scenario_name
+        self._build_scenario = build_scenario
         self._stop_requested = False
         self.minutes_per_second = _require_finite_positive(
             minutes_per_second, label="minutes_per_second"
@@ -76,18 +78,49 @@ class ActorWorldService:
             sensor_backlog_threshold=25,
             sensor_recovery_threshold=10,
         )
-        return cls(seed=seed, config=config, bus=bus, minutes_per_second=minutes_per_second)
+        return cls(
+            seed=seed,
+            bus=bus,
+            scenario_name="support",
+            build_scenario=lambda runtime: SupportScenario(runtime, config),
+            minutes_per_second=minutes_per_second,
+        )
 
-    def _install(self, seed: int) -> tuple[SimulationRuntime, SupportScenario]:
+    @classmethod
+    def telco(
+        cls, seed: int, bus: EventBus, minutes_per_second: float = 10
+    ) -> ActorWorldService:
+        """Build the live telco network-incident world with its exact config.
+
+        A long horizon keeps the standing session population alive across an
+        interactive proof; the deterministic unit config (``NetworkConfig``
+        default) uses a shorter horizon for a bounded journal.
+        """
+        config = NetworkConfig(
+            site_count=12,
+            subscriber_count=2_000,
+            session_count=2_200,
+            site_capacity_mbps=600.0,
+            simulation_minutes=20_000.0,
+        )
+        return cls(
+            seed=seed,
+            bus=bus,
+            scenario_name="telco",
+            build_scenario=lambda runtime: NetworkScenario(runtime, config),
+            minutes_per_second=minutes_per_second,
+        )
+
+    def _install(self, seed: int) -> tuple[SimulationRuntime, Any]:
         """Build and install a fresh runtime/scenario; reset the publish cursor.
 
-        Customer/worker installation events land in the journal directly (not
+        Installation events (actor creation) land in the journal directly (not
         via SimPy steps) so they are catch-up/snapshot-only: `_published_seq`
         is set past them here, before anything is ever published, so they are
         never blasted onto the EventBus on startup.
         """
         runtime = SimulationRuntime(seed)
-        scenario = SupportScenario(runtime, self.config)
+        scenario = self._build_scenario(runtime)
         scenario.install()
         self._published_seq = len(runtime.journal)
         return runtime, scenario
@@ -130,12 +163,21 @@ class ActorWorldService:
     def inject_demand_surge(self, multiplier: float, duration_minutes: float) -> None:
         multiplier = _require_finite_positive(multiplier, label="multiplier", floor=1.0)
         duration_minutes = _require_finite_positive(duration_minutes, label="duration_minutes")
+        from api.server.world.packs.support import DemandSurge
+
         surge = DemandSurge(
             at_minute=self.runtime.now,
             multiplier=multiplier,
             duration_minutes=duration_minutes,
         )
         self.scenario.schedule_surge(surge)
+
+    def inject_site_failure(self, site_id: str | None = None) -> str:
+        """Fail one real cell site (telco scenario). Returns the resolved ID."""
+        inject = getattr(self.scenario, "inject_site_failure", None)
+        if inject is None:
+            raise ValueError(f"scenario {self.scenario_name!r} has no site_failure")
+        return inject(site_id)
 
     # -- catch-up ---------------------------------------------------------
 
@@ -162,19 +204,8 @@ class ActorWorldService:
 
     # -- read surfaces ---------------------------------------------------------
 
-    @staticmethod
-    def _customer_wire(d: dict[str, Any]) -> dict[str, Any]:
-        d["active_ticket_ids"] = sorted(d["active_ticket_ids"])
-        return d
-
-    @staticmethod
-    def _worker_wire(d: dict[str, Any]) -> dict[str, Any]:
-        d["skills"] = list(d["skills"])
-        return d
-
     def snapshot(self) -> dict[str, Any]:
-        scenario = self.scenario
-        return {
+        base = {
             "enabled": True,
             "scenario": self.scenario_name,
             "seed": self.seed,
@@ -182,63 +213,12 @@ class ActorWorldService:
             "sim_time": self.runtime.now,
             "speed": self.minutes_per_second,
             "latest_seq": len(self.runtime.journal),
-            "projection": asdict(project_support(scenario)),
-            "customers": [self._customer_wire(asdict(c)) for c in scenario.customers.values()],
-            "tickets": [asdict(ticket) for ticket in scenario.tickets.values()],
-            "workers": [self._worker_wire(asdict(w)) for w in scenario.workers.values()],
-            "teams": [asdict(team) for team in scenario.teams.values()],
         }
+        base.update(self.scenario.render_state())
+        return base
 
     def build_observation(self, sensor_event: dict[str, Any]) -> dict[str, Any]:
-        payload = sensor_event.get("payload") or {}
-        actor_ids = payload.get("actor_ids") or []
-        queued_tickets = []
-        for ticket_id in actor_ids:
-            ticket = self.scenario.tickets.get(ticket_id)
-            if ticket is None:
-                continue
-            queued_tickets.append(
-                {
-                    "id": ticket.id,
-                    "customer_id": ticket.customer_id,
-                    "severity": ticket.severity,
-                    "required_skill": ticket.required_skill,
-                    "status": ticket.status,
-                    "queued_at": ticket.queued_at,
-                    "sla_deadline": ticket.sla_deadline,
-                    "wait_minutes": self.runtime.now - ticket.queued_at,
-                }
-            )
-
-        def worker_view(worker: Worker) -> dict[str, Any]:
-            return {
-                "id": worker.id,
-                "skills": list(worker.skills),
-                "status": worker.status,
-                "team_id": worker.team_id,
-                "current_ticket_id": worker.current_ticket_id,
-            }
-
-        support_workers = [
-            worker_view(worker)
-            for worker in self.scenario.workers.values()
-            if worker.team_id == "TEAM-SUPPORT"
-        ]
-        reserve_workers = [
-            worker_view(worker)
-            for worker in self.scenario.workers.values()
-            if worker.team_id == "TEAM-RESERVE"
-        ]
-
-        return {
-            "trace_id": sensor_event.get("trace_id"),
-            "sensor_event_id": sensor_event.get("event_id"),
-            "queued_tickets": queued_tickets,
-            "support_workers": support_workers,
-            "reserve_workers": reserve_workers,
-            "projection": asdict(project_support(self.scenario)),
-            "allowed_commands": ["reallocate_workers"],
-        }
+        return self.scenario.build_observation(sensor_event, now=self.runtime.now)
 
     # -- write surfaces ----------------------------------------------------
 

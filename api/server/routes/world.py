@@ -42,6 +42,13 @@ class DemandSurgeRequest(BaseModel):
     duration_minutes: float = Field(default=90, gt=0, allow_inf_nan=False)
 
 
+class SiteFailureRequest(BaseModel):
+    """Body for ``POST /inject/site_failure`` (telco). ``site_id`` optional —
+    when omitted the world fails its busiest healthy site deterministically."""
+
+    site_id: str | None = Field(default=None)
+
+
 @router.get("/state")
 async def world_state() -> dict:
     service = getattr(app_state, "world_service", None)
@@ -93,3 +100,17 @@ async def inject_demand_surge(body: DemandSurgeRequest = DemandSurgeRequest()) -
         engine.inject("demand_surge")
         return {"ok": True, "injected": "demand_surge"}
     return {"ok": False, "error": "world engine not enabled (set ZAVA_WORLD)"}
+
+
+@router.post("/inject/site_failure")
+async def inject_site_failure(body: SiteFailureRequest = SiteFailureRequest()) -> dict:
+    """Fail one real cell site (telco actor world). Deterministic default site."""
+    service = getattr(app_state, "world_service", None)
+    inject = getattr(service, "inject_site_failure", None) if service is not None else None
+    if inject is None:
+        return {"ok": False, "error": "telco world not enabled (set ZAVA_WORLD=telco)"}
+    try:
+        site_id = inject(body.site_id)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": True, "sim_time": service.runtime.now, "site_id": site_id}

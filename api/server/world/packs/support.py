@@ -554,6 +554,82 @@ class SupportScenario:
             },
         )
 
+    # -- scenario read surfaces (consumed by ActorWorldService) -------------
+
+    @staticmethod
+    def _customer_wire(d: dict[str, Any]) -> dict[str, Any]:
+        d["active_ticket_ids"] = sorted(d["active_ticket_ids"])
+        return d
+
+    @staticmethod
+    def _worker_wire(d: dict[str, Any]) -> dict[str, Any]:
+        d["skills"] = list(d["skills"])
+        return d
+
+    def render_state(self) -> dict[str, Any]:
+        from api.server.world.projection import project_support
+
+        return {
+            "projection": asdict(project_support(self)),
+            "customers": [self._customer_wire(asdict(c)) for c in self.customers.values()],
+            "tickets": [asdict(ticket) for ticket in self.tickets.values()],
+            "workers": [self._worker_wire(asdict(w)) for w in self.workers.values()],
+            "teams": [asdict(team) for team in self.teams.values()],
+        }
+
+    def build_observation(self, sensor_event: dict[str, Any], *, now: float) -> dict[str, Any]:
+        from api.server.world.projection import project_support
+
+        payload = sensor_event.get("payload") or {}
+        actor_ids = payload.get("actor_ids") or []
+        queued_tickets = []
+        for ticket_id in actor_ids:
+            ticket = self.tickets.get(ticket_id)
+            if ticket is None:
+                continue
+            queued_tickets.append(
+                {
+                    "id": ticket.id,
+                    "customer_id": ticket.customer_id,
+                    "severity": ticket.severity,
+                    "required_skill": ticket.required_skill,
+                    "status": ticket.status,
+                    "queued_at": ticket.queued_at,
+                    "sla_deadline": ticket.sla_deadline,
+                    "wait_minutes": now - ticket.queued_at,
+                }
+            )
+
+        def worker_view(worker: Worker) -> dict[str, Any]:
+            return {
+                "id": worker.id,
+                "skills": list(worker.skills),
+                "status": worker.status,
+                "team_id": worker.team_id,
+                "current_ticket_id": worker.current_ticket_id,
+            }
+
+        support_workers = [
+            worker_view(worker)
+            for worker in self.workers.values()
+            if worker.team_id == "TEAM-SUPPORT"
+        ]
+        reserve_workers = [
+            worker_view(worker)
+            for worker in self.workers.values()
+            if worker.team_id == "TEAM-RESERVE"
+        ]
+
+        return {
+            "trace_id": sensor_event.get("trace_id"),
+            "sensor_event_id": sensor_event.get("event_id"),
+            "queued_tickets": queued_tickets,
+            "support_workers": support_workers,
+            "reserve_workers": reserve_workers,
+            "projection": asdict(project_support(self)),
+            "allowed_commands": ["reallocate_workers"],
+        }
+
 
 def run_support(
     *,

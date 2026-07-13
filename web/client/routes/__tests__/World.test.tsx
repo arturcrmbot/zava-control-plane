@@ -95,6 +95,7 @@ function hook(over: Partial<UseWorldSimulationResult> = {}): UseWorldSimulationR
     loading: false,
     error: null,
     injectSurge: vi.fn(async () => {}),
+    injectSiteFailure: vi.fn(async () => {}),
     ...over,
   };
 }

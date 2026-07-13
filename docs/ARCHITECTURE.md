@@ -27,10 +27,11 @@ on top: **autonomous-domain-insights** (§12) and the **observable actor world**
    into other personae's `decision_policy` blocks via
    `active_policies_for()`, closing the loop.
 6. **Observable actor world** (§15) — an opt-in SimPy discrete-event
-   simulation (`ZAVA_WORLD=support`) with explicit customers, tickets,
-   workers and teams. Actor-backed pressure events trigger a real Durable
-   responder; its typed command moves actual workers and is journalled back
-   into the same causal world.
+   simulation (`ZAVA_WORLD=support` or `telco`) with explicit actors:
+   customers/tickets/workers for support, cell-sites/subscribers/sessions
+   for telco. Actor-backed sensor events trigger a real Durable responder;
+   its typed command moves actual actors and is journalled back into the
+   same causal world.
 
 ```mermaid
 flowchart LR
@@ -1123,10 +1124,11 @@ explicit-actor discrete-event model under
 | [`model.py`](../api/server/world/model.py) | Immutable causal events and typed simulation commands. |
 | [`runtime.py`](../api/server/world/runtime.py) | Seeded SimPy environment, logical stepping and NDJSON journal. |
 | [`packs/support.py`](../api/server/world/packs/support.py) | Customers, tickets, workers, teams, queues, SLA, abandonment, demand surges and worker reallocation. |
-| [`projection.py`](../api/server/world/projection.py) | Aggregate signals derived from actor state. |
-| [`service.py`](../api/server/world/service.py) | Live pacing, EventBus publication, snapshots, observations and command application. |
-| [`services/world_bridge.py`](../api/server/services/world_bridge.py) | Actor sensor → real Durable orchestration → typed command loop. |
-| [`routes/world.py`](../api/server/routes/world.py) | JSON state, causal event catch-up and demand-surge injection. |
+| [`packs/telco.py`](../api/server/world/packs/telco.py) | Cell-sites, subscribers and voice/data/video sessions; site failure, degraded/rerouted sessions, a `network.anomaly` sensor and atomic session reroute (§15.4). |
+| [`projection.py`](../api/server/world/projection.py) | Aggregate signals derived from actor state (`SupportProjection` / `NetworkProjection`). |
+| [`service.py`](../api/server/world/service.py) | Live pacing, EventBus publication, snapshots, observations and command application. One class, scenario-selected via `.support()` / `.telco()` builders and a `scenario_name`. |
+| [`services/world_bridge.py`](../api/server/services/world_bridge.py) | Actor sensor → real Durable orchestration → typed command loop. One bridge; a `_RESPONDERS` map picks the orchestrator from `scenario_name`. |
+| [`routes/world.py`](../api/server/routes/world.py) | JSON state, causal event catch-up and typed injection (`demand_surge` for support, `site_failure` for telco). |
 
 ### 15.1 Authority and data flow
 
@@ -1220,3 +1222,99 @@ Design: [`docs/superpowers/specs/2026-07-13-observable-actor-simulator-design.md
 Plans:
 [`actor kernel + support world`](superpowers/plans/2026-07-13-actor-simulator-kernel-support-world.md),
 [`Durable command loop + APIs`](superpowers/plans/2026-07-13-actor-durable-command-loop-apis.md).
+
+### 15.4 Telco network-incident scenario (`ZAVA_WORLD=telco`)
+
+A second scenario reuses the *entire* substrate above — same runtime, service,
+bridge, routes, viewer and proof stack — with no second platform. Selecting
+`ZAVA_WORLD=telco` makes the telco pack the sole state authority; support is
+unchanged. DRY seams, not copies: one `ActorWorldService` (scenario-selected
+by builder + `scenario_name`), one `WorldBridge` (a `_RESPONDERS` map keyed on
+`scenario_name`), one `/world` route (React switches on `state.scenario`), and
+one parametrised proof-stack library.
+
+The pack ([`packs/telco.py`](../api/server/world/packs/telco.py)) installs real
+actors: **12 CellSite** actors (id, region, capacity, traffic, utilisation,
+latency, packet-loss, neighbours), **2,000 Subscriber** actors and **2,200
+NetworkSession** actors (voice/data/video with per-session demand). Site
+metrics are re-derived every simulated minute from live session load.
+
+```text
+site.failed (one real site) → sessions on it become session.degraded
+  → actor-derived network.anomaly sensor (real site + degraded session IDs)
+  → EventBus → WorldBridge → NetworkIncidentOrchestrator (:7071)
+  → reroute_sessions command (atomic, idempotent, capacity-checked)
+  → real NetworkSession actors move to healthy neighbour CellSites
+  → failed site recovers; neighbour load/metrics change; journalled throughout
+```
+
+The Durable activity
+([`network_incident_activities.py`](../api/functions/workflows/network_incident_activities.py))
+receives a bounded observation (failed site, neighbours with spare capacity,
+every degraded session) and greedily assigns each **actual session ID** to the
+healthiest neighbour that fits — **voice first, then deterministic by session
+ID** — returning a typed `reroute_sessions` command plus reasoning, never an
+aggregate. `apply_command` validates the whole command atomically (rejects if
+any target would exceed capacity) and idempotently (by `command_id`).
+
+**Autonomous & reversible by design — no HITL gate, persona or authority
+matrix.** Rerouting degraded sessions onto neighbours with proven spare
+capacity is safe and self-undoing (the site recovers in the same command), so
+the process runs to completion without human approval. This is a deliberate
+choice recorded in the Level-0 brief
+([`network-incident-brief.yaml`](superpowers/specs/network-incident-brief.yaml));
+its phases are `telemetry_correlation` (deterministic), `impact_diagnosis`
+(agent), `reroute_execution` (agent) and `recovery_verification`
+(deterministic). The domain registers as `network-incident` in
+[`api/shared/domains.py`](../api/shared/domains.py) with an ops function owner
+and a focused entity projection
+([`entity_projections/network_incident.py`](../api/server/services/entity_projections/network_incident.py))
+reusing existing `Workflow`/`Asset`/`Decision` kinds.
+
+The viewer ([`web/client/routes/TelcoWorld.tsx`](../web/client/routes/TelcoWorld.tsx))
+lays out the real cell-sites by region/status/utilisation, shows real
+active/degraded/rerouted session tokens (DOM capped, true totals stated), marks
+the incident site and its neighbours, renders the Durable causal intervention
+strip on the live `network-anomaly` trace, and exposes one write control:
+**Fail site**.
+
+#### Proven real loop
+
+[`tools/telco_world_e2e_proof.sh`](../tools/telco_world_e2e_proof.sh) boots the
+same unmocked stack as §15.2/§15.3 — via the shared, now-parametrised
+[`tools/lib/actor_world_proof_stack.sh`](../tools/lib/actor_world_proof_stack.sh)
+(`PROOF_WORLD=telco`, `NetworkIncidentOrchestrator`) plus a Control Plane Vite
+server — then runs the Playwright driver
+[`telco_world_e2e_proof.mjs`](../tools/telco_world_e2e_proof.mjs):
+
+```bash
+bash tools/telco_world_e2e_proof.sh
+```
+
+Using DOM test-ids (not screenshots) cross-checked against the JSON journal and
+the Durable runtime on `:7071`, it asserts the baseline site/session actor IDs
+render, **Fail site** produces a real `site.failed` + `session.degraded`, and —
+the crux — the reroute assignments (`session_id → neighbour site_id`) from the
+journal `session.rerouted` events **equal** the Durable output command (queried
+on `:7071`) **equal** the applied `last_response` command **equal** the
+rerouted-session state in the DOM, all under one stable `network-anomaly`
+trace, with the failed site's load dropping and receiving neighbours' load
+rising, ending in `site.recovered`.
+
+Latest deterministic proof (seed 42, cold **and** warm — identical outcome, new
+Durable instance each run):
+
+- actor trace: `network-anomaly-SITE-03-13`
+- failed site `SITE-03` load `327.629 → 0` mbps; **184** sessions degraded
+- real Durable instance (cold): `59ce2c3a18a24cea8a226f285a1cc668` — Completed
+- command: reroute **184/184** sessions (75 voice prioritised) onto healthy
+  neighbours `SITE-01`, `SITE-02`, `SITE-06`
+- causal chain:
+  `site.failed → session.degraded → sensor.tripped → responder.requested →
+  responder.decided → command.accepted → session.rerouted → site.recovered`
+- journal == Durable output == applied command == DOM rerouted state
+
+Screenshots (baseline/failed/rerouted/recovered), a session video and a
+machine-checked `summary.json` land under `tmp/telco-world-e2e-proof/`;
+teardown kills only the exact PIDs it started. Visual rules:
+[`docs/visualisation.md §1.2`](visualisation.md#12-control-plane-world-viewer-telco).

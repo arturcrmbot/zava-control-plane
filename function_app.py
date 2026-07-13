@@ -18,6 +18,10 @@ from api.functions.workflows.surge_staffing import surge_staffing_orchestration
 from api.functions.workflows.surge_staffing_activities import (
     surge_staffing_decide_activity,
 )
+from api.functions.workflows.network_incident import network_incident_orchestration
+from api.functions.workflows.network_incident_activities import (
+    network_incident_decide_activity,
+)
 from api.functions.workflows.activities import (
     intake_activity,
     classify_activity,
@@ -81,6 +85,13 @@ def FleetTravelPreapprovalOrchestrator(context: df.DurableOrchestrationContext):
 @app.orchestration_trigger(context_name="context")
 def SurgeStaffingOrchestrator(context: df.DurableOrchestrationContext):
     return surge_staffing_orchestration(context)
+
+
+# Triggered by the world's network.anomaly sensor (via world_bridge) when a
+# cell site fails: reroutes the failed site's sessions onto healthy neighbours.
+@app.orchestration_trigger(context_name="context")
+def NetworkIncidentOrchestrator(context: df.DurableOrchestrationContext):
+    return network_incident_orchestration(context)
 
 
 # Activity registrations — Azure DF requires each as a decorated function in function_app.py
@@ -268,6 +279,11 @@ def fleet_travel_preapproval_policy_fit_check_activity_trigger(payload: dict) ->
 @app.activity_trigger(input_name="payload")
 def surge_staffing_decide_activity_trigger(payload: dict) -> dict:
     return surge_staffing_decide_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def network_incident_decide_activity_trigger(payload: dict) -> dict:
+    return network_incident_decide_activity(payload)
 
 
 # HTTP trigger to start a new orchestration. Used by FastAPI's simulator route.
