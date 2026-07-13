@@ -1,27 +1,63 @@
-"""Unit test for the surge-staffing decision activity — the "agent" that reads
-world state and sizes the staffing response. Proves the decision is a genuine
-function of world data (not a constant)."""
-from api.functions.workflows.surge_staffing_activities import surge_staffing_decide_activity
+from api.functions.workflows.surge_staffing_activities import (
+    surge_staffing_decide_activity,
+)
 
 
-def test_hires_to_cover_backlog_and_arrival():
-    # backlog 50 + arrival 90 at HANDLE 2 -> target 70 agents; already have 20 -> hire 50.
-    out = surge_staffing_decide_activity({"world": {"backlog": 50, "arrival": 90, "handle": 2, "agents": 20}})
-    assert out["target_agents"] == 70
-    assert out["hired"] == 50
+def observation(*, technical=30, billing=10, account=0, reserve=True):
+    tickets = [
+        {"id": f"TKT-T-{i}", "required_skill": "technical"}
+        for i in range(technical)
+    ]
+    tickets += [
+        {"id": f"TKT-B-{i}", "required_skill": "billing"}
+        for i in range(billing)
+    ]
+    tickets += [
+        {"id": f"TKT-A-{i}", "required_skill": "account"}
+        for i in range(account)
+    ]
+    workers = (
+        [
+            {"id": "WRK-0031", "skills": ["billing"]},
+            {"id": "WRK-0032", "skills": ["technical"]},
+            {"id": "WRK-0033", "skills": ["technical", "account"]},
+            {"id": "WRK-0034", "skills": ["account"]},
+        ]
+        if reserve else []
+    )
+    return {
+        "trace_id": "support-pressure-42",
+        "observation": {
+            "queued_tickets": tickets,
+            "support_workers": [],
+            "reserve_workers": workers,
+            "projection": {"support_backlog": len(tickets)},
+            "allowed_commands": ["reallocate_workers"],
+        },
+    }
 
 
-def test_no_hire_when_capacity_already_sufficient():
-    out = surge_staffing_decide_activity({"world": {"backlog": 0, "arrival": 30, "handle": 2, "agents": 20}})
-    assert out["hired"] == 0
+def test_selects_workers_covering_the_highest_skill_pressure():
+    out = surge_staffing_decide_activity(observation())
+    command = out["command"]
+    assert command["payload"]["worker_ids"] == ["WRK-0032", "WRK-0033"]
+    assert command["type"] == "reallocate_workers"
+    assert command["trace_id"] == "support-pressure-42"
 
 
-def test_decision_scales_with_the_world():
-    small = surge_staffing_decide_activity({"world": {"backlog": 20, "arrival": 30, "handle": 2, "agents": 20}})
-    big = surge_staffing_decide_activity({"world": {"backlog": 400, "arrival": 90, "handle": 2, "agents": 20}})
-    assert big["hired"] > small["hired"]
+def test_selected_worker_count_scales_with_backlog():
+    small = surge_staffing_decide_activity(observation(technical=5, billing=0))
+    large = surge_staffing_decide_activity(observation(technical=65, billing=0))
+    assert len(small["command"]["payload"]["worker_ids"]) == 1
+    assert len(large["command"]["payload"]["worker_ids"]) == 4
 
 
-def test_missing_world_is_safe():
-    out = surge_staffing_decide_activity({})
-    assert out["hired"] == 0
+def test_no_queue_or_no_reserve_returns_explicit_noop():
+    empty = surge_staffing_decide_activity(
+        observation(technical=0, billing=0, account=0)
+    )
+    no_reserve = surge_staffing_decide_activity(observation(reserve=False))
+    assert empty["command"] is None
+    assert "no queued tickets" in empty["reasoning"]
+    assert no_reserve["command"] is None
+    assert "no reserve workers" in no_reserve["reasoning"]

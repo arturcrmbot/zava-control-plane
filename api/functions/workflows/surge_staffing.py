@@ -30,12 +30,13 @@ import azure.durable_functions as df
 
 
 def surge_staffing_orchestration(context: df.DurableOrchestrationContext) -> Generator[Any, Any, dict]:
-    """One decision activity: the agent sizes the staffing response to the world."""
+    """One decision activity: the agent selects reserve workers for the surge."""
     input_dict = context.get_input() or {}
     decision = yield context.call_activity("surge_staffing_decide_activity_trigger", input_dict)
     return {
         "status": "completed",
         "instance_id": context.instance_id,
-        "world": input_dict.get("world"),
-        **decision,
+        "observation": input_dict.get("observation"),
+        "command": decision.get("command"),
+        "reasoning": decision.get("reasoning"),
     }
