@@ -221,6 +221,13 @@ git commit -m "refactor(world-ui): move simulation out of constellation HUD" \
 
 ## Task 4: Real Playwright proof + docs
 
+**Status:** ✅ Done — `actor_world_viewer_proof.{mjs,sh}` + shared
+`tools/lib/actor_world_proof_stack.sh`; docs updated. Real-browser proof
+passes against the unmocked stack (trace `support-pressure-42`, Durable
+instance `5ba242668a4d4411a1cf076ef3b0501d`, reallocated `WRK-0035`/`WRK-0040`
+agreeing across the DOM support group, `/api/world/events` and the Durable
+runtime on `:7071`); evidence under `tmp/actor-world-viewer-proof/`.
+
 **Files:**
 - Create: `tools/actor_world_viewer_proof.mjs`
 - Create: `tools/actor_world_viewer_proof.sh`

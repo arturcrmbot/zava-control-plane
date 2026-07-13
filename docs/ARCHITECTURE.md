@@ -1173,13 +1173,48 @@ The proof queries the Durable runtime directly, checks actor IDs against
 baseline/final snapshots, validates causal links, writes evidence under
 `tmp/actor-world-e2e-proof/`, and tears down only its recorded PIDs.
 
-### 15.3 Deliberate deferrals
+### 15.3 Observable world viewer
 
-The live API is intentionally minimal: state, event catch-up and typed demand
-surge injection. Pause/step/restart, SSE subscriber queues and the dedicated
-actor viewer belong to the next viewer plan. The temporary constellation
-stats panel is not the target visualisation and will be removed when that
-viewer lands.
+The dedicated actor viewer shipped as the Control Plane `/world` route
+([`web/client/routes/World.tsx`](../web/client/routes/World.tsx) backed by
+[`useWorldSimulation`](../web/client/hooks/useWorldSimulation.ts)). One hook
+polls `GET /api/world/state` (1 s) and `GET /api/world/events?after=` (300 ms),
+advancing an events cursor and keeping a bounded 300-event ring — no SSE, store
+or chart library.
+
+The route renders the real actors, never aggregates: ticket cards in
+Waiting / In service / Resolved / Abandoned lanes, Support and Reserve worker
+pools by ID, the Durable intervention causal strip (one journal `trace_id`:
+`Pressure detected → Responder requested → Durable decided → Command accepted →
+WRK-… reallocated`), and a recent-event journal. Every pulse is keyed to a
+journal event seq; reallocated workers pulse green and move into the Support
+group because their snapshot `team_id` changed. The one write control is
+**Inject demand surge**. The temporary constellation `WorldSignalsPanel` was
+removed — the viewer is the target visualisation. Visual rules:
+[`docs/visualisation.md §1.1`](visualisation.md#11-control-plane-world-viewer-world).
+
+The viewer is proven in a **real browser** by
+[`tools/actor_world_viewer_proof.sh`](../tools/actor_world_viewer_proof.sh),
+which boots the same unmocked stack as §15.2 (via the shared
+[`tools/lib/actor_world_proof_stack.sh`](../tools/lib/actor_world_proof_stack.sh))
+plus the Control Plane Vite dev server on `:5273`, then runs the Playwright
+driver [`actor_world_viewer_proof.mjs`](../tools/actor_world_viewer_proof.mjs):
+
+```bash
+bash tools/actor_world_viewer_proof.sh
+```
+
+Using DOM test-ids (not screenshots), it asserts the baseline workers/tickets
+render, the surge accumulates genuinely new ticket cards, and — the crux — the
+`worker.reallocated` IDs from `/api/world/events` equal the Durable output
+command IDs (queried directly on `:7071`) equal the worker chips that newly
+appear in the Support group, under one stable journal trace, with a later
+`ticket.resolved`. Screenshots, a session video and a machine-checked
+`summary.json` land under `tmp/actor-world-viewer-proof/`; teardown kills only
+the exact PIDs it started (Vite plus the shared backend).
+
+Still deliberately out of scope: pause/step/restart and SSE subscriber queues —
+the world is observed by polling, driven only by demand-surge injection.
 
 Design: [`docs/superpowers/specs/2026-07-13-observable-actor-simulator-design.md`](superpowers/specs/2026-07-13-observable-actor-simulator-design.md).  
 Plans:

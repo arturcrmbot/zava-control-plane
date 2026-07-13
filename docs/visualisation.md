@@ -48,8 +48,43 @@ editorial blueprint page is the default.
 | Org-clone | `/?view=org-clone` | [`OrgClonePage.tsx`](../web/blueprint/src/pages/OrgClonePage.tsx) | Fan-out across entities, in-flight meta-workflows, ambient agents, function FMs, cadence schedule | 5 endpoints (entities/_stats, workflows, functions, functions/{n}/ambient, cadences); 8 s poll | Admin — single-page operator view |
 | Workflow run (drill-in) | `/?view=run&run_id=<id>` | [`WorkflowRunPage.tsx`](../web/blueprint/src/pages/WorkflowRunPage.tsx) | Per-run reasoning, tool calls, state, HITL interrupts — domain-agnostic | `GET /api/workflows/{run_id}/agui` (AG-UI SSE) | Day-to-day — single-run inspector |
 
-The Control Plane (`:5273`) and Candidate Portal (`:5274`) hold their
-own UIs; they are not visualisation surfaces and are out of scope here.
+The Candidate Portal (`:5274`) holds its own UI and is out of scope
+here. The Control Plane (`:5273`) is primarily an operator/admin UI, but
+it now also hosts one dedicated visualisation surface — the actor-world
+viewer at `/world`, inventoried in §1.1.
+
+### 1.1 Control Plane world viewer (`/world`)
+
+The observable actor world (ARCHITECTURE.md §15) ships a first-class
+viewer in the Control Plane, not the blueprint microsite.
+
+| Surface | URL | Component | What it shows | Data source | Role |
+|---|---|---|---|---|---|
+| World | `:5273/world` | [`World.tsx`](../web/client/routes/World.tsx) + [`useWorldSimulation`](../web/client/hooks/useWorldSimulation.ts) | Real ticket actors in Waiting / In service / Resolved / Abandoned lanes; Support + Reserve worker pools by ID; the Durable intervention causal strip; a recent-events journal | Polls `GET /api/world/state` (1 s) + `GET /api/world/events?after=` (300 ms) | Day-to-day — live actor-world operations view |
+
+**Every visual is a real actor or a journal event — never decoration:**
+
+- Each card is a real ticket ID and each chip a real worker ID from the
+  `/api/world/state` snapshot; the lanes are the actors' actual
+  `status`, worker groups their actual `team_id`.
+- A card/chip replays a one-shot pulse only when a newer journal event
+  references its actor id (the React key is `id:latest-seq`), so motion
+  maps 1:1 to a genuine transition.
+- Workers named by `worker.reallocated` events pulse green and appear in
+  the Support group because their snapshot `team_id` changed to
+  `TEAM-SUPPORT` — no worker moves without that event.
+- The **Durable intervention** strip renders one causal chain straight
+  from a single journal `trace_id`: `Pressure detected → Responder
+  requested → Durable decided → Command accepted → WRK-… reallocated`.
+  Each step carries the real event id; the reallocated IDs are the
+  actual `worker.reallocated` actors.
+- The only write control shipped is **Inject demand surge** (fixed
+  multiplier 4 / duration 90 → `POST /api/world/inject/demand_surge`).
+  No pause/step/restart, no aggregate KPI panel, no chart library.
+
+Proven in a real browser against the unmocked stack by
+[`tools/actor_world_viewer_proof.sh`](../tools/actor_world_viewer_proof.sh)
+(see ARCHITECTURE.md §15.3).
 
 ---
 
