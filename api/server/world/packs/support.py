@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 import simpy
 
+from api.server.world.model import SimulationCommand, SimulationEvent
 from api.server.world.runtime import SimulationRuntime
 
 Skill = Literal["billing", "technical", "account"]
@@ -72,6 +73,7 @@ class DemandSurge:
 class SupportConfig:
     customer_count: int = 1_000
     worker_count: int = 40
+    reserve_worker_count: int = 0
     arrival_rate_per_hour: float = 60.0
     simulation_minutes: float = 480.0
     sla_minutes: float = 30.0
@@ -81,6 +83,11 @@ class SupportConfig:
 
 class SupportScenario:
     def __init__(self, runtime: SimulationRuntime, config: SupportConfig) -> None:
+        if not 0 <= config.reserve_worker_count < config.worker_count:
+            raise ValueError(
+                "reserve_worker_count must satisfy "
+                "0 <= reserve_worker_count < worker_count"
+            )
         self.runtime = runtime
         self.config = config
         self.customers: dict[str, Customer] = {}
@@ -93,6 +100,8 @@ class SupportScenario:
         self._customer_ids: list[str] = []
         self._sensor_latched = False
         self.queued_ticket_ids: dict[str, None] = {}
+        self.worker_processes: dict[str, simpy.Process] = {}
+        self.applied_commands: dict[str, SimulationEvent] = {}
 
     def install(self) -> None:
         self.runtime.emit(
@@ -103,12 +112,111 @@ class SupportScenario:
         self._create_customers()
         self._create_workers()
         for worker in self.workers.values():
-            self.runtime.process(self._worker_loop(worker))
+            if worker.team_id == "TEAM-SUPPORT":
+                self._start_worker(worker)
         self.runtime.process(self._arrival_loop())
         self.runtime.process(self._sensor_loop())
 
     def schedule_surge(self, surge: DemandSurge) -> None:
         self.runtime.process(self._surge_process(surge))
+
+    def apply_command(self, command: SimulationCommand) -> SimulationEvent:
+        existing = self.applied_commands.get(command.command_id)
+        if existing is not None:
+            return existing
+        if command.type != "reallocate_workers":
+            return self._reject_command(
+                command, f"unsupported command type: {command.type!r}"
+            )
+        reason = self._validate_reallocate_workers(command.payload)
+        if reason is not None:
+            return self._reject_command(command, reason)
+        return self._accept_reallocate_workers(command)
+
+    def _validate_reallocate_workers(self, payload: dict[str, Any]) -> str | None:
+        worker_ids = payload.get("worker_ids")
+        if not isinstance(worker_ids, list) or not worker_ids:
+            return "worker_ids must be a non-empty list"
+        if not all(isinstance(worker_id, str) for worker_id in worker_ids):
+            return "worker_ids must contain only string worker IDs"
+        if len(set(worker_ids)) != len(worker_ids):
+            return "worker_ids must be unique"
+
+        if payload.get("from_team_id") != "TEAM-RESERVE":
+            return "from_team_id must be TEAM-RESERVE"
+        if payload.get("to_team_id") != "TEAM-SUPPORT":
+            return "to_team_id must be TEAM-SUPPORT"
+
+        duration_minutes = payload.get("duration_minutes")
+        if isinstance(duration_minutes, bool) or not isinstance(duration_minutes, (int, float)):
+            return "duration_minutes must be numeric"
+        if duration_minutes <= 0:
+            return "duration_minutes must be greater than zero"
+
+        for worker_id in worker_ids:
+            worker = self.workers.get(worker_id)
+            if worker is None:
+                return f"unknown worker_id: {worker_id}"
+            if worker.team_id != "TEAM-RESERVE":
+                return f"worker {worker_id} is not in TEAM-RESERVE"
+            if worker.status != "reserve":
+                return f"worker {worker_id} is not reserve status"
+        return None
+
+    def _reject_command(self, command: SimulationCommand, reason: str) -> SimulationEvent:
+        rejected = self.runtime.emit(
+            "command.rejected",
+            actor_id=command.issued_by,
+            target_id="TEAM-SUPPORT",
+            trace_id=command.trace_id,
+            payload={"command": command.to_dict(), "reason": reason},
+        )
+        self.applied_commands[command.command_id] = rejected
+        return rejected
+
+    def _accept_reallocate_workers(self, command: SimulationCommand) -> SimulationEvent:
+        payload = command.payload
+        worker_ids: list[str] = list(payload["worker_ids"])
+        from_team_id = payload["from_team_id"]
+        to_team_id = payload["to_team_id"]
+        duration_minutes = payload["duration_minutes"]
+
+        accepted = self.runtime.emit(
+            "command.accepted",
+            actor_id=command.issued_by,
+            target_id="TEAM-SUPPORT",
+            trace_id=command.trace_id,
+            payload={"command": command.to_dict()},
+        )
+        self.applied_commands[command.command_id] = accepted
+
+        from_team = self.teams[from_team_id]
+        to_team = self.teams[to_team_id]
+        for worker_id in worker_ids:
+            worker = self.workers[worker_id]
+            if worker_id in from_team.worker_ids:
+                from_team.worker_ids.remove(worker_id)
+            to_team.worker_ids.append(worker_id)
+            worker.team_id = to_team_id
+            worker.status = "idle"
+            reallocated = self.runtime.emit(
+                "worker.reallocated",
+                actor_id=worker_id,
+                target_id=to_team_id,
+                cause_event_id=accepted.event_id,
+                trace_id=command.trace_id,
+                payload={
+                    "command_id": command.command_id,
+                    "from_team_id": from_team_id,
+                    "to_team_id": to_team_id,
+                    "duration_minutes": duration_minutes,
+                },
+            )
+            self._start_worker(worker)
+            self.runtime.process(
+                self._return_worker_after(worker, duration_minutes, reallocated)
+            )
+        return accepted
 
     def _create_customers(self) -> None:
         patience = {"standard": 60.0, "premium": 90.0, "vulnerable": 30.0}
@@ -133,8 +241,11 @@ class SupportScenario:
             )
 
     def _create_workers(self) -> None:
-        team = Team(id="TEAM-SUPPORT", name="Customer Support")
-        self.teams[team.id] = team
+        support_team = Team(id="TEAM-SUPPORT", name="Customer Support")
+        reserve_team = Team(id="TEAM-RESERVE", name="Reserve")
+        self.teams[support_team.id] = support_team
+        self.teams[reserve_team.id] = reserve_team
+        support_count = self.config.worker_count - self.config.reserve_worker_count
         for index in range(1, self.config.worker_count + 1):
             primary = SKILLS[(index - 1) % len(SKILLS)]
             skills: tuple[Skill, ...]
@@ -142,11 +253,14 @@ class SupportScenario:
                 skills = SKILLS
             else:
                 skills = (primary,)
+            is_reserve = index > support_count
+            team = reserve_team if is_reserve else support_team
             worker = Worker(
                 id=f"WRK-{index:04d}",
                 team_id=team.id,
                 skills=skills,
                 service_rate=round(self.runtime.rng.uniform(0.85, 1.15), 3),
+                status="reserve" if is_reserve else "idle",
             )
             self.workers[worker.id] = worker
             team.worker_ids.append(worker.id)
@@ -157,6 +271,12 @@ class SupportScenario:
                 trace_id=f"worker-{worker.id}",
                 payload={"skills": list(worker.skills), "service_rate": worker.service_rate},
             )
+
+    def _start_worker(self, worker: Worker) -> None:
+        process = self.worker_processes.get(worker.id)
+        if process is not None and process.is_alive:
+            return
+        self.worker_processes[worker.id] = self.runtime.process(self._worker_loop(worker))
 
     def _arrival_loop(self):
         while self.runtime.now < self.config.simulation_minutes:
@@ -214,9 +334,14 @@ class SupportScenario:
 
     def _worker_loop(self, worker: Worker):
         while True:
-            ticket: Ticket = yield self.queue.get(
+            request = self.queue.get(
                 lambda item: item.status == "queued" and item.required_skill in worker.skills
             )
+            try:
+                ticket: Ticket = yield request
+            except simpy.Interrupt:
+                request.cancel()
+                return
             if ticket.status != "queued":
                 continue
             self.queued_ticket_ids.pop(ticket.id, None)
@@ -388,6 +513,42 @@ class SupportScenario:
             cause_event_id=started.event_id,
             trace_id=started.trace_id,
             payload={"multiplier": surge.multiplier},
+        )
+
+    def _return_worker_after(
+        self, worker: Worker, duration_minutes: float, reallocated_event: SimulationEvent
+    ):
+        yield self.runtime.env.timeout(duration_minutes)
+        while worker.status == "busy":
+            yield self.runtime.env.timeout(1)
+
+        process = self.worker_processes.get(worker.id)
+        if process is not None and process.is_alive:
+            process.interrupt()
+        yield self.runtime.env.timeout(0)
+
+        support_team = self.teams["TEAM-SUPPORT"]
+        reserve_team = self.teams["TEAM-RESERVE"]
+        if worker.id in support_team.worker_ids:
+            support_team.worker_ids.remove(worker.id)
+        if worker.id not in reserve_team.worker_ids:
+            reserve_team.worker_ids.append(worker.id)
+        worker.team_id = reserve_team.id
+        worker.status = "reserve"
+        worker.current_ticket_id = None
+        worker.available_at = self.runtime.now
+
+        self.runtime.emit(
+            "worker.returned",
+            actor_id=worker.id,
+            target_id=reserve_team.id,
+            cause_event_id=reallocated_event.event_id,
+            trace_id=reallocated_event.trace_id,
+            payload={
+                "command_id": reallocated_event.payload["command_id"],
+                "from_team_id": reallocated_event.payload["from_team_id"],
+                "to_team_id": reallocated_event.payload["to_team_id"],
+            },
         )
 
 
