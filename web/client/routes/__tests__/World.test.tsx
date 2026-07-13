@@ -78,7 +78,7 @@ const BASE_STATE: WorldState = {
     tickets_opened: 6, workers_idle: 2, workers_busy: 2, sla_breach_pct: 0.33,
     average_wait_minutes: 4, customer_sentiment: 0.8, customer_churn_risk: 0.1,
   },
-  customers: [{ id: "CUST-1", segment: "premium", value_band: "high", sentiment: 0.8, churn_risk: 0.1, active_ticket_ids: ["TCK-1"] }],
+  customers: [{ id: "CUST-1" }],
   tickets: TICKETS,
   workers: WORKERS,
   teams: [
