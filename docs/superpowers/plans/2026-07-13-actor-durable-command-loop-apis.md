@@ -12,6 +12,12 @@
 
 ---
 
+## Execution amendment — ponytail cut
+
+Plan 2 defers pause/resume/step/restart, subscriber queues, /stream and /control to Plan 3 (viewer). Plan 2 APIs are state/events/inject only. This overrides Tasks 2/5 below where they mention deferred surfaces.
+
+---
+
 ## File structure
 
 | File | Responsibility |

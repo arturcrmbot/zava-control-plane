@@ -1,17 +1,18 @@
 """ActorWorldService: a focused async adapter over SimulationRuntime/SupportScenario.
 
 Owns one authoritative actor world, paces SimPy one event at a time inside an
-asyncio task, and publishes journal events to the EventBus and to bounded
-subscriber queues. Provides the read surfaces (snapshot/events_after/
-build_observation) and write surfaces (apply_command/record_external) the
-world bridge, routes and Durable responder need, plus playback controls
-(pause/resume/stop/step_once/set_speed/restart/inject_demand_surge).
+asyncio task, and publishes journal events to the EventBus. Provides the read
+surfaces (snapshot/events_after/build_observation) and write surfaces
+(apply_command/record_external) the world bridge, routes and Durable
+responder need, plus inject_demand_surge.
+
+Viewer-era controls (pause/resume/step_once/restart/set_speed) and SSE
+subscriber plumbing are deferred to Plan 3; this service is state/events/
+inject only.
 
 Single-threaded asyncio only: every method is synchronous and runs to
-completion atomically except `run()`, whose loop is the sole place that
-awaits between events; `step_once()` is `async` only so callers have one
-consistent single-step awaitable, but it never yields internally. No locks
-or threads are needed.
+completion atomically except `run()`, which is the sole place that awaits
+between events. No locks or threads are needed.
 """
 from __future__ import annotations
 
@@ -53,10 +54,10 @@ class ActorWorldService:
         self.config = config
         self.bus = bus
         self.scenario_name = "support"
-        self._subscribers: list[asyncio.Queue[dict[str, Any]]] = []
-        self._paused = False
         self._stop_requested = False
-        self.set_speed(minutes_per_second)
+        self.minutes_per_second = _require_finite_positive(
+            minutes_per_second, label="minutes_per_second"
+        )
         self.seed = seed
         self.runtime, self.scenario = self._install(seed)
 
@@ -97,8 +98,6 @@ class ActorWorldService:
             return "completed"
         if self._stop_requested:
             return "stopped"
-        if self._paused:
-            return "paused"
         return "running"
 
     # -- playback ------------------------------------------------------------
@@ -108,48 +107,25 @@ class ActorWorldService:
 
         Wall delay between events is the positive logical time delta divided
         by `minutes_per_second`. Same-time events (delta == 0) still yield to
-        asyncio so pause()/stop() called from another task are observed
-        promptly instead of starving the event loop.
+        asyncio so stop() called from another task is observed promptly
+        instead of starving the event loop.
         """
         self._stop_requested = False
         while not self._stop_requested:
-            if self._paused:
-                await asyncio.sleep(0.05)
-                continue
             if self.runtime.status == "completed":
                 break
             before = self.runtime.now
-            await self.step_once()
+            self._step_once()
             delta = self.runtime.now - before
-            if delta > 0:
-                await asyncio.sleep(delta / self.minutes_per_second)
-            else:
-                await asyncio.sleep(0)
+            await asyncio.sleep(max(0, delta / self.minutes_per_second))
 
-    async def step_once(self) -> None:
+    def _step_once(self) -> None:
         """Execute exactly one SimPy env event and publish anything new."""
         self.runtime.step()
         self._publish_new()
 
-    def pause(self) -> None:
-        self._paused = True
-
-    def resume(self) -> None:
-        self._paused = False
-
     def stop(self) -> None:
         self._stop_requested = True
-
-    def set_speed(self, value: float) -> None:
-        self.minutes_per_second = _require_finite_positive(value, label="minutes_per_second")
-
-    def restart(self, seed: int | None = None) -> None:
-        """Rebuild runtime/scenario with the same config; only while paused."""
-        if not self._paused:
-            raise RuntimeError("restart is only allowed while the world is paused")
-        self.seed = self.seed if seed is None else seed
-        self._stop_requested = False
-        self.runtime, self.scenario = self._install(self.seed)
 
     def inject_demand_surge(self, multiplier: float, duration_minutes: float) -> None:
         multiplier = _require_finite_positive(multiplier, label="multiplier", floor=1.0)
@@ -161,20 +137,11 @@ class ActorWorldService:
         )
         self.scenario.schedule_surge(surge)
 
-    # -- catch-up + live subscription -----------------------------------------
+    # -- catch-up ---------------------------------------------------------
 
     def events_after(self, seq: int) -> list[dict[str, Any]]:
         start = max(seq, 0)
         return [event.to_dict() for event in self.runtime.journal[start:]]
-
-    def subscribe(self, maxsize: int = 1000) -> asyncio.Queue[dict[str, Any]]:
-        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=maxsize)
-        self._subscribers.append(queue)
-        return queue
-
-    def unsubscribe(self, queue: asyncio.Queue[dict[str, Any]]) -> None:
-        if queue in self._subscribers:
-            self._subscribers.remove(queue)
 
     def _publish_new(self) -> None:
         self._publish_since(self._published_seq)
@@ -192,20 +159,6 @@ class ActorWorldService:
                 trace_id=event.trace_id,
             )
         )
-        payload = event.to_dict()
-        for queue in self._subscribers:
-            self._enqueue(queue, payload)
-
-    @staticmethod
-    def _enqueue(queue: asyncio.Queue[dict[str, Any]], payload: dict[str, Any]) -> None:
-        try:
-            queue.put_nowait(payload)
-        except asyncio.QueueFull:
-            try:
-                queue.get_nowait()
-            except asyncio.QueueEmpty:
-                pass
-            queue.put_nowait(payload)
 
     # -- read surfaces ---------------------------------------------------------
 

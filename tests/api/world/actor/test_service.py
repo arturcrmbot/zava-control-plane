@@ -1,6 +1,8 @@
 """Behavioural proof for ActorWorldService: the live async adapter that paces
-SimulationRuntime/SupportScenario, publishes journal events to EventBus and
-subscribers, and exposes snapshot/observation/control/command surfaces.
+SimulationRuntime/SupportScenario and publishes journal events to EventBus.
+
+Viewer-era controls (pause/resume/step/restart/subscribers) are deferred to
+Plan 3 and are intentionally not covered here.
 """
 from __future__ import annotations
 
@@ -39,9 +41,10 @@ def test_events_after_returns_causal_journal_tail():
     assert all(event["seq"] > 1_030 for event in tail)
 
 
-def test_apply_command_publishes_command_and_worker_events():
+def test_apply_command_publishes_command_and_worker_events_and_moves_worker():
     world = service()
-    queue = world.subscribe()
+    published: list[str] = []
+    world.bus.on_any(lambda event: published.append(event.type))
     command = SimulationCommand(
         command_id="cmd-test",
         trace_id="trace-test",
@@ -56,46 +59,34 @@ def test_apply_command_publishes_command_and_worker_events():
     )
     result = world.apply_command(command)
     assert result.type == "command.accepted"
-    published = [queue.get_nowait(), queue.get_nowait()]
-    assert [e["type"] for e in published] == ["command.accepted", "worker.reallocated"]
+    assert published == ["world.command.accepted", "world.worker.reallocated"]
+    assert world.scenario.workers["WRK-0031"].team_id == "TEAM-SUPPORT"
+
+
+def test_record_external_publishes_to_event_bus():
+    world = service()
+    published: list[str] = []
+    world.bus.on_any(lambda event: published.append(event.type))
+    world.record_external("test.happened", trace_id="t1")
+    assert published == ["world.test.happened"]
 
 
 @pytest.mark.asyncio
-async def test_pause_step_resume_control_authoritative_runtime():
+async def test_run_advances_authoritative_runtime_and_stop_ends_task():
     world = service()
-    world.pause()
     before = world.runtime.now
-    await world.step_once()
-    assert world.runtime.now >= before
-    world.resume()
     task = asyncio.create_task(world.run())
     await asyncio.sleep(0.02)
     world.stop()
     await task
     assert world.runtime.now > before
-
-
-# --- Focused tests beyond the authoritative set -----------------------------
-
-
-def test_installation_backlog_is_not_published_on_startup():
-    world = service()
-    queue = world.subscribe()
-    assert queue.qsize() == 0
-    assert world._published_seq == len(world.runtime.journal)
+    assert task.done()
 
 
 @pytest.mark.parametrize("value", [0, -1, float("nan"), float("inf"), float("-inf")])
-def test_set_speed_rejects_non_positive_or_non_finite(value):
-    world = service()
+def test_constructor_rejects_non_positive_or_non_finite_speed(value):
     with pytest.raises(ValueError):
-        world.set_speed(value)
-
-
-def test_set_speed_accepts_positive_finite_value():
-    world = service()
-    world.set_speed(42.5)
-    assert world.minutes_per_second == 42.5
+        ActorWorldService.support(seed=42, bus=EventBus(), minutes_per_second=value)
 
 
 @pytest.mark.parametrize("multiplier", [1, 0.5, 0, -2, float("nan"), float("inf")])
@@ -120,45 +111,6 @@ def test_inject_demand_surge_schedules_a_real_perturbation_process():
     assert any(
         event.type == "perturbation.started" for event in world.runtime.journal[before:]
     )
-
-
-def test_restart_rejects_while_not_paused():
-    world = service()
-    with pytest.raises(RuntimeError):
-        world.restart()
-
-
-def test_restart_resets_actors_and_journal_deterministically_when_paused():
-    world = service()
-    world.runtime.run_until(5)
-    world.pause()
-    world.restart(seed=42)
-
-    fresh = service()
-    assert world.runtime.canonical_journal() == fresh.runtime.canonical_journal()
-    assert len(world.scenario.customers) == 1_000
-    assert len(world.scenario.workers) == 40
-    assert world._published_seq == len(world.runtime.journal)
-
-
-def test_subscriber_queue_drops_oldest_when_full():
-    world = service()
-    queue = world.subscribe(maxsize=2)
-    world.record_external("test.one", trace_id="t1")
-    world.record_external("test.two", trace_id="t2")
-    world.record_external("test.three", trace_id="t3")
-    assert queue.qsize() == 2
-    first = queue.get_nowait()
-    second = queue.get_nowait()
-    assert [first["type"], second["type"]] == ["test.two", "test.three"]
-
-
-def test_unsubscribe_stops_future_delivery():
-    world = service()
-    queue = world.subscribe()
-    world.unsubscribe(queue)
-    world.record_external("test.after.unsubscribe", trace_id="t1")
-    assert queue.qsize() == 0
 
 
 def test_build_observation_reports_real_reserve_ids_and_ticket_details():
