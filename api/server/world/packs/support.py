@@ -91,6 +91,7 @@ class SupportScenario:
         self.arrival_multiplier = 1.0
         self._ticket_seq = 0
         self._customer_ids: list[str] = []
+        self._sensor_latched = False
 
     def install(self) -> None:
         self.runtime.emit(
@@ -103,6 +104,7 @@ class SupportScenario:
         for worker in self.workers.values():
             self.runtime.process(self._worker_loop(worker))
         self.runtime.process(self._arrival_loop())
+        self.runtime.process(self._sensor_loop())
 
     def schedule_surge(self, surge: DemandSurge) -> None:
         self.runtime.process(self._surge_process(surge))
@@ -309,6 +311,58 @@ class SupportScenario:
             payload={"customer_id": customer.id},
         )
         ticket.last_event_id = abandoned.event_id
+
+    def _sensor_loop(self):
+        from api.server.world.projection import project_support
+
+        while self.runtime.now < self.config.simulation_minutes:
+            yield self.runtime.env.timeout(1)
+            projection = project_support(self)
+            if (
+                projection.support_backlog >= self.config.sensor_backlog_threshold
+                and not self._sensor_latched
+            ):
+                queued_ids = [
+                    ticket.id
+                    for ticket in self.tickets.values()
+                    if ticket.status == "queued"
+                ][:20]
+                cause = next(
+                    (
+                        event.event_id
+                        for event in reversed(self.runtime.journal)
+                        if event.type == "ticket.queued"
+                    ),
+                    None,
+                )
+                self.runtime.emit(
+                    "sensor.tripped",
+                    actor_id="sensor:support_pressure",
+                    target_id="queue:support",
+                    cause_event_id=cause,
+                    trace_id=f"support-pressure-{int(self.runtime.now)}",
+                    payload={
+                        "actor_ids": queued_ids,
+                        "measurements": {
+                            "support_backlog": projection.support_backlog,
+                            "sla_breach_pct": projection.sla_breach_pct,
+                            "average_wait_minutes": projection.average_wait_minutes,
+                        },
+                    },
+                )
+                self._sensor_latched = True
+            elif (
+                projection.support_backlog <= self.config.sensor_recovery_threshold
+                and self._sensor_latched
+            ):
+                self.runtime.emit(
+                    "sensor.recovered",
+                    actor_id="sensor:support_pressure",
+                    target_id="queue:support",
+                    trace_id=f"support-pressure-recovery-{int(self.runtime.now)}",
+                    payload={"support_backlog": projection.support_backlog},
+                )
+                self._sensor_latched = False
 
     def _surge_process(self, surge: DemandSurge):
         if surge.at_minute < self.runtime.now:
