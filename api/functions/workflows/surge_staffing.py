@@ -1,25 +1,9 @@
-"""Surge-staffing orchestrator — a REAL Durable Functions workflow triggered by
-the world simulator.
+"""Durable responder that turns actor-level pressure into a typed command.
 
-This is the "responder" half of the world-simulator closed loop, proven on the
-real Azure Durable Functions runtime (not a mock):
-
-    world engine sensor  ──►  ops.surge_staffing.requested (bus)
-                              │
-    world_bridge (FastAPI) ──►  schedules THIS orchestration on the func host
-                              │   with a snapshot of world state as input
-                              ▼
-    SurgeStaffingOrchestrator  ──►  surge_staffing_decide_activity ("the agent"
-                                    reads the world data and decides how many
-                                    agents to hire)
-                              │
-                              ▼  returns {hired: N}
-    world_bridge  ──►  emits surge-staffing.completed(hired=N) on the bus
-                       ──►  world engine actuator raises agent capacity
-                       ──►  the simulated backlog drains (world changed)
-
-Sync generator per the Azure Durable Functions Python convention; the activity
-is registered in ``function_app.py``.
+The orchestration receives queued tickets, active workers and reserve workers
+from the authoritative simulation. Its activity selects actual reserve worker
+IDs by skill pressure and returns a ``reallocate_workers`` command. FastAPI's
+world bridge validates and applies that command to the real worker actors.
 """
 from __future__ import annotations
 
