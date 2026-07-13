@@ -37,15 +37,6 @@ def test_projection_emits_workflow_and_incident_site_asset():
     assert asset.attrs["identifier"] == "SITE-03"
 
 
-def test_projection_unwraps_the_spawner_double_nesting():
-    # The simulator spawner nests {"incident": {"incident": observation}}.
-    wf = make_workflow(
-        "NI-T2", WORKFLOW_TYPE, {"incident": _incident_payload()}, nest_under="incident",
-    )
-    asset = next(o for o in project(wf) if isinstance(o, EntityWrite) and o.kind == "Asset")
-    assert asset.attrs["identifier"] == "SITE-03"
-
-
 def test_projection_falls_back_to_workflow_id_without_incident_site():
     wf = make_workflow("NI-T3", WORKFLOW_TYPE, {}, nest_under="incident")
     ops = project(wf)

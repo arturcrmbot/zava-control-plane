@@ -189,42 +189,43 @@ export function useWorldSimulation(): UseWorldSimulationResult {
     }
   }, []);
 
-  const injectSurge = useCallback(async (): Promise<void> => {
-    try {
-      const r = await fetch("/api/world/inject/demand_surge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          multiplier: SURGE_MULTIPLIER,
-          duration_minutes: SURGE_DURATION_MINUTES,
-        }),
-        signal: abortRef.current?.signal,
-      });
-      if (!r.ok) throw new Error(`inject surge HTTP ${r.status}`);
-    } catch (err) {
-      if (isAbort(err)) return;
-      setError((err as Error).message || "failed to inject demand surge");
-      return;
-    }
-    await Promise.all([fetchState(), fetchEvents()]);
-  }, [fetchState, fetchEvents]);
+  // Shared POST-then-refresh body for the /api/world/inject/* write surface:
+  // both injectSurge and injectSiteFailure differ only in path, body and the
+  // error label reported on failure.
+  const postInjection = useCallback(
+    async (path: string, body: unknown, errorLabel: string): Promise<void> => {
+      try {
+        const r = await fetch(`/api/world/inject/${path}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: abortRef.current?.signal,
+        });
+        if (!r.ok) throw new Error(`${errorLabel} HTTP ${r.status}`);
+      } catch (err) {
+        if (isAbort(err)) return;
+        setError((err as Error).message || `failed to ${errorLabel}`);
+        return;
+      }
+      await Promise.all([fetchState(), fetchEvents()]);
+    },
+    [fetchState, fetchEvents],
+  );
 
-  const injectSiteFailure = useCallback(async (): Promise<void> => {
-    try {
-      const r = await fetch("/api/world/inject/site_failure", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-        signal: abortRef.current?.signal,
-      });
-      if (!r.ok) throw new Error(`inject site failure HTTP ${r.status}`);
-    } catch (err) {
-      if (isAbort(err)) return;
-      setError((err as Error).message || "failed to inject site failure");
-      return;
-    }
-    await Promise.all([fetchState(), fetchEvents()]);
-  }, [fetchState, fetchEvents]);
+  const injectSurge = useCallback(
+    (): Promise<void> =>
+      postInjection(
+        "demand_surge",
+        { multiplier: SURGE_MULTIPLIER, duration_minutes: SURGE_DURATION_MINUTES },
+        "inject surge",
+      ),
+    [postInjection],
+  );
+
+  const injectSiteFailure = useCallback(
+    (): Promise<void> => postInjection("site_failure", {}, "inject site failure"),
+    [postInjection],
+  );
 
   useEffect(() => {
     const ctrl = new AbortController();

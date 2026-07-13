@@ -12,6 +12,7 @@ import {
   type WorldTicket,
   type WorldWorker,
 } from "@client/hooks/useWorldSimulation";
+import { deriveCommonIntervention, type InterventionStep } from "@client/lib/worldIntervention";
 import TelcoWorld from "@client/routes/TelcoWorld";
 
 const WAITING_CAP = 40;
@@ -419,12 +420,6 @@ function WorkerChip({
 
 // -- Durable intervention ----------------------------------------------------
 
-interface InterventionStep {
-  label: string;
-  eventId: string;
-  detail?: string;
-}
-
 interface Intervention {
   trace: string;
   steps: InterventionStep[];
@@ -432,37 +427,11 @@ interface Intervention {
 }
 
 function deriveIntervention(events: WorldEvent[]): Intervention | null {
-  let trace: string | null = null;
-  for (const e of events) {
-    if (RESPONDER_TYPES.has(e.type)) trace = e.trace_id;
-  }
-  if (!trace) return null;
+  const common = deriveCommonIntervention(events, (e) => RESPONDER_TYPES.has(e.type));
+  if (!common) return null;
+  const { trace, traceEvents, steps } = common;
 
-  const traceEvents = events.filter((e) => e.trace_id === trace);
-  const find = (type: string) => traceEvents.find((e) => e.type === type);
-
-  const steps: InterventionStep[] = [];
-  const pressure = find("sensor.tripped");
-  if (pressure) steps.push({ label: "Pressure detected", eventId: pressure.event_id });
-
-  const requested = find("responder.requested");
-  if (requested) steps.push({ label: "Responder requested", eventId: requested.event_id });
-
-  const decided = find("responder.decided");
-  const deferred = find("responder.deferred");
-  const failed = find("responder.failed");
-  if (decided) {
-    const instance = String((decided.payload?.instance_id as string) ?? "");
-    steps.push({ label: "Durable decided", eventId: decided.event_id, detail: instance.slice(0, 12) || undefined });
-  } else if (deferred) {
-    steps.push({ label: "Durable deferred", eventId: deferred.event_id });
-  } else if (failed) {
-    steps.push({ label: "Responder failed", eventId: failed.event_id });
-  }
-
-  const accepted = find("command.accepted");
-  if (accepted) steps.push({ label: "Command accepted", eventId: accepted.event_id });
-
+  // Scenario-specific tail: which workers a worker.reallocated command moved.
   const reallocations = traceEvents.filter((e) => e.type === "worker.reallocated");
   const reallocatedWorkerIds = reallocations.map((e) => e.actor_id).filter((id): id is string => Boolean(id));
   if (reallocatedWorkerIds.length > 0) {

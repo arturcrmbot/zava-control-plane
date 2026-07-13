@@ -1617,13 +1617,17 @@ async def spawn_network_incident_workflow(scenario: str | None = None) -> str:
     global _nir_seq
     _nir_seq += 1
     wid = f"NIR-{_nir_seq:04d}"
+    # Raw observation, passed as-is for payload_key "incident" — the same
+    # single-nesting shape every other strategic spawner uses (see
+    # spawn_hire_to_productive_workflow etc). No extra wrapping here; the
+    # projection reads workflow.payload["incident"]["incident_site"] directly.
     observation = {
         "incident_site": {"id": "SITE-01", "status": "failed"},
         "neighbor_sites": [],
         "affected_sessions": [],
+        "scenario": scenario,
     }
-    data = {"incident": observation, **({"scenario": scenario} if scenario else {})}
-    w = _build_strategic_workflow(wid, "network-incident", "incident", data)
+    w = _build_strategic_workflow(wid, "network-incident", "incident", observation)
     app_state.store.upsert_workflow(w)
     payload: dict = {
         "workflow_id": wid,
@@ -1631,6 +1635,8 @@ async def spawn_network_incident_workflow(scenario: str | None = None) -> str:
         "trace_id": wid,
         "observation": observation,
     }
+    if scenario:
+        payload["scenario"] = scenario
     try:
         result = await schedule_new_orchestration(
             payload, function_name="NetworkIncidentOrchestrator",

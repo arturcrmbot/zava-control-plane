@@ -31,10 +31,6 @@ WORKFLOW_TYPE = "network-incident"
 
 def _incident_site(payload: dict) -> dict:
     incident = payload.get("incident") or {}
-    # The simulator spawner double-nests {"incident": {"incident": observation}};
-    # unwrap one level when the site isn't found directly.
-    if "incident_site" not in incident and isinstance(incident.get("incident"), dict):
-        incident = incident["incident"]
     site = incident.get("incident_site")
     return site if isinstance(site, dict) else {}
 

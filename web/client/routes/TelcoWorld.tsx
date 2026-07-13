@@ -13,6 +13,7 @@ import {
   type WorldSite,
   type WorldSession,
 } from "@client/hooks/useWorldSimulation";
+import { deriveCommonIntervention, type InterventionStep } from "@client/lib/worldIntervention";
 
 const REGIONS = ["north", "east", "south", "west"] as const;
 const TOKEN_CAP = 24;
@@ -27,55 +28,38 @@ function round(n: number | undefined): number {
 
 // -- Durable causal chain, derived from the network.anomaly trace ------------
 
-interface NetStep { label: string; eventId: string; detail?: string }
 interface NetIntervention {
   trace: string;
   incidentSiteId: string | null;
-  steps: NetStep[];
+  steps: InterventionStep[];
   reroutedSessionIds: string[];
 }
 function deriveIntervention(events: WorldEvent[]): NetIntervention | null {
-  let trace: string | null = null;
-  let incidentSiteId: string | null = null;
-  for (const e of events) {
-    if (e.type === "sensor.tripped") {
-      const m = (e.payload?.measurements as Record<string, unknown>) ?? {};
-      if (m.site_id) { trace = e.trace_id; incidentSiteId = String(m.site_id); }
-    }
-  }
-  if (!trace) return null;
-  const te = events.filter((e) => e.trace_id === trace);
-  const find = (t: string) => te.find((e) => e.type === t);
-  const steps: NetStep[] = [];
+  const common = deriveCommonIntervention(
+    events,
+    (e) => e.type === "sensor.tripped" && Boolean(((e.payload?.measurements as Record<string, unknown>) ?? {}).site_id),
+    {
+      pressureLabel: "Anomaly detected",
+      pressureDetail: (e) => String(((e.payload?.measurements as Record<string, unknown>) ?? {}).site_id ?? ""),
+    },
+  );
+  if (!common) return null;
+  const { trace, traceEvents, steps } = common;
 
-  const tripped = find("sensor.tripped");
-  if (tripped) {
-    const m = (tripped.payload?.measurements as Record<string, unknown>) ?? {};
-    steps.push({ label: "Anomaly detected", eventId: tripped.event_id, detail: String(m.site_id ?? "") });
-  }
-  const requested = find("responder.requested");
-  if (requested) steps.push({ label: "Responder requested", eventId: requested.event_id });
-  const decided = find("responder.decided");
-  const deferred = find("responder.deferred");
-  const failed = find("responder.failed");
-  if (decided) {
-    const instance = String((decided.payload?.instance_id as string) ?? "");
-    steps.push({ label: "Durable decided", eventId: decided.event_id, detail: instance.slice(0, 12) || undefined });
-  } else if (deferred) {
-    steps.push({ label: "Durable deferred", eventId: deferred.event_id });
-  } else if (failed) {
-    steps.push({ label: "Responder failed", eventId: failed.event_id });
-  }
-  const accepted = find("command.accepted");
-  if (accepted) steps.push({ label: "Command accepted", eventId: accepted.event_id });
+  const tripped = traceEvents.find((e) => e.type === "sensor.tripped");
+  const trippedSiteId = tripped ? String(((tripped.payload?.measurements as Record<string, unknown>) ?? {}).site_id ?? "") : "";
+  const incidentSiteId = trippedSiteId || null;
 
-  const reroutes = te.filter((e) => e.type === "session.rerouted");
+  // Scenario-specific tail: sessions rerouted away from the failed site, then
+  // the site's eventual recovery.
+  const reroutes = traceEvents.filter((e) => e.type === "session.rerouted");
   const reroutedSessionIds = reroutes.map((e) => e.actor_id).filter((id): id is string => Boolean(id));
   if (reroutedSessionIds.length > 0) {
     steps.push({ label: `${reroutedSessionIds.length} sessions rerouted`, eventId: reroutes[reroutes.length - 1].event_id });
   }
-  const recovered = find("site.recovered");
+  const recovered = traceEvents.find((e) => e.type === "site.recovered");
   if (recovered) steps.push({ label: "Site recovered", eventId: recovered.event_id });
+
   return { trace, incidentSiteId, steps, reroutedSessionIds };
 }
 

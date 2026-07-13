@@ -374,6 +374,11 @@ class NetworkScenario:
 
     # -- command -----------------------------------------------------------
 
+    # Mirrors support.py's apply_command dispatch shape (idempotency check,
+    # then type check, then validate-and-accept), but the validation rules
+    # below are telco-domain specific (site/session/capacity invariants) and
+    # deliberately stay local rather than being pulled into a shared
+    # command/sensor framework.
     def apply_command(self, command: SimulationCommand) -> SimulationEvent:
         existing = self.applied_commands.get(command.command_id)
         if existing is not None:
