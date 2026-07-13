@@ -247,7 +247,8 @@ responder.observed
 responder.decided
 command.accepted
 command.rejected
-workers.reallocated
+worker.reallocated
+worker.returned
 simulation.paused
 simulation.resumed
 ```
