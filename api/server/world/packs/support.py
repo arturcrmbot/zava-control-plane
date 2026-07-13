@@ -1,6 +1,7 @@
 """Explicit-actor support-world scenario running on SimulationRuntime."""
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
@@ -150,6 +151,8 @@ class SupportScenario:
         duration_minutes = payload.get("duration_minutes")
         if isinstance(duration_minutes, bool) or not isinstance(duration_minutes, (int, float)):
             return "duration_minutes must be numeric"
+        if not math.isfinite(duration_minutes):
+            return "duration_minutes must be finite"
         if duration_minutes <= 0:
             return "duration_minutes must be greater than zero"
 

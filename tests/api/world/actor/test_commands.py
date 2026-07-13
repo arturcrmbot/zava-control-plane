@@ -76,3 +76,18 @@ def test_workers_return_to_reserve_after_duration():
         e.event_id for e in scenario.runtime.journal if e.type == "worker.reallocated"
     }
     assert accepted.trace_id == returned.trace_id
+
+
+import pytest
+
+
+@pytest.mark.parametrize("duration", [float("nan"), float("inf"), float("-inf")])
+def test_non_finite_duration_is_rejected_without_mutation(duration):
+    scenario = scenario_with_reserve()
+    cmd = command(("WRK-0010",), command_id=f"cmd-{duration}")
+    cmd.payload["duration_minutes"] = duration
+    result = scenario.apply_command(cmd)
+    assert result.type == "command.rejected"
+    assert "finite" in result.payload["reason"]
+    assert scenario.workers["WRK-0010"].team_id == "TEAM-RESERVE"
+    assert not any(e.type == "worker.reallocated" for e in scenario.runtime.journal)
