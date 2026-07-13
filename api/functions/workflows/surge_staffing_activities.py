@@ -29,7 +29,10 @@ def surge_staffing_decide_activity(payload: dict) -> dict:
             worker["id"],
         ),
     )
-    count = min(len(ranked), max(1, math.ceil(len(queued) / 20)))
+    backlog = int(
+        observation.get("projection", {}).get("support_backlog", len(queued))
+    )
+    count = min(len(ranked), max(1, math.ceil(backlog / 20)))
     worker_ids = [worker["id"] for worker in ranked[:count]]
     return {
         "command": {
@@ -45,7 +48,7 @@ def surge_staffing_decide_activity(payload: dict) -> dict:
             },
         },
         "reasoning": (
-            f"backlog={len(queued)}; selected {len(worker_ids)} reserve workers "
+            f"backlog={backlog}; selected {len(worker_ids)} reserve workers "
             f"against skill pressure {dict(pressure)}"
         ),
     }

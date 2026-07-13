@@ -52,6 +52,14 @@ def test_selected_worker_count_scales_with_backlog():
     assert len(large["command"]["payload"]["worker_ids"]) == 4
 
 
+def test_worker_count_uses_total_projection_not_capped_ticket_sample():
+    payload = observation(technical=20, billing=0)
+    payload["observation"]["projection"]["support_backlog"] = 65
+    out = surge_staffing_decide_activity(payload)
+    assert len(out["command"]["payload"]["worker_ids"]) == 4
+    assert "backlog=65" in out["reasoning"]
+
+
 def test_no_queue_or_no_reserve_returns_explicit_noop():
     empty = surge_staffing_decide_activity(
         observation(technical=0, billing=0, account=0)
