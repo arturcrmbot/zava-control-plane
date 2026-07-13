@@ -27,6 +27,7 @@ import Dashboard from "@client/routes/Dashboard";
 import Memory from "@client/routes/Memory";
 import Knowledge from "@client/routes/Knowledge";
 import Compose from "@client/routes/Compose";
+import World from "@client/routes/World";
 import NotFound from "@client/routes/NotFound";
 
 function ShellBody() {
@@ -129,6 +130,7 @@ function ShellInner({
             <Route path="/memory" element={<Memory />} />
             <Route path="/knowledge" element={<Knowledge />} />
             <Route path="/compose" element={<Compose />} />
+            <Route path="/world" element={<World />} />
             <Route path="/fleet" element={<Navigate to="/" replace />} />
             <Route path="/exceptions" element={<Navigate to="/?filter=exceptions" replace />} />
             <Route path="/reviewer-queue" element={<Navigate to="/?filter=hitl" replace />} />

@@ -5,7 +5,7 @@
 // demoted secondary routes.
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { ChevronDown, ChevronsLeft, ChevronsRight, Plus, BarChart3, Brain, Network, Sparkles, Wand2 } from "lucide-react";
+import { ChevronDown, ChevronsLeft, ChevronsRight, Plus, BarChart3, Brain, Network, Sparkles, Wand2, Globe2 } from "lucide-react";
 import type { RolePreset, SavedView } from "@shared/roles";
 import { useLocalStorageState } from "@client/hooks/useLocalStorageState";
 
@@ -59,6 +59,14 @@ export default function LeftRail({
             `p-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"}`
           }
         ><BarChart3 size={16} /></NavLink>
+        <NavLink
+          to="/world"
+          aria-label="World"
+          title="World"
+          className={({ isActive }) =>
+            `p-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"}`
+          }
+        ><Globe2 size={16} /></NavLink>
       </aside>
     );
   }
@@ -99,6 +107,13 @@ export default function LeftRail({
           `flex items-center gap-2 text-xs px-3 py-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"}`
         }
       ><BarChart3 size={14} /> Dashboard</NavLink>
+
+      <NavLink
+        to="/world"
+        className={({ isActive }) =>
+          `flex items-center gap-2 text-xs px-3 py-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"}`
+        }
+      ><Globe2 size={14} /> World</NavLink>
 
       <NavLink
         to="/memory"
