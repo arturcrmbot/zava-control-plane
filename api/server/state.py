@@ -67,6 +67,7 @@ class AppState:
         self.bus = EventBus()
         self.store = StateStore()
         self.audit = AuditLogger()
+        self.world_last_response = None
 
         # Dream-pass daily LLM cost budget — in-process per-domain hard
         # stop. Resets implicitly per UTC day and on process restart;

@@ -414,6 +414,7 @@ async def lifespan(app: FastAPI):
         app_state.world_service = None
         app_state.world_engine = None
         app_state.world_bridge = None
+        app_state.world_last_response = None
         try:
             _portal_orch_off()
         except Exception:
