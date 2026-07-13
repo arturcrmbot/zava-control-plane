@@ -12,6 +12,8 @@
 
 ## Task 1: World polling hook
 
+**Status:** ✅ Done — `useWorldSimulation.ts` + 5 passing tests.
+
 **Files:**
 - Create: `web/client/hooks/useWorldSimulation.ts`
 - Create: `web/client/hooks/__tests__/useWorldSimulation.test.tsx`
@@ -89,6 +91,8 @@ git commit -m "feat(world-ui): poll actor state and causal events" \
 ---
 
 ## Task 2: Actual-actor operational view
+
+**Status:** ✅ Done — `World.tsx` + 12 passing tests.
 
 **Files:**
 - Create: `web/client/routes/World.tsx`
@@ -172,6 +176,8 @@ git commit -m "feat(world-ui): render live tickets, workers and interventions" \
 ---
 
 ## Task 3: Route/nav + remove constellation table
+
+**Status:** ✅ Done — `/world` route + LeftRail nav wired; `WorldSignalsPanel` removed.
 
 **Files:**
 - Modify: `web/client/components/feed/FleetControlShell.tsx`
