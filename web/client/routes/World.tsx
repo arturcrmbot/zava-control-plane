@@ -12,6 +12,7 @@ import {
   type WorldTicket,
   type WorldWorker,
 } from "@client/hooks/useWorldSimulation";
+import { WorldInterventionStrip } from "@client/components/WorldInterventionStrip";
 import { deriveCommonIntervention, type InterventionStep } from "@client/lib/worldIntervention";
 import TelcoWorld from "@client/routes/TelcoWorld";
 
@@ -213,7 +214,12 @@ export default function World() {
         ) : (
           <>
             {intervention && (
-              <InterventionStrip intervention={intervention} onActor={toggleActor} />
+              <WorldInterventionStrip
+                testId="intervention"
+                trace={intervention.trace}
+                steps={intervention.steps}
+                onTrace={toggleActor}
+              />
             )}
 
             <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -442,42 +448,6 @@ function deriveIntervention(events: WorldEvent[]): Intervention | null {
   }
 
   return { trace, steps, reallocatedWorkerIds };
-}
-
-function InterventionStrip({
-  intervention, onActor,
-}: {
-  intervention: Intervention;
-  onActor: (id: string) => void;
-}) {
-  return (
-    <section
-      data-testid="intervention"
-      className="rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-3"
-    >
-      <div className="flex items-center justify-between pb-2">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-          Durable intervention
-        </h2>
-        <button
-          type="button"
-          onClick={() => onActor(intervention.trace)}
-          className="text-[11px] font-mono text-emerald-700 dark:text-emerald-400 hover:underline"
-        >{intervention.trace}</button>
-      </div>
-      <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-slate-700 dark:text-slate-200">
-        {intervention.steps.map((step, i) => (
-          <li key={step.eventId} className="flex items-center gap-1.5">
-            {i > 0 && <span className="text-emerald-500">→</span>}
-            <span className="font-medium">{step.label}</span>
-            {step.detail && (
-              <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400">{step.detail}</span>
-            )}
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
 }
 
 // -- recent event journal ----------------------------------------------------

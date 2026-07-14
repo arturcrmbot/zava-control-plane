@@ -121,11 +121,6 @@ class SupportScenario:
     def schedule_surge(self, surge: DemandSurge) -> None:
         self.runtime.process(self._surge_process(surge))
 
-    # Mirrors telco.py's apply_command dispatch shape (idempotency check, then
-    # type check, then validate-and-accept), but the validation rules below
-    # are support-domain specific (worker/team/status invariants) and
-    # deliberately stay local rather than being pulled into a shared
-    # command/sensor framework.
     def apply_command(self, command: SimulationCommand) -> SimulationEvent:
         existing = self.applied_commands.get(command.command_id)
         if existing is not None:

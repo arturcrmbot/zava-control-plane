@@ -189,11 +189,14 @@ export function useWorldSimulation(): UseWorldSimulationResult {
     }
   }, []);
 
-  // Shared POST-then-refresh body for the /api/world/inject/* write surface:
-  // both injectSurge and injectSiteFailure differ only in path, body and the
-  // error label reported on failure.
+  // Shared POST-then-refresh flow for world injection endpoints.
   const postInjection = useCallback(
-    async (path: string, body: unknown, errorLabel: string): Promise<void> => {
+    async (
+      path: string,
+      body: unknown,
+      errorLabel: string,
+      fallbackMessage = `failed to ${errorLabel}`,
+    ): Promise<void> => {
       try {
         const r = await fetch(`/api/world/inject/${path}`, {
           method: "POST",
@@ -204,7 +207,7 @@ export function useWorldSimulation(): UseWorldSimulationResult {
         if (!r.ok) throw new Error(`${errorLabel} HTTP ${r.status}`);
       } catch (err) {
         if (isAbort(err)) return;
-        setError((err as Error).message || `failed to ${errorLabel}`);
+        setError((err as Error).message || fallbackMessage);
         return;
       }
       await Promise.all([fetchState(), fetchEvents()]);
@@ -218,6 +221,7 @@ export function useWorldSimulation(): UseWorldSimulationResult {
         "demand_surge",
         { multiplier: SURGE_MULTIPLIER, duration_minutes: SURGE_DURATION_MINUTES },
         "inject surge",
+        "failed to inject demand surge",
       ),
     [postInjection],
   );

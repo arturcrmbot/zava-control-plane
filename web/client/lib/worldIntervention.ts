@@ -1,13 +1,5 @@
-// web/client/lib/worldIntervention.ts
-//
-// Shared causal derivation for the /world "Durable intervention" strip.
-// Both World.tsx (ticket-queue scenario) and TelcoWorld.tsx (network
-// scenario) walk the same first stretch of a Durable trace — a tripped
-// sensor, a responder request, its decided/deferred/failed outcome, and the
-// resulting command.accepted — before appending their own scenario-specific
-// tail (worker.reallocated vs session.rerouted + site.recovered). This module
-// owns only that common stretch; it is a pure function, not a component or
-// command/sensor framework.
+// Shared causal derivation for support and telco intervention strips.
+// Callers append their scenario-specific tail steps.
 import type { WorldEvent } from "@client/hooks/useWorldSimulation";
 
 export interface InterventionStep {
@@ -18,25 +10,16 @@ export interface InterventionStep {
 
 export interface CommonIntervention {
   trace: string;
-  /** All events on this trace, for the caller to derive its own tail steps. */
   traceEvents: WorldEvent[];
   steps: InterventionStep[];
 }
 
 export interface DeriveCommonInterventionOptions {
-  /** Step label for the sensor.tripped step. Defaults to "Pressure detected". */
   pressureLabel?: string;
-  /** Optional detail extracted from the sensor.tripped event's payload. */
   pressureDetail?: (event: WorldEvent) => string | undefined;
 }
 
-/**
- * Finds the most recent trace matched by `isTraceTrigger` and derives the
- * common causal steps (sensor.tripped, responder.requested,
- * responder.decided|deferred|failed, command.accepted) for it. Returns null
- * if no matching trace is found. Callers append scenario-specific tail steps
- * to the returned `steps` array using `traceEvents`.
- */
+/** Derive common causal steps for the newest matching trace. */
 export function deriveCommonIntervention(
   events: WorldEvent[],
   isTraceTrigger: (event: WorldEvent) => boolean,

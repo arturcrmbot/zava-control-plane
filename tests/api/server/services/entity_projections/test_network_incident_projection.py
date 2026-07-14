@@ -37,6 +37,23 @@ def test_projection_emits_workflow_and_incident_site_asset():
     assert asset.attrs["identifier"] == "SITE-03"
 
 
+def test_projection_reads_legacy_double_nested_incident_payload():
+    wf = make_workflow(
+        "NI-T2",
+        WORKFLOW_TYPE,
+        {"incident": _incident_payload()},
+        nest_under="incident",
+    )
+
+    asset = next(
+        op
+        for op in project(wf)
+        if isinstance(op, EntityWrite) and op.kind == "Asset"
+    )
+
+    assert asset.attrs["identifier"] == "SITE-03"
+
+
 def test_projection_falls_back_to_workflow_id_without_incident_site():
     wf = make_workflow("NI-T3", WORKFLOW_TYPE, {}, nest_under="incident")
     ops = project(wf)

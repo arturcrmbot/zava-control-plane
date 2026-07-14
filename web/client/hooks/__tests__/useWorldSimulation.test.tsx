@@ -173,6 +173,27 @@ describe("useWorldSimulation", () => {
     expect(JSON.parse(String(opts.body))).toEqual({ multiplier: 4, duration_minutes: 90 });
   });
 
+  it("preserves the demand-surge fallback message", async () => {
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {
+      const u = String(url);
+      if (u.includes("/api/world/inject/demand_surge")) throw new Error();
+      if (u.includes("/api/world/state")) return jsonResponse(BASE_STATE);
+      if (u.includes("/api/world/events")) {
+        return jsonResponse({ enabled: true, latest_seq: 0, events: [] });
+      }
+      return jsonResponse({});
+    }) as unknown as typeof fetch;
+
+    const { result } = renderHook(() => useWorldSimulation());
+    await act(async () => { await flush(); });
+
+    await act(async () => {
+      await result.current.injectSurge();
+    });
+
+    expect(result.current.error).toBe("failed to inject demand surge");
+  });
+
   it("clears both intervals and aborts in-flight fetches on unmount", async () => {
     const abortSpy = vi.spyOn(AbortController.prototype, "abort");
     globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {

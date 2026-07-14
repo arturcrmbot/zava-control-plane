@@ -31,6 +31,9 @@ WORKFLOW_TYPE = "network-incident"
 
 def _incident_site(payload: dict) -> dict:
     incident = payload.get("incident") or {}
+    # Replay tapes may retain the producer's legacy double nesting.
+    if "incident_site" not in incident and isinstance(incident.get("incident"), dict):
+        incident = incident["incident"]
     site = incident.get("incident_site")
     return site if isinstance(site, dict) else {}
 

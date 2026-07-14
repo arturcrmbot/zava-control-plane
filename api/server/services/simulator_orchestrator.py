@@ -1617,10 +1617,7 @@ async def spawn_network_incident_workflow(scenario: str | None = None) -> str:
     global _nir_seq
     _nir_seq += 1
     wid = f"NIR-{_nir_seq:04d}"
-    # Raw observation, passed as-is for payload_key "incident" — the same
-    # single-nesting shape every other strategic spawner uses (see
-    # spawn_hire_to_productive_workflow etc). No extra wrapping here; the
-    # projection reads workflow.payload["incident"]["incident_site"] directly.
+    # Store the raw observation under payload["incident"] without another wrapper.
     observation = {
         "incident_site": {"id": "SITE-01", "status": "failed"},
         "neighbor_sites": [],
