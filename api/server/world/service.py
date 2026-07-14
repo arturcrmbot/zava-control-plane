@@ -6,10 +6,13 @@ Provides the read surfaces (snapshot/events_after/build_observation) and write
 surfaces (apply_command/record_external) the world bridge, routes and Durable
 responder need, plus the scenario perturbation injectors.
 
-The service is scenario-agnostic: it holds a ``build_scenario`` factory and a
-``scenario_name``, and delegates every scenario-specific projection to the
-scenario object (``render_state`` / ``build_observation``). Exactly one
-scenario is live per process, selected in ``main.py`` via ``ZAVA_WORLD``.
+The service is scenario-agnostic: it holds a :class:`WorldPackRegistration`
+(``build_scenario`` factory, ``scenario_name``, objective/command vocabulary)
+and delegates every scenario-specific projection to the scenario object
+(``render_state`` / ``build_observation``). The registration is resolved from
+the static world-pack registry via ``for_world`` (``.support()`` / ``.telco()``
+are thin wrappers). Exactly one scenario is live per process, selected in
+``main.py`` via ``ZAVA_WORLD``.
 
 Single-threaded asyncio only: every method is synchronous and runs to
 completion atomically except `run()`, which is the sole place that awaits
@@ -19,13 +22,11 @@ from __future__ import annotations
 
 import asyncio
 import math
-from collections.abc import Callable
 from typing import Any
 
 from api.server.services.event_bus import EventBus
 from api.server.world.model import SimulationCommand, SimulationEvent
-from api.server.world.packs.support import SupportConfig, SupportScenario
-from api.server.world.packs.telco import NetworkConfig, NetworkScenario
+from api.server.world.registry import WorldPackRegistration, resolve_world_pack
 from api.server.world.runtime import SimulationRuntime
 from api.shared.events import FleetEvent
 
@@ -49,67 +50,56 @@ class ActorWorldService:
         *,
         seed: int,
         bus: EventBus,
-        scenario_name: str,
-        build_scenario: Callable[[SimulationRuntime], Any],
-        minutes_per_second: float = 10,
+        registration: WorldPackRegistration,
+        minutes_per_second: float | None = None,
     ) -> None:
         self.bus = bus
-        self.scenario_name = scenario_name
-        self._build_scenario = build_scenario
+        self.registration = registration
+        self.scenario_name = registration.name
+        self._build_scenario = registration.build_scenario
         self._stop_requested = False
         self.minutes_per_second = _require_finite_positive(
-            minutes_per_second, label="minutes_per_second"
+            registration.default_minutes_per_second
+            if minutes_per_second is None
+            else minutes_per_second,
+            label="minutes_per_second",
         )
         self.seed = seed
         self.runtime, self.scenario = self._install(seed)
 
     @classmethod
-    def support(
-        cls, seed: int, bus: EventBus, minutes_per_second: float = 10
+    def for_world(
+        cls,
+        name: str,
+        seed: int,
+        bus: EventBus,
+        speed: float | None = None,
     ) -> ActorWorldService:
-        """Build the live support-scenario proof world with its exact config."""
-        config = SupportConfig(
-            customer_count=1_000,
-            worker_count=40,
-            reserve_worker_count=10,
-            arrival_rate_per_hour=90,
-            simulation_minutes=480,
-            sla_minutes=30,
-            sensor_backlog_threshold=25,
-            sensor_recovery_threshold=10,
-        )
+        """Build the live world registered under ``name`` (``support``/``telco``).
+
+        ``speed`` overrides the registration's ``default_minutes_per_second``;
+        ``None`` keeps the registered default. Unknown names raise ``ValueError``.
+        """
         return cls(
             seed=seed,
             bus=bus,
-            scenario_name="support",
-            build_scenario=lambda runtime: SupportScenario(runtime, config),
-            minutes_per_second=minutes_per_second,
+            registration=resolve_world_pack(name),
+            minutes_per_second=speed,
         )
+
+    @classmethod
+    def support(
+        cls, seed: int, bus: EventBus, minutes_per_second: float = 10
+    ) -> ActorWorldService:
+        """Thin compatibility wrapper: build the live support world."""
+        return cls.for_world("support", seed, bus, speed=minutes_per_second)
 
     @classmethod
     def telco(
         cls, seed: int, bus: EventBus, minutes_per_second: float = 10
     ) -> ActorWorldService:
-        """Build the live telco network-incident world with its exact config.
-
-        A long horizon keeps the standing session population alive across an
-        interactive proof; the deterministic unit config (``NetworkConfig``
-        default) uses a shorter horizon for a bounded journal.
-        """
-        config = NetworkConfig(
-            site_count=12,
-            subscriber_count=2_000,
-            session_count=2_200,
-            site_capacity_mbps=600.0,
-            simulation_minutes=20_000.0,
-        )
-        return cls(
-            seed=seed,
-            bus=bus,
-            scenario_name="telco",
-            build_scenario=lambda runtime: NetworkScenario(runtime, config),
-            minutes_per_second=minutes_per_second,
-        )
+        """Thin compatibility wrapper: build the live telco world."""
+        return cls.for_world("telco", seed, bus, speed=minutes_per_second)
 
     def _install(self, seed: int) -> tuple[SimulationRuntime, Any]:
         """Build and install a fresh runtime/scenario; reset the publish cursor.

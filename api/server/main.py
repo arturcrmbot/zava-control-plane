@@ -189,11 +189,11 @@ async def lifespan(app: FastAPI):
         from api.server.services.world_bridge import WorldBridge
         from api.server.world.service import ActorWorldService
 
-        builder = ActorWorldService.telco if world_name == "telco" else ActorWorldService.support
-        world_service = builder(
+        world_service = ActorWorldService.for_world(
+            world_name,
             seed=int(os.getenv("WORLD_SEED", "42")),
             bus=app_state.bus,
-            minutes_per_second=float(os.getenv("WORLD_MINUTES_PER_SECOND", "10")),
+            speed=float(os.getenv("WORLD_MINUTES_PER_SECOND", "10")),
         )
         app_state.world_service = world_service
         world_task = asyncio.create_task(world_service.run())
