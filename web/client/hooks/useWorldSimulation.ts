@@ -80,6 +80,32 @@ export interface WorldSubscriber {
   session_count: number;
 }
 
+// -- objective/command lifecycle: mirror world/model.py + objectives.py ------
+
+export interface WorldObjective {
+  id: string;
+  type: string;
+  trace_id: string;
+  owner_function: string;
+  priority: number;
+  status: string;
+  created_at: number;
+  deadline: number | null;
+  evidence_event_ids: string[];
+  allowed_command_types: string[];
+  claimed_by: string | null;
+}
+
+export interface WorldEvaluation {
+  id: string;
+  objective_id: string;
+  trace_id: string;
+  command_id: string;
+  started_at: number;
+  baseline: Record<string, number>;
+  status: string;
+}
+
 export interface WorldState {
   enabled: boolean;
   scenario?: string;
@@ -95,6 +121,9 @@ export interface WorldState {
   sites?: WorldSite[];
   sessions?: WorldSession[];
   subscribers?: WorldSubscriber[];
+  // objective/command lifecycle (both worlds)
+  objectives?: WorldObjective[];
+  evaluations?: WorldEvaluation[];
 }
 
 export interface WorldEvent {
@@ -189,7 +218,6 @@ export function useWorldSimulation(): UseWorldSimulationResult {
     }
   }, []);
 
-  // Shared POST-then-refresh flow for world injection endpoints.
   const postInjection = useCallback(
     async (
       path: string,

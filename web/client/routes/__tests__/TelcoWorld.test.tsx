@@ -89,6 +89,14 @@ const TELCO_STATE: WorldState = {
   sites: SITES,
   sessions: SESSIONS,
   subscribers: [{ id: "SUB-0001", home_site_id: "SITE-01", tier: "standard", session_count: 1 }],
+  objectives: [
+    {
+      id: "obj-E-60", type: "network_service_recovery", trace_id: TRACE, owner_function: "network_incident",
+      priority: 0, status: "evaluating", created_at: 60, deadline: null,
+      evidence_event_ids: ["E-60"], allowed_command_types: ["reroute_sessions"],
+      claimed_by: "network_incident",
+    },
+  ],
 };
 
 function hook(over: Partial<UseWorldSimulationResult> = {}): UseWorldSimulationResult {
@@ -165,6 +173,14 @@ describe("TelcoWorld route", () => {
     expect(within(strip).getByText("Durable decided")).toBeTruthy();
     expect(within(strip).getByText("2 sessions rerouted")).toBeTruthy();
     expect(within(strip).getByText("Site recovered")).toBeTruthy();
+  });
+
+  it("renders the compact objective status row from the snapshot", () => {
+    renderWorld();
+    const strip = screen.getByTestId("telco-objective");
+    expect(within(strip).getByTestId("telco-objective-status").textContent).toMatch(/evaluating/i);
+    expect(within(strip).getByText(/network_service_recovery/)).toBeTruthy();
+    expect(within(strip).getByText(/network_incident/)).toBeTruthy();
   });
 
   it("invokes injectSiteFailure from the single Fail site control", () => {

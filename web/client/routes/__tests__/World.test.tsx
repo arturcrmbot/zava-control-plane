@@ -86,6 +86,14 @@ const BASE_STATE: WorldState = {
     { id: "TEAM-RESERVE", name: "Reserve", worker_ids: ["WRK-0050"] },
   ],
   last_response: null,
+  objectives: [
+    {
+      id: "obj-E-60", type: "support_capacity", trace_id: TRACE, owner_function: "surge_staffing",
+      priority: 0, status: "evaluating", created_at: 60, deadline: null,
+      evidence_event_ids: ["E-60"], allowed_command_types: ["reallocate_workers"],
+      claimed_by: "surge_staffing",
+    },
+  ],
 };
 
 function hook(over: Partial<UseWorldSimulationResult> = {}): UseWorldSimulationResult {
@@ -180,6 +188,21 @@ describe("World route", () => {
     mockUseWorld.mockReturnValue(hook({ events: [ev(1, "ticket.queued", "TCK-9", "queue:support", null, "t")] }));
     renderWorld();
     expect(screen.queryByTestId("intervention")).toBeNull();
+  });
+
+  it("renders the compact objective status row from the snapshot", () => {
+    renderWorld();
+    const strip = screen.getByTestId("objective");
+    expect(within(strip).getByTestId("objective-status").textContent).toMatch(/evaluating/i);
+    expect(within(strip).getByText(/support_capacity/)).toBeTruthy();
+    expect(within(strip).getByText(/surge_staffing/)).toBeTruthy();
+    expect(within(strip).getByText(/^P0$/)).toBeTruthy();
+  });
+
+  it("hides the objective row when the snapshot has no objectives", () => {
+    mockUseWorld.mockReturnValue(hook({ state: { ...BASE_STATE, objectives: [] } }));
+    renderWorld();
+    expect(screen.queryByTestId("objective")).toBeNull();
   });
 
   it("renders the recent event journal with actor and cause", () => {

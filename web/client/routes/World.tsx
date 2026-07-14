@@ -13,6 +13,7 @@ import {
   type WorldWorker,
 } from "@client/hooks/useWorldSimulation";
 import { WorldInterventionStrip } from "@client/components/WorldInterventionStrip";
+import { WorldObjectiveStrip } from "@client/components/WorldObjectiveStrip";
 import { deriveCommonIntervention, type InterventionStep } from "@client/lib/worldIntervention";
 import TelcoWorld from "@client/routes/TelcoWorld";
 
@@ -213,6 +214,7 @@ export default function World() {
           </div>
         ) : (
           <>
+            <WorldObjectiveStrip testId="objective" objectives={state.objectives} />
             {intervention && (
               <WorldInterventionStrip
                 testId="intervention"

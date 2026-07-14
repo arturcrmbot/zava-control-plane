@@ -14,6 +14,7 @@ import {
   type WorldSession,
 } from "@client/hooks/useWorldSimulation";
 import { WorldInterventionStrip } from "@client/components/WorldInterventionStrip";
+import { WorldObjectiveStrip } from "@client/components/WorldObjectiveStrip";
 import { deriveCommonIntervention, type InterventionStep } from "@client/lib/worldIntervention";
 
 const REGIONS = ["north", "east", "south", "west"] as const;
@@ -149,6 +150,7 @@ export default function TelcoWorld({
             <AlertTriangle size={14} /> {error}
           </div>
         )}
+        <WorldObjectiveStrip testId="telco-objective" objectives={state?.objectives} />
         {intervention && (
           <WorldInterventionStrip
             testId="telco-intervention"
