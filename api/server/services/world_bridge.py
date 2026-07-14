@@ -9,16 +9,21 @@ spec's "couple only via the bus" seam requires.
 Flow:
   1. Subscribe to the actor world's sensor event ``world.sensor.tripped``.
   2. On fire: extract the nested ``simulation_event``, build an observation
-     from the live actor world, and journal ``responder.requested``.
-  3. Schedule the scenario's Durable responder on the func host (:7071) with
-     the trace ID and observation as input (``SurgeStaffingOrchestrator`` for
-     support, ``NetworkIncidentOrchestrator`` for telco).
+     from the live actor world, and open the world-pack's objective
+     (``objective.opened``). A prior in-flight episode for the same objective
+     (type + target) short-circuits here — no second orchestration.
+  3. Claim the objective (``objective.claimed`` by the responder's owner
+     function), journal ``responder.requested``, and schedule the responder
+     resolved from the objective type — never a scenario branch
+     (``SurgeStaffingOrchestrator`` for ``support_capacity``,
+     ``NetworkIncidentOrchestrator`` for ``network_service_recovery``). Once
+     scheduled, the objective moves to ``objective.acting``.
   4. Await the orchestration's completion and read its typed command.
-  5. No command: journal ``responder.deferred`` — the world is unchanged. A
-     command: journal ``responder.decided`` and apply it through
-     ``world_service.apply_command`` — the world has been changed by a real
-     Durable workflow. Any failure/timeout journals ``responder.failed`` and
-     the simulation keeps running.
+  5. No command: journal ``responder.deferred`` and fail the objective — the
+     world is unchanged. A command: journal ``responder.decided`` and apply it
+     through ``world_service.apply_command`` — the world has been changed by a
+     real Durable workflow. Any failure/timeout journals ``responder.failed``
+     and fails the objective; the simulation keeps running.
 
 One in-flight response is tracked per sensor trace (not a single global
 flag), so independent trace firings never block each other.
@@ -32,28 +37,13 @@ import httpx
 
 from api.shared.events import FleetEvent
 from api.server.services.durable_client import schedule_new_orchestration
+from api.server.services.world_responders import resolve_responder
 from api.server.world.model import SimulationCommand
+from api.server.world.objectives import objective_id
 
 log = logging.getLogger("world_bridge")
 
 SENSOR_EVENT = "world.sensor.tripped"
-
-# One Durable responder per live scenario. Exactly one world is active per
-# process (selected by ZAVA_WORLD in main.py); the bridge picks the responder
-# from the service's ``scenario_name`` (defaulting to support so any service
-# stand-in without the attribute keeps the original behaviour).
-_RESPONDERS: dict[str, dict[str, str]] = {
-    "support": {
-        "orchestrator": "SurgeStaffingOrchestrator",
-        "type": "surge-staffing",
-        "prefix": "surge",
-    },
-    "telco": {
-        "orchestrator": "NetworkIncidentOrchestrator",
-        "type": "network-incident",
-        "prefix": "incident",
-    },
-}
 
 _TERMINAL_OK = "Completed"
 _TERMINAL_BAD = {"Failed", "Terminated", "Canceled"}
@@ -99,52 +89,73 @@ class WorldBridge:
         trace_id = simulation_event.get("trace_id")
         service = None
         requested = None
+        objective = None
         try:
             service = self._app.world_service
             observation = service.build_observation(simulation_event)
+
+            responder = resolve_responder(service.registration.objective_type)
+            objective = service.open_objective(
+                simulation_event, owner_function=responder.owner_function
+            )
+            # A prior sensor episode already owns this (type + target)
+            # objective: the manager returned it instead of a fresh one, so we
+            # schedule no second orchestration for the same live objective.
+            if objective.id != objective_id(simulation_event.get("event_id")):
+                log.info("world_bridge: %s already active; skipping trace=%s",
+                         objective.id, trace_id)
+                return
+            service.transition_objective(
+                objective.id, "claimed", claimed_by=responder.owner_function
+            )
+
             requested = service.record_external(
                 "responder.requested",
                 trace_id=trace_id,
                 cause_event_id=simulation_event.get("event_id"),
-                payload={"observation": observation},
+                payload={"observation": observation, "objective_id": objective.id},
             )
 
-            responder = _RESPONDERS.get(
-                getattr(service, "scenario_name", "support"), _RESPONDERS["support"]
-            )
-            orchestrator = responder["orchestrator"]
             payload = {
-                "workflow_id": f"{responder['prefix']}-{trace_id}",
-                "type": responder["type"],
+                "workflow_id": f"{responder.prefix}-{trace_id}",
+                "type": responder.workflow_type,
                 "trace_id": trace_id,
                 "observation": observation,
             }
-            resp = await schedule_new_orchestration(payload, orchestrator)
+            resp = await schedule_new_orchestration(payload, responder.orchestrator)
             instance_id = resp.get("id")
             status_uri = resp.get("statusQueryGetUri")
             log.info("world_bridge: scheduled %s instance=%s trace=%s",
-                     orchestrator, instance_id, trace_id)
+                     responder.orchestrator, instance_id, trace_id)
 
-            output = await self._await_output(instance_id, status_uri)
+            service.transition_objective(
+                objective.id, "acting",
+                cause_event_id=requested.event_id,
+                payload={"instance_id": instance_id},
+            )
+
+            output = await self._await_output(instance_id, status_uri, responder.timeout_seconds)
             if not isinstance(output, dict):
-                service.record_external(
+                failed = service.record_external(
                     "responder.failed",
                     trace_id=trace_id,
                     cause_event_id=requested.event_id,
                     payload={"instance_id": instance_id, "error": "no orchestration output"},
                 )
+                service.fail_objective(objective.id, cause_event_id=failed.event_id)
                 log.error("world_bridge: %s produced no output for trace=%s", instance_id, trace_id)
                 return
 
             command_data = output.get("command")
             reasoning = output.get("reasoning")
             if command_data is None:
-                service.record_external(
+                deferred = service.record_external(
                     "responder.deferred",
                     trace_id=trace_id,
                     cause_event_id=requested.event_id,
                     payload={"instance_id": instance_id, "reasoning": reasoning},
                 )
+                service.fail_objective(objective.id, cause_event_id=deferred.event_id)
                 log.info("world_bridge: %s deferred trace=%s reasoning=%s",
                          instance_id, trace_id, reasoning)
                 return
@@ -165,6 +176,7 @@ class WorldBridge:
                 "command": command_data,
                 "result_event_id": result.event_id,
                 "result_type": result.type,
+                "objective_id": objective.id,
             }
             log.info("world_bridge: %s applied command=%s trace=%s",
                      instance_id, command.type, trace_id)
@@ -172,12 +184,14 @@ class WorldBridge:
             log.exception("world_bridge: drive failed for trace=%s: %s", trace_id, ex)
             if service is not None and trace_id:
                 try:
-                    service.record_external(
+                    failed = service.record_external(
                         "responder.failed",
                         trace_id=trace_id,
                         cause_event_id=requested.event_id if requested is not None else None,
                         payload={"error": str(ex)},
                     )
+                    if objective is not None:
+                        service.fail_objective(objective.id, cause_event_id=failed.event_id)
                 except Exception:  # noqa: BLE001 — never let failure-reporting itself crash
                     log.exception(
                         "world_bridge: failed to record responder.failed for trace=%s", trace_id
@@ -185,12 +199,12 @@ class WorldBridge:
         finally:
             self._in_flight_traces.discard(trace_id)
 
-    async def _await_output(self, instance_id, status_uri):
+    async def _await_output(self, instance_id, status_uri, timeout: float | None = None):
         """Poll the Durable status endpoint until the orchestration is terminal."""
         if not status_uri:
             log.error("world_bridge: no statusQueryGetUri for %s", instance_id)
             return None
-        deadline = asyncio.get_event_loop().time() + self._poll_timeout
+        deadline = asyncio.get_event_loop().time() + (timeout or self._poll_timeout)
         async with httpx.AsyncClient() as c:
             while asyncio.get_event_loop().time() < deadline:
                 try:

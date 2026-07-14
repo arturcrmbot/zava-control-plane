@@ -31,6 +31,12 @@ _ALLOWED_TRANSITIONS: dict[str, frozenset[str]] = {
     "superseded": frozenset(),
 }
 _TERMINAL: frozenset[str] = frozenset({"resolved", "failed", "superseded"})
+TERMINAL_STATUSES = _TERMINAL
+
+
+def objective_id(sensor_event_id: str) -> str:
+    """Deterministic objective id for a sensor event id."""
+    return f"obj-{sensor_event_id}"
 
 
 def _event_type(status: str) -> str:
@@ -73,7 +79,7 @@ class ObjectiveManager:
 
         sensor_event_id = sensor_event["event_id"]
         objective = Objective(
-            id=f"obj-{sensor_event_id}",
+            id=objective_id(sensor_event_id),
             type=objective_type,
             trace_id=sensor_event["trace_id"],
             owner_function=owner_function,

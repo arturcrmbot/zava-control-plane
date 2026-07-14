@@ -25,7 +25,8 @@ import math
 from typing import Any
 
 from api.server.services.event_bus import EventBus
-from api.server.world.model import SimulationCommand, SimulationEvent
+from api.server.world.model import Objective, SimulationCommand, SimulationEvent
+from api.server.world.objectives import TERMINAL_STATUSES, ObjectiveManager
 from api.server.world.registry import WorldPackRegistration, resolve_world_pack
 from api.server.world.runtime import SimulationRuntime
 from api.shared.events import FleetEvent
@@ -113,6 +114,7 @@ class ActorWorldService:
         scenario = self._build_scenario(runtime)
         scenario.install()
         self._published_seq = len(runtime.journal)
+        self.objectives = ObjectiveManager(runtime)
         return runtime, scenario
 
     @property
@@ -235,3 +237,39 @@ class ActorWorldService:
         )
         self._publish_since(start)
         return event
+
+    # -- objective surface -------------------------------------------------
+
+    def open_objective(
+        self,
+        sensor_event: dict[str, Any],
+        *,
+        owner_function: str,
+        priority: int = 0,
+        deadline: float | None = None,
+    ) -> Objective:
+        """Open (or return the existing active) objective for this world's pack."""
+        start = len(self.runtime.journal)
+        objective = self.objectives.open(
+            sensor_event,
+            self.registration,
+            owner_function=owner_function,
+            priority=priority,
+            deadline=deadline,
+        )
+        self._publish_since(start)
+        return objective
+
+    def transition_objective(self, objective_id: str, to_status: str, **kwargs: Any) -> Objective:
+        """Transition an objective and publish the journalled lifecycle event."""
+        start = len(self.runtime.journal)
+        objective = self.objectives.transition(objective_id, to_status, **kwargs)
+        self._publish_since(start)
+        return objective
+
+    def fail_objective(self, objective_id: str, **kwargs: Any) -> Objective | None:
+        """Fail an active objective; no-op if it is unknown or already terminal."""
+        objective = self.objectives.get(objective_id)
+        if objective is None or objective.status in TERMINAL_STATUSES:
+            return objective
+        return self.transition_objective(objective_id, "failed", **kwargs)
