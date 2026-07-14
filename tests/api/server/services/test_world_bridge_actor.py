@@ -72,7 +72,7 @@ class FakeWorld:
             return objective
         return self.transition_objective(objective_id, "failed", **kwargs)
 
-    def apply_command(self, command):
+    def apply_typed_command(self, objective, command):
         self.applied.append(command)
         return SimpleNamespace(event_id="evt-command", type="command.accepted")
 

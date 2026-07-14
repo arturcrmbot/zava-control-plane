@@ -167,7 +167,7 @@ class WorldBridge:
                 payload={"instance_id": instance_id, "command": command_data, "reasoning": reasoning},
             )
             command = SimulationCommand(**command_data)
-            result = service.apply_command(command)
+            result = service.apply_typed_command(objective, command)
 
             self._app.world_last_response = {
                 "instance_id": instance_id,

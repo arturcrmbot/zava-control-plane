@@ -25,6 +25,7 @@ import math
 from typing import Any
 
 from api.server.services.event_bus import EventBus
+from api.server.world.commands import CommandGateway
 from api.server.world.model import Objective, SimulationCommand, SimulationEvent
 from api.server.world.objectives import TERMINAL_STATUSES, ObjectiveManager
 from api.server.world.registry import WorldPackRegistration, resolve_world_pack
@@ -115,6 +116,7 @@ class ActorWorldService:
         scenario.install()
         self._published_seq = len(runtime.journal)
         self.objectives = ObjectiveManager(runtime)
+        self.commands = CommandGateway(runtime, self.objectives, scenario.apply_command)
         return runtime, scenario
 
     @property
@@ -206,6 +208,8 @@ class ActorWorldService:
             "speed": self.minutes_per_second,
             "latest_seq": len(self.runtime.journal),
         }
+        base["objectives"] = [objective.to_dict() for objective in self.objectives.all()]
+        base["evaluations"] = [evaluation.to_dict() for evaluation in self.commands.evaluations]
         base.update(self.scenario.render_state())
         return base
 
@@ -217,6 +221,15 @@ class ActorWorldService:
     def apply_command(self, command: SimulationCommand) -> SimulationEvent:
         start = len(self.runtime.journal)
         result = self.scenario.apply_command(command)
+        self._publish_since(start)
+        return result
+
+    def apply_typed_command(
+        self, objective: Objective, command: SimulationCommand
+    ) -> SimulationEvent:
+        """Apply a typed command through the gateway under its claimed objective."""
+        start = len(self.runtime.journal)
+        result = self.commands.apply(objective, command)
         self._publish_since(start)
         return result
 

@@ -73,3 +73,23 @@ class Objective:
         data["evidence_event_ids"] = list(self.evidence_event_ids)
         data["allowed_command_types"] = sorted(self.allowed_command_types)
         return data
+
+
+@dataclass(frozen=True, slots=True)
+class Evaluation:
+    """An immutable evaluation opened when an accepted command starts changing
+    the world. It captures the objective's baseline sensor measurements so a
+    later coupled slice can judge effectiveness; for now it only ever reaches
+    ``started`` (no effectiveness claim, no policy change).
+    """
+
+    id: str
+    objective_id: str
+    trace_id: str
+    command_id: str
+    started_at: float
+    baseline: dict[str, Any]
+    status: str = "started"
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)

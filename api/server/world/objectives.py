@@ -53,6 +53,7 @@ class ObjectiveManager:
         self._order: list[str] = []
         self._active_by_key: dict[tuple[str, str | None], str] = {}
         self._target_by_id: dict[str, str | None] = {}
+        self._baseline_by_id: dict[str, dict] = {}
         self._last_event_id: dict[str, str] = {}
 
     def open(
@@ -94,6 +95,9 @@ class ObjectiveManager:
         self._order.append(objective.id)
         self._active_by_key[key] = objective.id
         self._target_by_id[objective.id] = target
+        self._baseline_by_id[objective.id] = dict(
+            (sensor_event.get("payload") or {}).get("measurements") or {}
+        )
         self._emit(objective, cause_event_id=sensor_event_id)
         return objective
 
@@ -139,6 +143,14 @@ class ObjectiveManager:
 
     def get(self, objective_id: str) -> Objective | None:
         return self._objectives.get(objective_id)
+
+    def baseline_for(self, objective_id: str) -> dict:
+        """Baseline sensor measurements captured when the objective opened."""
+        return dict(self._baseline_by_id.get(objective_id, {}))
+
+    def last_event_id(self, objective_id: str) -> str | None:
+        """Id of the most recent lifecycle event journalled for the objective."""
+        return self._last_event_id.get(objective_id)
 
     def all(self) -> list[Objective]:
         return [self._objectives[oid] for oid in self._order]
