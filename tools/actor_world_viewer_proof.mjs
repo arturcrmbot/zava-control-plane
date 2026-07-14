@@ -56,9 +56,13 @@ const POLL_MS = 500;
 
 const REQUIRED_TYPES = [
   "sensor.tripped",
+  "objective.opened",
+  "objective.claimed",
   "responder.requested",
+  "objective.acting",
   "responder.decided",
   "command.accepted",
+  "objective.evaluating",
   "worker.reallocated",
 ];
 
@@ -357,6 +361,30 @@ async function run() {
       { deadline: DURABLE_DEADLINE, message: `anchored trace ${anchorTrace} never carried the full chain` },
     );
 
+    // The objective lifecycle rides the same anchored trace, strictly ordered
+    // open -> claimed -> acting -> evaluating, all naming one objective id.
+    const objectiveChain = ["objective.opened", "objective.claimed", "objective.acting", "objective.evaluating"];
+    const objectiveSteps = objectiveChain.map((type) => {
+      const hits = journal.byType(type, anchorTrace).sort((a, b) => a.seq - b.seq);
+      require(hits.length > 0, `anchored trace ${anchorTrace} missing ${type}`);
+      return { type, seq: hits[0].seq, objective_id: (hits[0].payload || {}).id };
+    });
+    for (let i = 1; i < objectiveSteps.length; i++) {
+      require(
+        objectiveSteps[i].seq > objectiveSteps[i - 1].seq,
+        `objective lifecycle out of order: ${objectiveSteps[i - 1].type} !< ${objectiveSteps[i].type}`,
+      );
+    }
+    const objectiveId = objectiveSteps[0].objective_id;
+    require(
+      Boolean(objectiveId) && objectiveSteps.every((s) => s.objective_id === objectiveId),
+      `objective id not stable across lifecycle: ${JSON.stringify(objectiveSteps.map((s) => s.objective_id))}`,
+    );
+    mark("objective_lifecycle", {
+      trace: anchorTrace,
+      objective_id: objectiveId,
+      chain: objectiveSteps.map((s) => `${s.type}@${s.seq}`),
+    });
     const accepted = journal.byType("command.accepted", anchorTrace).sort((a, b) => a.seq - b.seq);
     const reallocated = journal.byType("worker.reallocated", anchorTrace);
     const reallocatedIds = sortedUnique(reallocated.map((e) => e.actor_id).filter(Boolean));
