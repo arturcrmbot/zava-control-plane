@@ -8,9 +8,16 @@
 
 **Tech Stack:** Python 3.13, SimPy, FastAPI EventBus, Azure Durable Functions, pytest.
 
+**Status:** ✅ Implemented (all tasks). Commits: Task 1 `59abcfc1`, Task 2
+`232c4d20`, Task 3 `341a90a7`, Task 4 `2604509d`, Task 5 `3aea3c7e`, proof
+lifecycle assertions `013caf47`, docs this commit. Plan B (measured verdict +
+governance integration) intentionally deferred — see "Deliberate deferrals".
+
 ---
 
 ## Task 1: Scenario pack registry
+
+**Status:** ✅ Done (`59abcfc1`).
 
 **Files:**
 - Create: `api/server/world/registry.py`
@@ -49,6 +56,8 @@ both real browser proof scripts still pass after the complete plan.
 
 ## Task 2: Objective records and deterministic manager
 
+**Status:** ✅ Done (`232c4d20`).
+
 **Files:**
 - Modify: `api/server/world/model.py`
 - Create: `api/server/world/objectives.py`
@@ -86,6 +95,8 @@ Tests cover dedupe, invalid transition, causal/trace links and deterministic IDs
 
 ## Task 3: Responder registry + objective-driven bridge
 
+**Status:** ✅ Done (`341a90a7`).
+
 **Files:**
 - Create: `api/server/services/world_responders.py`
 - Modify: `api/server/services/world_bridge.py`
@@ -117,6 +128,9 @@ second Durable orchestration.
 
 ## Task 4: Command gateway + evaluation foundation
 
+**Status:** ✅ Done (`2604509d`). Gateway is the foundation; measured verdict and
+governance integration deferred to Plan B (would require speculative APIs).
+
 **Files:**
 - Create: `api/server/world/commands.py`
 - Modify: `api/server/world/service.py`
@@ -143,6 +157,9 @@ No duplicate command validation is moved out of scenarios.
 ---
 
 ## Task 5: Snapshot/view compatibility + real proof
+
+**Status:** ✅ Done (view/snapshot `3aea3c7e`; proof lifecycle assertions
+`013caf47`; docs this commit).
 
 **Files:**
 - Modify: `api/server/world/service.py`

@@ -1121,13 +1121,17 @@ explicit-actor discrete-event model under
 
 | Module | Role |
 |---|---|
-| [`model.py`](../api/server/world/model.py) | Immutable causal events and typed simulation commands. |
+| [`model.py`](../api/server/world/model.py) | Immutable causal events and typed simulation commands, plus frozen `Objective` and `Evaluation` records. |
+| [`registry.py`](../api/server/world/registry.py) | Static `WorldPackRegistration` table (support/telco → pack builder, objective type, allowed command types). `ActorWorldService.for_world` selects a pack from it; `main` keeps no support/telco branch. |
 | [`runtime.py`](../api/server/world/runtime.py) | Seeded SimPy environment, logical stepping and NDJSON journal. |
 | [`packs/support.py`](../api/server/world/packs/support.py) | Customers, tickets, workers, teams, queues, SLA, abandonment, demand surges and worker reallocation. |
 | [`packs/telco.py`](../api/server/world/packs/telco.py) | Cell-sites, subscribers and voice/data/video sessions; site failure, degraded/rerouted sessions, a `network.anomaly` sensor and atomic session reroute (§15.4). |
 | [`projection.py`](../api/server/world/projection.py) | Aggregate signals derived from actor state (`SupportProjection` / `NetworkProjection`). |
-| [`service.py`](../api/server/world/service.py) | Live pacing, EventBus publication, snapshots, observations and command application. One class, scenario-selected via `.support()` / `.telco()` builders and a `scenario_name`. |
-| [`services/world_bridge.py`](../api/server/services/world_bridge.py) | Actor sensor → real Durable orchestration → typed command loop. One bridge; a `_RESPONDERS` map picks the orchestrator from `scenario_name`. |
+| [`objectives.py`](../api/server/world/objectives.py) | Deterministic `ObjectiveManager`: opens/dedupes objectives, drives the strict lifecycle transition table, captures the open-time baseline and journals each transition. |
+| [`commands.py`](../api/server/world/commands.py) | `CommandGateway`: checks acting status, trace, allowed type and claimed issuer, delegates domain validation to the pack, then moves the objective to `evaluating` with an `evaluation.started` baseline. |
+| [`service.py`](../api/server/world/service.py) | Live pacing, EventBus publication, snapshots, observations and command application. One class, pack-selected via `for_world` and the registry; installs the `ObjectiveManager` + `CommandGateway`; snapshots include objectives and evaluations. |
+| [`services/world_responders.py`](../api/server/services/world_responders.py) | Static `ResponderRegistration` table keyed by objective type (owner function + orchestrator URI builder). One lookup, no scenario branch. |
+| [`services/world_bridge.py`](../api/server/services/world_bridge.py) | Actor sensor → objective → real Durable orchestration → typed command loop. One bridge; the responder is resolved from the objective type via the responder registry, not `scenario_name`. |
 | [`routes/world.py`](../api/server/routes/world.py) | JSON state, causal event catch-up and typed injection (`demand_surge` for support, `site_failure` for telco). |
 
 ### 15.1 Authority and data flow
@@ -1138,8 +1142,9 @@ logical time, actor/target IDs, `cause_event_id` and `trace_id`.
 
 ```text
 ticket events → actor-derived pressure sensor → EventBus
-  → WorldBridge → SurgeStaffingOrchestrator (:7071)
-  → reallocate_workers command → validation/idempotency
+  → WorldBridge opens+claims an Objective → SurgeStaffingOrchestrator (:7071)
+  → reallocate_workers command → CommandGateway (acting/trace/type/issuer)
+  → pack validation/idempotency → objective → evaluating (evaluation.started)
   → real reserve Worker actors move to TEAM-SUPPORT
   → later ticket events reflect the changed capacity
 ```
@@ -1228,10 +1233,10 @@ Plans:
 A second scenario reuses the *entire* substrate above — same runtime, service,
 bridge, routes, viewer and proof stack — with no second platform. Selecting
 `ZAVA_WORLD=telco` makes the telco pack the sole state authority; support is
-unchanged. DRY seams, not copies: one `ActorWorldService` (scenario-selected
-by builder + `scenario_name`), one `WorldBridge` (a `_RESPONDERS` map keyed on
-`scenario_name`), one `/world` route (React switches on `state.scenario`), and
-one parametrised proof-stack library.
+unchanged. DRY seams, not copies: one `ActorWorldService` (pack-selected by
+`for_world` + the static registry), one `WorldBridge` (responder resolved from
+the objective type via the responder registry), one `/world` route (React
+switches on `state.scenario`), and one parametrised proof-stack library.
 
 The pack ([`packs/telco.py`](../api/server/world/packs/telco.py)) installs real
 actors: **12 CellSite** actors (id, region, capacity, traffic, utilisation,
@@ -1318,3 +1323,61 @@ Screenshots (baseline/failed/rerouted/recovered), a session video and a
 machine-checked `summary.json` land under `tmp/telco-world-e2e-proof/`;
 teardown kills only the exact PIDs it started. Visual rules:
 [`docs/visualisation.md §1.2`](visualisation.md#12-control-plane-world-viewer-telco).
+
+### 15.5 Objective and command lifecycle kernel (July 2026)
+
+Both scenarios now run over a small, deterministic objective/command kernel that
+replaced the scenario/responder branches with static registries. It is a
+**decision spine, not a framework**: no dynamic discovery, queue scheduler,
+learning, policy mutation, checkpoints, database, generic repository or event
+framework — every seam is a frozen record plus a hand-written table.
+
+**Objective.** When a pack sensor trips, the bridge asks the `ObjectiveManager`
+to `open` a frozen `Objective` (deterministic id `obj-{sensor_event_id}`, the
+objective type from the registry, a `target_id`, and the sensor's `trace_id`).
+Opening captures the sensor's measurements as an immutable **baseline** and
+journals `objective.opened`. Objectives are **deduped by
+`(objective_type, target_id)` among active objectives** (support: one per
+`queue:support`; telco: one per site) — a duplicate sensor reuses the live
+objective and the bridge skips a second Durable call.
+
+**Strict lifecycle.** Transitions are validated against a fixed table; illegal
+moves raise. The happy path is:
+
+```text
+open → claimed → acting → evaluating → resolved
+        (any active state) → superseded | failed
+```
+
+Every transition journals `objective.{status}` (open → `objective.opened`) on
+the objective's `trace_id`, so the whole lifecycle rides the same anchored trace
+as `sensor.tripped → responder.* → command.accepted → <mutation>`.
+
+**Responder registry.** [`world_responders.py`](../api/server/services/world_responders.py)
+maps objective type → `ResponderRegistration` (owner function + orchestrator URI).
+The bridge claims the objective with `claimed_by = responder.owner_function`
+(support `surge_staffing`, telco `network_incident`) so the claim names the same
+function that later issues the Durable command.
+
+**Command gateway.** [`commands.py`](../api/server/world/commands.py) re-fetches
+the live objective and rejects a command unless it is `acting`, its trace matches
+the objective, its type is in the registry's allowed set, and its issuer equals
+the objective's `claimed_by`. On rejection it emits `command.rejected` and fails
+the objective. On acceptance it **delegates domain validation to the pack**
+(`apply_command`, which keeps its own atomic/idempotent scenario validators),
+then moves the objective to `evaluating` and emits `evaluation.started` carrying
+a frozen `Evaluation` with the captured baseline. Verdict/close-out is **not**
+implemented — see Plan B.
+
+**Snapshot & viewer.** `service.snapshot()` exposes `objectives` and
+`evaluations`; each world view renders one compact `WorldObjectiveStrip` row
+(objective type + status) — no new page, chart or control. The real browser
+proofs assert `objective.opened/claimed/acting/evaluating` in strict order on the
+anchored trace, naming one stable objective id.
+
+**Deferred (Plan B, deliberately not built).** Closing the objective with a
+measured verdict (compare post-command projection to the baseline and transition
+`evaluating → resolved`) and any governance/authority-matrix integration are left
+as the next increment: the gateway is the foundation for them but wiring either
+would need speculative APIs. The kernel stops at `evaluating` so nothing
+half-built ships.
