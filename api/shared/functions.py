@@ -159,7 +159,7 @@ FUNCTIONS: dict[str, Function] = {
         name="ops",
         display="Operations",
         operator_surface="change-manager",
-        owns_domains=("crisis-response", "network-incident"),
+        owns_domains=("crisis-response", "network-incident", "order-to-activate"),
         ambient_agents=(),
         kpis=("on-time-delivery-pct", "cycle-time", "incident-rate", "cost-per-unit"),
         # D1 (pitch-d1): change_manager → program_manager → project_manager → delivery_lead.
@@ -318,7 +318,7 @@ FUNCTIONS: dict[str, Function] = {
         name="customer-success",
         display="Customer Success",
         operator_surface="account-director",
-        owns_domains=(),
+        owns_domains=("proactive-customer-care",),
         ambient_agents=(),
         kpis=("nps", "gross-retention-pct", "expansion-arr-pct", "csat"),
         # D1 (pitch-d1): cs_director → cs_account_director → cs_manager → cs_specialist.

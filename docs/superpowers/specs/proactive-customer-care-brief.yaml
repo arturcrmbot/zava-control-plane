@@ -1,0 +1,47 @@
+# Proactive customer care — telco actor-world domain.
+domain:
+  workflow_type: proactive-customer-care
+  prefix: care
+  display_name: Proactive customer care
+  owner_role: customer-success
+  operator_surface: customer-success
+  realistic_interval_seconds: 86400
+  description: |
+    A customer-impact sensor identifies accounts and subscriptions affected by
+    a network incident. The workflow assesses impact, determines policy-backed
+    entitlement, obtains bounded approval for material credits, and applies
+    notifications and credits to the authoritative commercial actor world.
+
+phases:
+  - name: impact_assessment
+    kind: deterministic
+    intent: Gather impacted account, subscription, site, and vulnerability facts.
+  - name: entitlement_decision
+    kind: agent
+    intent: Use customer-care policy tools to propose notification and credit actions.
+  - name: credit_approval
+    kind: hitl
+    persona: cs_manager
+    external_event: cs_manager_decision
+    intent: Approve material service credits outside the automatic authority band.
+  - name: care_execution
+    kind: agent
+    intent: Prepare the typed, authority-approved customer remediation command.
+  - name: outcome_verification
+    kind: deterministic
+    intent: Resolve only from care.completed evidence in the world journal.
+
+skills:
+  - proactive-customer-care-entitlement
+  - proactive-customer-care-execution
+
+function: customer-success
+
+ambient:
+  name: CustomerImpactWatcher
+  function: customer-success
+  spawnable_workflow_types: [proactive-customer-care]
+  spawn_fn: api.server.services.simulator_orchestrator.spawn_proactive_customer_care_workflow
+  triggers:
+    - kind: sensor
+      event_type: customer.impact

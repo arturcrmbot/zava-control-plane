@@ -46,5 +46,9 @@ def test_build_domain_manifest_filters_to_telco_domains(monkeypatch: pytest.Monk
 
     module = _reload_blueprint_inventory()
 
-    assert _registry_manifest_types(module) == {"network-incident"}
+    assert _registry_manifest_types(module) == {
+        "network-incident",
+        "proactive-customer-care",
+        "order-to-activate",
+    }
     assert any(entry["workflow_type"] == "onboarding" for entry in module.DOMAINS)

@@ -1159,6 +1159,59 @@ DOMAINS: dict[str, Domain] = {
         # 900s (15 min) of demo-warped time.
         realistic_interval_seconds=900,
     ),
+    "proactive-customer-care": Domain(
+        workflow_type="proactive-customer-care",
+        display_name="Proactive Customer Care",
+        workflow_id_prefix="CARE",
+        orchestrator_name="ProactiveCustomerCareOrchestrator",
+        operator_surface="customer-success",
+        phases=(
+            Phase("Impact Assessment", "deterministic"),
+            Phase("Entitlement Decision", "agent"),
+            Phase("Credit Approval", "hitl"),
+            Phase("Care Execution", "agent"),
+            Phase("Outcome Verification", "deterministic"),
+        ),
+        hitl_gates=(
+            HitlGate(
+                "Credit Approval",
+                "cs_manager_decision",
+                "cs_manager",
+                wait_probability=0.0,
+            ),
+        ),
+        skills=(
+            "proactive-customer-care-entitlement",
+            "proactive-customer-care-execution",
+        ),
+        spawn_fn="api.server.services.simulator_orchestrator.spawn_proactive_customer_care_workflow",
+        realistic_interval_seconds=86400,
+    ),
+    "order-to-activate": Domain(
+        workflow_type="order-to-activate",
+        display_name="Order to Activate",
+        workflow_id_prefix="ORDER",
+        orchestrator_name="OrderToActivateOrchestrator",
+        operator_surface="service-fulfillment",
+        phases=(
+            Phase("Order Intake", "deterministic"),
+            Phase("Feasibility Check", "deterministic"),
+            Phase("Capacity Approval", "hitl"),
+            Phase("Service Activation", "deterministic"),
+            Phase("Activation Verification", "deterministic"),
+        ),
+        hitl_gates=(
+            HitlGate(
+                "Capacity Approval",
+                "capacity_manager_decision",
+                "delivery_lead",
+                wait_probability=0.0,
+            ),
+        ),
+        skills=(),
+        spawn_fn=None,
+        realistic_interval_seconds=86400,
+    ),
     # ----- autonomous-domain-insights v1 (Phase 5.1) -----
     # Generic one-shot workflow spawned by persona action approvals.
     # Not driven by the simulator (no spawn_fn); the route in Task 6.3

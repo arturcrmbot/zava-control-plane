@@ -1576,5 +1576,57 @@
       "ceo"
     ],
     "basis": "Training course over GBP 1500 escalates to CFO for budget impact review."
+  },
+  {
+    "rule_id": "CARE-001",
+    "action": "customer_care_credit_approval",
+    "category": "service_credit",
+    "value_band_gbp": {
+      "min": 0,
+      "max": 25
+    },
+    "business_unit": "*",
+    "geography": "*",
+    "requester_role": "*",
+    "approver_role": "auto",
+    "escalation_chain": [
+      "cs_manager"
+    ],
+    "basis": "Routine service recovery credit within the automatic customer-care band."
+  },
+  {
+    "rule_id": "CARE-002",
+    "action": "customer_care_credit_approval",
+    "category": "service_credit",
+    "value_band_gbp": {
+      "min": 25,
+      "max": null
+    },
+    "business_unit": "*",
+    "geography": "*",
+    "requester_role": "*",
+    "approver_role": "cs_manager",
+    "escalation_chain": [
+      "cs_director"
+    ],
+    "basis": "Material service recovery credit requires Customer Success Manager approval."
+  },
+  {
+    "rule_id": "ORDER-001",
+    "action": "order_capacity_exception",
+    "category": "site_capacity",
+    "value_band_gbp": {
+      "min": 90,
+      "max": null
+    },
+    "business_unit": "*",
+    "geography": "*",
+    "requester_role": "*",
+    "approver_role": "delivery_lead",
+    "escalation_chain": [
+      "project_manager",
+      "program_manager"
+    ],
+    "basis": "Activation on a site at or above 90 percent utilisation requires delivery-lead approval."
   }
 ]

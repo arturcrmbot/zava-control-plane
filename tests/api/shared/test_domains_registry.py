@@ -126,3 +126,18 @@ def test_network_incident_phase_vocabulary_matches_brief() -> None:
         "reroute_planning",
         "recovery_verification",
     ]
+
+
+def test_proactive_customer_care_domain_is_registered() -> None:
+    domain = registry.DOMAINS["proactive-customer-care"]
+    assert domain.orchestrator_name == "ProactiveCustomerCareOrchestrator"
+    assert [(phase.name, phase.kind) for phase in domain.phases] == [
+        ("Impact Assessment", "deterministic"),
+        ("Entitlement Decision", "agent"),
+        ("Credit Approval", "hitl"),
+        ("Care Execution", "agent"),
+        ("Outcome Verification", "deterministic"),
+    ]
+    gate = domain.hitl_gates[0]
+    assert gate.persona == "cs_manager"
+    assert gate.external_event == "cs_manager_decision"

@@ -103,6 +103,30 @@ def test_resolve_unmatched_returns_reason() -> None:
     assert "not_a_real_action" in r.reason
 
 
+def test_customer_care_credit_escalates_to_cs_manager() -> None:
+    result = kernel().resolve_approver(
+        action="customer_care_credit_approval",
+        category="service_credit",
+        value=75.0,
+    )
+
+    assert result.matched is True
+    assert result.rule_id == "CARE-002"
+    assert result.approver_role == "cs_manager"
+
+
+def test_order_capacity_exception_routes_to_delivery_lead() -> None:
+    result = kernel().resolve_approver(
+        action="order_capacity_exception",
+        category="site_capacity",
+        value=95.0,
+    )
+
+    assert result.matched is True
+    assert result.rule_id == "ORDER-001"
+    assert result.approver_role == "delivery_lead"
+
+
 # ---------------------------------------------------------------------------
 # kernel.check_authority — primary, escalation, denied
 # ---------------------------------------------------------------------------

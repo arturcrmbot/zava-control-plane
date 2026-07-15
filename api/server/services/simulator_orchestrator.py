@@ -651,12 +651,7 @@ async def ramp_loop() -> None:
 
     avg_interval = float(os.getenv("SIMULATOR_RAMP_AVG_INTERVAL_SECONDS", "90"))
 
-    valid_domains: list[Domain] = []
-    for d in wanted:
-        if d not in by_type:
-            print(f"[ramp] WARNING: unknown domain {d!r}; skipping")
-            continue
-        valid_domains.append(by_type[d])
+    valid_domains = _select_ramp_domains(wanted, by_type)
 
     if not valid_domains:
         print("[ramp] no valid domains in SIMULATOR_RAMP_DOMAINS; nothing to spawn")
@@ -690,6 +685,38 @@ async def ramp_loop() -> None:
         for t in tasks:
             t.cancel()
         raise
+
+
+_WORLD_OWNED_RAMP_TYPES = frozenset({
+    "network-incident",
+    "proactive-customer-care",
+    "order-to-activate",
+})
+
+
+def _select_ramp_domains(
+    wanted: list[str], by_type: dict[str, Domain]
+) -> list[Domain]:
+    selected: list[Domain] = []
+    for workflow_type in wanted:
+        domain = by_type.get(workflow_type)
+        if domain is None:
+            print(f"[ramp] WARNING: unknown domain {workflow_type!r}; skipping")
+            continue
+        if workflow_type in _WORLD_OWNED_RAMP_TYPES:
+            print(
+                f"[ramp] WARNING: domain {workflow_type!r} is world-owned; "
+                "trigger it through an actor-world sensor"
+            )
+            continue
+        if not domain.spawn_fn:
+            print(
+                f"[ramp] WARNING: domain {workflow_type!r} has no simulator "
+                "spawner; skipping"
+            )
+            continue
+        selected.append(domain)
+    return selected
 
 
 def _scenarios_for(domain: str) -> list[str] | None:
@@ -1608,6 +1635,7 @@ async def spawn_crisis_response_workflow(scenario: str | None = None) -> str:
 # with no affected sessions supplied the decision activity defers, so a
 # ramp-spawned instance never mutates the live world.
 _nir_seq = 0
+_care_seq = 0
 
 
 async def spawn_network_incident_workflow(scenario: str | None = None) -> str:
@@ -1641,6 +1669,63 @@ async def spawn_network_incident_workflow(scenario: str | None = None) -> str:
     except Exception as ex:
         print(f"[orchestrator] failed to schedule {wid}: {ex}")
     _apply_business_time_to_workflow("network-incident", wid)
+    return wid
+
+
+async def spawn_proactive_customer_care_workflow(
+    scenario: str | None = None,
+) -> str:
+    """Spawn a deterministic care workflow for manual demo controls."""
+    global _care_seq
+    _care_seq += 1
+    wid = f"CARE-{_care_seq:04d}"
+    observation = {
+        "incident_site_id": "SITE-01",
+        "impacted_accounts": [
+            {
+                "id": "ACC-00002",
+                "subscriber_id": "SUB-00002",
+                "segment": "consumer",
+                "vulnerable": True,
+            }
+        ],
+        "subscriptions": [
+            {
+                "id": "SUBS-00002",
+                "account_id": "ACC-00002",
+                "subscriber_id": "SUB-00002",
+                "site_id": "SITE-01",
+                "product": "5g-premium",
+                "status": "active",
+            }
+        ],
+        "scenario": scenario,
+    }
+    w = _build_strategic_workflow(
+        wid,
+        "proactive-customer-care",
+        "customer_impact",
+        observation,
+    )
+    app_state.store.upsert_workflow(w)
+    payload = {
+        "workflow_id": wid,
+        "type": "proactive-customer-care",
+        "trace_id": wid,
+        "observation": observation,
+    }
+    if scenario:
+        payload["scenario"] = scenario
+    try:
+        result = await schedule_new_orchestration(
+            payload,
+            function_name="ProactiveCustomerCareOrchestrator",
+        )
+        w.orchestration_instance_id = result.get("id")
+        app_state.store.upsert_workflow(w)
+    except Exception as ex:
+        print(f"[orchestrator] failed to schedule {wid}: {ex}")
+    _apply_business_time_to_workflow("proactive-customer-care", wid)
     return wid
 # === END telco: network-incident spawner ===
 

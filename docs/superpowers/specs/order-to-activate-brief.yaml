@@ -1,0 +1,22 @@
+domain:
+  workflow_type: order-to-activate
+  prefix: order
+  display_name: Order to activate
+  owner_role: ops
+  operator_surface: service-fulfillment
+  description: |
+    A submitted service order is checked against the requested live cell site.
+    Feasible orders activate automatically; high-utilisation exceptions suspend
+    for delivery-lead approval before creating the service subscription.
+
+phases:
+  - {name: order_intake, kind: deterministic}
+  - {name: feasibility_check, kind: deterministic}
+  - name: capacity_approval
+    kind: hitl
+    persona: delivery_lead
+    external_event: capacity_manager_decision
+  - {name: service_activation, kind: deterministic}
+  - {name: activation_verification, kind: deterministic}
+
+function: ops

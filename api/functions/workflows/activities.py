@@ -36,11 +36,18 @@ from api.functions.graphs import (
 from api.functions.webhook import emit
 
 
-async def _run_workflow(workflow_factory, payload: dict, step_name: str) -> dict:
+async def _run_workflow(
+    workflow_factory,
+    payload: dict,
+    step_name: str,
+    *,
+    emit_boundaries: bool = True,
+) -> dict:
     """Run a freshly-built MAF Workflow and return the first output dict."""
     wf = workflow_factory()
-    await emit(payload.get("workflow_id", "?"), payload.get("instance_id"),
-               "step.started", {"step": step_name})
+    if emit_boundaries:
+        await emit(payload.get("workflow_id", "?"), payload.get("instance_id"),
+                   "step.started", {"step": step_name})
     import time as _t
     t0 = _t.time()
     try:
@@ -51,8 +58,9 @@ async def _run_workflow(workflow_factory, payload: dict, step_name: str) -> dict
         raise
     outputs = events.get_outputs()
     result = outputs[0] if outputs else {}
-    await emit(payload.get("workflow_id", "?"), payload.get("instance_id"),
-               "step.completed", {"step": step_name, "duration_ms": int((_t.time() - t0) * 1000)})
+    if emit_boundaries:
+        await emit(payload.get("workflow_id", "?"), payload.get("instance_id"),
+                   "step.completed", {"step": step_name, "duration_ms": int((_t.time() - t0) * 1000)})
     return result
 
 

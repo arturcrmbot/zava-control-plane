@@ -39,7 +39,11 @@ def test_active_vertical_selects_telco_profile_and_intersects_registered_domains
         ),
         ramp_workflow_types=(),
     )
-    assert verticals.registered_workflow_types() == ("network-incident",)
+    assert verticals.registered_workflow_types() == (
+        "network-incident",
+        "proactive-customer-care",
+        "order-to-activate",
+    )
 
 
 def test_registered_workflow_types_preserves_default_registry_when_vertical_unset(
