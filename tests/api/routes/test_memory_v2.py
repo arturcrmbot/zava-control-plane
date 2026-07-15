@@ -8,6 +8,21 @@ from api.server.state import app_state
 client = TestClient(app)
 
 
+def test_list_domains_returns_live_memory_partitions(monkeypatch):
+    monkeypatch.setattr(
+        app_state,
+        "domain_memories",
+        {"network-incident": MagicMock(), "proactive-customer-care": MagicMock()},
+    )
+
+    response = client.get("/api/memory/v2/domains")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "domains": ["network-incident", "proactive-customer-care"]
+    }
+
+
 def test_recall_returns_memories_from_domain_store(monkeypatch):
     class FakeDM:
         domain = "hiring"

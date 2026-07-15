@@ -31,6 +31,11 @@ class _DreamBody(BaseModel):
     domain: str = Field(..., min_length=1)
 
 
+@router.get("/domains")
+def list_domains() -> dict:
+    return {"domains": sorted(app_state.domain_memories)}
+
+
 @router.post("/recall")
 def recall(body: _RecallBody) -> dict:
     store = app_state.domain_memories.get(body.domain)

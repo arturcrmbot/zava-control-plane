@@ -21,6 +21,7 @@ import json
 from api.server.services.entity_projections import (
     DecisionWrite,
     EntityWrite,
+    RelWrite,
     build_decision,
     slug,
 )
@@ -38,7 +39,7 @@ def _incident_site(payload: dict) -> dict:
     return site if isinstance(site, dict) else {}
 
 
-def project(workflow: Workflow) -> list[EntityWrite | DecisionWrite]:
+def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
     payload = workflow.payload or {}
     site = _incident_site(payload)
     site_id = str(site.get("id") or workflow.id)
@@ -59,7 +60,7 @@ def project(workflow: Workflow) -> list[EntityWrite | DecisionWrite]:
         ),
     }
 
-    ops: list[EntityWrite | DecisionWrite] = [
+    ops: list[EntityWrite | RelWrite | DecisionWrite] = [
         EntityWrite(
             kind="Workflow",
             id=workflow.id,
@@ -73,6 +74,41 @@ def project(workflow: Workflow) -> list[EntityWrite | DecisionWrite]:
             source_workflows=sw,
         ),
     ]
+
+    incident = payload.get("incident") or {}
+    if "affected_sessions" not in incident and isinstance(incident.get("incident"), dict):
+        incident = incident["incident"]
+    for session in incident.get("affected_sessions") or []:
+        session_id = str(session.get("id") or "")
+        if not session_id:
+            continue
+        service_asset_id = f"ASSET-session-{slug(session_id)}"
+        ops.extend(
+            [
+                EntityWrite(
+                    kind="Asset",
+                    id=service_asset_id,
+                    attrs={
+                        "kind": "network-session",
+                        "identifier": session_id,
+                        "attributes": json.dumps(
+                            {
+                                "subscriber_id": session.get("subscriber_id"),
+                                "service_kind": session.get("kind"),
+                            },
+                            sort_keys=True,
+                            default=str,
+                        ),
+                    },
+                    source_workflows=sw,
+                ),
+                RelWrite(
+                    src_id=service_asset_id,
+                    rel="HOSTED_ON",
+                    dst_id=asset_id,
+                ),
+            ]
+        )
 
     # Autonomous, reversible mitigation — no HITL gate. A DecisionWrite is
     # still emitted when the payload records the reroute outcome so the

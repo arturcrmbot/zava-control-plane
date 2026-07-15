@@ -530,6 +530,12 @@ _REL_TABLES: tuple[tuple[str, str], ...] = (
     ("BOOKED_AGAINST_CC", "CREATE REL TABLE IF NOT EXISTS BOOKED_AGAINST_CC (FROM Money TO CostCentre, posted_at TIMESTAMP, decided_at TIMESTAMP)"),
     ("COSTED_TO", "CREATE REL TABLE IF NOT EXISTS COSTED_TO (FROM Money TO CostCentre, posted_at TIMESTAMP, decided_at TIMESTAMP)"),
     ("COSTED_TO_BRAND", "CREATE REL TABLE IF NOT EXISTS COSTED_TO_BRAND (FROM Money TO Brand, posted_at TIMESTAMP, decided_at TIMESTAMP)"),
+    # ----- telco: connected customer/service topology ------------------
+    ("HOLDS_ACCOUNT", "CREATE REL TABLE IF NOT EXISTS HOLDS_ACCOUNT (FROM Person TO Account, decided_at TIMESTAMP)"),
+    ("SUBSCRIBED_TO", "CREATE REL TABLE IF NOT EXISTS SUBSCRIBED_TO (FROM Person TO Asset, decided_at TIMESTAMP)"),
+    ("HOSTED_ON", "CREATE REL TABLE IF NOT EXISTS HOSTED_ON (FROM Asset TO Asset, decided_at TIMESTAMP)"),
+    ("PLACED_ORDER", "CREATE REL TABLE IF NOT EXISTS PLACED_ORDER (FROM Account TO Asset, decided_at TIMESTAMP)"),
+    ("DECIDED_ACCOUNT", "CREATE REL TABLE IF NOT EXISTS DECIDED_ACCOUNT (FROM Decision TO Account, decided_at TIMESTAMP)"),
     # Note: COSTED_TO targets CostCentre. A separate Money→Brand cost rel
     # is added in Phase 3 (Task 3.5) once Brand nodes exist.
     # ----- lesson-store: dream-pass provenance edges -------------------
@@ -554,6 +560,7 @@ _DECIDED_REL_BY_KIND: dict[str, str] = {
     "Pitch": "DECIDED_PITCH",
     "MediaPlan": "DECIDED_MEDIAPLAN",
     "Subsidiary": "DECIDED_SUBSIDIARY",
+    "Account": "DECIDED_ACCOUNT",
 }
 
 # Public canonical list of every rel-table name that represents a

@@ -17,6 +17,28 @@ from typing import Any
 
 from api.server.services.replay.mutation_bus import emit_mutation
 
+_DEFAULT_MEMORY_DOMAINS = ("hiring",)
+_TELCO_MEMORY_DOMAINS = (
+    "network-incident",
+    "proactive-customer-care",
+    "order-to-activate",
+)
+
+
+def configured_memory_domains(
+    *,
+    raw: str | None,
+    vertical_name: str | None,
+    registered_workflow_types: tuple[str, ...],
+) -> list[str]:
+    """Resolve memory partitions without changing default-off behavior."""
+    if raw is not None:
+        return [item.strip() for item in raw.split(",") if item.strip()]
+    if vertical_name == "telco":
+        registered = set(registered_workflow_types)
+        return [name for name in _TELCO_MEMORY_DOMAINS if name in registered]
+    return list(_DEFAULT_MEMORY_DOMAINS)
+
 
 class DomainMemory:
     """Thin wrapper over mem0.Memory scoped to one domain."""

@@ -1,7 +1,7 @@
 """Test the network-incident projection (telco actor-world domain)."""
 from __future__ import annotations
 
-from api.server.services.entity_graph import DecisionWrite, EntityWrite
+from api.server.services.entity_graph import DecisionWrite, EntityWrite, RelWrite
 from api.server.services.entity_projections.network_incident import (
     project, WORKFLOW_TYPE,
 )
@@ -78,3 +78,25 @@ def test_projection_emits_reroute_planning_decision_when_payload_carries_it():
     decisions = [op for op in project(wf) if isinstance(op, DecisionWrite)]
     assert len(decisions) == 1
     assert decisions[0].phase == "reroute_planning"
+
+
+def test_projection_connects_affected_service_to_incident_site():
+    incident = _incident_payload()
+    incident["affected_sessions"] = [
+        {"id": "SESS-00001", "subscriber_id": "SUB-00001", "kind": "voice"}
+    ]
+    wf = make_workflow("NI-T5", WORKFLOW_TYPE, incident, nest_under="incident")
+
+    ops = project(wf)
+
+    services = [
+        op
+        for op in ops
+        if isinstance(op, EntityWrite) and op.attrs.get("kind") == "network-session"
+    ]
+    assert [service.id for service in services] == ["ASSET-session-sess-00001"]
+    assert RelWrite(
+        src_id="ASSET-session-sess-00001",
+        rel="HOSTED_ON",
+        dst_id="ASSET-site-site-03",
+    ) in ops

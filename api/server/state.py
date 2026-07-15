@@ -186,8 +186,9 @@ class AppState:
         try:
             from api.server.services.lessons.mem0_store import build_default_memory
             from api.server.services.memory.domain_memory import (
-                DomainMemory, build_domain_memories,
+                DomainMemory, build_domain_memories, configured_memory_domains,
             )
+            from api.shared.verticals import active_vertical, registered_workflow_types
 
             # In replay mode the tape carries the working notes / lessons
             # that hydrate writes via memory_store.add(). Routing those
@@ -201,11 +202,12 @@ class AppState:
                 raise RuntimeError("replay mode → using FallbackMemory for tape hydration")
 
             _mem0_backend = build_default_memory()
-            _memory_domains = [
-                d.strip()
-                for d in os.getenv("MEMORY_DOMAINS", "hiring").split(",")
-                if d.strip()
-            ]
+            _vertical = active_vertical()
+            _memory_domains = configured_memory_domains(
+                raw=os.getenv("MEMORY_DOMAINS"),
+                vertical_name=_vertical.name if _vertical else None,
+                registered_workflow_types=registered_workflow_types(),
+            )
             self.domain_memories: dict[str, DomainMemory] = build_domain_memories(
                 domains=_memory_domains,
                 memory=_mem0_backend,
@@ -220,16 +222,20 @@ class AppState:
             )
             try:
                 from api.server.services.memory.domain_memory import (
-                    DomainMemory, build_domain_memories,
+                    DomainMemory, build_domain_memories, configured_memory_domains,
                 )
                 from api.server.services.memory.fallback_memory import (
                     get_fallback_memory,
                 )
-                _memory_domains = [
-                    d.strip()
-                    for d in os.getenv("MEMORY_DOMAINS", "hiring").split(",")
-                    if d.strip()
-                ]
+                from api.shared.verticals import (
+                    active_vertical, registered_workflow_types,
+                )
+                _vertical = active_vertical()
+                _memory_domains = configured_memory_domains(
+                    raw=os.getenv("MEMORY_DOMAINS"),
+                    vertical_name=_vertical.name if _vertical else None,
+                    registered_workflow_types=registered_workflow_types(),
+                )
                 self.domain_memories: dict[str, DomainMemory] = build_domain_memories(
                     domains=_memory_domains,
                     memory=get_fallback_memory(),

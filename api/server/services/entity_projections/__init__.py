@@ -153,9 +153,11 @@ from . import media_pitch_to_win    # noqa: E402  pitch-c2
 from . import monthly_client_pnl    # noqa: E402  pitch-c3
 from . import network_incident      # noqa: E402  telco actor-world domain
 from . import new_business_pipeline_scrub  # noqa: E402  pitch-c3
+from . import order_to_activate     # noqa: E402  telco actor-world domain
 from . import perf_review           # noqa: E402  TASK-023
 from . import policy_set            # noqa: E402  autonomous-domain-insights v1
 from . import privacy_dpia          # noqa: E402  TASK-024
+from . import proactive_customer_care  # noqa: E402  telco actor-world domain
 from . import purchase_order        # noqa: E402  TASK-016
 from . import quarterly_creative_awards  # noqa: E402  pitch-c3
 from . import talent_redeployment   # noqa: E402  pitch-c2
@@ -176,8 +178,9 @@ _DOMAIN_MODULES = (
     intercompany_recharge, intercompany_talent_transfer,
     it_access_request, lead_to_cash, m_and_a_integration,
     media_pitch_to_win, monthly_client_pnl, network_incident,
-    new_business_pipeline_scrub,
-    perf_review, policy_set, privacy_dpia, purchase_order, quarterly_creative_awards,
+    new_business_pipeline_scrub, order_to_activate,
+    perf_review, policy_set, privacy_dpia, proactive_customer_care,
+    purchase_order, quarterly_creative_awards,
     talent_redeployment, training_request, travel_preapproval, treasury_fx,
     vendor_kyc, vendor_risk_to_pay, weekly_pitch_review,
 )
