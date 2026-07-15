@@ -63,7 +63,10 @@ def test_inject_site_failure_fails_a_real_site_and_trips_the_sensor():
     failed = next(e for e in world.runtime.journal if e.type == "site.failed")
     assert failed.actor_id == site_id
     assert world.scenario.sites[site_id].status == "failed"
-    sensor = next(e for e in world.runtime.journal if e.type == "sensor.tripped")
+    sensor = next(
+        e for e in world.runtime.journal
+        if e.type == "sensor.tripped" and e.actor_id == "sensor:network_anomaly"
+    )
     assert sensor.payload["measurements"]["site_id"] == site_id
 
 
@@ -73,7 +76,10 @@ def test_full_incident_loop_reroutes_real_sessions_via_the_durable_activity():
     world.runtime.run_until(2)
 
     # Observe: build the exact observation the world bridge hands the orchestrator.
-    sensor = next(e for e in world.runtime.journal if e.type == "sensor.tripped")
+    sensor = next(
+        e for e in world.runtime.journal
+        if e.type == "sensor.tripped" and e.actor_id == "sensor:network_anomaly"
+    )
     observation = world.build_observation(sensor.to_dict())
     assert observation["incident_site"]["id"] == site_id
     assert observation["affected_sessions"]
@@ -121,7 +127,10 @@ def test_full_incident_loop_changes_neighbour_load_and_is_idempotent():
     world = service()
     world.inject_site_failure()
     world.runtime.run_until(2)
-    sensor = next(e for e in world.runtime.journal if e.type == "sensor.tripped")
+    sensor = next(
+        e for e in world.runtime.journal
+        if e.type == "sensor.tripped" and e.actor_id == "sensor:network_anomaly"
+    )
     observation = world.build_observation(sensor.to_dict())
     decision = _decide(observation["trace_id"], observation)
     command = _command_from(decision)

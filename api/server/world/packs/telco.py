@@ -22,6 +22,13 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
 from api.server.world.model import SimulationCommand, SimulationEvent
+from api.server.world.packs.telco_commercial import (
+    CreditAdjustment,
+    CustomerAccount,
+    Notification,
+    ServiceOrder,
+    ServiceSubscription,
+)
 from api.server.world.runtime import SimulationRuntime
 
 SessionKind = Literal["voice", "data", "video"]
@@ -59,6 +66,8 @@ class Subscriber:
     id: str
     home_site_id: str
     tier: str
+    account_id: str
+    subscription_id: str
     session_ids: set[str] = field(default_factory=set)
 
 
@@ -106,9 +115,15 @@ class NetworkScenario:
         self.sites: dict[str, CellSite] = {}
         self.subscribers: dict[str, Subscriber] = {}
         self.sessions: dict[str, NetworkSession] = {}
+        self.accounts: dict[str, CustomerAccount] = {}
+        self.subscriptions: dict[str, ServiceSubscription] = {}
+        self.orders: dict[str, ServiceOrder] = {}
+        self.notifications: dict[str, Notification] = {}
+        self.credits: dict[str, CreditAdjustment] = {}
         self._site_ids: list[str] = []
         self._subscriber_ids: list[str] = []
         self._failed_sites_latched: set[str] = set()
+        self._impacted_account_ids_by_trace: dict[str, tuple[str, ...]] = {}
         self.applied_commands: dict[str, SimulationEvent] = {}
 
     # -- installation ------------------------------------------------------
@@ -121,6 +136,7 @@ class NetworkScenario:
         )
         self._create_sites()
         self._create_subscribers()
+        self._create_commercial_state()
         self._create_sessions()
         for site in self.sites.values():
             self._derive_metrics(site)
@@ -172,7 +188,13 @@ class NetworkScenario:
         for index in range(1, self.config.subscriber_count + 1):
             home = self._site_ids[(index - 1) % len(self._site_ids)]
             tier = self.runtime.rng.choices(tiers, weights=[75, 20, 5], k=1)[0]
-            subscriber = Subscriber(id=f"SUB-{index:05d}", home_site_id=home, tier=tier)
+            subscriber = Subscriber(
+                id=f"SUB-{index:05d}",
+                home_site_id=home,
+                tier=tier,
+                account_id=f"ACC-{index:05d}",
+                subscription_id=f"SUBS-{index:05d}",
+            )
             self.subscribers[subscriber.id] = subscriber
             self._subscriber_ids.append(subscriber.id)
             self.runtime.emit(
@@ -182,6 +204,41 @@ class NetworkScenario:
                 trace_id=f"subscriber-{subscriber.id}",
                 payload={"home_site_id": home, "tier": tier},
             )
+
+    def _create_commercial_state(self) -> None:
+        for index, subscriber_id in enumerate(self._subscriber_ids, start=1):
+            subscriber = self.subscribers[subscriber_id]
+            if index == 1:
+                segment = "priority_business"
+            elif subscriber.tier == "business":
+                segment = "business"
+            else:
+                segment = "consumer"
+            account = CustomerAccount(
+                id=subscriber.account_id,
+                subscriber_id=subscriber.id,
+                segment=segment,
+                vulnerable=index == 2,
+                approval_required=index == 3,
+            )
+            subscription = ServiceSubscription(
+                id=subscriber.subscription_id,
+                account_id=account.id,
+                subscriber_id=subscriber.id,
+                site_id=subscriber.home_site_id,
+                product="business-premium" if index == 1 else "mobile-connect",
+            )
+            self.accounts[account.id] = account
+            self.subscriptions[subscription.id] = subscription
+
+        self.orders["ORD-00001"] = ServiceOrder(
+            id="ORD-00001",
+            account_id="ACC-00003",
+            product="business-premium",
+            requested_site_id="SITE-01",
+            status="infeasible",
+            reason="hero order requires exception approval",
+        )
 
     def _create_sessions(self) -> None:
         for index in range(1, self.config.session_count + 1):
@@ -315,6 +372,7 @@ class NetworkScenario:
                 },
             )
             session.last_event_id = degraded.event_id
+        self._emit_customer_impact(failed, affected)
         site.status = "failed"
         self._derive_metrics(site)
         for neighbor_id in site.neighbor_ids:
@@ -330,6 +388,43 @@ class NetworkScenario:
                 trace_id=failed.trace_id,
                 payload={**self._metrics_payload(neighbor), "reason": "reattach_congestion"},
             )
+
+    def _emit_customer_impact(
+        self, failed: SimulationEvent, affected: list[NetworkSession]
+    ) -> None:
+        account_ids = tuple(
+            sorted(
+                {
+                    self.subscribers[session.subscriber_id].account_id
+                    for session in affected
+                }
+            )
+        )
+        subscription_ids = tuple(
+            sorted(
+                {
+                    self.subscribers[session.subscriber_id].subscription_id
+                    for session in affected
+                }
+            )
+        )
+        self._impacted_account_ids_by_trace[failed.trace_id] = account_ids
+        self.runtime.emit(
+            "sensor.tripped",
+            actor_id="sensor:customer_impact",
+            target_id=failed.actor_id,
+            cause_event_id=failed.event_id,
+            trace_id=failed.trace_id,
+            payload={
+                "account_ids": list(account_ids[:50]),
+                "subscription_ids": list(subscription_ids[:50]),
+                "measurements": {
+                    "site_id": failed.actor_id,
+                    "affected_account_count": len(account_ids),
+                    "affected_subscription_count": len(subscription_ids),
+                },
+            },
+        )
 
     # -- sensor ------------------------------------------------------------
 
@@ -359,7 +454,14 @@ class NetworkScenario:
             actor_id="sensor:network_anomaly",
             target_id=site.id,
             cause_event_id=site.last_event_id,
-            trace_id=f"network-anomaly-{site.id}-{int(self.runtime.now)}",
+            trace_id=next(
+                (
+                    event.trace_id
+                    for event in reversed(self.runtime.journal)
+                    if event.event_id == site.last_event_id
+                ),
+                f"network-incident-{site.id}-{int(self.runtime.now)}",
+            ),
             payload={
                 "actor_ids": [s.id for s in affected[:20]],
                 "measurements": {
@@ -372,18 +474,226 @@ class NetworkScenario:
             },
         )
 
+    def submit_service_order(
+        self, *, account_id: str, product: str, requested_site_id: str
+    ) -> str:
+        if account_id not in self.accounts:
+            raise ValueError(f"unknown account_id: {account_id!r}")
+        if requested_site_id not in self.sites:
+            raise ValueError(f"unknown requested_site_id: {requested_site_id!r}")
+        order_id = f"ORD-{len(self.orders) + 1:05d}"
+        order = ServiceOrder(
+            id=order_id,
+            account_id=account_id,
+            product=product,
+            requested_site_id=requested_site_id,
+            status="pending",
+        )
+        self.orders[order_id] = order
+        trace_id = f"service-order-{order_id}"
+        created = self.runtime.emit(
+            "order.created",
+            actor_id=order_id,
+            target_id=account_id,
+            trace_id=trace_id,
+            payload=asdict(order),
+        )
+        self.runtime.emit(
+            "sensor.tripped",
+            actor_id="sensor:service_order",
+            target_id=order_id,
+            cause_event_id=created.event_id,
+            trace_id=trace_id,
+            payload={"order_id": order_id},
+        )
+        return order_id
+
     # -- command -----------------------------------------------------------
 
     def apply_command(self, command: SimulationCommand) -> SimulationEvent:
         existing = self.applied_commands.get(command.command_id)
         if existing is not None:
             return existing
-        if command.type != "reroute_sessions":
-            return self._reject_command(command, f"unsupported command type: {command.type!r}")
-        reason = self._validate_reroute_sessions(command.payload)
-        if reason is not None:
-            return self._reject_command(command, reason)
-        return self._accept_reroute_sessions(command)
+        if command.type == "reroute_sessions":
+            reason = self._validate_reroute_sessions(command.payload)
+            if reason is not None:
+                return self._reject_command(command, reason)
+            return self._accept_reroute_sessions(command)
+        if command.type == "apply_customer_remediation":
+            reason = self._validate_customer_remediation(command)
+            if reason is not None:
+                return self._reject_command(command, reason)
+            return self._accept_customer_remediation(command)
+        if command.type == "activate_service_order":
+            reason = self._validate_service_order_activation(command)
+            if reason is not None:
+                return self._reject_command(command, reason)
+            return self._accept_service_order_activation(command)
+        return self._reject_command(command, f"unsupported command type: {command.type!r}")
+
+    def _validate_service_order_activation(
+        self, command: SimulationCommand
+    ) -> str | None:
+        order = self.orders.get(command.payload.get("order_id"))
+        if order is None:
+            return f"unknown order_id: {command.payload.get('order_id')!r}"
+        if order.status != "pending":
+            return f"order {order.id} is not pending"
+        site = self.sites[order.requested_site_id]
+        if site.status != "healthy":
+            return f"requested site {site.id} is not healthy"
+        if site.utilization >= 0.9 and command.payload.get("capacity_approved") is not True:
+            return f"insufficient capacity at {site.id}"
+        return None
+
+    def _accept_service_order_activation(
+        self, command: SimulationCommand
+    ) -> SimulationEvent:
+        order = self.orders[command.payload["order_id"]]
+        accepted = self.runtime.emit(
+            "command.accepted",
+            actor_id=command.issued_by,
+            target_id=order.id,
+            trace_id=command.trace_id,
+            payload={"command": command.to_dict()},
+        )
+        self.applied_commands[command.command_id] = accepted
+        account = self.accounts[order.account_id]
+        subscription_id = f"SUBS-{len(self.subscriptions) + 1:05d}"
+        subscription = ServiceSubscription(
+            id=subscription_id,
+            account_id=account.id,
+            subscriber_id=account.subscriber_id,
+            site_id=order.requested_site_id,
+            product=order.product,
+            status="active",
+        )
+        self.subscriptions[subscription.id] = subscription
+        order.status = "activated"
+        order.reason = None
+        self.runtime.emit(
+            "order.activated",
+            actor_id=order.id,
+            target_id=subscription.id,
+            cause_event_id=accepted.event_id,
+            trace_id=command.trace_id,
+            payload={
+                "order": asdict(order),
+                "subscription": asdict(subscription),
+            },
+        )
+        return accepted
+
+    def _validate_customer_remediation(
+        self, command: SimulationCommand
+    ) -> str | None:
+        actions = command.payload.get("actions")
+        if not isinstance(actions, list) or not actions:
+            return "actions must be a non-empty list"
+        impacted = set(self._impacted_account_ids_by_trace.get(command.trace_id, ()))
+        seen: set[str] = set()
+        for action in actions:
+            if not isinstance(action, dict):
+                return "each remediation action must be an object"
+            account_id = action.get("account_id")
+            if not isinstance(account_id, str) or account_id not in impacted:
+                return f"account {account_id!r} is not affected on this trace"
+            if account_id in seen:
+                return f"duplicate account_id: {account_id}"
+            seen.add(account_id)
+            if action.get("channel") not in {"sms", "email"}:
+                return f"unsupported channel: {action.get('channel')!r}"
+            if not isinstance(action.get("message"), str) or not action["message"].strip():
+                return "message must be a non-empty string"
+            amount = action.get("credit_amount")
+            if isinstance(amount, bool) or not isinstance(amount, (int, float)):
+                return "credit_amount must be numeric"
+            account = self.accounts[account_id]
+            expected_amount = (
+                50.0
+                if account.approval_required
+                else 20.0
+                if account.vulnerable
+                else 10.0
+                if account.segment == "priority_business"
+                else 5.0
+            )
+            if float(amount) != expected_amount:
+                return (
+                    f"credit_amount for {account_id} does not match policy "
+                    f"entitlement {expected_amount:.2f}"
+                )
+            if (
+                account.approval_required
+                and command.payload.get("approval_decision") != "approve"
+            ):
+                return f"approved cs_manager decision required for {account_id}"
+        return None
+
+    def _accept_customer_remediation(
+        self, command: SimulationCommand
+    ) -> SimulationEvent:
+        accepted = self.runtime.emit(
+            "command.accepted",
+            actor_id=command.issued_by,
+            trace_id=command.trace_id,
+            payload={"command": command.to_dict()},
+        )
+        self.applied_commands[command.command_id] = accepted
+        actions = list(command.payload["actions"])
+        for action in actions:
+            account = self.accounts[action["account_id"]]
+            notification = Notification(
+                id=f"NOT-{len(self.notifications) + 1:06d}",
+                account_id=account.id,
+                channel=action["channel"],
+                message=action["message"],
+                trace_id=command.trace_id,
+            )
+            self.notifications[notification.id] = notification
+            account.notification_ids.append(notification.id)
+            self.runtime.emit(
+                "notification.sent",
+                actor_id=notification.id,
+                target_id=account.id,
+                cause_event_id=accepted.event_id,
+                trace_id=command.trace_id,
+                payload=asdict(notification),
+            )
+            amount = float(action["credit_amount"])
+            if amount > 0:
+                credit = CreditAdjustment(
+                    id=f"CRD-{len(self.credits) + 1:06d}",
+                    account_id=account.id,
+                    amount=amount,
+                    trace_id=command.trace_id,
+                    authority_approved=True,
+                )
+                self.credits[credit.id] = credit
+                account.credit_ids.append(credit.id)
+                account.total_credits = round(account.total_credits + amount, 2)
+                self.runtime.emit(
+                    "credit.applied",
+                    actor_id=credit.id,
+                    target_id=account.id,
+                    cause_event_id=accepted.event_id,
+                    trace_id=command.trace_id,
+                    payload=asdict(credit),
+                )
+        self.runtime.emit(
+            "care.completed",
+            actor_id="customer_care",
+            cause_event_id=accepted.event_id,
+            trace_id=command.trace_id,
+            payload={
+                "account_ids": [action["account_id"] for action in actions],
+                "notification_count": len(actions),
+                "credit_total": round(
+                    sum(float(action["credit_amount"]) for action in actions), 2
+                ),
+            },
+        )
+        return accepted
 
     def _validate_reroute_sessions(self, payload: dict[str, Any]) -> str | None:
         incident_site_id = payload.get("incident_site_id")
@@ -540,7 +850,31 @@ class NetworkScenario:
             "id": subscriber.id,
             "home_site_id": subscriber.home_site_id,
             "tier": subscriber.tier,
+            "account_id": subscriber.account_id,
+            "subscription_id": subscriber.subscription_id,
             "session_count": len(subscriber.session_ids),
+        }
+
+    def _account_view(self, account: CustomerAccount) -> dict[str, Any]:
+        return asdict(account)
+
+    def _customer_impact_view(self) -> dict[str, Any]:
+        impacted = {
+            account_id
+            for account_ids in self._impacted_account_ids_by_trace.values()
+            for account_id in account_ids
+        }
+        return {
+            "affected_account_count": len(impacted),
+            "notified_account_count": sum(
+                bool(self.accounts[account_id].notification_ids)
+                for account_id in impacted
+            ),
+            "credited_account_count": sum(
+                bool(self.accounts[account_id].credit_ids)
+                for account_id in impacted
+            ),
+            "account_ids": sorted(impacted),
         }
 
     def render_state(self) -> dict[str, Any]:
@@ -551,12 +885,50 @@ class NetworkScenario:
             "sites": [self._site_view(s) for s in self.sites.values()],
             "sessions": [self._session_view(s) for s in self.sessions.values()],
             "subscribers": [self._subscriber_view(s) for s in self.subscribers.values()],
+            "accounts": [self._account_view(a) for a in self.accounts.values()],
+            "subscriptions": [asdict(s) for s in self.subscriptions.values()],
+            "orders": [asdict(order) for order in self.orders.values()],
+            "notifications": [asdict(item) for item in self.notifications.values()],
+            "credits": [asdict(item) for item in self.credits.values()],
+            "customer_impact": self._customer_impact_view(),
         }
 
     def build_observation(self, sensor_event: dict[str, Any], *, now: float) -> dict[str, Any]:
         from api.server.world.projection import project_network
 
         payload = sensor_event.get("payload") or {}
+        if sensor_event.get("actor_id") == "sensor:service_order":
+            order = self.orders[payload["order_id"]]
+            return {
+                "trace_id": sensor_event.get("trace_id"),
+                "sensor_event_id": sensor_event.get("event_id"),
+                "order": asdict(order),
+                "account": self._account_view(self.accounts[order.account_id]),
+                "requested_site": self._site_view(
+                    self.sites[order.requested_site_id]
+                ),
+                "allowed_commands": ["activate_service_order"],
+            }
+        if sensor_event.get("actor_id") == "sensor:customer_impact":
+            account_ids = self._impacted_account_ids_by_trace.get(
+                sensor_event.get("trace_id"), ()
+            )
+            return {
+                "trace_id": sensor_event.get("trace_id"),
+                "sensor_event_id": sensor_event.get("event_id"),
+                "incident_site_id": (payload.get("measurements") or {}).get("site_id"),
+                "impacted_accounts": [
+                    self._account_view(self.accounts[account_id])
+                    for account_id in account_ids
+                ],
+                "subscriptions": [
+                    asdict(self.subscriptions[self.subscribers[
+                        self.accounts[account_id].subscriber_id
+                    ].subscription_id])
+                    for account_id in account_ids
+                ],
+                "allowed_commands": ["apply_customer_remediation"],
+            }
         measurements = payload.get("measurements") or {}
         site_id = measurements.get("site_id")
         incident = self.sites.get(site_id)

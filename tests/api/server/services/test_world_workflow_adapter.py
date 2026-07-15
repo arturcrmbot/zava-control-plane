@@ -25,7 +25,7 @@ def _app_state():
     bus.on_any(lambda ev: captured.append(ev))
     state = SimpleNamespace(
         bus=bus, store=StateStore(), hub=MagicMock(), audit=MagicMock(),
-        orchestration_history={},
+        orchestration_history={}, domain_memories={},
     )
     state.workflow_event_ingestor = WorkflowEventIngestor(state)
     return state, captured
@@ -155,6 +155,28 @@ async def test_decided_is_nonterminal_and_does_not_rerecord_orchestrator_phases(
     assert not (terminal & {e.type for e in captured})
 
 
+async def test_decided_records_order_service_activation_after_world_mutation():
+    state, _ = _app_state()
+    adapter = WorldWorkflowAdapter(state)
+    responder = resolve_responder("order_to_activate")
+    workflow_id = adapter.start(
+        _sensor(event_id="evt-order", trace="service-order-1"),
+        _objective(oid="obj-evt-order", trace="service-order-1"),
+        responder,
+        {"order": {"id": "ORD-00002"}},
+    )
+
+    await adapter.decided(
+        workflow_id,
+        "order-instance",
+        {"type": "activate_service_order"},
+    )
+
+    assert {
+        phase.name for phase in state.store.get_phases(workflow_id)
+    } == {"Service Activation"}
+
+
 async def test_failed_marks_failed_without_completion():
     state, captured = _app_state()
     adapter = WorldWorkflowAdapter(state)
@@ -167,8 +189,34 @@ async def test_failed_marks_failed_without_completion():
     w = state.store.get_workflow(wid)
     assert w.status == "failed"
     # Never claims success before evaluation.
+    assert "workflow.failed" in {e.type for e in captured}
     assert "durable.workflow.completed" not in {e.type for e in captured}
     assert "workflow.resolved" not in {e.type for e in captured}
+
+
+async def test_evaluation_failed_preserves_terminal_world_evidence():
+    state, captured = _app_state()
+    adapter = WorldWorkflowAdapter(state)
+    responder = resolve_responder("network_service_recovery")
+    workflow_id = adapter.start(_sensor(), _objective(), responder, _observation())
+    outcome = {
+        "status": "failed",
+        "reason": "packet loss remained above threshold",
+        "evidence_event_type": "site.degraded",
+        "evidence_event_id": "evt-evidence-1",
+    }
+
+    await adapter.evaluation_failed(workflow_id, "durable-instance-1", outcome)
+
+    workflow = state.store.get_workflow(workflow_id)
+    assert workflow.status == "failed"
+    assert workflow.payload["outcome"] == outcome
+    assert workflow.metadata["world_lifecycle"] == "failed"
+    assert workflow.current_phase == "Recovery Verification"
+    phases = {phase.name: phase.status for phase in state.store.get_phases(workflow_id)}
+    assert phases["Recovery Verification"] == "failed"
+    assert "workflow.failed" in {event.type for event in captured}
+    assert "workflow.resolved" not in {event.type for event in captured}
 
 
 async def test_resolved_is_defined_for_future_terminal_path():
@@ -181,6 +229,57 @@ async def test_resolved_is_defined_for_future_terminal_path():
 
     assert state.store.get_workflow(wid).status == "completed"
     assert "durable.workflow.completed" in {e.type for e in captured}
+
+
+async def test_resolved_uses_registered_domain_outcome_phase():
+    state, _ = _app_state()
+    adapter = WorldWorkflowAdapter(state)
+    responder = resolve_responder("proactive_customer_care")
+    sensor = _sensor(event_id="evt-care", trace="incident-root")
+    objective = _objective(oid="obj-evt-care", trace="incident-root")
+    observation = {"impacted_accounts": [{"id": "ACC-00001"}]}
+    workflow_id = adapter.start(sensor, objective, responder, observation)
+
+    await adapter.resolved(workflow_id, "care-instance", {"status": "resolved"})
+
+    assert state.store.get_workflow(workflow_id).current_phase == "Outcome Verification"
+
+
+async def test_scheduled_does_not_fabricate_network_phase_for_other_domains():
+    state, _ = _app_state()
+    adapter = WorldWorkflowAdapter(state)
+    responder = resolve_responder("order_to_activate")
+    workflow_id = adapter.start(
+        _sensor(event_id="evt-order", trace="service-order-1"),
+        _objective(oid="obj-evt-order", trace="service-order-1"),
+        responder,
+        {"order": {"id": "ORD-00002"}},
+    )
+
+    await adapter.scheduled(workflow_id, "order-instance")
+
+    assert state.store.get_phases(workflow_id) == []
+
+
+async def test_resolved_captures_truthful_operational_memory():
+    state, _ = _app_state()
+    memory = MagicMock()
+    state.domain_memories["network-incident"] = memory
+    adapter = WorldWorkflowAdapter(state)
+    responder = resolve_responder("network_service_recovery")
+    workflow_id = adapter.start(_sensor(), _objective(), responder, _observation())
+
+    await adapter.resolved(
+        workflow_id,
+        "network-instance",
+        {"status": "resolved", "evidence_event_type": "site.recovered"},
+    )
+
+    memory.add.assert_called_once()
+    text = memory.add.call_args.args[0]
+    assert "site.recovered" in text
+    assert memory.add.call_args.kwargs["workflow_id"] == workflow_id
+    assert memory.add.call_args.kwargs["agent_skill"] == ""
 
 
 def test_start_supports_support_world_observation_key():

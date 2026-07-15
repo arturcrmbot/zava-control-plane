@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from api.server.world.model import Objective
-from api.server.world.registry import WorldPackRegistration
+from api.server.world.registry import ObjectiveRoute
 from api.server.world.runtime import SimulationRuntime
 
 # Strict allowed-state table. Non-terminal states may fail or be superseded at
@@ -54,12 +54,13 @@ class ObjectiveManager:
         self._active_by_key: dict[tuple[str, str | None], str] = {}
         self._target_by_id: dict[str, str | None] = {}
         self._baseline_by_id: dict[str, dict] = {}
+        self._route_by_id: dict[str, ObjectiveRoute] = {}
         self._last_event_id: dict[str, str] = {}
 
     def open(
         self,
         sensor_event: dict,
-        registration: WorldPackRegistration,
+        route: ObjectiveRoute,
         *,
         owner_function: str,
         priority: int = 0,
@@ -72,7 +73,7 @@ class ObjectiveManager:
         no second ``objective.opened`` is journalled.
         """
         target = sensor_event.get("target_id")
-        objective_type = registration.objective_type
+        objective_type = route.objective_type
         key = (objective_type, target)
         existing_id = self._active_by_key.get(key)
         if existing_id is not None:
@@ -89,7 +90,7 @@ class ObjectiveManager:
             created_at=self._runtime.now,
             deadline=deadline,
             evidence_event_ids=(sensor_event_id,),
-            allowed_command_types=registration.allowed_command_types,
+            allowed_command_types=route.allowed_command_types,
         )
         self._objectives[objective.id] = objective
         self._order.append(objective.id)
@@ -98,6 +99,7 @@ class ObjectiveManager:
         self._baseline_by_id[objective.id] = dict(
             (sensor_event.get("payload") or {}).get("measurements") or {}
         )
+        self._route_by_id[objective.id] = route
         self._emit(objective, cause_event_id=sensor_event_id)
         return objective
 
@@ -147,6 +149,10 @@ class ObjectiveManager:
     def baseline_for(self, objective_id: str) -> dict:
         """Baseline sensor measurements captured when the objective opened."""
         return dict(self._baseline_by_id.get(objective_id, {}))
+
+    def route_for(self, objective_id: str) -> ObjectiveRoute:
+        """Route that opened the objective."""
+        return self._route_by_id[objective_id]
 
     def last_event_id(self, objective_id: str) -> str | None:
         """Id of the most recent lifecycle event journalled for the objective."""

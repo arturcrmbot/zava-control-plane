@@ -13,7 +13,10 @@ import json
 import pytest
 
 from api.server.main import app
+from api.server.routes.workflow_agui import _history_to_fleet_events
+from api.server.services.substrate_to_agui import SubstrateToAGUI
 from api.server.state import app_state
+from api.shared.agui_events import to_sse_dict
 from api.shared.events import FleetEvent
 
 
@@ -122,3 +125,24 @@ async def test_other_run_events_are_filtered_out():
     types = [e["type"] for e in seen]
     assert "RUN_STARTED" not in types
     assert types == ["RUN_FINISHED"]
+
+
+def test_failed_history_replays_run_error_without_run_finished():
+    events = _history_to_fleet_events(
+        "care-failed",
+        {
+            "kind": "workflow.failed",
+            "at": 1.0,
+            "payload": {"reason": "approval denied"},
+        },
+    )
+    translator = SubstrateToAGUI("care-failed")
+
+    payloads = [
+        to_sse_dict(event)
+        for fleet_event in events
+        for event in translator.translate(fleet_event)
+    ]
+
+    assert [payload["type"] for payload in payloads] == ["RUN_ERROR"]
+    assert payloads[0]["message"] == "approval denied"

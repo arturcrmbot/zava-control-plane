@@ -7,16 +7,34 @@ from __future__ import annotations
 import pytest
 
 from api.server.services.event_bus import EventBus
-from api.server.world.registry import WORLD_PACKS, resolve_world_pack
+from api.server.world.registry import (
+    WORLD_PACKS,
+    resolve_objective_route,
+    resolve_world_pack,
+)
 from api.server.world.service import ActorWorldService
 
 
 def test_registry_declares_only_support_and_telco():
     assert set(WORLD_PACKS) == {"support", "telco"}
-    assert WORLD_PACKS["support"].objective_type == "support_capacity"
-    assert WORLD_PACKS["support"].allowed_command_types == frozenset({"reallocate_workers"})
-    assert WORLD_PACKS["telco"].objective_type == "network_service_recovery"
-    assert WORLD_PACKS["telco"].allowed_command_types == frozenset({"reroute_sessions"})
+    support_route = WORLD_PACKS["support"].objective_routes[0]
+    assert support_route.sensor_id == "sensor:support_pressure"
+    assert support_route.objective_type == "support_capacity"
+    assert support_route.allowed_command_types == frozenset({"reallocate_workers"})
+    assert support_route.success_event_types == frozenset({"worker.reallocated"})
+    assert support_route.failure_event_types == frozenset({"ticket.abandoned"})
+
+    telco_route = WORLD_PACKS["telco"].objective_routes[0]
+    assert telco_route.sensor_id == "sensor:network_anomaly"
+    assert telco_route.objective_type == "network_service_recovery"
+    assert telco_route.allowed_command_types == frozenset({"reroute_sessions"})
+    assert telco_route.success_event_types == frozenset({"site.recovered"})
+    assert telco_route.failure_event_types == frozenset({"command.rejected"})
+
+
+def test_resolve_objective_route_rejects_unknown_sensor():
+    with pytest.raises(ValueError, match="no objective route for sensor 'sensor:unknown'"):
+        resolve_objective_route(WORLD_PACKS["telco"], "sensor:unknown")
 
 
 def test_resolve_unknown_world_rejects():

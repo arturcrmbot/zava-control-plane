@@ -111,6 +111,11 @@ def _history_to_fleet_events(
             type="durable.workflow.completed", ts=ts, workflow_id=run_id,
             status="completed"))
 
+    elif kind == "workflow.failed":
+        events.append(FleetEvent(
+            type="workflow.failed", ts=ts, workflow_id=run_id,
+            reason=payload.get("reason", "workflow failed")))
+
     return events
 
 

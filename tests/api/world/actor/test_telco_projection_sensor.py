@@ -29,7 +29,12 @@ def test_failed_world_trips_sensor_with_real_site_and_session_ids():
     scenario = run_network(
         seed=22, config=_config(), failures=(SiteFailure(at_minute=5),),
     )
-    sensor = next(e for e in scenario.runtime.journal if e.type == "sensor.tripped")
+    sensor = next(
+        e for e in scenario.runtime.journal
+        if e.type == "sensor.tripped" and e.actor_id == "sensor:network_anomaly"
+    )
+    failed = next(e for e in scenario.runtime.journal if e.type == "site.failed")
+    assert sensor.trace_id == failed.trace_id
     measurements = sensor.payload["measurements"]
     site_id = measurements["site_id"]
     assert site_id in scenario.sites

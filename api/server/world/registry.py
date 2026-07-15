@@ -20,14 +20,25 @@ from api.server.world.runtime import SimulationRuntime
 
 
 @dataclass(frozen=True, slots=True)
+class ObjectiveRoute:
+    """Static routing and outcome contract for one world sensor."""
+
+    sensor_id: str
+    objective_type: str
+    allowed_command_types: frozenset[str]
+    success_event_types: frozenset[str]
+    failure_event_types: frozenset[str]
+    evaluation_timeout_minutes: float
+
+
+@dataclass(frozen=True, slots=True)
 class WorldPackRegistration:
     """Immutable declaration of one live actor world."""
 
     name: str
     build_scenario: Callable[[SimulationRuntime], Any]
     default_minutes_per_second: float
-    objective_type: str
-    allowed_command_types: frozenset[str]
+    objective_routes: tuple[ObjectiveRoute, ...]
 
 
 # The exact proven configs that used to live in ActorWorldService.support/telco.
@@ -58,15 +69,47 @@ WORLD_PACKS: dict[str, WorldPackRegistration] = {
         name="support",
         build_scenario=lambda runtime: SupportScenario(runtime, _SUPPORT_CONFIG),
         default_minutes_per_second=10.0,
-        objective_type="support_capacity",
-        allowed_command_types=frozenset({"reallocate_workers"}),
+        objective_routes=(
+            ObjectiveRoute(
+                sensor_id="sensor:support_pressure",
+                objective_type="support_capacity",
+                allowed_command_types=frozenset({"reallocate_workers"}),
+                success_event_types=frozenset({"worker.reallocated"}),
+                failure_event_types=frozenset({"ticket.abandoned"}),
+                evaluation_timeout_minutes=30.0,
+            ),
+        ),
     ),
     "telco": WorldPackRegistration(
         name="telco",
         build_scenario=lambda runtime: NetworkScenario(runtime, _TELCO_CONFIG),
         default_minutes_per_second=10.0,
-        objective_type="network_service_recovery",
-        allowed_command_types=frozenset({"reroute_sessions"}),
+        objective_routes=(
+            ObjectiveRoute(
+                sensor_id="sensor:network_anomaly",
+                objective_type="network_service_recovery",
+                allowed_command_types=frozenset({"reroute_sessions"}),
+                success_event_types=frozenset({"site.recovered"}),
+                failure_event_types=frozenset({"command.rejected"}),
+                evaluation_timeout_minutes=30.0,
+            ),
+            ObjectiveRoute(
+                sensor_id="sensor:customer_impact",
+                objective_type="proactive_customer_care",
+                allowed_command_types=frozenset({"apply_customer_remediation"}),
+                success_event_types=frozenset({"care.completed"}),
+                failure_event_types=frozenset({"command.rejected"}),
+                evaluation_timeout_minutes=60.0,
+            ),
+            ObjectiveRoute(
+                sensor_id="sensor:service_order",
+                objective_type="order_to_activate",
+                allowed_command_types=frozenset({"activate_service_order"}),
+                success_event_types=frozenset({"order.activated"}),
+                failure_event_types=frozenset({"command.rejected"}),
+                evaluation_timeout_minutes=60.0,
+            ),
+        ),
     ),
 }
 
@@ -79,3 +122,15 @@ def resolve_world_pack(name: str) -> WorldPackRegistration:
         raise ValueError(
             f"unknown world {name!r}; known worlds: {sorted(WORLD_PACKS)}"
         ) from None
+
+
+def resolve_objective_route(
+    registration: WorldPackRegistration, sensor_id: str
+) -> ObjectiveRoute:
+    """Resolve one sensor to its declared objective route."""
+    for route in registration.objective_routes:
+        if route.sensor_id == sensor_id:
+            return route
+    raise ValueError(
+        f"no objective route for sensor {sensor_id!r} in world {registration.name!r}"
+    )

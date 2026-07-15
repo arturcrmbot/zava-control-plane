@@ -236,6 +236,22 @@ class WorkflowEventIngestor:
                 self._emit("workflow.phase.completed", wid, phase=step, durationMs=dur)
                 self._emit("durable.step.completed", wid, phase=step, step=step, duration_ms=dur)
 
+        elif kind == "step.failed":
+            step = payload.get("step")
+            reason = str(payload.get("error") or payload.get("reason") or "step failed")
+            if step:
+                app_state.store.update_phase(
+                    wid, step, status="failed", completed_at=now
+                )
+                self._ledger(
+                    wid,
+                    kind="agent",
+                    actor_id=f"phase:{step}",
+                    action=f"phase.failed:{step}",
+                    details={"reason": reason},
+                )
+                self._emit("workflow.phase.failed", wid, phase=step, reason=reason)
+
         elif kind == "executor.invoked":
             name = str(payload.get("name", "?"))
             stage = payload.get("stage")
@@ -742,6 +758,35 @@ class WorkflowEventIngestor:
                          actor_id=payload.get("by") or "operator",
                          action=str(payload.get("action") or "log.action"),
                          details={})
+
+        elif kind == "workflow.failed":
+            reason = str(payload.get("reason") or "workflow failed")
+            failed_by = str(payload.get("by") or "orchestrator")
+            self._ledger(
+                wid,
+                kind="agent",
+                actor_id=failed_by,
+                action="workflow.failed",
+                details={"reason": reason},
+            )
+            w = app_state.store.get_workflow(wid)
+            if w:
+                w.status = "failed"
+                if w.metadata:
+                    w.metadata = {
+                        key: value
+                        for key, value in w.metadata.items()
+                        if key not in {"awaiting_reason", "wait_kind"}
+                    }
+                w.metadata = dict(w.metadata or {})
+                w.metadata["failure_reason"] = reason
+                w.metadata["failed_by"] = failed_by
+            self._auto_resolve_open(wid, "auto-resolved:failed")
+            self._emit("workflow.failed", wid, reason=reason)
+            pending_gates.clear(wid)
+            self._workflow_types.pop(wid, None)
+            for key in [key for key in self._span_starts if key[0] == wid]:
+                self._span_starts.pop(key, None)
 
         elif kind == "workflow.rejected":
             self._ledger(wid, kind="human",

@@ -26,9 +26,10 @@ from typing import Any
 
 from api.server.services.event_bus import EventBus
 from api.server.world.commands import CommandGateway
+from api.server.world.evaluations import OutcomeEvaluator
 from api.server.world.model import Objective, SimulationCommand, SimulationEvent
 from api.server.world.objectives import TERMINAL_STATUSES, ObjectiveManager
-from api.server.world.registry import WorldPackRegistration, resolve_world_pack
+from api.server.world.registry import ObjectiveRoute, WorldPackRegistration, resolve_world_pack
 from api.server.world.runtime import SimulationRuntime
 from api.shared.events import FleetEvent
 
@@ -116,7 +117,10 @@ class ActorWorldService:
         scenario.install()
         self._published_seq = len(runtime.journal)
         self.objectives = ObjectiveManager(runtime)
-        self.commands = CommandGateway(runtime, self.objectives, scenario.apply_command)
+        self.evaluator = OutcomeEvaluator(runtime, self.objectives)
+        self.commands = CommandGateway(
+            runtime, self.objectives, scenario.apply_command, self.evaluator
+        )
         return runtime, scenario
 
     @property
@@ -173,6 +177,18 @@ class ActorWorldService:
             raise ValueError(f"scenario {self.scenario_name!r} has no site_failure")
         return inject(site_id)
 
+    def submit_service_order(
+        self, *, account_id: str, product: str, requested_site_id: str
+    ) -> str:
+        submit = getattr(self.scenario, "submit_service_order", None)
+        if submit is None:
+            raise ValueError(f"scenario {self.scenario_name!r} has no service orders")
+        return submit(
+            account_id=account_id,
+            product=product,
+            requested_site_id=requested_site_id,
+        )
+
     # -- catch-up ---------------------------------------------------------
 
     def events_after(self, seq: int) -> list[dict[str, Any]]:
@@ -183,8 +199,12 @@ class ActorWorldService:
         self._publish_since(self._published_seq)
 
     def _publish_since(self, start: int) -> None:
-        for event in self.runtime.journal[start:]:
+        index = start
+        while index < len(self.runtime.journal):
+            event = self.runtime.journal[index]
+            self.evaluator.observe((event,))
             self._publish(event)
+            index += 1
         self._published_seq = len(self.runtime.journal)
 
     def _publish(self, event: SimulationEvent) -> None:
@@ -209,7 +229,7 @@ class ActorWorldService:
             "latest_seq": len(self.runtime.journal),
         }
         base["objectives"] = [objective.to_dict() for objective in self.objectives.all()]
-        base["evaluations"] = [evaluation.to_dict() for evaluation in self.commands.evaluations]
+        base["evaluations"] = [evaluation.to_dict() for evaluation in self.evaluator.evaluations]
         base.update(self.scenario.render_state())
         return base
 
@@ -256,6 +276,7 @@ class ActorWorldService:
     def open_objective(
         self,
         sensor_event: dict[str, Any],
+        route: ObjectiveRoute,
         *,
         owner_function: str,
         priority: int = 0,
@@ -265,7 +286,7 @@ class ActorWorldService:
         start = len(self.runtime.journal)
         objective = self.objectives.open(
             sensor_event,
-            self.registration,
+            route,
             owner_function=owner_function,
             priority=priority,
             deadline=deadline,

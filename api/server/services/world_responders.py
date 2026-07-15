@@ -52,6 +52,24 @@ RESPONDERS: dict[str, ResponderRegistration] = {
         timeout_seconds=90.0,
         observation_key="incident",
     ),
+    "proactive_customer_care": ResponderRegistration(
+        objective_type="proactive_customer_care",
+        orchestrator="ProactiveCustomerCareOrchestrator",
+        workflow_type="proactive-customer-care",
+        prefix="care",
+        owner_function="customer_care",
+        timeout_seconds=900.0,
+        observation_key="customer_impact",
+    ),
+    "order_to_activate": ResponderRegistration(
+        objective_type="order_to_activate",
+        orchestrator="OrderToActivateOrchestrator",
+        workflow_type="order-to-activate",
+        prefix="order",
+        owner_function="service_fulfillment",
+        timeout_seconds=900.0,
+        observation_key="service_order",
+    ),
 }
 
 

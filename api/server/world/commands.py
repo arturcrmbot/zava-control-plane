@@ -18,7 +18,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from api.server.world.model import Evaluation, Objective, SimulationCommand, SimulationEvent
+from api.server.world.evaluations import OutcomeEvaluator
+from api.server.world.model import Objective, SimulationCommand, SimulationEvent
 from api.server.world.objectives import ObjectiveManager
 from api.server.world.runtime import SimulationRuntime
 
@@ -31,11 +32,12 @@ class CommandGateway:
         runtime: SimulationRuntime,
         objectives: ObjectiveManager,
         apply_scenario_command: Callable[[SimulationCommand], SimulationEvent],
+        evaluator: OutcomeEvaluator | None = None,
     ) -> None:
         self._runtime = runtime
         self._objectives = objectives
         self._apply_scenario = apply_scenario_command
-        self.evaluations: list[Evaluation] = []
+        self.evaluator = evaluator or OutcomeEvaluator(runtime, objectives)
 
     def apply(self, objective: Objective, command: SimulationCommand) -> SimulationEvent:
         """Apply ``command`` under ``objective`` and return the resulting event.
@@ -63,6 +65,7 @@ class CommandGateway:
             )
             return rejected
 
+        journal_start = len(self._runtime.journal)
         result = self._apply_scenario(command)
         if result.type == "command.rejected":
             # Scenario applied its own validation and refused the mutation.
@@ -76,23 +79,9 @@ class CommandGateway:
             objective.id, "evaluating",
             cause_event_id=result.event_id, evidence_event_id=result.event_id,
         )
-        evaluation = Evaluation(
-            id=f"eval-{command.command_id}",
-            objective_id=objective.id,
-            trace_id=command.trace_id,
-            command_id=command.command_id,
-            started_at=self._runtime.now,
-            baseline=self._objectives.baseline_for(objective.id),
-        )
-        self.evaluations.append(evaluation)
-        self._runtime.emit(
-            "evaluation.started",
-            actor_id=objective.owner_function,
-            target_id=objective.claimed_by,
-            cause_event_id=result.event_id,
-            trace_id=command.trace_id,
-            payload=evaluation.to_dict(),
-        )
+        route = self._objectives.route_for(objective.id)
+        self.evaluator.start(objective, command, route, cause_event_id=result.event_id)
+        self.evaluator.observe(self._runtime.journal[journal_start:])
         return result
 
     def _reject_reason(self, objective: Objective, command: SimulationCommand) -> str | None:

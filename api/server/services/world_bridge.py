@@ -41,10 +41,16 @@ from api.server.services.world_responders import resolve_responder
 from api.server.services.world_workflow_adapter import WorldWorkflowAdapter
 from api.server.world.model import SimulationCommand
 from api.server.world.objectives import objective_id
+from api.server.world.registry import resolve_objective_route
 
 log = logging.getLogger("world_bridge")
 
 SENSOR_EVENT = "world.sensor.tripped"
+_EVALUATION_EVENTS = (
+    "world.evaluation.resolved",
+    "world.evaluation.failed",
+    "world.evaluation.timed_out",
+)
 
 _TERMINAL_OK = "Completed"
 _TERMINAL_BAD = {"Failed", "Terminated", "Canceled"}
@@ -68,38 +74,77 @@ class WorldBridge:
         self._app = app_state
         self._bus = app_state.bus
         self._poll_timeout = poll_timeout
-        self._in_flight_traces: set[str] = set()
-        self._off = None
+        self._in_flight_event_ids: set[str] = set()
+        self._workflow_by_objective: dict[str, tuple[str, str | None]] = {}
+        self._decision_ready: set[str] = set()
+        self._pending_evaluations: dict[str, dict] = {}
+        self._off: list = []
         # Canonical Workflow lifecycle owner: mints the one StateStore Workflow
         # (deterministic sensor-event id) before Durable scheduling and routes
         # every lifecycle transition through the shared WorkflowEventIngestor.
         self._adapter = WorldWorkflowAdapter(app_state)
 
     def start(self) -> None:
-        self._off = self._bus.on(SENSOR_EVENT, self._on_sensor)
+        self._off.append(self._bus.on(SENSOR_EVENT, self._on_sensor))
+        for event_type in _EVALUATION_EVENTS:
+            self._off.append(self._bus.on(event_type, self._on_evaluation))
         log.info("world_bridge: armed; listening for %s", SENSOR_EVENT)
 
     def stop(self) -> None:
-        if self._off is not None:
-            self._off()
-            self._off = None
-        self._in_flight_traces.clear()
+        for off in self._off:
+            off()
+        self._off.clear()
+        self._in_flight_event_ids.clear()
+        self._workflow_by_objective.clear()
+        self._decision_ready.clear()
+        self._pending_evaluations.clear()
 
     def _on_sensor(self, event: FleetEvent) -> None:
         simulation_event = getattr(event, "simulation_event", None)
         if not isinstance(simulation_event, dict):
             log.error("world_bridge: sensor event missing simulation_event: %s", event)
             return
-        trace_id = simulation_event.get("trace_id")
-        if not trace_id:
-            log.error("world_bridge: sensor event missing trace_id: %s", simulation_event)
+        event_id = simulation_event.get("event_id")
+        if not event_id:
+            log.error("world_bridge: sensor event missing event_id: %s", simulation_event)
             return
-        # Latched synchronously (before the task even runs) so a second sensor
-        # firing for the same trace is suppressed while the first is in flight.
-        if trace_id in self._in_flight_traces:
+        if event_id in self._in_flight_event_ids:
             return
-        self._in_flight_traces.add(trace_id)
+        self._in_flight_event_ids.add(event_id)
         asyncio.create_task(self._drive(simulation_event))
+
+    def _on_evaluation(self, event: FleetEvent) -> None:
+        simulation_event = getattr(event, "simulation_event", None)
+        if not isinstance(simulation_event, dict):
+            log.error("world_bridge: evaluation event missing simulation_event: %s", event)
+            return
+        outcome = simulation_event.get("payload")
+        if not isinstance(outcome, dict):
+            log.error("world_bridge: evaluation event missing payload: %s", simulation_event)
+            return
+        obj_id = outcome.get("objective_id")
+        if not obj_id or obj_id not in self._workflow_by_objective:
+            return
+        self._pending_evaluations[str(obj_id)] = outcome
+        if obj_id not in self._decision_ready:
+            return
+        asyncio.create_task(
+            self._complete_from_evaluation(str(obj_id), outcome)
+        )
+
+    async def _complete_from_evaluation(
+        self, objective_id: str, outcome: dict
+    ) -> None:
+        workflow = self._workflow_by_objective.pop(objective_id, None)
+        self._decision_ready.discard(objective_id)
+        self._pending_evaluations.pop(objective_id, None)
+        if workflow is None:
+            return
+        workflow_id, instance_id = workflow
+        if outcome.get("status") == "resolved":
+            await self._adapter.resolved(workflow_id, instance_id, outcome)
+            return
+        await self._adapter.evaluation_failed(workflow_id, instance_id, outcome)
 
     async def _drive(self, simulation_event: dict) -> None:
         trace_id = simulation_event.get("trace_id")
@@ -110,11 +155,26 @@ class WorldBridge:
         instance_id = None
         try:
             service = self._app.world_service
+            try:
+                route = resolve_objective_route(
+                    service.registration, simulation_event.get("actor_id")
+                )
+            except ValueError:
+                service.record_external(
+                    "objective.unroutable",
+                    trace_id=trace_id,
+                    cause_event_id=simulation_event.get("event_id"),
+                    payload={
+                        "sensor_id": simulation_event.get("actor_id"),
+                        "sensor_event_id": simulation_event.get("event_id"),
+                    },
+                )
+                return
             observation = service.build_observation(simulation_event)
 
-            responder = resolve_responder(service.registration.objective_type)
+            responder = resolve_responder(route.objective_type)
             objective = service.open_objective(
-                simulation_event, owner_function=responder.owner_function
+                simulation_event, route, owner_function=responder.owner_function
             )
             # A prior sensor episode already owns this (type + target)
             # objective: the manager returned it instead of a fresh one, so we
@@ -153,6 +213,7 @@ class WorldBridge:
             resp = await schedule_new_orchestration(payload, responder.orchestrator)
             instance_id = resp.get("id")
             status_uri = resp.get("statusQueryGetUri")
+            self._workflow_by_objective[objective.id] = (workflow_id, instance_id)
             log.info("world_bridge: scheduled %s instance=%s trace=%s",
                      responder.orchestrator, instance_id, trace_id)
 
@@ -176,6 +237,7 @@ class WorldBridge:
                     payload={"instance_id": instance_id, "error": "no orchestration output"},
                 )
                 service.fail_objective(objective.id, cause_event_id=failed.event_id)
+                self._workflow_by_objective.pop(objective.id, None)
                 await self._adapter.failed(workflow_id, instance_id, "no orchestration output")
                 log.error("world_bridge: %s produced no output for trace=%s", instance_id, trace_id)
                 return
@@ -190,6 +252,7 @@ class WorldBridge:
                     payload={"instance_id": instance_id, "reasoning": reasoning},
                 )
                 service.fail_objective(objective.id, cause_event_id=deferred.event_id)
+                self._workflow_by_objective.pop(objective.id, None)
                 await self._adapter.failed(
                     workflow_id, instance_id, reasoning or "responder deferred"
                 )
@@ -219,6 +282,7 @@ class WorldBridge:
             }
             if result.type == "command.rejected":
                 reason = _command_failure_reason(result)
+                self._workflow_by_objective.pop(objective.id, None)
                 await self._adapter.failed(workflow_id, instance_id, reason)
                 log.info("world_bridge: %s rejected command=%s trace=%s reason=%s",
                          instance_id, command.type, trace_id, reason)
@@ -229,6 +293,19 @@ class WorldBridge:
             # but its recovery/effectiveness is evaluated in Phase 3, so the
             # bridge never marks the workflow completed/resolved here.
             await self._adapter.decided(workflow_id, instance_id, command_data, reasoning)
+            self._decision_ready.add(objective.id)
+            pending = self._pending_evaluations.get(objective.id)
+            if pending is None:
+                final_objective = service.objectives.get(objective.id)
+                evaluation = service.evaluator.for_objective(objective.id)
+                if (
+                    final_objective is not None
+                    and final_objective.status in {"resolved", "failed"}
+                    and evaluation is not None
+                ):
+                    pending = evaluation.to_dict()
+            if pending is not None:
+                await self._complete_from_evaluation(objective.id, pending)
             log.info("world_bridge: %s applied command=%s trace=%s",
                      instance_id, command.type, trace_id)
         except Exception as ex:  # noqa: BLE001 — bridge must never crash the simulation
@@ -243,6 +320,7 @@ class WorldBridge:
                     )
                     if objective is not None:
                         service.fail_objective(objective.id, cause_event_id=failed.event_id)
+                        self._workflow_by_objective.pop(objective.id, None)
                     if workflow_id is not None:
                         await self._adapter.failed(workflow_id, instance_id, str(ex))
                 except Exception:  # noqa: BLE001 — never let failure-reporting itself crash
@@ -250,7 +328,7 @@ class WorldBridge:
                         "world_bridge: failed to record responder.failed for trace=%s", trace_id
                     )
         finally:
-            self._in_flight_traces.discard(trace_id)
+            self._in_flight_event_ids.discard(simulation_event.get("event_id"))
 
     async def _await_output(self, instance_id, status_uri, timeout: float | None = None):
         """Poll the Durable status endpoint until the orchestration is terminal."""

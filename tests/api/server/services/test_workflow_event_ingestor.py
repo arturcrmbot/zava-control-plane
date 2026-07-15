@@ -153,6 +153,26 @@ async def test_workflow_rejected_sets_failed_and_emits_failed():
     assert "workflow.resolved" in types
 
 
+async def test_workflow_failed_is_single_canonical_failure_terminal():
+    state, captured = _app_state()
+    _seed(state, "ING-FAILED")
+    ing = WorkflowEventIngestor(state)
+
+    await ing.ingest(
+        "ING-FAILED",
+        "I-1",
+        "workflow.failed",
+        {"by": "world_bridge", "reason": "no command"},
+    )
+
+    assert state.store.get_workflow("ING-FAILED").status == "failed"
+    assert state.orchestration_history["ING-FAILED"][-1]["kind"] == "workflow.failed"
+    types = [event.type for event in captured]
+    assert types.count("workflow.failed") == 1
+    assert "workflow.resolved" not in types
+    assert "durable.workflow.completed" not in types
+
+
 async def test_at_override_stamps_history_timestamp():
     state, _ = _app_state()
     _seed(state, "ING-9")

@@ -16,6 +16,7 @@ from api.server.services.event_bus import EventBus
 from api.server.services.state_store import StateStore
 from api.server.services.workflow_event_ingestor import WorkflowEventIngestor
 from api.server.services.world_bridge import WorldBridge
+from api.server.world.registry import ObjectiveRoute
 from api.shared.events import FleetEvent
 
 
@@ -33,9 +34,20 @@ class FakeWorld:
         self.objective_events = []
         self._objectives = {}
         self.registration = SimpleNamespace(
-            objective_type="support_capacity",
-            allowed_command_types=frozenset({"reallocate_workers"}),
+            name="support",
+            objective_routes=(
+                ObjectiveRoute(
+                    sensor_id="sensor:support_pressure",
+                    objective_type="support_capacity",
+                    allowed_command_types=frozenset({"reallocate_workers"}),
+                    success_event_types=frozenset({"worker.reallocated"}),
+                    failure_event_types=frozenset({"ticket.abandoned"}),
+                    evaluation_timeout_minutes=30,
+                ),
+            ),
         )
+        self.objectives = self
+        self.evaluator = SimpleNamespace(for_objective=lambda _objective_id: None)
 
     def build_observation(self, event):
         return {
@@ -53,7 +65,7 @@ class FakeWorld:
         self.recorded.append((event_type, kwargs))
         return event
 
-    def open_objective(self, sensor_event, *, owner_function, **kwargs):
+    def open_objective(self, sensor_event, route, *, owner_function, **kwargs):
         oid = f"obj-{sensor_event['event_id']}"
         objective = self._objectives.get(oid)
         if objective is None:
@@ -67,6 +79,9 @@ class FakeWorld:
         objective.status = to_status
         self.objective_events.append((to_status, objective_id))
         return objective
+
+    def get(self, objective_id):
+        return self._objectives.get(objective_id)
 
     def fail_objective(self, objective_id, **kwargs):
         objective = self._objectives.get(objective_id)
@@ -95,6 +110,7 @@ def sensor(trace="trace-1"):
         simulation_event={
             "event_id": "evt-sensor",
             "trace_id": trace,
+            "actor_id": "sensor:support_pressure",
             "type": "sensor.tripped",
             "payload": {"actor_ids": ["TKT-1"]},
         },
@@ -303,6 +319,45 @@ async def test_command_rejected_routes_workflow_failure_without_decision_ready(m
 
 
 @pytest.mark.asyncio
+async def test_delayed_evaluation_event_completes_the_canonical_workflow():
+    state = app_state()
+    bridge = WorldBridge(state)
+    bridge._workflow_by_objective["obj-delayed"] = (
+        "incident-evt-delayed",
+        "durable-delayed",
+    )
+    bridge._decision_ready.add("obj-delayed")
+    bridge._adapter.resolved = AsyncMock()
+    bridge.start()
+
+    state.bus.emit(
+        FleetEvent(
+            type="world.evaluation.resolved",
+            simulation_event={
+                "type": "evaluation.resolved",
+                "payload": {
+                    "objective_id": "obj-delayed",
+                    "status": "resolved",
+                    "evidence_event_ids": ["evt-site-recovered"],
+                },
+            },
+        )
+    )
+    await asyncio.sleep(0)
+
+    bridge._adapter.resolved.assert_awaited_once_with(
+        "incident-evt-delayed",
+        "durable-delayed",
+        {
+            "objective_id": "obj-delayed",
+            "status": "resolved",
+            "evidence_event_ids": ["evt-site-recovered"],
+        },
+    )
+    assert "obj-delayed" not in bridge._workflow_by_objective
+
+
+@pytest.mark.asyncio
 async def test_canonical_workflow_is_created_before_scheduling(monkeypatch):
     state = app_state()
     bridge = WorldBridge(state)
@@ -358,6 +413,38 @@ async def test_duplicate_trace_is_scheduled_once_while_in_flight(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_unknown_sensor_is_journalled_unroutable_without_scheduling(monkeypatch):
+    state = app_state()
+    bridge = WorldBridge(state)
+    scheduled = AsyncMock()
+    monkeypatch.setattr(
+        "api.server.services.world_bridge.schedule_new_orchestration", scheduled
+    )
+    bridge.start()
+    event = sensor()
+    event.simulation_event["actor_id"] = "sensor:unknown"
+
+    state.bus.emit(event)
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    scheduled.assert_not_awaited()
+    assert state.world_service.recorded == [
+        (
+            "objective.unroutable",
+            {
+                "trace_id": "trace-1",
+                "cause_event_id": "evt-sensor",
+                "payload": {
+                    "sensor_id": "sensor:unknown",
+                    "sensor_event_id": "evt-sensor",
+                },
+            },
+        )
+    ]
+
+
+@pytest.mark.asyncio
 async def test_schedule_failure_records_failed_and_clears_in_flight_trace(monkeypatch):
     state = app_state()
     bridge = WorldBridge(state)
@@ -372,7 +459,7 @@ async def test_schedule_failure_records_failed_and_clears_in_flight_trace(monkey
     assert state.world_service.applied == []
     assert state.world_service.recorded[-1][0] == "responder.failed"
     assert state.world_service._objectives["obj-evt-sensor"].status == "failed"
-    assert "trace-1" not in bridge._in_flight_traces
+    assert "evt-sensor" not in bridge._in_flight_event_ids
 
     # Same trace can be retried now that it is no longer in flight.
     retry_schedule = AsyncMock(

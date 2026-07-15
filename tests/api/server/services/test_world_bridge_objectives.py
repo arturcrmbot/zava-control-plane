@@ -44,6 +44,7 @@ def _sensor(event_id: str, trace: str, target: str = "queue:support") -> FleetEv
             "event_id": event_id,
             "trace_id": trace,
             "target_id": target,
+            "actor_id": "sensor:support_pressure",
             "type": "sensor.tripped",
             "payload": {"actor_ids": []},
         },

@@ -108,13 +108,18 @@ async def test_combined_adapter_and_orchestrator_single_owner_lifecycle():
     # -- real sensor trip + observation from the live telco world -------------
     world.inject_site_failure()
     world.runtime.run_until(2)
-    sensor = next(e for e in world.runtime.journal if e.type == "sensor.tripped")
+    sensor = next(
+        e for e in world.runtime.journal
+        if e.type == "sensor.tripped" and e.actor_id == "sensor:network_anomaly"
+    )
     sensor_event = sensor.to_dict()
     event_id = sensor_event["event_id"]
     expected_wid = f"incident-{event_id}"
     instance_id = "durable-ni-1"
 
-    responder = resolve_responder(world.registration.objective_type)
+    responder = resolve_responder(
+        world.registration.objective_routes[0].objective_type
+    )
     objective = SimpleNamespace(
         id=f"obj-{event_id}", trace_id=sensor_event["trace_id"], status="claimed",
     )

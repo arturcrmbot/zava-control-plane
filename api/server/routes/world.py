@@ -49,6 +49,12 @@ class SiteFailureRequest(BaseModel):
     site_id: str | None = Field(default=None)
 
 
+class ServiceOrderRequest(BaseModel):
+    account_id: str = Field(min_length=1)
+    product: str = Field(min_length=1)
+    requested_site_id: str = Field(min_length=1)
+
+
 @router.get("/state")
 async def world_state() -> dict:
     service = getattr(app_state, "world_service", None)
@@ -114,3 +120,20 @@ async def inject_site_failure(body: SiteFailureRequest = SiteFailureRequest()) -
     except ValueError as exc:
         return {"ok": False, "error": str(exc)}
     return {"ok": True, "sim_time": service.runtime.now, "site_id": site_id}
+
+
+@router.post("/service-orders")
+async def submit_service_order(body: ServiceOrderRequest) -> dict:
+    service = getattr(app_state, "world_service", None)
+    submit = getattr(service, "submit_service_order", None)
+    if submit is None:
+        return {"ok": False, "error": "telco world not enabled"}
+    try:
+        order_id = submit(
+            account_id=body.account_id,
+            product=body.product,
+            requested_site_id=body.requested_site_id,
+        )
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": True, "order_id": order_id, "sim_time": service.runtime.now}

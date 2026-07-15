@@ -59,6 +59,7 @@ from typing import Any
 
 from api.server.services.synthetic_data import build_registered_workflow
 from api.server.services.world_responders import ResponderRegistration
+from api.shared.domains import DOMAINS
 
 log = logging.getLogger("world_workflow_adapter")
 
@@ -131,14 +132,12 @@ class WorldWorkflowAdapter:
             w.orchestration_instance_id = instance_id
             self._app.store.upsert_workflow(w)
 
-        # Telemetry Correlation is the deterministic bridge-side gather (sensor
-        # trip → observation) that has already completed by scheduling time.
-        # Stamp workflow_type into the checkpoint payload so the ingestor caches
-        # it and the emitted FleetEvent resolves `domain` even when this boundary
-        # is recorded before the orchestrator's workflow.started arrives.
-        await self._record_phase(
-            workflow_id, instance_id, _TELEMETRY_CORRELATION, workflow_type,
-        )
+        # Telemetry Correlation belongs only to network-incident. Other
+        # responders checkpoint their own first phase inside their orchestrator.
+        if workflow_type == "network-incident":
+            await self._record_phase(
+                workflow_id, instance_id, _TELEMETRY_CORRELATION, workflow_type,
+            )
 
     async def decided(
         self,
@@ -179,6 +178,13 @@ class WorldWorkflowAdapter:
             workflow_id, instance_id, "log.action",
             {"by": "world_bridge", "action": "responder.decided"},
         )
+        if getattr(w, "type", None) == "order-to-activate":
+            await self._record_phase(
+                workflow_id,
+                instance_id,
+                "Service Activation",
+                "order-to-activate",
+            )
 
     async def failed(
         self, workflow_id: str, instance_id: str | None, reason: Any
@@ -195,23 +201,136 @@ class WorldWorkflowAdapter:
             w.metadata["failure_reason"] = str(reason)
             w.status = "failed"
             self._app.store.upsert_workflow(w)
-        # Route the failure onto the ledger/audit trail through the ingestor
-        # (log.action does not mutate status/phase, so no duplicate writes).
         await self._ingest(
-            workflow_id, instance_id, "log.action",
-            {"by": "world_bridge", "action": "responder.failed", "reason": str(reason)},
+            workflow_id,
+            instance_id,
+            "workflow.failed",
+            {"by": "world_bridge", "reason": str(reason)},
         )
 
-    async def resolved(self, workflow_id: str, instance_id: str | None) -> None:
+    async def resolved(
+        self,
+        workflow_id: str,
+        instance_id: str | None,
+        outcome: dict[str, Any] | None = None,
+    ) -> None:
         """Future/evidenced terminal path (Phase 3).
 
         Emits the canonical ``workflow.completed`` through the ingestor. The
         WorldBridge MUST NOT call this before world mutation + evaluation; it is
         defined here so the terminal seam exists for the coupled Phase 3 slice.
         """
+        w = self._app.store.get_workflow(workflow_id)
+        if w is not None:
+            if not isinstance(w.payload, dict):
+                w.payload = {}
+            if outcome is not None:
+                w.payload["outcome"] = outcome
+            w.metadata = dict(w.metadata or {})
+            w.metadata["world_lifecycle"] = "resolved"
+            self._app.store.upsert_workflow(w)
+        final_phase = "Outcome Verification"
+        if w is not None:
+            domain = DOMAINS.get(w.type)
+            if domain is not None and domain.phases:
+                final_phase = domain.phases[-1].name
+        await self._ingest(
+            workflow_id,
+            instance_id,
+            "step.started",
+            {"step": final_phase, "workflow_type": getattr(w, "type", None)},
+        )
+        await self._ingest(
+            workflow_id,
+            instance_id,
+            "step.completed",
+            {
+                "step": final_phase,
+                "duration_ms": 0,
+                "workflow_type": getattr(w, "type", None),
+            },
+        )
         await self._ingest(workflow_id, instance_id, "workflow.completed", {})
+        self._capture_operational_memory(w, outcome)
+
+    async def evaluation_failed(
+        self,
+        workflow_id: str,
+        instance_id: str | None,
+        outcome: dict[str, Any],
+    ) -> None:
+        """Close a post-command failure from explicit world evidence."""
+        w = self._app.store.get_workflow(workflow_id)
+        if w is not None:
+            if not isinstance(w.payload, dict):
+                w.payload = {}
+            w.payload["outcome"] = outcome
+            w.metadata = dict(w.metadata or {})
+            w.metadata["world_lifecycle"] = "failed"
+            w.metadata["failure_reason"] = str(
+                outcome.get("reason") or outcome.get("status") or "evaluation failed"
+            )
+            self._app.store.upsert_workflow(w)
+        final_phase = "Outcome Verification"
+        if w is not None:
+            domain = DOMAINS.get(w.type)
+            if domain is not None and domain.phases:
+                final_phase = domain.phases[-1].name
+        await self._ingest(
+            workflow_id,
+            instance_id,
+            "step.started",
+            {"step": final_phase, "workflow_type": getattr(w, "type", None)},
+        )
+        await self._ingest(
+            workflow_id,
+            instance_id,
+            "step.failed",
+            {
+                "step": final_phase,
+                "error": str(outcome.get("reason") or outcome.get("status")),
+                "workflow_type": getattr(w, "type", None),
+            },
+        )
+        await self._ingest(
+            workflow_id,
+            instance_id,
+            "workflow.failed",
+            {
+                "by": "world_outcome_evaluator",
+                "reason": str(outcome.get("reason") or outcome.get("status")),
+            },
+        )
 
     # -- helpers ---------------------------------------------------------
+
+    def _capture_operational_memory(
+        self, workflow: Any, outcome: dict[str, Any] | None
+    ) -> None:
+        if workflow is None:
+            return
+        memory = getattr(self._app, "domain_memories", {}).get(workflow.type)
+        if memory is None:
+            return
+        evidence = (outcome or {}).get("evidence_event_type") or "world evidence"
+        text = (
+            f"Workflow {workflow.id} resolved from {evidence}; "
+            f"trace_id={(workflow.payload or {}).get('trace_id', '')}."
+        )
+        try:
+            memory.add(
+                text,
+                agent_skill="",
+                workflow_id=workflow.id,
+                extra_metadata={
+                    "source": "world_outcome_evaluator",
+                    "evidence_event_type": evidence,
+                },
+            )
+        except Exception:
+            log.exception(
+                "operational memory write failed for workflow=%s", workflow.id
+            )
 
     async def _record_phase(
         self, workflow_id: str, instance_id: str | None, phase: str,

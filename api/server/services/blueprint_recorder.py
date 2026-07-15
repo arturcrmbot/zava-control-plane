@@ -58,6 +58,7 @@ RECORDED_TYPES: frozenset[str] = frozenset({
     "durable.suspended",
     "durable.workflow.completed",
     "workflow.resolved",
+    "workflow.failed",
 })
 
 
@@ -180,7 +181,11 @@ class BlueprintRecorder:
 
         # Workflow-end events: write out and forget. Mark closed so a second
         # terminal event for the same wid doesn't open a fresh file.
-        if event.type in ("durable.workflow.completed", "workflow.resolved"):
+        if event.type in (
+            "durable.workflow.completed",
+            "workflow.resolved",
+            "workflow.failed",
+        ):
             self._write_recording(rec)
             self._workflows.pop(wid, None)
             self._closed.add(wid)

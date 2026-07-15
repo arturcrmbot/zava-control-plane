@@ -148,7 +148,10 @@ async def test_actor_network_incident_end_to_end(monkeypatch):
     # -- drive the real world to a cell-site failure + anomaly ----------------
     site_id = world.inject_site_failure()
     world.runtime.run_until(2)
-    sensor = next(e for e in world.runtime.journal if e.type == "sensor.tripped")
+    sensor = next(
+        e for e in world.runtime.journal
+        if e.type == "sensor.tripped" and e.actor_id == "sensor:network_anomaly"
+    )
     sensor_event = sensor.to_dict()
     event_id = sensor_event["event_id"]
     expected_wid = f"incident-{event_id}"
@@ -192,8 +195,8 @@ async def test_actor_network_incident_end_to_end(monkeypatch):
     assert w.type == "network-incident"
     # Never started on a hardcoded "Intake": the initial phase derived from the
     # registered domain (Telemetry Correlation) and then advanced through the
-    # recorded boundaries to the last real phase (nonterminal, pre-Phase-3).
-    assert w.current_phase == "Reroute Planning"
+    # recorded boundaries through the evidence-backed world evaluation.
+    assert w.current_phase == "Recovery Verification"
     assert w.current_phase != "Intake"
 
     # === 2. payload carries objective_id, trace_id and the incident observation
@@ -209,9 +212,12 @@ async def test_actor_network_incident_end_to_end(monkeypatch):
 
     # === 3. phases + history recorded through the shared ingestor
     phase_names = {p.name for p in state.store.get_phases(expected_wid)}
-    assert {"Telemetry Correlation", "Impact Diagnosis", "Reroute Planning"} <= phase_names
-    # Recovery Verification is the Phase 3 world-eval boundary — NOT recorded yet.
-    assert "Recovery Verification" not in phase_names
+    assert {
+        "Telemetry Correlation",
+        "Impact Diagnosis",
+        "Reroute Planning",
+        "Recovery Verification",
+    } <= phase_names
     assert state.orchestration_history.get(expected_wid)
 
     # === 4. workflow-scoped standard FleetEvents accepted by Blueprint normalisation
@@ -235,8 +241,7 @@ async def test_actor_network_incident_end_to_end(monkeypatch):
         agui_names.extend(type(a).__name__ for a in translator.translate(e))
     assert "RunStarted" in agui_names
     assert "StepStarted" in agui_names
-    # No terminal run-finish before Phase 3.
-    assert "RunFinished" not in agui_names
+    assert "RunFinished" in agui_names
 
     # === 6. EntityReflector ran the network_incident projection: Workflow + Asset
     workflow_writes = [
@@ -250,11 +255,12 @@ async def test_actor_network_incident_end_to_end(monkeypatch):
     )
     assert any(op.attrs.get("kind") == "cell-site" for op in asset_writes)
 
-    # === 7. NO terminal completion/resolution before world mutation/evaluation
-    assert w.status == "in_progress"
+    # === 7. terminal completion follows world mutation/evaluation evidence
+    assert w.status == "completed"
+    assert w.payload["outcome"]["status"] == "resolved"
+    assert w.payload["outcome"]["evidence_event_ids"]
     emitted_types = {e.type for e in fleet_events}
-    assert "durable.workflow.completed" not in emitted_types
-    assert "workflow.resolved" not in emitted_types
+    assert "durable.workflow.completed" in emitted_types
 
     # === 8. existing WorldBridge actor command behaviour preserved
     assert state.world_last_response is not None
@@ -262,9 +268,11 @@ async def test_actor_network_incident_end_to_end(monkeypatch):
     journal_types = [e.type for e in world.runtime.journal]
     assert "session.rerouted" in journal_types  # real session actors moved
     assert "command.accepted" in journal_types
-    # Objective walked open → claimed → acting → evaluating via the gateway.
+    # Objective walked open → claimed → acting → evaluating → resolved.
     objective = world.objectives.get(expected_oid)
-    assert objective is not None and objective.status == "evaluating"
+    assert objective is not None and objective.status == "resolved"
+    evaluation = world.evaluator.for_objective(expected_oid)
+    assert evaluation is not None and evaluation.status == "resolved"
 
 
 async def test_actor_network_incident_workflow_id_is_idempotent(monkeypatch):
@@ -290,7 +298,10 @@ async def test_actor_network_incident_workflow_id_is_idempotent(monkeypatch):
 
     world.inject_site_failure()
     world.runtime.run_until(2)
-    sensor = next(e for e in world.runtime.journal if e.type == "sensor.tripped")
+    sensor = next(
+        e for e in world.runtime.journal
+        if e.type == "sensor.tripped" and e.actor_id == "sensor:network_anomaly"
+    )
     sensor_event = sensor.to_dict()
     expected_wid = f"incident-{sensor_event['event_id']}"
 

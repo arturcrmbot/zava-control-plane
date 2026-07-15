@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from api.server.world.commands import CommandGateway
+from api.server.world.evaluations import OutcomeEvaluator
 from api.server.world.model import SimulationCommand
 from api.server.world.objectives import ObjectiveManager
 from api.server.world.registry import resolve_world_pack
@@ -50,7 +51,8 @@ def _explode_apply(command):
 
 
 def _acting_objective(runtime, manager, *, issuer=ISSUER):
-    objective = manager.open(_sensor(), resolve_world_pack("support"), owner_function=issuer)
+    route = resolve_world_pack("support").objective_routes[0]
+    objective = manager.open(_sensor(), route, owner_function=issuer)
     manager.transition(objective.id, "claimed", claimed_by=issuer)
     manager.transition(objective.id, "acting")
     return manager.get(objective.id)
@@ -60,7 +62,8 @@ def test_accepts_valid_command_and_starts_evaluation():
     runtime = SimulationRuntime(1)
     manager = ObjectiveManager(runtime)
     objective = _acting_objective(runtime, manager)
-    gateway = CommandGateway(runtime, manager, _accepting_apply(runtime))
+    evaluator = OutcomeEvaluator(runtime, manager)
+    gateway = CommandGateway(runtime, manager, _accepting_apply(runtime), evaluator)
 
     result = gateway.apply(objective, _command())
 
@@ -69,8 +72,8 @@ def test_accepts_valid_command_and_starts_evaluation():
     types = [event.type for event in runtime.journal]
     assert "objective.evaluating" in types
     assert "evaluation.started" in types
-    assert len(gateway.evaluations) == 1
-    evaluation = gateway.evaluations[0]
+    assert len(evaluator.evaluations) == 1
+    evaluation = evaluator.evaluations[0]
     assert evaluation.objective_id == objective.id
     assert evaluation.baseline == {"support_backlog": 12}
     started = next(event for event in runtime.journal if event.type == "evaluation.started")
@@ -80,7 +83,8 @@ def test_accepts_valid_command_and_starts_evaluation():
 def test_rejects_when_objective_not_acting():
     runtime = SimulationRuntime(1)
     manager = ObjectiveManager(runtime)
-    objective = manager.open(_sensor(), resolve_world_pack("support"), owner_function=ISSUER)
+    route = resolve_world_pack("support").objective_routes[0]
+    objective = manager.open(_sensor(), route, owner_function=ISSUER)
     manager.transition(objective.id, "claimed", claimed_by=ISSUER)  # still claimed, not acting
     gateway = CommandGateway(runtime, manager, _explode_apply)
 
@@ -88,7 +92,7 @@ def test_rejects_when_objective_not_acting():
 
     assert result.type == "command.rejected"
     assert manager.get(objective.id).status == "failed"
-    assert gateway.evaluations == []
+    assert gateway.evaluator.evaluations == []
 
 
 @pytest.mark.parametrize(
@@ -110,7 +114,7 @@ def test_rejects_out_of_scope_command_without_mutation(command):
 
     assert result.type == "command.rejected"
     assert manager.get(objective.id).status == "failed"
-    assert gateway.evaluations == []
+    assert gateway.evaluator.evaluations == []
 
 
 def test_scenario_rejection_fails_objective_without_evaluation():
@@ -129,5 +133,5 @@ def test_scenario_rejection_fails_objective_without_evaluation():
 
     assert result.type == "command.rejected"
     assert manager.get(objective.id).status == "failed"
-    assert gateway.evaluations == []
+    assert gateway.evaluator.evaluations == []
     assert "evaluation.started" not in [event.type for event in runtime.journal]

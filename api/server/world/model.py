@@ -77,11 +77,7 @@ class Objective:
 
 @dataclass(frozen=True, slots=True)
 class Evaluation:
-    """An immutable evaluation opened when an accepted command starts changing
-    the world. It captures the objective's baseline sensor measurements so a
-    later coupled slice can judge effectiveness; for now it only ever reaches
-    ``started`` (no effectiveness claim, no policy change).
-    """
+    """Evidence-backed outcome evaluation for one accepted world command."""
 
     id: str
     objective_id: str
@@ -90,6 +86,12 @@ class Evaluation:
     started_at: float
     baseline: dict[str, Any]
     status: str = "started"
+    deadline_at: float | None = None
+    final_measurements: dict[str, Any] | None = None
+    evidence_event_ids: tuple[str, ...] = ()
+    completed_at: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        data = asdict(self)
+        data["evidence_event_ids"] = list(self.evidence_event_ids)
+        return data
