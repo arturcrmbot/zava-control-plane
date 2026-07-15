@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.server.middleware.replay_readonly import ReplayReadOnlyMiddleware
 from api.server.services.replay.mode import is_replay
 from api.server.state import app_state
+from api.shared.verticals import active_vertical
 
 
 def _cors_allowed_origins() -> list[str]:
@@ -174,7 +175,8 @@ async def lifespan(app: FastAPI):
     # Start the simulator ramp loop (spawns workflows via the AF Durable host)
     ramp_task = asyncio.create_task(simulator_orchestrator.ramp_loop())
     # World simulator — exactly one authority at a time, selected by
-    # ZAVA_WORLD. `support` runs the live actor-world service (spec
+    # normalized ZAVA_WORLD or, when unset/blank, the active vertical's
+    # default world. `support` runs the live actor-world service (spec
     # 2026-07-13) and arms the actor WorldBridge, which schedules a REAL
     # SurgeStaffingOrchestrator on the func host and applies its typed
     # command back through the service. Any other value falls back to the
@@ -184,7 +186,13 @@ async def lifespan(app: FastAPI):
     # observations/commands, not aggregate stocks/signals).
     world_task = None
     world_bridge = None
-    world_name = os.getenv("ZAVA_WORLD")
+    vertical = active_vertical()
+    world_source = "ZAVA_WORLD"
+    raw_world_name = os.getenv("ZAVA_WORLD")
+    world_name = raw_world_name.strip() if raw_world_name is not None else None
+    if not world_name and vertical is not None:
+        world_name = vertical.world
+        world_source = "ZAVA_VERTICAL"
     if world_name in ("support", "telco"):
         from api.server.services.world_bridge import WorldBridge
         from api.server.world.service import ActorWorldService
@@ -200,7 +208,7 @@ async def lifespan(app: FastAPI):
         world_bridge = WorldBridge(app_state)
         world_bridge.start()
         app_state.world_bridge = world_bridge
-        print(f"[server] actor world ON (ZAVA_WORLD={world_name}) + bridge armed")
+        print(f"[server] actor world ON (world={world_name}, source={world_source}) + bridge armed")
     elif world_name:
         from api.server.world import maybe_start_world
 
@@ -209,7 +217,10 @@ async def lifespan(app: FastAPI):
             on_engine=lambda e: setattr(app_state, "world_engine", e),
         )
         if world_task is not None:
-            print(f"[server] world engine ON (ZAVA_WORLD={world_name}, aggregate toy fallback)")
+            print(
+                f"[server] world engine ON (world={world_name}, source={world_source}, "
+                "aggregate toy fallback)"
+            )
     # Optional dream-pass cadence. Off unless DREAM_PASS_DEMO_CADENCE_SECONDS
     # is set. Scheduled here (not in AppState.__init__) because
     # AppState is constructed at module import time, before uvicorn has

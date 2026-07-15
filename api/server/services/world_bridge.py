@@ -38,6 +38,7 @@ import httpx
 from api.shared.events import FleetEvent
 from api.server.services.durable_client import schedule_new_orchestration
 from api.server.services.world_responders import resolve_responder
+from api.server.services.world_workflow_adapter import WorldWorkflowAdapter
 from api.server.world.model import SimulationCommand
 from api.server.world.objectives import objective_id
 
@@ -49,6 +50,17 @@ _TERMINAL_OK = "Completed"
 _TERMINAL_BAD = {"Failed", "Terminated", "Canceled"}
 
 
+def _command_failure_reason(result) -> str:
+    payload = getattr(result, "payload", None)
+    if isinstance(payload, dict):
+        reason = payload.get("reason")
+        if reason:
+            return str(reason)
+        if payload:
+            return str(payload)
+    return f"{getattr(result, 'type', 'command.rejected')} returned by world command gateway"
+
+
 class WorldBridge:
     """Drives one Durable orchestration per sensor trace (never overlaps a trace)."""
 
@@ -58,6 +70,10 @@ class WorldBridge:
         self._poll_timeout = poll_timeout
         self._in_flight_traces: set[str] = set()
         self._off = None
+        # Canonical Workflow lifecycle owner: mints the one StateStore Workflow
+        # (deterministic sensor-event id) before Durable scheduling and routes
+        # every lifecycle transition through the shared WorkflowEventIngestor.
+        self._adapter = WorldWorkflowAdapter(app_state)
 
     def start(self) -> None:
         self._off = self._bus.on(SENSOR_EVENT, self._on_sensor)
@@ -90,6 +106,8 @@ class WorldBridge:
         service = None
         requested = None
         objective = None
+        workflow_id = None
+        instance_id = None
         try:
             service = self._app.world_service
             observation = service.build_observation(simulation_event)
@@ -116,10 +134,20 @@ class WorldBridge:
                 payload={"observation": observation, "objective_id": objective.id},
             )
 
+            # Create/upsert exactly one canonical Workflow BEFORE scheduling the
+            # Durable orchestration. The adapter derives the workflow id
+            # deterministically from the sensor event id; it is the ONLY id used
+            # for the Durable payload, StateStore, AG-UI and EntityReflector —
+            # there is no independent prefix-trace reconstruction anywhere here.
+            workflow_id = self._adapter.start(
+                simulation_event, objective, responder, observation
+            )
+
             payload = {
-                "workflow_id": f"{responder.prefix}-{trace_id}",
+                "workflow_id": workflow_id,
                 "type": responder.workflow_type,
                 "trace_id": trace_id,
+                "objective_id": objective.id,
                 "observation": observation,
             }
             resp = await schedule_new_orchestration(payload, responder.orchestrator)
@@ -127,6 +155,11 @@ class WorldBridge:
             status_uri = resp.get("statusQueryGetUri")
             log.info("world_bridge: scheduled %s instance=%s trace=%s",
                      responder.orchestrator, instance_id, trace_id)
+
+            # Record ONLY the deterministic bridge-side Telemetry Correlation
+            # boundary through the ingestor; the Durable orchestrator owns
+            # workflow.started and emits it on the same ingestion path.
+            await self._adapter.scheduled(workflow_id, instance_id)
 
             service.transition_objective(
                 objective.id, "acting",
@@ -143,6 +176,7 @@ class WorldBridge:
                     payload={"instance_id": instance_id, "error": "no orchestration output"},
                 )
                 service.fail_objective(objective.id, cause_event_id=failed.event_id)
+                await self._adapter.failed(workflow_id, instance_id, "no orchestration output")
                 log.error("world_bridge: %s produced no output for trace=%s", instance_id, trace_id)
                 return
 
@@ -156,6 +190,9 @@ class WorldBridge:
                     payload={"instance_id": instance_id, "reasoning": reasoning},
                 )
                 service.fail_objective(objective.id, cause_event_id=deferred.event_id)
+                await self._adapter.failed(
+                    workflow_id, instance_id, reasoning or "responder deferred"
+                )
                 log.info("world_bridge: %s deferred trace=%s reasoning=%s",
                          instance_id, trace_id, reasoning)
                 return
@@ -176,8 +213,22 @@ class WorldBridge:
                 "command": command_data,
                 "result_event_id": result.event_id,
                 "result_type": result.type,
+                "result_payload": getattr(result, "payload", None),
                 "objective_id": objective.id,
+                "workflow_id": workflow_id,
             }
+            if result.type == "command.rejected":
+                reason = _command_failure_reason(result)
+                await self._adapter.failed(workflow_id, instance_id, reason)
+                log.info("world_bridge: %s rejected command=%s trace=%s reason=%s",
+                         instance_id, command.type, trace_id, reason)
+                return
+
+            # Record the decision boundaries + stash the command on the canonical
+            # Workflow. NONTERMINAL by design: the world command has been applied
+            # but its recovery/effectiveness is evaluated in Phase 3, so the
+            # bridge never marks the workflow completed/resolved here.
+            await self._adapter.decided(workflow_id, instance_id, command_data, reasoning)
             log.info("world_bridge: %s applied command=%s trace=%s",
                      instance_id, command.type, trace_id)
         except Exception as ex:  # noqa: BLE001 — bridge must never crash the simulation
@@ -192,6 +243,8 @@ class WorldBridge:
                     )
                     if objective is not None:
                         service.fail_objective(objective.id, cause_event_id=failed.event_id)
+                    if workflow_id is not None:
+                        await self._adapter.failed(workflow_id, instance_id, str(ex))
                 except Exception:  # noqa: BLE001 — never let failure-reporting itself crash
                     log.exception(
                         "world_bridge: failed to record responder.failed for trace=%s", trace_id

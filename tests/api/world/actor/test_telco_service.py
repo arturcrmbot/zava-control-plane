@@ -7,11 +7,25 @@ from __future__ import annotations
 import json
 
 from api.functions.workflows.network_incident_activities import (
-    network_incident_decide_activity,
+    network_incident_impact_activity,
+    network_incident_reroute_activity,
 )
 from api.server.services.event_bus import EventBus
 from api.server.world.model import SimulationCommand
 from api.server.world.service import ActorWorldService
+
+
+def _decide(trace_id: str, observation: dict) -> dict:
+    """Compose the two REAL deterministic activities exactly as the
+    NetworkIncidentOrchestrator does: impact diagnosis → reroute execution."""
+    impact = network_incident_impact_activity(
+        {"trace_id": trace_id, "observation": observation}
+    )
+    return network_incident_reroute_activity({
+        "trace_id": trace_id,
+        "diagnosis": impact.get("diagnosis"),
+        "diagnosis_reasoning": impact.get("reasoning"),
+    })
 
 
 def service() -> ActorWorldService:
@@ -65,10 +79,8 @@ def test_full_incident_loop_reroutes_real_sessions_via_the_durable_activity():
     assert observation["affected_sessions"]
     assert observation["neighbor_sites"]
 
-    # Decide: run the REAL Durable activity (no mocks).
-    decision = network_incident_decide_activity(
-        {"trace_id": observation["trace_id"], "observation": observation}
-    )
+    # Decide: run the REAL Durable activities (no mocks), composed in order.
+    decision = _decide(observation["trace_id"], observation)
     command = _command_from(decision)
     assert command.type == "reroute_sessions"
     assigned_ids = [a["session_id"] for a in command.payload["assignments"]]
@@ -111,9 +123,7 @@ def test_full_incident_loop_changes_neighbour_load_and_is_idempotent():
     world.runtime.run_until(2)
     sensor = next(e for e in world.runtime.journal if e.type == "sensor.tripped")
     observation = world.build_observation(sensor.to_dict())
-    decision = network_incident_decide_activity(
-        {"trace_id": observation["trace_id"], "observation": observation}
-    )
+    decision = _decide(observation["trace_id"], observation)
     command = _command_from(decision)
 
     target_ids = {a["to_site_id"] for a in command.payload["assignments"]}

@@ -1133,6 +1133,13 @@ DOMAINS: dict[str, Domain] = {
     # live trigger is the actor-world network.anomaly sensor bridged to
     # NetworkIncidentOrchestrator; the spawn_fn lets the simulator schedule
     # it too. Owned by the ops function (incident-rate KPI).
+    #
+    # All four phases are DETERMINISTIC: the orchestrator runs two real
+    # deterministic activities (network_incident_impact_activity +
+    # network_incident_reroute_activity) between the bridge-side telemetry
+    # correlation and the later world-evaluation recovery verification. There
+    # are no agent/GHCP skills — ``skills`` is intentionally empty; the greedy
+    # reroute is pure deterministic code, not a reasoning model.
     "network-incident": Domain(
         workflow_type="network-incident",
         display_name="Network Incident Response",
@@ -1141,12 +1148,12 @@ DOMAINS: dict[str, Domain] = {
         operator_surface="network-operations",
         phases=(
             Phase("Telemetry Correlation", "deterministic"),
-            Phase("Impact Diagnosis", "agent"),
-            Phase("Reroute Execution", "agent"),
+            Phase("Impact Diagnosis", "deterministic"),
+            Phase("Reroute Planning", "deterministic"),
             Phase("Recovery Verification", "deterministic"),
         ),
         hitl_gates=(),
-        skills=("impact_diagnosis", "reroute_execution"),
+        skills=(),
         spawn_fn="api.server.services.simulator_orchestrator.spawn_network_incident_workflow",
         # Cell-site incidents are frequent in a large RAN — cap at every
         # 900s (15 min) of demo-warped time.

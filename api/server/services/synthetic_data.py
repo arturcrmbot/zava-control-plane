@@ -567,3 +567,67 @@ def build_creative_campaign_workflow(
         agency=r.get("agency", "Ogilvy"),
         payload={"brief": brief, "scenario": r.get("scenario")},
     )
+
+
+# ---------------------------------------------------------------------------
+# Registered-domain Workflow factory
+# ---------------------------------------------------------------------------
+# Shared by the simulator strategic-domain spawners (see
+# api/server/services/simulator_orchestrator.py::_build_strategic_workflow) and
+# the actor-world WorldWorkflowAdapter (api/server/services/world_workflow_adapter.py).
+# Both mint an identical canonical Workflow shape from registered domain
+# metadata so there is exactly one place that decides the initial phase, the
+# payload nesting, and the platform-required fields.
+
+
+def _registered_initial_phase(workflow_type: str) -> str:
+    """First phase for a registered domain, or ``"Intake"`` when unknown.
+
+    The initial ``current_phase`` MUST come from ``DOMAINS[workflow_type]
+    .phases[0]`` — never a hardcoded ``"Intake"`` — so a domain whose first
+    phase is e.g. ``"Telemetry Correlation"`` starts on the truthful phase.
+    Imported lazily to avoid an import cycle (domains.py → functions.py wiring
+    runs at import).
+    """
+    from api.shared import domains as _domains
+
+    domain = _domains.DOMAINS.get(workflow_type)
+    if domain is not None and domain.phases:
+        return domain.phases[0].name
+    return "Intake"
+
+
+def build_registered_workflow(
+    workflow_id: str,
+    workflow_type: str,
+    payload_key: str,
+    payload_data: dict,
+    *,
+    extra_payload: dict | None = None,
+    initial_phase: str | None = None,
+) -> Workflow:
+    """Build a canonical :class:`Workflow` from registered domain metadata.
+
+    ``payload`` nests the business object under ``payload_key`` and hoists
+    ``scenario`` to the top level (the shape the simulator spawners emit and the
+    per-domain entity projections read). ``extra_payload`` merges additional
+    top-level keys — the adapter uses it to stamp ``objective_id`` / ``trace_id``
+    onto the workflow payload. ``initial_phase`` overrides the domain-derived
+    phase for the rare caller that needs to; by default the phase derives from
+    ``DOMAINS[workflow_type].phases[0]``.
+    """
+    now = time.time()
+    phase = initial_phase or _registered_initial_phase(workflow_type)
+    payload: dict = {payload_key: dict(payload_data), "scenario": payload_data.get("scenario")}
+    if extra_payload:
+        payload.update(extra_payload)
+    return Workflow(
+        id=workflow_id,
+        type=workflow_type,
+        current_phase=phase,
+        created_at=now,
+        sla_due_at=now + 86400,
+        jurisdiction="London-Zava",
+        agency="Zava",
+        payload=payload,
+    )

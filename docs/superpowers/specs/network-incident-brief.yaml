@@ -21,11 +21,12 @@
 # has NO HITL gate, NO persona, and NO authority-matrix entry. Rerouting a
 # session to a neighbouring cell is a safe, idempotent, self-healing control
 # action that a human operator would never be asked to hand-approve in the
-# seconds-scale incident loop — gating it would defeat the purpose. The two
-# reasoning phases (impact_diagnosis, reroute_execution) are agent steps; the
-# bracketing phases (telemetry_correlation, recovery_verification) are
-# deterministic. This mirrors the real "self-organising network" (SON)
-# closed-loop pattern.
+# seconds-scale incident loop — gating it would defeat the purpose. All four
+# phases are DETERMINISTIC: the orchestrator runs two real deterministic
+# activities (impact_diagnosis, reroute_planning) — greedy capacity maths, not
+# a reasoning model — bracketed by the deterministic telemetry_correlation and
+# recovery_verification boundaries. There are NO agent/GHCP skills. This mirrors
+# the real "self-organising network" (SON) closed-loop pattern.
 #
 # AGENT-CHOICE: `network-incident` chosen as the workflow_type (no collision
 # with any existing domain). Owner function is `ops` (network operations).
@@ -61,24 +62,24 @@ phases:
 
   - name: impact_diagnosis
     intent: |
-      Agent. Read the failed site, the neighbouring sites and their spare
-      capacity, and the affected session set (id, type, demand_mbps).
-      Diagnose the blast radius: which sessions are degraded, which
-      neighbours can absorb them.
-    kind: agent
-    agent_skill_name: impact_diagnosis
+      Deterministic. Read the failed site, the neighbouring sites and their
+      spare capacity, and the affected session set (id, type, demand_mbps).
+      Diagnose the blast radius: which sessions are degraded, which neighbours
+      can absorb them, and the deterministic order to move them (voice first,
+      then by session id). Pure gather + ordering — no reasoning model.
+    kind: deterministic
     external_systems: []
 
-  - name: reroute_execution
+  - name: reroute_planning
     intent: |
-      Agent. Greedily assign each affected session to the healthiest
-      neighbour with spare capacity — voice first, then deterministic by
-      session ID. Emit a typed `reroute_sessions` command whose payload is
-      {incident_site_id, assignments:[{session_id, to_site_id}]}. The live
-      service validates all assignments atomically (rejects the whole
-      command if any target would exceed capacity) and idempotently.
-    kind: agent
-    agent_skill_name: reroute_execution
+      Deterministic. Greedily plan each affected session's assignment to the
+      healthiest neighbour with spare capacity — voice first, then
+      deterministic by session ID. Emit a typed `reroute_sessions` command
+      whose payload is {incident_site_id, assignments:[{session_id,
+      to_site_id}]}. The live service validates and applies that plan
+      atomically later (rejecting the whole command if any target would
+      exceed capacity) and idempotently.
+    kind: deterministic
     external_systems: []
 
   - name: recovery_verification

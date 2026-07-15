@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
+import yaml
 
 from api.shared import domains as registry
 
@@ -106,3 +106,23 @@ def test_all_wake_hints_includes_at_least_one_per_fleet_domain():
     }
     missing = expected - hints
     assert not missing, f"missing wake hints: {missing}"
+
+
+def test_network_incident_phase_vocabulary_matches_brief() -> None:
+    domain = registry.DOMAINS["network-incident"]
+    assert [p.name for p in domain.phases] == [
+        "Telemetry Correlation",
+        "Impact Diagnosis",
+        "Reroute Planning",
+        "Recovery Verification",
+    ]
+
+    brief = yaml.safe_load(
+        (REPO_ROOT / "docs" / "superpowers" / "specs" / "network-incident-brief.yaml").read_text()
+    )
+    assert [phase["name"] for phase in brief["phases"]] == [
+        "telemetry_correlation",
+        "impact_diagnosis",
+        "reroute_planning",
+        "recovery_verification",
+    ]

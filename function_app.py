@@ -20,7 +20,8 @@ from api.functions.workflows.surge_staffing_activities import (
 )
 from api.functions.workflows.network_incident import network_incident_orchestration
 from api.functions.workflows.network_incident_activities import (
-    network_incident_decide_activity,
+    network_incident_impact_activity,
+    network_incident_reroute_activity,
 )
 from api.functions.workflows.activities import (
     intake_activity,
@@ -282,8 +283,13 @@ def surge_staffing_decide_activity_trigger(payload: dict) -> dict:
 
 
 @app.activity_trigger(input_name="payload")
-def network_incident_decide_activity_trigger(payload: dict) -> dict:
-    return network_incident_decide_activity(payload)
+def network_incident_impact_activity_trigger(payload: dict) -> dict:
+    return network_incident_impact_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def network_incident_reroute_activity_trigger(payload: dict) -> dict:
+    return network_incident_reroute_activity(payload)
 
 
 # HTTP trigger to start a new orchestration. Used by FastAPI's simulator route.

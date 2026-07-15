@@ -35,8 +35,8 @@ from api.server.services.durable_client import (
     schedule_new_orchestration, raise_orchestration_event,
 )
 from api.shared.expense_taxonomy import ReceiptFlavour
-from api.shared import domains as _registry
 from api.shared.domains import Domain, live_domains, DOMAINS
+from api.shared.verticals import active_vertical
 from api.server.services.time_compression import business_now
 
 # Cache resolved spawners so we import the module + look up the attr once
@@ -612,6 +612,8 @@ async def ramp_loop() -> None:
         print("[ramp] disabled (SIMULATOR_RAMP_ENABLED=0); use POST /api/simulator/{inject,hire,travel} to fire workflows by hand")
         return
 
+    vertical = active_vertical()
+
     # Boot-race guard: the FastAPI lifespan kicks the ramp loop a few
     # seconds before the Functions host finishes binding port 7071. Any
     # spawn fired in that window fails with "All connection attempts
@@ -642,6 +644,8 @@ async def ramp_loop() -> None:
     domains_csv = os.getenv("SIMULATOR_RAMP_DOMAINS", "").strip()
     if domains_csv:
         wanted = [d.strip() for d in domains_csv.split(",") if d.strip()]
+    elif vertical is not None:
+        wanted = list(vertical.ramp_workflow_types)
     else:
         wanted = list(by_type.keys())
 
@@ -1192,6 +1196,7 @@ async def spawn_creative_campaign_workflow(
 # orchestrators in function_app.py are minimal pass-through stubs — the
 # domains exist to populate the entity graph and exercise the substrate.
 from api.shared.types import Workflow as _Workflow  # noqa: E402
+from api.server.services.synthetic_data import build_registered_workflow  # noqa: E402
 
 
 def _build_strategic_workflow(
@@ -1199,25 +1204,18 @@ def _build_strategic_workflow(
     workflow_type: str,
     payload_key: str,
     payload_data: dict,
-    *,
-    initial_phase: str = "Intake",
 ) -> _Workflow:
     """Generic Workflow factory for pitch-c1/c2/c3 strategic domains.
 
-    Strategic / meta / agency-specific domains don't need bespoke
-    synthetic-data factories — they share a tiny payload shape.
+    Thin wrapper over the shared registered-domain factory
+    (:func:`api.server.services.synthetic_data.build_registered_workflow`) so
+    the simulator spawners and the actor-world WorldWorkflowAdapter mint an
+    identical Workflow shape and the initial ``current_phase`` always derives
+    from ``DOMAINS[workflow_type].phases[0]`` rather than a hardcoded
+    ``"Intake"``.
     """
-    import time as _time
-    now = _time.time()
-    return _Workflow(
-        id=workflow_id,
-        type=workflow_type,
-        current_phase=initial_phase,
-        created_at=now,
-        sla_due_at=now + 86400,
-        jurisdiction="London-Zava",
-        agency="Zava",
-        payload={payload_key: dict(payload_data), "scenario": payload_data.get("scenario")},
+    return build_registered_workflow(
+        workflow_id, workflow_type, payload_key, payload_data
     )
 
 

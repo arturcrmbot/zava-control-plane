@@ -6,7 +6,7 @@ Focused, schema-additive projection using only existing node kinds. Emits:
   * one ``Asset`` node (kind ``cell-site``) for the incident site, carrying
     the region/status and (when present) the rerouted-session count, and
   * an optional autonomous ``Decision`` when the payload records the
-    ``reroute_execution`` outcome — the domain has no HITL gate, so the
+    ``reroute_planning`` outcome — the domain has no HITL gate, so the
     decision is agent-authored, not persona-gated.
 
 No new graph schema; no relationships beyond the decision target. The live
@@ -79,7 +79,7 @@ def project(workflow: Workflow) -> list[EntityWrite | DecisionWrite]:
     # agent's action is auditable in the entity graph.
     d = build_decision(
         workflow,
-        gate_phase="reroute_execution",
+        gate_phase="reroute_planning",
         persona_role="network_incident",
         source_event="world.responder.decided",
         decided_on=(asset_id,),

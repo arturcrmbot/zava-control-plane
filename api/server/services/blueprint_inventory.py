@@ -34,6 +34,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from api.shared.verticals import registered_workflow_types
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SKILLS_DIR = REPO_ROOT / "api" / "server" / "skills"
 MCP_TOOLS_DIR = REPO_ROOT / "api" / "server" / "mcp_tools"
@@ -108,10 +110,6 @@ _PHASE_ALIASES: dict[str, dict[str, str]] = {
     "training-request": {
         "fleet-training-request-eligibility-and-catalogue-matcher": "Eligibility & catalogue",
     },
-    "network-incident": {
-        "impact_diagnosis": "Impact diagnosis",
-        "reroute_execution": "Reroute execution",
-    },
 }
 
 
@@ -124,8 +122,12 @@ def _build_domain_manifest() -> list[dict[str, Any]]:
     hand-authored entries below.
     """
     from api.shared import domains as _registry
+
+    allowed_types = set(registered_workflow_types())
     out: list[dict[str, Any]] = []
     for d in _registry.DOMAINS.values():
+        if d.workflow_type not in allowed_types:
+            continue
         # Phase display names + kinds, derived from the registry. Consumed
         # by the Control Plane UI's PhaseRibbon / PhaseTimeline so a new
         # compose-domain graduation auto-renders its real phase ordering

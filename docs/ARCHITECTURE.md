@@ -1253,14 +1253,16 @@ site.failed (one real site) → sessions on it become session.degraded
   → failed site recovers; neighbour load/metrics change; journalled throughout
 ```
 
-The Durable activity
+The Durable activities
 ([`network_incident_activities.py`](../api/functions/workflows/network_incident_activities.py))
-receives a bounded observation (failed site, neighbours with spare capacity,
-every degraded session) and greedily assigns each **actual session ID** to the
+receive a bounded observation (failed site, neighbours with spare capacity,
+every degraded session). `impact_diagnosis` orders the affected **actual
+session IDs**; `reroute_planning` then greedily plans each assignment to the
 healthiest neighbour that fits — **voice first, then deterministic by session
-ID** — returning a typed `reroute_sessions` command plus reasoning, never an
-aggregate. `apply_command` validates the whole command atomically (rejects if
-any target would exceed capacity) and idempotently (by `command_id`).
+ID** — returning a typed `reroute_sessions` command plus planning rationale,
+never an aggregate. `apply_command` validates the whole command atomically
+(rejects if any target would exceed capacity) and idempotently (by
+`command_id`).
 
 **Autonomous & reversible by design — no HITL gate, persona or authority
 matrix.** Rerouting degraded sessions onto neighbours with proven spare
@@ -1268,9 +1270,11 @@ capacity is safe and self-undoing (the site recovers in the same command), so
 the process runs to completion without human approval. This is a deliberate
 choice recorded in the Level-0 brief
 ([`network-incident-brief.yaml`](superpowers/specs/network-incident-brief.yaml));
-its phases are `telemetry_correlation` (deterministic), `impact_diagnosis`
-(agent), `reroute_execution` (agent) and `recovery_verification`
-(deterministic). The domain registers as `network-incident` in
+its phases are `telemetry_correlation` (deterministic bridge boundary),
+`impact_diagnosis` (deterministic Durable activity), `reroute_planning`
+(deterministic Durable activity) and `recovery_verification`
+(deterministic world-evaluation boundary). There are no runtime skills or
+agent phases in this loop. The domain registers as `network-incident` in
 [`api/shared/domains.py`](../api/shared/domains.py) with an ops function owner
 and a focused entity projection
 ([`entity_projections/network_incident.py`](../api/server/services/entity_projections/network_incident.py))

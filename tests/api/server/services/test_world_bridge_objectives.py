@@ -14,11 +14,13 @@ from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from api.server.services.event_bus import EventBus
+from api.server.services.state_store import StateStore
+from api.server.services.workflow_event_ingestor import WorkflowEventIngestor
 from api.server.services.world_bridge import WorldBridge
 from api.server.world.service import ActorWorldService
 from api.shared.events import FleetEvent
@@ -26,7 +28,13 @@ from api.shared.events import FleetEvent
 
 def _state():
     service = ActorWorldService.for_world("support", seed=7, bus=EventBus())
-    return SimpleNamespace(bus=service.bus, world_service=service, world_last_response=None)
+    state = SimpleNamespace(
+        bus=service.bus, world_service=service, world_last_response=None,
+        store=StateStore(), hub=MagicMock(), audit=MagicMock(),
+        orchestration_history={},
+    )
+    state.workflow_event_ingestor = WorkflowEventIngestor(state)
+    return state
 
 
 def _sensor(event_id: str, trace: str, target: str = "queue:support") -> FleetEvent:

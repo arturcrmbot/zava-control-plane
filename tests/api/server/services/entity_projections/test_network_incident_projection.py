@@ -1,7 +1,7 @@
 """Test the network-incident projection (telco actor-world domain)."""
 from __future__ import annotations
 
-from api.server.services.entity_graph import EntityWrite
+from api.server.services.entity_graph import DecisionWrite, EntityWrite
 from api.server.services.entity_projections.network_incident import (
     project, WORKFLOW_TYPE,
 )
@@ -59,3 +59,22 @@ def test_projection_falls_back_to_workflow_id_without_incident_site():
     ops = project(wf)
     asset = next(o for o in ops if isinstance(o, EntityWrite) and o.kind == "Asset")
     assert asset.attrs["identifier"] == "NI-T3"
+
+
+def test_projection_emits_reroute_planning_decision_when_payload_carries_it():
+    wf = make_workflow(
+        "NI-T4",
+        WORKFLOW_TYPE,
+        _incident_payload(),
+        nest_under="incident",
+        decisions=[{
+            "phase": "reroute_planning",
+            "verdict": "approve",
+            "reason": "planned assignment set is valid",
+            "decided_at": "2026-07-14T18:00:00Z",
+        }],
+    )
+
+    decisions = [op for op in project(wf) if isinstance(op, DecisionWrite)]
+    assert len(decisions) == 1
+    assert decisions[0].phase == "reroute_planning"

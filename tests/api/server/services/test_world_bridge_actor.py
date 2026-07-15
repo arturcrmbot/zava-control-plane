@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from api.server.services.event_bus import EventBus
+from api.server.services.state_store import StateStore
+from api.server.services.workflow_event_ingestor import WorkflowEventIngestor
 from api.server.services.world_bridge import WorldBridge
 from api.shared.events import FleetEvent
 
@@ -78,9 +80,13 @@ class FakeWorld:
 
 
 def app_state():
-    return SimpleNamespace(
-        bus=EventBus(), world_service=FakeWorld(), world_last_response=None
+    state = SimpleNamespace(
+        bus=EventBus(), world_service=FakeWorld(), world_last_response=None,
+        store=StateStore(), hub=MagicMock(), audit=MagicMock(),
+        orchestration_history={},
     )
+    state.workflow_event_ingestor = WorkflowEventIngestor(state)
+    return state
 
 
 def sensor(trace="trace-1"):
@@ -126,6 +132,18 @@ async def test_sensor_schedules_actor_observation_and_applies_typed_command(monk
     await asyncio.sleep(0)
     assert schedule.await_count == 1
     assert schedule.await_args.args[0]["observation"]["queued_tickets"][0]["id"] == "TKT-1"
+    # Canonical Workflow created BEFORE scheduling, with a deterministic
+    # sensor-event-based id and objective_id in the Durable payload (no
+    # prefix-trace id reconstruction).
+    assert schedule.await_args.args[0]["workflow_id"] == "surge-evt-sensor"
+    assert schedule.await_args.args[0]["objective_id"] == "obj-evt-sensor"
+    assert schedule.await_args.args[0]["trace_id"] == "trace-1"
+    w = state.store.get_workflow("surge-evt-sensor")
+    assert w is not None
+    # Command applied, but the workflow stays NONTERMINAL pending Phase 3
+    # world-recovery evaluation — never completed/resolved here.
+    assert w.status == "in_progress"
+    assert w.payload["decision"]["command"]["command_id"] == "cmd-1"
     assert state.world_service.applied[0].command_id == "cmd-1"
     assert [kind for kind, _ in state.world_service.recorded] == [
         "responder.requested", "responder.decided"
@@ -158,6 +176,163 @@ async def test_no_command_records_deferred_without_mutation(monkeypatch):
     assert state.world_service.recorded[-1][0] == "responder.deferred"
     assert state.world_service._objectives["obj-evt-sensor"].status == "failed"
     assert state.world_last_response is None
+    # Canonical workflow reflects the genuine failure (nothing applied) — but
+    # is NOT completed/resolved.
+    w = state.store.get_workflow("surge-evt-sensor")
+    assert w is not None and w.status == "failed"
+
+
+@pytest.mark.asyncio
+async def test_command_rejected_routes_workflow_failure_without_decision_ready(monkeypatch):
+    state = app_state()
+    bridge = WorldBridge(state)
+    monkeypatch.setattr(
+        "api.server.services.world_bridge.schedule_new_orchestration",
+        AsyncMock(return_value={"id": "durable-1", "statusQueryGetUri": "status://1"}),
+    )
+    bridge._await_output = AsyncMock(return_value={
+        "command": {
+            "command_id": "cmd-1",
+            "trace_id": "trace-1",
+            "issued_by": "surge_staffing",
+            "type": "reallocate_workers",
+            "payload": {
+                "worker_ids": ["WRK-31"],
+                "from_team_id": "TEAM-RESERVE",
+                "to_team_id": "TEAM-SUPPORT",
+                "duration_minutes": 60,
+            },
+        },
+        "reasoning": "move technical worker",
+    })
+
+    rejection_reason = "worker WRK-31 is no longer available"
+    rejection_payload = {
+        "command": {
+            "command_id": "cmd-1",
+            "trace_id": "trace-1",
+            "issued_by": "surge_staffing",
+            "type": "reallocate_workers",
+            "payload": {
+                "worker_ids": ["WRK-31"],
+                "from_team_id": "TEAM-RESERVE",
+                "to_team_id": "TEAM-SUPPORT",
+                "duration_minutes": 60,
+            },
+        },
+        "reason": rejection_reason,
+    }
+
+    def reject_command(objective, command):
+        state.world_service.applied.append(command)
+        state.world_service.transition_objective(objective.id, "failed")
+        return SimpleNamespace(
+            event_id="evt-command-rejected",
+            type="command.rejected",
+            payload=rejection_payload,
+        )
+
+    state.world_service.apply_typed_command = reject_command
+    decided = AsyncMock(wraps=bridge._adapter.decided)
+    failed = AsyncMock(wraps=bridge._adapter.failed)
+    bridge._adapter.decided = decided
+    bridge._adapter.failed = failed
+
+    bridge.start()
+    state.bus.emit(sensor())
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    decided.assert_not_awaited()
+    failed.assert_awaited_once()
+    assert failed.await_args.args == ("surge-evt-sensor", "durable-1", rejection_reason)
+
+    w = state.store.get_workflow("surge-evt-sensor")
+    assert w is not None
+    assert w.status == "failed"
+    assert w.metadata["world_lifecycle"] == "failed"
+    assert w.metadata["failure_reason"] == rejection_reason
+    assert "decision" not in (w.payload or {})
+    assert state.world_service._objectives["obj-evt-sensor"].status == "failed"
+    assert state.world_service.objective_events == [
+        ("opened", "obj-evt-sensor"),
+        ("claimed", "obj-evt-sensor"),
+        ("acting", "obj-evt-sensor"),
+        ("failed", "obj-evt-sensor"),
+    ]
+    assert state.world_last_response == {
+        "instance_id": "durable-1",
+        "observation": {
+            "trace_id": "trace-1",
+            "queued_tickets": [{"id": "TKT-1", "required_skill": "technical"}],
+            "reserve_workers": [{"id": "WRK-31", "skills": ["technical"]}],
+        },
+        "output": {
+            "command": {
+                "command_id": "cmd-1",
+                "trace_id": "trace-1",
+                "issued_by": "surge_staffing",
+                "type": "reallocate_workers",
+                "payload": {
+                    "worker_ids": ["WRK-31"],
+                    "from_team_id": "TEAM-RESERVE",
+                    "to_team_id": "TEAM-SUPPORT",
+                    "duration_minutes": 60,
+                },
+            },
+            "reasoning": "move technical worker",
+        },
+        "command": {
+            "command_id": "cmd-1",
+            "trace_id": "trace-1",
+            "issued_by": "surge_staffing",
+            "type": "reallocate_workers",
+            "payload": {
+                "worker_ids": ["WRK-31"],
+                "from_team_id": "TEAM-RESERVE",
+                "to_team_id": "TEAM-SUPPORT",
+                "duration_minutes": 60,
+            },
+        },
+        "result_event_id": "evt-command-rejected",
+        "result_type": "command.rejected",
+        "result_payload": rejection_payload,
+        "objective_id": "obj-evt-sensor",
+        "workflow_id": "surge-evt-sensor",
+    }
+
+
+@pytest.mark.asyncio
+async def test_canonical_workflow_is_created_before_scheduling(monkeypatch):
+    state = app_state()
+    bridge = WorldBridge(state)
+    gate = asyncio.Event()
+    seen_before_schedule = {}
+
+    async def schedule(*args):
+        # The canonical Workflow MUST exist in the store before we schedule.
+        seen_before_schedule["w"] = state.store.get_workflow("surge-evt-sensor")
+        await gate.wait()
+        return {"id": "durable-1", "statusQueryGetUri": "status://1"}
+
+    monkeypatch.setattr(
+        "api.server.services.world_bridge.schedule_new_orchestration",
+        AsyncMock(side_effect=schedule),
+    )
+    bridge._await_output = AsyncMock(return_value={"command": None, "reasoning": "x"})
+    bridge.start()
+    state.bus.emit(sensor())
+    await asyncio.sleep(0)
+
+    w = seen_before_schedule.get("w")
+    assert w is not None, "workflow must be upserted before Durable scheduling"
+    assert w.id == "surge-evt-sensor"
+    assert w.type == "surge-staffing"
+    assert w.payload["objective_id"] == "obj-evt-sensor"
+    assert w.payload["trace_id"] == "trace-1"
+    gate.set()
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
 
 
 @pytest.mark.asyncio

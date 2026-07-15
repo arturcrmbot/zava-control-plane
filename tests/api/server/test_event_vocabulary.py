@@ -59,42 +59,40 @@ def test_entity_graph_get_emits_entity_read(tmp_path):
     )
 
 
-def test_workflow_rejected_path_emits_workflow_failed(monkeypatch):
-    """The internal_durable_event.py rejected branch should emit workflow.failed."""
-    # Lighter-touch test: import the route module and verify _emit is called
-    # with workflow.failed when body.kind == "workflow.rejected".
-    from api.server.routes import internal_durable_event as mod
+async def test_workflow_rejected_path_emits_workflow_failed():
+    """The durable-event `workflow.rejected` branch should emit workflow.failed.
 
-    captured: list[tuple] = []
-    monkeypatch.setattr(mod, "_emit", lambda et, wid, **f: captured.append((et, wid, f)))
+    Ingestion moved out of the HTTP route into the non-HTTP
+    :class:`WorkflowEventIngestor` service (Phase 2); this now exercises the
+    branch directly against a fresh ingestor bound to a minimal fake app_state.
+    """
+    import time as _time
+    from types import SimpleNamespace
 
-    # Stub the dependencies _emit-replacement still needs.
-    fake_store = MagicMock()
-    fake_store.get_workflow.return_value = MagicMock(status="awaiting_hitl",
-                                                     metadata={}, current_phase="Triage")
-    fake_bus = MagicMock()
+    from api.server.services.state_store import StateStore
+    from api.server.services.workflow_event_ingestor import WorkflowEventIngestor
+    from api.shared.types import Workflow
 
-    class _AppState:
-        store = fake_store
-        bus = fake_bus
+    bus, captured = _capture_bus_emits()
+    store = StateStore()
+    now = _time.time()
+    store.upsert_workflow(Workflow(
+        id="WF-REJ", type="expense-claim", status="awaiting_hitl",
+        current_phase="Triage", created_at=now, sla_due_at=now + 86400,
+        jurisdiction="UK-Zava", agency="Zava",
+    ))
+    app_state = SimpleNamespace(
+        bus=bus, store=store, audit=MagicMock(), hub=MagicMock(),
+        orchestration_history={},
+    )
+    ingestor = WorkflowEventIngestor(app_state)
 
-    monkeypatch.setattr(mod, "app_state", _AppState)
-    monkeypatch.setattr(mod, "_ledger", lambda *a, **k: None)
-    monkeypatch.setattr(mod, "_auto_resolve_open", lambda *a, **k: None)
-    monkeypatch.setattr(mod, "pending_gates", MagicMock())
-    monkeypatch.setattr(mod, "_workflow_types", {})
-    monkeypatch.setattr(mod, "_span_starts", {})
+    await ingestor.ingest("WF-REJ", None, "workflow.rejected",
+                          {"by": "operator", "reason": "test"})
 
-    body = MagicMock()
-    body.kind = "workflow.rejected"
-    body.payload = {"by": "operator", "reason": "test"}
-
-    # _on_internal_event isn't directly callable here; we'll let the test
-    # assert by manually invoking the rejected branch via a thin wrapper if
-    # the route refactor doesn't expose it. Skip if the helper isn't
-    # importable as a module-level function — the assertion is that the
-    # bus.emit call list contains a FleetEvent with type="workflow.failed".
-    pytest.skip("assertion deferred — covered indirectly by integration smoke")
+    types = [e.type for e in captured]
+    assert "workflow.failed" in types, f"expected workflow.failed, saw {types}"
+    assert store.get_workflow("WF-REJ").status == "failed"
 
 
 def test_observatory_event_cap_drops_excess(monkeypatch):

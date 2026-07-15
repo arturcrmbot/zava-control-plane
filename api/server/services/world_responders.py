@@ -21,6 +21,13 @@ class ResponderRegistration:
     prefix: str
     owner_function: str
     timeout_seconds: float
+    # Payload key under which the world observation is nested on the canonical
+    # Workflow (api.server.services.world_workflow_adapter). The per-domain
+    # entity projection reads the observation from this key — for
+    # network-incident it MUST be ``"incident"`` so
+    # api/server/services/entity_projections/network_incident.py resolves the
+    # incident site.
+    observation_key: str = "observation"
 
 
 # owner_function equals the command's ``issued_by`` (see the surge-staffing /
@@ -34,6 +41,7 @@ RESPONDERS: dict[str, ResponderRegistration] = {
         prefix="surge",
         owner_function="surge_staffing",
         timeout_seconds=90.0,
+        observation_key="observation",
     ),
     "network_service_recovery": ResponderRegistration(
         objective_type="network_service_recovery",
@@ -42,6 +50,7 @@ RESPONDERS: dict[str, ResponderRegistration] = {
         prefix="incident",
         owner_function="network_incident",
         timeout_seconds=90.0,
+        observation_key="incident",
     ),
 }
 

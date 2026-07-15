@@ -152,6 +152,17 @@ class AppState:
         self.function_fms: dict = {}
 
         self.orchestration_history: dict[str, list[dict]] = {}
+
+        # Durable-event ingestion service — the single non-HTTP entry point for
+        # workflow lifecycle side effects (history, phases, ledger, hub, and
+        # workflow-scoped FleetEvent emission). The /internal/durable-event
+        # route delegates to it after HMAC + body validation, and the actor
+        # WorldBridge adapter routes its own lifecycle events through the same
+        # instance so both share one store/bus/hub/audit and the bounded
+        # per-run caches. Lightweight to construct (holds references + two
+        # empty dicts); deps are read at ingest time, not here.
+        from api.server.services.workflow_event_ingestor import WorkflowEventIngestor
+        self.workflow_event_ingestor = WorkflowEventIngestor(self)
         # ----------------------------------------------------- candidate portal
         # MagicLinkStore: sqlite-backed, single-use offer tokens + repeatable
         # status tokens. File lives at data/portal/magic_links.sqlite.
