@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from api.server.services.blueprint_recorder import BlueprintRecorder
+from api.server.services.blueprint_recorder import BlueprintRecorder, _recordings_dir
 from api.shared.events import FleetEvent
 
 
@@ -34,3 +34,10 @@ def test_workflow_failed_closes_recording_without_completion(monkeypatch):
         "workflow.started",
         "workflow.failed",
     ]
+
+
+def test_recordings_dir_accepts_isolated_override(monkeypatch, tmp_path):
+    target = tmp_path / "recordings"
+    monkeypatch.setenv("BLUEPRINT_RECORDINGS_DIR", str(target))
+
+    assert _recordings_dir() == target

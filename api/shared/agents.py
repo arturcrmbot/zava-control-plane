@@ -322,6 +322,32 @@ AGENTS: dict[str, AgentRegistryEntry] = {
             "Hiring Segment F (onboarding) — aggregates onboarding-buddy."
         ),
     ),
+    # ---------------- Telco customer care ----------------
+    "proactive-customer-care-entitlement": AgentRegistryEntry(
+        agent_id="proactive-customer-care-entitlement",
+        allowed_tools=("customer_care_policy_lookup",),
+        max_value_gbp=None,
+        reversible_only=True,
+        scope_function="shared",
+        description=(
+            "Telco care entitlement agent — reads governed policy for each "
+            "impacted commercial account."
+        ),
+    ),
+    "proactive-customer-care-execution": AgentRegistryEntry(
+        agent_id="proactive-customer-care-execution",
+        allowed_tools=(
+            "customer_care_prepare_notification",
+            "customer_care_prepare_credit",
+        ),
+        max_value_gbp=None,
+        reversible_only=True,
+        scope_function="shared",
+        description=(
+            "Telco care execution agent — prepares notification and credit "
+            "actions for authoritative world validation."
+        ),
+    ),
     # ---------------- System actors (Phase 1 entity-graph plane) ----------------
     # The entity-graph reflector dispatches projection ops (Person /
     # Organisation upserts + Decision writes) under a fixed actor id so

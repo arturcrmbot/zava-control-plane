@@ -12,7 +12,7 @@ async def _noop_wait_for_functions_host(*_args: Any, **_kwargs: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_ramp_loop_defaults_to_all_live_domains_when_vertical_unset(
+async def test_ramp_loop_defaults_to_non_world_owned_live_domains_when_vertical_unset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("SIMULATOR_RAMP_ENABLED", "1")
@@ -38,7 +38,12 @@ async def test_ramp_loop_defaults_to_all_live_domains_when_vertical_unset(
 
     await simulator_orchestrator.ramp_loop()
 
-    assert scheduled == [d.workflow_type for d in simulator_orchestrator.live_domains()]
+    assert scheduled == [
+        domain.workflow_type
+        for domain in simulator_orchestrator.live_domains()
+        if domain.workflow_type not in simulator_orchestrator._WORLD_OWNED_RAMP_TYPES
+        and domain.spawn_fn
+    ]
 
 
 @pytest.mark.asyncio
@@ -56,8 +61,8 @@ async def test_ramp_loop_uses_profile_ramp_domains_when_csv_unset(
         lambda: VerticalProfile(
             name="demo",
             world="toy",
-            workflow_types=("network-incident",),
-            ramp_workflow_types=("network-incident",),
+            workflow_types=("expense-claim",),
+            ramp_workflow_types=("expense-claim",),
         ),
     )
 
@@ -79,11 +84,13 @@ async def test_ramp_loop_uses_profile_ramp_domains_when_csv_unset(
 
     await simulator_orchestrator.ramp_loop()
 
-    assert scheduled == ["network-incident"]
+    assert scheduled == ["expense-claim"]
 
 
 @pytest.mark.asyncio
-async def test_ramp_loop_explicit_csv_overrides_telco_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_ramp_loop_explicit_csv_cannot_spawn_world_owned_domains(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("SIMULATOR_RAMP_ENABLED", "1")
     monkeypatch.setenv("ZAVA_VERTICAL", "telco")
     monkeypatch.setenv("SIMULATOR_RAMP_DOMAINS", "expense-claim,network-incident")
@@ -107,7 +114,7 @@ async def test_ramp_loop_explicit_csv_overrides_telco_profile(monkeypatch: pytes
 
     await simulator_orchestrator.ramp_loop()
 
-    assert scheduled == ["expense-claim", "network-incident"]
+    assert scheduled == ["expense-claim"]
 
 
 @pytest.mark.asyncio

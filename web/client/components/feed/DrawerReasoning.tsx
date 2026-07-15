@@ -5,6 +5,7 @@
 // reasoning, tool calls, state deltas, and HITL interrupts in real time.
 import { useEffect, useReducer } from "react";
 import type { DrawerData } from "./Drawer";
+import { replaceOrAppendById } from "@shared/replaceOrAppendById";
 
 // ── Inline reducer (same logic as blueprint's runReducer) ───────────
 
@@ -52,13 +53,13 @@ function reducer(s: RunState, ev: Ev): RunState {
     case "RUN_ERROR":       return { ...s, finished: true, error: ev.message ?? "error" };
     case "RUN_INTERRUPTED": return { ...s, interrupt: { reason: ev.reason, persona: ev.persona } };
     case "TEXT_MESSAGE_START":
-      return { ...s, messages: [...s.messages, { id: ev.messageId, role: ev.role ?? "assistant", text: "", closed: false }] };
+      return { ...s, messages: replaceOrAppendById(s.messages, { id: ev.messageId, role: ev.role ?? "assistant", text: "", closed: false }) };
     case "TEXT_MESSAGE_CONTENT":
       return { ...s, messages: s.messages.map(m => m.id === ev.messageId ? { ...m, text: m.text + ev.delta } : m) };
     case "TEXT_MESSAGE_END":
       return { ...s, messages: s.messages.map(m => m.id === ev.messageId ? { ...m, closed: true } : m) };
     case "TOOL_CALL_START":
-      return { ...s, toolCalls: [...s.toolCalls, { id: ev.toolCallId, name: ev.toolCallName, args: "", closed: false }] };
+      return { ...s, toolCalls: replaceOrAppendById(s.toolCalls, { id: ev.toolCallId, name: ev.toolCallName, args: "", closed: false }) };
     case "TOOL_CALL_ARGS":
       return { ...s, toolCalls: s.toolCalls.map(t => t.id === ev.toolCallId ? { ...t, args: t.args + ev.delta } : t) };
     case "TOOL_CALL_END":

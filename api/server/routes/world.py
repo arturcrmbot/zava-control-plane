@@ -49,6 +49,11 @@ class SiteFailureRequest(BaseModel):
     site_id: str | None = Field(default=None)
 
 
+class CapacityPressureRequest(BaseModel):
+    site_id: str = Field(min_length=1)
+    utilization: float = Field(default=0.95, ge=0.9, le=1.0, allow_inf_nan=False)
+
+
 class ServiceOrderRequest(BaseModel):
     account_id: str = Field(min_length=1)
     product: str = Field(min_length=1)
@@ -120,6 +125,29 @@ async def inject_site_failure(body: SiteFailureRequest = SiteFailureRequest()) -
     except ValueError as exc:
         return {"ok": False, "error": str(exc)}
     return {"ok": True, "sim_time": service.runtime.now, "site_id": site_id}
+
+
+@router.post("/inject/capacity_pressure")
+async def inject_capacity_pressure(body: CapacityPressureRequest) -> dict:
+    """Constrain a healthy Telco site's available capacity with world evidence."""
+    service = getattr(app_state, "world_service", None)
+    inject = (
+        getattr(service, "inject_capacity_pressure", None)
+        if service is not None
+        else None
+    )
+    if inject is None:
+        return {"ok": False, "error": "telco world not enabled (set ZAVA_WORLD=telco)"}
+    try:
+        site_id = inject(body.site_id, utilization=body.utilization)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    return {
+        "ok": True,
+        "sim_time": service.runtime.now,
+        "site_id": site_id,
+        "utilization": body.utilization,
+    }
 
 
 @router.post("/service-orders")

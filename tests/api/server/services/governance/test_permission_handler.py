@@ -78,6 +78,29 @@ def test_disallowed_tool_enforce_denies(monkeypatch: pytest.MonkeyPatch) -> None
     assert result.message
 
 
+@pytest.mark.parametrize(
+    ("actor", "tool"),
+    [
+        ("proactive-customer-care-entitlement", "customer_care_policy_lookup"),
+        (
+            "proactive-customer-care-execution",
+            "customer_care_prepare_notification",
+        ),
+        ("proactive-customer-care-execution", "customer_care_prepare_credit"),
+    ],
+)
+def test_telco_care_agent_tools_approve_under_enforcement(
+    monkeypatch: pytest.MonkeyPatch, actor: str, tool: str
+) -> None:
+    monkeypatch.setenv("AGT_ENFORCE", "1")
+    _reset_for_tests()
+    handler = AGTPermissionHandler(skill_label=actor, workflow_id="WF-TELCO-CARE")
+
+    result = handler(_mcp_request(server="", tool=tool), {})
+
+    assert result.kind == "approved"
+
+
 def test_kill_switch_active_denies(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AGT_ENFORCE", "1")
     _reset_for_tests()

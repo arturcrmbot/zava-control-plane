@@ -1,4 +1,5 @@
 import type { BaseEvent } from "@ag-ui/core";
+import { replaceOrAppendById } from "@shared/replaceOrAppendById";
 
 export interface MessageView {
   id: string;
@@ -76,10 +77,12 @@ export function applyEvent(state: RunState, ev: BaseEvent & any): RunState {
     case "TEXT_MESSAGE_START":
       return {
         ...state,
-        messages: [
-          ...state.messages,
-          { id: ev.messageId, role: ev.role ?? "assistant", text: "", closed: false },
-        ],
+        messages: replaceOrAppendById(state.messages, {
+          id: ev.messageId,
+          role: ev.role ?? "assistant",
+          text: "",
+          closed: false,
+        }),
       };
     case "TEXT_MESSAGE_CONTENT":
       return {
@@ -98,10 +101,12 @@ export function applyEvent(state: RunState, ev: BaseEvent & any): RunState {
     case "TOOL_CALL_START":
       return {
         ...state,
-        toolCalls: [
-          ...state.toolCalls,
-          { id: ev.toolCallId, name: ev.toolCallName, args: "", closed: false },
-        ],
+        toolCalls: replaceOrAppendById(state.toolCalls, {
+          id: ev.toolCallId,
+          name: ev.toolCallName,
+          args: "",
+          closed: false,
+        }),
       };
     case "TOOL_CALL_ARGS":
       return {

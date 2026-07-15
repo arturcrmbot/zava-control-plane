@@ -16,6 +16,23 @@ describe("runReducer", () => {
     ]);
   });
 
+  it("replays a message idempotently when the stream reconnects", () => {
+    let s = initialRunState();
+    const events = [
+      { type: "TEXT_MESSAGE_START", messageId: "m1", role: "assistant" },
+      { type: "TEXT_MESSAGE_CONTENT", messageId: "m1", delta: "Hello" },
+      { type: "TEXT_MESSAGE_END", messageId: "m1" },
+    ];
+
+    for (const event of [...events, ...events]) {
+      s = applyEvent(s, event as any);
+    }
+
+    expect(s.messages).toEqual([
+      { id: "m1", role: "assistant", text: "Hello", closed: true },
+    ]);
+  });
+
   it("records tool calls with args + status", () => {
     let s = initialRunState();
     s = applyEvent(s, { type: "TOOL_CALL_START", toolCallId: "tc1",
@@ -23,6 +40,23 @@ describe("runReducer", () => {
     s = applyEvent(s, { type: "TOOL_CALL_ARGS", toolCallId: "tc1",
                         delta: '{"q":"x"}' } as any);
     s = applyEvent(s, { type: "TOOL_CALL_END", toolCallId: "tc1" } as any);
+    expect(s.toolCalls).toEqual([
+      { id: "tc1", name: "policy_search", args: '{"q":"x"}', closed: true },
+    ]);
+  });
+
+  it("replays a tool call idempotently when the stream reconnects", () => {
+    let s = initialRunState();
+    const events = [
+      { type: "TOOL_CALL_START", toolCallId: "tc1", toolCallName: "policy_search" },
+      { type: "TOOL_CALL_ARGS", toolCallId: "tc1", delta: '{"q":"x"}' },
+      { type: "TOOL_CALL_END", toolCallId: "tc1" },
+    ];
+
+    for (const event of [...events, ...events]) {
+      s = applyEvent(s, event as any);
+    }
+
     expect(s.toolCalls).toEqual([
       { id: "tc1", name: "policy_search", args: '{"q":"x"}', closed: true },
     ]);

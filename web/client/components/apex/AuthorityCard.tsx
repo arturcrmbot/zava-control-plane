@@ -204,6 +204,7 @@ function fmtGbp(v: number | null | undefined): string {
 export default function AuthorityCard({ workflow }: { workflow: Workflow }) {
   const [resolution, setResolution] = useState<Resolution | null>(null);
   const [loading, setLoading] = useState(true);
+  const payloadKey = JSON.stringify(workflow.payload ?? null);
 
   useEffect(() => {
     const req = deriveMatrixRequest(workflow);
@@ -232,7 +233,7 @@ export default function AuthorityCard({ workflow }: { workflow: Workflow }) {
     return () => {
       cancelled = true;
     };
-  }, [workflow.id, workflow.type, workflow.payload]);
+  }, [workflow.id, workflow.type, payloadKey]);
 
   if (loading) return null;
   if (!resolution || !resolution.matched || !resolution.approver_role) return null;

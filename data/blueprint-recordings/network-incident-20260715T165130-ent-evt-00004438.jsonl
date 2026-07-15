@@ -1,0 +1,11 @@
+{"ts_offset_ms":0,"event":{"type":"durable.step.started","workflow_id":"incident-evt-00004438","phase":"Telemetry Correlation","step":"Telemetry Correlation","workflow_type":"network-incident"}}
+{"ts_offset_ms":856,"event":{"type":"durable.step.completed","workflow_id":"incident-evt-00004438","phase":"Telemetry Correlation","step":"Telemetry Correlation","duration_ms":0,"workflow_type":"network-incident"}}
+{"ts_offset_ms":1326,"event":{"type":"workflow.started","workflow_id":"incident-evt-00004438","workflow_type":"network-incident"}}
+{"ts_offset_ms":1747,"event":{"type":"durable.workflow.started","workflow_id":"incident-evt-00004438","workflow_type":"network-incident"}}
+{"ts_offset_ms":4976,"event":{"type":"durable.step.started","workflow_id":"incident-evt-00004438","phase":"Impact Diagnosis","step":"Impact Diagnosis","workflow_type":"network-incident"}}
+{"ts_offset_ms":8327,"event":{"type":"durable.step.completed","workflow_id":"incident-evt-00004438","phase":"Impact Diagnosis","step":"Impact Diagnosis","duration_ms":0,"workflow_type":"network-incident"}}
+{"ts_offset_ms":11831,"event":{"type":"durable.step.started","workflow_id":"incident-evt-00004438","phase":"Reroute Planning","step":"Reroute Planning","workflow_type":"network-incident"}}
+{"ts_offset_ms":15387,"event":{"type":"durable.step.completed","workflow_id":"incident-evt-00004438","phase":"Reroute Planning","step":"Reroute Planning","duration_ms":0,"workflow_type":"network-incident"}}
+{"ts_offset_ms":17529,"event":{"type":"durable.step.started","workflow_id":"incident-evt-00004438","phase":"Recovery Verification","step":"Recovery Verification","workflow_type":"network-incident"}}
+{"ts_offset_ms":18464,"event":{"type":"durable.step.completed","workflow_id":"incident-evt-00004438","phase":"Recovery Verification","step":"Recovery Verification","duration_ms":0,"workflow_type":"network-incident"}}
+{"ts_offset_ms":18923,"event":{"type":"durable.workflow.completed","workflow_id":"incident-evt-00004438","status":"completed","workflow_type":"network-incident"}}

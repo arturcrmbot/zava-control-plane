@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -67,6 +68,9 @@ def _recordings_dir() -> Path:
 
     Created lazily on first write.
     """
+    override = os.getenv("BLUEPRINT_RECORDINGS_DIR")
+    if override:
+        return Path(override).expanduser()
     repo_root = Path(__file__).resolve().parents[3]
     return repo_root / "data" / "blueprint-recordings"
 

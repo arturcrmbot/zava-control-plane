@@ -232,6 +232,36 @@ There is no `_recorder/status` UI on the page — it's a developer endpoint
 only. Hit `GET /api/blueprint/_recorder/status` from curl if you want to
 check whether a session is currently running.
 
+### Telco live proof versus public replay
+
+Run the complete Telco proof from the repository root:
+
+```bash
+bash tools/telco_zava_e2e_proof.sh
+```
+
+The command has two explicit stages:
+
+1. **Live proof:** isolated Azurite, Azure Functions, FastAPI, Control Plane
+   and Blueprint processes execute real network recovery, proactive care and
+   order activation workflows. Playwright cross-checks World, workflow drawer,
+   Memory, Knowledge, AG-UI and Constellation against workflow, Durable, graph
+   and world-journal data.
+2. **Replay proof:** the command stops Functions, Azurite and the actor world,
+   restarts only FastAPI with the freshly recorded JSONL walks, and proves
+   Blueprint renders all three Telco domains while the Functions host is
+   unreachable and `/api/world/state` reports disabled.
+
+Runtime data is isolated under `/tmp/zava-telco-proof-<uid>`. Evidence is
+written under `tmp/telco-zava-e2e-proof/`, including summaries, recordings,
+world journal, Durable outputs, graph snapshot, screenshots, video and logs.
+Use `bash tools/telco_zava_e2e_proof.sh --print-config` to inspect the fixed
+ports and storage root without starting processes.
+
+Passing Telco walks are curated into `data/blueprint-recordings/` for public
+replay. The curated files retain workflow, phase, tool, HITL, timing, and
+terminal evidence while omitting large agent prompt/context/response payloads.
+
 ### Path C: hand-coded synthetic template (fallback when no recordings exist)
 
 If there are no recordings for a domain yet, the trickle falls back to
@@ -542,4 +572,3 @@ docs — adds a CNAME and a managed cert. No redeploy needed.
 - **Frontend types**: [`web/blueprint/src/lib/types.ts`](../web/blueprint/src/lib/types.ts)
 - **Dockerfile**: [`web/blueprint/Dockerfile`](../web/blueprint/Dockerfile)
 - **Deploy script**: [`scripts/deploy-blueprint.sh`](../scripts/deploy-blueprint.sh)
-

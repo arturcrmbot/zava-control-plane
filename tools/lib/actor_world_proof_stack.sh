@@ -28,15 +28,19 @@
 _STACK_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$_STACK_LIB_DIR/../.." && pwd)"
 
-COMPOSE_DIR="$ROOT/.compose"
-AZ_DATA="$COMPOSE_DIR/actor-proof-azurite"
+COMPOSE_DIR="${ACTOR_PROOF_ROOT:-$ROOT/.compose}"
+AZ_DATA="${ACTOR_PROOF_AZ_DATA:-$COMPOSE_DIR/actor-proof-azurite}"
 AZ_LOG="$COMPOSE_DIR/actor-proof-azurite.log"
 FUNC_LOG="$COMPOSE_DIR/actor-proof-func.log"
 API_LOG="$COMPOSE_DIR/actor-proof-api.log"
 
-AZ_PORTS=(10000 10001 10002)
-FUNC_PORT=7071
-API_PORT=3101
+AZ_PORTS=(
+  "${ACTOR_PROOF_AZ_BLOB_PORT:-10000}"
+  "${ACTOR_PROOF_AZ_QUEUE_PORT:-10001}"
+  "${ACTOR_PROOF_AZ_TABLE_PORT:-10002}"
+)
+FUNC_PORT="${ACTOR_PROOF_FUNCTIONS_PORT:-7071}"
+API_PORT="${ACTOR_PROOF_API_PORT:-3101}"
 
 # Scenario knobs. Defaults reproduce the original support proof exactly, so the
 # support proofs keep booting an identical stack. The telco proof overrides
@@ -129,7 +133,9 @@ start_azurite() {
 
   log "starting Azurite (${AZ_PORTS[*]})"
   ( exec azurite --silent --location "$AZ_DATA" \
-      --blobHost 127.0.0.1 --queueHost 127.0.0.1 --tableHost 127.0.0.1 ) \
+      --blobHost 127.0.0.1 --blobPort "${AZ_PORTS[0]}" \
+      --queueHost 127.0.0.1 --queuePort "${AZ_PORTS[1]}" \
+      --tableHost 127.0.0.1 --tablePort "${AZ_PORTS[2]}" ) \
     >"$AZ_LOG" 2>&1 &
   AZ_PID=$!
   echo "$AZ_PID" >"$COMPOSE_DIR/actor-proof-azurite.pid"
@@ -140,7 +146,7 @@ start_azurite() {
       err "Azurite exited early; log tail:"; tail -n 20 "$AZ_LOG" >&2; exit 3
     fi
     local code
-    code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:10000/devstoreaccount1 2>/dev/null)"
+    code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${AZ_PORTS[0]}/devstoreaccount1" 2>/dev/null || true)"
     if [ "$code" = "400" ]; then ready=1; break; fi
     sleep 1
   done
@@ -155,7 +161,7 @@ start_functions_host() {
   log "starting Functions host (:$FUNC_PORT)"
   ( cd "$ROOT" \
       && source .venv/bin/activate \
-      && exec env ENTITY_PLANE_ENABLED=0 PYTHONPATH="$ROOT" \
+      && exec env ENTITY_PLANE_ENABLED=0 FUNCTIONS_WORKER_RUNTIME=python PYTHONPATH="$ROOT" \
            func start --port "$FUNC_PORT" ) \
     >"$FUNC_LOG" 2>&1 &
   FUNC_PID=$!
@@ -195,7 +201,7 @@ start_fastapi() {
       err "FastAPI exited early; log tail:"; tail -n 30 "$API_LOG" >&2; exit 5
     fi
     local health
-    health="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:"$API_PORT"/healthz 2>/dev/null)"
+    health="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:"$API_PORT"/healthz 2>/dev/null || true)"
     if [ "$health" = "200" ]; then
       # Health is up; require the actor world to actually be enabled + scenario.
       if curl -s http://127.0.0.1:"$API_PORT"/api/world/state 2>/dev/null \

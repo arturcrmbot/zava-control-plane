@@ -177,6 +177,17 @@ class ActorWorldService:
             raise ValueError(f"scenario {self.scenario_name!r} has no site_failure")
         return inject(site_id)
 
+    def inject_capacity_pressure(
+        self, site_id: str, *, utilization: float = 0.95
+    ) -> str:
+        """Constrain one healthy Telco site's real capacity for exception proof."""
+        inject = getattr(self.scenario, "inject_capacity_pressure", None)
+        if inject is None:
+            raise ValueError(
+                f"scenario {self.scenario_name!r} has no capacity pressure"
+            )
+        return inject(site_id, utilization=utilization)
+
     def submit_service_order(
         self, *, account_id: str, product: str, requested_site_id: str
     ) -> str:

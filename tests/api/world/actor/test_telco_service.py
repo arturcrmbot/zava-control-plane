@@ -70,6 +70,27 @@ def test_inject_site_failure_fails_a_real_site_and_trips_the_sensor():
     assert sensor.payload["measurements"]["site_id"] == site_id
 
 
+def test_capacity_pressure_constrains_a_healthy_site_and_journals_world_evidence():
+    world = service()
+    site = world.scenario.sites["SITE-12"]
+    prior_capacity = site.capacity_mbps
+
+    site_id = world.inject_capacity_pressure("SITE-12", utilization=0.95)
+
+    assert site_id == "SITE-12"
+    assert site.status == "healthy"
+    assert site.capacity_mbps < prior_capacity
+    assert site.utilization == 0.95
+    constrained = next(
+        event
+        for event in reversed(world.runtime.journal)
+        if event.type == "site.capacity_constrained"
+    )
+    assert constrained.actor_id == site_id
+    assert constrained.payload["prior_capacity_mbps"] == prior_capacity
+    assert constrained.payload["utilization"] == 0.95
+
+
 def test_full_incident_loop_reroutes_real_sessions_via_the_durable_activity():
     world = service()
     site_id = world.inject_site_failure()

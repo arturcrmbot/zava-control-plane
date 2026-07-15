@@ -1,0 +1,13 @@
+{"ts_offset_ms":0,"event":{"type":"workflow.started","workflow_id":"order-evt-00004242","workflow_type":"order-to-activate"}}
+{"ts_offset_ms":7,"event":{"type":"durable.workflow.started","workflow_id":"order-evt-00004242","workflow_type":"order-to-activate"}}
+{"ts_offset_ms":3175,"event":{"type":"durable.step.started","workflow_id":"order-evt-00004242","phase":"Order Intake","step":"Order Intake","workflow_type":"order-to-activate"}}
+{"ts_offset_ms":6513,"event":{"type":"durable.step.completed","workflow_id":"order-evt-00004242","phase":"Order Intake","step":"Order Intake","duration_ms":0,"workflow_type":"order-to-activate"}}
+{"ts_offset_ms":7481,"event":{"type":"durable.step.started","workflow_id":"order-evt-00004242","phase":"Feasibility Check","step":"Feasibility Check","workflow_type":"order-to-activate"}}
+{"ts_offset_ms":10985,"event":{"type":"durable.step.completed","workflow_id":"order-evt-00004242","phase":"Feasibility Check","step":"Feasibility Check","duration_ms":0,"workflow_type":"order-to-activate"}}
+{"ts_offset_ms":13481,"event":{"type":"workflow.hitl.requested","workflow_id":"order-evt-00004242","reason":"awaiting_capacity_approval","wait_kind":"operator_review","instance_id":"83d73a5708c2438a99bd10c9b89432d4","persona":"delivery_lead","external_event":"capacity_manager_decision","context":{"phase":"Capacity Approval"},"workflow_type":"order-to-activate"}}
+{"ts_offset_ms":13490,"event":{"type":"durable.suspended","workflow_id":"order-evt-00004242","reason":"awaiting_capacity_approval","wait_kind":"operator_review","phase":"Capacity Approval","persona":"delivery_lead","external_event":"capacity_manager_decision","workflow_type":"order-to-activate"}}
+{"ts_offset_ms":19555,"event":{"type":"durable.step.started","workflow_id":"order-evt-00004242","phase":"Service Activation","step":"Service Activation","workflow_type":"order-to-activate"}}
+{"ts_offset_ms":19568,"event":{"type":"durable.step.completed","workflow_id":"order-evt-00004242","phase":"Service Activation","step":"Service Activation","duration_ms":0,"workflow_type":"order-to-activate"}}
+{"ts_offset_ms":19579,"event":{"type":"durable.step.started","workflow_id":"order-evt-00004242","phase":"Activation Verification","step":"Activation Verification","workflow_type":"order-to-activate"}}
+{"ts_offset_ms":19592,"event":{"type":"durable.step.completed","workflow_id":"order-evt-00004242","phase":"Activation Verification","step":"Activation Verification","duration_ms":0,"workflow_type":"order-to-activate"}}
+{"ts_offset_ms":19599,"event":{"type":"durable.workflow.completed","workflow_id":"order-evt-00004242","status":"completed","workflow_type":"order-to-activate"}}

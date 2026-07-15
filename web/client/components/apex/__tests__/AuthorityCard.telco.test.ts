@@ -1,7 +1,16 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+
+import { createElement } from "react";
+import { cleanup, render, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Workflow } from "@shared/types";
-import { deriveMatrixRequest } from "../AuthorityCard";
+import AuthorityCard, { deriveMatrixRequest } from "../AuthorityCard";
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 function workflow(
   type: Workflow["type"],
@@ -69,5 +78,32 @@ describe("Telco AuthorityCard mapping", () => {
     const item = workflow("proactive-customer-care", {});
 
     expect(deriveMatrixRequest(item)).toBeNull();
+  });
+
+  it("does not resolve authority again for an equivalent payload object", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      json: async () => ({ matched: false }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const item = workflow("order-to-activate", {
+      service_order: { requested_site: { utilization: 0.95 } },
+    });
+
+    const view = render(createElement(AuthorityCard, { workflow: item }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    view.rerender(
+      createElement(AuthorityCard, {
+        workflow: {
+          ...item,
+          payload: {
+            service_order: { requested_site: { utilization: 0.95 } },
+          },
+        },
+      }),
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

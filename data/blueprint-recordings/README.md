@@ -51,6 +51,16 @@ the recording window. In-flight workflows at stop-time are flushed too
 (partial recordings — fine for playback, page just stops the workflow
 mid-walk).
 
+Set `BLUEPRINT_RECORDINGS_DIR` to record into an isolated evidence directory
+instead of this committed replay catalogue. The Telco proof runner uses this
+override so failed or exploratory runs never dirty `data/blueprint-recordings/`.
+
+The committed Telco recordings come from a passing
+`tools/telco_zava_e2e_proof.sh` live run. During curation, large
+`agent.completed` prompt/context/response fields are removed; workflow IDs,
+timing, agent/tool metadata, phase events, HITL evidence, and terminal outcomes
+remain unchanged.
+
 ## How to curate
 
 - Open the JSONL files. Each line is one event. Hand-delete short runs

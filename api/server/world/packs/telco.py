@@ -308,6 +308,41 @@ class NetworkScenario:
         self.schedule_failure(SiteFailure(at_minute=self.runtime.now, site_id=resolved))
         return resolved
 
+    def inject_capacity_pressure(
+        self, site_id: str, *, utilization: float = 0.95
+    ) -> str:
+        target = float(utilization)
+        if not 0.9 <= target <= 1.0:
+            raise ValueError("utilization must be between 0.9 and 1.0")
+        site = self.sites.get(site_id)
+        if site is None:
+            raise ValueError(f"unknown site_id: {site_id}")
+        if site.status != "healthy":
+            raise ValueError(f"site {site_id} is not healthy")
+        if site.traffic_mbps <= 0:
+            raise ValueError(f"site {site_id} has no traffic to constrain")
+        prior_capacity = site.capacity_mbps
+        site.capacity_mbps = round(site.traffic_mbps / target, 3)
+        self._derive_metrics(site)
+        constrained = self.runtime.emit(
+            "site.capacity_constrained",
+            actor_id=site.id,
+            trace_id=f"capacity-pressure-{site.id}-{int(self.runtime.now)}",
+            payload={
+                "prior_capacity_mbps": prior_capacity,
+                "capacity_mbps": site.capacity_mbps,
+                "utilization": site.utilization,
+            },
+        )
+        self.runtime.emit(
+            "site.metrics",
+            actor_id=site.id,
+            cause_event_id=constrained.event_id,
+            trace_id=constrained.trace_id,
+            payload={**self._metrics_payload(site), "reason": "capacity_pressure"},
+        )
+        return site.id
+
     def _resolve_failure_site(self, site_id: str | None) -> str:
         if site_id is not None:
             site = self.sites.get(site_id)
