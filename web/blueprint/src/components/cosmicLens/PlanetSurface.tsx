@@ -40,7 +40,7 @@ const VERT = /* glsl */ `
   }
 `;
 
-const FRAG = /* glsl */ `
+export const FRAG = /* glsl */ `
   uniform vec3  uOcean;
   uniform vec3  uLand;
   uniform vec3  uHighland;
@@ -81,9 +81,9 @@ const FRAG = /* glsl */ `
     // Sample noise on the *normal* direction (sphere surface) so the
     // pattern wraps cleanly around the planet without UV seams. Add a
     // per-planet seed so every planet looks distinct.
-    vec3 sample = normalize(vNormal) * 2.4 + vec3(uSeed * 13.7);
-    float continent = fbm(sample);
-    float detail    = fbm(sample * 6.0);
+    vec3 noisePoint = normalize(vNormal) * 2.4 + vec3(uSeed * 13.7);
+    float continent = fbm(noisePoint);
+    float detail    = fbm(noisePoint * 6.0);
 
     // Continents are where high-density noise lives. Smooth band so
     // shorelines feather rather than jaggy.
@@ -183,7 +183,7 @@ export function PlanetSurface({ radius, color, seed, rotationSpeed = 0.08 }: Pro
  * rotates a touch faster than the planet body. Cloud strength threshold
  * via smoothstep so we get cloud BANDS rather than a uniform fog.
  */
-const CLOUD_FRAG = /* glsl */ `
+export const CLOUD_FRAG = /* glsl */ `
   uniform float uSeed;
   uniform float uTime;
   varying vec3 vNormal;
@@ -214,8 +214,8 @@ const CLOUD_FRAG = /* glsl */ `
   }
 
   void main() {
-    vec3 sample = normalize(vNormal) * 3.2 + vec3(uSeed * 7.3);
-    float c = fbm(sample);
+    vec3 noisePoint = normalize(vNormal) * 3.2 + vec3(uSeed * 7.3);
+    float c = fbm(noisePoint);
     float cloudMask = smoothstep(0.55, 0.78, c);
     vec3 lightDir = normalize(vec3(0.7, 0.45, 0.55));
     float lit = max(0.0, dot(normalize(vNormal), lightDir));

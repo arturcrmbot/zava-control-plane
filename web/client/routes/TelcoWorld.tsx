@@ -76,6 +76,7 @@ export default function TelcoWorld({
 }) {
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
+  const [lens, setLens] = useState<"Network" | "Customer Impact" | "Orders" | "Control">("Network");
   const toggle = (id: string | null) => setSelected((c) => (c === id ? null : id));
   const sites = state.sites ?? [];
   const sessions = state.sessions ?? [];
@@ -150,6 +151,24 @@ export default function TelcoWorld({
             <AlertTriangle size={14} /> {error}
           </div>
         )}
+        <nav className="flex flex-wrap gap-2" aria-label="Telco lenses">
+          {(["Network", "Customer Impact", "Orders", "Control"] as const).map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setLens(item)}
+              className={`rounded px-3 py-1.5 text-xs font-medium ${
+                lens === item
+                  ? "bg-blue-600 text-white"
+                  : "bg-white text-slate-600 border border-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700"
+              }`}
+            >
+              {item}
+            </button>
+          ))}
+        </nav>
+        {lens === "Network" && (
+          <>
         <WorldObjectiveStrip testId="telco-objective" objectives={state?.objectives} />
         {intervention && (
           <WorldInterventionStrip
@@ -221,6 +240,11 @@ export default function TelcoWorld({
             ))}
           </ul>
         </section>
+          </>
+        )}
+        {lens === "Customer Impact" && <CustomerImpactLens state={state} />}
+        {lens === "Orders" && <OrderLens state={state} />}
+        {lens === "Control" && <ControlLens state={state} events={events} />}
         {loading && sites.length === 0 && (
           <div data-testid="telco-loading" className="text-sm text-slate-500 dark:text-slate-400 py-6 text-center">Loading network…</div>
         )}
@@ -228,6 +252,91 @@ export default function TelcoWorld({
     </div>
   );
 }
+
+function CustomerImpactLens({ state }: { state: WorldState }) {
+  const impacted = new Set(state.customer_impact?.account_ids ?? []);
+  const accounts = (state.accounts ?? []).filter((account) => impacted.has(account.id));
+  return (
+    <section data-testid="customer-impact-lens" className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {accounts.map((account) => (
+        <article key={account.id} className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+          <div className="font-mono text-sm font-semibold">{account.id}</div>
+          <div className="mt-1 text-xs text-slate-500">{account.segment} · {account.subscriber_id}</div>
+          <div className="mt-2 text-xs">
+            {account.notification_ids.length} notification · £{account.total_credits} credit
+          </div>
+        </article>
+      ))}
+    </section>
+  );
+}
+
+function OrderLens({ state }: { state: WorldState }) {
+  const [submitting, setSubmitting] = useState(false);
+  const submitDemoOrder = async () => {
+    const accountId = state.accounts?.[0]?.id ?? "ACC-00001";
+    const siteId = state.sites?.find((site) => site.status === "healthy")?.id
+      ?? "SITE-02";
+    setSubmitting(true);
+    try {
+      await fetch("/api/world/service-orders", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          account_id: accountId,
+          product: "fiber-1gb",
+          requested_site_id: siteId,
+        }),
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  return (
+    <section data-testid="order-lens" className="space-y-3">
+      <button
+        type="button"
+        disabled={submitting}
+        onClick={submitDemoOrder}
+        className="rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+      >
+        {submitting ? "Submitting…" : "Submit demo order"}
+      </button>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {(state.orders ?? []).map((order) => (
+          <article key={order.id} className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+            <div className="font-mono text-sm font-semibold">{order.id}</div>
+            <div className="mt-1 text-xs text-slate-500">{order.product} · {order.account_id}</div>
+            <div className="mt-2 text-xs font-medium">{order.status} at {order.requested_site_id}</div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ControlLens({ state, events }: { state: WorldState; events: WorldEvent[] }) {
+  const evidence = events.filter((event) => (
+    event.type.startsWith("objective.")
+    || event.type.startsWith("evaluation.")
+    || event.type === "site.recovered"
+    || event.type === "care.completed"
+  )).slice(-30).reverse();
+  return (
+    <section data-testid="control-lens" className="space-y-3">
+      <WorldObjectiveStrip testId="telco-control-objectives" objectives={state.objectives} />
+      <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+        {evidence.map((event) => (
+          <div key={event.event_id} className="flex gap-3 border-b border-slate-100 py-1 font-mono text-xs last:border-0 dark:border-slate-800">
+            <span className="w-40">{event.type}</span>
+            <span>{event.trace_id}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function SiteCard({
   site, incident, neighbor, selected, onClick,
 }: {

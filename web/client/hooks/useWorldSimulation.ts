@@ -80,6 +80,51 @@ export interface WorldSubscriber {
   session_count: number;
 }
 
+export interface WorldAccount {
+  id: string;
+  subscriber_id: string;
+  segment: string;
+  vulnerable: boolean;
+  approval_required: boolean;
+  total_credits: number;
+  notification_ids: string[];
+  credit_ids: string[];
+}
+
+export interface WorldSubscription {
+  id: string;
+  account_id: string;
+  subscriber_id: string;
+  site_id: string;
+  product: string;
+  status: string;
+}
+
+export interface WorldOrder {
+  id: string;
+  account_id: string;
+  product: string;
+  requested_site_id: string;
+  status: string;
+  reason?: string | null;
+}
+
+export interface WorldNotification {
+  id: string;
+  account_id: string;
+  channel: string;
+  message: string;
+  trace_id: string;
+}
+
+export interface WorldCredit {
+  id: string;
+  account_id: string;
+  amount: number;
+  trace_id: string;
+  authority_approved: boolean;
+}
+
 // -- objective/command lifecycle: mirror world/model.py + objectives.py ------
 
 export interface WorldObjective {
@@ -121,6 +166,17 @@ export interface WorldState {
   sites?: WorldSite[];
   sessions?: WorldSession[];
   subscribers?: WorldSubscriber[];
+  accounts?: WorldAccount[];
+  subscriptions?: WorldSubscription[];
+  orders?: WorldOrder[];
+  notifications?: WorldNotification[];
+  credits?: WorldCredit[];
+  customer_impact?: {
+    affected_account_count: number;
+    notified_account_count: number;
+    credited_account_count: number;
+    account_ids: string[];
+  };
   // objective/command lifecycle (both worlds)
   objectives?: WorldObjective[];
   evaluations?: WorldEvaluation[];

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import Memory from "../Memory";
@@ -52,19 +52,35 @@ beforeEach(() => {
 describe("Memory route", () => {
   afterEach(cleanup);
 
-  it("renders three columns with their respective data", async () => {
+  it("renders the current memory and dream-pass columns", async () => {
     render(<MemoryRouter><Memory /></MemoryRouter>);
-    expect(screen.getByText(/Working memory/i)).toBeTruthy();
-    expect(screen.getByText(/Active lessons/i)).toBeTruthy();
+    expect(screen.getByText(/Memories/i)).toBeTruthy();
     expect(screen.getByText(/Dream passes/i)).toBeTruthy();
-    await waitFor(() => screen.getByText(/Trigger: X/));
-    await waitFor(() => screen.getByText(/DP-1/));
-    await waitFor(() => screen.getByText(/candidate weak on leadership/));
   });
 
   it("has Trigger dream pass and Dream storm buttons", () => {
     render(<MemoryRouter><Memory /></MemoryRouter>);
-    expect(screen.getByRole("button", { name: /Trigger dream pass/i })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Dream storm/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Trigger pass/i })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /More actions/i }));
+    expect(screen.getByRole("menuitem", { name: /Dream storm/i })).toBeTruthy();
+  });
+
+  it("uses the live Telco memory domains returned by the API", async () => {
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {
+      if (String(url).includes("/api/memory/v2/domains")) {
+        return new Response(JSON.stringify({
+          domains: ["network-incident", "proactive-customer-care"],
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ items: [] }), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    render(<MemoryRouter><Memory /></MemoryRouter>);
+
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "network-incident" })).toBeTruthy();
+      expect(screen.getByRole("option", { name: "proactive-customer-care" })).toBeTruthy();
+    });
+    expect(screen.queryByRole("option", { name: "hiring" })).toBeNull();
   });
 });

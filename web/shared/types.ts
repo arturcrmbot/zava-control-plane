@@ -114,7 +114,9 @@ export interface Workflow {
     // Hand-graduated curve-proof domain.
     | "ap-invoice"
     // Hand-graduated wave 2: matrix-driven dynamic-persona domains.
-    | "purchase-order" | "contract-review" | "privacy-dpia" | "treasury-fx";
+    | "purchase-order" | "contract-review" | "privacy-dpia" | "treasury-fx"
+    // Telco demonstrator domains.
+    | "network-incident" | "proactive-customer-care" | "order-to-activate";
   status: WorkflowStatus;
   currentPhase: PhaseName;
   createdAt: number;

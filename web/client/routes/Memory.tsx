@@ -8,13 +8,34 @@ import { ArrowLeft, Sparkles } from "lucide-react";
 import MemoriesColumn from "@client/components/memory/MemoriesColumn";
 import DreamPassColumn from "@client/components/memory/DreamPassColumn";
 
-const DOMAINS = ["hiring", "vendor_kyc", "expense_claim"];
+const DEFAULT_DOMAINS = ["hiring", "vendor_kyc", "expense_claim"];
 
 export default function Memory() {
+  const [domains, setDomains] = useState<string[]>(DEFAULT_DOMAINS);
   const [domain, setDomain] = useState<string>("hiring");
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/memory/v2/domains")
+      .then((response) => {
+        if (!response.ok) throw new Error(`memory domains: ${response.status}`);
+        return response.json() as Promise<{ domains?: string[] }>;
+      })
+      .then((body) => {
+        if (!active || !body.domains?.length) return;
+        setDomains(body.domains);
+        setDomain((current) => (
+          body.domains!.includes(current) ? current : body.domains![0]
+        ));
+      })
+      .catch(() => {
+        // Keep the compatibility selector when the older API is unavailable.
+      });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -42,7 +63,7 @@ export default function Memory() {
     setBusy(true);
     try {
       await fetch(
-        `/api/simulator/dream-storm?domains=${DOMAINS.join(",")}&runs=3`,
+        `/api/simulator/dream-storm?domains=${domains.join(",")}&runs=3`,
         { method: "POST" },
       );
     } finally {
@@ -67,7 +88,7 @@ export default function Memory() {
               onChange={(e) => setDomain(e.target.value)}
               className="text-xs border border-slate-300 dark:border-slate-700 dark:bg-slate-800 rounded px-2 py-1"
             >
-              {DOMAINS.map((d) => <option key={d} value={d}>{d}</option>)}
+              {domains.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
             <button
               type="button"

@@ -36,7 +36,7 @@ type Derivation = {
  * Returns null when there's no sensible mapping (in which case the card is
  * silent — operators get the existing FleetAssignment/Audit/Economics tiles).
  */
-function deriveMatrixRequest(w: Workflow): Derivation | null {
+export function deriveMatrixRequest(w: Workflow): Derivation | null {
   const t = w.type;
   if (t === "expense-claim" && w.claim) {
     return {
@@ -53,6 +53,37 @@ function deriveMatrixRequest(w: Workflow): Derivation | null {
       action: "hire_budget_approval",
       value: undefined,
       category: "within_band",
+    };
+  }
+  if (t === "proactive-customer-care") {
+    const p = (w.payload ?? {}) as {
+      decision?: {
+        command?: {
+          payload?: { actions?: Array<{ credit_amount?: number }> };
+        };
+      };
+    };
+    const actions = p.decision?.command?.payload?.actions ?? [];
+    if (actions.length === 0) return null;
+    return {
+      action: "customer_care_credit_approval",
+      category: "service_credit",
+      value: actions.reduce(
+        (total, action) => total + (action.credit_amount ?? 0),
+        0,
+      ),
+    };
+  }
+  if (t === "order-to-activate") {
+    const p = (w.payload ?? {}) as {
+      service_order?: { requested_site?: { utilization?: number } };
+    };
+    const utilization = p.service_order?.requested_site?.utilization;
+    if (utilization == null) return null;
+    return {
+      action: "order_capacity_exception",
+      category: "site_capacity",
+      value: utilization * 100,
     };
   }
   if (t === "travel-preapproval") {
@@ -201,7 +232,7 @@ export default function AuthorityCard({ workflow }: { workflow: Workflow }) {
     return () => {
       cancelled = true;
     };
-  }, [workflow.id, workflow.type]);
+  }, [workflow.id, workflow.type, workflow.payload]);
 
   if (loading) return null;
   if (!resolution || !resolution.matched || !resolution.approver_role) return null;

@@ -89,6 +89,22 @@ const TELCO_STATE: WorldState = {
   sites: SITES,
   sessions: SESSIONS,
   subscribers: [{ id: "SUB-0001", home_site_id: "SITE-01", tier: "standard", session_count: 1 }],
+  accounts: [
+    { id: "ACC-00001", subscriber_id: "SUB-0001", segment: "business", vulnerable: false, approval_required: false, total_credits: 5, notification_ids: ["NOT-1"], credit_ids: ["CRD-1"] },
+  ],
+  subscriptions: [
+    { id: "SUBS-00001", account_id: "ACC-00001", subscriber_id: "SUB-0001", site_id: "SITE-01", product: "5g-premium", status: "active" },
+  ],
+  orders: [
+    { id: "ORD-00001", account_id: "ACC-00001", product: "fiber-1gb", requested_site_id: "SITE-02", status: "pending" },
+  ],
+  notifications: [
+    { id: "NOT-1", account_id: "ACC-00001", channel: "sms", message: "Service restored", trace_id: TRACE },
+  ],
+  credits: [
+    { id: "CRD-1", account_id: "ACC-00001", amount: 5, trace_id: TRACE, authority_approved: true },
+  ],
+  customer_impact: { affected_account_count: 1, notified_account_count: 1, credited_account_count: 1, account_ids: ["ACC-00001"] },
   objectives: [
     {
       id: "obj-E-60", type: "network_service_recovery", trace_id: TRACE, owner_function: "network_incident",
@@ -189,5 +205,38 @@ describe("TelcoWorld route", () => {
     renderWorld();
     fireEvent.click(screen.getByTestId("inject-site-failure"));
     expect(injectSiteFailure).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders customer impact, order, and control lenses from snapshot data", () => {
+    renderWorld();
+
+    fireEvent.click(screen.getByRole("button", { name: "Customer Impact" }));
+    expect(screen.getByText("ACC-00001")).toBeTruthy();
+    expect(screen.getByText(/£5 credit/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Orders" }));
+    expect(screen.getByText("ORD-00001")).toBeTruthy();
+    expect(screen.getByText(/fiber-1gb/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Control" }));
+    expect(screen.getByText(TRACE)).toBeTruthy();
+    expect(screen.getByText(/care.completed|site.recovered/)).toBeTruthy();
+  });
+
+  it("submits a real demo service order from the Orders lens", async () => {
+    const fetchMock = vi.fn(async () => new Response(
+      JSON.stringify({ ok: true, order_id: "ORD-00002" }),
+      { status: 200 },
+    ));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    renderWorld();
+    fireEvent.click(screen.getByRole("button", { name: "Orders" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit demo order" }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/world/service-orders",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 });
