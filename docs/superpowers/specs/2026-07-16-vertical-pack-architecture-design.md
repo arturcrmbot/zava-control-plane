@@ -181,8 +181,10 @@ class VerticalPack:
     external_capabilities: frozenset[str]
     worlds: Mapping[str, WorldPackRegistration]
     default_world: str | None
+    seed: SeedRegistration
     projections: tuple[ProjectionRegistration, ...]
     memory: tuple[MemoryRegistration, ...]
+    lifecycle: LifecycleRegistration
     recordings: RecordingSources
     ui: VerticalUiManifest
     ramp_workflow_types: tuple[str, ...]
@@ -395,6 +397,15 @@ kinds and workflow types they consume.
 Operational-memory stores are created only for active domains. Agency-specific
 watchers and recorders start from Agency's lifecycle registration; Telco does
 not boot them accidentally.
+
+`SeedRegistration` supplies the active pack's immutable entity/bootstrap
+sources. Agency retains its employee, vendor, and agency fixtures. Telco does
+not load those fixtures merely because the shared graph mechanism is enabled.
+
+`LifecycleRegistration` owns pack-specific startup and teardown hooks for
+ambient watchers, cadence sources, responders, and recorders. Every start hook
+returns or registers its corresponding stop action so the shared FastAPI
+lifespan can unwind the selected pack without knowing its business modules.
 
 ## 10. Blueprint, recordings, and UI
 
