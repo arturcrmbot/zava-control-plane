@@ -16,6 +16,7 @@ from verticals.telco.authority import TELCO_AUTHORITY
 from verticals.telco.domains import TELCO_DOMAINS
 from verticals.telco.functions import TELCO_FUNCTIONS
 from verticals.telco.lifecycle import bootstrap, start
+from verticals.telco.personas import TELCO_PERSONAS
 from verticals.telco.projections import TELCO_PROJECTIONS
 from verticals.telco.worlds import TELCO_WORLDS
 
@@ -41,6 +42,7 @@ def build_pack() -> VerticalPack:
         organisation_functions=TELCO_FUNCTIONS,
         agents=TELCO_AGENTS,
         authority=TELCO_AUTHORITY,
+        personas=TELCO_PERSONAS,
         policy_sources=(PACK_ROOT / "policies" / "tools.yaml",),
         durable_functions=DurableFunctionRegistration(
             load_module=_load_durable_module,

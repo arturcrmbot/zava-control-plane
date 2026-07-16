@@ -124,6 +124,7 @@ def freeze_pack(pack: VerticalPack) -> VerticalPack:
         organisation_functions=_freeze_mapping(pack.organisation_functions),
         agents=_freeze_mapping(pack.agents),
         authority=_freeze_mapping(pack.authority),
+        personas=_freeze_mapping(pack.personas),
         worlds=_freeze_mapping(worlds),
         projections=_freeze_mapping(pack.projections),
         ui=ui,
@@ -155,6 +156,13 @@ def validate_pack(pack: VerticalPack) -> None:
             raise ValueError(
                 f"vertical {pack.name!r} domain key {workflow_type!r} "
                 f"does not match workflow type {domain.workflow_type!r}"
+            )
+
+    for role, persona in pack.personas.items():
+        if role != persona.role:
+            raise ValueError(
+                f"vertical {pack.name!r} persona key {role!r} "
+                f"does not match registration {persona.role!r}"
             )
 
     owners: dict[str, list[str]] = {}
@@ -265,11 +273,26 @@ def validate_pack(pack: VerticalPack) -> None:
                 f"vertical {pack.name!r} function {function_name!r} "
                 f"references missing persona {node.role!r}"
             )
+        if node.role not in pack.personas:
+            raise ValueError(
+                f"vertical {pack.name!r} function {function_name!r} "
+                f"references unregistered persona {node.role!r}"
+            )
         for child in node.manages:
             validate_persona(child, function_name)
 
     for function_name, function in pack.organisation_functions.items():
         validate_persona(function.persona_hierarchy, function_name)
+
+    for domain in pack.domains.values():
+        for gate in domain.hitl_gates:
+            if gate.persona == "__legacy__":
+                continue
+            if gate.persona not in pack.personas:
+                raise ValueError(
+                    f"vertical {pack.name!r} domain {domain.workflow_type!r} "
+                    f"HITL gate references unregistered persona {gate.persona!r}"
+                )
 
     registered_operations: set[str] = set()
     module_stems: set[str] = set()

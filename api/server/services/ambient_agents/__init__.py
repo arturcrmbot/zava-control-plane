@@ -14,8 +14,8 @@ This module exposes:
 
 Cross-validation: every discovered agent must have ``agent.function in
 FUNCTIONS`` AND ``agent.name in FUNCTIONS[agent.function].ambient_agents``
-(loud failure on mismatch — same discipline as
-``_wire_function_back_refs`` in api.shared.functions).
+(loud failure on mismatch — same discipline as the active pack's function
+ownership wiring in ``verticals._helpers.wire_domain_functions``).
 """
 from __future__ import annotations
 

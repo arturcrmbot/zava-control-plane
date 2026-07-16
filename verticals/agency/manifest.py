@@ -16,6 +16,7 @@ from verticals.agency.authority import AGENCY_AUTHORITY
 from verticals.agency.domains import AGENCY_DOMAINS
 from verticals.agency.functions import AGENCY_FUNCTIONS
 from verticals.agency.lifecycle import bootstrap, start
+from verticals.agency.personas import AGENCY_PERSONAS
 from verticals.agency.projections import AGENCY_PROJECTIONS
 from verticals.agency.worlds import AGENCY_WORLDS
 
@@ -84,6 +85,7 @@ def build_pack() -> VerticalPack:
         organisation_functions=AGENCY_FUNCTIONS,
         agents=AGENCY_AGENTS,
         authority=AGENCY_AUTHORITY,
+        personas=AGENCY_PERSONAS,
         policy_sources=(REPO_ROOT / "data" / "policies" / "tools.yaml",),
         durable_functions=DurableFunctionRegistration(
             load_module=_load_durable_module,
