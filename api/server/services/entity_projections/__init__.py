@@ -55,7 +55,9 @@ ProjectionFn = Callable[[Workflow], list[EntityWrite | RelWrite | DecisionWrite]
 # registers itself by setting ``WORKFLOW_TYPE`` + ``project``; the loop at
 # the bottom of this file walks every imported domain module and binds the
 # registry entry.
-PROJECTIONS = active_runtime().pack.projections
+# Compatibility working copy for legacy tests and call sites that temporarily
+# register a projection. The immutable pack mapping remains authoritative.
+PROJECTIONS: dict[str, ProjectionFn] = dict(active_runtime().pack.projections)
 
 
 _SLUG_RE = re.compile(r"[^A-Za-z0-9]+")

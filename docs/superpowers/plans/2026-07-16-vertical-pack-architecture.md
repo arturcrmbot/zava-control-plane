@@ -21,13 +21,15 @@ recordings, UI metadata, and Durable module loading.
 | Task | Commit | Result |
 |---|---|---|
 | Contracts and loader | `61d2b02b` | Static Agency/Telco selection, validation, namespaced data |
-| Business registries | `2ba1eef9` | Active domains, functions, agents, authority, personae |
+| Transitional business views | `2ba1eef9` | Added active-only compatibility views before ownership inversion |
 | Durable isolation | `6d62d545` | Functions imports only the selected vertical module |
 | Runtime bootstrap | `cf7d1b43` | AppState, ramp, lifecycle, and storage use active runtime |
 | Runtime assets | `af577247` | Worlds, responders, projections, memory isolated |
 | Blueprint assets | `db3b0cda` | Domains, skills, MCPs, aliases, personae pack-scoped |
 | Recordings | `7d14db5f` | Curated and captured replay pack-scoped |
-| Registry consolidation | `7c80ce36` | Removed five transitional `all_*` registry copies |
+| Runtime registry consolidation | `7c80ce36` | Removed transitional runtime copies; declarations still awaited pack ownership |
+| Business registry ownership | `3e84298b` | Moved domains, functions, agents, authority, and personae into packs |
+| Agency lifecycle isolation | `3cd2d256` | Moved Agency ambient startup and teardown behind its lifecycle |
 
 Validated boundaries:
 
@@ -79,6 +81,9 @@ npm run build:blueprint
 Commit: `feat(ui): render active vertical manifest`
 
 ### Task B: Remove remaining global fallbacks
+
+**Status:** Complete in `3e84298b` and `3cd2d256`; final regression cleanup
+lands with Task C.
 
 **Scope:**
 

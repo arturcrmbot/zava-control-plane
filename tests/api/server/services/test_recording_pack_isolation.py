@@ -3,8 +3,6 @@ from __future__ import annotations
 import json
 from importlib import import_module
 
-import pytest
-
 from api.shared.vertical_loader import build_runtime
 
 
@@ -68,7 +66,7 @@ def test_runtime_recordings_are_pack_namespaced(tmp_path) -> None:
     )
 
 
-def test_foreign_override_recording_is_rejected(
+def test_foreign_override_recording_is_excluded(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -81,8 +79,8 @@ def test_foreign_override_recording_is_rejected(
     _write_recording(override / "hiring.jsonl", "hiring")
     monkeypatch.setenv("BLUEPRINT_RECORDINGS_DIR", str(override))
 
-    with pytest.raises(
-        ValueError,
-        match="workflow 'hiring' is not in active vertical 'telco'",
-    ):
-        recorder.load_recorded_templates(runtime)
+    templates = recorder.load_recorded_templates(runtime)
+
+    assert templates
+    assert all(template["workflow_type"] != "hiring" for template in templates)
+    assert all(template["filename"] != "hiring.jsonl" for template in templates)
