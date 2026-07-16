@@ -95,6 +95,7 @@ def _app_state():
     state = SimpleNamespace(
         bus=world.bus, world_service=world, store=StateStore(),
         hub=MagicMock(), audit=MagicMock(), orchestration_history={},
+        runtime=world.vertical_runtime,
     )
     state.workflow_event_ingestor = WorkflowEventIngestor(state)
     return state, world
@@ -118,6 +119,7 @@ async def test_combined_adapter_and_orchestrator_single_owner_lifecycle():
     instance_id = "durable-ni-1"
 
     responder = resolve_responder(
+        state.runtime,
         world.registration.objective_routes[0].objective_type
     )
     objective = SimpleNamespace(

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from api.server.services.entity_graph import DecisionWrite, EntityWrite, RelWrite
-from api.server.services.entity_projections.network_incident import (
+from verticals.telco.entity_projections.network_incident import (
     project, WORKFLOW_TYPE,
 )
 

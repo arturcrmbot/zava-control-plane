@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from api.server.world.packs.support import SupportScenario
-    from api.server.world.packs.telco import NetworkScenario
+    from verticals.telco.world import NetworkScenario
 
 
 @dataclass(frozen=True, slots=True)

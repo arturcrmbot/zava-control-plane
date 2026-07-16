@@ -13,7 +13,7 @@ from api.server.world.commands import CommandGateway
 from api.server.world.evaluations import OutcomeEvaluator
 from api.server.world.model import SimulationCommand
 from api.server.world.objectives import ObjectiveManager
-from api.server.world.registry import resolve_world_pack
+from verticals.agency.worlds import SUPPORT_WORLD
 from api.server.world.runtime import SimulationRuntime
 
 TRACE = "support-pressure-5"
@@ -51,7 +51,7 @@ def _explode_apply(command):
 
 
 def _acting_objective(runtime, manager, *, issuer=ISSUER):
-    route = resolve_world_pack("support").objective_routes[0]
+    route = SUPPORT_WORLD.objective_routes[0]
     objective = manager.open(_sensor(), route, owner_function=issuer)
     manager.transition(objective.id, "claimed", claimed_by=issuer)
     manager.transition(objective.id, "acting")
@@ -83,7 +83,7 @@ def test_accepts_valid_command_and_starts_evaluation():
 def test_rejects_when_objective_not_acting():
     runtime = SimulationRuntime(1)
     manager = ObjectiveManager(runtime)
-    route = resolve_world_pack("support").objective_routes[0]
+    route = SUPPORT_WORLD.objective_routes[0]
     objective = manager.open(_sensor(), route, owner_function=ISSUER)
     manager.transition(objective.id, "claimed", claimed_by=ISSUER)  # still claimed, not acting
     gateway = CommandGateway(runtime, manager, _explode_apply)

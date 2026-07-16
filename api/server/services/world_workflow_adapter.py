@@ -58,8 +58,7 @@ import logging
 from typing import Any
 
 from api.server.services.synthetic_data import build_registered_workflow
-from api.server.services.world_responders import ResponderRegistration
-from api.shared.domains import DOMAINS
+from api.shared.world_contracts import ResponderRegistration
 
 log = logging.getLogger("world_workflow_adapter")
 
@@ -109,6 +108,7 @@ class WorldWorkflowAdapter:
                 "objective_id": getattr(objective, "id", None),
                 "trace_id": getattr(objective, "trace_id", None),
             },
+            domains=self._app.runtime.pack.domains,
         )
         self._app.store.upsert_workflow(workflow)
         return workflow_id
@@ -231,7 +231,7 @@ class WorldWorkflowAdapter:
             self._app.store.upsert_workflow(w)
         final_phase = "Outcome Verification"
         if w is not None:
-            domain = DOMAINS.get(w.type)
+            domain = self._app.runtime.pack.domains.get(w.type)
             if domain is not None and domain.phases:
                 final_phase = domain.phases[-1].name
         await self._ingest(
@@ -273,7 +273,7 @@ class WorldWorkflowAdapter:
             self._app.store.upsert_workflow(w)
         final_phase = "Outcome Verification"
         if w is not None:
-            domain = DOMAINS.get(w.type)
+            domain = self._app.runtime.pack.domains.get(w.type)
             if domain is not None and domain.phases:
                 final_phase = domain.phases[-1].name
         await self._ingest(

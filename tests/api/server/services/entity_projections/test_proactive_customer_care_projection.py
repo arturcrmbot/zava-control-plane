@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from api.server.services.entity_graph import DecisionWrite, EntityWrite, RelWrite
-from api.server.services.entity_projections.proactive_customer_care import (
+from verticals.telco.entity_projections.proactive_customer_care import (
     WORKFLOW_TYPE,
     project,
 )

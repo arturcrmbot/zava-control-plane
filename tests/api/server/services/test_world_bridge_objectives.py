@@ -27,11 +27,11 @@ from api.shared.events import FleetEvent
 
 
 def _state():
-    service = ActorWorldService.for_world("support", seed=7, bus=EventBus())
+    service = ActorWorldService.support(seed=7, bus=EventBus())
     state = SimpleNamespace(
         bus=service.bus, world_service=service, world_last_response=None,
         store=StateStore(), hub=MagicMock(), audit=MagicMock(),
-        orchestration_history={},
+        orchestration_history={}, runtime=service.vertical_runtime,
     )
     state.workflow_event_ingestor = WorkflowEventIngestor(state)
     return state

@@ -35,6 +35,7 @@ from api.server.services.entity_graph import (
     RelWrite,
 )
 from api.shared.types import Workflow
+from api.shared.vertical_loader import active_runtime
 
 __all__ = [
     "DecisionWrite",
@@ -54,7 +55,7 @@ ProjectionFn = Callable[[Workflow], list[EntityWrite | RelWrite | DecisionWrite]
 # registers itself by setting ``WORKFLOW_TYPE`` + ``project``; the loop at
 # the bottom of this file walks every imported domain module and binds the
 # registry entry.
-PROJECTIONS: dict[str, ProjectionFn] = {}
+PROJECTIONS = active_runtime().pack.projections
 
 
 _SLUG_RE = re.compile(r"[^A-Za-z0-9]+")
@@ -119,71 +120,3 @@ def build_decision(
         attributes=dict(attributes or {}),
         decided_on=decided_on,
     )
-
-
-# Sub-phase 3: each import has the side effect of exposing
-# ``WORKFLOW_TYPE`` + ``project`` on the module; the loop below binds them
-# into PROJECTIONS. A missing module is therefore an explicit ImportError
-# at boot rather than a silent no-op.
-from . import account_onboarding    # noqa: E402  pitch-c2
-from . import agency_network_roll_up  # noqa: E402  pitch-c2
-from . import annual_budget_setting  # noqa: E402  pitch-c3
-from . import ap_invoice            # noqa: E402  TASK-015
-from . import board_prep            # noqa: E402  pitch-c1
-from . import client_renewal        # noqa: E402  pitch-c3
-from . import contract_renewal      # noqa: E402  TASK-021
-from . import contract_review       # noqa: E402  TASK-022
-from . import creative_awards_submission  # noqa: E402  pitch-c3
-from . import creative_campaign     # noqa: E402  TASK-026
-from . import crisis_response       # noqa: E402  pitch-c2
-from . import data_clean_room_setup  # noqa: E402  pitch-c3
-from . import employee_onboarding   # noqa: E402  TASK-018
-from . import employee_transfer     # noqa: E402  compose-domain v4 (fleet-employee-transfer)
-from . import expense_claim         # noqa: E402  pitch-a4
-from . import freelancer_onboarding  # noqa: E402  pitch-c3
-from . import fy_close              # noqa: E402  pitch-c1
-from . import hire_to_productive    # noqa: E402  pitch-c1
-from . import hiring                # noqa: E402  pitch-a4
-from . import intercompany_recharge  # noqa: E402  pitch-c2
-from . import intercompany_talent_transfer  # noqa: E402  pitch-c3
-from . import it_access_request     # noqa: E402  TASK-019
-from . import lead_to_cash          # noqa: E402  pitch-c1
-from . import m_and_a_integration   # noqa: E402  pitch-c2
-from . import media_pitch_to_win    # noqa: E402  pitch-c2
-from . import monthly_client_pnl    # noqa: E402  pitch-c3
-from . import network_incident      # noqa: E402  telco actor-world domain
-from . import new_business_pipeline_scrub  # noqa: E402  pitch-c3
-from . import order_to_activate     # noqa: E402  telco actor-world domain
-from . import perf_review           # noqa: E402  TASK-023
-from . import policy_set            # noqa: E402  autonomous-domain-insights v1
-from . import privacy_dpia          # noqa: E402  TASK-024
-from . import proactive_customer_care  # noqa: E402  telco actor-world domain
-from . import purchase_order        # noqa: E402  TASK-016
-from . import quarterly_creative_awards  # noqa: E402  pitch-c3
-from . import talent_redeployment   # noqa: E402  pitch-c2
-from . import training_request      # noqa: E402  compose-domain v4 (fleet-training-request)
-from . import travel_preapproval    # noqa: E402  TASK-020
-from . import treasury_fx           # noqa: E402  TASK-025
-from . import vendor_kyc            # noqa: E402  TASK-017
-from . import vendor_risk_to_pay    # noqa: E402  pitch-c1
-from . import weekly_pitch_review   # noqa: E402  pitch-c3
-
-_DOMAIN_MODULES = (
-    account_onboarding, agency_network_roll_up, annual_budget_setting,
-    ap_invoice, board_prep, client_renewal,
-    contract_renewal, contract_review, creative_awards_submission,
-    creative_campaign, crisis_response, data_clean_room_setup,
-    employee_onboarding, employee_transfer, expense_claim, freelancer_onboarding,
-    fy_close, hire_to_productive, hiring,
-    intercompany_recharge, intercompany_talent_transfer,
-    it_access_request, lead_to_cash, m_and_a_integration,
-    media_pitch_to_win, monthly_client_pnl, network_incident,
-    new_business_pipeline_scrub, order_to_activate,
-    perf_review, policy_set, privacy_dpia, proactive_customer_care,
-    purchase_order, quarterly_creative_awards,
-    talent_redeployment, training_request, travel_preapproval, treasury_fx,
-    vendor_kyc, vendor_risk_to_pay, weekly_pitch_review,
-)
-
-for _mod in _DOMAIN_MODULES:
-    PROJECTIONS[_mod.WORKFLOW_TYPE] = _mod.project

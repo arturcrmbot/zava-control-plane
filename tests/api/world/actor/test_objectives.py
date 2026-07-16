@@ -6,11 +6,11 @@ from __future__ import annotations
 import pytest
 
 from api.server.world.objectives import ObjectiveManager
-from api.server.world.registry import ObjectiveRoute, WORLD_PACKS
 from api.server.world.runtime import SimulationRuntime
+from api.shared.world_contracts import ObjectiveRoute
+from verticals.agency.worlds import SUPPORT_WORLD
 
-SUPPORT = WORLD_PACKS["support"]
-SUPPORT_ROUTE = SUPPORT.objective_routes[0]
+SUPPORT_ROUTE = SUPPORT_WORLD.objective_routes[0]
 
 
 def _runtime() -> SimulationRuntime:

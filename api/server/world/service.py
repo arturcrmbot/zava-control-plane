@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+from pathlib import Path
 from typing import Any
 
 from api.server.services.event_bus import EventBus
@@ -29,9 +30,12 @@ from api.server.world.commands import CommandGateway
 from api.server.world.evaluations import OutcomeEvaluator
 from api.server.world.model import Objective, SimulationCommand, SimulationEvent
 from api.server.world.objectives import TERMINAL_STATUSES, ObjectiveManager
-from api.server.world.registry import ObjectiveRoute, WorldPackRegistration, resolve_world_pack
+from api.server.world.registry import resolve_world_pack
 from api.server.world.runtime import SimulationRuntime
 from api.shared.events import FleetEvent
+from api.shared.vertical_loader import active_runtime, build_runtime
+from api.shared.vertical_pack import VerticalRuntime
+from api.shared.world_contracts import ObjectiveRoute, WorldPackRegistration
 
 
 def _require_finite_positive(value: Any, *, label: str, floor: float = 0.0) -> float:
@@ -53,16 +57,21 @@ class ActorWorldService:
         *,
         seed: int,
         bus: EventBus,
+        vertical_runtime: VerticalRuntime,
         registration: WorldPackRegistration,
+        scale_name: str,
         minutes_per_second: float | None = None,
     ) -> None:
         self.bus = bus
+        self.vertical_runtime = vertical_runtime
         self.registration = registration
         self.scenario_name = registration.name
-        self._build_scenario = registration.build_scenario
+        self.scale_name = scale_name
+        scale = registration.scales[scale_name]
+        self._build_scenario = scale.build_scenario
         self._stop_requested = False
         self.minutes_per_second = _require_finite_positive(
-            registration.default_minutes_per_second
+            scale.default_minutes_per_second
             if minutes_per_second is None
             else minutes_per_second,
             label="minutes_per_second",
@@ -78,15 +87,40 @@ class ActorWorldService:
         bus: EventBus,
         speed: float | None = None,
     ) -> ActorWorldService:
-        """Build the live world registered under ``name`` (``support``/``telco``).
+        runtime = active_runtime()
+        return cls.for_runtime(
+            runtime,
+            seed=seed,
+            bus=bus,
+            speed=speed,
+            world_name=name,
+        )
 
-        ``speed`` overrides the registration's ``default_minutes_per_second``;
-        ``None`` keeps the registered default. Unknown names raise ``ValueError``.
-        """
+    @classmethod
+    def for_runtime(
+        cls,
+        runtime: VerticalRuntime,
+        *,
+        seed: int,
+        bus: EventBus,
+        speed: float | None = None,
+        world_name: str | None = None,
+    ) -> ActorWorldService:
+        name = world_name or runtime.world_name
+        if name is None:
+            raise ValueError(
+                f"vertical {runtime.pack.name!r} has no active world"
+            )
+        registration = resolve_world_pack(runtime, name)
+        scale_name = (
+            runtime.world_scale_name or registration.default_scale
+        )
         return cls(
             seed=seed,
             bus=bus,
-            registration=resolve_world_pack(name),
+            vertical_runtime=runtime,
+            registration=registration,
+            scale_name=scale_name,
             minutes_per_second=speed,
         )
 
@@ -95,14 +129,32 @@ class ActorWorldService:
         cls, seed: int, bus: EventBus, minutes_per_second: float = 10
     ) -> ActorWorldService:
         """Thin compatibility wrapper: build the live support world."""
-        return cls.for_world("support", seed, bus, speed=minutes_per_second)
+        runtime = build_runtime(
+            {"ZAVA_WORLD": "support"},
+            data_root=Path("."),
+        )
+        return cls.for_runtime(
+            runtime,
+            seed=seed,
+            bus=bus,
+            speed=minutes_per_second,
+        )
 
     @classmethod
     def telco(
         cls, seed: int, bus: EventBus, minutes_per_second: float = 10
     ) -> ActorWorldService:
         """Thin compatibility wrapper: build the live telco world."""
-        return cls.for_world("telco", seed, bus, speed=minutes_per_second)
+        runtime = build_runtime(
+            {"ZAVA_VERTICAL": "telco"},
+            data_root=Path("."),
+        )
+        return cls.for_runtime(
+            runtime,
+            seed=seed,
+            bus=bus,
+            speed=minutes_per_second,
+        )
 
     def _install(self, seed: int) -> tuple[SimulationRuntime, Any]:
         """Build and install a fresh runtime/scenario; reset the publish cursor.

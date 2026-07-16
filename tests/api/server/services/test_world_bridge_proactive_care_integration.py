@@ -21,6 +21,7 @@ async def test_customer_impact_creates_and_resolves_canonical_care_workflow(
         hub=MagicMock(),
         audit=MagicMock(),
         orchestration_history={},
+        runtime=world.vertical_runtime,
     )
     state.workflow_event_ingestor = WorkflowEventIngestor(state)
     world.inject_site_failure("SITE-01")

@@ -580,7 +580,10 @@ def build_creative_campaign_workflow(
 # payload nesting, and the platform-required fields.
 
 
-def _registered_initial_phase(workflow_type: str) -> str:
+def _registered_initial_phase(
+    workflow_type: str,
+    domains: dict | None = None,
+) -> str:
     """First phase for a registered domain, or ``"Intake"`` when unknown.
 
     The initial ``current_phase`` MUST come from ``DOMAINS[workflow_type]
@@ -589,9 +592,11 @@ def _registered_initial_phase(workflow_type: str) -> str:
     Imported lazily to avoid an import cycle (domains.py → functions.py wiring
     runs at import).
     """
-    from api.shared import domains as _domains
+    if domains is None:
+        from api.shared import domains as _domains
 
-    domain = _domains.DOMAINS.get(workflow_type)
+        domains = _domains.DOMAINS
+    domain = domains.get(workflow_type)
     if domain is not None and domain.phases:
         return domain.phases[0].name
     return "Intake"
@@ -605,6 +610,7 @@ def build_registered_workflow(
     *,
     extra_payload: dict | None = None,
     initial_phase: str | None = None,
+    domains: dict | None = None,
 ) -> Workflow:
     """Build a canonical :class:`Workflow` from registered domain metadata.
 
@@ -617,7 +623,10 @@ def build_registered_workflow(
     ``DOMAINS[workflow_type].phases[0]``.
     """
     now = time.time()
-    phase = initial_phase or _registered_initial_phase(workflow_type)
+    phase = initial_phase or _registered_initial_phase(
+        workflow_type,
+        domains,
+    )
     payload: dict = {payload_key: dict(payload_data), "scenario": payload_data.get("scenario")}
     if extra_payload:
         payload.update(extra_payload)

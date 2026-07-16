@@ -157,8 +157,16 @@ async def test_lifespan_selects_expected_world_for_vertical(
     fake_service = FakeWorldService()
     fake_bridge: FakeWorldBridge | None = None
 
-    def fake_for_world(cls, world_name: str, *, seed: int, bus, speed: float):
-        requested_worlds.append(world_name)
+    def fake_for_runtime(
+        cls,
+        runtime,
+        *,
+        seed: int,
+        bus,
+        speed: float,
+        world_name=None,
+    ):
+        requested_worlds.append(world_name or runtime.world_name)
         return fake_service
 
     def fake_bridge_factory(state):
@@ -166,7 +174,11 @@ async def test_lifespan_selects_expected_world_for_vertical(
         fake_bridge = FakeWorldBridge(state)
         return fake_bridge
 
-    monkeypatch.setattr(world_service_module.ActorWorldService, "for_world", classmethod(fake_for_world))
+    monkeypatch.setattr(
+        world_service_module.ActorWorldService,
+        "for_runtime",
+        classmethod(fake_for_runtime),
+    )
     monkeypatch.setattr(world_bridge_module, "WorldBridge", fake_bridge_factory)
     set_active_player(None)
 
