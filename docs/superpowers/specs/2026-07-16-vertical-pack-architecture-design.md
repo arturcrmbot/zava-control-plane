@@ -1,7 +1,7 @@
 # Interchangeable Vertical Pack Architecture — Design Specification
 
 **Date:** 2026-07-16  
-**Status:** Approved direction; written-spec review pending  
+**Status:** Approved 2026-07-16
 **Scope:** Vertical packaging and Agency/Telco isolation only  
 **Follow-on:** A separate Telco portfolio and synthetic-world specification
 
@@ -119,6 +119,7 @@ verticals/
     worlds.py
     projections.py
     memory.py
+    ambient_agents/
     personae/
     skills/
     mcp_tools/
@@ -134,6 +135,7 @@ verticals/
     worlds.py
     projections.py
     memory.py
+    ambient_agents/
     personae/
     skills/
     mcp_tools/
@@ -160,6 +162,8 @@ api/shared/vertical_pack.py       # frozen contract types
 api/shared/vertical_loader.py     # selection, validation, process cache
 api/shared/domain_contracts.py    # Domain, Phase, HitlGate, ...
 api/shared/agent_contracts.py     # AgentRegistryEntry, ...
+api/shared/world_contracts.py     # world, scale, objective, responder types
+api/shared/projection_contracts.py # projection callable type
 api/server/runtime_context.py     # resolved VerticalRuntime for FastAPI
 ```
 
@@ -172,6 +176,7 @@ This is a surgical extraction, not a wholesale rename of the kernel.
 ```python
 @dataclass(frozen=True, slots=True)
 class VerticalPack:
+    root: Path
     name: str
     display_name: str
     manifest_version: str
@@ -188,8 +193,8 @@ class VerticalPack:
     worlds: Mapping[str, WorldPackRegistration]
     default_world: str | None
     seed: SeedRegistration
-    projections: tuple[ProjectionRegistration, ...]
-    memory: tuple[MemoryRegistration, ...]
+    projections: Mapping[str, ProjectionFn]
+    memory_workflow_types: tuple[str, ...]
     lifecycle: LifecycleRegistration
     recordings: RecordingSources
     ui: VerticalUiManifest
@@ -200,6 +205,12 @@ The mappings exposed by a built pack are read-only. A pack builder may use
 ordinary dictionaries internally, but the loader freezes them before
 publication.
 
+Pack manifests are safe to import in both FastAPI and Functions processes.
+Server-heavy providers are imported inside their registration callbacks, not
+at manifest module import time. Resolving a pack therefore does not initialise
+world scenarios, projections, lifecycle watchers, entity storage, or Durable
+workflow modules until the owning process invokes that capability.
+
 `VerticalRuntime` adds environment-specific decisions:
 
 ```python
@@ -207,6 +218,7 @@ publication.
 class VerticalRuntime:
     pack: VerticalPack
     world_name: str | None
+    world_scale_name: str | None
     data_dir: Path
     fingerprint: str
 ```
@@ -285,6 +297,12 @@ Blank values count as unset.
 World inference exists only for the two existing legacy world names. New
 worlds do not gain implicit vertical selection; callers must set
 `ZAVA_VERTICAL`.
+
+`ZAVA_WORLD_SCALE` is valid only when a world is active. It defaults to the
+selected world's declared default scale. Current Agency support and Telco
+worlds each expose only the compatibility `demo` scale; the follow-on Telco
+world design adds `standard` and `stress`. An unknown scale or a scale without
+an active world fails startup.
 
 Agency declares the support world but has no default actor world, preserving
 today's unset behaviour. Telco declares and defaults to the Telco world,
@@ -395,6 +413,8 @@ Each `WorldPackRegistration` owns its named scale-profile registrations. This
 architecture defines that selection seam; the follow-on Telco specification
 defines the actual demo/standard/stress counts and distributions. An unknown
 scale profile fails instead of reverting to a fixed scenario configuration.
+The registration also owns its objective-to-responder mapping; the shared
+bridge never consults a second global responder registry.
 
 ### 9.5 Projections and memory
 
@@ -537,6 +557,8 @@ Hard failures include:
 
 - unknown pack or world
 - world not owned by the selected pack
+- world scale supplied without an active world
+- world scale not declared by the active world
 - duplicate IDs across pack and kernel registrations
 - live domain without its declared orchestrator
 - function registration not declared by the active pack or kernel
