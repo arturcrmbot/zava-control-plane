@@ -126,6 +126,7 @@ start_fastapi
 
 log "starting Control Plane (:$CONTROL_PLANE_PORT)"
 ( exec env VITE_API_BASE_URL="http://127.0.0.1:$API_PORT" \
+    VITE_BLUEPRINT_URL="http://127.0.0.1:$BLUEPRINT_PORT" \
     "$ROOT/node_modules/.bin/vite" --host 127.0.0.1 \
     --port "$CONTROL_PLANE_PORT" --strictPort ) \
   >"$CONTROL_PLANE_LOG" 2>&1 &

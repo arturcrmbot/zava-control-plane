@@ -88,6 +88,12 @@ def test_telco_proof_queries_workflow_nodes_and_connected_graph_topology():
     assert "graph.edges.length > 0" in source
 
 
+def test_telco_proof_links_control_plane_to_isolated_blueprint():
+    source = SCRIPT.read_text(encoding="utf-8")
+
+    assert 'VITE_BLUEPRINT_URL="http://127.0.0.1:$BLUEPRINT_PORT"' in source
+
+
 def test_actor_world_stack_accepts_isolated_port_overrides(tmp_path):
     command = f"""
       export ACTOR_PROOF_ROOT={tmp_path}
