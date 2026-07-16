@@ -1,5 +1,16 @@
+import pytest
+
 from api.server.services.compose import tape
 from api.server.services.compose.session import ComposeSession
+from api.shared.vertical_loader import active_runtime
+
+
+@pytest.fixture(autouse=True)
+def _isolated_runtime_data(tmp_path, monkeypatch):
+    monkeypatch.setenv("ZAVA_DATA_DIR", str(tmp_path))
+    active_runtime.cache_clear()
+    yield
+    active_runtime.cache_clear()
 
 
 def test_save_and_load_round_trip(tmp_path, monkeypatch):
