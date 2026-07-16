@@ -17,11 +17,12 @@ from api.server.services import kpi_history
 
 @pytest.fixture(autouse=True)
 def _isolated_db(tmp_path: Path):
+    original = kpi_history._DB_PATH
     db = tmp_path / "kh.sqlite"
     kpi_history.set_db_path(db)
     kpi_history.init()
     yield db
-    kpi_history.set_db_path(kpi_history._DEFAULT_DB_PATH)
+    kpi_history.set_db_path(original)
 
 
 def test_empty_series_and_latest_return_empty():

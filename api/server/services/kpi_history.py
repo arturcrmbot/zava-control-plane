@@ -21,13 +21,23 @@ import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import TYPE_CHECKING, Iterator
 
-# Default lives under repo-root ``data/`` (gitignored). Override for tests.
-_DEFAULT_DB_PATH = (
-    Path(__file__).resolve().parents[3] / "data" / "kpi_history.sqlite"
+if TYPE_CHECKING:
+    from api.shared.vertical_pack import VerticalRuntime
+
+
+def default_db_path(runtime: "VerticalRuntime | None" = None) -> Path:
+    if runtime is None:
+        from api.shared.vertical_loader import active_runtime
+
+        runtime = active_runtime()
+    return runtime.data_dir / "kpi_history.sqlite"
+
+
+_DB_PATH: Path = Path(
+    os.environ.get("KPI_HISTORY_DB", str(default_db_path()))
 )
-_DB_PATH: Path = Path(os.environ.get("KPI_HISTORY_DB", _DEFAULT_DB_PATH))
 
 _RETENTION = 60 * 60 * 24  # 24 hours
 

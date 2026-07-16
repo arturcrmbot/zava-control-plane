@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from typing import Any
+from dataclasses import replace
 
 import pytest
-
 from api.server.services import simulator_orchestrator
+from api.shared.vertical_loader import build_runtime
 
 
 async def _noop_wait_for_functions_host(*_args: Any, **_kwargs: Any) -> None:
@@ -14,6 +15,7 @@ async def _noop_wait_for_functions_host(*_args: Any, **_kwargs: Any) -> None:
 @pytest.mark.asyncio
 async def test_ramp_loop_defaults_to_non_world_owned_live_domains_when_vertical_unset(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
 ) -> None:
     monkeypatch.setenv("SIMULATOR_RAMP_ENABLED", "1")
     monkeypatch.delenv("SIMULATOR_RAMP_DOMAINS", raising=False)
@@ -36,32 +38,25 @@ async def test_ramp_loop_defaults_to_non_world_owned_live_domains_when_vertical_
     monkeypatch.setattr(simulator_orchestrator, "_effective_interval", lambda domain: 1.0)
     monkeypatch.setattr(simulator_orchestrator, "_scenarios_for", lambda _workflow_type: None)
 
-    await simulator_orchestrator.ramp_loop()
+    runtime = build_runtime({}, data_root=tmp_path)
+    await simulator_orchestrator.ramp_loop(runtime)
 
-    assert scheduled == [
-        domain.workflow_type
-        for domain in simulator_orchestrator.live_domains()
-        if domain.workflow_type not in simulator_orchestrator._WORLD_OWNED_RAMP_TYPES
-        and domain.spawn_fn
-    ]
+    assert scheduled == list(runtime.pack.ramp_workflow_types)
 
 
 @pytest.mark.asyncio
 async def test_ramp_loop_uses_profile_ramp_domains_when_csv_unset(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
 ) -> None:
-    from api.shared.verticals import VerticalProfile
-
     monkeypatch.setenv("SIMULATOR_RAMP_ENABLED", "1")
     monkeypatch.delenv("SIMULATOR_RAMP_DOMAINS", raising=False)
     monkeypatch.setattr(simulator_orchestrator, "_wait_for_functions_host", _noop_wait_for_functions_host)
-    monkeypatch.setattr(
-        simulator_orchestrator,
-        "active_vertical",
-        lambda: VerticalProfile(
-            name="demo",
-            world="toy",
-            workflow_types=("expense-claim",),
+    runtime = build_runtime({}, data_root=tmp_path)
+    runtime = replace(
+        runtime,
+        pack=replace(
+            runtime.pack,
             ramp_workflow_types=("expense-claim",),
         ),
     )
@@ -82,7 +77,7 @@ async def test_ramp_loop_uses_profile_ramp_domains_when_csv_unset(
     monkeypatch.setattr(simulator_orchestrator, "_effective_interval", lambda domain: 1.0)
     monkeypatch.setattr(simulator_orchestrator, "_scenarios_for", lambda _workflow_type: None)
 
-    await simulator_orchestrator.ramp_loop()
+    await simulator_orchestrator.ramp_loop(runtime)
 
     assert scheduled == ["expense-claim"]
 
@@ -90,6 +85,7 @@ async def test_ramp_loop_uses_profile_ramp_domains_when_csv_unset(
 @pytest.mark.asyncio
 async def test_ramp_loop_explicit_csv_cannot_spawn_world_owned_domains(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
 ) -> None:
     monkeypatch.setenv("SIMULATOR_RAMP_ENABLED", "1")
     monkeypatch.setenv("ZAVA_VERTICAL", "telco")
@@ -112,14 +108,19 @@ async def test_ramp_loop_explicit_csv_cannot_spawn_world_owned_domains(
     monkeypatch.setattr(simulator_orchestrator, "_effective_interval", lambda domain: 1.0)
     monkeypatch.setattr(simulator_orchestrator, "_scenarios_for", lambda _workflow_type: None)
 
-    await simulator_orchestrator.ramp_loop()
+    runtime = build_runtime(
+        {"ZAVA_VERTICAL": "telco"},
+        data_root=tmp_path,
+    )
+    await simulator_orchestrator.ramp_loop(runtime)
 
-    assert scheduled == ["expense-claim"]
+    assert scheduled == []
 
 
 @pytest.mark.asyncio
 async def test_ramp_loop_has_no_telco_timer_noise_when_profile_ramp_is_empty(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
 ) -> None:
     monkeypatch.setenv("SIMULATOR_RAMP_ENABLED", "1")
     monkeypatch.setenv("ZAVA_VERTICAL", "telco")
@@ -142,6 +143,10 @@ async def test_ramp_loop_has_no_telco_timer_noise_when_profile_ramp_is_empty(
     monkeypatch.setattr(simulator_orchestrator, "_effective_interval", lambda domain: 1.0)
     monkeypatch.setattr(simulator_orchestrator, "_scenarios_for", lambda _workflow_type: None)
 
-    await simulator_orchestrator.ramp_loop()
+    runtime = build_runtime(
+        {"ZAVA_VERTICAL": "telco"},
+        data_root=tmp_path,
+    )
+    await simulator_orchestrator.ramp_loop(runtime)
 
     assert scheduled == []

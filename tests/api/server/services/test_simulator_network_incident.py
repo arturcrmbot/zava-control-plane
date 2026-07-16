@@ -99,9 +99,15 @@ async def test_proactive_care_spawner_uses_registered_payload_shape(monkeypatch)
 
 
 def test_default_ramp_excludes_registered_domains_without_spawners():
+    world_owned = {
+        responder.workflow_type
+        for world in app_state.runtime.pack.worlds.values()
+        for responder in world.responders.values()
+    }
     selected = simulator_orchestrator._select_ramp_domains(
         list(DOMAINS),
         DOMAINS,
+        world_owned,
     )
 
     assert selected

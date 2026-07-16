@@ -16,9 +16,6 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/story-pack")
 
-_DEFAULT_BASE_DIR = Path("data/snapshots")
-
-
 def _list_story_files(base_dir: Path) -> list[Path]:
     """Return story-*.md files sorted newest-first.
 
@@ -44,7 +41,12 @@ def latest(
     Reverse-chronological. Empty list when no stories have been
     written yet (cold demo, ambient writer hasn't ticked).
     """
-    root = Path(base_dir) if base_dir else _DEFAULT_BASE_DIR
+    if base_dir:
+        root = Path(base_dir)
+    else:
+        from api.server.services.story_pack import default_base_dir
+
+        root = default_base_dir()
     items: list[dict] = []
     for p in _list_story_files(root)[:n]:
         # filename: story-<YYYY-MM-DDTHH>.md

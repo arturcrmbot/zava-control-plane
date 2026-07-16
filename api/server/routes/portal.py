@@ -21,10 +21,10 @@ from api.shared.events import FleetEvent
 
 router = APIRouter(prefix="/api/portal", tags=["portal"])
 
-# Where pre-rendered welcome videos live, keyed by slugified candidate name.
-# Populated automatically the first time agent_onboarding renders for that
-# candidate (see api/functions/graphs/executors/agents/agent_onboarding.py).
-_PRERECORD_DIR = Path(__file__).resolve().parents[3] / "data" / "portal" / "welcome-videos"
+def _prerecord_dir() -> Path:
+    from api.server.state import app_state
+
+    return app_state.data_dir / "welcome-videos"
 
 
 # ----------------------------------------------------------------- Task 5: apply
@@ -165,8 +165,9 @@ async def welcome_video(filename: str):
     """
     if not filename.endswith(".mp4") or "/" in filename or ".." in filename:
         raise HTTPException(400, "filename must be <slug>.mp4")
-    path = (_PRERECORD_DIR / filename).resolve()
-    if not str(path).startswith(str(_PRERECORD_DIR.resolve())):
+    prerecord_dir = _prerecord_dir()
+    path = (prerecord_dir / filename).resolve()
+    if not str(path).startswith(str(prerecord_dir.resolve())):
         raise HTTPException(400, "invalid filename")
     if not path.is_file():
         raise HTTPException(404, f"no pre-recorded video for {filename}")

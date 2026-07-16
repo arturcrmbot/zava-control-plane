@@ -15,7 +15,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.server.middleware.replay_readonly import ReplayReadOnlyMiddleware
 from api.server.services.replay.mode import is_replay
 from api.server.state import app_state
-from api.shared.verticals import active_vertical
 
 
 def _cors_allowed_origins() -> list[str]:
@@ -46,12 +45,14 @@ app_state.fm = FleetManagerService(
 # because the mcp_tools package eagerly imports submodules that
 # themselves do ``from api.server.state import app_state``; populating
 # function_fms inside __init__ would race the binding.
-app_state.init_function_fms()
+if app_state.runtime.pack.name == "agency":
+    app_state.init_function_fms()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_otel("control-plane-server")
+    runtime = app_state.runtime
     # Governance kernel — see plan/feature-agent-governance-toolkit-1.md
     # (TASK-004). Idempotent. Logs AGT version + policy_version +
     # enforcement_mode at boot. Phase 1: returns ALLOW for everything;
@@ -105,13 +106,14 @@ async def lifespan(app: FastAPI):
         return
 
     try:
-        await app_state.fm.start()
+        if runtime.pack.name == "agency":
+            await app_state.fm.start()
     except Exception as ex:
         print(f"[server] Fleet Manager failed to start: {ex}")
     # Phase 3 IP6 — start the ambient dispatcher inside the lifespan so
     # cypher sweep loops are scheduled on the running event loop.
     try:
-        if hasattr(app_state, "ambient_dispatcher"):
+        if runtime.pack.name == "agency" and hasattr(app_state, "ambient_dispatcher"):
             app_state.ambient_dispatcher.start()
     except Exception as ex:
         print(f"[server] Ambient dispatcher failed to start: {ex}")
@@ -127,9 +129,10 @@ async def lifespan(app: FastAPI):
         trend_cadence_watcher,
         auto_block_rule_learner,
         kpi_history_recorder,
+        story_pack_writer,
     )
     try:
-        if hasattr(app_state, "entities"):
+        if runtime.pack.name == "agency" and hasattr(app_state, "entities"):
             vendor_block_watcher.start(app_state.bus, app_state.entities)
             brand_budget_watcher.start(app_state.bus, app_state.entities)
     except Exception as ex:
@@ -138,7 +141,8 @@ async def lifespan(app: FastAPI):
     # counts from the StateStore (no entity-graph dependency) so it can
     # boot even when the entity plane is disabled.
     try:
-        subsidiary_capacity_watcher.start(app_state.bus, app_state.store)
+        if runtime.pack.name == "agency":
+            subsidiary_capacity_watcher.start(app_state.bus, app_state.store)
     except Exception as ex:
         print(f"[server] subsidiary_capacity_watcher failed to start: {ex}")
     # pitch-i2: auto-block rule learner. Subscribes to decision.recorded
@@ -146,9 +150,10 @@ async def lifespan(app: FastAPI):
     # vendor. Wired regardless of the entity plane — falls back to the
     # in-memory ledger when ``entities`` is absent.
     try:
-        auto_block_rule_learner.start(
-            app_state.bus, getattr(app_state, "entities", None)
-        )
+        if runtime.pack.name == "agency":
+            auto_block_rule_learner.start(
+                app_state.bus, getattr(app_state, "entities", None)
+            )
     except Exception as ex:
         print(f"[server] auto_block_rule_learner failed to start: {ex}")
     # pitch-i5: KPI-trend-driven cadence triggers. Provisional in-memory
@@ -156,24 +161,36 @@ async def lifespan(app: FastAPI):
     # KPI history series. Mirrors the H1/H2 module-singleton pattern so
     # uvicorn --reload cycles don't accumulate tick loops.
     try:
-        trend_cadence_watcher.start(bus=app_state.bus)
+        if runtime.pack.name == "agency":
+            trend_cadence_watcher.start(bus=app_state.bus)
     except Exception as ex:
         print(f"[server] trend_cadence_watcher failed to start: {ex}")
     # pitch-j5: hourly story-pack writer. Idempotent on the (hour, hour+1)
     # key so a tick storm at boot can't duplicate a file.
     try:
-        story_pack_writer.start()
+        if runtime.pack.name == "agency":
+            story_pack_writer.start(
+                base_dir=app_state.data_dir / "snapshots"
+            )
     except Exception as ex:
         print(f"[server] story_pack_writer failed to start: {ex}")
     # pitch-j1: KPI history recorder. Per-minute snapshot of agency KPIs
     # (and, via J2, per-persona load) into the durable kpi_history SQLite
     # ring. Module-singleton pattern matches the trend watcher above.
     try:
-        kpi_history_recorder.start()
+        if runtime.pack.name == "agency":
+            from api.server.services import kpi_history
+
+            kpi_history.set_db_path(
+                app_state.data_dir / "kpi_history.sqlite"
+            )
+            kpi_history_recorder.start()
     except Exception as ex:
         print(f"[server] kpi_history_recorder failed to start: {ex}")
     # Start the simulator ramp loop (spawns workflows via the AF Durable host)
-    ramp_task = asyncio.create_task(simulator_orchestrator.ramp_loop())
+    ramp_task = asyncio.create_task(
+        simulator_orchestrator.ramp_loop(runtime)
+    )
     # World simulator — exactly one authority at a time, selected by
     # normalized ZAVA_WORLD or, when unset/blank, the active vertical's
     # default world. `support` runs the live actor-world service (spec
@@ -186,41 +203,34 @@ async def lifespan(app: FastAPI):
     # observations/commands, not aggregate stocks/signals).
     world_task = None
     world_bridge = None
-    vertical = active_vertical()
-    world_source = "ZAVA_WORLD"
-    raw_world_name = os.getenv("ZAVA_WORLD")
-    world_name = raw_world_name.strip() if raw_world_name is not None else None
-    if not world_name and vertical is not None:
-        world_name = vertical.world
-        world_source = "ZAVA_VERTICAL"
+    world_name = runtime.world_name
     if world_name in ("support", "telco"):
         from api.server.services.world_bridge import WorldBridge
         from api.server.world.service import ActorWorldService
 
+        scale = runtime.pack.worlds[world_name].scales[
+            runtime.world_scale_name
+        ]
         world_service = ActorWorldService.for_world(
             world_name,
             seed=int(os.getenv("WORLD_SEED", "42")),
             bus=app_state.bus,
-            speed=float(os.getenv("WORLD_MINUTES_PER_SECOND", "10")),
+            speed=float(
+                os.getenv(
+                    "WORLD_MINUTES_PER_SECOND",
+                    str(scale.default_minutes_per_second),
+                )
+            ),
         )
         app_state.world_service = world_service
         world_task = asyncio.create_task(world_service.run())
         world_bridge = WorldBridge(app_state)
         world_bridge.start()
         app_state.world_bridge = world_bridge
-        print(f"[server] actor world ON (world={world_name}, source={world_source}) + bridge armed")
-    elif world_name:
-        from api.server.world import maybe_start_world
-
-        world_task = maybe_start_world(
-            app_state.bus,
-            on_engine=lambda e: setattr(app_state, "world_engine", e),
+        print(
+            f"[server] actor world ON (world={world_name}, "
+            f"scale={runtime.world_scale_name}) + bridge armed"
         )
-        if world_task is not None:
-            print(
-                f"[server] world engine ON (world={world_name}, source={world_source}, "
-                "aggregate toy fallback)"
-            )
     # Optional dream-pass cadence. Off unless DREAM_PASS_DEMO_CADENCE_SECONDS
     # is set. Scheduled here (not in AppState.__init__) because
     # AppState is constructed at module import time, before uvicorn has
@@ -233,7 +243,7 @@ async def lifespan(app: FastAPI):
             "DREAM_PASS_DEMO_CADENCE_DOMAINS", "hiring",
         ).split(",") if d.strip()
     )
-    if _dream_cadence_secs > 0:
+    if runtime.pack.name == "agency" and _dream_cadence_secs > 0:
         dream_cadence_task = asyncio.create_task(_run_dream_pass_cadence(
             app_state.dream_pass_orchestrator,
             domains=_dream_cadence_domains,
@@ -253,8 +263,15 @@ async def lifespan(app: FastAPI):
     await lifespan_register(app)
     # Candidate-portal: subscribe the cv_crystalliser → magic-link + email
     # bridge. Returns an unsubscribe callable that we hold for teardown.
-    from api.server.services.portal_orchestration import attach as _attach_portal_orch
-    _portal_orch_off = _attach_portal_orch(app_state)
+    if runtime.pack.name == "agency":
+        from api.server.services.portal_orchestration import (
+            attach as _attach_portal_orch,
+        )
+
+        _portal_orch_off = _attach_portal_orch(app_state)
+    else:
+        def _portal_orch_off() -> None:
+            return None
     # Persona responder: closes generated-domain HITL gates by applying the
     # persona's decision policy deterministically against the parked context
     # and raising the resolving external event back to Durable. Hand-built
@@ -284,7 +301,10 @@ async def lifespan(app: FastAPI):
     # Gated by PORTAL_SEED_REQS=1; off by default so the POC2 demo can
     # walk a real apply → triage → screen flow without three pre-existing
     # HIRE-DEMO-* workflows in the queue.
-    if _os.environ.get("PORTAL_SEED_REQS") == "1":
+    if (
+        runtime.pack.name == "agency"
+        and _os.environ.get("PORTAL_SEED_REQS") == "1"
+    ):
         from api.server.services.portal_seed import seed_demo_reqs
         async def _seed_in_background():
             try:
@@ -302,19 +322,20 @@ async def lifespan(app: FastAPI):
     # ``workflow.sub_spawned`` events + Person-OWNS-Asset reassignment so
     # the cosmic lens animates the cross-domain ripple.
     _ttc_off = None
-    try:
-        from api.server.services.ambient_agents.talent_transfer_cascade import (
-            TalentTransferCascade,
-        )
-        app_state.talent_transfer_cascade = TalentTransferCascade(
-            bus=app_state.bus,
-            audit=getattr(app_state, "audit", None),
-            graph=getattr(app_state, "entities", None),
-        )
-        app_state.talent_transfer_cascade.start()
-        _ttc_off = app_state.talent_transfer_cascade.aclose
-    except Exception as ex:
-        print(f"[server] TalentTransferCascade failed to start: {ex}")
+    if runtime.pack.name == "agency":
+        try:
+            from api.server.services.ambient_agents.talent_transfer_cascade import (
+                TalentTransferCascade,
+            )
+            app_state.talent_transfer_cascade = TalentTransferCascade(
+                bus=app_state.bus,
+                audit=getattr(app_state, "audit", None),
+                graph=getattr(app_state, "entities", None),
+            )
+            app_state.talent_transfer_cascade.start()
+            _ttc_off = app_state.talent_transfer_cascade.aclose
+        except Exception as ex:
+            print(f"[server] TalentTransferCascade failed to start: {ex}")
 
     # Wire bus -> hub fan-out inside the lifespan so each app instance owns
     # exactly one subscription. Previously this lived at module import time,
@@ -329,7 +350,11 @@ async def lifespan(app: FastAPI):
     # pitch-j6: subscribe the what's-new ring buffer to the four
     # learning-loop event types. Owned by the lifespan so each
     # uvicorn --reload cycle ends with a single subscription.
-    _whats_new_off = _whats_new_attach(app_state.bus)
+    _whats_new_off = (
+        _whats_new_attach(app_state.bus)
+        if runtime.pack.name == "agency"
+        else lambda: None
+    )
 
     # Optional in-process Recorder. Set ZAVA_RECORD_TO=/path/to/tape.tar.gz
     # to capture every bus event + mutation that fires during this lifespan
@@ -368,8 +393,21 @@ async def lifespan(app: FastAPI):
     else:
         _recorder_arm_task = None
 
+    @asynccontextmanager
+    async def _empty_session_manager():
+        yield
+
+    session_manager = (
+        compose_mcp.session_manager.run()
+        if runtime.pack.name == "agency"
+        else _empty_session_manager()
+    )
+    pack_stop_actions = list(
+        await runtime.pack.lifecycle.start(app_state)
+    )
+
     try:
-        async with compose_mcp.session_manager.run():
+        async with session_manager:
             yield
     finally:
         if _recorder_arm_task is not None and not _recorder_arm_task.done():
@@ -471,6 +509,13 @@ async def lifespan(app: FastAPI):
             await app_state.aclose()
         except Exception:
             pass
+        for stop in reversed(pack_stop_actions):
+            try:
+                result = stop()
+                if asyncio.iscoroutine(result):
+                    await result
+            except Exception:
+                pass
         await lifespan_shutdown(app)
 
 
@@ -572,6 +617,7 @@ from api.server.routes.compose import router as compose_router
 # World simulator — internal state/events/inject (JSON only; specs
 # 2026-07-10 aggregate + 2026-07-13 actor).
 from api.server.routes.world import router as world_router
+from api.server.routes.runtime import router as runtime_router
 # Per-lesson observability — D1.
 
 for r in (stream_router, workflows_router, exceptions_router, policy_router,
@@ -608,7 +654,8 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           memory_router,
           workflow_agui_router,
           compose_router,
-          world_router):
+          world_router,
+          runtime_router):
     app.include_router(r)
 
 app.mount("/api/compose/mcp", compose_mcp.streamable_http_app())
