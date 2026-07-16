@@ -93,6 +93,19 @@ wait_http() {
   return 1
 }
 
+wait_port_clear() {
+  local port="$1" label="$2" _
+  for _ in $(seq 1 40); do
+    if ! port_listening "$port"; then
+      log "$label stopped (port $port clear)"
+      return 0
+    fi
+    sleep 0.5
+  done
+  err "$label still reachable on port $port"
+  return 1
+}
+
 for required in azurite curl func lsof node uv; do
   command -v "$required" >/dev/null || {
     err "missing required command: $required"
@@ -173,9 +186,16 @@ if [[ "$rc" -eq 0 ]]; then
   FUNC_PID=""
   kill_tree "$AZ_PID" "azurite"
   AZ_PID=""
+  wait_port_clear "$API_PORT" "live FastAPI"
+  wait_port_clear "$FUNCTIONS_PORT" "Functions host"
+  for port in "${AZURITE_PORTS[@]}"; do
+    wait_port_clear "$port" "Azurite"
+  done
 
   ( cd "$ROOT" \
-      && exec env -u ZAVA_WORLD -u ZAVA_VERTICAL -u FUNCTIONS_HOST \
+      && exec env -u ZAVA_WORLD -u FUNCTIONS_HOST \
+        ZAVA_VERTICAL=telco \
+        ZAVA_BLUEPRINT_REPLAY_ONLY=1 \
         PORTAL_DATA_DIR="$DATA_ROOT/replay-portal" \
         ENTITY_PLANE_ENABLED=0 \
         SIMULATOR_RAMP_ENABLED=0 \

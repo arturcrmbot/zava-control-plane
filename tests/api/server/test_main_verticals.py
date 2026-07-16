@@ -220,6 +220,37 @@ async def test_lifespan_rejects_world_owned_by_another_vertical(
 
 
 @pytest.mark.asyncio
+async def test_blueprint_replay_only_skips_telco_world(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    from api.server.world import service as world_service_module
+    from api.shared.vertical_loader import build_runtime
+
+    _patch_live_lifespan_dependencies(monkeypatch)
+    monkeypatch.setenv("ZAVA_BLUEPRINT_REPLAY_ONLY", "1")
+    monkeypatch.setattr(
+        app_state,
+        "runtime",
+        build_runtime({"ZAVA_VERTICAL": "telco"}, data_root=tmp_path),
+        raising=False,
+    )
+    app_state.world_service = None
+
+    def fail_if_started(*_args, **_kwargs):
+        raise AssertionError("actor world must stay disabled for Blueprint replay")
+
+    monkeypatch.setattr(
+        world_service_module.ActorWorldService,
+        "for_runtime",
+        fail_if_started,
+    )
+
+    async with lifespan(app):
+        assert app_state.world_service is None
+
+
+@pytest.mark.asyncio
 async def test_telco_lifespan_skips_agency_watchers(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path,

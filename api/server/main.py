@@ -53,6 +53,7 @@ if app_state.runtime.pack.name == "agency":
 async def lifespan(app: FastAPI):
     init_otel("control-plane-server")
     runtime = app_state.runtime
+    blueprint_replay_only = os.getenv("ZAVA_BLUEPRINT_REPLAY_ONLY", "0") == "1"
     # Governance kernel — see plan/feature-agent-governance-toolkit-1.md
     # (TASK-004). Idempotent. Logs AGT version + policy_version +
     # enforcement_mode at boot. Phase 1: returns ALLOW for everything;
@@ -107,7 +108,9 @@ async def lifespan(app: FastAPI):
 
     # Start the simulator ramp loop (spawns workflows via the AF Durable host)
     ramp_task = asyncio.create_task(
-        simulator_orchestrator.ramp_loop(runtime)
+        asyncio.sleep(0)
+        if blueprint_replay_only
+        else simulator_orchestrator.ramp_loop(runtime)
     )
     # World simulator — exactly one authority at a time, selected by
     # normalized ZAVA_WORLD or, when unset/blank, the active vertical's
@@ -121,7 +124,7 @@ async def lifespan(app: FastAPI):
     # observations/commands, not aggregate stocks/signals).
     world_task = None
     world_bridge = None
-    world_name = runtime.world_name
+    world_name = None if blueprint_replay_only else runtime.world_name
     if world_name in ("support", "telco"):
         from api.server.services.world_bridge import WorldBridge
         from api.server.world.service import ActorWorldService
