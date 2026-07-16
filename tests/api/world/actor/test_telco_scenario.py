@@ -1,4 +1,4 @@
-from api.server.world.packs.telco import (
+from verticals.telco.world import (
     NetworkConfig,
     SiteFailure,
     run_network,

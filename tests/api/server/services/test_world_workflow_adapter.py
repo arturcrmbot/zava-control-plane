@@ -9,14 +9,34 @@ BEFORE Durable scheduling, and routes lifecycle transitions
 """
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from api.server.services.event_bus import EventBus
 from api.server.services.state_store import StateStore
 from api.server.services.workflow_event_ingestor import WorkflowEventIngestor
-from api.server.services.world_responders import resolve_responder
+from api.server.services.world_responders import (
+    resolve_responder as _resolve_responder,
+)
 from api.server.services.world_workflow_adapter import WorldWorkflowAdapter
+from api.shared.vertical_loader import build_runtime
+
+
+_TELCO_RUNTIME = build_runtime(
+    {"ZAVA_VERTICAL": "telco"},
+    data_root=Path("/tmp"),
+)
+_AGENCY_RUNTIME = build_runtime({}, data_root=Path("/tmp"))
+
+
+def resolve_responder(objective_type: str):
+    runtime = (
+        _AGENCY_RUNTIME
+        if objective_type == "support_capacity"
+        else _TELCO_RUNTIME
+    )
+    return _resolve_responder(runtime, objective_type)
 
 
 def _app_state():
@@ -26,6 +46,7 @@ def _app_state():
     state = SimpleNamespace(
         bus=bus, store=StateStore(), hub=MagicMock(), audit=MagicMock(),
         orchestration_history={}, domain_memories={},
+        runtime=_TELCO_RUNTIME,
     )
     state.workflow_event_ingestor = WorkflowEventIngestor(state)
     return state, captured

@@ -7,6 +7,7 @@ required.
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -18,6 +19,10 @@ from api.server.services.workflow_event_ingestor import WorkflowEventIngestor
 from api.server.services.world_bridge import WorldBridge
 from api.server.world.registry import ObjectiveRoute
 from api.shared.events import FleetEvent
+from api.shared.vertical_loader import build_runtime
+
+
+_AGENCY_RUNTIME = build_runtime({}, data_root=Path("/tmp"))
 
 
 class FakeObjective:
@@ -98,7 +103,7 @@ def app_state():
     state = SimpleNamespace(
         bus=EventBus(), world_service=FakeWorld(), world_last_response=None,
         store=StateStore(), hub=MagicMock(), audit=MagicMock(),
-        orchestration_history={},
+        orchestration_history={}, runtime=_AGENCY_RUNTIME,
     )
     state.workflow_event_ingestor = WorkflowEventIngestor(state)
     return state

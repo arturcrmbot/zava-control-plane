@@ -1,6 +1,6 @@
 import json
 
-from api.server.world.packs.telco import NetworkConfig, SiteFailure, run_network
+from verticals.telco.world import NetworkConfig, SiteFailure, run_network
 
 
 CONFIG = NetworkConfig(

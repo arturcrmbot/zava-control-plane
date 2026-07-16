@@ -23,6 +23,7 @@ async def test_service_order_reaches_canonical_workflow_and_world_activation(
         audit=MagicMock(),
         orchestration_history={},
         domain_memories={},
+        runtime=world.vertical_runtime,
     )
     state.workflow_event_ingestor = WorkflowEventIngestor(state)
     order_id = world.submit_service_order(

@@ -133,7 +133,7 @@ async def test_actor_network_incident_end_to_end(monkeypatch):
     state = SimpleNamespace(
         bus=world.bus, world_service=world, world_last_response=None,
         store=StateStore(), hub=MagicMock(), audit=MagicMock(),
-        orchestration_history={},
+        orchestration_history={}, runtime=world.vertical_runtime,
     )
     state.workflow_event_ingestor = WorkflowEventIngestor(state)
 
@@ -281,7 +281,7 @@ async def test_actor_network_incident_workflow_id_is_idempotent(monkeypatch):
     state = SimpleNamespace(
         bus=world.bus, world_service=world, world_last_response=None,
         store=StateStore(), hub=MagicMock(), audit=MagicMock(),
-        orchestration_history={},
+        orchestration_history={}, runtime=world.vertical_runtime,
     )
     state.workflow_event_ingestor = WorkflowEventIngestor(state)
     bridge = WorldBridge(state)

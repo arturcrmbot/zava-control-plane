@@ -1,5 +1,5 @@
 from api.server.services.entity_graph import EntityWrite, RelWrite
-from api.server.services.entity_projections.order_to_activate import (
+from verticals.telco.entity_projections.order_to_activate import (
     WORKFLOW_TYPE,
     project,
 )

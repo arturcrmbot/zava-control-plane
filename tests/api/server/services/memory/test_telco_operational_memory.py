@@ -1,14 +1,14 @@
+import pytest
+
 from api.server.services.memory.domain_memory import configured_memory_domains
 
 
 def test_telco_profile_defaults_to_registered_telco_memory_domains():
     assert configured_memory_domains(
         raw=None,
-        vertical_name="telco",
-        registered_workflow_types=(
+        allowed=(
             "network-incident",
             "proactive-customer-care",
-            "hiring",
         ),
     ) == ["network-incident", "proactive-customer-care"]
 
@@ -16,14 +16,23 @@ def test_telco_profile_defaults_to_registered_telco_memory_domains():
 def test_unset_profile_preserves_existing_hiring_default():
     assert configured_memory_domains(
         raw=None,
-        vertical_name=None,
-        registered_workflow_types=("network-incident", "hiring"),
+        allowed=("hiring",),
     ) == ["hiring"]
 
 
-def test_explicit_memory_domains_override_vertical_default():
+def test_explicit_memory_domains_must_belong_to_active_pack():
+    with pytest.raises(
+        ValueError,
+        match="memory domains not in active pack: \\['vendor_kyc'\\]",
+    ):
+        configured_memory_domains(
+            raw="vendor_kyc, network-incident",
+            allowed=("network-incident",),
+        )
+
+
+def test_explicit_active_memory_domains_are_preserved():
     assert configured_memory_domains(
-        raw="vendor_kyc, network-incident",
-        vertical_name="telco",
-        registered_workflow_types=("network-incident",),
-    ) == ["vendor_kyc", "network-incident"]
+        raw="proactive-customer-care, network-incident",
+        allowed=("network-incident", "proactive-customer-care"),
+    ) == ["proactive-customer-care", "network-incident"]

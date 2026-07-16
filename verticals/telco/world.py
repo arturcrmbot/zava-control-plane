@@ -22,7 +22,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
 from api.server.world.model import SimulationCommand, SimulationEvent
-from api.server.world.packs.telco_commercial import (
+from verticals.telco.commercial import (
     CreditAdjustment,
     CustomerAccount,
     Notification,

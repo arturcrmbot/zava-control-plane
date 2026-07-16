@@ -7,7 +7,7 @@ from api.shared.world_contracts import (
 
 
 def build_telco_demo(runtime):
-    from api.server.world.packs.telco import NetworkConfig, NetworkScenario
+    from verticals.telco.world import NetworkConfig, NetworkScenario
 
     config = NetworkConfig(
         site_count=12,

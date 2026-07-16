@@ -1,0 +1,1 @@
+"""Telco entity projection implementations."""

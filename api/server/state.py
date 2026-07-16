@@ -199,8 +199,7 @@ class AppState:
             _mem0_backend = build_default_memory(self.data_dir)
             _memory_domains = configured_memory_domains(
                 raw=os.getenv("MEMORY_DOMAINS"),
-                vertical_name=self.runtime.pack.name,
-                registered_workflow_types=tuple(self.runtime.pack.domains),
+                allowed=self.runtime.pack.memory_workflow_types,
             )
             self.domain_memories: dict[str, DomainMemory] = build_domain_memories(
                 domains=_memory_domains,
@@ -223,8 +222,7 @@ class AppState:
                 )
                 _memory_domains = configured_memory_domains(
                     raw=os.getenv("MEMORY_DOMAINS"),
-                    vertical_name=self.runtime.pack.name,
-                    registered_workflow_types=tuple(self.runtime.pack.domains),
+                    allowed=self.runtime.pack.memory_workflow_types,
                 )
                 self.domain_memories: dict[str, DomainMemory] = build_domain_memories(
                     domains=_memory_domains,

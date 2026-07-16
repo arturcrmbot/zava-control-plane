@@ -172,7 +172,10 @@ class WorldBridge:
                 return
             observation = service.build_observation(simulation_event)
 
-            responder = resolve_responder(route.objective_type)
+            responder = resolve_responder(
+                self._app.runtime,
+                route.objective_type,
+            )
             objective = service.open_objective(
                 simulation_event, route, owner_function=responder.owner_function
             )

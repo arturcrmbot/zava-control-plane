@@ -1,5 +1,5 @@
 from api.server.world.model import SimulationCommand
-from api.server.world.packs.telco import NetworkConfig, SiteFailure, run_network
+from verticals.telco.world import NetworkConfig, SiteFailure, run_network
 
 
 def _degraded_world():

@@ -211,8 +211,8 @@ async def lifespan(app: FastAPI):
         scale = runtime.pack.worlds[world_name].scales[
             runtime.world_scale_name
         ]
-        world_service = ActorWorldService.for_world(
-            world_name,
+        world_service = ActorWorldService.for_runtime(
+            runtime,
             seed=int(os.getenv("WORLD_SEED", "42")),
             bus=app_state.bus,
             speed=float(
