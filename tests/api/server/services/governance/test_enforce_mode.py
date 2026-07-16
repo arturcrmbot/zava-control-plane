@@ -177,21 +177,19 @@ def test_reversibility_gate_denies_irreversible_for_reversible_only_actor(
 
     # Patch rag-classifier in-memory to allow postGLEntry (irreversible
     # per tools.yaml). The reversibility gate should still fire.
-    from api.shared.agents import AGENTS, AgentRegistryEntry
+    from api.shared import agents as agent_registry
 
-    original = AGENTS["rag-classifier"]
-    monkeypatch.setitem(
-        AGENTS,
-        "rag-classifier",
-        AgentRegistryEntry(
+    original = agent_registry.AGENTS["rag-classifier"]
+    patched = dict(agent_registry.AGENTS)
+    patched["rag-classifier"] = agent_registry.AgentRegistryEntry(
             agent_id="rag-classifier",
             allowed_tools=original.allowed_tools + ("postGLEntry",),
             max_value_gbp=None,
             reversible_only=True,  # explicit
             scope_function="finance",
             description="patched for test",
-        ),
     )
+    monkeypatch.setattr(agent_registry, "AGENTS", patched)
 
     with pytest.raises(GovernanceDenied) as excinfo:
         k.evaluate_tool_call(
@@ -218,20 +216,18 @@ def test_value_ceiling_gate_denies_when_above(
     _reset_for_tests()
     k = kernel()
 
-    from api.shared.agents import AGENTS, AgentRegistryEntry
+    from api.shared import agents as agent_registry
 
-    monkeypatch.setitem(
-        AGENTS,
-        "rag-classifier",
-        AgentRegistryEntry(
+    patched = dict(agent_registry.AGENTS)
+    patched["rag-classifier"] = agent_registry.AgentRegistryEntry(
             agent_id="rag-classifier",
             allowed_tools=("postGLEntry",),
             max_value_gbp=1000.0,
             reversible_only=False,  # so reversibility doesn't intercept
             scope_function="finance",
             description="patched for test",
-        ),
     )
+    monkeypatch.setattr(agent_registry, "AGENTS", patched)
 
     with pytest.raises(GovernanceDenied) as excinfo:
         k.evaluate_tool_call(
@@ -251,20 +247,18 @@ def test_value_ceiling_gate_allows_when_under(
     _reset_for_tests()
     k = kernel()
 
-    from api.shared.agents import AGENTS, AgentRegistryEntry
+    from api.shared import agents as agent_registry
 
-    monkeypatch.setitem(
-        AGENTS,
-        "rag-classifier",
-        AgentRegistryEntry(
+    patched = dict(agent_registry.AGENTS)
+    patched["rag-classifier"] = agent_registry.AgentRegistryEntry(
             agent_id="rag-classifier",
             allowed_tools=("postGLEntry",),
             max_value_gbp=1000.0,
             reversible_only=False,
             scope_function="finance",
             description="patched for test",
-        ),
     )
+    monkeypatch.setattr(agent_registry, "AGENTS", patched)
 
     decision = k.evaluate_tool_call(
         actor="rag-classifier",

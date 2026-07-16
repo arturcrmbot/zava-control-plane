@@ -15,11 +15,11 @@ PERSONAE_DIR = REPO_ROOT / "api" / "server" / "personae"
 
 EXPECTED_KEYS = {
     "finance", "hr", "revenue", "ops", "legal",
-    "marketing", "tech", "data", "customer-success", "ceo", "legacy",
+    "marketing", "tech", "data", "ceo", "legacy",
 }
 
 
-def test_eleven_expected_keys():
+def test_ten_agency_function_keys():
     assert set(FUNCTIONS.keys()) == EXPECTED_KEYS
 
 

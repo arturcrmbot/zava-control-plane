@@ -1,0 +1,22 @@
+tools:
+  - id: customer_care_policy_lookup
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: customer-success
+    description: Resolve governed Telco care entitlement.
+  - id: customer_care_prepare_notification
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: customer-success
+    description: Prepare a restoration notification without sending it.
+  - id: customer_care_prepare_credit
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: customer-success
+    description: Prepare a governed credit for world validation.

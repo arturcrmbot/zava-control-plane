@@ -32,7 +32,7 @@ from typing import Any, Literal, Mapping, Optional
 
 from pydantic import BaseModel, Field
 
-from .manifest import ToolManifestEntry, load_tools_yaml
+from .manifest import ToolManifestEntry, load_active_tools, load_tools_yaml
 from .policy_compiler import CompiledBundle, compile_bundle
 from . import authority as _authority
 from .identity import AgentIdentityStore
@@ -215,7 +215,7 @@ class GovernanceKernel:
         # boot-time choke).
         from agent_os.policies import PolicyEvaluator  # noqa: WPS433
 
-        tools = load_tools_yaml(tools_path)
+        tools = load_tools_yaml(tools_path) if tools_path else load_active_tools()
         matrix = _load_matrix(matrix_path)
         bundle: CompiledBundle = compile_bundle(matrix=matrix, tools=tools)
 

@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
-from api.server.mcp_tools.customer_care import lookup_entitlement
+from verticals.telco.mcp_tools.customer_care import lookup_entitlement
 from api.server.services.event_bus import EventBus
 from api.server.services.state_store import StateStore
 from api.server.services.workflow_event_ingestor import WorkflowEventIngestor
