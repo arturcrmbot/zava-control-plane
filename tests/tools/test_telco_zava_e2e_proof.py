@@ -94,6 +94,12 @@ def test_telco_proof_links_control_plane_to_isolated_blueprint():
     assert 'VITE_BLUEPRINT_URL="http://127.0.0.1:$BLUEPRINT_PORT"' in source
 
 
+def test_telco_replay_checks_only_the_isolated_functions_port():
+    source = SCRIPT.read_text(encoding="utf-8")
+
+    assert 'FUNCTIONS_HOST="http://127.0.0.1:$FUNCTIONS_PORT"' in source
+
+
 def test_actor_world_stack_accepts_isolated_port_overrides(tmp_path):
     command = f"""
       export ACTOR_PROOF_ROOT={tmp_path}
