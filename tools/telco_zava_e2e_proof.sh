@@ -210,6 +210,7 @@ if [[ "$rc" -eq 0 ]]; then
   set +e
   BLUEPRINT_BASE="http://127.0.0.1:$BLUEPRINT_PORT" \
   WORLD_API_BASE="http://127.0.0.1:$API_PORT" \
+  FUNCTIONS_HOST="http://127.0.0.1:$FUNCTIONS_PORT" \
   PROOF_OUT_DIR="$OUT_DIR" \
     node "$DRIVER" --replay
   rc=$?
