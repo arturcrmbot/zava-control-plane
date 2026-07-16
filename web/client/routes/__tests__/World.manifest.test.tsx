@@ -73,4 +73,29 @@ describe("World runtime manifest routing", () => {
 
     expect(screen.getByTestId("telco-world-route")).toBeTruthy();
   });
+
+  it("waits for the first world snapshot before rendering Telco", () => {
+    mockRuntime.mockReturnValue({
+      loading: false,
+      error: null,
+      manifest: {
+        vertical: { display_name: "Telco" },
+        world: "telco",
+        ui: { lenses: ["telco-network"] },
+      },
+    });
+    mockWorld.mockReturnValue({
+      state: null,
+      events: [],
+      loading: true,
+      error: null,
+      injectSurge: vi.fn(),
+      injectSiteFailure: vi.fn(),
+    });
+
+    render(<World />);
+
+    expect(screen.getByRole("status").textContent).toContain("Loading world");
+    expect(screen.queryByTestId("telco-world-route")).toBeNull();
+  });
 });

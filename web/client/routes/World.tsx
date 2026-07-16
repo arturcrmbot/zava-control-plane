@@ -177,6 +177,14 @@ function ActiveWorld({ telco }: { telco: boolean }) {
 
   const enabled = state?.enabled === true;
 
+  if (!state) {
+    return (
+      <div data-testid="world-loading" role="status">
+        {loading ? "Loading world…" : error ?? "No world snapshot available."}
+      </div>
+    );
+  }
+
   if (telco) {
     return (
       <TelcoWorld
