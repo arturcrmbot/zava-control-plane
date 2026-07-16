@@ -26,6 +26,17 @@ const { mockUseWorld } = vi.hoisted(() => ({ mockUseWorld: vi.fn() }));
 vi.mock("@client/hooks/useWorldSimulation", () => ({
   useWorldSimulation: mockUseWorld,
 }));
+vi.mock("@client/hooks/useRuntimeManifest", () => ({
+  useRuntimeManifest: () => ({
+    loading: false,
+    error: null,
+    manifest: {
+      vertical: { display_name: "Telco" },
+      world: "telco",
+      ui: { lenses: ["telco-network"] },
+    },
+  }),
+}));
 
 import World from "../World";
 

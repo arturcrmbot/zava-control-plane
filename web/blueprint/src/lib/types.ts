@@ -34,6 +34,12 @@ export interface MetaSkill {
 }
 
 export interface CompositionTree {
+  vertical: {
+    name: string;
+    display_name: string;
+    manifest_version: string;
+    fingerprint: string;
+  };
   skills: Skill[];
   mcps: Mcp[];
   domains: Domain[];

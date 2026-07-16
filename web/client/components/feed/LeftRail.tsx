@@ -8,6 +8,7 @@ import { NavLink } from "react-router-dom";
 import { ChevronDown, ChevronsLeft, ChevronsRight, Plus, BarChart3, Brain, Network, Sparkles, Wand2, Globe2 } from "lucide-react";
 import type { RolePreset, SavedView } from "@shared/roles";
 import { useLocalStorageState } from "@client/hooks/useLocalStorageState";
+import { useRuntimeManifest } from "@client/hooks/useRuntimeManifest";
 
 const ROUTE_LABEL: Record<string, string> = {
   "/analytics": "Analytics",
@@ -39,6 +40,10 @@ export default function LeftRail({
 }) {
   const [collapsed, setCollapsed] = useLocalStorageState<boolean>("fleetctl.leftRail.collapsed", false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const { manifest, loading, error } = useRuntimeManifest();
+  const capabilities = new Set(manifest?.capabilities ?? []);
+  const verticalLabel = manifest?.vertical.display_name
+    ?? (loading ? "Loading…" : "Runtime unavailable");
   const allViews = [...role.defaultSavedViews, ...userViews];
 
   if (collapsed) {
@@ -59,14 +64,16 @@ export default function LeftRail({
             `p-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"}`
           }
         ><BarChart3 size={16} /></NavLink>
-        <NavLink
-          to="/world"
-          aria-label="World"
-          title="World"
-          className={({ isActive }) =>
-            `p-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"}`
-          }
-        ><Globe2 size={16} /></NavLink>
+        {capabilities.has("world") && (
+          <NavLink
+            to="/world"
+            aria-label="World"
+            title="World"
+            className={({ isActive }) =>
+              `p-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"}`
+            }
+          ><Globe2 size={16} /></NavLink>
+        )}
       </aside>
     );
   }
@@ -74,7 +81,9 @@ export default function LeftRail({
   return (
     <aside className="w-[200px] shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 p-3 flex flex-col gap-3 text-sm overflow-y-auto">
       <div className="flex items-center justify-between">
-        <div className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500 px-2">Saved views</div>
+        <div className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500 px-2">
+          Saved views · {verticalLabel}
+        </div>
         <button
           type="button"
           onClick={() => setCollapsed(true)}
@@ -108,40 +117,56 @@ export default function LeftRail({
         }
       ><BarChart3 size={14} /> Dashboard</NavLink>
 
-      <NavLink
-        to="/world"
-        className={({ isActive }) =>
-          `flex items-center gap-2 text-xs px-3 py-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"}`
-        }
-      ><Globe2 size={14} /> World</NavLink>
+      {capabilities.has("world") && (
+        <NavLink
+          to="/world"
+          className={({ isActive }) =>
+            `flex items-center gap-2 text-xs px-3 py-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"}`
+          }
+        ><Globe2 size={14} /> World</NavLink>
+      )}
 
-      <NavLink
-        to="/memory"
-        className={({ isActive }) =>
-          `flex items-center gap-2 text-xs px-3 py-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"}`
-        }
-      ><Brain size={14} /> Memory</NavLink>
+      {capabilities.has("memory") && (
+        <NavLink
+          to="/memory"
+          className={({ isActive }) =>
+            `flex items-center gap-2 text-xs px-3 py-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"}`
+          }
+        ><Brain size={14} /> Memory</NavLink>
+      )}
 
-      <NavLink
-        to="/knowledge"
-        className={({ isActive }) =>
-          `flex items-center gap-2 text-xs px-3 py-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"}`
-        }
-      ><Network size={14} /> Knowledge</NavLink>
+      {capabilities.has("knowledge") && (
+        <NavLink
+          to="/knowledge"
+          className={({ isActive }) =>
+            `flex items-center gap-2 text-xs px-3 py-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"}`
+          }
+        ><Network size={14} /> Knowledge</NavLink>
+      )}
 
-      <NavLink
-        to="/compose"
-        className={({ isActive }) =>
-          `flex items-center gap-2 text-xs px-3 py-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"}`
-        }
-      ><Wand2 size={14} /> Compose</NavLink>
+      {capabilities.has("compose") && (
+        <NavLink
+          to="/compose"
+          className={({ isActive }) =>
+            `flex items-center gap-2 text-xs px-3 py-1.5 rounded ${isActive ? "bg-blue-50 text-blue-700 font-medium dark:bg-blue-900/30 dark:text-blue-300" : "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"}`
+          }
+        ><Wand2 size={14} /> Compose</NavLink>
+      )}
 
-      <a
-        href={constellationUrl()}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-2 text-xs px-3 py-1.5 rounded text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
-      ><Sparkles size={14} /> Constellation ↗</a>
+      {capabilities.has("blueprint") && (
+        <a
+          href={constellationUrl()}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 text-xs px-3 py-1.5 rounded text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+        ><Sparkles size={14} /> Constellation ↗</a>
+      )}
+
+      {error && (
+        <div role="alert" className="px-2 text-[10px] text-red-600">
+          {error}
+        </div>
+      )}
 
       <div className="mt-auto">
         <button

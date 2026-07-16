@@ -3,6 +3,20 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+
+vi.mock("@client/hooks/useRuntimeManifest", () => ({
+  useRuntimeManifest: () => ({
+    loading: false,
+    error: null,
+    manifest: {
+      vertical: { name: "agency", display_name: "Agency" },
+      world: null,
+      capabilities: ["blueprint", "compose", "knowledge", "memory"],
+      ui: { lenses: ["agency-operations"], theme: {} },
+    },
+  }),
+}));
+
 import LeftRail from "@client/components/feed/LeftRail";
 import { getRolePreset } from "@shared/roles";
 
