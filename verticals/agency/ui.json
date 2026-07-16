@@ -5,7 +5,75 @@
     "accent": "#2563eb",
     "label": "Agency"
   },
-  "phase_aliases": {},
+  "phase_aliases": {
+    "expense-claim": {
+      "field-extractor": "Intake",
+      "line-item-extractor": "Intake",
+      "rag-classifier": "Classify",
+      "receipt-validator": "Receipt",
+      "escalation-advisor": "Route",
+      "notification-composer": "Notify",
+      "arbitration": "Arbitrate",
+      "audit-summariser": "Audit"
+    },
+    "hiring": {
+      "budget-checker": "Budget",
+      "jd-drafter": "Job Design",
+      "sourcing-orchestrator": "Sourcing",
+      "cv-crystalliser": "Triage",
+      "auto-shortlister": "Screening",
+      "voice-screener": "Voice",
+      "interview-recommender": "Interview",
+      "interview-coordinator": "Interview",
+      "jurisdiction-router": "Compliance",
+      "betrvg-checker": "Compliance",
+      "offer-personaliser": "Offer"
+    },
+    "travel-preapproval": {
+      "fleet-travel-preapproval-policy-fit-checker": "Policy fit"
+    },
+    "employee-onboarding": {
+      "fleet-employee-onboarding-access-drafter": "Access drafter",
+      "fleet-employee-onboarding-induction-planner": "Induction planner"
+    },
+    "vendor-kyc": {
+      "vendor_intake": "Vendor Intake",
+      "kyc_diligence": "KYC Diligence",
+      "ubo_resolver": "UBO Resolver",
+      "finance_signoff": "Finance Signoff"
+    },
+    "it-access-request": {
+      "fleet-it-access-request-rbac-resolver": "RBAC resolver",
+      "fleet-it-access-request-access-risk-assessor": "Access risk assessor"
+    },
+    "contract-renewal": {
+      "fleet-contract-renewal-market-benchmarker": "Market benchmarker",
+      "fleet-contract-renewal-renewal-terms-drafter": "Renewal terms drafter"
+    },
+    "perf-review": {
+      "fleet-perf-review-peer-feedback-aggregator": "Peer feedback aggregator",
+      "fleet-perf-review-calibration-drafter": "Calibration drafter"
+    },
+    "employee-transfer": {
+      "fleet-employee-transfer-transfer-eligibility-checker": "Eligibility check",
+      "fleet-employee-transfer-compensation-remapper": "Compensation remap"
+    },
+    "training-request": {
+      "fleet-training-request-eligibility-and-catalogue-matcher": "Eligibility & catalogue"
+    }
+  },
+  "supplemental_domains": [
+    {
+      "name": "Onboarding",
+      "status": "live",
+      "workflow_type": "onboarding",
+      "skills": ["onboarding-buddy"],
+      "phase_aliases": {
+        "onboarding-buddy": "Onboarding"
+      },
+      "phases": []
+    }
+  ],
   "aspirational_domains": ["Procurement", "Legal", "IT"],
   "include_meta_skills": true
 }

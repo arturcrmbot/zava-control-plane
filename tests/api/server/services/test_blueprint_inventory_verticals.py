@@ -1,54 +1,48 @@
 from __future__ import annotations
 
-import importlib
-
-import pytest
-
-from api.shared.domains import DOMAINS as REGISTRY_DOMAINS
+from api.server.services.blueprint_inventory import _build_domain_manifest
+from api.shared.domains import DOMAINS as AGENCY_DOMAINS
+from api.shared.vertical_loader import build_runtime
 
 
-@pytest.fixture(autouse=True)
-def _restore_blueprint_inventory(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("ZAVA_VERTICAL", raising=False)
-    yield
-    monkeypatch.delenv("ZAVA_VERTICAL", raising=False)
-    from api.server.services import blueprint_inventory
-
-    importlib.reload(blueprint_inventory)
+TELCO_WORKFLOW_TYPES = {
+    "network-incident",
+    "proactive-customer-care",
+    "order-to-activate",
+}
 
 
-def _reload_blueprint_inventory():
-    from api.server.services import blueprint_inventory
-
-    return importlib.reload(blueprint_inventory)
-
-
-def _registry_manifest_types(module) -> set[str]:
+def _live_workflow_types(manifest) -> set[str]:
     return {
         entry["workflow_type"]
-        for entry in module.DOMAINS
-        if entry["status"] == "live" and entry["workflow_type"] in REGISTRY_DOMAINS
+        for entry in manifest
+        if entry["status"] == "live" and entry["workflow_type"]
     }
 
 
-def test_build_domain_manifest_keeps_registered_domains_when_vertical_unset(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv("ZAVA_VERTICAL", raising=False)
+def test_build_domain_manifest_defaults_to_agency_domains(tmp_path) -> None:
+    runtime = build_runtime({}, data_root=tmp_path)
 
-    module = _reload_blueprint_inventory()
+    manifest = _build_domain_manifest(runtime)
 
-    assert _registry_manifest_types(module) == set(REGISTRY_DOMAINS.keys())
-
-
-def test_build_domain_manifest_filters_to_telco_domains(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ZAVA_VERTICAL", "telco")
-
-    module = _reload_blueprint_inventory()
-
-    assert _registry_manifest_types(module) == {
-        "network-incident",
-        "proactive-customer-care",
-        "order-to-activate",
+    assert _live_workflow_types(manifest) == set(AGENCY_DOMAINS) | {
+        "onboarding"
     }
-    assert any(entry["workflow_type"] == "onboarding" for entry in module.DOMAINS)
+    assert TELCO_WORKFLOW_TYPES.isdisjoint(
+        _live_workflow_types(manifest)
+    )
+
+
+def test_build_domain_manifest_filters_to_telco_domains(tmp_path) -> None:
+    runtime = build_runtime(
+        {"ZAVA_VERTICAL": "telco"},
+        data_root=tmp_path,
+    )
+
+    manifest = _build_domain_manifest(runtime)
+
+    assert _live_workflow_types(manifest) == TELCO_WORKFLOW_TYPES
+    assert not any(
+        entry["workflow_type"] == "onboarding"
+        for entry in manifest
+    )

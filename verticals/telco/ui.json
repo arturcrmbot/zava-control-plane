@@ -6,6 +6,7 @@
     "label": "Telco"
   },
   "phase_aliases": {},
+  "supplemental_domains": [],
   "aspirational_domains": [],
   "include_meta_skills": false
 }

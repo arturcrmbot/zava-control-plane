@@ -34,86 +34,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from api.shared.verticals import registered_workflow_types
-
-REPO_ROOT = Path(__file__).resolve().parents[3]
-SKILLS_DIR = REPO_ROOT / "api" / "server" / "skills"
-MCP_TOOLS_DIR = REPO_ROOT / "api" / "server" / "mcp_tools"
+from api.shared.vertical_loader import active_runtime
+from api.shared.vertical_pack import VerticalRuntime
 
 
-# --------------------------------------------------------------------------
-# Domain manifest.
-#
-# Phase 1 of feature-fleet-domain-substrate-1: name/status/workflow_type/
-# skills are sourced from api.shared.domains.DOMAINS so the registry
-# remains the single source of truth. phase_aliases (a UI concern: which
-# skill orbits which phase ring on the mind-map) stays local because it
-# encodes a visual layout, not an integration fact. Aspirational entries
-# (Procurement / Legal / IT) keep their hand-authored shape.
-# --------------------------------------------------------------------------
-
-# UI phase-orbit aliases per workflow_type. Skills not listed here appear in
-# the orbit without a phase label.
-_PHASE_ALIASES: dict[str, dict[str, str]] = {
-    "expense-claim": {
-        "field-extractor": "Intake",
-        "line-item-extractor": "Intake",
-        "rag-classifier": "Classify",
-        "receipt-validator": "Receipt",
-        "escalation-advisor": "Route",
-        "notification-composer": "Notify",
-        "arbitration": "Arbitrate",
-        "audit-summariser": "Audit",
-    },
-    "hiring": {
-        "budget-checker": "Budget",
-        "jd-drafter": "Job Design",
-        "sourcing-orchestrator": "Sourcing",
-        "cv-crystalliser": "Triage",
-        "auto-shortlister": "Screening",
-        "voice-screener": "Voice",
-        "interview-recommender": "Interview",
-        "interview-coordinator": "Interview",
-        "jurisdiction-router": "Compliance",
-        "betrvg-checker": "Compliance",
-        "offer-personaliser": "Offer",
-    },
-    "travel-preapproval": {
-        "fleet-travel-preapproval-policy-fit-checker": "Policy fit",
-    },
-    "employee-onboarding": {
-        "fleet-employee-onboarding-access-drafter": "Access drafter",
-        "fleet-employee-onboarding-induction-planner": "Induction planner",
-    },
-    "vendor-kyc": {
-        "vendor_intake": "Vendor Intake",
-        "kyc_diligence": "KYC Diligence",
-        "ubo_resolver": "UBO Resolver",
-        "finance_signoff": "Finance Signoff",
-    },
-    "it-access-request": {
-        "fleet-it-access-request-rbac-resolver": "RBAC resolver",
-        "fleet-it-access-request-access-risk-assessor": "Access risk assessor",
-    },
-    "contract-renewal": {
-        "fleet-contract-renewal-market-benchmarker": "Market benchmarker",
-        "fleet-contract-renewal-renewal-terms-drafter": "Renewal terms drafter",
-    },
-    "perf-review": {
-        "fleet-perf-review-peer-feedback-aggregator": "Peer feedback aggregator",
-        "fleet-perf-review-calibration-drafter": "Calibration drafter",
-    },
-    "employee-transfer": {
-        "fleet-employee-transfer-transfer-eligibility-checker": "Eligibility check",
-        "fleet-employee-transfer-compensation-remapper": "Compensation remap",
-    },
-    "training-request": {
-        "fleet-training-request-eligibility-and-catalogue-matcher": "Eligibility & catalogue",
-    },
-}
-
-
-def _build_domain_manifest() -> list[dict[str, Any]]:
+def _build_domain_manifest(
+    runtime: VerticalRuntime | None = None,
+) -> list[dict[str, Any]]:
     """Compose the page's domain list from the registry + UI aliases.
 
     Live domains are derived from api.shared.domains.DOMAINS so a new
@@ -121,13 +48,9 @@ def _build_domain_manifest() -> list[dict[str, Any]]:
     (no workflow_type yet) and the legacy 'Onboarding' surface stay as
     hand-authored entries below.
     """
-    from api.shared import domains as _registry
-
-    allowed_types = set(registered_workflow_types())
+    runtime = runtime or active_runtime()
     out: list[dict[str, Any]] = []
-    for d in _registry.DOMAINS.values():
-        if d.workflow_type not in allowed_types:
-            continue
+    for d in runtime.pack.domains.values():
         # Phase display names + kinds, derived from the registry. Consumed
         # by the Control Plane UI's PhaseRibbon / PhaseTimeline so a new
         # compose-domain graduation auto-renders its real phase ordering
@@ -140,20 +63,13 @@ def _build_domain_manifest() -> list[dict[str, Any]]:
             "status": "live",
             "workflow_type": d.workflow_type,
             "skills": list(d.skills),
-            "phase_aliases": _PHASE_ALIASES.get(d.workflow_type, {}),
+            "phase_aliases": dict(
+                runtime.pack.ui.phase_aliases.get(d.workflow_type, {})
+            ),
             "phases": phases,
         })
-    # Legacy "Onboarding" surface — still rendered as a separate ring on
-    # the mind-map even though it shares the hiring orchestrator.
-    out.append({
-        "name": "Onboarding",
-        "status": "live",
-        "workflow_type": "onboarding",
-        "skills": ["onboarding-buddy"],
-        "phase_aliases": {"onboarding-buddy": "Onboarding"},
-    })
-    # Aspirational rings (designed, not shipped).
-    for label in ("Procurement", "Legal", "IT"):
+    out.extend(dict(domain) for domain in runtime.pack.ui.supplemental_domains)
+    for label in runtime.pack.ui.aspirational_domains:
         out.append({
             "name": label,
             "status": "aspirational",
@@ -317,29 +233,42 @@ def _extract_registered_ops(text: str) -> list[str]:
     return _DEFINE_TOOL_NAME_RE.findall(text)
 
 
-def _load_skills() -> list[Skill]:
+def _load_skills(
+    runtime: VerticalRuntime | None = None,
+) -> list[Skill]:
+    runtime = runtime or active_runtime()
     skills: list[Skill] = []
-    for skill_md in sorted(SKILLS_DIR.glob("*/SKILL.md")):
-        text = skill_md.read_text(encoding="utf-8")
-        fm = _parse_frontmatter(text)
-        name = fm.get("name") or skill_md.parent.name
-        description = fm.get("description", "").strip()
-        raw_tools = fm.get("allowed-tools", "")
-        tools = _split_csv_or_block(raw_tools) if raw_tools else []
-        model = fm.get("model")
-        skills.append(
-            Skill(
-                name=name,
-                description=description,
-                allowed_tools=tools,
-                model=model,
-                status="live",
+    seen: set[str] = set()
+    for root in runtime.pack.skill_roots:
+        for skill_md in sorted(root.glob("*/SKILL.md")):
+            text = skill_md.read_text(encoding="utf-8")
+            fm = _parse_frontmatter(text)
+            name = fm.get("name") or skill_md.parent.name
+            if name in seen:
+                raise ValueError(
+                    f"vertical {runtime.pack.name!r} has duplicate skill "
+                    f"{name!r}"
+                )
+            seen.add(name)
+            description = fm.get("description", "").strip()
+            raw_tools = fm.get("allowed-tools", "")
+            tools = _split_csv_or_block(raw_tools) if raw_tools else []
+            model = fm.get("model")
+            skills.append(
+                Skill(
+                    name=name,
+                    description=description,
+                    allowed_tools=tools,
+                    model=model,
+                    status="live",
+                )
             )
-        )
     return skills
 
 
-def _load_mcp_tools() -> list[McpTool]:
+def _load_mcp_tools(
+    runtime: VerticalRuntime | None = None,
+) -> list[McpTool]:
     """Enumerate MCP tool files and the operations each registers.
 
     Historically each file registered a single tool whose name matched the
@@ -350,8 +279,11 @@ def _load_mcp_tools() -> list[McpTool]:
     ``identity_provider_list_role_templates``,
     ``identity_provider_get_role_template``, ...). The matcher needs both.
     """
+    runtime = runtime or active_runtime()
+    repo_root = Path(__file__).resolve().parents[3]
     tools: list[McpTool] = []
-    for path in sorted(MCP_TOOLS_DIR.glob("*.py")):
+    for module_name in runtime.pack.mcp_modules:
+        path = repo_root.joinpath(*module_name.split(".")).with_suffix(".py")
         stem = path.stem
         if stem.startswith("_") or stem == "__init__":
             continue
@@ -377,7 +309,9 @@ def _normalise_tool(name: str) -> str:
     return cleaned
 
 
-def composition_tree() -> dict[str, Any]:
+def composition_tree(
+    runtime: VerticalRuntime | None = None,
+) -> dict[str, Any]:
     """Build the JSON payload for ``GET /api/blueprint/composition``.
 
     Returns a tree the page can render directly:
@@ -392,8 +326,10 @@ def composition_tree() -> dict[str, Any]:
         "counts":           { skills, mcps, domains_live, domains_aspirational }
       }
     """
-    skills = _load_skills()
-    mcps = _load_mcp_tools()
+    runtime = runtime or active_runtime()
+    domains = _build_domain_manifest(runtime)
+    skills = _load_skills(runtime)
+    mcps = _load_mcp_tools(runtime)
     skill_names = {s.name for s in skills}
     mcp_names = {t.name for t in mcps}
 
@@ -419,7 +355,7 @@ def composition_tree() -> dict[str, Any]:
 
     # Build skill -> domains lookup.
     skill_to_domains: dict[str, list[str]] = {}
-    for domain in DOMAINS:
+    for domain in domains:
         if domain["status"] != "live":
             continue
         for skill_name in domain["skills"]:
@@ -436,7 +372,7 @@ def composition_tree() -> dict[str, Any]:
 
     # Resolve each domain's tool set (union of its skills' allowed-tools).
     domain_payload: list[dict[str, Any]] = []
-    for domain in DOMAINS:
+    for domain in domains:
         domain_skills = [s for s in skills if s.name in domain["skills"]]
         domain_tools_raw: set[str] = set()
         for s in domain_skills:
@@ -481,7 +417,7 @@ def composition_tree() -> dict[str, Any]:
     #   skill "cv-crystalliser" -> phase "Triage"
     workflow_types: dict[str, str] = {}
     phase_aliases: dict[str, str] = {}
-    for domain in DOMAINS:
+    for domain in domains:
         wt = domain.get("workflow_type")
         if wt:
             workflow_types[wt] = domain["name"]
@@ -492,16 +428,26 @@ def composition_tree() -> dict[str, Any]:
     counts = {
         "skills": len(skills),
         "mcps": len(mcps),
-        "domains_live": sum(1 for d in DOMAINS if d["status"] == "live"),
-        "domains_aspirational": sum(1 for d in DOMAINS if d["status"] != "live"),
+        "domains_live": sum(1 for d in domains if d["status"] == "live"),
+        "domains_aspirational": sum(
+            1 for d in domains if d["status"] != "live"
+        ),
     }
 
     return {
         "skills": skills_payload,
         "mcps": mcps_payload,
         "domains": domain_payload,
-        "meta_skills": META_SKILLS,
+        "meta_skills": (
+            META_SKILLS if runtime.pack.ui.include_meta_skills else []
+        ),
         "workflow_types": workflow_types,
         "phase_aliases": phase_aliases,
         "counts": counts,
+        "vertical": {
+            "name": runtime.pack.name,
+            "display_name": runtime.pack.display_name,
+            "manifest_version": runtime.pack.manifest_version,
+            "fingerprint": runtime.fingerprint,
+        },
     }

@@ -34,6 +34,7 @@ class VerticalUiManifest:
     lenses: tuple[str, ...]
     theme: Mapping[str, str]
     phase_aliases: Mapping[str, Mapping[str, str]]
+    supplemental_domains: tuple[Mapping[str, Any], ...] = ()
     aspirational_domains: tuple[str, ...] = ()
     include_meta_skills: bool = False
 
