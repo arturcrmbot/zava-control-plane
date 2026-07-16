@@ -13,6 +13,7 @@ def create_app() -> df.DFApp:
 
     init_governance()
     app = df.DFApp(http_auth_level=func.AuthLevel.ANONYMOUS)
+    from api.functions.workflows.activities import checkpoint_activity
 
     @app.route(route="orchestrators/{functionName}")
     @app.durable_client_input(client_name="client")
@@ -24,5 +25,9 @@ def create_app() -> df.DFApp:
         payload = req.get_json() if req.get_body() else {}
         instance_id = await client.start_new(function_name, None, payload)
         return client.create_check_status_response(req, instance_id)
+
+    @app.activity_trigger(input_name="payload")
+    def checkpoint_activity_trigger(payload: dict) -> dict:
+        return checkpoint_activity(payload)
 
     return app

@@ -25,6 +25,10 @@ TELCO_FUNCTIONS = {
     "order_activation_feasibility_activity_trigger",
     "order_activation_prepare_activity_trigger",
 }
+KERNEL_FUNCTIONS = {
+    "http_start",
+    "checkpoint_activity_trigger",
+}
 AGENCY_SENTINELS = {
     "ExpenseClaimOrchestrator",
     "HiringOrchestrator",
@@ -59,6 +63,7 @@ def test_agency_functions_index_excludes_telco(tmp_path) -> None:
     indexed = _indexed_functions("agency", tmp_path)
 
     assert AGENCY_SENTINELS <= indexed
+    assert KERNEL_FUNCTIONS <= indexed
     assert TELCO_FUNCTIONS.isdisjoint(indexed)
 
 
@@ -66,4 +71,5 @@ def test_telco_functions_index_excludes_agency(tmp_path) -> None:
     indexed = _indexed_functions("telco", tmp_path)
 
     assert TELCO_FUNCTIONS <= indexed
+    assert KERNEL_FUNCTIONS <= indexed
     assert AGENCY_SENTINELS.isdisjoint(indexed)
