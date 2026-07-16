@@ -72,13 +72,12 @@ async def test_phase_3_substrate_has_function_fms_and_ambient_dispatcher_alive(
     3 concrete agents discovered + per-function SSE topics."""
     state = await _build_app_state(tmp_path, monkeypatch)
     try:
-        # 9 non-legacy FMs (legacy is excluded by init_function_fms);
-        # plan floor was "5+", we ship 9 (finance, hr, revenue, ops,
-        # legal, marketing, tech, data, customer-success).
+        # Agency has 9 non-legacy FMs (legacy is excluded by
+        # init_function_fms). Customer Success belongs to the Telco pack.
         assert len(state.function_fms) >= 5
         for fn_name in (
             "finance", "hr", "revenue", "ops", "legal",
-            "marketing", "tech", "data", "customer-success",
+            "marketing", "tech", "data", "ceo",
         ):
             assert fn_name in state.function_fms, (
                 f"function FM missing for {fn_name!r}: have {sorted(state.function_fms)}"

@@ -22,11 +22,12 @@ from api.server.services.ambient_agents import kpi_history_recorder
 
 @pytest.fixture(autouse=True)
 def _isolated_db(tmp_path: Path):
+    original = kpi_history._DB_PATH
     db = tmp_path / "kh.sqlite"
     kpi_history.set_db_path(db)
     kpi_history.init()
     yield db
-    kpi_history.set_db_path(kpi_history._DEFAULT_DB_PATH)
+    kpi_history.set_db_path(original)
 
 
 async def test_tick_records_agency_kpis():

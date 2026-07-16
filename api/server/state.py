@@ -27,12 +27,8 @@ from api.server.services.replay.mode import is_replay
 
 if TYPE_CHECKING:
     from api.server.services.dream_pass.orchestrator import DreamPassOrchestrator
+    from api.shared.vertical_pack import VerticalRuntime
 
-
-# Local artefact roots — magic-link sqlite, email outbox, blob fallback dir.
-# All under ./data/portal/ so the demo can `ls` the artefacts in one place.
-_PORTAL_DATA_DIR = Path(os.getenv("PORTAL_DATA_DIR", "data/portal"))
-_PORTAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Repo root resolved from this file's location so the entity-graph bootstrap
 # fixtures load regardless of the cwd that AppState is constructed from
@@ -63,7 +59,12 @@ def _build_blob_store():
 
 
 class AppState:
-    def __init__(self) -> None:
+    def __init__(self, runtime: "VerticalRuntime | None" = None) -> None:
+        from api.shared.vertical_loader import active_runtime
+
+        self.runtime = runtime or active_runtime()
+        self.data_dir = self.runtime.data_dir
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         self.bus = EventBus()
         self.store = StateStore()
         self.audit = AuditLogger()
@@ -101,25 +102,20 @@ class AppState:
             # Phase 4 IP2 (TASK-010) — KPI snapshot store. File lives at
             # data/portal/kpis.sqlite. Constructed early so per-function
             # FMs built later can reference it via app_state.kpi_store.
-            self.kpi_store = KpiStore(_PORTAL_DATA_DIR / "kpis.sqlite")
+            self.kpi_store = KpiStore(self.data_dir / "kpis.sqlite")
 
             # ----------------------------------------------------- entity graph plane
             # (a) Embedded property graph for the entity-graph plane. Imports
             #     are local to delay the kuzu import until AppState is actually
             #     constructed (preserves the existing module-import shape).
             from api.server.services.entity_graph import EntityGraph
-            self.entities = EntityGraph(_PORTAL_DATA_DIR / "entity_graph.kuzu")
+            self.entities = EntityGraph(self.data_dir / "entity_graph.kuzu")
 
             # (b) Wire bus/audit/governance into the graph for event + audit emission.
             self.entities.attach(bus=self.bus, audit=self.audit, governance=self.governance)
 
-            # (c) One-shot bootstrap from the existing fixtures into Person /
-            #     Organisation entities. Repo-rooted so it works regardless of cwd.
-            self.entities.bootstrap_from_fixtures(
-                employees_path=_REPO_ROOT / "data/synthetic/employees.json",
-                vendors_path=_REPO_ROOT / "api/server/fixtures/vendors.json",
-                agencies_path=_REPO_ROOT / "api/server/fixtures/agencies.json",
-            )
+            # (c) One-shot bootstrap from the active vertical's seed sources.
+            self.runtime.pack.seed.bootstrap(self)
 
             # (d) Reflector subscribes AFTER bootstrap so the very first workflow
             #     event does not race against an unfinished bootstrap.
@@ -167,7 +163,7 @@ class AppState:
         # MagicLinkStore: sqlite-backed, single-use offer tokens + repeatable
         # status tokens. File lives at data/portal/magic_links.sqlite.
         self.magic_links = MagicLinkStore(
-            db_path=_PORTAL_DATA_DIR / "magic_links.sqlite",
+            db_path=self.data_dir / "magic_links.sqlite",
         )
         # EmailSender: ACS Email REST when configured, outbox-only fallback
         # otherwise. Always writes the HTML body to the outbox so the demo
@@ -175,7 +171,7 @@ class AppState:
         self.email_sender = EmailSender(
             connection_string=os.getenv("ACS_EMAIL_CONNECTION_STRING"),
             sender_address=os.getenv("ACS_EMAIL_SENDER_ADDRESS"),
-            outbox_dir=_PORTAL_DATA_DIR / "email_outbox",
+            outbox_dir=self.data_dir / "email_outbox",
         )
         # BlobStore: optional — only present when AZURE_STORAGE_CONNECTION_STRING
         # is set (Azurite locally, real Storage in cloud).
@@ -188,7 +184,6 @@ class AppState:
             from api.server.services.memory.domain_memory import (
                 DomainMemory, build_domain_memories, configured_memory_domains,
             )
-            from api.shared.verticals import active_vertical, registered_workflow_types
 
             # In replay mode the tape carries the working notes / lessons
             # that hydrate writes via memory_store.add(). Routing those
@@ -201,12 +196,11 @@ class AppState:
             if is_replay():
                 raise RuntimeError("replay mode → using FallbackMemory for tape hydration")
 
-            _mem0_backend = build_default_memory()
-            _vertical = active_vertical()
+            _mem0_backend = build_default_memory(self.data_dir)
             _memory_domains = configured_memory_domains(
                 raw=os.getenv("MEMORY_DOMAINS"),
-                vertical_name=_vertical.name if _vertical else None,
-                registered_workflow_types=registered_workflow_types(),
+                vertical_name=self.runtime.pack.name,
+                registered_workflow_types=tuple(self.runtime.pack.domains),
             )
             self.domain_memories: dict[str, DomainMemory] = build_domain_memories(
                 domains=_memory_domains,
@@ -227,14 +221,10 @@ class AppState:
                 from api.server.services.memory.fallback_memory import (
                     get_fallback_memory,
                 )
-                from api.shared.verticals import (
-                    active_vertical, registered_workflow_types,
-                )
-                _vertical = active_vertical()
                 _memory_domains = configured_memory_domains(
                     raw=os.getenv("MEMORY_DOMAINS"),
-                    vertical_name=_vertical.name if _vertical else None,
-                    registered_workflow_types=registered_workflow_types(),
+                    vertical_name=self.runtime.pack.name,
+                    registered_workflow_types=tuple(self.runtime.pack.domains),
                 )
                 self.domain_memories: dict[str, DomainMemory] = build_domain_memories(
                     domains=_memory_domains,

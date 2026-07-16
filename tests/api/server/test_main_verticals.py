@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -42,7 +43,7 @@ def _patch_live_lifespan_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_fm_stop() -> None:
         return None
 
-    async def fake_ramp_loop() -> None:
+    async def fake_ramp_loop(_runtime=None) -> None:
         await _sleep_forever()
 
     async def fake_register(_app) -> None:
@@ -105,7 +106,6 @@ def _patch_live_lifespan_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
         ("telco", None, "telco"),
         ("telco", "", "telco"),
         ("telco", "   ", "telco"),
-        ("telco", "support", "support"),
     ],
 )
 async def test_lifespan_selects_expected_world_for_vertical(
@@ -113,16 +113,25 @@ async def test_lifespan_selects_expected_world_for_vertical(
     vertical: str,
     world_env: str | None,
     expected_world: str,
+    tmp_path,
 ) -> None:
     from api.server.world import service as world_service_module
     from api.server.services import world_bridge as world_bridge_module
 
     _patch_live_lifespan_dependencies(monkeypatch)
-    monkeypatch.setenv("ZAVA_VERTICAL", vertical)
-    if world_env is None:
-        monkeypatch.delenv("ZAVA_WORLD", raising=False)
-    else:
-        monkeypatch.setenv("ZAVA_WORLD", world_env)
+    from api.shared.vertical_loader import build_runtime
+
+    environment = {"ZAVA_VERTICAL": vertical}
+    if world_env is not None:
+        environment["ZAVA_WORLD"] = world_env
+    monkeypatch.setattr(
+        app_state,
+        "runtime",
+        build_runtime(environment, data_root=tmp_path),
+        raising=False,
+    )
+    monkeypatch.delenv("ZAVA_VERTICAL", raising=False)
+    monkeypatch.delenv("ZAVA_WORLD", raising=False)
 
     requested_worlds: list[str] = []
     stopped: list[str] = []
@@ -176,3 +185,55 @@ async def test_lifespan_selects_expected_world_for_vertical(
     assert stopped == ["service"]
     assert fake_bridge is not None
     assert fake_bridge.stopped == 1
+
+
+@pytest.mark.asyncio
+async def test_lifespan_rejects_world_owned_by_another_vertical(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    from api.shared.vertical_loader import build_runtime
+
+    with pytest.raises(
+        ValueError,
+        match="world 'support' is not owned by vertical 'telco'",
+    ):
+        build_runtime(
+            {
+                "ZAVA_VERTICAL": "telco",
+                "ZAVA_WORLD": "support",
+            },
+            data_root=tmp_path,
+        )
+
+
+@pytest.mark.asyncio
+async def test_telco_lifespan_skips_agency_watchers(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    from api.server.services.ambient_agents import vendor_block_watcher
+    from api.shared.vertical_loader import build_runtime
+
+    _patch_live_lifespan_dependencies(monkeypatch)
+    runtime = build_runtime(
+        {"ZAVA_VERTICAL": "telco"},
+        data_root=tmp_path,
+    )
+    monkeypatch.setattr(
+        app_state,
+        "runtime",
+        replace(runtime, world_name=None, world_scale_name=None),
+        raising=False,
+    )
+    starts: list[str] = []
+    monkeypatch.setattr(
+        vendor_block_watcher,
+        "start",
+        lambda *_args, **_kwargs: starts.append("vendor"),
+    )
+
+    async with lifespan(app):
+        await asyncio.sleep(0)
+
+    assert starts == []

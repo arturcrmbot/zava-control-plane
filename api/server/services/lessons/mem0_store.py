@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 
-def build_default_memory() -> Any:
+def build_default_memory(data_dir: Path | None = None) -> Any:
     """Build a `mem0.Memory` wired to Azure OpenAI + file-backed Chroma."""
     from mem0 import Memory
 
@@ -19,7 +19,12 @@ def build_default_memory() -> Any:
     if not embed_deployment:
         raise RuntimeError("AZURE_OPENAI_EMBED_DEPLOYMENT not set")
 
-    chroma_dir = Path(os.getenv("MEM0_CHROMA_DIR", "data/portal/mem0/chroma"))
+    default_chroma_dir = (
+        data_dir / "mem0" / "chroma"
+        if data_dir is not None
+        else Path("data/runtime/agency/mem0/chroma")
+    )
+    chroma_dir = Path(os.getenv("MEM0_CHROMA_DIR", str(default_chroma_dir)))
     chroma_dir.mkdir(parents=True, exist_ok=True)
 
     azure_kwargs = {

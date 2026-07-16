@@ -35,8 +35,8 @@ from api.server.services.durable_client import (
     schedule_new_orchestration, raise_orchestration_event,
 )
 from api.shared.expense_taxonomy import ReceiptFlavour
-from api.shared.domains import Domain, live_domains, DOMAINS
-from api.shared.verticals import active_vertical
+from api.shared.domains import Domain, DOMAINS
+from api.shared.vertical_pack import VerticalRuntime
 from api.server.services.time_compression import business_now
 
 # Cache resolved spawners so we import the module + look up the attr once
@@ -576,7 +576,7 @@ async def _wait_for_functions_host(timeout_seconds: float = 120.0) -> bool:
     return False
 
 
-async def ramp_loop() -> None:
+async def ramp_loop(runtime: VerticalRuntime | None = None) -> None:
     """Domain-aware steady-state ramp loop.
 
     Default: enabled, spawning each live domain at ~90s intervals jittered
@@ -612,7 +612,7 @@ async def ramp_loop() -> None:
         print("[ramp] disabled (SIMULATOR_RAMP_ENABLED=0); use POST /api/simulator/{inject,hire,travel} to fire workflows by hand")
         return
 
-    vertical = active_vertical()
+    runtime = runtime or app_state.runtime
 
     # Boot-race guard: the FastAPI lifespan kicks the ramp loop a few
     # seconds before the Functions host finishes binding port 7071. Any
@@ -639,19 +639,26 @@ async def ramp_loop() -> None:
     # Build the spawn map from the live domain registry. Adding a new
     # domain is now a single edit in api/shared/domains.py — no second
     # registry to maintain here.
-    by_type: dict[str, Domain] = {d.workflow_type: d for d in live_domains()}
+    by_type: dict[str, Domain] = {
+        workflow_type: domain
+        for workflow_type, domain in runtime.pack.domains.items()
+        if not domain.stub
+    }
 
     domains_csv = os.getenv("SIMULATOR_RAMP_DOMAINS", "").strip()
     if domains_csv:
         wanted = [d.strip() for d in domains_csv.split(",") if d.strip()]
-    elif vertical is not None:
-        wanted = list(vertical.ramp_workflow_types)
     else:
-        wanted = list(by_type.keys())
+        wanted = list(runtime.pack.ramp_workflow_types)
 
     avg_interval = float(os.getenv("SIMULATOR_RAMP_AVG_INTERVAL_SECONDS", "90"))
 
-    valid_domains = _select_ramp_domains(wanted, by_type)
+    world_owned = {
+        responder.workflow_type
+        for world in runtime.pack.worlds.values()
+        for responder in world.responders.values()
+    }
+    valid_domains = _select_ramp_domains(wanted, by_type, world_owned)
 
     if not valid_domains:
         print("[ramp] no valid domains in SIMULATOR_RAMP_DOMAINS; nothing to spawn")
@@ -687,15 +694,10 @@ async def ramp_loop() -> None:
         raise
 
 
-_WORLD_OWNED_RAMP_TYPES = frozenset({
-    "network-incident",
-    "proactive-customer-care",
-    "order-to-activate",
-})
-
-
 def _select_ramp_domains(
-    wanted: list[str], by_type: dict[str, Domain]
+    wanted: list[str],
+    by_type: dict[str, Domain],
+    world_owned: set[str],
 ) -> list[Domain]:
     selected: list[Domain] = []
     for workflow_type in wanted:
@@ -703,7 +705,7 @@ def _select_ramp_domains(
         if domain is None:
             print(f"[ramp] WARNING: unknown domain {workflow_type!r}; skipping")
             continue
-        if workflow_type in _WORLD_OWNED_RAMP_TYPES:
+        if workflow_type in world_owned:
             print(
                 f"[ramp] WARNING: domain {workflow_type!r} is world-owned; "
                 "trigger it through an actor-world sensor"

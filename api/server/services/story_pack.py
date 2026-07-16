@@ -15,7 +15,10 @@ import datetime as _dt
 import logging
 from collections import Counter
 from pathlib import Path
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Iterable
+
+if TYPE_CHECKING:
+    from api.shared.vertical_pack import VerticalRuntime
 
 log = logging.getLogger(__name__)
 
@@ -138,7 +141,7 @@ def _format_md(
         _format_iso(until_unix_ts) if until_unix_ts is not None else "now"
     )
     lines: list[str] = []
-    lines.append(f"# Story of the hour")
+    lines.append("# Story of the hour")
     lines.append("")
     lines.append(
         f"Window: `{_format_iso(since_unix_ts)}` → `{until_str}` "
@@ -210,8 +213,16 @@ def _story_filename(hour_start: _dt.datetime) -> str:
     return f"story-{hour_start.strftime('%Y-%m-%dT%H')}.md"
 
 
+def default_base_dir(runtime: "VerticalRuntime | None" = None) -> Path:
+    if runtime is None:
+        from api.shared.vertical_loader import active_runtime
+
+        runtime = active_runtime()
+    return runtime.data_dir / "snapshots"
+
+
 def write_hourly_story(
-    *, base_dir: Path | str = Path("data/snapshots"), now_ts: float | None = None
+    *, base_dir: Path | str | None = None, now_ts: float | None = None
 ) -> Path:
     """Render + write the most recent hour's story to ``base_dir``.
 
@@ -219,7 +230,7 @@ def write_hourly_story(
     if the file already exists for that hour, it is overwritten in
     place rather than duplicated. ``now_ts`` is injectable for tests.
     """
-    base_dir = Path(base_dir)
+    base_dir = Path(base_dir) if base_dir is not None else default_base_dir()
     base_dir.mkdir(parents=True, exist_ok=True)
 
     if now_ts is None:

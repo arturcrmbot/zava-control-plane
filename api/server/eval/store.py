@@ -12,10 +12,18 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from api.shared.vertical_pack import VerticalRuntime
 
 
-DEFAULT_DB_PATH = "data/.eval/store.sqlite"
+def default_db_path(runtime: "VerticalRuntime | None" = None) -> Path:
+    if runtime is None:
+        from api.shared.vertical_loader import active_runtime
+
+        runtime = active_runtime()
+    return runtime.data_dir / "eval" / "store.sqlite"
 
 
 @dataclass
@@ -37,11 +45,12 @@ class EvalRow:
 
 
 class EvalStore:
-    def __init__(self, db_path: str = DEFAULT_DB_PATH) -> None:
-        self._db_path = db_path
-        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    def __init__(self, db_path: str | Path | None = None) -> None:
+        resolved_path = Path(db_path) if db_path is not None else default_db_path()
+        self._db_path = str(resolved_path)
+        resolved_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
-        self._conn = sqlite3.connect(db_path, check_same_thread=False)
+        self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._init_schema()
 

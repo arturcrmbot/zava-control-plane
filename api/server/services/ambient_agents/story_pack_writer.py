@@ -19,7 +19,6 @@ log = logging.getLogger(__name__)
 
 
 DEFAULT_TICK_SECONDS: float = 60.0
-DEFAULT_BASE_DIR: Path = Path("data/snapshots")
 
 
 class StoryPackWriter:
@@ -28,10 +27,10 @@ class StoryPackWriter:
     def __init__(
         self,
         *,
-        base_dir: Path = DEFAULT_BASE_DIR,
+        base_dir: Path | None = None,
         tick_seconds: float = DEFAULT_TICK_SECONDS,
     ) -> None:
-        self._base_dir = base_dir
+        self._base_dir = base_dir or story_pack.default_base_dir()
         self._tick_seconds = tick_seconds
         self._task: asyncio.Task | None = None
         # Track the last hour we successfully wrote so a single tick

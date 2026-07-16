@@ -12,7 +12,8 @@ persisting — the portal then renders the no-video Onboarding panel.
 
 Prerecord short-circuit
 -----------------------
-For demo stability we look up `data/portal/welcome-videos/<slug>.mp4`
+For demo stability we look up the active Agency data namespace's
+`welcome-videos/<slug>.mp4`
 keyed on a slugified candidate name BEFORE calling Azure Speech. Hits
 return immediately (no network, no minute-long render, no Azurite
 dependency). After a successful Azure render the resulting bytes are
@@ -22,7 +23,6 @@ The file is served by FastAPI at `/api/portal/welcome-video/<slug>.mp4`
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import re
@@ -35,10 +35,10 @@ log = logging.getLogger(__name__)
 
 
 # Resolve the prerecord directory relative to the repo root.
-# agent_onboarding.py lives 5 levels under the repo root:
-#   api/functions/graphs/executors/agents/agent_onboarding.py
-_REPO_ROOT = Path(__file__).resolve().parents[5]
-_PRERECORD_DIR = _REPO_ROOT / "data" / "portal" / "welcome-videos"
+def _prerecord_dir() -> Path:
+    from api.shared.vertical_loader import active_runtime
+
+    return active_runtime().data_dir / "welcome-videos"
 
 
 def _candidate_slug(candidate_name: str) -> str:
@@ -133,9 +133,9 @@ async def execute(input: dict) -> dict:
     # If a candidate-named MP4 has been pre-staged on disk, serve it
     # directly — instant, no Azure call, survives Azurite wipes. Stable
     # candidates like 'Alex Doe' (the canonical demo applicant) get
-    # rendered once then committed to data/portal/welcome-videos/.
+    # rendered once then committed to the active pack's welcome-video cache.
     slug = _candidate_slug(candidate_name)
-    prerecord_path = _PRERECORD_DIR / f"{slug}.mp4"
+    prerecord_path = _prerecord_dir() / f"{slug}.mp4"
     if prerecord_path.is_file():
         video_url = f"{_portal_base_url()}/api/portal/welcome-video/{slug}.mp4"
         log.info(
@@ -218,7 +218,7 @@ def _persist_video_url(workflow_id: str | None, video_url: str) -> None:
 
 def _snapshot_to_prerecord(blob_sas_url: str, dest: Path) -> None:
     """Download a freshly-rendered MP4 from its Azure Blob SAS URL and save
-    it under data/portal/welcome-videos/<slug>.mp4.
+    it under the active pack's welcome-video cache.
 
     Subsequent runs for the same candidate hit the prerecord short-circuit
     and skip Azure entirely — instant playback, immune to Azurite resets.
