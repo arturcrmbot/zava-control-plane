@@ -1,4 +1,4 @@
-from api.shared.all_authority import AUTHORITY
+from api.shared.authority import ALL_AUTHORITY
 
 
 TELCO_ONLY_AUTHORITY = {
@@ -9,6 +9,6 @@ TELCO_ONLY_AUTHORITY = {
 }
 AGENCY_AUTHORITY = {
     role: row
-    for role, row in AUTHORITY.items()
+    for role, row in ALL_AUTHORITY.items()
     if role not in TELCO_ONLY_AUTHORITY
 }

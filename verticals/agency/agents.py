@@ -1,4 +1,4 @@
-from api.shared.all_agents import AGENTS
+from api.shared.agents import ALL_AGENTS
 
 
 EXCLUDED_AGENT_IDS = {
@@ -8,6 +8,6 @@ EXCLUDED_AGENT_IDS = {
 }
 AGENCY_AGENTS = {
     agent_id: agent
-    for agent_id, agent in AGENTS.items()
+    for agent_id, agent in ALL_AGENTS.items()
     if agent_id not in EXCLUDED_AGENT_IDS
 }

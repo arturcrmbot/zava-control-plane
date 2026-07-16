@@ -1,11 +1,11 @@
 from dataclasses import replace
 
-from api.shared.all_functions import FUNCTIONS
+from api.shared.functions import ALL_FUNCTIONS
 
 
 AGENCY_FUNCTIONS = {
     name: function
-    for name, function in FUNCTIONS.items()
+    for name, function in ALL_FUNCTIONS.items()
     if name != "customer-success"
 }
 AGENCY_FUNCTIONS["ops"] = replace(
