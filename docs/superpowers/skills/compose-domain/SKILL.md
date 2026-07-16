@@ -642,6 +642,11 @@ itself to write:
   `author-durable-domain` returns the structured fragments (orchestrator-
   import block, activity-trigger block, ramp-loop spawner entry,
   inventory DOMAIN entry, etc.) for you to splice into the template.
+  Supply `VERTICAL_NAME`, `SPAWNER_REGISTRATION_BLOCK`,
+  `DOMAIN_DECLARATION_BLOCK`, and `FUNCTION_MEMBERSHIP_BLOCK`. These
+  blocks must append to the selected pack's modules; they must not patch
+  `function_app.py`, `api/shared/*`, Blueprint inventory, or another
+  vertical.
   Mark the file executable (`chmod +x`).
 
   The graduate.sh script must:
