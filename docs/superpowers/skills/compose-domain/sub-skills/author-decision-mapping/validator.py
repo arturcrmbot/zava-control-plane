@@ -21,11 +21,20 @@ from _shared.brief_validator import SchemaError, validate_brief
 __all__ = ["SchemaError", "validate"]
 
 
-def _list_personae(repo_root: Path) -> set[str]:
-    pdir = repo_root / "api" / "server" / "personae"
-    if not pdir.exists():
-        return set()
-    return {p.name for p in pdir.iterdir() if p.is_dir() and not p.name.startswith("_")}
+def _list_personae(repo_root: Path | None) -> set[str]:
+    if repo_root is not None:
+        roots = (repo_root / "api" / "server" / "personae",)
+    else:
+        from api.shared.vertical_loader import active_runtime
+
+        roots = active_runtime().pack.personae_roots
+    return {
+        path.name
+        for root in roots
+        if root.exists()
+        for path in root.iterdir()
+        if path.is_dir() and not path.name.startswith("_")
+    }
 
 
 def validate(brief: dict, repo_root: Path | None = None) -> None:
@@ -45,8 +54,7 @@ def validate(brief: dict, repo_root: Path | None = None) -> None:
         e.get("ref_field") for e in (brief.get("entities") or []) if e.get("ref_field")
     }
 
-    personae_dir = repo_root or Path.cwd()
-    known_personae = _list_personae(personae_dir)
+    known_personae = _list_personae(repo_root)
 
     seen_phases: set[str] = set()
     for i, dec in enumerate(decisions):
@@ -77,7 +85,7 @@ def validate(brief: dict, repo_root: Path | None = None) -> None:
                 path=f"decisions[{i}].persona",
                 reason=(
                     f"persona {persona!r} not registered under "
-                    f"api/server/personae/"
+                    "the active vertical's personae roots"
                 ),
             )
 

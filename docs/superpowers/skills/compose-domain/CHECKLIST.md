@@ -13,6 +13,7 @@ in the sandbox — that hides the procedure bug.
 
 ## §1 — Sandbox layout
 
+- [ ] §1.0  The run records its target vertical; graduation destinations are under `verticals/<vertical>/` for business assets.
 - [ ] §1.1  `tools/scratch/compose-domain/<run-id>/` exists.
 - [ ] §1.2  `<run-id>/api/server/skills/<domain>-<phase>/SKILL.md` exists for every phase with `kind: agent`.
 - [ ] §1.3  `<run-id>/api/server/personae/<role>/SKILL.md` exists for every phase with `kind: hitl`.
