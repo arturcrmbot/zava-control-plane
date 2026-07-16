@@ -145,6 +145,12 @@ verticals/
 Only files needed by a pack are required. An empty capability is represented
 explicitly in its manifest, not by probing for a directory.
 
+The layout above is mandatory for Telco and all new vertical content. To avoid
+an unrelated mass rename, Agency may retain an explicitly declared legacy asset
+root for one compatibility cycle after every Telco-specific file has been moved
+out of it. Such a root must then contain Agency-only assets and is treated as
+part of the Agency pack; it is not a global fallback.
+
 Shared contracts and mechanisms remain in the existing `api/shared` and
 `api/server` packages. The implementation extracts only the registry types and
 loader needed to break circular imports:
@@ -366,9 +372,11 @@ Blueprint and runtime skill loading receive explicit `skill_roots`. MCP
 registrations receive explicit module names. Neither scans the old global
 folders after migration.
 
-During migration, existing files are moved to their owning pack rather than
-copied. A compatibility import module may re-export an MCP implementation when
-needed, but there is one canonical source file.
+During migration, Telco-specific files are moved to the Telco pack rather than
+copied. Existing Agency-only roots may remain at their current paths for one
+compatibility cycle, declared explicitly by the Agency manifest. A
+compatibility import module may re-export an implementation when needed, but
+there is one canonical source file and no mixed root after the cutover.
 
 The domain composer must target a vertical. Its backward-compatible default is
 Agency. Generated domains, skills, personae, MCP modules, and recordings are
