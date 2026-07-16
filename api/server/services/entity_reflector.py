@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from collections.abc import Mapping
 from typing import Any, Callable
 
 from api.server.services.entity_graph import (
@@ -81,12 +82,14 @@ class EntityReflector:
         graph: EntityGraph,
         governance: Any | None = None,
         audit: Any | None = None,
+        projections: Mapping[str, Any] | None = None,
     ) -> None:
         self._bus = bus
         self._store = store
         self._graph = graph
         self._governance = governance
         self._audit = audit
+        self._projections = projections if projections is not None else PROJECTIONS
         self._off: Callable[[], None] | None = None
 
     # -- lifecycle -------------------------------------------------------
@@ -128,7 +131,7 @@ class EntityReflector:
                 return
 
             workflow_type = workflow.type
-            projection = PROJECTIONS.get(workflow_type)
+            projection = self._projections.get(workflow_type)
             if projection is None:
                 # CON-001: unknown / unregistered workflow_type is a silent
                 # no-op. No audit, no exception.

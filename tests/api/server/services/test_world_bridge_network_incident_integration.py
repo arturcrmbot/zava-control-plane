@@ -139,7 +139,14 @@ async def test_actor_network_incident_end_to_end(monkeypatch):
 
     # REAL EntityReflector with the graph-store boundary faked.
     graph = FakeGraph()
-    reflector = EntityReflector(state.bus, state.store, graph, governance=None, audit=None)
+    reflector = EntityReflector(
+        state.bus,
+        state.store,
+        graph,
+        governance=None,
+        audit=None,
+        projections=world.vertical_runtime.pack.projections,
+    )
     reflector.start()
 
     fleet_events: list = []
