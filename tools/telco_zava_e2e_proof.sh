@@ -14,6 +14,7 @@ BLUEPRINT_PORT="${TELCO_PROOF_BLUEPRINT_PORT:-15275}"
 DATA_ROOT="${TELCO_PROOF_DATA_ROOT:-/tmp/zava-telco-proof-$(id -u)}"
 DRIVER="tools/telco_zava_e2e_proof.mjs"
 WORLD_MINUTES_PER_SECOND=10
+MODE="full"
 
 if [[ "${1:-}" == "--print-config" ]]; then
   printf '{"api_port":%d,"azurite_ports":[%d,%d,%d],"blueprint_port":%d,"control_plane_port":%d,"data_root":"%s","driver":"%s","functions_port":%d,"vertical":"telco","world_minutes_per_second":%d}\n' \
@@ -21,6 +22,9 @@ if [[ "${1:-}" == "--print-config" ]]; then
     "$BLUEPRINT_PORT" "$CONTROL_PLANE_PORT" "$DATA_ROOT" "$DRIVER" \
     "$FUNCTIONS_PORT" "$WORLD_MINUTES_PER_SECOND"
   exit 0
+fi
+if [[ "${1:-}" == "--replay-only" ]]; then
+  MODE="replay-only"
 fi
 
 export ACTOR_PROOF_ROOT="$DATA_ROOT/run"
@@ -105,6 +109,60 @@ wait_port_clear() {
   err "$label still reachable on port $port"
   return 1
 }
+
+if [[ "$MODE" == "replay-only" ]]; then
+  for required in curl lsof node uv; do
+    command -v "$required" >/dev/null || {
+      err "missing required command: $required"
+      exit 2
+    }
+  done
+  preflight_ports "$API_PORT" "$FUNCTIONS_PORT" "$BLUEPRINT_PORT"
+  test -d "$OUT_DIR/recordings" || {
+    err "replay evidence missing: $OUT_DIR/recordings"
+    exit 2
+  }
+
+  ( cd "$ROOT" \
+      && exec env -u ZAVA_WORLD -u FUNCTIONS_HOST \
+        ZAVA_VERTICAL=telco \
+        ZAVA_BLUEPRINT_REPLAY_ONLY=1 \
+        PORTAL_DATA_DIR="$DATA_ROOT/replay-portal" \
+        ENTITY_PLANE_ENABLED=0 \
+        SIMULATOR_RAMP_ENABLED=0 \
+        BLUEPRINT_RECORDINGS_DIR="$OUT_DIR/recordings" \
+        uv run --frozen --no-sync uvicorn api.server.main:app \
+          --host 127.0.0.1 --port "$API_PORT" ) \
+    >"$REPLAY_API_LOG" 2>&1 &
+  API_PID=$!
+  wait_http "http://127.0.0.1:$API_PORT/healthz" \
+    "replay FastAPI" "$API_PID" "$REPLAY_API_LOG"
+
+  ( cd "$ROOT/web/blueprint" \
+      && exec env VITE_API_BASE_URL="http://127.0.0.1:$API_PORT" \
+        "$ROOT/node_modules/.bin/vite" --host 127.0.0.1 \
+        --port "$BLUEPRINT_PORT" --strictPort ) \
+    >"$BLUEPRINT_LOG" 2>&1 &
+  BLUEPRINT_PID=$!
+  wait_http "http://127.0.0.1:$BLUEPRINT_PORT/?view=constellation" \
+    "Blueprint replay" "$BLUEPRINT_PID" "$BLUEPRINT_LOG"
+
+  set +e
+  BLUEPRINT_BASE="http://127.0.0.1:$BLUEPRINT_PORT" \
+  WORLD_API_BASE="http://127.0.0.1:$API_PORT" \
+  FUNCTIONS_HOST="http://127.0.0.1:$FUNCTIONS_PORT" \
+  PROOF_OUT_DIR="$OUT_DIR" \
+    node "$DRIVER" --replay
+  rc=$?
+  set -e
+  cp "$REPLAY_API_LOG" "$BLUEPRINT_LOG" "$OUT_DIR/logs/" 2>/dev/null || true
+
+  if ! cleanup; then
+    rc=9
+  fi
+  trap - EXIT INT TERM
+  exit "$rc"
+fi
 
 for required in azurite curl func lsof node uv; do
   command -v "$required" >/dev/null || {

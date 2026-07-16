@@ -38,6 +38,13 @@ def test_telco_proof_sources_parse():
     subprocess.run(["node", "--check", str(DRIVER)], cwd=ROOT, check=True)
 
 
+def test_telco_proof_supports_replay_only_validation():
+    source = SCRIPT.read_text(encoding="utf-8")
+
+    assert '"--replay-only"' in source
+    assert '"replay evidence missing: $OUT_DIR/recordings"' in source
+
+
 def test_telco_proof_driver_declares_cross_surface_contract():
     result = subprocess.run(
         ["node", str(DRIVER), "--print-contract"],
