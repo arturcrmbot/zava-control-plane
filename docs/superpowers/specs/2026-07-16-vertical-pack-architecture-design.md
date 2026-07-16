@@ -93,13 +93,11 @@ The implementation must preserve these invariants:
    kernel registry, not because it happened to be found on disk.
 6. **Pack-local IDs:** duplicate domain, agent, skill, MCP operation, world,
    projection, or function IDs are boot errors.
-7. **Cross-process agreement:** FastAPI and Azure Functions expose and compare
-   the same vertical fingerprint before live workflow scheduling.
-8. **Pack-scoped persistence:** mutable runtime data and newly captured
+7. **Pack-scoped persistence:** mutable runtime data and newly captured
    recordings are written beneath the active pack's data namespace.
-9. **No silent fallback:** an explicit invalid vertical/world combination
+8. **No silent fallback:** an explicit invalid vertical/world combination
    fails startup. It never falls back to Agency or an aggregate world.
-10. **Truthful UI:** Control Plane and Blueprint render the active runtime
+9. **Truthful UI:** Control Plane and Blueprint render the active runtime
     manifest; build-time environment variables are not a second source of
     vertical truth.
 
@@ -519,36 +517,13 @@ shared platform code; a pack chooses and configures it declaratively.
 Unavailable routes or lenses are absent from navigation instead of rendering
 empty Agency/Telco shells.
 
-## 11. FastAPI and Functions agreement
+## 11. Process configuration
 
-FastAPI and Functions are separate processes and could be started with
-different environment values. That must be observable before scheduling work.
-
-Both processes expose:
-
-- vertical name
-- manifest version
-- fingerprint
-- registered orchestrator names
-
-The shared Functions health registration provides this information. FastAPI's
-Durable client verifies the fingerprint during startup/readiness and before
-the first live schedule after a Functions reconnect.
-
-A mismatch:
-
-- marks workflow scheduling unavailable
-- exposes an unhealthy readiness result with both fingerprints
-- does not start the actor-world bridge
-- does not silently schedule an orchestrator with the same name from another
-  pack
-
-An unreachable Functions host is also degraded readiness, not a FastAPI boot
-failure. Ramp scheduling and the actor-world bridge remain disarmed until a
-matching host is available. Read-only API and UI surfaces may still start.
-
-Replay mode does not require a Functions host, but the replay's vertical
-metadata must match the active pack.
+FastAPI and Functions independently resolve the same required environment.
+Launch scripts and deployment manifests set `ZAVA_VERTICAL` identically for
+both processes and verify their indexed orchestrators in tests. Runtime
+fingerprint negotiation is deferred until there is a deployment topology that
+cannot guarantee shared configuration.
 
 ## 12. Validation and failure behaviour
 
@@ -579,11 +554,6 @@ Validation never catches a broad exception and proceeds with a partial pack.
 Mutable runtime startup failures retain existing component-level handling only
 where degraded operation is already intentional. Pack composition itself is
 atomic: valid or not started.
-
-Functions unavailability and API/Functions fingerprint mismatch are runtime
-readiness failures. They block all live scheduling and actor-world bridge
-startup but do not disguise themselves as successful readiness or terminate
-otherwise valid read-only/replay surfaces.
 
 ## 13. Agency migration and compatibility
 
@@ -666,10 +636,8 @@ changing the loader or kernel contracts.
   tests remain green
 - the existing isolated unmocked Telco proof remains green
 
-### 15.4 Cross-process and browser proof
+### 15.4 Browser proof
 
-- API/Functions matching fingerprints reach ready state
-- mismatched fingerprints block scheduling with a descriptive readiness error
 - Agency and Telco each receive a fresh isolated full-stack run
 - Control Plane navigation and Blueprint composition match the runtime manifest
 - browser, page, console, and application-network error counts are zero
@@ -726,7 +694,7 @@ The architecture migration is complete when:
 5. worlds, agents, personae, projections, memory, policies, and UI lenses are
    sourced from the active pack.
 6. committed and mutable recordings are pack-scoped.
-7. invalid pack composition or API/Functions mismatch fails descriptively.
+7. invalid pack composition fails descriptively.
 8. Agency and Telco unmocked browser proofs pass independently with zero
    browser/page/network application errors.
 9. no compatibility-global consumer can observe inactive-pack content.

@@ -28,10 +28,6 @@ def test_runtime_payload_defaults_to_agency(tmp_path) -> None:
             "lenses": ["agency-operations"],
             "theme": {"accent": "#2563eb", "label": "Agency"},
         },
-        "readiness": {
-            "functions": "unavailable",
-            "scheduling_enabled": False,
-        },
     }
 
 
