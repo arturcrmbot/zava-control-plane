@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import time
 from datetime import datetime, timezone
@@ -44,6 +45,8 @@ from typing import Any
 
 from api.shared.events import FleetEvent
 from api.shared.vertical_pack import VerticalRuntime
+
+log = logging.getLogger(__name__)
 
 # The set of event types the observatory surfaces; recordings filter to the
 # same set so we never capture noise the page would discard anyway.
@@ -281,9 +284,11 @@ def load_recorded_templates(runtime: VerticalRuntime) -> list[dict[str, Any]]:
                             deltas_ms.append(max(0, offset - prev_offset))
                         prev_offset = offset
             except (OSError, ValueError, KeyError) as error:
-                raise ValueError(
-                    f"invalid Blueprint recording {path}: {error}"
-                ) from error
+                # Curated recordings are validated when the pack loads.
+                # Runtime captures can be interrupted or left behind by an
+                # older vertical; one bad local file must not kill SSE replay.
+                log.warning("ignoring invalid Blueprint recording %s: %s", path, error)
+                continue
             if not events:
                 continue
             workflow_type = (
@@ -292,10 +297,12 @@ def load_recorded_templates(runtime: VerticalRuntime) -> list[dict[str, Any]]:
                 or "unknown"
             )
             if workflow_type not in runtime.pack.domains:
-                raise ValueError(
-                    f"recording workflow {workflow_type!r} is not in active "
-                    f"vertical {runtime.pack.name!r}: {path.name}"
+                log.warning(
+                    "ignoring Blueprint recording %s for inactive workflow %s",
+                    path,
+                    workflow_type,
                 )
+                continue
             workflow_id = (
                 events[0].get("workflow_id")
                 or events[0].get("workflowId")

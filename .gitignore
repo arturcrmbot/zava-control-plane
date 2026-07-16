@@ -134,6 +134,9 @@ data/kpi_history.sqlite-journal
 data/kpi_history.sqlite-wal
 data/kpi_history.sqlite-shm
 
+# Pack-scoped mutable runtime state.
+/data/runtime/
+
 
 # Local agent scratch (entity-audit dumps, ad-hoc analysis)
 /tmp/
