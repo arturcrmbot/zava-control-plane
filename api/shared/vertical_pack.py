@@ -18,7 +18,7 @@ StopAction = Callable[[], Any]
 
 @dataclass(frozen=True, slots=True)
 class DurableFunctionRegistration:
-    register: Callable[[Any], None]
+    load_module: Callable[[], Any]
     orchestrators: frozenset[str]
     activities: frozenset[str]
 

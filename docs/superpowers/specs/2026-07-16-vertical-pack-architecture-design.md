@@ -245,18 +245,20 @@ reviewable registry change.
 
 `DurableFunctionRegistration` declares:
 
-- a callable that decorates an existing `df.DFApp`
+- a lazy loader for the selected pack's decorated Functions module
 - the orchestrator names it registers
 - the activity names it registers
 - any shared kernel function capabilities it requires
 
 `function_app.py` becomes a small composition root:
 
-1. initialise telemetry and governance
-2. create `df.DFApp`
-3. register kernel-level functions
-4. resolve the active vertical
-5. call only that pack's function registrar
+1. resolve the active vertical
+2. lazily import only that pack's Functions module
+3. expose the module's `df.DFApp`
+
+Each pack module creates its app through the shared kernel app factory, which
+initialises telemetry, governance, and kernel HTTP triggers before applying
+that pack's decorators.
 
 Azure Functions indexes decorators at module import, so changing vertical
 requires a Functions host restart. Inactive workflow modules are not imported.
