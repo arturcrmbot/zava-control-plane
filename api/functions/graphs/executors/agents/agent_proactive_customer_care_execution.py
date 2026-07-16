@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from api.server.mcp_tools.customer_care import (
+from verticals.telco.mcp_tools.customer_care import (
     customer_care_prepare_credit_tool,
     customer_care_prepare_notification_tool,
 )

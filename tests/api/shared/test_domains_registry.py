@@ -10,6 +10,7 @@ from pathlib import Path
 import yaml
 
 from api.shared import domains as registry
+from verticals.telco.domains import TELCO_DOMAINS
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -109,7 +110,7 @@ def test_all_wake_hints_includes_at_least_one_per_fleet_domain():
 
 
 def test_network_incident_phase_vocabulary_matches_brief() -> None:
-    domain = registry.DOMAINS["network-incident"]
+    domain = TELCO_DOMAINS["network-incident"]
     assert [p.name for p in domain.phases] == [
         "Telemetry Correlation",
         "Impact Diagnosis",
@@ -129,7 +130,7 @@ def test_network_incident_phase_vocabulary_matches_brief() -> None:
 
 
 def test_proactive_customer_care_domain_is_registered() -> None:
-    domain = registry.DOMAINS["proactive-customer-care"]
+    domain = TELCO_DOMAINS["proactive-customer-care"]
     assert domain.orchestrator_name == "ProactiveCustomerCareOrchestrator"
     assert [(phase.name, phase.kind) for phase in domain.phases] == [
         ("Impact Assessment", "deterministic"),

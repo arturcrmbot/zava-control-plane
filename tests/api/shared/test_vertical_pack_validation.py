@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, replace
 from importlib import import_module
+import json
 
 import pytest
 
@@ -156,6 +157,70 @@ def test_validation_rejects_unknown_ui_vocabulary(tmp_path) -> None:
                     lenses=("mystery",),
                     theme={},
                     phase_aliases={},
+                ),
+            )
+        )
+
+
+def test_validation_rejects_missing_pack_assets(tmp_path) -> None:
+    pack = _pack_with_domain(tmp_path)
+    domain = replace(_domain(), skills=("missing-skill",))
+    pack = replace(pack, domains={"demo": domain})
+
+    with pytest.raises(ValueError, match="missing skill 'missing-skill'"):
+        validate_pack(pack)
+
+    missing_persona = replace(
+        pack,
+        domains={"demo": _domain()},
+        organisation_functions={
+            "ops": replace(
+                _function("demo"),
+                persona_hierarchy=PersonaTree(role="missing-persona"),
+            )
+        },
+    )
+    with pytest.raises(ValueError, match="missing persona 'missing-persona'"):
+        validate_pack(missing_persona)
+
+    with pytest.raises(ValueError, match="missing MCP module 'missing.module'"):
+        validate_pack(
+            replace(
+                _pack_with_domain(tmp_path),
+                mcp_modules=("missing.module",),
+            )
+        )
+
+
+def test_validation_rejects_missing_policy_and_foreign_recording(tmp_path) -> None:
+    pack = _pack_with_domain(tmp_path)
+    with pytest.raises(ValueError, match="missing policy source"):
+        validate_pack(
+            replace(pack, policy_sources=(tmp_path / "missing.yaml",))
+        )
+
+    recordings = tmp_path / "recordings"
+    recordings.mkdir()
+    (recordings / "foreign.jsonl").write_text(
+        json.dumps(
+            {
+                "ts_offset_ms": 0,
+                "event": {
+                    "type": "workflow.started",
+                    "workflow_type": "foreign",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="recording workflow 'foreign'"):
+        validate_pack(
+            replace(
+                pack,
+                recordings=replace(
+                    pack.recordings,
+                    curated_dirs=(recordings,),
                 ),
             )
         )

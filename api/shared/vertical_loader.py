@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import json
+import re
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from functools import cache
@@ -20,6 +22,8 @@ PACK_MODULES = {
     "telco": "verticals.telco.manifest",
 }
 LEGACY_WORLD_OWNERS = {"support": "agency", "telco": "telco"}
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_SKILL_NAME = re.compile(r"^name:\s*[\"']?([^\"'\n]+)", re.MULTILINE)
 
 
 def _normalise(value: str | None) -> str | None:
@@ -184,6 +188,83 @@ def validate_pack(pack: VerticalPack) -> None:
         raise ValueError(
             f"vertical {pack.name!r} has unknown UI lenses {unknown_lenses}"
         )
+
+    skill_names: set[str] = set()
+    for root in pack.skill_roots:
+        if not root.is_dir():
+            raise ValueError(
+                f"vertical {pack.name!r} has missing skill root {str(root)!r}"
+            )
+        for skill_file in root.glob("*/SKILL.md"):
+            match = _SKILL_NAME.search(skill_file.read_text(encoding="utf-8"))
+            skill_names.add(
+                match.group(1).strip() if match else skill_file.parent.name
+            )
+    for domain in pack.domains.values():
+        for skill_name in domain.skills:
+            if skill_name not in skill_names:
+                raise ValueError(
+                    f"vertical {pack.name!r} domain {domain.workflow_type!r} "
+                    f"references missing skill {skill_name!r}"
+                )
+
+    def validate_persona(node, function_name: str) -> None:
+        if node.role == "__legacy__":
+            return
+        if not any(
+            (root / node.role / "SKILL.md").is_file()
+            for root in pack.personae_roots
+        ):
+            raise ValueError(
+                f"vertical {pack.name!r} function {function_name!r} "
+                f"references missing persona {node.role!r}"
+            )
+        for child in node.manages:
+            validate_persona(child, function_name)
+
+    for function_name, function in pack.organisation_functions.items():
+        validate_persona(function.persona_hierarchy, function_name)
+
+    for module_name in pack.mcp_modules:
+        module_path = _REPO_ROOT.joinpath(*module_name.split(".")).with_suffix(
+            ".py"
+        )
+        if not module_path.is_file():
+            raise ValueError(
+                f"vertical {pack.name!r} has missing MCP module "
+                f"{module_name!r}"
+            )
+
+    for policy_path in pack.policy_sources:
+        if not policy_path.is_file():
+            raise ValueError(
+                f"vertical {pack.name!r} has missing policy source "
+                f"{str(policy_path)!r}"
+            )
+
+    for recordings_dir in pack.recordings.curated_dirs:
+        if not recordings_dir.is_dir():
+            raise ValueError(
+                f"vertical {pack.name!r} has missing recordings directory "
+                f"{str(recordings_dir)!r}"
+            )
+        for recording_path in recordings_dir.glob("*.jsonl"):
+            workflow_types: set[str] = set()
+            for line in recording_path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                entry = json.loads(line)
+                event = entry.get("event") or {}
+                workflow_type = event.get("workflow_type")
+                if workflow_type:
+                    workflow_types.add(str(workflow_type))
+            for workflow_type in workflow_types:
+                if workflow_type not in pack.domains:
+                    raise ValueError(
+                        f"vertical {pack.name!r} recording workflow "
+                        f"{workflow_type!r} is not active: "
+                        f"{recording_path.name}"
+                    )
 
 
 def build_runtime(

@@ -1,0 +1,11 @@
+{
+  "capabilities": ["blueprint", "compose", "memory", "knowledge"],
+  "lenses": ["agency-operations"],
+  "theme": {
+    "accent": "#2563eb",
+    "label": "Agency"
+  },
+  "phase_aliases": {},
+  "aspirational_domains": ["Procurement", "Legal", "IT"],
+  "include_meta_skills": true
+}

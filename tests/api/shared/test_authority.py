@@ -10,6 +10,7 @@ from api.shared.authority import (
     delegate_for,
     is_ooo,
 )
+from verticals.telco.authority import TELCO_AUTHORITY
 
 
 def test_authority_table_is_non_empty_and_typed():
@@ -98,7 +99,17 @@ def test_d1_personae_have_authority_rows():
         "it_admin_director", "support_engineer",
         "chief_data_officer", "data_lead", "data_engineer",
         "analytics_engineer", "analyst",
-        "cs_director", "cs_account_director", "cs_manager", "cs_specialist",
     }
     missing = expected - set(AUTHORITY.keys())
     assert not missing, f"D1 roles missing from AUTHORITY: {sorted(missing)}"
+
+
+def test_telco_customer_success_roles_have_authority_rows():
+    expected = {
+        "cs_director",
+        "cs_account_director",
+        "cs_manager",
+        "cs_specialist",
+        "delivery_lead",
+    }
+    assert set(TELCO_AUTHORITY) == expected

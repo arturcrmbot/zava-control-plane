@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from api.server.mcp_tools.customer_care import customer_care_policy_lookup_tool
+from verticals.telco.mcp_tools.customer_care import customer_care_policy_lookup_tool
 
 from ._wrapper import SKILLS_DIR, run_agent_session
 

@@ -1,0 +1,11 @@
+{
+  "capabilities": ["blueprint", "world", "memory", "knowledge"],
+  "lenses": ["telco-network", "customer-impact", "order", "control"],
+  "theme": {
+    "accent": "#14b8a6",
+    "label": "Telco"
+  },
+  "phase_aliases": {},
+  "aspirational_domains": [],
+  "include_meta_skills": false
+}

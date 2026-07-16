@@ -137,6 +137,22 @@ def load_tools_yaml(path: Optional[str] = None) -> dict[str, ToolManifestEntry]:
     return out
 
 
+def load_active_tools() -> dict[str, ToolManifestEntry]:
+    from api.shared.vertical_loader import active_runtime
+
+    runtime = active_runtime()
+    merged: dict[str, ToolManifestEntry] = {}
+    for path in runtime.pack.policy_sources:
+        for tool_id, entry in load_tools_yaml(str(path)).items():
+            if tool_id in merged:
+                raise ValueError(
+                    f"vertical {runtime.pack.name!r} policy sources contain "
+                    f"duplicate tool id {tool_id!r}"
+                )
+            merged[tool_id] = entry
+    return merged
+
+
 def _reset_cache_for_tests() -> None:
     """Drop the LRU cache. Tests that rewrite tools.yaml on disk call this."""
     load_tools_yaml.cache_clear()
