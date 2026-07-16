@@ -1,4 +1,4 @@
-from api.shared.all_domains import DOMAINS
+from api.shared.domains import ALL_DOMAINS
 
 
 TELCO_WORKFLOW_TYPES = (
@@ -7,6 +7,6 @@ TELCO_WORKFLOW_TYPES = (
     "order-to-activate",
 )
 TELCO_DOMAINS = {
-    workflow_type: DOMAINS[workflow_type]
+    workflow_type: ALL_DOMAINS[workflow_type]
     for workflow_type in TELCO_WORKFLOW_TYPES
 }

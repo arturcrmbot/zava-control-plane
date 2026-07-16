@@ -1,4 +1,4 @@
-from api.shared.all_agents import AGENTS
+from api.shared.agents import ALL_AGENTS
 
 
 TELCO_AGENT_IDS = (
@@ -6,6 +6,6 @@ TELCO_AGENT_IDS = (
     "proactive-customer-care-execution",
 )
 TELCO_AGENTS = {
-    agent_id: AGENTS[agent_id]
+    agent_id: ALL_AGENTS[agent_id]
     for agent_id in TELCO_AGENT_IDS
 }

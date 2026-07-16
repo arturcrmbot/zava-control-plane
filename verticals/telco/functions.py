@@ -1,4 +1,4 @@
-from api.shared.all_functions import Function, PersonaTree
+from api.shared.functions import Function, PersonaTree
 
 
 TELCO_FUNCTIONS = {

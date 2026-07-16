@@ -1,4 +1,4 @@
-from api.shared.all_authority import AUTHORITY
+from api.shared.authority import ALL_AUTHORITY
 
 
 TELCO_AUTHORITY_ROLES = (
@@ -9,6 +9,6 @@ TELCO_AUTHORITY_ROLES = (
     "delivery_lead",
 )
 TELCO_AUTHORITY = {
-    role: AUTHORITY[role]
+    role: ALL_AUTHORITY[role]
     for role in TELCO_AUTHORITY_ROLES
 }
