@@ -41,7 +41,7 @@ from api.shared.events import FleetEvent
 router = APIRouter()
 
 # Module-level recorder handle. One per uvicorn process.
-_recorder = BlueprintRecorder()
+_recorder = BlueprintRecorder(app_state.runtime)
 
 
 class _TokenBucket:
@@ -292,7 +292,7 @@ async def blueprint_stream(request: Request) -> EventSourceResponse:
                 # nearly always catches the start of a workflow within a
                 # few seconds of landing on the page.
                 if not in_flight:
-                    recorded = load_recorded_templates()
+                    recorded = load_recorded_templates(app_state.runtime)
                     if recorded:
                         template = random.choice(recorded)
                         wf_type = template["workflow_type"]
@@ -633,7 +633,7 @@ async def _stream_loop() -> None:
         while True:
             # Top up to 3 in-flight workflows.
             while len(in_flight) < 3:
-                recorded = load_recorded_templates()
+                recorded = load_recorded_templates(app_state.runtime)
                 if recorded:
                     template = random.choice(recorded)
                     wf_type = template["workflow_type"]

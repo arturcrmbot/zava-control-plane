@@ -1,11 +1,22 @@
 from pathlib import Path
 
-from api.server.services.blueprint_recorder import BlueprintRecorder, _recordings_dir
+from api.server.services.blueprint_recorder import (
+    BlueprintRecorder,
+    runtime_recordings_dir,
+)
 from api.shared.events import FleetEvent
+from api.shared.vertical_loader import build_runtime
 
 
-def test_workflow_failed_closes_recording_without_completion(monkeypatch):
-    recorder = BlueprintRecorder()
+def test_workflow_failed_closes_recording_without_completion(
+    monkeypatch,
+    tmp_path,
+):
+    runtime = build_runtime(
+        {"ZAVA_VERTICAL": "telco"},
+        data_root=tmp_path,
+    )
+    recorder = BlueprintRecorder(runtime)
     written = []
 
     def capture(recording):
@@ -37,7 +48,8 @@ def test_workflow_failed_closes_recording_without_completion(monkeypatch):
 
 
 def test_recordings_dir_accepts_isolated_override(monkeypatch, tmp_path):
+    runtime = build_runtime({}, data_root=tmp_path)
     target = tmp_path / "recordings"
     monkeypatch.setenv("BLUEPRINT_RECORDINGS_DIR", str(target))
 
-    assert _recordings_dir() == target
+    assert runtime_recordings_dir(runtime) == target

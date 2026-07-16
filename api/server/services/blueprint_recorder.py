@@ -43,6 +43,7 @@ from pathlib import Path
 from typing import Any
 
 from api.shared.events import FleetEvent
+from api.shared.vertical_pack import VerticalRuntime
 
 # The set of event types the observatory surfaces; recordings filter to the
 # same set so we never capture noise the page would discard anyway.
@@ -63,16 +64,18 @@ RECORDED_TYPES: frozenset[str] = frozenset({
 })
 
 
-def _recordings_dir() -> Path:
-    """Resolve to repo-root/data/blueprint-recordings/.
-
-    Created lazily on first write.
-    """
+def runtime_recordings_dir(runtime: VerticalRuntime) -> Path:
     override = os.getenv("BLUEPRINT_RECORDINGS_DIR")
     if override:
         return Path(override).expanduser()
-    repo_root = Path(__file__).resolve().parents[3]
-    return repo_root / "data" / "blueprint-recordings"
+    return runtime.data_dir / "blueprint-recordings"
+
+
+def recording_read_dirs(runtime: VerticalRuntime) -> tuple[Path, ...]:
+    return (
+        *runtime.pack.recordings.curated_dirs,
+        runtime_recordings_dir(runtime),
+    )
 
 
 # --------------------------------------------------------------------------
@@ -95,7 +98,8 @@ class BlueprintRecorder:
     playback will replay whatever lines they contain).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, runtime: VerticalRuntime) -> None:
+        self._runtime = runtime
         self._unsubscribe = None  # callable returned by bus.on_any
         self._workflows: dict[str, _Recording] = {}  # workflow_id -> Recording
         # Workflows that have already been written. Subsequent terminal
@@ -121,7 +125,10 @@ class BlueprintRecorder:
             self._handle(event)
 
         self._unsubscribe = bus.on_any(_on_event)
-        return {"status": "started", "recordings_dir": str(_recordings_dir())}
+        return {
+            "status": "started",
+            "recordings_dir": str(runtime_recordings_dir(self._runtime)),
+        }
 
     def stop(self) -> dict[str, Any]:
         if self._unsubscribe is None:
@@ -149,7 +156,7 @@ class BlueprintRecorder:
         return {
             "running": self.is_running,
             "in_flight_workflows": list(self._workflows.keys()),
-            "recordings_dir": str(_recordings_dir()),
+            "recordings_dir": str(runtime_recordings_dir(self._runtime)),
         }
 
     def _handle(self, event: FleetEvent) -> None:
@@ -195,7 +202,7 @@ class BlueprintRecorder:
             self._closed.add(wid)
 
     def _write_recording(self, rec: "_Recording") -> Path:
-        rdir = _recordings_dir()
+        rdir = runtime_recordings_dir(self._runtime)
         rdir.mkdir(parents=True, exist_ok=True)
         # Filename: <workflow_type>-<UTC ISO without colons>-<short id>.jsonl
         # Keep the ID readable: take a 16-char tail (or full id if shorter).
@@ -232,7 +239,7 @@ class _Recording:
 # --------------------------------------------------------------------------
 
 
-def load_recorded_templates() -> list[dict[str, Any]]:
+def load_recorded_templates(runtime: VerticalRuntime) -> list[dict[str, Any]]:
     """Read every JSONL file under data/blueprint-recordings/ and return
     them as templates suitable for the demo stream loop.
 
@@ -250,43 +257,58 @@ def load_recorded_templates() -> list[dict[str, Any]]:
     parseable files. The caller falls back to hand-coded templates in
     that case.
     """
-    rdir = _recordings_dir()
-    if not rdir.exists():
-        return []
     templates: list[dict[str, Any]] = []
-    for path in sorted(rdir.glob("*.jsonl")):
-        events: list[dict[str, Any]] = []
-        deltas_ms: list[int] = []
-        prev_offset: int | None = None
-        try:
-            with path.open("r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    entry = json.loads(line)
-                    offset = int(entry.get("ts_offset_ms", 0))
-                    events.append(entry["event"])
-                    if prev_offset is None:
-                        deltas_ms.append(0)
-                    else:
-                        deltas_ms.append(max(0, offset - prev_offset))
-                    prev_offset = offset
-        except (OSError, ValueError, KeyError):
-            # Skip malformed files silently; operator can curate by hand.
+    seen: set[tuple[str, str | None]] = set()
+    for recordings_dir in recording_read_dirs(runtime):
+        if not recordings_dir.exists():
             continue
-        if not events:
-            continue
-        wf_type = (
-            events[0].get("workflow_type")
-            or events[0].get("workflowType")
-            or "unknown"
-        )
-        templates.append({
-            "workflow_type": wf_type,
-            "events": events,
-            "deltas_ms": deltas_ms,
-            "source": "recorded",
-            "filename": path.name,
-        })
+        for path in sorted(recordings_dir.glob("*.jsonl")):
+            events: list[dict[str, Any]] = []
+            deltas_ms: list[int] = []
+            prev_offset: int | None = None
+            try:
+                with path.open("r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        entry = json.loads(line)
+                        offset = int(entry.get("ts_offset_ms", 0))
+                        events.append(entry["event"])
+                        if prev_offset is None:
+                            deltas_ms.append(0)
+                        else:
+                            deltas_ms.append(max(0, offset - prev_offset))
+                        prev_offset = offset
+            except (OSError, ValueError, KeyError) as error:
+                raise ValueError(
+                    f"invalid Blueprint recording {path}: {error}"
+                ) from error
+            if not events:
+                continue
+            workflow_type = (
+                events[0].get("workflow_type")
+                or events[0].get("workflowType")
+                or "unknown"
+            )
+            if workflow_type not in runtime.pack.domains:
+                raise ValueError(
+                    f"recording workflow {workflow_type!r} is not in active "
+                    f"vertical {runtime.pack.name!r}: {path.name}"
+                )
+            workflow_id = (
+                events[0].get("workflow_id")
+                or events[0].get("workflowId")
+            )
+            key = (path.name, workflow_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            templates.append({
+                "workflow_type": workflow_type,
+                "events": events,
+                "deltas_ms": deltas_ms,
+                "source": "recorded",
+                "filename": path.name,
+            })
     return templates
