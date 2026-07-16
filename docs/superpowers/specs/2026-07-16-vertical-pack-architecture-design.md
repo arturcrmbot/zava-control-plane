@@ -170,8 +170,9 @@ class VerticalPack:
     display_name: str
     manifest_version: str
     domains: Mapping[str, Domain]
+    organisation_functions: Mapping[str, OrganisationFunction]
     agents: Mapping[str, AgentRegistryEntry]
-    functions: FunctionRegistration
+    durable_functions: DurableFunctionRegistration
     personae_roots: tuple[Path, ...]
     skill_roots: tuple[Path, ...]
     mcp_modules: tuple[str, ...]
@@ -220,7 +221,7 @@ reviewable registry change.
 
 ### 6.2 Function registration
 
-`FunctionRegistration` declares:
+`DurableFunctionRegistration` declares:
 
 - a callable that decorates an existing `df.DFApp`
 - the orchestrator names it registers
@@ -318,6 +319,9 @@ No consumer reparses the environment.
 
 The `Domain`, `Phase`, `HitlGate`, `RegionOverlay`, and `WakeHint` types move to
 `domain_contracts.py`. Agency and Telco each build their own domain mapping.
+The organisational `Function` and `PersonaTree` types move to
+`function_contracts.py`; each pack declares the business functions that own its
+domains.
 
 `api/shared/domains.py` remains temporarily as a compatibility adapter:
 
@@ -328,6 +332,12 @@ The `Domain`, `Phase`, `HitlGate`, `RegionOverlay`, and `WakeHint` types move to
 
 Function back-references are wired while building the selected pack. There is
 no boot-time mutation across one global domain dictionary.
+
+`api/shared/functions.py` follows the same compatibility pattern as
+`api/shared/domains.py`: it re-exports contract types and exposes only the
+active pack's organisational function mapping. It does not register Azure
+Functions; that is the separate `durable_functions` field and Functions
+composition root described in section 6.2.
 
 ### 9.2 Agents, personae, and governance
 
