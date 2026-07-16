@@ -2,6 +2,7 @@ import json
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from api.server.routes.compose import router
+from api.shared.vertical_loader import active_runtime
 
 
 def _app() -> FastAPI:
@@ -11,7 +12,7 @@ def _app() -> FastAPI:
 
 
 def _write_tape(tmp_path):
-    d = tmp_path / "data" / "compose-recordings"
+    d = tmp_path / "agency" / "compose-recordings"
     d.mkdir(parents=True)
     p = d / "capex-approval-20260101T000000.jsonl"
     p.write_text("\n".join(json.dumps(e) for e in [
@@ -23,6 +24,8 @@ def _write_tape(tmp_path):
 
 def test_list_and_replay(tmp_path, monkeypatch):
     monkeypatch.setenv("ZAVA_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("ZAVA_DATA_DIR", str(tmp_path))
+    active_runtime.cache_clear()
     (tmp_path / ".poc-safety").write_text("POC_UNSAFE_FOR_PUBLIC_DEPLOY=1\n")
     name = _write_tape(tmp_path)
     client = TestClient(_app())
@@ -46,3 +49,4 @@ def test_list_and_replay(tmp_path, monkeypatch):
                     break
     assert any(e["type"] == "thought" for e in events)
     assert any(e.get("type") == "done" for e in events)
+    active_runtime.cache_clear()
