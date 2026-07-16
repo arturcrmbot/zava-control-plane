@@ -1,7 +1,17 @@
-from api.shared.functions import Function, PersonaTree
+"""verticals/telco/functions.py — Telco organisational function registry.
+
+Canonical Telco ``Function`` declarations. The Telco pack owns exactly two
+business functions: ``network-operations`` (network-incident +
+order-to-activate) and ``customer-success`` (proactive-customer-care).
+Agency's functions live in ``verticals/agency/functions.py`` and are never
+imported here.
+"""
+from __future__ import annotations
+
+from api.shared.function_contracts import Function, PersonaTree
 
 
-TELCO_FUNCTIONS = {
+TELCO_FUNCTIONS: dict[str, Function] = {
     "network-operations": Function(
         name="network-operations",
         display="Network Operations",

@@ -9,6 +9,7 @@ from api.shared.agent_contracts import AgentRegistryEntry
 from api.shared.authority_contracts import AuthorityRow
 from api.shared.domain_contracts import Domain
 from api.shared.function_contracts import Function
+from api.shared.persona_contracts import Persona
 from api.shared.projection_contracts import ProjectionFn
 from api.shared.world_contracts import WorldPackRegistration
 
@@ -59,6 +60,7 @@ class VerticalPack:
     organisation_functions: Mapping[str, Function]
     agents: Mapping[str, AgentRegistryEntry]
     authority: Mapping[str, AuthorityRow]
+    personas: Mapping[str, Persona]
     policy_sources: tuple[Path, ...]
     durable_functions: DurableFunctionRegistration
     personae_roots: tuple[Path, ...]

@@ -41,6 +41,7 @@ def make_test_pack(name: str, root: Path) -> VerticalPack:
         organisation_functions={},
         agents={},
         authority={},
+        personas={},
         policy_sources=(),
         durable_functions=DurableFunctionRegistration(
             load_module=lambda: None,
