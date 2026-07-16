@@ -24,11 +24,49 @@ PACK_MODULES = {
 LEGACY_WORLD_OWNERS = {"support": "agency", "telco": "telco"}
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SKILL_NAME = re.compile(r"^name:\s*[\"']?([^\"'\n]+)", re.MULTILINE)
+_FRONTMATTER = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
+_DEFINE_TOOL_NAME = re.compile(
+    r"@define_tool\s*\(\s*[^)]*?name\s*=\s*[\"']"
+    r"([A-Za-z0-9_.-]+)[\"']",
+    re.DOTALL,
+)
 
 
 def _normalise(value: str | None) -> str | None:
     cleaned = value.strip().lower() if value is not None else ""
     return cleaned or None
+
+
+def _normalise_capability(value: str) -> str:
+    return value.strip().lower().replace(".", "_").replace("-", "_")
+
+
+def _skill_allowed_tools(text: str) -> tuple[str, ...]:
+    match = _FRONTMATTER.match(text)
+    if match is None:
+        return ()
+    values: list[str] = []
+    collecting = False
+    for line in match.group(1).splitlines():
+        if line.startswith((" ", "\t")) and collecting:
+            values.append(line.strip())
+            continue
+        collecting = False
+        if ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        if key.strip() == "allowed-tools":
+            collecting = True
+            if value.strip():
+                values.append(value.strip())
+    tools: list[str] = []
+    for value in values:
+        for item in value.replace("\n", ",").split(","):
+            cleaned = item.strip().strip("\"'")
+            cleaned = re.sub(r"^[-\s]+", "", cleaned)
+            if cleaned:
+                tools.append(cleaned)
+    return tuple(tools)
 
 
 def select_vertical(environment: Mapping[str, str]) -> tuple[str, str | None]:
@@ -75,6 +113,10 @@ def freeze_pack(pack: VerticalPack) -> VerticalPack:
         pack.ui,
         theme=_freeze_mapping(pack.ui.theme),
         phase_aliases=_freeze_mapping(phase_aliases),
+        supplemental_domains=tuple(
+            _freeze_mapping(domain)
+            for domain in pack.ui.supplemental_domains
+        ),
     )
     return replace(
         pack,
@@ -190,16 +232,20 @@ def validate_pack(pack: VerticalPack) -> None:
         )
 
     skill_names: set[str] = set()
+    skill_tools: dict[str, tuple[str, ...]] = {}
     for root in pack.skill_roots:
         if not root.is_dir():
             raise ValueError(
                 f"vertical {pack.name!r} has missing skill root {str(root)!r}"
             )
         for skill_file in root.glob("*/SKILL.md"):
-            match = _SKILL_NAME.search(skill_file.read_text(encoding="utf-8"))
-            skill_names.add(
+            text = skill_file.read_text(encoding="utf-8")
+            match = _SKILL_NAME.search(text)
+            skill_name = (
                 match.group(1).strip() if match else skill_file.parent.name
             )
+            skill_names.add(skill_name)
+            skill_tools[skill_name] = _skill_allowed_tools(text)
     for domain in pack.domains.values():
         for skill_name in domain.skills:
             if skill_name not in skill_names:
@@ -225,6 +271,8 @@ def validate_pack(pack: VerticalPack) -> None:
     for function_name, function in pack.organisation_functions.items():
         validate_persona(function.persona_hierarchy, function_name)
 
+    registered_operations: set[str] = set()
+    module_stems: set[str] = set()
     for module_name in pack.mcp_modules:
         module_path = _REPO_ROOT.joinpath(*module_name.split(".")).with_suffix(
             ".py"
@@ -234,6 +282,33 @@ def validate_pack(pack: VerticalPack) -> None:
                 f"vertical {pack.name!r} has missing MCP module "
                 f"{module_name!r}"
             )
+        module_stems.add(_normalise_capability(module_path.stem))
+        registered_operations.update(
+            _normalise_capability(operation)
+            for operation in _DEFINE_TOOL_NAME.findall(
+                module_path.read_text(encoding="utf-8")
+            )
+        )
+    external_capabilities = {
+        _normalise_capability(capability)
+        for capability in pack.external_capabilities
+    }
+    for skill_name, allowed_tools in skill_tools.items():
+        for tool_name in allowed_tools:
+            normalised = _normalise_capability(tool_name)
+            resolves_to_module = any(
+                normalised == stem or normalised.startswith(stem + "_")
+                for stem in module_stems
+            )
+            if (
+                normalised not in registered_operations
+                and normalised not in external_capabilities
+                and not resolves_to_module
+            ):
+                raise ValueError(
+                    f"vertical {pack.name!r} skill {skill_name!r} "
+                    f"references unresolved tool {tool_name!r}"
+                )
 
     for policy_path in pack.policy_sources:
         if not policy_path.is_file():

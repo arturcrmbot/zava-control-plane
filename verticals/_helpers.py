@@ -45,6 +45,7 @@ def load_ui_manifest(path: Path) -> VerticalUiManifest:
         "lenses",
         "theme",
         "phase_aliases",
+        "supplemental_domains",
         "aspirational_domains",
         "include_meta_skills",
     }
@@ -56,6 +57,7 @@ def load_ui_manifest(path: Path) -> VerticalUiManifest:
         lenses=tuple(data["lenses"]),
         theme=data["theme"],
         phase_aliases=data["phase_aliases"],
+        supplemental_domains=tuple(data.get("supplemental_domains", ())),
         aspirational_domains=tuple(data.get("aspirational_domains", ())),
         include_meta_skills=bool(data.get("include_meta_skills", False)),
     )

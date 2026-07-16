@@ -235,3 +235,35 @@ def test_validation_rejects_missing_policy_and_foreign_recording(tmp_path) -> No
                 ),
             )
         )
+
+
+def test_validation_rejects_unresolved_skill_tool(tmp_path) -> None:
+    skills = tmp_path / "skills"
+    skill_dir = skills / "demo-skill"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\n"
+        "name: demo-skill\n"
+        "description: demo\n"
+        "allowed-tools: missing_tool\n"
+        "---\n",
+        encoding="utf-8",
+    )
+    pack = _pack_with_domain(tmp_path)
+    pack = replace(
+        pack,
+        domains={
+            "demo": replace(_domain(), skills=("demo-skill",))
+        },
+        skill_roots=(skills,),
+    )
+
+    with pytest.raises(ValueError, match="unresolved tool 'missing_tool'"):
+        validate_pack(pack)
+
+    validate_pack(
+        replace(
+            pack,
+            external_capabilities=frozenset({"missing_tool"}),
+        )
+    )
