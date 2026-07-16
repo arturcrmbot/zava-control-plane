@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from importlib import import_module
 from pathlib import Path
 
 from api.shared.vertical_pack import (
@@ -22,10 +23,8 @@ from verticals.telco.worlds import TELCO_WORLDS
 PACK_ROOT = Path(__file__).resolve().parent
 
 
-def _register_durable(app) -> None:
-    from verticals.telco.durable import register
-
-    register(app)
+def _load_durable_module():
+    return import_module("verticals.telco.durable")
 
 
 def build_pack() -> VerticalPack:
@@ -44,11 +43,21 @@ def build_pack() -> VerticalPack:
         authority=TELCO_AUTHORITY,
         policy_sources=(PACK_ROOT / "policies" / "tools.yaml",),
         durable_functions=DurableFunctionRegistration(
-            register=_register_durable,
+            load_module=_load_durable_module,
             orchestrators=frozenset(
                 domain.orchestrator_name for domain in domains.values()
             ),
-            activities=frozenset(),
+            activities=frozenset(
+                {
+                    "network_incident_impact_activity_trigger",
+                    "network_incident_reroute_activity_trigger",
+                    "customer_care_impact_activity_trigger",
+                    "customer_care_entitlement_activity_trigger",
+                    "customer_care_execution_activity_trigger",
+                    "order_activation_feasibility_activity_trigger",
+                    "order_activation_prepare_activity_trigger",
+                }
+            ),
         ),
         personae_roots=(PACK_ROOT / "personae",),
         skill_roots=(PACK_ROOT / "skills",),

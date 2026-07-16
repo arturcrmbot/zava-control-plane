@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from importlib import import_module
 from pathlib import Path
 
 from api.shared.vertical_pack import (
@@ -50,10 +51,8 @@ AGENCY_EXTERNAL_CAPABILITIES = frozenset(
 )
 
 
-def _register_durable(app) -> None:
-    from verticals.agency.durable import register
-
-    register(app)
+def _load_durable_module():
+    return import_module("verticals.agency.durable")
 
 
 def _mcp_modules() -> tuple[str, ...]:
@@ -87,7 +86,7 @@ def build_pack() -> VerticalPack:
         authority=AGENCY_AUTHORITY,
         policy_sources=(REPO_ROOT / "data" / "policies" / "tools.yaml",),
         durable_functions=DurableFunctionRegistration(
-            register=_register_durable,
+            load_module=_load_durable_module,
             orchestrators=frozenset(orchestrators),
             activities=frozenset(),
         ),

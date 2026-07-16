@@ -43,7 +43,7 @@ def make_test_pack(name: str, root: Path) -> VerticalPack:
         authority={},
         policy_sources=(),
         durable_functions=DurableFunctionRegistration(
-            register=lambda _app: None,
+            load_module=lambda: None,
             orchestrators=frozenset(),
             activities=frozenset(),
         ),

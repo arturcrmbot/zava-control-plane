@@ -53,6 +53,17 @@ def test_world_registration_declares_named_scales_and_responders() -> None:
     assert world.responders == {}
 
 
+def test_durable_registration_loads_the_selected_module_lazily() -> None:
+    marker = object()
+    registration = DurableFunctionRegistration(
+        load_module=lambda: marker,
+        orchestrators=frozenset(),
+        activities=frozenset(),
+    )
+
+    assert registration.load_module() is marker
+
+
 def _domain() -> Domain:
     return Domain(
         workflow_type="demo",
@@ -84,7 +95,7 @@ def _pack_with_domain(tmp_path):
         domains={"demo": _domain()},
         organisation_functions={"ops": _function("demo")},
         durable_functions=DurableFunctionRegistration(
-            register=lambda _app: None,
+            load_module=lambda: None,
             orchestrators=frozenset({"DemoOrchestrator"}),
             activities=frozenset(),
         ),
@@ -112,7 +123,7 @@ def test_validation_rejects_missing_domain_orchestrator(tmp_path) -> None:
     pack = replace(
         pack,
         durable_functions=DurableFunctionRegistration(
-            register=lambda _app: None,
+            load_module=lambda: None,
             orchestrators=frozenset(),
             activities=frozenset(),
         ),

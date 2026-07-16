@@ -45,25 +45,31 @@ def test_every_persona_has_skill_md():
             )
 
 
-def test_orchestrator_names_resolve():
-    """Every Domain.orchestrator_name must be a decorated orchestrator
-    in function_app.py. Parsed via simple text scan to avoid importing
-    the Functions worker module (which depends on Azure runtime).
+def test_agency_orchestrator_names_are_declared_by_pack():
+    from api.shared.vertical_loader import active_runtime
 
-    Stub Domains (Phase 4 IP5+6 — meta-workflow/strategic shells whose
-    orchestrators are codegen'd but not yet registered in
-    function_app.py) are skipped.
-    """
-    fa = (REPO_ROOT / "function_app.py").read_text(encoding="utf-8")
+    registered = active_runtime().pack.durable_functions.orchestrators
     for wt, d in registry.DOMAINS.items():
         if getattr(d, "stub", False):
             continue
-        # Match the decorator pattern `def <orchestrator_name>(`
-        token = f"def {d.orchestrator_name}("
-        assert token in fa, (
-            f"{wt}: orchestrator_name={d.orchestrator_name!r} not found "
-            f"in function_app.py"
+        assert d.orchestrator_name in registered, (
+            f"{wt}: orchestrator_name={d.orchestrator_name!r} not declared "
+            "by the Agency pack"
         )
+
+
+def test_telco_orchestrator_names_are_declared_by_pack(tmp_path):
+    from api.shared.vertical_loader import build_runtime
+
+    runtime = build_runtime(
+        {"ZAVA_VERTICAL": "telco"},
+        data_root=tmp_path,
+    )
+    registered = runtime.pack.durable_functions.orchestrators
+    assert {
+        domain.orchestrator_name
+        for domain in runtime.pack.domains.values()
+    } <= registered
 
 
 def test_resolve_external_event_round_trip():
