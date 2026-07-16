@@ -60,9 +60,10 @@ import yaml
 
 from api.server.services.durable_client import raise_orchestration_event
 from api.shared.events import FleetEvent
+from api.shared.vertical_loader import active_runtime
 
 
-PERSONAE_DIR = Path(__file__).resolve().parents[2] / "server" / "personae"
+PERSONAE_DIR = active_runtime().pack.personae_roots[0]
 
 # A persona handler takes the parked context dict and returns the resolving
 # event payload (e.g. {"decision": "approve", "reason": "in-policy + low band"}).

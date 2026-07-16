@@ -44,6 +44,25 @@ You are invoked one of two ways:
 2. **With a free-text idea.** "Compose a new domain for X." Run step 1 to
    produce the brief, then continue.
 
+### Vertical target
+
+Every run targets one vertical: explicit `vertical=<name>`, otherwise the
+active `ZAVA_VERTICAL`, otherwise `agency`. Sandbox paths retain their legacy
+shape for generator compatibility, but graduation maps business assets to:
+
+```text
+verticals/<vertical>/skills/
+verticals/<vertical>/personae/
+verticals/<vertical>/mcp_tools/
+verticals/<vertical>/entity_projections/
+verticals/<vertical>/domains.py
+verticals/<vertical>/functions.py
+```
+
+Workflow implementation modules may remain under `api/functions/`; only the
+selected pack's Durable module registers them. Never graduate a Telco asset
+into an Agency-owned legacy root.
+
 ## Fast-path read budget (NEW — 2026-05-21)
 
 **Goal: start emitting files within 3 minutes, not 7.** This skill historically

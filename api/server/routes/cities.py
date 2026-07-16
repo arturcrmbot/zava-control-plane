@@ -24,10 +24,19 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query
 
 from api.server.services.read_route_auth import Actor, require_actor
+from api.shared.personas import PERSONAS
+from api.shared.vertical_loader import active_runtime
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-SKILLS_DIR = REPO_ROOT / "api" / "server" / "skills"
-MCP_TOOLS_DIR = REPO_ROOT / "api" / "server" / "mcp_tools"
+_RUNTIME = active_runtime()
+SKILLS_DIR = _RUNTIME.pack.skill_roots[0]
+MCP_TOOL_PATHS = {
+    module_name.rsplit(".", 1)[-1]: REPO_ROOT.joinpath(
+        *module_name.split(".")
+    ).with_suffix(".py")
+    for module_name in _RUNTIME.pack.mcp_modules
+}
+PERSONAE_ROOTS = _RUNTIME.pack.personae_roots
 
 
 # Real entity-graph kinds enumerated when listing cities in entity-mode.
@@ -92,14 +101,7 @@ def _gather_skills() -> list[dict[str, str]]:
 
 def _gather_mcp_tools() -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
-    if not MCP_TOOLS_DIR.exists():
-        return out
-    for child in sorted(MCP_TOOLS_DIR.iterdir()):
-        if not child.is_file() or child.suffix != ".py":
-            continue
-        if child.name.startswith("_") or child.name == "__init__.py":
-            continue
-        name = child.stem
+    for name in sorted(MCP_TOOL_PATHS):
         out.append({
             "id": name,
             "kind": "mcp",
@@ -110,33 +112,9 @@ def _gather_mcp_tools() -> list[dict[str, str]]:
 
 
 def _gather_personas() -> list[dict[str, str]]:
-    canonical = [
-        "ap_clerk", "controller", "cfo", "treasurer", "fpa_analyst", "finance_bp",
-        "category_manager", "vendor_owner",
-        "recruiter", "hiring_manager", "interviewer", "candidate", "people_partner",
-        "line_manager", "talent_lead",
-        "legal_counsel", "compliance_officer",
-        "ceo", "coo", "cmo", "cto", "cdo", "chro", "general_counsel",
-        "creative_director", "brand_steward", "campaign_manager", "account_director",
-        "policy_owner", "support_lead",
-    ]
-    # Authoritative source: the persona_responder loads every SKILL.md
-    # under api/server/personae/ at boot. Use that. The hardcoded canonical
-    # list is only a fallback for tests / stripped-down environments where
-    # the responder hasn't been attached.
-    try:
-        from api.server.services import persona_responder
-        roles = sorted(persona_responder.PERSONA_DEFINITIONS.keys())
-        if roles:
-            return [
-                {"id": role, "kind": "persona", "label": role, "category": "persona"}
-                for role in roles
-            ]
-    except Exception:
-        pass
     return [
         {"id": role, "kind": "persona", "label": role, "category": "persona"}
-        for role in canonical
+        for role in sorted(PERSONAS)
     ]
 
 
@@ -167,10 +145,8 @@ def _read_skill_description(skill_id: str) -> str | None:
 
 def _read_mcp_description(mcp_id: str) -> str | None:
     """Pull the first paragraph of the module docstring from `mcp_tools/<id>.py`."""
-    if not MCP_TOOLS_DIR.exists():
-        return None
-    py = MCP_TOOLS_DIR / f"{mcp_id}.py"
-    if not py.exists():
+    py = MCP_TOOL_PATHS.get(mcp_id)
+    if py is None or not py.exists():
         return None
     try:
         text = py.read_text()
@@ -186,9 +162,15 @@ def _read_mcp_description(mcp_id: str) -> str | None:
 
 def _read_persona_description(role: str) -> str | None:
     """Pull `description:` from the matching persona SKILL.md frontmatter."""
-    personae_dir = REPO_ROOT / "api" / "server" / "personae" / role
-    skill_md = personae_dir / "SKILL.md"
-    if not skill_md.exists():
+    skill_md = next(
+        (
+            root / role / "SKILL.md"
+            for root in PERSONAE_ROOTS
+            if (root / role / "SKILL.md").exists()
+        ),
+        None,
+    )
+    if skill_md is None:
         return None
     try:
         text = skill_md.read_text()

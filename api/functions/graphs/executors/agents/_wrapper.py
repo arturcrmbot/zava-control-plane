@@ -35,12 +35,15 @@ from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 
 from api.server.state import app_state
-from api.shared.events import FleetEvent
 from api.server.services.governance.permission_handler import AGTPermissionHandler
 from api.functions.graphs.executors.agents.runtime import _get_runtime, LLMRuntimeResult
 
 
-_SKILLS_DIR = Path(__file__).resolve().parents[4] / "server" / "skills"
+if len(app_state.runtime.pack.skill_roots) != 1:
+    raise RuntimeError(
+        f"vertical {app_state.runtime.pack.name!r} must declare one skill root"
+    )
+_SKILLS_DIR = app_state.runtime.pack.skill_roots[0]
 SKILLS_DIR = _SKILLS_DIR
 _tracer = trace.get_tracer("zava.agents.finance")
 _MAX_RESPONSE_EVENT_BYTES = 4096

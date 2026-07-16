@@ -9,12 +9,15 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from api.shared.compose_config import repo_root
+from api.shared.vertical_pack import VerticalRuntime
 
 
-def _dir() -> Path:
-    d = repo_root() / "data" / "compose-recordings"
-    return d
+def _dir(runtime: VerticalRuntime | None = None) -> Path:
+    if runtime is None:
+        from api.shared.vertical_loader import active_runtime
+
+        runtime = active_runtime()
+    return runtime.data_dir / "compose-recordings"
 
 
 def save_tape(session, workflow_type: str) -> Path:
