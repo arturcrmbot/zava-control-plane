@@ -171,7 +171,7 @@ async def test_lifespan_replay_starts_player_without_simulator(
     tape_path = _build_tape(tmp_path)
     ramp_calls = 0
 
-    async def fake_ramp_loop() -> None:
+    async def fake_ramp_loop(_runtime=None) -> None:
         nonlocal ramp_calls
         ramp_calls += 1
 
@@ -263,7 +263,7 @@ async def test_lifespan_live_mode_does_not_set_player(
     async def fake_fm_stop() -> None:
         return None
 
-    async def fake_ramp_loop() -> None:
+    async def fake_ramp_loop(_runtime=None) -> None:
         calls["ramp"] += 1
         try:
             await asyncio.Future()

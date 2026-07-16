@@ -307,3 +307,29 @@ def test_import_smoke_agency_vertical() -> None:
 
 def test_import_smoke_telco_vertical() -> None:
     _import_smoke("telco")
+
+
+def test_telco_server_imports_no_agency_ambient_modules(tmp_path) -> None:
+    environment = os.environ.copy()
+    environment["ZAVA_VERTICAL"] = "telco"
+    environment["ENTITY_PLANE_ENABLED"] = "0"
+    environment["PORTAL_DATA_DIR"] = str(tmp_path)
+    script = """
+import json
+import sys
+import api.server.main
+print(json.dumps(sorted(
+    name for name in sys.modules
+    if name.startswith("api.server.services.ambient_agents")
+)))
+"""
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert json.loads(result.stdout.splitlines()[-1]) == []

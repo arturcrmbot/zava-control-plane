@@ -105,88 +105,6 @@ async def lifespan(app: FastAPI):
             raise
         return
 
-    try:
-        if runtime.pack.name == "agency":
-            await app_state.fm.start()
-    except Exception as ex:
-        print(f"[server] Fleet Manager failed to start: {ex}")
-    # Phase 3 IP6 — start the ambient dispatcher inside the lifespan so
-    # cypher sweep loops are scheduled on the running event loop.
-    try:
-        if runtime.pack.name == "agency" and hasattr(app_state, "ambient_dispatcher"):
-            app_state.ambient_dispatcher.start()
-    except Exception as ex:
-        print(f"[server] Ambient dispatcher failed to start: {ex}")
-    # pitch-h1 / pitch-h2 cross-domain entanglement watchers — see
-    # plan/feature-enterprise-pitch-readiness-1.md Track H. They need the
-    # entity graph (vendor / brand lookups) so we skip wiring when the
-    # entity plane is disabled (e.g. the Functions worker side of a
-    # multi-process boot).
-    from api.server.services.ambient_agents import (
-        brand_budget_watcher,
-        vendor_block_watcher,
-        subsidiary_capacity_watcher,
-        trend_cadence_watcher,
-        auto_block_rule_learner,
-        kpi_history_recorder,
-        story_pack_writer,
-    )
-    try:
-        if runtime.pack.name == "agency" and hasattr(app_state, "entities"):
-            vendor_block_watcher.start(app_state.bus, app_state.entities)
-            brand_budget_watcher.start(app_state.bus, app_state.entities)
-    except Exception as ex:
-        print(f"[server] entanglement watchers failed to start: {ex}")
-    # pitch-h4: subsidiary capacity watcher. Reads in-flight workflow
-    # counts from the StateStore (no entity-graph dependency) so it can
-    # boot even when the entity plane is disabled.
-    try:
-        if runtime.pack.name == "agency":
-            subsidiary_capacity_watcher.start(app_state.bus, app_state.store)
-    except Exception as ex:
-        print(f"[server] subsidiary_capacity_watcher failed to start: {ex}")
-    # pitch-i2: auto-block rule learner. Subscribes to decision.recorded
-    # and installs a permanent precedent after 3 KYC rejections per
-    # vendor. Wired regardless of the entity plane — falls back to the
-    # in-memory ledger when ``entities`` is absent.
-    try:
-        if runtime.pack.name == "agency":
-            auto_block_rule_learner.start(
-                app_state.bus, getattr(app_state, "entities", None)
-            )
-    except Exception as ex:
-        print(f"[server] auto_block_rule_learner failed to start: {ex}")
-    # pitch-i5: KPI-trend-driven cadence triggers. Provisional in-memory
-    # ring buffer (kpi_trend_buffer); J1 will replace with the durable
-    # KPI history series. Mirrors the H1/H2 module-singleton pattern so
-    # uvicorn --reload cycles don't accumulate tick loops.
-    try:
-        if runtime.pack.name == "agency":
-            trend_cadence_watcher.start(bus=app_state.bus)
-    except Exception as ex:
-        print(f"[server] trend_cadence_watcher failed to start: {ex}")
-    # pitch-j5: hourly story-pack writer. Idempotent on the (hour, hour+1)
-    # key so a tick storm at boot can't duplicate a file.
-    try:
-        if runtime.pack.name == "agency":
-            story_pack_writer.start(
-                base_dir=app_state.data_dir / "snapshots"
-            )
-    except Exception as ex:
-        print(f"[server] story_pack_writer failed to start: {ex}")
-    # pitch-j1: KPI history recorder. Per-minute snapshot of agency KPIs
-    # (and, via J2, per-persona load) into the durable kpi_history SQLite
-    # ring. Module-singleton pattern matches the trend watcher above.
-    try:
-        if runtime.pack.name == "agency":
-            from api.server.services import kpi_history
-
-            kpi_history.set_db_path(
-                app_state.data_dir / "kpi_history.sqlite"
-            )
-            kpi_history_recorder.start()
-    except Exception as ex:
-        print(f"[server] kpi_history_recorder failed to start: {ex}")
     # Start the simulator ramp loop (spawns workflows via the AF Durable host)
     ramp_task = asyncio.create_task(
         simulator_orchestrator.ramp_loop(runtime)
@@ -317,26 +235,6 @@ async def lifespan(app: FastAPI):
     else:
         seed_task = asyncio.create_task(asyncio.sleep(0))
 
-    # pitch-h5 (entanglement) — TalentTransferCascade bridges
-    # ``intercompany-talent-transfer`` completions into four child
-    # ``workflow.sub_spawned`` events + Person-OWNS-Asset reassignment so
-    # the cosmic lens animates the cross-domain ripple.
-    _ttc_off = None
-    if runtime.pack.name == "agency":
-        try:
-            from api.server.services.ambient_agents.talent_transfer_cascade import (
-                TalentTransferCascade,
-            )
-            app_state.talent_transfer_cascade = TalentTransferCascade(
-                bus=app_state.bus,
-                audit=getattr(app_state, "audit", None),
-                graph=getattr(app_state, "entities", None),
-            )
-            app_state.talent_transfer_cascade.start()
-            _ttc_off = app_state.talent_transfer_cascade.aclose
-        except Exception as ex:
-            print(f"[server] TalentTransferCascade failed to start: {ex}")
-
     # Wire bus -> hub fan-out inside the lifespan so each app instance owns
     # exactly one subscription. Previously this lived at module import time,
     # which under uvicorn --reload accumulated a fresh subscription per
@@ -430,11 +328,6 @@ async def lifespan(app: FastAPI):
             _bus_to_hub_off()
         except Exception:
             pass
-        if _ttc_off is not None:
-            try:
-                _ttc_off()
-            except Exception:
-                pass
         ramp_task.cancel()
         seed_task.cancel()
         if dream_cadence_task is not None:
@@ -471,38 +364,6 @@ async def lifespan(app: FastAPI):
             pass
         try:
             _persona_responder_off()
-        except Exception:
-            pass
-        try:
-            vendor_block_watcher.stop()
-        except Exception:
-            pass
-        try:
-            brand_budget_watcher.stop()
-        except Exception:
-            pass
-        try:
-            subsidiary_capacity_watcher.stop()
-        except Exception:
-            pass
-        try:
-            auto_block_rule_learner.stop()
-        except Exception:
-            pass
-        try:
-            trend_cadence_watcher.stop()
-        except Exception:
-            pass
-        try:
-            story_pack_writer.stop()
-        except Exception:
-            pass
-        try:
-            kpi_history_recorder.stop()
-        except Exception:
-            pass
-        try:
-            await app_state.fm.stop()
         except Exception:
             pass
         try:
@@ -584,7 +445,6 @@ from api.server.routes.entities import router as entities_router
 # Phase 2 — accounts substrate.
 from api.server.routes.accounts import router as accounts_router
 from api.server.routes.functions import router as functions_router
-from api.server.routes.functions_ambient import router as functions_ambient_router
 from api.server.routes.cadences import router as cadences_router
 # Cosmic Lens v2 — capabilities/entities city roster + affinity for the new viz
 from api.server.routes.cities import router as cities_router
@@ -620,7 +480,7 @@ from api.server.routes.world import router as world_router
 from api.server.routes.runtime import router as runtime_router
 # Per-lesson observability — D1.
 
-for r in (stream_router, workflows_router, exceptions_router, policy_router,
+routers = [stream_router, workflows_router, exceptions_router, policy_router,
           simulator_router, audit_router, evals_router, orchestration_router,
           durable_event_router, fleet_router, accuracy_router, policy_md_router,
           receipts_router, creative_campaign_assets_router,
@@ -635,7 +495,6 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           entities_router,
           accounts_router,
           functions_router,
-          functions_ambient_router,
           cadences_router,
           cities_router,
           kpis_router,
@@ -655,7 +514,14 @@ for r in (stream_router, workflows_router, exceptions_router, policy_router,
           workflow_agui_router,
           compose_router,
           world_router,
-          runtime_router):
+          runtime_router]
+
+if app_state.runtime.pack.name == "agency":
+    from api.server.routes.functions_ambient import router as functions_ambient_router
+
+    routers.append(functions_ambient_router)
+
+for r in routers:
     app.include_router(r)
 
 app.mount("/api/compose/mcp", compose_mcp.streamable_http_app())
