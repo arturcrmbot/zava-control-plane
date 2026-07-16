@@ -24,7 +24,6 @@ from api.functions.workflows.activities import (
     notify_activity,
     arbitrate_activity,
     audit_activity,
-    checkpoint_activity,
     # POC2 hiring spine — budget + voice + interview-coordination
     # activities. The per-phase Job Design / Sourcing / Triage /
     # Screening / Compliance / Offer / Onboarding / Interview-Recommender
@@ -102,11 +101,6 @@ def arbitrate_activity_trigger(payload: dict) -> dict:
 @app.activity_trigger(input_name="payload")
 def audit_activity_trigger(payload: dict) -> dict:
     return audit_activity(payload)
-
-
-@app.activity_trigger(input_name="payload")
-def checkpoint_activity_trigger(payload: dict) -> dict:
-    return checkpoint_activity(payload)
 
 
 # --- POC2 hiring activity triggers ---------------------------------------
