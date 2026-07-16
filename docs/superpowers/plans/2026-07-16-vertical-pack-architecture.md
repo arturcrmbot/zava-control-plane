@@ -43,9 +43,11 @@ Validated boundaries:
 
 ---
 
-## Remaining
+## Completion record
 
 ### Task A: Finish runtime-driven UI
+
+**Status:** Complete in `ee215533`, `67de5141`, `a0bfe035`, and `956cc553`.
 
 **Files:**
 
@@ -110,6 +112,18 @@ git diff --check
 Commit: `refactor(verticals): remove global fallbacks`
 
 ### Task C: Prove and hand off
+
+**Status:** Complete.
+
+- focused Python: 199 passed / 1 skipped and 227 passed
+- changed frontend: 51 passed
+- Control Plane and Blueprint Vite builds: passed
+- Agency support browser proof: passed with zero console/page errors
+- Telco live proof: passed across network, care, happy order, HITL order,
+  Memory, Knowledge, AG-UI, graph, Control Plane, and Constellation
+- Telco replay-only proof: passed for all three Telco workflow types with
+  Functions unreachable, actor world disabled, and zero browser errors
+- all isolated proof ports released
 
 1. Run focused Python and Vitest suites.
 2. Build Control Plane and Blueprint.
