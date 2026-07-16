@@ -172,6 +172,8 @@ class VerticalPack:
     domains: Mapping[str, Domain]
     organisation_functions: Mapping[str, OrganisationFunction]
     agents: Mapping[str, AgentRegistryEntry]
+    authority: Mapping[str, AuthorityRow]
+    policy_sources: tuple[Path, ...]
     durable_functions: DurableFunctionRegistration
     personae_roots: tuple[Path, ...]
     skill_roots: tuple[Path, ...]
@@ -341,12 +343,13 @@ composition root described in section 6.2.
 
 ### 9.2 Agents, personae, and governance
 
-`AgentRegistryEntry` moves to `agent_contracts.py`. Each pack owns its business
-agent mapping and persona roots. Governance enforcement remains shared and is
-initialised with:
+`AgentRegistryEntry` moves to `agent_contracts.py`. `AuthorityRow` moves to
+`authority_contracts.py`. Each pack owns its business-agent mapping, delegated
+authority rows, policy sources, and persona roots. Governance enforcement
+remains shared and is initialised with:
 
 ```text
-kernel identities + active pack identities
+kernel identities/safety policy + active pack identities/authority/policy
 ```
 
 The inactive pack contributes nothing to the authority graph, capability
