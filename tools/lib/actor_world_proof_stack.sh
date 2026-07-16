@@ -79,7 +79,7 @@ kill_tree() {
   [ -n "$pids" ] || return 0
   log "stopping $label (pids: $(echo "$pids" | tr '\n' ' '))"
   local p
-  for p in $pids; do kill -TERM "$p" 2>/dev/null; done
+  for p in $pids; do kill -TERM "$p" 2>/dev/null || true; done
   local waited
   for waited in $(seq 1 20); do
     local alive=""
@@ -87,7 +87,11 @@ kill_tree() {
     [ -z "$alive" ] && return 0
     sleep 0.5
   done
-  for p in $pids; do kill -0 "$p" 2>/dev/null && kill -KILL "$p" 2>/dev/null; done
+  for p in $pids; do
+    if kill -0 "$p" 2>/dev/null; then
+      kill -KILL "$p" 2>/dev/null || true
+    fi
+  done
 }
 
 # preflight_ports PORT...  — abort (exit 2) if any given port is already bound.

@@ -25,11 +25,11 @@ set -uo pipefail
 source "$(cd "$(dirname "$0")" && pwd)/lib/actor_world_proof_stack.sh"
 cd "$ROOT"
 
-UI_PORT=5273
+UI_PORT="${ACTOR_PROOF_UI_PORT:-5273}"
 VITE_LOG="$COMPOSE_DIR/actor-viewer-vite.log"
 VITE_PID=""
 ALL_PORTS=("${AZ_PORTS[@]}" "$FUNC_PORT" "$API_PORT" "$UI_PORT")
-OUT_DIR="$ROOT/tmp/actor-world-viewer-proof"
+OUT_DIR="${ACTOR_PROOF_OUT_DIR:-$ROOT/tmp/actor-world-viewer-proof}"
 CLEANED=""
 
 cleanup() {
