@@ -42,7 +42,7 @@ export default function LeftRail({
   const [moreOpen, setMoreOpen] = useState(false);
   const { manifest, loading, error } = useRuntimeManifest();
   const capabilities = new Set(manifest?.capabilities ?? []);
-  const verticalLabel = manifest?.vertical.display_name
+  const verticalLabel = manifest?.vertical?.display_name
     ?? (loading ? "Loading…" : "Runtime unavailable");
   const allViews = [...role.defaultSavedViews, ...userViews];
 
