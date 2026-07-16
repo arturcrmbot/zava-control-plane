@@ -11,7 +11,7 @@ export function Composition() {
         <header className="stack">
           <p className="subtitle">What I built, and what it&apos;s for</p>
           <h2 className="section-title">
-            A working model of an organisation, on this substrate.
+            A working model of the {data.vertical.display_name} organisation.
           </h2>
           <p className="body">
             I built a reference organisation on top of this substrate so
