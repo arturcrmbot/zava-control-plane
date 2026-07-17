@@ -47,7 +47,13 @@ _TELCO_PERSONAS: dict[str, Persona] = {
         description="CS Specialist; day-to-day customer support and engagement; escalates to CS Manager.",
     ),
 
-    # Ops tier (shared with Agency: delivery_lead)
+    # Network Operations
+    "network_ops_director": Persona(
+        role="network_ops_director", archetype="approver", scope_function="commercial",
+        workflow_label="Network Operations — director",
+        external_event_default="network_ops_director_decision",
+        description="Network Operations Director; approves exceptional operational and capital actions.",
+    ),
     "delivery_lead": Persona(
         role="delivery_lead", archetype="approver", scope_function="commercial",
         workflow_label="Operations — delivery", external_event_default="delivery_lead_decision",
@@ -61,6 +67,7 @@ TELCO_DISPLAY_COLORS: dict[str, str] = {
     # account-services tree).
     "cs_director": "#7fc4ff",
     "cs_manager": "#7fc4ff",
+    "network_ops_director": "#8b5cf6",
 }
 
 TELCO_PERSONAS: dict[str, Persona] = {

@@ -1,8 +1,6 @@
 """pitch-d2: data-driven delegated-authority matrix tests."""
 from __future__ import annotations
 
-import pytest
-
 from api.shared.authority import (
     AUTHORITY,
     AuthorityRow,
@@ -111,5 +109,6 @@ def test_telco_customer_success_roles_have_authority_rows():
         "cs_manager",
         "cs_specialist",
         "delivery_lead",
+        "network_ops_director",
     }
     assert set(TELCO_AUTHORITY) == expected

@@ -41,4 +41,39 @@ TELCO_AGENTS: dict[str, AgentRegistryEntry] = {
             "actions for authoritative world validation."
         ),
     ),
+    "outage-risk-planning": AgentRegistryEntry(
+        agent_id="outage-risk-planning",
+        scope_function="shared",
+        description="Plans proportionate resource pre-staging from weather risk.",
+    ),
+    "site-failure-diagnosis": AgentRegistryEntry(
+        agent_id="site-failure-diagnosis",
+        scope_function="shared",
+        description="Diagnoses imminent network asset failure from telemetry.",
+    ),
+    "field-resource-matching": AgentRegistryEntry(
+        agent_id="field-resource-matching",
+        scope_function="shared",
+        description="Matches ready work orders to technicians and spare stock.",
+    ),
+    "capacity-action-planner": AgentRegistryEntry(
+        agent_id="capacity-action-planner",
+        scope_function="shared",
+        description="Selects proportionate actions for congested sites.",
+    ),
+    "ticket-root-cause-correlation": AgentRegistryEntry(
+        agent_id="ticket-root-cause-correlation",
+        scope_function="shared",
+        description="Correlates service tickets with network and order events.",
+    ),
+    "churn-driver-analysis": AgentRegistryEntry(
+        agent_id="churn-driver-analysis",
+        scope_function="shared",
+        description="Explains churn risk from service experience evidence.",
+    ),
+    "retention-offer-selection": AgentRegistryEntry(
+        agent_id="retention-offer-selection",
+        scope_function="shared",
+        description="Selects fair retention remedies for evidenced service failures.",
+    ),
 }

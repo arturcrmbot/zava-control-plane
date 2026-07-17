@@ -12,10 +12,23 @@ TELCO_WORKFLOWS = {
     "network-incident",
     "proactive-customer-care",
     "order-to-activate",
+    "outage-risk-management",
+    "predictive-site-maintenance",
+    "field-repair-dispatch",
+    "capacity-optimization",
+    "service-ticket-resolution",
+    "retention-orchestration",
 }
 TELCO_AGENTS = {
     "proactive-customer-care-entitlement",
     "proactive-customer-care-execution",
+    "outage-risk-planning",
+    "site-failure-diagnosis",
+    "field-resource-matching",
+    "capacity-action-planner",
+    "ticket-root-cause-correlation",
+    "churn-driver-analysis",
+    "retention-offer-selection",
 }
 AGENCY_FUNCTIONS = {
     "finance",
@@ -35,12 +48,15 @@ TELCO_CUSTOMER_SUCCESS_KPIS = (
     "nps",
     "proactive-resolution-pct",
     "credit-cost",
+    "ticket-resolution-time",
+    "retention-acceptance",
 )
 TELCO_ONLY_AUTHORITY_ROLES = {
     "cs_director",
     "cs_account_director",
     "cs_manager",
     "cs_specialist",
+    "network_ops_director",
 }
 TELCO_AUTHORITY_ROLES = TELCO_ONLY_AUTHORITY_ROLES | {"delivery_lead"}
 TELCO_PERSONA_ROLES = TELCO_AUTHORITY_ROLES
@@ -60,7 +76,7 @@ def test_agency_default_excludes_all_telco_business_assets(tmp_path) -> None:
     )
 
 
-def test_telco_contains_only_the_proven_business_slice(tmp_path) -> None:
+def test_telco_contains_the_declared_business_slice(tmp_path) -> None:
     runtime = build_runtime(
         {"ZAVA_VERTICAL": "telco"},
         data_root=tmp_path,
@@ -164,6 +180,7 @@ def test_compatibility_registries_expose_only_active_pack_plus_kernel() -> None:
         "cs_manager",
         "cs_specialist",
         "delivery_lead",
+        "network_ops_director",
     }
 
 

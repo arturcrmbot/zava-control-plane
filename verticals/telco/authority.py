@@ -39,10 +39,15 @@ TELCO_AUTHORITY: dict[str, AuthorityRow] = {
         delegate_to=None,
     ),
 
-    # ----- Ops (shared with Agency: delivery_lead) ---------------------
+    # ----- Network Operations ------------------------------------------
     "delivery_lead": AuthorityRow(
         role="delivery_lead", spend_limit_gbp=10_000.0,
         approval_actions=("delivery_lead_decision",),
-        delegate_to="project_manager",
+        delegate_to="network_ops_director",
+    ),
+    "network_ops_director": AuthorityRow(
+        role="network_ops_director", spend_limit_gbp=100_000.0,
+        approval_actions=("network_ops_director_decision",),
+        delegate_to=None,
     ),
 }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import azure.durable_functions as df
 
+from api.functions.activities.telco_cascade import telco_cascade_decision
 from api.functions.kernel_registration import create_app
 from api.functions.workflows.network_incident import network_incident_orchestration
 from api.functions.workflows.network_incident_activities import (
@@ -22,6 +23,14 @@ from api.functions.workflows.proactive_customer_care_activities import (
     customer_care_entitlement_activity,
     customer_care_execution_activity,
     customer_care_impact_activity,
+)
+from api.functions.workflows.telco_cascade import (
+    capacity_optimization_orchestration,
+    field_repair_dispatch_orchestration,
+    outage_risk_management_orchestration,
+    predictive_site_maintenance_orchestration,
+    retention_orchestration,
+    service_ticket_resolution_orchestration,
 )
 
 
@@ -76,3 +85,42 @@ def order_activation_feasibility_activity_trigger(payload: dict) -> dict:
 @app.activity_trigger(input_name="payload")
 def order_activation_prepare_activity_trigger(payload: dict) -> dict:
     return order_activation_prepare_activity(payload)
+
+
+@app.orchestration_trigger(context_name="context")
+def OutageRiskManagementOrchestrator(context: df.DurableOrchestrationContext):
+    return outage_risk_management_orchestration(context)
+
+
+@app.orchestration_trigger(context_name="context")
+def PredictiveSiteMaintenanceOrchestrator(
+    context: df.DurableOrchestrationContext,
+):
+    return predictive_site_maintenance_orchestration(context)
+
+
+@app.orchestration_trigger(context_name="context")
+def FieldRepairDispatchOrchestrator(context: df.DurableOrchestrationContext):
+    return field_repair_dispatch_orchestration(context)
+
+
+@app.orchestration_trigger(context_name="context")
+def CapacityOptimizationOrchestrator(context: df.DurableOrchestrationContext):
+    return capacity_optimization_orchestration(context)
+
+
+@app.orchestration_trigger(context_name="context")
+def ServiceTicketResolutionOrchestrator(
+    context: df.DurableOrchestrationContext,
+):
+    return service_ticket_resolution_orchestration(context)
+
+
+@app.orchestration_trigger(context_name="context")
+def RetentionOrchestrationOrchestrator(context: df.DurableOrchestrationContext):
+    return retention_orchestration(context)
+
+
+@app.activity_trigger(input_name="payload")
+def telco_cascade_decision_activity_trigger(payload: dict) -> dict:
+    return telco_cascade_decision(payload)

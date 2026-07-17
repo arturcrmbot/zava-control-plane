@@ -1,8 +1,6 @@
 """verticals/telco/domains.py — Telco vertical domain registry.
 
-Canonical Telco ``Domain`` declarations. The Telco pack owns exactly three
-workflow types: ``network-incident``, ``proactive-customer-care``, and
-``order-to-activate``. Agency's domains live in
+Canonical Telco ``Domain`` declarations. Agency's domains live in
 ``verticals/agency/domains.py`` and are never imported here.
 
 Function back-references are wired once, at
@@ -100,5 +98,143 @@ TELCO_DOMAINS: dict[str, Domain] = {
         skills=(),
         spawn_fn=None,
         realistic_interval_seconds=86400,
+    ),
+    "outage-risk-management": Domain(
+        workflow_type="outage-risk-management",
+        display_name="Outage Risk Management",
+        workflow_id_prefix="OUTAGE",
+        orchestrator_name="OutageRiskManagementOrchestrator",
+        operator_surface="network-operations",
+        phases=(
+            Phase("Assess Weather Risk", "deterministic"),
+            Phase("Plan Pre-Staging", "agent"),
+            Phase("Approve Exceptional Spend", "hitl"),
+            Phase("Pre-Stage Resources", "deterministic"),
+        ),
+        hitl_gates=(
+            HitlGate(
+                "Approve Exceptional Spend",
+                "delivery_lead_decision",
+                "delivery_lead",
+                wait_probability=0.0,
+            ),
+        ),
+        skills=("outage-risk-planning",),
+        realistic_interval_seconds=86_400,
+    ),
+    "predictive-site-maintenance": Domain(
+        workflow_type="predictive-site-maintenance",
+        display_name="Predictive Site Maintenance",
+        workflow_id_prefix="MAINT",
+        orchestrator_name="PredictiveSiteMaintenanceOrchestrator",
+        operator_surface="network-operations",
+        phases=(
+            Phase("Diagnose Failure Risk", "agent"),
+            Phase("Plan Maintenance", "deterministic"),
+            Phase("Approve Replacement", "hitl"),
+            Phase("Create Work Order", "deterministic"),
+        ),
+        hitl_gates=(
+            HitlGate(
+                "Approve Replacement",
+                "delivery_lead_decision",
+                "delivery_lead",
+                wait_probability=0.0,
+            ),
+        ),
+        skills=("site-failure-diagnosis",),
+        realistic_interval_seconds=86_400,
+    ),
+    "field-repair-dispatch": Domain(
+        workflow_type="field-repair-dispatch",
+        display_name="Field Repair Dispatch",
+        workflow_id_prefix="FIELD",
+        orchestrator_name="FieldRepairDispatchOrchestrator",
+        operator_surface="network-operations",
+        phases=(
+            Phase("Match Field Resources", "agent"),
+            Phase("Validate Dispatch", "deterministic"),
+            Phase("Approve Dispatch Exception", "hitl"),
+            Phase("Dispatch Repair", "deterministic"),
+        ),
+        hitl_gates=(
+            HitlGate(
+                "Approve Dispatch Exception",
+                "delivery_lead_decision",
+                "delivery_lead",
+                wait_probability=0.0,
+            ),
+        ),
+        skills=("field-resource-matching",),
+        realistic_interval_seconds=3_600,
+    ),
+    "capacity-optimization": Domain(
+        workflow_type="capacity-optimization",
+        display_name="Capacity Optimization",
+        workflow_id_prefix="CAP",
+        orchestrator_name="CapacityOptimizationOrchestrator",
+        operator_surface="network-operations",
+        phases=(
+            Phase("Diagnose Congestion", "deterministic"),
+            Phase("Plan Capacity Action", "agent"),
+            Phase("Approve Capital Action", "hitl"),
+            Phase("Apply Capacity Action", "deterministic"),
+        ),
+        hitl_gates=(
+            HitlGate(
+                "Approve Capital Action",
+                "network_ops_director_decision",
+                "network_ops_director",
+                wait_probability=0.0,
+            ),
+        ),
+        skills=("capacity-action-planner",),
+        realistic_interval_seconds=86_400,
+    ),
+    "service-ticket-resolution": Domain(
+        workflow_type="service-ticket-resolution",
+        display_name="Service Ticket Resolution",
+        workflow_id_prefix="TICKET",
+        orchestrator_name="ServiceTicketResolutionOrchestrator",
+        operator_surface="customer-success",
+        phases=(
+            Phase("Correlate Root Cause", "agent"),
+            Phase("Plan Ticket Resolution", "deterministic"),
+            Phase("Review Vulnerable Customers", "hitl"),
+            Phase("Resolve Ticket Batch", "deterministic"),
+        ),
+        hitl_gates=(
+            HitlGate(
+                "Review Vulnerable Customers",
+                "cs_manager_decision",
+                "cs_manager",
+                wait_probability=0.0,
+            ),
+        ),
+        skills=("ticket-root-cause-correlation",),
+        realistic_interval_seconds=3_600,
+    ),
+    "retention-orchestration": Domain(
+        workflow_type="retention-orchestration",
+        display_name="Retention Orchestration",
+        workflow_id_prefix="RETAIN",
+        orchestrator_name="RetentionOrchestrationOrchestrator",
+        operator_surface="customer-success",
+        phases=(
+            Phase("Analyse Churn Drivers", "agent"),
+            Phase("Select Retention Offer", "agent"),
+            Phase("Approve High-Value Offer", "hitl"),
+            Phase("Issue Retention Offer", "deterministic"),
+        ),
+        hitl_gates=(
+            HitlGate(
+                "Approve High-Value Offer",
+                "cs_manager_decision",
+                "cs_manager",
+                wait_probability=0.0,
+            ),
+        ),
+        skills=("churn-driver-analysis", "retention-offer-selection"),
+        realistic_interval_seconds=86_400,
     ),
 }
