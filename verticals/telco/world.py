@@ -98,11 +98,15 @@ def _clamp(value: float, low: float, high: float) -> float:
 
 
 def _risk_band(failure_probability: float) -> str:
-    if failure_probability >= 0.5:
+    # Thresholds tuned so seeded initial health (0.72-0.99, see
+    # ``_create_assets``) always classifies as "healthy" at install — the
+    # worst-case starting failure_probability is ~0.26 with no active
+    # weather. Bands remain distinct and ordered for later escalation.
+    if failure_probability >= 0.8:
         return "critical"
-    if failure_probability >= 0.2:
+    if failure_probability >= 0.55:
         return "high"
-    if failure_probability >= 0.05:
+    if failure_probability >= 0.3:
         return "elevated"
     return "healthy"
 
@@ -364,14 +368,14 @@ class NetworkScenario:
         for site_id in self._site_ids:
             site = self.sites[site_id]
             for kind in ASSET_KINDS:
-                asset_id = f"AST-{site_id}-{kind.upper()}"
+                asset_id = f"AST-{site_id}-{kind}"
                 asset = NetworkAsset(
                     id=asset_id,
                     site_id=site_id,
                     kind=kind,
-                    health=1.0,
-                    temperature_c=0.0,
-                    load=round(site.utilization * LOAD_MULTIPLIER[kind], 4),
+                    health=round(self.runtime.rng.uniform(0.72, 0.99), 4),
+                    temperature_c=round(self.runtime.rng.uniform(28.0, 48.0), 2),
+                    load=round(site.utilization, 4),
                 )
                 self._derive_asset_metrics(asset)
                 self.assets[asset_id] = asset
@@ -506,7 +510,7 @@ class NetworkScenario:
         asset.failure_probability = round(
             _clamp(failure_probability, 0.0, 1.0), 4
         )
-        asset.status = _risk_band(asset.failure_probability)
+        asset.risk_band = _risk_band(asset.failure_probability)
 
     def _decay_asset_health(self, asset: NetworkAsset) -> None:
         site = self.sites[asset.site_id]
@@ -528,16 +532,16 @@ class NetworkScenario:
             yield self.runtime.env.timeout(1)
             for asset_id in self._asset_ids:
                 asset = self.assets[asset_id]
-                prior_status = asset.status
+                prior_risk_band = asset.risk_band
                 self._decay_asset_health(asset)
-                if asset.status == prior_status:
+                if asset.risk_band == prior_risk_band:
                     continue
                 self.runtime.emit(
                     "asset.metrics",
                     actor_id=asset.id,
                     target_id=asset.site_id,
                     trace_id=f"asset-{asset.id}",
-                    payload={**asdict(asset), "prior_status": prior_status},
+                    payload={**asdict(asset), "prior_risk_band": prior_risk_band},
                 )
 
     # -- perturbation ------------------------------------------------------

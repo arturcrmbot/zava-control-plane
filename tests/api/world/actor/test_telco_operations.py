@@ -8,10 +8,12 @@ scoped to actor state, deterministic dynamics and the scenario injectors.
 from __future__ import annotations
 
 import json
+import typing
 
 import pytest
 
 from api.server.world.runtime import SimulationRuntime
+from verticals.telco.operations import WorkOrder
 from verticals.telco.world import (
     ASSET_KINDS,
     NetworkConfig,
@@ -56,13 +58,14 @@ def test_install_creates_48_assets_four_kinds_per_site():
         }
         assert kinds == set(ASSET_KINDS)
     for kind in ASSET_KINDS:
-        expected_id = f"AST-SITE-01-{kind.upper()}"
+        expected_id = f"AST-SITE-01-{kind}"
         assert expected_id in scenario.assets
         asset = scenario.assets[expected_id]
         assert asset.site_id == "SITE-01"
         assert asset.kind == kind
         assert 0.0 <= asset.health <= 1.0
         assert asset.status == "healthy"
+        assert asset.risk_band == "healthy"
 
 
 def test_install_creates_20_technicians_five_per_region():
@@ -197,10 +200,98 @@ def test_asset_metrics_emitted_only_on_risk_band_transitions():
     assert 0 < len(metrics_events) < 48 * 10
     by_actor: dict[str, list[str]] = {}
     for event in metrics_events:
-        by_actor.setdefault(event.actor_id, []).append(event.payload["status"])
-    for statuses in by_actor.values():
+        by_actor.setdefault(event.actor_id, []).append(event.payload["risk_band"])
+    for bands in by_actor.values():
         # No two consecutive emissions report the same band.
-        assert all(a != b for a, b in zip(statuses, statuses[1:]))
+        assert all(a != b for a, b in zip(bands, bands[1:]))
+
+
+def test_asset_metrics_payload_uses_risk_band_and_preserves_lifecycle_status():
+    scenario = _installed(seed=8, simulation_minutes=10.0)
+    scenario.inject_weather_risk("south", 2.0, 4.0)
+    scenario.runtime.run_until(10.0)
+
+    metrics_events = [e for e in scenario.runtime.journal if e.type == "asset.metrics"]
+    assert metrics_events
+    for event in metrics_events:
+        assert "risk_band" in event.payload
+        assert "prior_risk_band" in event.payload
+        assert event.payload["risk_band"] != event.payload["prior_risk_band"]
+        # Lifecycle status is untouched by risk-band derivation.
+        assert event.payload["status"] == "healthy"
+
+
+# -- status/risk_band separation ----------------------------------------------
+
+
+def test_network_asset_has_separate_lifecycle_status_and_risk_band_fields():
+    scenario = _scenario()
+    asset = next(iter(scenario.assets.values()))
+    assert hasattr(asset, "status")
+    assert hasattr(asset, "risk_band")
+
+
+def test_all_assets_start_with_healthy_risk_band_and_lifecycle_status():
+    scenario = _installed(seed=11, simulation_minutes=5.0)
+    for asset in scenario.assets.values():
+        assert asset.status == "healthy"
+        assert asset.risk_band == "healthy"
+
+
+def test_setting_asset_status_maintenance_survives_metric_derivation():
+    scenario = _installed(seed=12, simulation_minutes=5.0)
+    asset = next(iter(scenario.assets.values()))
+    asset.status = "maintenance"
+    prior_risk_band = asset.risk_band
+
+    # Force a large health drop so risk-band derivation clearly moves.
+    asset.health = 0.05
+    scenario._derive_asset_metrics(asset)
+
+    assert asset.status == "maintenance"  # lifecycle status untouched
+    assert asset.risk_band != prior_risk_band  # risk band updates independently
+
+
+def test_work_order_priority_is_typed_int_not_str():
+    hints = typing.get_type_hints(WorkOrder)
+    assert hints["priority"] is int
+    order = WorkOrder(
+        id="WO-0001",
+        site_id="SITE-01",
+        asset_id="AST-SITE-01-radio-unit",
+        kind="repair",
+        priority=1,
+        required_skill="radio-unit",
+        required_spare="radio-unit",
+        due_at=10.0,
+    )
+    assert isinstance(order.priority, int)
+
+
+# -- deterministic asset heterogeneity ----------------------------------------
+
+
+def test_asset_health_is_seeded_heterogeneously_within_approved_range():
+    scenario = _installed(seed=13, simulation_minutes=5.0)
+    healths = [asset.health for asset in scenario.assets.values()]
+    assert len(set(healths)) > 1
+    assert all(0.72 <= h <= 0.99 for h in healths)
+
+
+def test_asset_load_equals_site_utilization_at_install():
+    scenario = _installed(seed=14, simulation_minutes=5.0)
+    for asset in scenario.assets.values():
+        site = scenario.sites[asset.site_id]
+        assert asset.load == round(site.utilization, 4)
+
+
+def test_asset_ids_use_lowercase_kind_stable_pattern():
+    scenario = _scenario()
+    for site_id in scenario.sites:
+        for kind in ASSET_KINDS:
+            expected_id = f"AST-{site_id}-{kind}"
+            assert expected_id in scenario.assets
+            assert kind.islower() or "-" in kind
 
 
 # -- injection validation / idempotent semantics -----------------------------

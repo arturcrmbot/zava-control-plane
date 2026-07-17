@@ -19,7 +19,12 @@ class NetworkAsset:
     temperature_c: float
     load: float
     failure_probability: float = 0.0
+    # Lifecycle state: healthy|degraded|failed|maintenance. Owned by later
+    # maintenance/field-dispatch workflows — never written by risk derivation.
     status: str = "healthy"
+    # Derived risk classification: healthy|elevated|high|critical. Recomputed
+    # every tick from health/temperature/weather; independent of ``status``.
+    risk_band: str = "healthy"
 
 
 @dataclass(slots=True)
@@ -39,7 +44,7 @@ class WorkOrder:
     site_id: str
     asset_id: str
     kind: str
-    priority: str
+    priority: int
     required_skill: str
     required_spare: str
     due_at: float
