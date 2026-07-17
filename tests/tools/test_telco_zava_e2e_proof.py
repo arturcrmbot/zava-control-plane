@@ -4,6 +4,8 @@ import subprocess
 import textwrap
 from pathlib import Path
 
+from verticals.telco.process_profiles import STANDARD_PROCESS_PROFILES
+
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "tools" / "telco_zava_e2e_proof.sh"
@@ -83,14 +85,7 @@ def test_telco_proof_driver_declares_cross_surface_contract():
             "service-ticket-resolution",
             "retention-orchestration",
         ],
-        "standard_samples": [
-            "core-network-anomaly-management",
-            "ran-capacity-planning",
-            "billing-dispute-resolution",
-            "service-provisioning-activation",
-            "revenue-assurance",
-            "contact-centre-agent-assist",
-        ],
+        "standard_samples": list(STANDARD_PROCESS_PROFILES),
     }
 
 
@@ -107,17 +102,10 @@ def test_telco_proof_drives_all_four_real_scenarios_and_fails_fast():
     assert "if (error instanceof ProofError)" in source
 
 
-def test_telco_proof_runs_one_standard_profile_per_engine():
+def test_telco_proof_runs_every_standard_profile():
     source = DRIVER.read_text(encoding="utf-8")
 
-    for workflow_type in (
-        "core-network-anomaly-management",
-        "ran-capacity-planning",
-        "billing-dispute-resolution",
-        "service-provisioning-activation",
-        "revenue-assurance",
-        "contact-centre-agent-assist",
-    ):
+    for workflow_type in STANDARD_PROCESS_PROFILES:
         assert workflow_type in source
     assert "/api/world/processes/${type}/run" in source
 
