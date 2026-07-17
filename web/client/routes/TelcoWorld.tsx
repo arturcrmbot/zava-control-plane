@@ -337,11 +337,30 @@ function FieldOperationsLens({ state }: { state: WorldState }) {
 function CustomerImpactLens({ state }: { state: WorldState }) {
   const impacted = new Set(state.customer_impact?.account_ids ?? []);
   const accounts = (state.accounts ?? []).filter((account) => impacted.has(account.id));
+  const visibleAccounts = [...accounts]
+    .sort((left, right) => {
+      const score = (account: typeof left) => (
+        Number(account.vulnerable) * 4
+        + Number(account.notification_ids.length > 0) * 2
+        + Number(account.credit_ids.length > 0)
+      );
+      return score(right) - score(left) || left.id.localeCompare(right.id);
+    })
+    .slice(0, 6);
+  const impact = state.customer_impact;
   return (
     <section data-testid="customer-impact-lens" className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-4">
+        <ImpactMetric label="Affected" value={impact?.affected_account_count ?? accounts.length} />
+        <ImpactMetric label="Notified" value={impact?.notified_account_count ?? 0} />
+        <ImpactMetric label="Credited" value={impact?.credited_account_count ?? 0} />
+        <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900">
+          Showing {visibleAccounts.length} of {accounts.length} impacted accounts
+        </div>
+      </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {accounts.map((account) => (
-          <article key={account.id} className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+        {visibleAccounts.map((account) => (
+          <article key={account.id} data-testid="customer-account-card" className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
             <div className="font-mono text-sm font-semibold">{account.id}</div>
             <div className="mt-1 text-xs text-slate-500">{account.segment} · {account.subscriber_id}</div>
             <div className="mt-2 text-xs">
@@ -371,6 +390,15 @@ function CustomerImpactLens({ state }: { state: WorldState }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function ImpactMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-1 text-xl font-semibold tabular-nums">{value}</div>
+    </div>
   );
 }
 

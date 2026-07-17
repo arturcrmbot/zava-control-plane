@@ -273,6 +273,39 @@ describe("TelcoWorld route", () => {
     expect(screen.getByText(/care.completed|site.recovered/)).toBeTruthy();
   });
 
+  it("keeps customer impact focused on six priority accounts", () => {
+    const accounts = Array.from({ length: 20 }, (_, index) => ({
+      id: `ACC-${String(index + 1).padStart(5, "0")}`,
+      subscriber_id: `SUB-${String(index + 1).padStart(5, "0")}`,
+      segment: index === 0 ? "priority_business" : "consumer",
+      vulnerable: index === 1,
+      approval_required: false,
+      total_credits: index < 2 ? 20 : 0,
+      notification_ids: index < 2 ? [`NOT-${index + 1}`] : [],
+      credit_ids: index < 2 ? [`CRD-${index + 1}`] : [],
+    }));
+    mockUseWorld.mockReturnValue(hook({
+      state: {
+        ...TELCO_STATE,
+        accounts,
+        customer_impact: {
+          affected_account_count: 20,
+          notified_account_count: 2,
+          credited_account_count: 2,
+          account_ids: accounts.map((account) => account.id),
+        },
+      },
+    }));
+    renderWorld();
+
+    fireEvent.click(screen.getByRole("button", { name: "Customer Impact" }));
+
+    expect(screen.getAllByTestId("customer-account-card")).toHaveLength(6);
+    expect(screen.getByText("Showing 6 of 20 impacted accounts")).toBeTruthy();
+    expect(screen.getByText("TKT-000001")).toBeTruthy();
+    expect(screen.getByText("RET-000001")).toBeTruthy();
+  });
+
   it("submits a real demo service order from the Orders lens", async () => {
     const fetchMock = vi.fn(async () => new Response(
       JSON.stringify({ ok: true, order_id: "ORD-00002" }),
