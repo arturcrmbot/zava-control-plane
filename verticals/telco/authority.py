@@ -50,4 +50,14 @@ TELCO_AUTHORITY: dict[str, AuthorityRow] = {
         approval_actions=("network_ops_director_decision",),
         delegate_to=None,
     ),
+    "service_ops_manager": AuthorityRow(
+        role="service_ops_manager", spend_limit_gbp=100_000.0,
+        approval_actions=("service_ops_manager_decision",),
+        delegate_to="network_ops_director",
+    ),
+    "commercial_risk_director": AuthorityRow(
+        role="commercial_risk_director", spend_limit_gbp=1_000_000.0,
+        approval_actions=("commercial_risk_director_decision",),
+        delegate_to=None,
+    ),
 }

@@ -59,6 +59,18 @@ _TELCO_PERSONAS: dict[str, Persona] = {
         workflow_label="Operations — delivery", external_event_default="delivery_lead_decision",
         description="Delivery Lead; owns delivery within a single project workstream; first-line approver under the project manager.",
     ),
+    "service_ops_manager": Persona(
+        role="service_ops_manager", archetype="approver", scope_function="commercial",
+        workflow_label="Service Operations — manager",
+        external_event_default="service_ops_manager_decision",
+        description="Service Operations Manager; approves exceptional field, fulfilment and change actions.",
+    ),
+    "commercial_risk_director": Persona(
+        role="commercial_risk_director", archetype="approver", scope_function="commercial",
+        workflow_label="Commercial Risk — director",
+        external_event_default="commercial_risk_director_decision",
+        description="Commercial Risk Director; approves material revenue, fraud, identity and fair-treatment actions.",
+    ),
 }
 
 TELCO_DISPLAY_COLORS: dict[str, str] = {
@@ -68,6 +80,8 @@ TELCO_DISPLAY_COLORS: dict[str, str] = {
     "cs_director": "#7fc4ff",
     "cs_manager": "#7fc4ff",
     "network_ops_director": "#8b5cf6",
+    "service_ops_manager": "#f59e0b",
+    "commercial_risk_director": "#ef4444",
 }
 
 TELCO_PERSONAS: dict[str, Persona] = {

@@ -11,9 +11,13 @@ back-refs and performs no boot-time mutation.
 from __future__ import annotations
 
 from api.shared.domain_contracts import Domain, HitlGate, Phase
+from verticals.telco.process_profiles import (
+    STANDARD_PROCESS_PROFILES,
+    TelcoProcessProfile,
+)
 
 
-TELCO_DOMAINS: dict[str, Domain] = {
+HERO_DOMAINS: dict[str, Domain] = {
     # ----- telco: network-incident response (actor-world scenario) -----
     # Autonomous, reversible mitigation — NO HITL gate by explicit design
     # (see docs/superpowers/specs/network-incident-brief.yaml). The primary
@@ -237,4 +241,50 @@ TELCO_DOMAINS: dict[str, Domain] = {
         skills=("churn-driver-analysis", "retention-offer-selection"),
         realistic_interval_seconds=86_400,
     ),
+}
+
+ENGINE_ORCHESTRATORS = {
+    "DDA": "TelcoDetectDiagnoseActOrchestrator",
+    "FSP": "TelcoForecastSimulatePlanOrchestrator",
+    "CTR": "TelcoCaseTriageResolveOrchestrator",
+    "OFV": "TelcoOrderFulfilVerifyOrchestrator",
+    "RIG": "TelcoRiskInvestigateGovernOrchestrator",
+    "ARA": "TelcoAssistRecommendActOrchestrator",
+}
+
+
+def _domain_from_profile(profile: TelcoProcessProfile) -> Domain:
+    gates: tuple[HitlGate, ...] = ()
+    if profile.hitl_persona and profile.hitl_event:
+        hitl_phase = next(
+            phase.name for phase in profile.phases if phase.kind == "hitl"
+        )
+        gates = (
+            HitlGate(
+                hitl_phase,
+                profile.hitl_event,
+                profile.hitl_persona,
+                wait_probability=0.0,
+            ),
+        )
+    return Domain(
+        workflow_type=profile.workflow_type,
+        display_name=profile.display_name,
+        workflow_id_prefix=profile.source_id.replace("-", ""),
+        orchestrator_name=ENGINE_ORCHESTRATORS[profile.engine],
+        operator_surface=profile.function,
+        phases=tuple(Phase(phase.name, phase.kind) for phase in profile.phases),
+        hitl_gates=gates,
+        skills=profile.skills,
+        realistic_interval_seconds=86_400,
+    )
+
+
+STANDARD_DOMAINS = {
+    workflow_type: _domain_from_profile(profile)
+    for workflow_type, profile in STANDARD_PROCESS_PROFILES.items()
+}
+TELCO_DOMAINS: dict[str, Domain] = {
+    **HERO_DOMAINS,
+    **STANDARD_DOMAINS,
 }

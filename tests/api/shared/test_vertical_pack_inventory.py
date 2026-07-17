@@ -6,6 +6,10 @@ import subprocess
 import sys
 
 from api.shared.vertical_loader import build_runtime
+from verticals.telco.process_profiles import (
+    SKILL_NAMES,
+    STANDARD_PROCESS_PROFILES,
+)
 
 
 TELCO_WORKFLOWS = {
@@ -18,7 +22,7 @@ TELCO_WORKFLOWS = {
     "capacity-optimization",
     "service-ticket-resolution",
     "retention-orchestration",
-}
+} | set(STANDARD_PROCESS_PROFILES)
 TELCO_AGENTS = {
     "proactive-customer-care-entitlement",
     "proactive-customer-care-execution",
@@ -29,7 +33,7 @@ TELCO_AGENTS = {
     "ticket-root-cause-correlation",
     "churn-driver-analysis",
     "retention-offer-selection",
-}
+} | set(SKILL_NAMES)
 AGENCY_FUNCTIONS = {
     "finance",
     "hr",
@@ -42,7 +46,12 @@ AGENCY_FUNCTIONS = {
     "ceo",
     "legacy",
 }
-TELCO_FUNCTIONS = {"network-operations", "customer-success"}
+TELCO_FUNCTIONS = {
+    "network-operations",
+    "service-operations",
+    "customer-success",
+    "commercial-risk",
+}
 TELCO_CUSTOMER_SUCCESS_SURFACE = "customer-success"
 TELCO_CUSTOMER_SUCCESS_KPIS = (
     "nps",
@@ -57,6 +66,8 @@ TELCO_ONLY_AUTHORITY_ROLES = {
     "cs_manager",
     "cs_specialist",
     "network_ops_director",
+    "service_ops_manager",
+    "commercial_risk_director",
 }
 TELCO_AUTHORITY_ROLES = TELCO_ONLY_AUTHORITY_ROLES | {"delivery_lead"}
 TELCO_PERSONA_ROLES = TELCO_AUTHORITY_ROLES
@@ -174,14 +185,7 @@ def test_compatibility_registries_expose_only_active_pack_plus_kernel() -> None:
         "reflector.entity_reflector"
     }
     assert set(telco["authority"]) == TELCO_AUTHORITY_ROLES
-    assert set(telco["personas"]) == {
-        "cs_director",
-        "cs_account_director",
-        "cs_manager",
-        "cs_specialist",
-        "delivery_lead",
-        "network_ops_director",
-    }
+    assert set(telco["personas"]) == TELCO_PERSONA_ROLES
 
 
 def test_agency_process_never_imports_telco_domain_or_function_modules() -> None:

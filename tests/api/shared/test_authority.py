@@ -110,5 +110,7 @@ def test_telco_customer_success_roles_have_authority_rows():
         "cs_specialist",
         "delivery_lead",
         "network_ops_director",
+        "service_ops_manager",
+        "commercial_risk_director",
     }
     assert set(TELCO_AUTHORITY) == expected

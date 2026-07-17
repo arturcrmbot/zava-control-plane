@@ -6,6 +6,15 @@ Canonical Telco ``Function`` declarations. Agency's functions live in
 from __future__ import annotations
 
 from api.shared.function_contracts import Function, PersonaTree
+from verticals.telco.process_profiles import STANDARD_PROCESS_PROFILES
+
+
+def _standard_domains(function_name: str) -> tuple[str, ...]:
+    return tuple(
+        profile.workflow_type
+        for profile in STANDARD_PROCESS_PROFILES.values()
+        if profile.function == function_name
+    )
 
 
 TELCO_FUNCTIONS: dict[str, Function] = {
@@ -20,7 +29,7 @@ TELCO_FUNCTIONS: dict[str, Function] = {
             "predictive-site-maintenance",
             "field-repair-dispatch",
             "capacity-optimization",
-        ),
+        ) + _standard_domains("network-operations"),
         ambient_agents=(),
         kpis=(
             "availability-pct",
@@ -35,6 +44,19 @@ TELCO_FUNCTIONS: dict[str, Function] = {
             manages=(PersonaTree(role="delivery_lead"),),
         ),
     ),
+    "service-operations": Function(
+        name="service-operations",
+        display="Service Operations",
+        operator_surface="service-operations",
+        owns_domains=_standard_domains("service-operations"),
+        ambient_agents=(),
+        kpis=(
+            "right-first-time",
+            "case-resolution-time",
+            "resource-utilization",
+        ),
+        persona_hierarchy=PersonaTree(role="service_ops_manager"),
+    ),
     "customer-success": Function(
         name="customer-success",
         display="Customer Success",
@@ -43,7 +65,7 @@ TELCO_FUNCTIONS: dict[str, Function] = {
             "proactive-customer-care",
             "service-ticket-resolution",
             "retention-orchestration",
-        ),
+        ) + _standard_domains("customer-success"),
         ambient_agents=(),
         kpis=(
             "nps",
@@ -66,5 +88,18 @@ TELCO_FUNCTIONS: dict[str, Function] = {
                 ),
             ),
         ),
+    ),
+    "commercial-risk": Function(
+        name="commercial-risk",
+        display="Commercial Risk",
+        operator_surface="commercial-risk",
+        owns_domains=_standard_domains("commercial-risk"),
+        ambient_agents=(),
+        kpis=(
+            "revenue-protected",
+            "risk-case-resolution",
+            "fair-treatment-compliance",
+        ),
+        persona_hierarchy=PersonaTree(role="commercial_risk_director"),
     ),
 }
