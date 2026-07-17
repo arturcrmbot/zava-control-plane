@@ -17,11 +17,13 @@ capacity → the failed site recovers. Same seed ⇒ identical journal.
 """
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
 from api.server.world.model import SimulationCommand, SimulationEvent
+from api.server.world.runtime import SimulationRuntime
 from verticals.telco.commercial import (
     CreditAdjustment,
     CustomerAccount,
@@ -29,7 +31,16 @@ from verticals.telco.commercial import (
     ServiceOrder,
     ServiceSubscription,
 )
-from api.server.world.runtime import SimulationRuntime
+from verticals.telco.operations import (
+    CareTicket,
+    ExperienceEpisode,
+    NetworkAsset,
+    RetentionOffer,
+    SpareStock,
+    Technician,
+    WeatherEvent,
+    WorkOrder,
+)
 
 SessionKind = Literal["voice", "data", "video"]
 SessionStatus = Literal["active", "degraded", "dropped", "rerouted"]
@@ -43,6 +54,67 @@ KIND_DEMAND: dict[SessionKind, tuple[float, float]] = {
     "data": (1.5, 2.5),
     "video": (4.0, 6.0),
 }
+
+# -- operational asset dynamics ---------------------------------------------
+
+ASSET_KINDS: tuple[str, ...] = ("radio-unit", "power", "cooling", "backhaul")
+TECHNICIANS_PER_REGION = 5
+# Deterministic hero constraints (see verticals/telco/operations.py actors):
+# one technician is unavailable from the start and one region's spare stock
+# for one part kind is already exhausted, forcing later maintenance/field
+# workflows to route around them instead of hitting a trivially-happy path.
+HERO_UNAVAILABLE_TECHNICIAN_ID = "TECH-WEST-05"
+HERO_SPARE_SHORTAGE_REGION = "west"
+HERO_SPARE_SHORTAGE_PART_KIND = "radio-unit"
+
+# Nominal operating temperature (°C) per asset kind at zero load/health-loss.
+BASE_TEMP_C: dict[str, float] = {
+    "radio-unit": 42.0,
+    "power": 32.0,
+    "cooling": 24.0,
+    "backhaul": 28.0,
+}
+# Headroom above baseline before temperature starts contributing risk.
+SAFE_MARGIN_C = 15.0
+# How strongly site load drives each asset kind's per-tick load figure.
+LOAD_MULTIPLIER: dict[str, float] = {
+    "radio-unit": 1.0,
+    "power": 0.7,
+    "cooling": 0.6,
+    "backhaul": 0.9,
+}
+# Baseline health decay per simulated minute, before load/weather amplify it.
+BASE_DECAY_PER_MINUTE: dict[str, float] = {
+    "radio-unit": 0.00006,
+    "power": 0.00004,
+    "cooling": 0.00005,
+    "backhaul": 0.00003,
+}
+RISK_BANDS: tuple[str, ...] = ("healthy", "elevated", "high", "critical")
+
+
+def _clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(high, value))
+
+
+def _risk_band(failure_probability: float) -> str:
+    if failure_probability >= 0.5:
+        return "critical"
+    if failure_probability >= 0.2:
+        return "high"
+    if failure_probability >= 0.05:
+        return "elevated"
+    return "healthy"
+
+
+def _require_finite_positive(value: Any, *, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{label} must be numeric")
+    if not math.isfinite(value):
+        raise ValueError(f"{label} must be finite")
+    if value <= 0:
+        raise ValueError(f"{label} must be positive")
+    return float(value)
 
 
 @dataclass(slots=True)
@@ -120,8 +192,18 @@ class NetworkScenario:
         self.orders: dict[str, ServiceOrder] = {}
         self.notifications: dict[str, Notification] = {}
         self.credits: dict[str, CreditAdjustment] = {}
+        self.assets: dict[str, NetworkAsset] = {}
+        self.weather_events: dict[str, WeatherEvent] = {}
+        self.work_orders: dict[str, WorkOrder] = {}
+        self.technicians: dict[str, Technician] = {}
+        self.spare_stocks: dict[str, SpareStock] = {}
+        self.tickets: dict[str, CareTicket] = {}
+        self.experience_episodes: dict[str, ExperienceEpisode] = {}
+        self.retention_offers: dict[str, RetentionOffer] = {}
         self._site_ids: list[str] = []
         self._subscriber_ids: list[str] = []
+        self._asset_ids: list[str] = []
+        self._spare_stock_by_key: dict[tuple[str, str], str] = {}
         self._failed_sites_latched: set[str] = set()
         self._impacted_account_ids_by_trace: dict[str, tuple[str, ...]] = {}
         self.applied_commands: dict[str, SimulationEvent] = {}
@@ -146,7 +228,11 @@ class NetworkScenario:
                 trace_id=f"site-{site.id}",
                 payload=self._metrics_payload(site),
             )
+        self._create_assets()
+        self._create_technicians()
+        self._create_spare_stocks()
         self.runtime.process(self._sensor_loop())
+        self.runtime.process(self._operations_loop())
 
     def _create_sites(self) -> None:
         per_region = self.config.site_count // len(REGIONS)
@@ -274,6 +360,79 @@ class NetworkScenario:
             )
             session.last_event_id = started.event_id
 
+    def _create_assets(self) -> None:
+        for site_id in self._site_ids:
+            site = self.sites[site_id]
+            for kind in ASSET_KINDS:
+                asset_id = f"AST-{site_id}-{kind.upper()}"
+                asset = NetworkAsset(
+                    id=asset_id,
+                    site_id=site_id,
+                    kind=kind,
+                    health=1.0,
+                    temperature_c=0.0,
+                    load=round(site.utilization * LOAD_MULTIPLIER[kind], 4),
+                )
+                self._derive_asset_metrics(asset)
+                self.assets[asset_id] = asset
+                self._asset_ids.append(asset_id)
+                self.runtime.emit(
+                    "asset.created",
+                    actor_id=asset_id,
+                    target_id=site_id,
+                    trace_id=f"asset-{asset_id}",
+                    payload=asdict(asset),
+                )
+
+    def _create_technicians(self) -> None:
+        for region in REGIONS:
+            for slot in range(1, TECHNICIANS_PER_REGION + 1):
+                tech_id = f"TECH-{region.upper()}-{slot:02d}"
+                skills = (
+                    ASSET_KINDS[(slot - 1) % len(ASSET_KINDS)],
+                    ASSET_KINDS[slot % len(ASSET_KINDS)],
+                )
+                status = (
+                    "unavailable" if tech_id == HERO_UNAVAILABLE_TECHNICIAN_ID
+                    else "available"
+                )
+                technician = Technician(
+                    id=tech_id, region=region, skills=skills, status=status
+                )
+                self.technicians[tech_id] = technician
+                self.runtime.emit(
+                    "technician.created",
+                    actor_id=tech_id,
+                    target_id=f"region:{region}",
+                    trace_id=f"technician-{tech_id}",
+                    payload=self._technician_view(technician),
+                )
+
+    def _create_spare_stocks(self) -> None:
+        for region in REGIONS:
+            for kind in ASSET_KINDS:
+                stock_id = f"SPARE-{region.upper()}-{kind.upper()}"
+                hero_zero = (
+                    region == HERO_SPARE_SHORTAGE_REGION
+                    and kind == HERO_SPARE_SHORTAGE_PART_KIND
+                )
+                stock = SpareStock(
+                    id=stock_id,
+                    region=region,
+                    part_kind=kind,
+                    quantity=0 if hero_zero else 15,
+                    reorder_point=5,
+                )
+                self.spare_stocks[stock_id] = stock
+                self._spare_stock_by_key[(region, kind)] = stock_id
+                self.runtime.emit(
+                    "spare_stock.created",
+                    actor_id=stock_id,
+                    target_id=f"region:{region}",
+                    trace_id=f"spare-stock-{stock_id}",
+                    payload=asdict(stock),
+                )
+
     # -- metrics -----------------------------------------------------------
 
     def _derive_metrics(self, site: CellSite) -> None:
@@ -297,6 +456,89 @@ class NetworkScenario:
             "latency_ms": site.latency_ms,
             "session_count": len(site.session_ids),
         }
+
+    # -- operational asset dynamics -----------------------------------------
+
+    def _active_weather_for_region(self, region: str) -> WeatherEvent | None:
+        now = self.runtime.now
+        active = [
+            weather
+            for weather in self.weather_events.values()
+            if weather.region == region and weather.starts_at <= now < weather.ends_at
+        ]
+        if not active:
+            return None
+        return WeatherEvent(
+            id="+".join(sorted(weather.id for weather in active)),
+            region=region,
+            severity=max(weather.severity for weather in active),
+            power_risk=max(weather.power_risk for weather in active),
+            cooling_risk=max(weather.cooling_risk for weather in active),
+            starts_at=min(weather.starts_at for weather in active),
+            ends_at=max(weather.ends_at for weather in active),
+        )
+
+    def _derive_asset_metrics(self, asset: NetworkAsset) -> None:
+        """Recompute temperature/failure_probability/status band from the
+        asset's current health/load and any active regional weather. Pure
+        function of current state — deterministic and idempotent."""
+        weather = self._active_weather_for_region(self.sites[asset.site_id].region)
+        power_risk = weather.power_risk if weather else 0.0
+        cooling_risk = weather.cooling_risk if weather else 0.0
+        if asset.kind == "power":
+            weather_term = power_risk
+        elif asset.kind == "cooling":
+            weather_term = cooling_risk
+        else:
+            weather_term = (power_risk + cooling_risk) / 2.0
+        base_temp = BASE_TEMP_C[asset.kind]
+        temperature = (
+            base_temp
+            + asset.load * 20.0
+            + weather_term * 20.0
+            + (1.0 - asset.health) * 10.0
+        )
+        asset.temperature_c = round(temperature, 2)
+        temp_excess = max(0.0, asset.temperature_c - (base_temp + SAFE_MARGIN_C))
+        failure_probability = (
+            0.01 + (1.0 - asset.health) * 0.9 + (temp_excess / 25.0) * 0.2
+        )
+        asset.failure_probability = round(
+            _clamp(failure_probability, 0.0, 1.0), 4
+        )
+        asset.status = _risk_band(asset.failure_probability)
+
+    def _decay_asset_health(self, asset: NetworkAsset) -> None:
+        site = self.sites[asset.site_id]
+        asset.load = round(site.utilization * LOAD_MULTIPLIER[asset.kind], 4)
+        weather = self._active_weather_for_region(site.region)
+        weather_component = (
+            (weather.power_risk + weather.cooling_risk) if weather else 0.0
+        )
+        decay = (
+            BASE_DECAY_PER_MINUTE[asset.kind]
+            * (1.0 + asset.load)
+            * (1.0 + weather_component)
+        )
+        asset.health = round(_clamp(asset.health - decay, 0.0, 1.0), 6)
+        self._derive_asset_metrics(asset)
+
+    def _operations_loop(self):
+        while self.runtime.now < self.config.simulation_minutes:
+            yield self.runtime.env.timeout(1)
+            for asset_id in self._asset_ids:
+                asset = self.assets[asset_id]
+                prior_status = asset.status
+                self._decay_asset_health(asset)
+                if asset.status == prior_status:
+                    continue
+                self.runtime.emit(
+                    "asset.metrics",
+                    actor_id=asset.id,
+                    target_id=asset.site_id,
+                    trace_id=f"asset-{asset.id}",
+                    payload={**asdict(asset), "prior_status": prior_status},
+                )
 
     # -- perturbation ------------------------------------------------------
 
@@ -342,6 +584,83 @@ class NetworkScenario:
             payload={**self._metrics_payload(site), "reason": "capacity_pressure"},
         )
         return site.id
+
+    def inject_weather_risk(
+        self, region: str, severity: float, duration_minutes: float
+    ) -> str:
+        if region not in REGIONS:
+            raise ValueError(f"unknown region: {region!r}")
+        severity = _require_finite_positive(severity, label="severity")
+        duration_minutes = _require_finite_positive(
+            duration_minutes, label="duration_minutes"
+        )
+        starts_at = self.runtime.now
+        ends_at = starts_at + duration_minutes
+        event_id = f"WEATHER-{len(self.weather_events) + 1:04d}"
+        weather = WeatherEvent(
+            id=event_id,
+            region=region,
+            severity=round(severity, 4),
+            power_risk=round(_clamp(severity * 0.6, 0.0, 1.0), 4),
+            cooling_risk=round(_clamp(severity * 0.9, 0.0, 1.0), 4),
+            starts_at=starts_at,
+            ends_at=ends_at,
+        )
+        self.weather_events[event_id] = weather
+        self.runtime.emit(
+            "weather.risk_injected",
+            actor_id=event_id,
+            target_id=f"region:{region}",
+            trace_id=f"weather-{event_id}",
+            payload=asdict(weather),
+        )
+        return event_id
+
+    def inject_spare_shortage(self, region: str, part_kind: str) -> str:
+        if region not in REGIONS:
+            raise ValueError(f"unknown region: {region!r}")
+        if part_kind not in ASSET_KINDS:
+            raise ValueError(f"unknown part_kind: {part_kind!r}")
+        stock_id = self._spare_stock_by_key.get((region, part_kind))
+        if stock_id is None:
+            raise ValueError(
+                f"no spare stock for region={region!r} part_kind={part_kind!r}"
+            )
+        stock = self.spare_stocks[stock_id]
+        if stock.quantity <= 0:
+            raise ValueError(f"spare stock {stock_id} is already at zero")
+        prior_quantity = stock.quantity
+        stock.quantity = 0
+        self.runtime.emit(
+            "spare_stock.shortage",
+            actor_id=stock_id,
+            target_id=f"region:{region}",
+            trace_id=f"spare-shortage-{stock_id}-{int(self.runtime.now)}",
+            payload={
+                "region": region,
+                "part_kind": part_kind,
+                "prior_quantity": prior_quantity,
+                "quantity": 0,
+                "reorder_point": stock.reorder_point,
+            },
+        )
+        return stock_id
+
+    def inject_technician_unavailable(self, technician_id: str) -> str:
+        technician = self.technicians.get(technician_id)
+        if technician is None:
+            raise ValueError(f"unknown technician_id: {technician_id!r}")
+        if technician.status != "available":
+            raise ValueError(f"technician {technician_id} is not available")
+        technician.status = "unavailable"
+        self.runtime.emit(
+            "technician.unavailable",
+            actor_id=technician_id,
+            target_id=f"region:{technician.region}",
+            trace_id=f"technician-unavailable-{technician_id}-{int(self.runtime.now)}",
+            payload={"region": technician.region, "status": technician.status},
+        )
+        return technician_id
 
     def _resolve_failure_site(self, site_id: str | None) -> str:
         if site_id is not None:
@@ -893,6 +1212,17 @@ class NetworkScenario:
     def _account_view(self, account: CustomerAccount) -> dict[str, Any]:
         return asdict(account)
 
+    def _asset_view(self, asset: NetworkAsset) -> dict[str, Any]:
+        return asdict(asset)
+
+    def _weather_view(self, weather: WeatherEvent) -> dict[str, Any]:
+        return asdict(weather)
+
+    def _technician_view(self, technician: Technician) -> dict[str, Any]:
+        data = asdict(technician)
+        data["skills"] = list(technician.skills)
+        return data
+
     def _customer_impact_view(self) -> dict[str, Any]:
         impacted = {
             account_id
@@ -926,6 +1256,16 @@ class NetworkScenario:
             "notifications": [asdict(item) for item in self.notifications.values()],
             "credits": [asdict(item) for item in self.credits.values()],
             "customer_impact": self._customer_impact_view(),
+            "assets": [self._asset_view(a) for a in self.assets.values()],
+            "weather_events": [self._weather_view(w) for w in self.weather_events.values()],
+            "work_orders": [asdict(w) for w in self.work_orders.values()],
+            "technicians": [self._technician_view(t) for t in self.technicians.values()],
+            "spare_stocks": [asdict(s) for s in self.spare_stocks.values()],
+            "tickets": [asdict(t) for t in self.tickets.values()],
+            "experience_episodes": [
+                asdict(e) for e in self.experience_episodes.values()
+            ],
+            "retention_offers": [asdict(o) for o in self.retention_offers.values()],
         }
 
     def build_observation(self, sensor_event: dict[str, Any], *, now: float) -> dict[str, Any]:

@@ -60,6 +60,21 @@ class ServiceOrderRequest(BaseModel):
     requested_site_id: str = Field(min_length=1)
 
 
+class WeatherRiskRequest(BaseModel):
+    region: str = Field(min_length=1)
+    severity: float = Field(gt=0, allow_inf_nan=False)
+    duration_minutes: float = Field(gt=0, allow_inf_nan=False)
+
+
+class SpareShortageRequest(BaseModel):
+    region: str = Field(min_length=1)
+    part_kind: str = Field(min_length=1)
+
+
+class TechnicianUnavailableRequest(BaseModel):
+    technician_id: str = Field(min_length=1)
+
+
 @router.get("/state")
 async def world_state() -> dict:
     service = getattr(app_state, "world_service", None)
@@ -165,3 +180,62 @@ async def submit_service_order(body: ServiceOrderRequest) -> dict:
     except ValueError as exc:
         return {"ok": False, "error": str(exc)}
     return {"ok": True, "order_id": order_id, "sim_time": service.runtime.now}
+
+
+@router.post("/inject/weather-risk")
+async def inject_weather_risk(body: WeatherRiskRequest) -> dict:
+    """Inject a regional weather risk event (telco actor world)."""
+    service = getattr(app_state, "world_service", None)
+    inject = (
+        getattr(service, "inject_weather_risk", None) if service is not None else None
+    )
+    if inject is None:
+        return {"ok": False, "error": "telco world not enabled (set ZAVA_WORLD=telco)"}
+    try:
+        event_id = inject(body.region, body.severity, body.duration_minutes)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    return {
+        "ok": True,
+        "sim_time": service.runtime.now,
+        "event_id": event_id,
+        "region": body.region,
+    }
+
+
+@router.post("/inject/spare-shortage")
+async def inject_spare_shortage(body: SpareShortageRequest) -> dict:
+    """Zero out one region's spare stock for a part kind (telco actor world)."""
+    service = getattr(app_state, "world_service", None)
+    inject = (
+        getattr(service, "inject_spare_shortage", None) if service is not None else None
+    )
+    if inject is None:
+        return {"ok": False, "error": "telco world not enabled (set ZAVA_WORLD=telco)"}
+    try:
+        stock_id = inject(body.region, body.part_kind)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": True, "sim_time": service.runtime.now, "stock_id": stock_id}
+
+
+@router.post("/inject/technician-unavailable")
+async def inject_technician_unavailable(body: TechnicianUnavailableRequest) -> dict:
+    """Mark one technician unavailable (telco actor world)."""
+    service = getattr(app_state, "world_service", None)
+    inject = (
+        getattr(service, "inject_technician_unavailable", None)
+        if service is not None
+        else None
+    )
+    if inject is None:
+        return {"ok": False, "error": "telco world not enabled (set ZAVA_WORLD=telco)"}
+    try:
+        technician_id = inject(body.technician_id)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    return {
+        "ok": True,
+        "sim_time": service.runtime.now,
+        "technician_id": technician_id,
+    }

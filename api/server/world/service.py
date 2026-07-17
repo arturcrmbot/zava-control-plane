@@ -252,6 +252,35 @@ class ActorWorldService:
             requested_site_id=requested_site_id,
         )
 
+    def _require_scenario_method(self, name: str):
+        """Return a scenario method or raise a clear error for unsupported
+        worlds (e.g. calling a telco-only injector against the support
+        world)."""
+        method = getattr(self.scenario, name, None)
+        if method is None:
+            raise ValueError(f"scenario {self.scenario_name!r} has no {name}")
+        return method
+
+    def inject_weather_risk(
+        self, region: str, severity: float, duration_minutes: float
+    ) -> str:
+        """Inject a regional weather risk event (telco scenario). Returns the
+        weather event id."""
+        inject = self._require_scenario_method("inject_weather_risk")
+        return inject(region, severity, duration_minutes)
+
+    def inject_spare_shortage(self, region: str, part_kind: str) -> str:
+        """Zero out one region's spare stock for a part kind (telco
+        scenario). Returns the spare stock id."""
+        inject = self._require_scenario_method("inject_spare_shortage")
+        return inject(region, part_kind)
+
+    def inject_technician_unavailable(self, technician_id: str) -> str:
+        """Mark one technician unavailable (telco scenario). Returns the
+        technician id."""
+        inject = self._require_scenario_method("inject_technician_unavailable")
+        return inject(technician_id)
+
     # -- catch-up ---------------------------------------------------------
 
     def events_after(self, seq: int) -> list[dict[str, Any]]:
