@@ -770,6 +770,59 @@ class NetworkScenario:
         )
         return technician_id
 
+    def run_scenario(self, name: str) -> dict[str, Any]:
+        expected_sensors = {
+            "storm-cascade": "sensor:outage_risk",
+            "maintenance-save": "sensor:asset_failure_risk",
+            "capacity-revenue": "sensor:site_congestion",
+            "vulnerable-retention": "sensor:ticket_pressure",
+        }
+        if name not in expected_sensors:
+            raise ValueError(f"unknown Telco scenario: {name!r}")
+        before = len(self.runtime.journal)
+        if name == "storm-cascade":
+            self.inject_weather_risk("west", 2.0, 60.0)
+        elif name == "maintenance-save":
+            asset = self.assets["AST-SITE-12-radio-unit"]
+            asset.health = 0.1
+            self._derive_asset_metrics(asset)
+            injected = self.runtime.emit(
+                "asset.risk_injected",
+                actor_id=asset.id,
+                target_id=asset.site_id,
+                trace_id=f"asset-risk-{asset.id}-{int(self.runtime.now)}",
+                payload=asdict(asset),
+            )
+            metrics = self.runtime.emit(
+                "asset.metrics",
+                actor_id=asset.id,
+                target_id=asset.site_id,
+                cause_event_id=injected.event_id,
+                trace_id=injected.trace_id,
+                payload={**asdict(asset), "prior_risk_band": "healthy"},
+            )
+            self._trip_asset_failure_risk(asset, metrics)
+        elif name == "capacity-revenue":
+            self.inject_capacity_pressure("SITE-12", utilization=0.95)
+            self.submit_service_order(
+                account_id="ACC-00001",
+                product="business-premium",
+                requested_site_id="SITE-12",
+            )
+        else:
+            site = self.sites["SITE-02"]
+            if site.status != "healthy":
+                raise ValueError("vulnerable-retention hero site is not healthy")
+            self._apply_site_failure(site)
+        new_events = self.runtime.journal[before:]
+        root = new_events[0]
+        return {
+            "scenario_id": f"{name}-{self.runtime.seed}-{root.event_id}",
+            "root_event_id": root.event_id,
+            "seed": self.runtime.seed,
+            "expected_first_sensor": expected_sensors[name],
+        }
+
     def _resolve_failure_site(self, site_id: str | None) -> str:
         if site_id is not None:
             site = self.sites.get(site_id)
@@ -887,6 +940,83 @@ class NetworkScenario:
                 },
             },
         )
+        ticket_ids: list[str] = []
+        ticket_events: list[SimulationEvent] = []
+        for account_id in account_ids[:12]:
+            account = self.accounts[account_id]
+            subscriber = self.subscribers[account.subscriber_id]
+            ticket = CareTicket(
+                id=f"TKT-{len(self.tickets) + 1:06d}",
+                account_id=account.id,
+                subscription_id=subscriber.subscription_id,
+                incident_trace_id=failed.trace_id,
+                category="network_outage",
+                severity=(
+                    "critical"
+                    if account.vulnerable
+                    else "high"
+                    if account.segment in {"business", "priority_business"}
+                    else "medium"
+                ),
+            )
+            self.tickets[ticket.id] = ticket
+            ticket_ids.append(ticket.id)
+            opened = self.runtime.emit(
+                "ticket.opened",
+                actor_id=ticket.id,
+                target_id=account.id,
+                cause_event_id=failed.event_id,
+                trace_id=failed.trace_id,
+                payload=asdict(ticket),
+            )
+            ticket_events.append(opened)
+            episode = ExperienceEpisode(
+                id=f"EXP-{len(self.experience_episodes) + 1:06d}",
+                account_id=account.id,
+                source_trace_id=failed.trace_id,
+                kind="service_outage",
+                impact_score=(
+                    0.9
+                    if account.vulnerable
+                    else 0.7
+                    if account.segment in {"business", "priority_business"}
+                    else 0.5
+                ),
+                occurred_at=self.runtime.now,
+            )
+            self.experience_episodes[episode.id] = episode
+            self.runtime.emit(
+                "experience.recorded",
+                actor_id=episode.id,
+                target_id=account.id,
+                cause_event_id=opened.event_id,
+                trace_id=failed.trace_id,
+                payload=asdict(episode),
+            )
+        if ticket_events:
+            ticket_trace_id = (
+                f"ticket-resolution-{failed.actor_id}-{ticket_events[-1].event_id}"
+            )
+            self.runtime.emit(
+                "sensor.tripped",
+                actor_id="sensor:ticket_pressure",
+                target_id=failed.actor_id,
+                cause_event_id=ticket_events[-1].event_id,
+                trace_id=ticket_trace_id,
+                payload={
+                    "ticket_ids": ticket_ids,
+                    "site_id": failed.actor_id,
+                    "parent_trace_id": failed.trace_id,
+                    "contributing_trace_ids": [failed.trace_id],
+                    "measurements": {
+                        "open_ticket_count": len(ticket_ids),
+                        "vulnerable_account_count": sum(
+                            self.accounts[self.tickets[ticket_id].account_id].vulnerable
+                            for ticket_id in ticket_ids
+                        ),
+                    },
+                },
+            )
 
     # -- sensor ------------------------------------------------------------
 
@@ -967,6 +1097,20 @@ class NetworkScenario:
             trace_id=trace_id,
             payload=asdict(order),
         )
+        if insufficient_capacity:
+            self.runtime.emit(
+                "order.infeasible",
+                actor_id=order_id,
+                target_id=requested_site_id,
+                cause_event_id=created.event_id,
+                trace_id=trace_id,
+                payload={
+                    "order_id": order_id,
+                    "reason": order.reason,
+                    "utilization": requested_site.utilization,
+                },
+            )
+            return order_id
         self.runtime.emit(
             "sensor.tripped",
             actor_id="sensor:service_order",
@@ -1018,6 +1162,16 @@ class NetworkScenario:
             if reason is not None:
                 return self._reject_command(command, reason)
             return self._accept_capacity_action(command)
+        if command.type == "resolve_ticket_batch":
+            reason = self._validate_ticket_batch(command)
+            if reason is not None:
+                return self._reject_command(command, reason)
+            return self._accept_ticket_batch(command)
+        if command.type == "apply_retention_offer":
+            reason = self._validate_retention_offer(command)
+            if reason is not None:
+                return self._reject_command(command, reason)
+            return self._accept_retention_offer(command)
         return self._reject_command(command, f"unsupported command type: {command.type!r}")
 
     def _record_command_accepted(
@@ -1075,7 +1229,7 @@ class NetworkScenario:
             float(estimated_cost) > 10_000.0
             and command.payload.get("approval_decision") != "approve"
         ):
-            return "delivery_lead approval required for exceptional spend"
+            return "network_ops_director approval required for exceptional spend"
         return None
 
     def _accept_prestage_field_resources(
@@ -1125,7 +1279,7 @@ class NetworkScenario:
             command.payload.get("kind") == "replace"
             and command.payload.get("approval_decision") != "approve"
         ):
-            return "delivery_lead approval required for asset replacement"
+            return "network_ops_director approval required for asset replacement"
         priority = command.payload.get("priority")
         if isinstance(priority, bool) or not isinstance(priority, int):
             return "priority must be an integer"
@@ -1340,6 +1494,169 @@ class NetworkScenario:
                     "contributing_trace_ids": [command.trace_id],
                 },
             )
+        return accepted
+
+    def _validate_ticket_batch(self, command: SimulationCommand) -> str | None:
+        ticket_ids = command.payload.get("ticket_ids")
+        if not isinstance(ticket_ids, list) or not ticket_ids:
+            return "ticket_ids must be a non-empty list"
+        if len(set(ticket_ids)) != len(ticket_ids):
+            return "ticket_ids must be unique"
+        tickets: list[CareTicket] = []
+        for ticket_id in ticket_ids:
+            ticket = self.tickets.get(ticket_id)
+            if ticket is None:
+                return f"unknown ticket_id: {ticket_id!r}"
+            if ticket.status != "open":
+                return f"ticket {ticket.id} is not open"
+            tickets.append(ticket)
+        if len({ticket.incident_trace_id for ticket in tickets}) != 1:
+            return "ticket batch must share one incident trace"
+        for field_name in ("root_cause", "resolution"):
+            value = command.payload.get(field_name)
+            if not isinstance(value, str) or not value.strip():
+                return f"{field_name} must be a non-empty string"
+        if (
+            any(self.accounts[ticket.account_id].vulnerable for ticket in tickets)
+            and command.payload.get("approval_decision") != "approve"
+        ):
+            return "cs_manager approval required for vulnerable customer batch"
+        return None
+
+    def _accept_ticket_batch(self, command: SimulationCommand) -> SimulationEvent:
+        tickets = [self.tickets[ticket_id] for ticket_id in command.payload["ticket_ids"]]
+        accepted = self._record_command_accepted(
+            command,
+            target_id=tickets[0].incident_trace_id,
+        )
+        for ticket in tickets:
+            ticket.status = "resolved"
+            ticket.root_cause = command.payload["root_cause"]
+            self.runtime.emit(
+                "ticket.resolved",
+                actor_id=ticket.id,
+                target_id=ticket.account_id,
+                cause_event_id=accepted.event_id,
+                trace_id=command.trace_id,
+                payload={
+                    **asdict(ticket),
+                    "resolution": command.payload["resolution"],
+                },
+            )
+        account_ids = sorted({ticket.account_id for ticket in tickets})
+        incident_traces = sorted(
+            {ticket.incident_trace_id for ticket in tickets}
+        )
+        resolved = self.runtime.emit(
+            "ticket_batch.resolved",
+            actor_id="customer_care",
+            cause_event_id=accepted.event_id,
+            trace_id=command.trace_id,
+            payload={
+                "ticket_ids": [ticket.id for ticket in tickets],
+                "account_ids": account_ids,
+                "root_cause": command.payload["root_cause"],
+                "resolution": command.payload["resolution"],
+            },
+        )
+        retention_account = min(
+            account_ids,
+            key=lambda account_id: (
+                not self.accounts[account_id].vulnerable,
+                -sum(
+                    episode.impact_score
+                    for episode in self.experience_episodes.values()
+                    if episode.account_id == account_id
+                ),
+                account_id,
+            ),
+        )
+        account_episodes = [
+            episode
+            for episode in self.experience_episodes.values()
+            if episode.account_id == retention_account
+        ]
+        impact_score = round(
+            sum(episode.impact_score for episode in account_episodes),
+            4,
+        )
+        contributing_trace_ids = [
+            *incident_traces,
+            command.trace_id,
+        ]
+        self.runtime.emit(
+            "sensor.tripped",
+            actor_id="sensor:churn_risk",
+            target_id=retention_account,
+            cause_event_id=resolved.event_id,
+            trace_id=f"retention-{retention_account}-{resolved.event_id}",
+            payload={
+                "account_id": retention_account,
+                "parent_trace_id": command.trace_id,
+                "contributing_trace_ids": contributing_trace_ids,
+                "measurements": {
+                    "impact_score": impact_score,
+                    "episode_count": len(account_episodes),
+                    "vulnerable": self.accounts[retention_account].vulnerable,
+                },
+            },
+        )
+        return accepted
+
+    def _validate_retention_offer(
+        self,
+        command: SimulationCommand,
+    ) -> str | None:
+        account = self.accounts.get(command.payload.get("account_id"))
+        if account is None:
+            return f"unknown account_id: {command.payload.get('account_id')!r}"
+        if any(
+            offer.account_id == account.id and offer.status == "issued"
+            for offer in self.retention_offers.values()
+        ):
+            return f"account {account.id} already has an issued retention offer"
+        for field_name in ("reason", "offer_kind"):
+            value = command.payload.get(field_name)
+            if not isinstance(value, str) or not value.strip():
+                return f"{field_name} must be a non-empty string"
+        value_gbp = command.payload.get("value_gbp")
+        if (
+            isinstance(value_gbp, bool)
+            or not isinstance(value_gbp, (int, float))
+            or not math.isfinite(value_gbp)
+            or not 0 < float(value_gbp) <= 500.0
+        ):
+            return "value_gbp must be a finite number between 0 and 500"
+        if (
+            float(value_gbp) > 50.0
+            and command.payload.get("approval_decision") != "approve"
+        ):
+            return "cs_manager approval required for high-value retention offer"
+        return None
+
+    def _accept_retention_offer(
+        self,
+        command: SimulationCommand,
+    ) -> SimulationEvent:
+        account = self.accounts[command.payload["account_id"]]
+        accepted = self._record_command_accepted(command, target_id=account.id)
+        offer = RetentionOffer(
+            id=f"RET-{len(self.retention_offers) + 1:06d}",
+            account_id=account.id,
+            reason=command.payload["reason"],
+            value_gbp=float(command.payload["value_gbp"]),
+            offer_kind=command.payload["offer_kind"],
+            status="issued",
+        )
+        self.retention_offers[offer.id] = offer
+        self.runtime.emit(
+            "retention_offer.issued",
+            actor_id=offer.id,
+            target_id=account.id,
+            cause_event_id=accepted.event_id,
+            trace_id=command.trace_id,
+            payload=asdict(offer),
+        )
         return accepted
 
     def _validate_service_order_activation(
@@ -1719,6 +2036,7 @@ class NetworkScenario:
             "technicians": [self._technician_view(t) for t in self.technicians.values()],
             "spare_stocks": [asdict(s) for s in self.spare_stocks.values()],
             "tickets": [asdict(t) for t in self.tickets.values()],
+            "care_tickets": [asdict(t) for t in self.tickets.values()],
             "experience_episodes": [
                 asdict(e) for e in self.experience_episodes.values()
             ],
@@ -1818,6 +2136,50 @@ class NetworkScenario:
                     and order.status == "infeasible"
                 ],
                 "allowed_commands": ["apply_capacity_action"],
+            }
+        if actor_id == "sensor:ticket_pressure":
+            tickets = [
+                self.tickets[ticket_id]
+                for ticket_id in payload.get("ticket_ids") or []
+            ]
+            account_ids = sorted({ticket.account_id for ticket in tickets})
+            site = self.sites[payload["site_id"]]
+            return {
+                **trace_context,
+                "tickets": [asdict(ticket) for ticket in tickets],
+                "accounts": [
+                    self._account_view(self.accounts[account_id])
+                    for account_id in account_ids
+                ],
+                "experience_episodes": [
+                    asdict(episode)
+                    for episode in self.experience_episodes.values()
+                    if episode.account_id in account_ids
+                ],
+                "incident_site": self._site_view(site),
+                "allowed_commands": ["resolve_ticket_batch"],
+            }
+        if actor_id == "sensor:churn_risk":
+            account = self.accounts[payload["account_id"]]
+            return {
+                **trace_context,
+                "account": self._account_view(account),
+                "experience_episodes": [
+                    asdict(episode)
+                    for episode in self.experience_episodes.values()
+                    if episode.account_id == account.id
+                ],
+                "tickets": [
+                    asdict(ticket)
+                    for ticket in self.tickets.values()
+                    if ticket.account_id == account.id
+                ],
+                "existing_offers": [
+                    asdict(offer)
+                    for offer in self.retention_offers.values()
+                    if offer.account_id == account.id
+                ],
+                "allowed_commands": ["apply_retention_offer"],
             }
         if actor_id == "sensor:service_order":
             order = self.orders[payload["order_id"]]

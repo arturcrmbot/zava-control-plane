@@ -115,6 +115,27 @@ const TELCO_STATE: WorldState = {
   credits: [
     { id: "CRD-1", account_id: "ACC-00001", amount: 5, trace_id: TRACE, authority_approved: true },
   ],
+  assets: [
+    { id: "AST-SITE-01-radio-unit", site_id: "SITE-01", kind: "radio-unit", health: 0.41, temperature_c: 67, load: 0.9, failure_probability: 0.72, status: "degraded", risk_band: "high" },
+  ],
+  work_orders: [
+    { id: "WO-00001", site_id: "SITE-01", asset_id: "AST-SITE-01-radio-unit", kind: "repair", priority: 1, required_skill: "radio-unit", required_spare: "radio-unit", due_at: 120, status: "open", technician_id: null },
+  ],
+  technicians: [
+    { id: "TECH-NORTH-01", region: "north", skills: ["radio-unit"], status: "prestaged", assigned_work_order_id: null },
+  ],
+  spare_stocks: [
+    { id: "SPARE-NORTH-RADIO-UNIT", region: "north", part_kind: "radio-unit", quantity: 0, reorder_point: 5 },
+  ],
+  care_tickets: [
+    { id: "TKT-000001", account_id: "ACC-00001", subscription_id: "SUBS-00001", incident_trace_id: TRACE, category: "network_outage", severity: "high", status: "open", root_cause: null },
+  ],
+  experience_episodes: [
+    { id: "EXP-000001", account_id: "ACC-00001", source_trace_id: TRACE, kind: "service_outage", impact_score: 0.7, occurred_at: 80 },
+  ],
+  retention_offers: [
+    { id: "RET-000001", account_id: "ACC-00001", reason: "Service recovery", value_gbp: 75, offer_kind: "service_recovery_bundle", status: "issued" },
+  ],
   customer_impact: { affected_account_count: 1, notified_account_count: 1, credited_account_count: 1, account_ids: ["ACC-00001"] },
   objectives: [
     {
@@ -134,6 +155,7 @@ function hook(over: Partial<UseWorldSimulationResult> = {}): UseWorldSimulationR
     error: null,
     injectSurge: vi.fn(async () => {}),
     injectSiteFailure: vi.fn(async () => {}),
+    runScenario: vi.fn(async () => {}),
     ...over,
   };
 }
@@ -218,12 +240,29 @@ describe("TelcoWorld route", () => {
     expect(injectSiteFailure).toHaveBeenCalledTimes(1);
   });
 
-  it("renders customer impact, order, and control lenses from snapshot data", () => {
+  it("runs a deterministic interconnected scenario", () => {
+    const runScenario = vi.fn(async () => {});
+    mockUseWorld.mockReturnValue(hook({ runScenario }));
     renderWorld();
+
+    fireEvent.click(screen.getByRole("button", { name: "Storm Cascade" }));
+
+    expect(runScenario).toHaveBeenCalledWith("storm-cascade");
+  });
+
+  it("renders field, customer impact, order, and control lenses from snapshot data", () => {
+    renderWorld();
+
+    fireEvent.click(screen.getByRole("button", { name: "Field Operations" }));
+    expect(screen.getByText("AST-SITE-01-radio-unit")).toBeTruthy();
+    expect(screen.getByText("WO-00001")).toBeTruthy();
+    expect(screen.getByText("TECH-NORTH-01")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Customer Impact" }));
     expect(screen.getByText("ACC-00001")).toBeTruthy();
     expect(screen.getByText(/£5 credit/)).toBeTruthy();
+    expect(screen.getByText("TKT-000001")).toBeTruthy();
+    expect(screen.getByText("RET-000001")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Orders" }));
     expect(screen.getByText("ORD-00001")).toBeTruthy();

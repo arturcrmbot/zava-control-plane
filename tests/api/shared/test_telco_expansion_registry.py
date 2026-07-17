@@ -92,4 +92,5 @@ def test_telco_authority_chain_stays_inside_pack(tmp_path):
     authority = runtime.pack.authority
     assert authority["delivery_lead"].delegate_to == "network_ops_director"
     assert authority["network_ops_director"].delegate_to is None
+    assert authority["network_ops_director"].spend_limit_gbp == 1_000_000.0
     assert "network_ops_director" in runtime.pack.personas

@@ -184,6 +184,7 @@ export SIMULATOR_RAMP_ENABLED="0"
 export DREAM_PASS_DEMO_CADENCE_SECONDS="0"
 export ENTITY_PLANE_ENABLED="1"
 export AGT_ENFORCE="1"
+export ZAVA_TELCO_AGENT_MODE="deterministic"
 export DURABLE_EVENT_SECRET="telco-proof-local-isolated"
 export FASTAPI_WEBHOOK_URL="http://127.0.0.1:$API_PORT/internal/durable-event"
 export CORS_ALLOWED_ORIGINS="http://127.0.0.1:$CONTROL_PLANE_PORT,http://127.0.0.1:$BLUEPRINT_PORT,http://127.0.0.1:$API_PORT"
@@ -191,7 +192,16 @@ export AzureWebJobsStorage="DefaultEndpointsProtocol=http;AccountName=devstoreac
 
 start_azurite
 start_functions_host
-for orchestrator in NetworkIncidentOrchestrator ProactiveCustomerCareOrchestrator OrderToActivateOrchestrator; do
+for orchestrator in \
+  NetworkIncidentOrchestrator \
+  ProactiveCustomerCareOrchestrator \
+  OrderToActivateOrchestrator \
+  OutageRiskManagementOrchestrator \
+  PredictiveSiteMaintenanceOrchestrator \
+  FieldRepairDispatchOrchestrator \
+  CapacityOptimizationOrchestrator \
+  ServiceTicketResolutionOrchestrator \
+  RetentionOrchestrationOrchestrator; do
   grep -q "$orchestrator" "$FUNC_LOG" || {
     err "Functions host did not index $orchestrator"
     exit 4

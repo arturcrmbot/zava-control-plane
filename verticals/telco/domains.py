@@ -114,8 +114,8 @@ TELCO_DOMAINS: dict[str, Domain] = {
         hitl_gates=(
             HitlGate(
                 "Approve Exceptional Spend",
-                "delivery_lead_decision",
-                "delivery_lead",
+                "network_ops_director_decision",
+                "network_ops_director",
                 wait_probability=0.0,
             ),
         ),
@@ -137,8 +137,8 @@ TELCO_DOMAINS: dict[str, Domain] = {
         hitl_gates=(
             HitlGate(
                 "Approve Replacement",
-                "delivery_lead_decision",
-                "delivery_lead",
+                "network_ops_director_decision",
+                "network_ops_director",
                 wait_probability=0.0,
             ),
         ),

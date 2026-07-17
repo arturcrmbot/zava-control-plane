@@ -404,8 +404,8 @@ def test_capacity_recovery_releases_infeasible_order_with_a_fresh_trace():
         for event in _events(scenario, "sensor.tripped")
         if event.actor_id == "sensor:service_order" and event.target_id == order_id
     ]
-    assert len(order_sensors) == 2
-    redrive = order_sensors[-1]
+    assert len(order_sensors) == 1
+    redrive = order_sensors[0]
     assert redrive.cause_event_id == stable.event_id
     assert redrive.trace_id != "trace-capacity-1"
     assert redrive.payload["parent_trace_id"] == "trace-capacity-1"

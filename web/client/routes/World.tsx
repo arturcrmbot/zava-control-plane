@@ -82,6 +82,7 @@ function ActiveWorld({ telco }: { telco: boolean }) {
     error,
     injectSurge,
     injectSiteFailure,
+    runScenario,
   } = useWorldSimulation();
   const [selectedActor, setSelectedActor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -193,6 +194,7 @@ function ActiveWorld({ telco }: { telco: boolean }) {
         loading={loading}
         error={error}
         onFailSite={injectSiteFailure}
+        onRunScenario={runScenario}
       />
     );
   }

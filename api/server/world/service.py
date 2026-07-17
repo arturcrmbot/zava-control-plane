@@ -281,6 +281,13 @@ class ActorWorldService:
         inject = self._require_scenario_method("inject_technician_unavailable")
         return inject(technician_id)
 
+    def run_scenario(self, name: str) -> dict[str, Any]:
+        run = self._require_scenario_method("run_scenario")
+        start = len(self.runtime.journal)
+        result = run(name)
+        self._publish_since(start)
+        return result
+
     # -- catch-up ---------------------------------------------------------
 
     def events_after(self, seq: int) -> list[dict[str, Any]]:

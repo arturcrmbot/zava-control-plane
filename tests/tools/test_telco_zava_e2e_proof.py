@@ -76,15 +76,34 @@ def test_telco_proof_driver_declares_cross_surface_contract():
             "network-incident",
             "proactive-customer-care",
             "order-to-activate",
+            "outage-risk-management",
+            "predictive-site-maintenance",
+            "field-repair-dispatch",
+            "capacity-optimization",
+            "service-ticket-resolution",
+            "retention-orchestration",
         ],
     }
 
 
-def test_telco_proof_drives_a_real_capacity_exception_and_fails_fast():
+def test_telco_proof_drives_all_four_real_scenarios_and_fails_fast():
     source = DRIVER.read_text(encoding="utf-8")
 
-    assert '"/api/world/inject/capacity_pressure"' in source
+    for name in (
+        "storm-cascade",
+        "maintenance-save",
+        "capacity-revenue",
+        "vulnerable-retention",
+    ):
+        assert name in source
     assert "if (error instanceof ProofError)" in source
+
+
+def test_telco_proof_uses_deterministic_agents_and_indexes_nine_orchestrators():
+    source = SCRIPT.read_text(encoding="utf-8")
+
+    assert 'ZAVA_TELCO_AGENT_MODE="deterministic"' in source
+    assert source.count("Orchestrator") >= 9
 
 
 def test_telco_proof_queries_workflow_nodes_and_connected_graph_topology():

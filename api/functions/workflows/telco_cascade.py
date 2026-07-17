@@ -27,8 +27,8 @@ CASCADE_SPECS = {
             ("Pre-Stage Resources", "deterministic"),
         ),
         approval_phase="Approve Exceptional Spend",
-        approval_event="delivery_lead_decision",
-        approval_persona="delivery_lead",
+        approval_event="network_ops_director_decision",
+        approval_persona="network_ops_director",
     ),
     "predictive-site-maintenance": CascadeSpec(
         workflow_type="predictive-site-maintenance",
@@ -39,8 +39,8 @@ CASCADE_SPECS = {
             ("Create Work Order", "deterministic"),
         ),
         approval_phase="Approve Replacement",
-        approval_event="delivery_lead_decision",
-        approval_persona="delivery_lead",
+        approval_event="network_ops_director_decision",
+        approval_persona="network_ops_director",
     ),
     "field-repair-dispatch": CascadeSpec(
         workflow_type="field-repair-dispatch",
@@ -121,18 +121,24 @@ def telco_cascade_orchestration(
         if kind == "hitl":
             if not decision.get("requires_approval"):
                 continue
+            approval_event = str(
+                decision.get("approval_event") or spec.approval_event
+            )
+            approval_persona = str(
+                decision.get("approval_persona") or spec.approval_persona
+            )
             yield checkpoint(
                 "suspended",
                 {
                     "reason": "awaiting_approval",
                     "phase": phase,
                     "wait_kind": "operator_review",
-                    "persona": spec.approval_persona,
-                    "external_event": spec.approval_event,
+                    "persona": approval_persona,
+                    "external_event": approval_event,
                     "context": decision.get("approval_context", {}),
                 },
             )
-            decision_event = context.wait_for_external_event(spec.approval_event)
+            decision_event = context.wait_for_external_event(approval_event)
             timer = context.create_timer(
                 context.current_utc_datetime + timedelta(minutes=5)
             )

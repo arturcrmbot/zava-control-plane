@@ -536,6 +536,12 @@ _REL_TABLES: tuple[tuple[str, str], ...] = (
     ("HOSTED_ON", "CREATE REL TABLE IF NOT EXISTS HOSTED_ON (FROM Asset TO Asset, decided_at TIMESTAMP)"),
     ("PLACED_ORDER", "CREATE REL TABLE IF NOT EXISTS PLACED_ORDER (FROM Account TO Asset, decided_at TIMESTAMP)"),
     ("DECIDED_ACCOUNT", "CREATE REL TABLE IF NOT EXISTS DECIDED_ACCOUNT (FROM Decision TO Account, decided_at TIMESTAMP)"),
+    ("ASSET_AT_SITE", "CREATE REL TABLE IF NOT EXISTS ASSET_AT_SITE (FROM Asset TO Asset, decided_at TIMESTAMP)"),
+    ("WORK_FOR_ASSET", "CREATE REL TABLE IF NOT EXISTS WORK_FOR_ASSET (FROM Asset TO Asset, decided_at TIMESTAMP)"),
+    ("ASSIGNED_TO", "CREATE REL TABLE IF NOT EXISTS ASSIGNED_TO (FROM Asset TO Person, decided_at TIMESTAMP)"),
+    ("REQUIRES_SPARE", "CREATE REL TABLE IF NOT EXISTS REQUIRES_SPARE (FROM Asset TO Asset, decided_at TIMESTAMP)"),
+    ("TICKET_FOR_SERVICE", "CREATE REL TABLE IF NOT EXISTS TICKET_FOR_SERVICE (FROM Asset TO Asset, decided_at TIMESTAMP)"),
+    ("OFFER_FOR_ACCOUNT", "CREATE REL TABLE IF NOT EXISTS OFFER_FOR_ACCOUNT (FROM Asset TO Account, decided_at TIMESTAMP)"),
     # Note: COSTED_TO targets CostCentre. A separate Money→Brand cost rel
     # is added in Phase 3 (Task 3.5) once Brand nodes exist.
     # ----- lesson-store: dream-pass provenance edges -------------------

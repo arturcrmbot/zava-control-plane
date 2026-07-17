@@ -17,6 +17,10 @@ _SKILL_BY_WORKFLOW = {
     "service-ticket-resolution": "ticket-root-cause-correlation",
     "retention-orchestration": "retention-offer-selection",
 }
+_SKILL_BY_PHASE = {
+    ("retention-orchestration", "Analyse Churn Drivers"): "churn-driver-analysis",
+    ("retention-orchestration", "Select Retention Offer"): "retention-offer-selection",
+}
 
 
 async def run_agent_session(prompt: str, **kwargs) -> dict[str, Any]:
@@ -135,12 +139,55 @@ def _deterministic_selection(payload: dict[str, Any]) -> dict[str, Any]:
             ),
             "reasoning": "Restore safe headroom with the least permanent action.",
         }
+    if workflow_type == "service-ticket-resolution":
+        ticket_ids = sorted(
+            str(item["id"])
+            for item in observation.get("tickets") or []
+            if isinstance(item, dict) and item.get("id")
+        )
+        return {
+            "ticket_ids": ticket_ids,
+            "root_cause": "network_site_failure",
+            "resolution": "Restored service and confirmed account impact.",
+            "reasoning": "Resolve the correlated outage ticket batch together.",
+        }
+    if workflow_type == "retention-orchestration":
+        if payload.get("phase") == "Analyse Churn Drivers":
+            churn_drivers = sorted(
+                {
+                    str(item["kind"])
+                    for item in observation.get("experience_episodes") or []
+                    if isinstance(item, dict) and item.get("kind")
+                }
+            )
+            return {
+                "churn_drivers": churn_drivers,
+                "reasoning": "Rank service experience evidence by direct account impact.",
+            }
+        account = _require_dict(observation.get("account"), label="account")
+        vulnerable = bool(account.get("vulnerable"))
+        prior = _require_dict(
+            payload.get("prior_decision"),
+            label="prior_decision",
+        )
+        drivers = list(prior.get("churn_drivers") or ["service_experience"])
+        return {
+            "offer_kind": (
+                "service_recovery_bundle" if vulnerable else "loyalty_credit"
+            ),
+            "value_gbp": 75.0 if vulnerable else 30.0,
+            "reason": f"Service recovery for {', '.join(map(str, drivers))}",
+            "reasoning": "Tie the smallest fair remedy to evidenced service harm.",
+        }
     raise ValueError(f"unsupported Telco cascade workflow: {workflow_type!r}")
 
 
 async def _live_selection(payload: dict[str, Any]) -> dict[str, Any]:
     workflow_type = str(payload.get("type") or "")
-    skill = _SKILL_BY_WORKFLOW.get(workflow_type)
+    skill = _SKILL_BY_PHASE.get(
+        (workflow_type, str(payload.get("phase") or "")),
+        _SKILL_BY_WORKFLOW.get(workflow_type),
+    )
     if skill is None:
         raise ValueError(f"unsupported Telco cascade workflow: {workflow_type!r}")
     prompt = (
@@ -205,7 +252,7 @@ def _outage_response(
         reasoning=str(selection.get("reasoning") or "Regional resources selected."),
         requires_approval=estimated_cost > 10_000.0,
         approval_amount=estimated_cost,
-        approval_action="delivery_lead_decision",
+        approval_action="network_ops_director_decision",
     )
 
 
@@ -239,7 +286,7 @@ def _maintenance_response(
         reasoning=str(selection.get("reasoning") or "Maintenance action selected."),
         requires_approval=kind == "replace",
         approval_amount=estimated_cost,
-        approval_action="delivery_lead_decision",
+        approval_action="network_ops_director_decision",
     )
 
 
@@ -340,6 +387,98 @@ def _capacity_response(
     )
 
 
+def _ticket_response(
+    payload: dict[str, Any],
+    selection: dict[str, Any],
+) -> dict[str, Any]:
+    observation = _require_dict(payload.get("observation"), label="observation")
+    tickets = {
+        str(item["id"])
+        for item in observation.get("tickets") or []
+        if isinstance(item, dict) and item.get("id")
+    }
+    ticket_ids = _require_selection(
+        selection.get("ticket_ids"),
+        tickets,
+        label="ticket_ids",
+    )
+    root_cause = selection.get("root_cause")
+    resolution = selection.get("resolution")
+    if not isinstance(root_cause, str) or not root_cause.strip():
+        raise ValueError("root_cause must be a non-empty string")
+    if not isinstance(resolution, str) or not resolution.strip():
+        raise ValueError("resolution must be a non-empty string")
+    vulnerable = any(
+        bool(account.get("vulnerable"))
+        for account in observation.get("accounts") or []
+        if isinstance(account, dict)
+    )
+    return _response(
+        payload,
+        command_type="resolve_ticket_batch",
+        issued_by="customer_care",
+        command_payload={
+            "ticket_ids": ticket_ids,
+            "root_cause": root_cause,
+            "resolution": resolution,
+        },
+        reasoning=str(selection.get("reasoning") or "Ticket batch correlated."),
+        requires_approval=vulnerable,
+        approval_amount=0.0,
+        approval_action="cs_manager_decision",
+    )
+
+
+def _retention_response(
+    payload: dict[str, Any],
+    selection: dict[str, Any],
+) -> dict[str, Any]:
+    if payload.get("phase") == "Analyse Churn Drivers":
+        churn_drivers = selection.get("churn_drivers")
+        if not isinstance(churn_drivers, list) or not churn_drivers:
+            raise ValueError("churn_drivers must be a non-empty list")
+        return {
+            "command": None,
+            "requires_approval": False,
+            "churn_drivers": [str(driver) for driver in churn_drivers],
+            "reasoning": str(
+                selection.get("reasoning") or "Churn drivers analysed."
+            ),
+        }
+    observation = _require_dict(payload.get("observation"), label="observation")
+    account = _require_dict(observation.get("account"), label="account")
+    offer_kind = selection.get("offer_kind")
+    reason = selection.get("reason")
+    if not isinstance(offer_kind, str) or not offer_kind.strip():
+        raise ValueError("offer_kind must be a non-empty string")
+    if not isinstance(reason, str) or not reason.strip():
+        raise ValueError("reason must be a non-empty string")
+    value_gbp = selection.get("value_gbp")
+    if (
+        isinstance(value_gbp, bool)
+        or not isinstance(value_gbp, (int, float))
+        or not math.isfinite(value_gbp)
+        or value_gbp <= 0
+    ):
+        raise ValueError("value_gbp must be a finite positive number")
+    value_gbp = float(value_gbp)
+    return _response(
+        payload,
+        command_type="apply_retention_offer",
+        issued_by="customer_care",
+        command_payload={
+            "account_id": account["id"],
+            "reason": reason,
+            "value_gbp": value_gbp,
+            "offer_kind": offer_kind,
+        },
+        reasoning=str(selection.get("reasoning") or "Retention remedy selected."),
+        requires_approval=value_gbp > 50.0,
+        approval_amount=value_gbp,
+        approval_action="cs_manager_decision",
+    )
+
+
 def _response(
     payload: dict[str, Any],
     *,
@@ -361,6 +500,8 @@ def _response(
             "payload": command_payload,
         },
         "requires_approval": requires_approval,
+        "approval_event": approval_action,
+        "approval_persona": approval_action.removesuffix("_decision"),
         "approval_context": {
             "action": approval_action,
             "request": {
@@ -377,6 +518,8 @@ _RESPONSE_BUILDERS = {
     "predictive-site-maintenance": _maintenance_response,
     "field-repair-dispatch": _field_response,
     "capacity-optimization": _capacity_response,
+    "service-ticket-resolution": _ticket_response,
+    "retention-orchestration": _retention_response,
 }
 
 

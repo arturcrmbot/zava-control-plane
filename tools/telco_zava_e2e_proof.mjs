@@ -28,12 +28,40 @@ export const PROOF_CONTRACT = {
     "network-incident",
     "proactive-customer-care",
     "order-to-activate",
+    "outage-risk-management",
+    "predictive-site-maintenance",
+    "field-repair-dispatch",
+    "capacity-optimization",
+    "service-ticket-resolution",
+    "retention-orchestration",
   ],
 };
 
 if (process.argv[2] === "--print-contract") {
   console.log(JSON.stringify(PROOF_CONTRACT));
   process.exit(0);
+}
+
+async function waitForWorkflowTypes(types, knownByType, resolutions) {
+  return waitFor(
+    async () => {
+      await resolveOpenExceptions(resolutions);
+      const workflows = await listWorkflows();
+      const selected = [];
+      for (const type of types) {
+        const known = knownByType.get(type) || new Set();
+        const candidates = workflows
+          .filter((workflow) => workflow.type === type && !known.has(workflow.id))
+          .sort((left, right) => right.createdAt - left.createdAt);
+        const failed = candidates.find((workflow) => workflow.status === "failed");
+        if (failed) throw new ProofError(workflowFailure(failed));
+        if (candidates[0]) selected.push(candidates[0]);
+      }
+      return selected.length === types.length ? selected : null;
+    },
+    `new workflows did not appear for: ${types.join(", ")}`,
+    WORKFLOW_DEADLINE_MS,
+  );
 }
 
 const API = (process.env.WORLD_API_BASE || "http://127.0.0.1:13101").replace(/\/$/, "");
@@ -281,6 +309,15 @@ async function assertLiveSurfaces(context, evidence, workflows, worldState, grap
     .locator("article")
     .count();
   need(evidence.surfaces.customerImpactCards > 0, "Customer Impact lens is empty");
+  await page.getByRole("button", { name: "Field Operations", exact: true }).click();
+  await page.getByTestId("field-operations-lens").waitFor();
+  evidence.surfaces.fieldOperations = await page
+    .getByTestId("field-operations-lens")
+    .innerText();
+  need(
+    evidence.surfaces.fieldOperations.includes("TECH-"),
+    "Field Operations lens has no technicians",
+  );
   await page.screenshot({
     path: path.join(SCREENSHOTS, "world.png"),
     fullPage: true,
@@ -295,11 +332,7 @@ async function assertLiveSurfaces(context, evidence, workflows, worldState, grap
     ).includes(workflow.id);
   }
 
-  const memoryIds = {
-    "network-incident": evidence.ids.incident,
-    "proactive-customer-care": evidence.ids.care,
-    "order-to-activate": evidence.ids.happyOrderWorkflow,
-  };
+  const memoryIds = evidence.ids.workflowsByType;
   await page.goto(`${CONTROL_PLANE}/memory`);
   await page.getByRole("heading", { name: "Memory" }).waitFor();
   evidence.surfaces.memory = {};
@@ -375,89 +408,63 @@ async function runLive() {
     recorderStarted = true;
 
     const initial = await listWorkflows();
+    const knownByType = new Map(
+      PROOF_CONTRACT.workflows.map((type) => [
+        type,
+        new Set(
+          initial
+            .filter((workflow) => workflow.type === type)
+            .map((workflow) => workflow.id),
+        ),
+      ]),
+    );
+    const initialWorld = await getJson("/api/world/state");
     const initialOrderIds = new Set(
-      initial
-        .filter((workflow) => workflow.type === "order-to-activate")
-        .map((workflow) => workflow.id),
+      (initialWorld.orders || []).map((order) => order.id),
     );
     const happyOrder = await postJson("/api/world/service-orders", {
       account_id: "ACC-00001",
       product: "fiber-1gb",
       requested_site_id: "SITE-01",
     });
-    const happyOrderWorkflow = await waitForNewWorkflow(
-      "order-to-activate",
-      initialOrderIds,
-      ["completed"],
-    );
-
-    const beforeFailure = await listWorkflows();
-    const incidentIds = new Set(
-      beforeFailure
-        .filter((workflow) => workflow.type === "network-incident")
-        .map((workflow) => workflow.id),
-    );
-    const careIds = new Set(
-      beforeFailure
-        .filter((workflow) => workflow.type === "proactive-customer-care")
-        .map((workflow) => workflow.id),
-    );
-    const orderIds = new Set(
-      beforeFailure
-        .filter((workflow) => workflow.type === "order-to-activate")
-        .map((workflow) => workflow.id),
-    );
-
-    const capacityPressure = await postJson(
-      "/api/world/inject/capacity_pressure",
-      { site_id: "SITE-12", utilization: 0.95 },
-    );
-    await postJson("/api/world/inject/site_failure", { site_id: "SITE-02" });
-    const exceptionOrder = await postJson("/api/world/service-orders", {
-      account_id: "ACC-00004",
-      product: "fiber-1gb",
-      requested_site_id: capacityPressure.site_id,
-    });
-    const exceptionOrderWorkflow = await waitForNewWorkflow(
-      "order-to-activate",
-      orderIds,
-      ["awaiting_hitl"],
-    );
-    const incident = await waitForNewWorkflow(
-      "network-incident",
-      incidentIds,
-      ["in_progress", "completed"],
-    );
-    const care = await waitForNewWorkflow(
-      "proactive-customer-care",
-      careIds,
-      ["in_progress", "awaiting_hitl", "completed"],
-    );
-
-    const completed = await waitForCompleted(
-      [
-        happyOrderWorkflow.id,
-        exceptionOrderWorkflow.id,
-        incident.id,
-        care.id,
-      ],
+    const scenarios = {};
+    for (const name of [
+      "storm-cascade",
+      "maintenance-save",
+      "capacity-revenue",
+      "vulnerable-retention",
+    ]) {
+      scenarios[name] = await postJson(`/api/world/scenarios/${name}`);
+      need(scenarios[name].ok, `${name} scenario was rejected`);
+    }
+    const appeared = await waitForWorkflowTypes(
+      PROOF_CONTRACT.workflows,
+      knownByType,
       evidence.approvals,
     );
-    const byId = new Map(completed.map((workflow) => [workflow.id, workflow]));
-    const primary = [
-      byId.get(incident.id),
-      byId.get(care.id),
-      byId.get(happyOrderWorkflow.id),
-      byId.get(exceptionOrderWorkflow.id),
-    ];
+    const completed = await waitForCompleted(
+      appeared.map((workflow) => workflow.id),
+      evidence.approvals,
+    );
+    const primary = PROOF_CONTRACT.workflows.map((type) => {
+      const workflow = completed.find((candidate) => candidate.type === type);
+      need(workflow, `completed workflow missing for ${type}`);
+      return workflow;
+    });
+    const workflowsByType = Object.fromEntries(
+      primary.map((workflow) => [workflow.type, workflow.id]),
+    );
+    const postScenarioWorld = await getJson("/api/world/state");
+    const serviceOrders = (postScenarioWorld.orders || [])
+      .filter((order) => !initialOrderIds.has(order.id))
+      .map((order) => order.id);
 
     evidence.ids = {
-      incident: incident.id,
-      care: care.id,
-      happyOrderWorkflow: happyOrderWorkflow.id,
-      exceptionOrderWorkflow: exceptionOrderWorkflow.id,
-      capacitySite: capacityPressure.site_id,
-      serviceOrders: [happyOrder.order_id, exceptionOrder.order_id],
+      workflowsByType,
+      scenarios,
+      capacitySite: "SITE-12",
+      serviceOrders,
+      happyOrder: happyOrder.order_id,
     };
 
     const details = {};
@@ -513,8 +520,8 @@ async function runLive() {
       (site) => site.id === evidence.ids.capacitySite,
     );
     need(
-      capacitySite?.status === "healthy" && capacitySite.utilization >= 0.9,
-      `${evidence.ids.capacitySite} is not a healthy constrained-capacity site`,
+      capacitySite?.status === "healthy" && capacitySite.utilization <= 0.85,
+      `${evidence.ids.capacitySite} did not regain safe capacity headroom`,
     );
     need(
       worldJournal.events.some(

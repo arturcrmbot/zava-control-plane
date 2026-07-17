@@ -62,6 +62,7 @@ def test_critical_asset_replacement_requires_delivery_approval():
     assert result["command"]["payload"]["priority"] == 1
     assert result["requires_approval"] is True
     assert result["approval_context"]["request"]["amount"] == 12_000.0
+    assert result["approval_event"] == "network_ops_director_decision"
 
 
 def test_severe_storm_prestage_requires_delivery_approval():
@@ -84,6 +85,7 @@ def test_severe_storm_prestage_requires_delivery_approval():
 
     assert result["requires_approval"] is True
     assert result["approval_context"]["request"]["amount"] > 10_000.0
+    assert result["approval_event"] == "network_ops_director_decision"
 
 
 def test_field_decision_uses_cross_region_spare_as_an_approved_exception():
@@ -148,6 +150,63 @@ def test_capacity_decision_restores_twenty_percent_headroom():
     assert result["requires_approval"] is False
 
 
+def test_ticket_decision_builds_vulnerable_customer_batch_for_review():
+    payload = _base_payload(
+        "service-ticket-resolution",
+        {
+            "tickets": [
+                {"id": "TKT-000002", "category": "network_outage"},
+                {"id": "TKT-000001", "category": "network_outage"},
+            ],
+            "accounts": [
+                {"id": "ACC-00001", "vulnerable": False},
+                {"id": "ACC-00002", "vulnerable": True},
+            ],
+            "incident_site": {"id": "SITE-02"},
+        },
+    )
+
+    result = telco_cascade.telco_cascade_decision(payload)
+
+    command = result["command"]
+    assert command["type"] == "resolve_ticket_batch"
+    assert command["payload"]["ticket_ids"] == ["TKT-000001", "TKT-000002"]
+    assert command["payload"]["root_cause"] == "network_site_failure"
+    assert result["requires_approval"] is True
+
+
+def test_retention_uses_two_agent_phases_before_building_offer():
+    observation = {
+        "account": {
+            "id": "ACC-00002",
+            "segment": "consumer",
+            "vulnerable": True,
+        },
+        "experience_episodes": [
+            {"kind": "service_outage", "impact_score": 0.9},
+        ],
+        "tickets": [{"root_cause": "network_site_failure"}],
+        "existing_offers": [],
+    }
+    analysis_payload = _base_payload("retention-orchestration", observation)
+    analysis_payload["phase"] = "Analyse Churn Drivers"
+
+    analysis = telco_cascade.telco_cascade_decision(analysis_payload)
+
+    assert analysis["command"] is None
+    assert analysis["churn_drivers"] == ["service_outage"]
+
+    offer_payload = _base_payload("retention-orchestration", observation)
+    offer_payload["phase"] = "Select Retention Offer"
+    offer_payload["prior_decision"] = analysis
+    offer = telco_cascade.telco_cascade_decision(offer_payload)
+
+    assert offer["command"]["type"] == "apply_retention_offer"
+    assert offer["command"]["payload"]["account_id"] == "ACC-00002"
+    assert offer["command"]["payload"]["value_gbp"] == 75.0
+    assert offer["requires_approval"] is True
+
+
 def test_live_decision_uses_the_registered_workflow_skill(monkeypatch):
     captured = {}
 
@@ -183,6 +242,41 @@ def test_live_decision_uses_the_registered_workflow_skill(monkeypatch):
     assert captured["workflow_id"] == "WF-TELCO-001"
     assert captured["skill_dir"].name == "outage-risk-planning"
     assert result["command"]["payload"]["technician_ids"] == ["TECH-WEST-01"]
+
+
+def test_retention_analysis_uses_churn_driver_skill(monkeypatch):
+    captured = {}
+
+    async def fake_run_agent_session(prompt: str, **kwargs):
+        captured.update(kwargs)
+        return {
+            "churn_drivers": ["service_outage"],
+            "reasoning": "Outage evidence dominates.",
+        }
+
+    monkeypatch.setattr(
+        telco_cascade,
+        "run_agent_session",
+        fake_run_agent_session,
+    )
+    payload = _base_payload(
+        "retention-orchestration",
+        {
+            "account": {"id": "ACC-00002", "vulnerable": True},
+            "experience_episodes": [
+                {"kind": "service_outage", "impact_score": 0.9},
+            ],
+            "tickets": [],
+            "existing_offers": [],
+        },
+    )
+    payload["phase"] = "Analyse Churn Drivers"
+    payload["agent_mode"] = "live"
+
+    result = telco_cascade.telco_cascade_decision(payload)
+
+    assert captured["skill_label"] == "churn-driver-analysis"
+    assert result["churn_drivers"] == ["service_outage"]
 
 
 def test_deterministic_proof_mode_can_be_selected_by_environment(monkeypatch):

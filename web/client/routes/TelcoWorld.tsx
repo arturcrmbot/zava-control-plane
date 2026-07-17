@@ -9,6 +9,7 @@ import { useMemo, useState } from "react";
 import { RadioTower, AlertTriangle, Zap } from "lucide-react";
 import {
   type WorldEvent,
+  type TelcoScenarioName,
   type WorldState,
   type WorldSite,
   type WorldSession,
@@ -20,6 +21,12 @@ import { deriveCommonIntervention, type InterventionStep } from "@client/lib/wor
 const REGIONS = ["north", "east", "south", "west"] as const;
 const TOKEN_CAP = 24;
 const JOURNAL_CAP = 30;
+const SCENARIOS: Array<{ name: TelcoScenarioName; label: string }> = [
+  { name: "storm-cascade", label: "Storm Cascade" },
+  { name: "maintenance-save", label: "Maintenance Save" },
+  { name: "capacity-revenue", label: "Capacity Revenue" },
+  { name: "vulnerable-retention", label: "Vulnerable Retention" },
+];
 
 function pct(n: number | undefined): number {
   return Math.round((n ?? 0) * 100);
@@ -66,17 +73,20 @@ function deriveIntervention(events: WorldEvent[]): NetIntervention | null {
 }
 
 export default function TelcoWorld({
-  state, events, loading, error, onFailSite,
+  state, events, loading, error, onFailSite, onRunScenario,
 }: {
   state: WorldState;
   events: WorldEvent[];
   loading: boolean;
   error: string | null;
   onFailSite: () => Promise<void>;
+  onRunScenario: (name: TelcoScenarioName) => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
-  const [lens, setLens] = useState<"Network" | "Customer Impact" | "Orders" | "Control">("Network");
+  const [lens, setLens] = useState<
+    "Network" | "Field Operations" | "Customer Impact" | "Orders" | "Control"
+  >("Network");
   const toggle = (id: string | null) => setSelected((c) => (c === id ? null : id));
   const sites = state.sites ?? [];
   const sessions = state.sessions ?? [];
@@ -112,6 +122,10 @@ export default function TelcoWorld({
   async function handleFail() {
     setBusy(true);
     try { await onFailSite(); } finally { setBusy(false); }
+  }
+  async function handleScenario(name: TelcoScenarioName) {
+    setBusy(true);
+    try { await onRunScenario(name); } finally { setBusy(false); }
   }
   const lanes: Array<{ id: string; title: string; list: WorldSession[]; tone: string }> = [
     { id: "degraded", title: "Degraded", list: degraded, tone: "text-red-600 dark:text-red-400" },
@@ -152,7 +166,7 @@ export default function TelcoWorld({
           </div>
         )}
         <nav className="flex flex-wrap gap-2" aria-label="Telco lenses">
-          {(["Network", "Customer Impact", "Orders", "Control"] as const).map((item) => (
+          {(["Network", "Field Operations", "Customer Impact", "Orders", "Control"] as const).map((item) => (
             <button
               key={item}
               type="button"
@@ -167,6 +181,20 @@ export default function TelcoWorld({
             </button>
           ))}
         </nav>
+        <section aria-label="Deterministic Telco scenarios" className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Stories</span>
+          {SCENARIOS.map((scenario) => (
+            <button
+              key={scenario.name}
+              type="button"
+              disabled={busy}
+              onClick={() => void handleScenario(scenario.name)}
+              className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+            >
+              {scenario.label}
+            </button>
+          ))}
+        </section>
         {lens === "Network" && (
           <>
         <WorldObjectiveStrip testId="telco-objective" objectives={state?.objectives} />
@@ -242,6 +270,7 @@ export default function TelcoWorld({
         </section>
           </>
         )}
+        {lens === "Field Operations" && <FieldOperationsLens state={state} />}
         {lens === "Customer Impact" && <CustomerImpactLens state={state} />}
         {lens === "Orders" && <OrderLens state={state} />}
         {lens === "Control" && <ControlLens state={state} events={events} />}
@@ -253,20 +282,94 @@ export default function TelcoWorld({
   );
 }
 
+function FieldOperationsLens({ state }: { state: WorldState }) {
+  const assets = state.assets ?? [];
+  const atRisk = assets.filter((asset) => (
+    asset.risk_band !== "healthy" || asset.status !== "healthy"
+  ));
+  const visibleAssets = atRisk.length > 0 ? atRisk : assets.slice(0, 8);
+  return (
+    <section data-testid="field-operations-lens" className="grid gap-3 lg:grid-cols-2">
+      <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assets at risk</h2>
+        {visibleAssets.map((asset) => (
+          <div key={asset.id} className="mt-2 border-t border-slate-100 pt-2 text-xs dark:border-slate-800">
+            <div className="font-mono font-semibold">{asset.id}</div>
+            <div className="text-slate-500">
+              {asset.risk_band} · health {Math.round(asset.health * 100)}% · {asset.temperature_c}°C
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Work orders</h2>
+        {(state.work_orders ?? []).map((order) => (
+          <div key={order.id} className="mt-2 border-t border-slate-100 pt-2 text-xs dark:border-slate-800">
+            <div className="font-mono font-semibold">{order.id}</div>
+            <div className="text-slate-500">{order.kind} · {order.asset_id} · {order.status}</div>
+          </div>
+        ))}
+      </div>
+      <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Field technicians</h2>
+        {(state.technicians ?? []).map((technician) => (
+          <div key={technician.id} className="mt-2 flex justify-between border-t border-slate-100 pt-2 text-xs dark:border-slate-800">
+            <span className="font-mono font-semibold">{technician.id}</span>
+            <span className="text-slate-500">{technician.region} · {technician.status}</span>
+          </div>
+        ))}
+      </div>
+      <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Spare stock</h2>
+        {(state.spare_stocks ?? []).map((stock) => (
+          <div key={stock.id} className="mt-2 flex justify-between border-t border-slate-100 pt-2 text-xs dark:border-slate-800">
+            <span className="font-mono">{stock.id}</span>
+            <span className={stock.quantity <= stock.reorder_point ? "font-semibold text-red-600" : "text-slate-500"}>
+              {stock.quantity} available
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function CustomerImpactLens({ state }: { state: WorldState }) {
   const impacted = new Set(state.customer_impact?.account_ids ?? []);
   const accounts = (state.accounts ?? []).filter((account) => impacted.has(account.id));
   return (
-    <section data-testid="customer-impact-lens" className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-      {accounts.map((account) => (
-        <article key={account.id} className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-          <div className="font-mono text-sm font-semibold">{account.id}</div>
-          <div className="mt-1 text-xs text-slate-500">{account.segment} · {account.subscriber_id}</div>
-          <div className="mt-2 text-xs">
-            {account.notification_ids.length} notification · £{account.total_credits} credit
-          </div>
-        </article>
-      ))}
+    <section data-testid="customer-impact-lens" className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {accounts.map((account) => (
+          <article key={account.id} className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+            <div className="font-mono text-sm font-semibold">{account.id}</div>
+            <div className="mt-1 text-xs text-slate-500">{account.segment} · {account.subscriber_id}</div>
+            <div className="mt-2 text-xs">
+              {account.notification_ids.length} notification · £{account.total_credits} credit
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Care tickets</h2>
+          {(state.care_tickets ?? []).map((ticket) => (
+            <div key={ticket.id} className="mt-2 border-t border-slate-100 pt-2 text-xs dark:border-slate-800">
+              <div className="font-mono font-semibold">{ticket.id}</div>
+              <div className="text-slate-500">{ticket.category} · {ticket.severity} · {ticket.status}</div>
+            </div>
+          ))}
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Retention offers</h2>
+          {(state.retention_offers ?? []).map((offer) => (
+            <div key={offer.id} className="mt-2 border-t border-slate-100 pt-2 text-xs dark:border-slate-800">
+              <div className="font-mono font-semibold">{offer.id}</div>
+              <div className="text-slate-500">{offer.offer_kind} · £{offer.value_gbp} · {offer.status}</div>
+            </div>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }

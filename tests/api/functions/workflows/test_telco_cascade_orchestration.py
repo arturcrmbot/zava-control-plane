@@ -76,9 +76,11 @@ def _decision(*, requires_approval: bool) -> dict:
         },
         "requires_approval": requires_approval,
         "approval_context": {
-            "action": "delivery_lead_decision",
+            "action": "network_ops_director_decision",
             "request": {"amount": 12_000.0},
         },
+        "approval_event": "network_ops_director_decision",
+        "approval_persona": "network_ops_director",
         "reasoning": "evidence-backed decision",
     }
 
@@ -107,12 +109,12 @@ def test_cascade_orchestration_waits_for_registered_approver():
     context = _Context(
         "predictive-site-maintenance",
         _decision(requires_approval=True),
-        approval={"decision": "approve", "persona": "delivery_lead"},
+        approval={"decision": "approve", "persona": "network_ops_director"},
     )
 
     result = _drive(context, "predictive-site-maintenance")
 
-    assert context.external_event == "delivery_lead_decision"
+    assert context.external_event == "network_ops_director_decision"
     assert result["command"]["payload"]["approval_decision"] == "approve"
     suspended = next(
         payload["payload"]
@@ -120,7 +122,7 @@ def test_cascade_orchestration_waits_for_registered_approver():
         if name == "checkpoint_activity_trigger"
         and payload["kind"] == "suspended"
     )
-    assert suspended["persona"] == "delivery_lead"
+    assert suspended["persona"] == "network_ops_director"
     assert suspended["context"]["request"]["amount"] == 12_000.0
 
 
@@ -128,7 +130,7 @@ def test_cascade_orchestration_stops_when_approval_is_denied():
     context = _Context(
         "predictive-site-maintenance",
         _decision(requires_approval=True),
-        approval={"decision": "deny", "persona": "delivery_lead"},
+        approval={"decision": "deny", "persona": "network_ops_director"},
     )
 
     result = _drive(context, "predictive-site-maintenance")

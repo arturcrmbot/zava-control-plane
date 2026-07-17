@@ -1,6 +1,6 @@
 {
   "capabilities": ["blueprint", "world", "memory", "knowledge"],
-  "lenses": ["telco-network", "customer-impact", "order", "control"],
+  "lenses": ["telco-network", "field-operations", "customer-impact", "order", "control"],
   "theme": {
     "accent": "#14b8a6",
     "label": "Telco"

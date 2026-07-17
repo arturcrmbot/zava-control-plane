@@ -45,6 +45,7 @@ def test_runtime_payload_exposes_telco_world(tmp_path) -> None:
     assert payload["world_scale"] == "demo"
     assert payload["ui"]["lenses"] == [
         "telco-network",
+        "field-operations",
         "customer-impact",
         "order",
         "control",

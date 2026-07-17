@@ -75,6 +75,16 @@ class TechnicianUnavailableRequest(BaseModel):
     technician_id: str = Field(min_length=1)
 
 
+TELCO_SCENARIOS = frozenset(
+    {
+        "storm-cascade",
+        "maintenance-save",
+        "capacity-revenue",
+        "vulnerable-retention",
+    }
+)
+
+
 @router.get("/state")
 async def world_state() -> dict:
     service = getattr(app_state, "world_service", None)
@@ -239,3 +249,21 @@ async def inject_technician_unavailable(body: TechnicianUnavailableRequest) -> d
         "sim_time": service.runtime.now,
         "technician_id": technician_id,
     }
+
+
+@router.post("/scenarios/{name}")
+async def run_telco_scenario(name: str) -> dict:
+    if name not in TELCO_SCENARIOS:
+        return {"ok": False, "error": f"unknown Telco scenario: {name!r}"}
+    service = getattr(app_state, "world_service", None)
+    run = getattr(service, "run_scenario", None) if service is not None else None
+    if run is None:
+        return {
+            "ok": False,
+            "error": "telco world not enabled (set ZAVA_WORLD=telco)",
+        }
+    try:
+        result = run(name)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": True, **result}

@@ -125,6 +125,76 @@ export interface WorldCredit {
   authority_approved: boolean;
 }
 
+export interface WorldNetworkAsset {
+  id: string;
+  site_id: string;
+  kind: string;
+  health: number;
+  temperature_c: number;
+  load: number;
+  failure_probability: number;
+  status: string;
+  risk_band: string;
+}
+
+export interface WorldWorkOrder {
+  id: string;
+  site_id: string;
+  asset_id: string;
+  kind: string;
+  priority: number;
+  required_skill: string;
+  required_spare: string;
+  due_at: number;
+  status: string;
+  technician_id: string | null;
+}
+
+export interface WorldTechnician {
+  id: string;
+  region: string;
+  skills: string[];
+  status: string;
+  assigned_work_order_id: string | null;
+}
+
+export interface WorldSpareStock {
+  id: string;
+  region: string;
+  part_kind: string;
+  quantity: number;
+  reorder_point: number;
+}
+
+export interface WorldCareTicket {
+  id: string;
+  account_id: string;
+  subscription_id: string;
+  incident_trace_id: string;
+  category: string;
+  severity: string;
+  status: string;
+  root_cause: string | null;
+}
+
+export interface WorldExperienceEpisode {
+  id: string;
+  account_id: string;
+  source_trace_id: string;
+  kind: string;
+  impact_score: number;
+  occurred_at: number;
+}
+
+export interface WorldRetentionOffer {
+  id: string;
+  account_id: string;
+  reason: string;
+  value_gbp: number;
+  offer_kind: string;
+  status: string;
+}
+
 // -- objective/command lifecycle: mirror world/model.py + objectives.py ------
 
 export interface WorldObjective {
@@ -171,6 +241,13 @@ export interface WorldState {
   orders?: WorldOrder[];
   notifications?: WorldNotification[];
   credits?: WorldCredit[];
+  assets?: WorldNetworkAsset[];
+  work_orders?: WorldWorkOrder[];
+  technicians?: WorldTechnician[];
+  spare_stocks?: WorldSpareStock[];
+  care_tickets?: WorldCareTicket[];
+  experience_episodes?: WorldExperienceEpisode[];
+  retention_offers?: WorldRetentionOffer[];
   customer_impact?: {
     affected_account_count: number;
     notified_account_count: number;
@@ -207,7 +284,14 @@ export interface UseWorldSimulationResult {
   error: string | null;
   injectSurge: () => Promise<void>;
   injectSiteFailure: () => Promise<void>;
+  runScenario: (name: TelcoScenarioName) => Promise<void>;
 }
+
+export type TelcoScenarioName =
+  | "storm-cascade"
+  | "maintenance-save"
+  | "capacity-revenue"
+  | "vulnerable-retention";
 
 function isAbort(err: unknown): boolean {
   return err instanceof DOMException ? err.name === "AbortError" : (err as Error)?.name === "AbortError";
@@ -315,6 +399,26 @@ export function useWorldSimulation(): UseWorldSimulationResult {
     [postInjection],
   );
 
+  const runScenario = useCallback(
+    async (name: TelcoScenarioName): Promise<void> => {
+      try {
+        const response = await fetch(`/api/world/scenarios/${name}`, {
+          method: "POST",
+          signal: abortRef.current?.signal,
+        });
+        if (!response.ok) throw new Error(`run scenario HTTP ${response.status}`);
+        const result = await response.json() as { ok?: boolean; error?: string };
+        if (!result.ok) throw new Error(result.error || "scenario rejected");
+      } catch (err) {
+        if (isAbort(err)) return;
+        setError((err as Error).message || "failed to run scenario");
+        return;
+      }
+      await Promise.all([fetchState(), fetchEvents()]);
+    },
+    [fetchState, fetchEvents],
+  );
+
   useEffect(() => {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -329,5 +433,13 @@ export function useWorldSimulation(): UseWorldSimulationResult {
     };
   }, [fetchState, fetchEvents]);
 
-  return { state, events, loading, error, injectSurge, injectSiteFailure };
+  return {
+    state,
+    events,
+    loading,
+    error,
+    injectSurge,
+    injectSiteFailure,
+    runScenario,
+  };
 }

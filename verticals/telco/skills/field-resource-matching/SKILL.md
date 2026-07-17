@@ -6,4 +6,8 @@ description: Matches ready work orders to technicians and spare inventory.
 # Field Resource Matching
 
 Use only supplied work-order, technician, and stock evidence. Choose a feasible
-dispatch with the lowest operational delay. Return concise JSON.
+dispatch with the lowest operational delay. Return only:
+
+```json
+{"technician_id":"TECH-...","source_stock_id":"SPARE-...","action":"repair","reasoning":"..."}
+```

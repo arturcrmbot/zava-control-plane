@@ -8,6 +8,7 @@ KNOWN_LENSES = frozenset(
         "agency-operations",
         "telco-network",
         "customer-impact",
+        "field-operations",
         "order",
         "control",
     }

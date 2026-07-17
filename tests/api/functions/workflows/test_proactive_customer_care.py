@@ -5,6 +5,7 @@ from api.functions.workflows.proactive_customer_care import (
 )
 from api.functions.workflows.proactive_customer_care_activities import (
     customer_care_entitlement_activity,
+    customer_care_execution_activity,
     customer_care_impact_activity,
 )
 
@@ -232,3 +233,45 @@ def test_agent_activities_leave_phase_ownership_to_orchestrator(monkeypatch):
     customer_care_entitlement_activity({"workflow_id": "care-1"})
 
     assert calls == [("Entitlement Decision", False)]
+
+
+def test_deterministic_proof_mode_avoids_model_calls(monkeypatch):
+    monkeypatch.setenv("ZAVA_TELCO_AGENT_MODE", "deterministic")
+
+    async def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("model workflow must not run in deterministic proof")
+
+    monkeypatch.setattr(
+        "api.functions.workflows.proactive_customer_care_activities._run_workflow",
+        fail_if_called,
+    )
+    entitlement = customer_care_entitlement_activity(
+        {
+            "workflow_id": "CARE-001",
+            "impact_assessment": {
+                "accounts": [
+                    {
+                        "id": "ACC-00002",
+                        "segment": "consumer",
+                        "vulnerable": True,
+                        "approval_required": False,
+                    }
+                ]
+            },
+        }
+    )
+    execution = customer_care_execution_activity(
+        {
+            "workflow_id": "CARE-001",
+            "trace_id": "trace-care-001",
+            "entitlement_decision": entitlement,
+            "approval": {"decision": "approve"},
+        }
+    )
+
+    assert entitlement["actions"][0]["credit_amount"] == 20.0
+    assert entitlement["requires_approval"] is False
+    command = execution["command"]
+    assert command["trace_id"] == "trace-care-001"
+    assert command["type"] == "apply_customer_remediation"
+    assert command["payload"]["actions"][0]["account_id"] == "ACC-00002"
