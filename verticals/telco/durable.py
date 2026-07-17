@@ -3,6 +3,10 @@ from __future__ import annotations
 import azure.durable_functions as df
 
 from api.functions.activities.telco_cascade import telco_cascade_decision
+from api.functions.activities.telco_profiled import (
+    telco_profile_command_activity,
+    telco_profile_skill_activity,
+)
 from api.functions.kernel_registration import create_app
 from api.functions.workflows.network_incident import network_incident_orchestration
 from api.functions.workflows.network_incident_activities import (
@@ -31,6 +35,14 @@ from api.functions.workflows.telco_cascade import (
     predictive_site_maintenance_orchestration,
     retention_orchestration,
     service_ticket_resolution_orchestration,
+)
+from api.functions.workflows.telco_profiled import (
+    telco_assist_recommend_act_orchestration,
+    telco_case_triage_resolve_orchestration,
+    telco_detect_diagnose_act_orchestration,
+    telco_forecast_simulate_plan_orchestration,
+    telco_order_fulfil_verify_orchestration,
+    telco_risk_investigate_govern_orchestration,
 )
 
 
@@ -124,3 +136,55 @@ def RetentionOrchestrationOrchestrator(context: df.DurableOrchestrationContext):
 @app.activity_trigger(input_name="payload")
 def telco_cascade_decision_activity_trigger(payload: dict) -> dict:
     return telco_cascade_decision(payload)
+
+
+@app.orchestration_trigger(context_name="context")
+def TelcoDetectDiagnoseActOrchestrator(
+    context: df.DurableOrchestrationContext,
+):
+    return telco_detect_diagnose_act_orchestration(context)
+
+
+@app.orchestration_trigger(context_name="context")
+def TelcoForecastSimulatePlanOrchestrator(
+    context: df.DurableOrchestrationContext,
+):
+    return telco_forecast_simulate_plan_orchestration(context)
+
+
+@app.orchestration_trigger(context_name="context")
+def TelcoCaseTriageResolveOrchestrator(
+    context: df.DurableOrchestrationContext,
+):
+    return telco_case_triage_resolve_orchestration(context)
+
+
+@app.orchestration_trigger(context_name="context")
+def TelcoOrderFulfilVerifyOrchestrator(
+    context: df.DurableOrchestrationContext,
+):
+    return telco_order_fulfil_verify_orchestration(context)
+
+
+@app.orchestration_trigger(context_name="context")
+def TelcoRiskInvestigateGovernOrchestrator(
+    context: df.DurableOrchestrationContext,
+):
+    return telco_risk_investigate_govern_orchestration(context)
+
+
+@app.orchestration_trigger(context_name="context")
+def TelcoAssistRecommendActOrchestrator(
+    context: df.DurableOrchestrationContext,
+):
+    return telco_assist_recommend_act_orchestration(context)
+
+
+@app.activity_trigger(input_name="payload")
+def telco_profile_skill_activity_trigger(payload: dict) -> dict:
+    return telco_profile_skill_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def telco_profile_command_activity_trigger(payload: dict) -> dict:
+    return telco_profile_command_activity(payload)

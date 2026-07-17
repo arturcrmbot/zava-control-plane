@@ -59,6 +59,8 @@ def build_pack() -> VerticalPack:
                     "order_activation_feasibility_activity_trigger",
                     "order_activation_prepare_activity_trigger",
                     "telco_cascade_decision_activity_trigger",
+                    "telco_profile_skill_activity_trigger",
+                    "telco_profile_command_activity_trigger",
                 }
             ),
         ),

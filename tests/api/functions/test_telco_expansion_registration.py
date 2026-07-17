@@ -13,6 +13,12 @@ EXPECTED_ORCHESTRATORS = {
     "CapacityOptimizationOrchestrator",
     "ServiceTicketResolutionOrchestrator",
     "RetentionOrchestrationOrchestrator",
+    "TelcoDetectDiagnoseActOrchestrator",
+    "TelcoForecastSimulatePlanOrchestrator",
+    "TelcoCaseTriageResolveOrchestrator",
+    "TelcoOrderFulfilVerifyOrchestrator",
+    "TelcoRiskInvestigateGovernOrchestrator",
+    "TelcoAssistRecommendActOrchestrator",
 }
 
 
@@ -46,3 +52,5 @@ def test_telco_functions_indexes_cascade_orchestrators(tmp_path):
     indexed = set(json.loads(result.stdout.splitlines()[-1]))
     assert EXPECTED_ORCHESTRATORS <= indexed
     assert "telco_cascade_decision_activity_trigger" in indexed
+    assert "telco_profile_skill_activity_trigger" in indexed
+    assert "telco_profile_command_activity_trigger" in indexed
