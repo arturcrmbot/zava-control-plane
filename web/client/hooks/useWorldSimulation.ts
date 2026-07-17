@@ -195,6 +195,27 @@ export interface WorldRetentionOffer {
   status: string;
 }
 
+export interface TelcoProcessSummary {
+  source_id: string;
+  workflow_type: string;
+  display_name: string;
+  function: string;
+  maturity: "hero" | "standard";
+  engine: string;
+  skills: string[];
+  mcp_packs: string[];
+}
+
+export interface TelcoProcessCase {
+  id: string;
+  workflow_type: string;
+  subject_ids: string[];
+  status: string;
+  facts: Record<string, unknown>;
+  allowed_actions: string[];
+  outcome: Record<string, unknown> | null;
+}
+
 // -- objective/command lifecycle: mirror world/model.py + objectives.py ------
 
 export interface WorldObjective {
@@ -248,6 +269,8 @@ export interface WorldState {
   care_tickets?: WorldCareTicket[];
   experience_episodes?: WorldExperienceEpisode[];
   retention_offers?: WorldRetentionOffer[];
+  process_library?: TelcoProcessSummary[];
+  process_cases?: TelcoProcessCase[];
   customer_impact?: {
     affected_account_count: number;
     notified_account_count: number;
@@ -285,6 +308,7 @@ export interface UseWorldSimulationResult {
   injectSurge: () => Promise<void>;
   injectSiteFailure: () => Promise<void>;
   runScenario: (name: TelcoScenarioName) => Promise<void>;
+  runReferenceProcess: (workflowType: string) => Promise<void>;
 }
 
 export type TelcoScenarioName =
@@ -419,6 +443,31 @@ export function useWorldSimulation(): UseWorldSimulationResult {
     [fetchState, fetchEvents],
   );
 
+  const runReferenceProcess = useCallback(
+    async (workflowType: string): Promise<void> => {
+      try {
+        const response = await fetch(
+          `/api/world/processes/${encodeURIComponent(workflowType)}/run`,
+          {
+            method: "POST",
+            signal: abortRef.current?.signal,
+          },
+        );
+        if (!response.ok) {
+          throw new Error(`run process HTTP ${response.status}`);
+        }
+        const result = await response.json() as { ok?: boolean; error?: string };
+        if (!result.ok) throw new Error(result.error || "process rejected");
+      } catch (err) {
+        if (isAbort(err)) return;
+        setError((err as Error).message || "failed to run process");
+        return;
+      }
+      await Promise.all([fetchState(), fetchEvents()]);
+    },
+    [fetchState, fetchEvents],
+  );
+
   useEffect(() => {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -441,5 +490,6 @@ export function useWorldSimulation(): UseWorldSimulationResult {
     injectSurge,
     injectSiteFailure,
     runScenario,
+    runReferenceProcess,
   };
 }

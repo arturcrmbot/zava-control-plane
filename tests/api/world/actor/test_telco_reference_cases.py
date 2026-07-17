@@ -78,3 +78,10 @@ def test_reference_cases_render_in_world_snapshot():
         "billing-dispute-resolution"
     )
     assert state["process_cases"][0]["status"] == "open"
+    assert len(state["process_library"]) == 37
+    assert sum(
+        item["maturity"] == "hero" for item in state["process_library"]
+    ) == 9
+    assert sum(
+        item["maturity"] == "standard" for item in state["process_library"]
+    ) == 28

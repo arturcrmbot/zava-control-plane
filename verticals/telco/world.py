@@ -41,7 +41,10 @@ from verticals.telco.operations import (
     WeatherEvent,
     WorkOrder,
 )
-from verticals.telco.process_profiles import STANDARD_PROCESS_PROFILES
+from verticals.telco.process_profiles import (
+    PROCESS_LIBRARY,
+    STANDARD_PROCESS_PROFILES,
+)
 from verticals.telco.reference_actions import (
     PROFILE_BY_COMMAND,
     apply_reference_command,
@@ -2118,6 +2121,7 @@ class NetworkScenario:
             "process_cases": [
                 process_case_view(case) for case in self.process_cases.values()
             ],
+            "process_library": [dict(item) for item in PROCESS_LIBRARY],
         }
 
     def build_observation(self, sensor_event: dict[str, Any], *, now: float) -> dict[str, Any]:

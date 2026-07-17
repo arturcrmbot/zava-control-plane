@@ -17,6 +17,7 @@ import {
 import { WorldInterventionStrip } from "@client/components/WorldInterventionStrip";
 import { WorldObjectiveStrip } from "@client/components/WorldObjectiveStrip";
 import { deriveCommonIntervention, type InterventionStep } from "@client/lib/worldIntervention";
+import TelcoProcessLibrary from "@client/routes/TelcoProcessLibrary";
 
 const REGIONS = ["north", "east", "south", "west"] as const;
 const TOKEN_CAP = 24;
@@ -73,7 +74,7 @@ function deriveIntervention(events: WorldEvent[]): NetIntervention | null {
 }
 
 export default function TelcoWorld({
-  state, events, loading, error, onFailSite, onRunScenario,
+  state, events, loading, error, onFailSite, onRunScenario, onRunProcess,
 }: {
   state: WorldState;
   events: WorldEvent[];
@@ -81,11 +82,12 @@ export default function TelcoWorld({
   error: string | null;
   onFailSite: () => Promise<void>;
   onRunScenario: (name: TelcoScenarioName) => Promise<void>;
+  onRunProcess: (workflowType: string) => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [lens, setLens] = useState<
-    "Network" | "Field Operations" | "Customer Impact" | "Orders" | "Control"
+    "Network" | "Process Library" | "Field Operations" | "Customer Impact" | "Orders" | "Control"
   >("Network");
   const toggle = (id: string | null) => setSelected((c) => (c === id ? null : id));
   const sites = state.sites ?? [];
@@ -166,7 +168,7 @@ export default function TelcoWorld({
           </div>
         )}
         <nav className="flex flex-wrap gap-2" aria-label="Telco lenses">
-          {(["Network", "Field Operations", "Customer Impact", "Orders", "Control"] as const).map((item) => (
+          {(["Network", "Process Library", "Field Operations", "Customer Impact", "Orders", "Control"] as const).map((item) => (
             <button
               key={item}
               type="button"
@@ -269,6 +271,13 @@ export default function TelcoWorld({
           </ul>
         </section>
           </>
+        )}
+        {lens === "Process Library" && (
+          <TelcoProcessLibrary
+            processes={state.process_library ?? []}
+            cases={state.process_cases ?? []}
+            onRun={onRunProcess}
+          />
         )}
         {lens === "Field Operations" && <FieldOperationsLens state={state} />}
         {lens === "Customer Impact" && <CustomerImpactLens state={state} />}

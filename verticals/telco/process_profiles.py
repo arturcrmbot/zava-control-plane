@@ -544,3 +544,123 @@ def validate_process_profiles(
 
 
 validate_process_profiles(STANDARD_PROCESS_PROFILES)
+
+HERO_PROCESS_SUMMARIES = (
+    {
+        "source_id": "OSS-01",
+        "workflow_type": "predictive-site-maintenance",
+        "display_name": "Predictive Site Maintenance",
+        "function": "network-operations",
+        "maturity": "hero",
+        "engine": "hero",
+        "skills": ["site-failure-diagnosis"],
+        "mcp_packs": ["network", "operations"],
+    },
+    {
+        "source_id": "OSS-02",
+        "workflow_type": "network-incident",
+        "display_name": "Network Incident Response",
+        "function": "network-operations",
+        "maturity": "hero",
+        "engine": "hero",
+        "skills": [],
+        "mcp_packs": ["network"],
+    },
+    {
+        "source_id": "OSS-04",
+        "workflow_type": "capacity-optimization",
+        "display_name": "Capacity Optimisation",
+        "function": "network-operations",
+        "maturity": "hero",
+        "engine": "hero",
+        "skills": ["capacity-action-planner"],
+        "mcp_packs": ["network", "twin"],
+    },
+    {
+        "source_id": "OSS-09",
+        "workflow_type": "field-repair-dispatch",
+        "display_name": "Field Repair Dispatch",
+        "function": "network-operations",
+        "maturity": "hero",
+        "engine": "hero",
+        "skills": ["field-resource-matching"],
+        "mcp_packs": ["operations"],
+    },
+    {
+        "source_id": "OSS-15",
+        "workflow_type": "service-ticket-resolution",
+        "display_name": "Service Ticket Resolution",
+        "function": "customer-success",
+        "maturity": "hero",
+        "engine": "hero",
+        "skills": ["ticket-root-cause-correlation"],
+        "mcp_packs": ["operations", "commercial", "network"],
+    },
+    {
+        "source_id": "OSS-20",
+        "workflow_type": "outage-risk-management",
+        "display_name": "Outage Risk Management",
+        "function": "network-operations",
+        "maturity": "hero",
+        "engine": "hero",
+        "skills": ["outage-risk-planning"],
+        "mcp_packs": ["network", "operations", "twin"],
+    },
+    {
+        "source_id": "BSS-03",
+        "workflow_type": "proactive-customer-care",
+        "display_name": "Proactive Customer Care",
+        "function": "customer-success",
+        "maturity": "hero",
+        "engine": "hero",
+        "skills": [
+            "proactive-customer-care-entitlement",
+            "proactive-customer-care-execution",
+        ],
+        "mcp_packs": ["commercial", "network"],
+    },
+    {
+        "source_id": "BSS-04",
+        "workflow_type": "retention-orchestration",
+        "display_name": "Retention Orchestration",
+        "function": "customer-success",
+        "maturity": "hero",
+        "engine": "hero",
+        "skills": ["churn-driver-analysis", "retention-offer-selection"],
+        "mcp_packs": ["commercial", "twin"],
+    },
+    {
+        "source_id": "BSS-06",
+        "workflow_type": "order-to-activate",
+        "display_name": "Order to Activate",
+        "function": "network-operations",
+        "maturity": "hero",
+        "engine": "hero",
+        "skills": [],
+        "mcp_packs": ["commercial", "network"],
+    },
+)
+
+STANDARD_PROCESS_SUMMARIES = tuple(
+    {
+        "source_id": profile.source_id,
+        "workflow_type": profile.workflow_type,
+        "display_name": profile.display_name,
+        "function": profile.function,
+        "maturity": "standard",
+        "engine": profile.engine,
+        "skills": list(profile.skills),
+        "mcp_packs": list(profile.mcp_packs),
+    }
+    for profile in STANDARD_PROCESS_PROFILES.values()
+)
+
+PROCESS_LIBRARY = tuple(
+    sorted(
+        (*HERO_PROCESS_SUMMARIES, *STANDARD_PROCESS_SUMMARIES),
+        key=lambda item: (
+            0 if str(item["source_id"]).startswith("OSS") else 1,
+            str(item["source_id"]),
+        ),
+    )
+)

@@ -9,6 +9,7 @@ KNOWN_LENSES = frozenset(
         "telco-network",
         "customer-impact",
         "field-operations",
+        "process-library",
         "order",
         "control",
     }
