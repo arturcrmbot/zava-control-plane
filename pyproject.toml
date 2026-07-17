@@ -1,7 +1,7 @@
 [project]
 name = "zava-control-plane-py"
 version = "0.1.0"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.11,<3.13"
 dependencies = [
   "fastapi>=0.115",
   "uvicorn[standard]>=0.32",
@@ -21,16 +21,15 @@ dependencies = [
   # api/functions/graphs/executors/agents/runtime.py for the Protocol
   # and docs/superpowers/specs/2026-05-19-substrate-agentic-segments-design.md
   # for the architectural rationale.
-  # Phase 0.2 spike resolved: github-copilot-sdk is the Python sibling of @github/copilot-sdk
-  "github-copilot-sdk>=0.2.1",
+  # Direct runtime dependency. 0.2.1 was removed from PyPI; 0.2.3 preserves
+  # the API used by GHCPRuntime without pulling the unused MAF integration.
+  "github-copilot-sdk==0.2.3",
   # Microsoft Agent Framework: meta-package pulls in agent-framework-core[all]
   # Pinned to exactly 1.0.1 — 1.4.0 ships an empty __init__.py (symbols moved
   # to subpackages) and breaks 'from agent_framework import Workflow' across
   # the codebase. Required pin for mem0 install: see B1 plan, "mem0 install
   # gotcha". Bump deliberately, not via floating resolution.
   "agent-framework==1.0.1",
-  # MAF GitHub Copilot integration (wraps copilot.CopilotClient as a MAF Agent)
-  "agent-framework-github-copilot>=1.0.0b260409",
   # MAF Azure Durable Functions hosting + Durable Task integration
   "agent-framework-azurefunctions>=1.0.0b260409",
   # OpenTelemetry → Azure Monitor (App Insights) for Foundry Tracing tab

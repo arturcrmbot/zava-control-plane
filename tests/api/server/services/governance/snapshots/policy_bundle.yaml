@@ -594,6 +594,24 @@ policy:
     condition:
       field: action
       operator: eq
+      value: customer_care_credit_approval
+    message: matrix:CARE-001 action=customer_care_credit_approval approver=auto band=(0,25) basis='Routine service recovery credit within the automatic customer-care band.'
+    name: matrix:CARE-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: customer_care_credit_approval
+    message: matrix:CARE-002 action=customer_care_credit_approval approver=cs_manager band=(25,None) basis='Material service recovery credit requires Customer Success Manager approval.'
+    name: matrix:CARE-002
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
       value: contract_review_signoff
     message: matrix:CONTRACT-REVIEW-001 action=contract_review_signoff approver=contracts_counsel band=(None,None) basis='NDA review; counsel sign-off, GC for material deviation from template.'
     name: matrix:CONTRACT-REVIEW-001
@@ -1092,6 +1110,15 @@ policy:
       value: employee_onboarding_access
     message: matrix:ONB-003 action=employee_onboarding_access approver=onboarding_it_admin band=(None,None) basis='External contractor; IT admin provisions, counsel confirms NDA + data-handling agreement on file.'
     name: matrix:ONB-003
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: order_capacity_exception
+    message: matrix:ORDER-001 action=order_capacity_exception approver=delivery_lead band=(90,None) basis='Activation on a site at or above 90 percent utilisation requires delivery-lead approval.'
+    name: matrix:ORDER-001
     override: false
     priority: 20
   - action: audit
