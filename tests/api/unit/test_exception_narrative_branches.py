@@ -340,6 +340,13 @@ class TestDescribeSubjectLegacyAndDefault:
         subject, _ = _describe_subject(w)
         assert "<unknown vendor>" in subject
 
+    def test_telco_workflow_never_uses_invoice_vendor_fallback(self):
+        w = _wf(id="OUTAGE-42", type="outage-risk-management")
+        subject, amount = _describe_subject(w)
+        assert subject == "Outage Risk Management workflow OUTAGE-42"
+        assert "vendor" not in subject.lower()
+        assert amount == ""
+
     def test_hiring_workflow_returns_id_only(self):
         w = _wf(id="HIRE-42", type="hiring")
         subject, amount = _describe_subject(w)

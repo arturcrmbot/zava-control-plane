@@ -154,6 +154,9 @@ def _describe_subject(workflow: Workflow) -> tuple[str, str]:
             f"FX {op.get('op_kind', 'op')} {op.get('op_id', '<op>')} "
             f"({op.get('currency_pair', '?')})"
         ), amount_str
+    if workflow.type != "invoice-p2p":
+        label = workflow.type.replace("-", " ").title()
+        return f"{label} workflow {workflow.id}", ""
     inv = workflow.invoice
     vendor = workflow.vendor.name if workflow.vendor else "<unknown vendor>"
     if inv:
