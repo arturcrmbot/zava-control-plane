@@ -5,6 +5,7 @@ from typing import Any
 
 from api.server.services.entity_projections import EntityWrite, RelWrite, slug
 from api.shared.types import Workflow
+from verticals.telco.process_profiles import STANDARD_PROCESS_PROFILES
 
 
 _OBSERVATION_KEYS = {
@@ -254,6 +255,28 @@ def _project_retention(
     ]
 
 
+def _project_reference(
+    workflow: Workflow,
+    observation: dict[str, Any],
+) -> list[EntityWrite | RelWrite]:
+    case = observation.get("case") or {}
+    case_id = str(case.get("id") or workflow.id)
+    return [
+        *_base(workflow),
+        _asset(
+            workflow,
+            case_id,
+            "telco-process-case",
+            {
+                "workflow_type": workflow.type,
+                "status": case.get("status"),
+                "subject_ids": case.get("subject_ids") or [],
+                "outcome": case.get("outcome"),
+            },
+        ),
+    ]
+
+
 _PROJECTORS = {
     "outage-risk-management": _project_outage,
     "predictive-site-maintenance": _project_maintenance,
@@ -265,6 +288,9 @@ _PROJECTORS = {
 
 
 def project(workflow: Workflow) -> list[EntityWrite | RelWrite]:
+    if workflow.type in STANDARD_PROCESS_PROFILES:
+        observation = (workflow.payload or {}).get("process_case") or {}
+        return _project_reference(workflow, observation)
     observation_key = _OBSERVATION_KEYS[workflow.type]
     observation = (workflow.payload or {}).get(observation_key) or {}
     return _PROJECTORS[workflow.type](workflow, observation)

@@ -4,6 +4,8 @@ from api.shared.world_contracts import (
     WorldPackRegistration,
     WorldScaleProfile,
 )
+from verticals.telco.domains import ENGINE_ORCHESTRATORS
+from verticals.telco.process_profiles import STANDARD_PROCESS_PROFILES
 
 
 def build_telco_demo(runtime):
@@ -17,6 +19,31 @@ def build_telco_demo(runtime):
         simulation_minutes=20_000.0,
     )
     return NetworkScenario(runtime, config)
+
+
+STANDARD_OBJECTIVE_ROUTES = tuple(
+    ObjectiveRoute(
+        sensor_id=profile.sensor_id,
+        objective_type=profile.objective_type,
+        allowed_command_types=frozenset({profile.command_type}),
+        success_event_types=frozenset({profile.success_event}),
+        failure_event_types=frozenset({"command.rejected"}),
+        evaluation_timeout_minutes=120.0,
+    )
+    for profile in STANDARD_PROCESS_PROFILES.values()
+)
+STANDARD_RESPONDERS = {
+    profile.objective_type: ResponderRegistration(
+        objective_type=profile.objective_type,
+        orchestrator=ENGINE_ORCHESTRATORS[profile.engine],
+        workflow_type=profile.workflow_type,
+        prefix=profile.source_id.lower().replace("-", ""),
+        owner_function=profile.function.replace("-", "_"),
+        timeout_seconds=900.0,
+        observation_key="process_case",
+    )
+    for profile in STANDARD_PROCESS_PROFILES.values()
+}
 
 
 TELCO_WORLD = WorldPackRegistration(
@@ -102,6 +129,7 @@ TELCO_WORLD = WorldPackRegistration(
             failure_event_types=frozenset({"command.rejected"}),
             evaluation_timeout_minutes=240.0,
         ),
+        *STANDARD_OBJECTIVE_ROUTES,
     ),
     responders={
         "network_service_recovery": ResponderRegistration(
@@ -185,6 +213,7 @@ TELCO_WORLD = WorldPackRegistration(
             timeout_seconds=900.0,
             observation_key="churn_risk",
         ),
+        **STANDARD_RESPONDERS,
     },
 )
 

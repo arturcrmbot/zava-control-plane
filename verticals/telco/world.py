@@ -41,6 +41,17 @@ from verticals.telco.operations import (
     WeatherEvent,
     WorkOrder,
 )
+from verticals.telco.process_profiles import STANDARD_PROCESS_PROFILES
+from verticals.telco.reference_actions import (
+    PROFILE_BY_COMMAND,
+    apply_reference_command,
+    validate_reference_command,
+)
+from verticals.telco.reference_cases import (
+    CASE_BUILDERS,
+    TelcoProcessCase,
+    process_case_view,
+)
 
 SessionKind = Literal["voice", "data", "video"]
 SessionStatus = Literal["active", "degraded", "dropped", "rerouted"]
@@ -91,6 +102,10 @@ BASE_DECAY_PER_MINUTE: dict[str, float] = {
     "backhaul": 0.00003,
 }
 RISK_BANDS: tuple[str, ...] = ("healthy", "elevated", "high", "critical")
+STANDARD_PROFILE_BY_SENSOR = {
+    profile.sensor_id: profile
+    for profile in STANDARD_PROCESS_PROFILES.values()
+}
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -204,6 +219,7 @@ class NetworkScenario:
         self.tickets: dict[str, CareTicket] = {}
         self.experience_episodes: dict[str, ExperienceEpisode] = {}
         self.retention_offers: dict[str, RetentionOffer] = {}
+        self.process_cases: dict[str, TelcoProcessCase] = {}
         self._site_ids: list[str] = []
         self._subscriber_ids: list[str] = []
         self._asset_ids: list[str] = []
@@ -824,6 +840,38 @@ class NetworkScenario:
             "expected_first_sensor": expected_sensors[name],
         }
 
+    def run_reference_process(self, workflow_type: str) -> dict[str, Any]:
+        profile = STANDARD_PROCESS_PROFILES.get(workflow_type)
+        if profile is None:
+            raise ValueError(f"unknown standard Telco process: {workflow_type!r}")
+        case_id = f"CASE-{profile.source_id.replace('-', '')}-{len(self.process_cases) + 1:04d}"
+        case = CASE_BUILDERS[profile.mutation_family](profile, self, case_id)
+        self.process_cases[case.id] = case
+        trace_id = f"{workflow_type}-{case.id}"
+        opened = self.runtime.emit(
+            "process_case.opened",
+            actor_id=case.id,
+            target_id=case.subject_ids[0] if case.subject_ids else None,
+            trace_id=trace_id,
+            payload=process_case_view(case),
+        )
+        sensor = self.runtime.emit(
+            "sensor.tripped",
+            actor_id=profile.sensor_id,
+            target_id=case.id,
+            cause_event_id=opened.event_id,
+            trace_id=trace_id,
+            payload={
+                "case_id": case.id,
+                "measurements": dict(case.facts),
+            },
+        )
+        return {
+            "case_id": case.id,
+            "root_event_id": opened.event_id,
+            "sensor_event_id": sensor.event_id,
+        }
+
     def _resolve_failure_site(self, site_id: str | None) -> str:
         if site_id is not None:
             site = self.sites.get(site_id)
@@ -1173,6 +1221,11 @@ class NetworkScenario:
             if reason is not None:
                 return self._reject_command(command, reason)
             return self._accept_retention_offer(command)
+        if command.type in PROFILE_BY_COMMAND:
+            reason = validate_reference_command(self, command)
+            if reason is not None:
+                return self._reject_command(command, reason)
+            return apply_reference_command(self, command)
         return self._reject_command(command, f"unsupported command type: {command.type!r}")
 
     def _record_command_accepted(
@@ -2017,6 +2070,26 @@ class NetworkScenario:
             "account_ids": sorted(impacted),
         }
 
+    def _reference_subject_view(self, actor_id: str) -> dict[str, Any]:
+        if actor_id in self.sites:
+            return {"kind": "site", **self._site_view(self.sites[actor_id])}
+        if actor_id in self.assets:
+            return {"kind": "network-asset", **self._asset_view(self.assets[actor_id])}
+        if actor_id in self.accounts:
+            return {"kind": "account", **self._account_view(self.accounts[actor_id])}
+        if actor_id in self.subscriptions:
+            return {"kind": "subscription", **asdict(self.subscriptions[actor_id])}
+        if actor_id in self.orders:
+            return {"kind": "order", **asdict(self.orders[actor_id])}
+        if actor_id in self.technicians:
+            return {
+                "kind": "technician",
+                **self._technician_view(self.technicians[actor_id]),
+            }
+        if actor_id in self.spare_stocks:
+            return {"kind": "spare-stock", **asdict(self.spare_stocks[actor_id])}
+        return {"kind": "process-subject", "id": actor_id}
+
     def render_state(self) -> dict[str, Any]:
         from api.server.world.projection import project_network
 
@@ -2042,6 +2115,9 @@ class NetworkScenario:
                 asdict(e) for e in self.experience_episodes.values()
             ],
             "retention_offers": [asdict(o) for o in self.retention_offers.values()],
+            "process_cases": [
+                process_case_view(case) for case in self.process_cases.values()
+            ],
         }
 
     def build_observation(self, sensor_event: dict[str, Any], *, now: float) -> dict[str, Any]:
@@ -2057,6 +2133,22 @@ class NetworkScenario:
                 payload.get("contributing_trace_ids") or []
             ),
         }
+        standard_profile = STANDARD_PROFILE_BY_SENSOR.get(str(actor_id))
+        if standard_profile is not None:
+            case = self.process_cases[payload["case_id"]]
+            return {
+                **trace_context,
+                "event_ids": [sensor_event.get("event_id")],
+                "case": process_case_view(case),
+                "subject_actors": [
+                    self._reference_subject_view(subject_id)
+                    for subject_id in case.subject_ids
+                ],
+                "skills": list(standard_profile.skills),
+                "mcp_packs": list(standard_profile.mcp_packs),
+                "allowed_tools": list(standard_profile.allowed_tools),
+                "allowed_commands": [standard_profile.command_type],
+            }
         if actor_id == "sensor:outage_risk":
             weather = self.weather_events[payload["weather_event_id"]]
             return {

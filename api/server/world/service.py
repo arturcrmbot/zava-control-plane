@@ -297,6 +297,12 @@ class ActorWorldService:
         self._publish_new()
         return result
 
+    def run_reference_process(self, workflow_type: str) -> dict[str, Any]:
+        run = self._require_scenario_method("run_reference_process")
+        result = run(workflow_type)
+        self._publish_new()
+        return result
+
     # -- catch-up ---------------------------------------------------------
 
     def events_after(self, seq: int) -> list[dict[str, Any]]:

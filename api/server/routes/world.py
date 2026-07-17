@@ -31,6 +31,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from api.server.state import app_state
+from verticals.telco.process_profiles import STANDARD_PROCESS_PROFILES
 
 router = APIRouter(prefix="/api/world", tags=["world"])
 
@@ -267,3 +268,33 @@ async def run_telco_scenario(name: str) -> dict:
     except ValueError as exc:
         return {"ok": False, "error": str(exc)}
     return {"ok": True, **result}
+
+
+@router.post("/processes/{workflow_type}/run")
+async def run_telco_reference_process(workflow_type: str) -> dict:
+    if workflow_type not in STANDARD_PROCESS_PROFILES:
+        return {
+            "ok": False,
+            "error": f"unknown standard Telco process: {workflow_type!r}",
+        }
+    service = getattr(app_state, "world_service", None)
+    run = (
+        getattr(service, "run_reference_process", None)
+        if service is not None
+        else None
+    )
+    if run is None:
+        return {
+            "ok": False,
+            "error": "telco world not enabled (set ZAVA_VERTICAL=telco)",
+        }
+    try:
+        result = run(workflow_type)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    return {
+        "ok": True,
+        "workflow_type": workflow_type,
+        **result,
+        "sim_time": service.runtime.now,
+    }

@@ -105,7 +105,7 @@ def test_telco_world_routes_every_new_objective(tmp_path):
     assert {
         responder.workflow_type
         for responder in world.responders.values()
-    } == HERO_WORKFLOWS
+    } == EXPECTED_WORKFLOWS
 
 
 def test_telco_authority_chain_stays_inside_pack(tmp_path):
