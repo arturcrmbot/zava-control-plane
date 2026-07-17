@@ -85,3 +85,28 @@ def test_reference_cases_render_in_world_snapshot():
     assert sum(
         item["maturity"] == "standard" for item in state["process_library"]
     ) == 28
+
+
+def test_reference_case_families_use_credible_telco_subjects():
+    scenario = _scenario()
+
+    expectations = {
+        "spares-inventory-optimization": "spare_stock",
+        "network-configuration-validation": "planning_horizon_days",
+        "contact-centre-agent-assist": "customer_interaction",
+        "service-provisioning-activation": "service_order",
+        "revenue-assurance": "invoice",
+        "fraud-prevention": "identity_case",
+        "core-network-anomaly-management": "assets",
+    }
+    for workflow_type, expected_fact in expectations.items():
+        result = scenario.run_reference_process(workflow_type)
+        case = scenario.process_cases[result["case_id"]]
+        assert expected_fact in case.facts
+
+    contact_case = next(
+        case
+        for case in scenario.process_cases.values()
+        if case.workflow_type == "contact-centre-agent-assist"
+    )
+    assert contact_case.subject_ids[0].startswith("ACC-")

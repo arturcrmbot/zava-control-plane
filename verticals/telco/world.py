@@ -51,7 +51,7 @@ from verticals.telco.reference_actions import (
     validate_reference_command,
 )
 from verticals.telco.reference_cases import (
-    CASE_BUILDERS,
+    CASE_BUILDERS_BY_WORKFLOW,
     TelcoProcessCase,
     process_case_view,
 )
@@ -848,7 +848,11 @@ class NetworkScenario:
         if profile is None:
             raise ValueError(f"unknown standard Telco process: {workflow_type!r}")
         case_id = f"CASE-{profile.source_id.replace('-', '')}-{len(self.process_cases) + 1:04d}"
-        case = CASE_BUILDERS[profile.mutation_family](profile, self, case_id)
+        case = CASE_BUILDERS_BY_WORKFLOW[workflow_type](
+            profile,
+            self,
+            case_id,
+        )
         self.process_cases[case.id] = case
         trace_id = f"{workflow_type}-{case.id}"
         opened = self.runtime.emit(
