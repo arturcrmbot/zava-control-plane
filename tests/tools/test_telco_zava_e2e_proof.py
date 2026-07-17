@@ -83,6 +83,14 @@ def test_telco_proof_driver_declares_cross_surface_contract():
             "service-ticket-resolution",
             "retention-orchestration",
         ],
+        "standard_samples": [
+            "core-network-anomaly-management",
+            "ran-capacity-planning",
+            "billing-dispute-resolution",
+            "service-provisioning-activation",
+            "revenue-assurance",
+            "contact-centre-agent-assist",
+        ],
     }
 
 
@@ -97,6 +105,21 @@ def test_telco_proof_drives_all_four_real_scenarios_and_fails_fast():
     ):
         assert name in source
     assert "if (error instanceof ProofError)" in source
+
+
+def test_telco_proof_runs_one_standard_profile_per_engine():
+    source = DRIVER.read_text(encoding="utf-8")
+
+    for workflow_type in (
+        "core-network-anomaly-management",
+        "ran-capacity-planning",
+        "billing-dispute-resolution",
+        "service-provisioning-activation",
+        "revenue-assurance",
+        "contact-centre-agent-assist",
+    ):
+        assert workflow_type in source
+    assert "/api/world/processes/${type}/run" in source
 
 
 def test_telco_proof_uses_deterministic_agents_and_indexes_nine_orchestrators():

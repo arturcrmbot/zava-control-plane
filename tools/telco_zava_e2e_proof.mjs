@@ -35,7 +35,19 @@ export const PROOF_CONTRACT = {
     "service-ticket-resolution",
     "retention-orchestration",
   ],
+  standard_samples: [
+    "core-network-anomaly-management",
+    "ran-capacity-planning",
+    "billing-dispute-resolution",
+    "service-provisioning-activation",
+    "revenue-assurance",
+    "contact-centre-agent-assist",
+  ],
 };
+const ALL_PROOF_TYPES = [
+  ...PROOF_CONTRACT.workflows,
+  ...PROOF_CONTRACT.standard_samples,
+];
 
 if (process.argv[2] === "--print-contract") {
   console.log(JSON.stringify(PROOF_CONTRACT));
@@ -289,6 +301,16 @@ async function assertLiveSurfaces(context, evidence, workflows, worldState, grap
     subscribers: await page.getByTestId("stat-subscribers").innerText(),
   };
 
+  await page.getByRole("button", { name: "Process Library", exact: true }).click();
+  await page.getByTestId("telco-process-library").waitFor();
+  evidence.surfaces.processLibraryCards = await page
+    .getByTestId("telco-process-card")
+    .count();
+  need(
+    evidence.surfaces.processLibraryCards === 37,
+    `Process Library rendered ${evidence.surfaces.processLibraryCards} cards`,
+  );
+
   await page.getByRole("button", { name: "Orders", exact: true }).click();
   for (const orderId of evidence.ids.serviceOrders) {
     const orderCard = page
@@ -409,7 +431,7 @@ async function runLive() {
 
     const initial = await listWorkflows();
     const knownByType = new Map(
-      PROOF_CONTRACT.workflows.map((type) => [
+      ALL_PROOF_TYPES.map((type) => [
         type,
         new Set(
           initial
@@ -437,22 +459,45 @@ async function runLive() {
       scenarios[name] = await postJson(`/api/world/scenarios/${name}`);
       need(scenarios[name].ok, `${name} scenario was rejected`);
     }
-    const appeared = await waitForWorkflowTypes(
+    const heroAppeared = await waitForWorkflowTypes(
       PROOF_CONTRACT.workflows,
       knownByType,
       evidence.approvals,
     );
-    const completed = await waitForCompleted(
-      appeared.map((workflow) => workflow.id),
+    const heroCompleted = await waitForCompleted(
+      heroAppeared.map((workflow) => workflow.id),
       evidence.approvals,
     );
+    const standardCases = {};
+    const standardCompleted = [];
+    for (const type of PROOF_CONTRACT.standard_samples) {
+      standardCases[type] = await postJson(`/api/world/processes/${type}/run`);
+      need(standardCases[type].ok, `${type} standard process was rejected`);
+      const appeared = await waitForWorkflowTypes(
+        [type],
+        knownByType,
+        evidence.approvals,
+      );
+      const completed = await waitForCompleted(
+        [appeared[0].id],
+        evidence.approvals,
+      );
+      standardCompleted.push(completed[0]);
+    }
+    const completed = [...heroCompleted, ...standardCompleted];
     const primary = PROOF_CONTRACT.workflows.map((type) => {
       const workflow = completed.find((candidate) => candidate.type === type);
       need(workflow, `completed workflow missing for ${type}`);
       return workflow;
     });
+    const standardWorkflows = PROOF_CONTRACT.standard_samples.map((type) => {
+      const workflow = completed.find((candidate) => candidate.type === type);
+      need(workflow, `completed workflow missing for ${type}`);
+      return workflow;
+    });
+    const proofWorkflows = [...primary, ...standardWorkflows];
     const workflowsByType = Object.fromEntries(
-      primary.map((workflow) => [workflow.type, workflow.id]),
+      proofWorkflows.map((workflow) => [workflow.type, workflow.id]),
     );
     const postScenarioWorld = await getJson("/api/world/state");
     const serviceOrders = (postScenarioWorld.orders || [])
@@ -462,13 +507,14 @@ async function runLive() {
     evidence.ids = {
       workflowsByType,
       scenarios,
+      standardCases,
       capacitySite: "SITE-12",
       serviceOrders,
       happyOrder: happyOrder.order_id,
     };
 
     const details = {};
-    for (const workflow of primary) {
+    for (const workflow of proofWorkflows) {
       const detail = await getJson(`/api/workflows/${encodeURIComponent(workflow.id)}`);
       details[workflow.id] = detail;
       evidence.workflowApi[workflow.id] = {
@@ -490,7 +536,7 @@ async function runLive() {
       "Knowledge graph has no connected topology",
     );
     graph.workflowNodes = {};
-    for (const workflow of primary) {
+    for (const workflow of proofWorkflows) {
       const node = await getJson(
         `/api/entities/${encodeURIComponent(workflow.id)}`,
       );
@@ -537,30 +583,46 @@ async function runLive() {
         const events = await constellation.evaluate(
           () => window.__telcoProofEvents || [],
         );
-        return primary.every((workflow) =>
+        const heroIdsObserved = primary.every((workflow) =>
           events.some(
             (event) =>
               event.workflow_id === workflow.id ||
               event.workflowId === workflow.id,
           ),
-        )
+        );
+        const standardTypes = new Set(
+          events
+            .map((event) => event.workflow_type || event.workflowType)
+            .filter(Boolean),
+        );
+        const standardsObserved = PROOF_CONTRACT.standard_samples.every(
+          (type) => standardTypes.has(type),
+        );
+        return heroIdsObserved && standardsObserved
           ? events
           : null;
       },
-      "Constellation stream did not observe every workflow ID",
+      "Constellation stream did not observe hero IDs and standard types",
       60_000,
     );
     const streamEvents = await constellation.evaluate(
       () => window.__telcoProofEvents || [],
     );
     evidence.surfaces.constellation = Object.fromEntries(
-      primary.map((workflow) => [
+      proofWorkflows.map((workflow) => [
         workflow.id,
         streamEvents
           .filter(
             (event) =>
               event.workflow_id === workflow.id ||
-              event.workflowId === workflow.id,
+              event.workflowId === workflow.id ||
+              (
+                PROOF_CONTRACT.standard_samples.includes(workflow.type)
+                && (
+                  event.workflow_type === workflow.type
+                  || event.workflowType === workflow.type
+                )
+              ),
           )
           .map((event) => event.type),
       ]),
@@ -570,11 +632,17 @@ async function runLive() {
       fullPage: true,
     });
 
-    await assertLiveSurfaces(context, evidence, primary, worldState, graph);
+    await assertLiveSurfaces(
+      context,
+      evidence,
+      proofWorkflows,
+      worldState,
+      graph,
+    );
     evidence.recorder.stop = await postJson("/api/blueprint/_recorder/stop");
     recorderStarted = false;
     evidence.recorder.files = (await readdir(RECORDINGS)).sort();
-    for (const type of PROOF_CONTRACT.workflows) {
+    for (const type of ALL_PROOF_TYPES) {
       need(
         evidence.recorder.files.some((name) => name.startsWith(`${type}-`)),
         `recorder produced no ${type} replay`,
@@ -627,7 +695,7 @@ async function runReplay() {
     worldEnabled: null,
   };
   const recordings = await readdir(RECORDINGS);
-  for (const type of PROOF_CONTRACT.workflows) {
+  for (const type of ALL_PROOF_TYPES) {
     need(
       recordings.some((name) => name.startsWith(`${type}-`)),
       `replay input missing ${type}`,
@@ -673,7 +741,7 @@ async function runReplay() {
             .map((event) => event.workflow_type || event.workflowType)
             .filter(Boolean),
         );
-        return PROOF_CONTRACT.workflows.every((type) => seen.has(type))
+        return ALL_PROOF_TYPES.every((type) => seen.has(type))
           ? [...seen].sort()
           : null;
       },
