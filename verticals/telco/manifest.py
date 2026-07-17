@@ -66,6 +66,10 @@ def build_pack() -> VerticalPack:
         skill_roots=(PACK_ROOT / "skills",),
         mcp_modules=(
             "verticals.telco.mcp_tools.customer_care",
+            "verticals.telco.mcp_tools.network",
+            "verticals.telco.mcp_tools.operations",
+            "verticals.telco.mcp_tools.commercial",
+            "verticals.telco.mcp_tools.twin",
         ),
         external_capabilities=frozenset(),
         worlds=TELCO_WORLDS,
