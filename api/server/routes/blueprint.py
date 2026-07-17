@@ -268,6 +268,12 @@ async def blueprint_stream(request: Request) -> EventSourceResponse:
     queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=400)
     loop = asyncio.get_running_loop()
 
+    def _enqueue(normalised: dict[str, Any]) -> None:
+        try:
+            queue.put_nowait(normalised)
+        except asyncio.QueueFull:
+            pass
+
     def _push_bus_event(event: FleetEvent) -> None:
         normalised = _normalise_event(event)
         if normalised is None:
@@ -275,8 +281,8 @@ async def blueprint_stream(request: Request) -> EventSourceResponse:
         if not _OBSERVATORY_CAP.allow():
             return
         try:
-            loop.call_soon_threadsafe(queue.put_nowait, normalised)
-        except (RuntimeError, asyncio.QueueFull):
+            loop.call_soon_threadsafe(_enqueue, normalised)
+        except RuntimeError:
             pass
 
     unsubscribe = app_state.bus.on_any(_push_bus_event)
