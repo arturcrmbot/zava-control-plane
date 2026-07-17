@@ -103,6 +103,7 @@ def test_telco_proof_uses_deterministic_agents_and_indexes_nine_orchestrators():
     source = SCRIPT.read_text(encoding="utf-8")
 
     assert 'ZAVA_TELCO_AGENT_MODE="deterministic"' in source
+    assert 'MAX_OBSERVATORY_EVENTS_PER_SEC="2000"' in source
     assert source.count("Orchestrator") >= 9
 
 

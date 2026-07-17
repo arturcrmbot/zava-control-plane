@@ -576,6 +576,7 @@ class NetworkScenario:
         cause: SimulationEvent,
     ) -> SimulationEvent:
         site = self.sites[asset.site_id]
+        asset.status = "degraded"
         trace_id = f"maintenance-{asset.id}-{cause.event_id}"
         parent_trace_id = self._outage_trace_by_region.get(
             site.region,
@@ -1266,7 +1267,7 @@ class NetworkScenario:
             return f"unknown asset_id: {command.payload.get('asset_id')!r}"
         if asset.status not in {"healthy", "degraded"}:
             return f"asset {asset.id} cannot enter maintenance from {asset.status}"
-        if asset.risk_band == "healthy":
+        if asset.risk_band == "healthy" and asset.status != "degraded":
             return f"asset {asset.id} has no actionable failure risk"
         if any(
             order.asset_id == asset.id and order.status != "completed"

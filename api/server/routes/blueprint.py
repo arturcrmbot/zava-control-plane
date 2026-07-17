@@ -77,6 +77,18 @@ def _make_event_cap() -> _TokenBucket:
 _OBSERVATORY_CAP = _make_event_cap()
 
 
+def _put_nowait_if_space(
+    queue: asyncio.Queue[dict[str, Any]],
+    event: dict[str, Any],
+) -> None:
+    if queue.full():
+        return
+    try:
+        queue.put_nowait(event)
+    except asyncio.QueueFull:
+        return
+
+
 # --------------------------------------------------------------------------
 # Composition tree
 # --------------------------------------------------------------------------
@@ -265,7 +277,7 @@ async def blueprint_stream(request: Request) -> EventSourceResponse:
 
     No global trickle. _stream_loop is gone.
     """
-    queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=400)
+    queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=2_000)
     loop = asyncio.get_running_loop()
 
     def _push_bus_event(event: FleetEvent) -> None:
@@ -275,8 +287,12 @@ async def blueprint_stream(request: Request) -> EventSourceResponse:
         if not _OBSERVATORY_CAP.allow():
             return
         try:
-            loop.call_soon_threadsafe(queue.put_nowait, normalised)
-        except (RuntimeError, asyncio.QueueFull):
+            loop.call_soon_threadsafe(
+                _put_nowait_if_space,
+                queue,
+                normalised,
+            )
+        except RuntimeError:
             pass
 
     unsubscribe = app_state.bus.on_any(_push_bus_event)
@@ -286,6 +302,8 @@ async def blueprint_stream(request: Request) -> EventSourceResponse:
     # the same queue. Cancelled on disconnect.
     async def _per_connection_replay() -> None:
         in_flight: list[dict[str, Any]] = []
+        recorded_index = 0
+        synthetic_index = 0
         try:
             while True:
                 # Maintain exactly 1 workflow in flight so the visitor
@@ -294,7 +312,14 @@ async def blueprint_stream(request: Request) -> EventSourceResponse:
                 if not in_flight:
                     recorded = load_recorded_templates(app_state.runtime)
                     if recorded:
-                        template = random.choice(recorded)
+                        recorded = list(
+                            {
+                                template["workflow_type"]: template
+                                for template in recorded
+                            }.values()
+                        )
+                        template = recorded[recorded_index % len(recorded)]
+                        recorded_index += 1
                         wf_type = template["workflow_type"]
                         prefix = _PREFIX_BY_TYPE.get(wf_type, "WF")
                         wid = f"{prefix}-{random.randint(1000, 9999)}"
@@ -308,7 +333,10 @@ async def blueprint_stream(request: Request) -> EventSourceResponse:
                             "source": template.get("source", "recorded"),
                         })
                     elif _STREAM_TEMPLATES:
-                        template = random.choice(_STREAM_TEMPLATES)
+                        template = _STREAM_TEMPLATES[
+                            synthetic_index % len(_STREAM_TEMPLATES)
+                        ]
+                        synthetic_index += 1
                         wf_type = template[0].get("workflow_type", "hiring")
                         prefix = _PREFIX_BY_TYPE.get(wf_type, "WF")
                         wid = f"{prefix}-{random.randint(1000, 9999)}"
@@ -346,6 +374,8 @@ async def blueprint_stream(request: Request) -> EventSourceResponse:
                     pause = min(delta, 4000) / 1000.0
                 else:
                     pause = random.uniform(0.9, 2.4)
+                if os.getenv("ZAVA_BLUEPRINT_REPLAY_ONLY") == "1":
+                    pause = min(pause, 0.2)
                 await asyncio.sleep(pause)
         except asyncio.CancelledError:
             return

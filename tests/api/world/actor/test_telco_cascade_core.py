@@ -150,6 +150,31 @@ def test_weather_risk_promotes_one_asset_into_a_maintenance_trace():
     assert sensor.trace_id != sensor.payload["parent_trace_id"]
 
 
+def test_asset_failure_alert_remains_actionable_after_weather_expires():
+    scenario = _scenario()
+    scenario.inject_weather_risk("west", 2.0, 2.0)
+    scenario.runtime.run_until(1.0)
+    sensor = next(
+        event
+        for event in _events(scenario, "sensor.tripped")
+        if event.actor_id == "sensor:asset_failure_risk"
+    )
+    asset = scenario.assets[sensor.target_id]
+
+    scenario.runtime.run_until(3.0)
+    accepted = scenario.apply_command(
+        _command(
+            "cmd-maintenance-after-weather",
+            "create_maintenance_work_order",
+            {"asset_id": asset.id, "kind": "repair", "priority": 2},
+            trace_id=sensor.trace_id,
+        )
+    )
+
+    assert accepted.type == "command.accepted"
+    assert scenario.work_orders["WO-00001"].asset_id == asset.id
+
+
 def test_prestage_command_reserves_real_available_technicians():
     scenario = _scenario()
     command = _command(

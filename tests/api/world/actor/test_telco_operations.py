@@ -217,8 +217,9 @@ def test_asset_metrics_payload_uses_risk_band_and_preserves_lifecycle_status():
         assert "risk_band" in event.payload
         assert "prior_risk_band" in event.payload
         assert event.payload["risk_band"] != event.payload["prior_risk_band"]
-        # Lifecycle status is untouched by risk-band derivation.
-        assert event.payload["status"] == "healthy"
+        # Risk derivation never overwrites lifecycle state. The maintenance
+        # sensor may separately latch an actionable asset as degraded.
+        assert event.payload["status"] in {"healthy", "degraded"}
 
 
 # -- status/risk_band separation ----------------------------------------------

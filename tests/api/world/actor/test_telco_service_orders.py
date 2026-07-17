@@ -27,6 +27,26 @@ def test_submit_service_order_emits_routable_sensor_observation():
     assert observation["requested_site"]["id"] == "SITE-02"
 
 
+def test_submit_service_order_publishes_sensor_without_waiting_for_world_tick():
+    bus = EventBus()
+    world = ActorWorldService.telco(
+        seed=42,
+        bus=bus,
+        minutes_per_second=1000,
+    )
+    seen = []
+    bus.on("world.sensor.tripped", seen.append)
+
+    order_id = world.submit_service_order(
+        account_id="ACC-00001",
+        product="fiber-1gb",
+        requested_site_id="SITE-02",
+    )
+
+    assert len(seen) == 1
+    assert seen[0].simulation_event["target_id"] == order_id
+
+
 def test_activation_command_updates_order_and_creates_subscription():
     world = _world()
     order_id = world.submit_service_order(

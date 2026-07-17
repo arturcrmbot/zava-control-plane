@@ -238,7 +238,9 @@ class ActorWorldService:
             raise ValueError(
                 f"scenario {self.scenario_name!r} has no capacity pressure"
             )
-        return inject(site_id, utilization=utilization)
+        result = inject(site_id, utilization=utilization)
+        self._publish_new()
+        return result
 
     def submit_service_order(
         self, *, account_id: str, product: str, requested_site_id: str
@@ -246,11 +248,13 @@ class ActorWorldService:
         submit = getattr(self.scenario, "submit_service_order", None)
         if submit is None:
             raise ValueError(f"scenario {self.scenario_name!r} has no service orders")
-        return submit(
+        result = submit(
             account_id=account_id,
             product=product,
             requested_site_id=requested_site_id,
         )
+        self._publish_new()
+        return result
 
     def _require_scenario_method(self, name: str):
         """Return a scenario method or raise a clear error for unsupported
@@ -267,25 +271,30 @@ class ActorWorldService:
         """Inject a regional weather risk event (telco scenario). Returns the
         weather event id."""
         inject = self._require_scenario_method("inject_weather_risk")
-        return inject(region, severity, duration_minutes)
+        result = inject(region, severity, duration_minutes)
+        self._publish_new()
+        return result
 
     def inject_spare_shortage(self, region: str, part_kind: str) -> str:
         """Zero out one region's spare stock for a part kind (telco
         scenario). Returns the spare stock id."""
         inject = self._require_scenario_method("inject_spare_shortage")
-        return inject(region, part_kind)
+        result = inject(region, part_kind)
+        self._publish_new()
+        return result
 
     def inject_technician_unavailable(self, technician_id: str) -> str:
         """Mark one technician unavailable (telco scenario). Returns the
         technician id."""
         inject = self._require_scenario_method("inject_technician_unavailable")
-        return inject(technician_id)
+        result = inject(technician_id)
+        self._publish_new()
+        return result
 
     def run_scenario(self, name: str) -> dict[str, Any]:
         run = self._require_scenario_method("run_scenario")
-        start = len(self.runtime.journal)
         result = run(name)
-        self._publish_since(start)
+        self._publish_new()
         return result
 
     # -- catch-up ---------------------------------------------------------
