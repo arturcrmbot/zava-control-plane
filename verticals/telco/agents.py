@@ -76,4 +76,89 @@ TELCO_AGENTS: dict[str, AgentRegistryEntry] = {
         scope_function="shared",
         description="Selects fair retention remedies for evidenced service failures.",
     ),
+    "evidence-correlator": AgentRegistryEntry(
+        agent_id="evidence-correlator",
+        allowed_tools=(
+            "network_query_state",
+            "network_query_impact",
+            "operations_query_case",
+            "commercial_query_customer",
+            "commercial_query_order_revenue",
+            "twin_query_external_signal",
+        ),
+        scope_function="shared",
+        description="Correlates supplied Telco evidence into causal groups.",
+    ),
+    "risk-impact-assessor": AgentRegistryEntry(
+        agent_id="risk-impact-assessor",
+        allowed_tools=(
+            "network_query_impact",
+            "commercial_query_customer",
+            "twin_forecast",
+        ),
+        scope_function="shared",
+        description="Assesses operational and commercial impact.",
+    ),
+    "next-best-action-planner": AgentRegistryEntry(
+        agent_id="next-best-action-planner",
+        allowed_tools=(
+            "network_validate_action",
+            "operations_search_runbook",
+            "commercial_evaluate_entitlement",
+            "twin_compare_scenarios",
+        ),
+        scope_function="shared",
+        description="Ranks declared actions by effect and risk.",
+    ),
+    "resource-matcher": AgentRegistryEntry(
+        agent_id="resource-matcher",
+        allowed_tools=(
+            "operations_match_resources",
+            "network_query_state",
+            "commercial_query_order_revenue",
+        ),
+        scope_function="shared",
+        description="Matches supplied resources to process constraints.",
+    ),
+    "policy-entitlement-evaluator": AgentRegistryEntry(
+        agent_id="policy-entitlement-evaluator",
+        allowed_tools=(
+            "commercial_evaluate_entitlement",
+            "commercial_query_customer",
+            "operations_query_case",
+        ),
+        scope_function="shared",
+        description="Evaluates policy, entitlement and approval evidence.",
+    ),
+    "exception-resolution-advisor": AgentRegistryEntry(
+        agent_id="exception-resolution-advisor",
+        allowed_tools=(
+            "operations_query_case",
+            "operations_search_runbook",
+            "network_query_impact",
+            "commercial_query_order_revenue",
+        ),
+        scope_function="shared",
+        description="Proposes bounded resolution for evidenced exceptions.",
+    ),
+    "communication-drafter": AgentRegistryEntry(
+        agent_id="communication-drafter",
+        allowed_tools=(
+            "commercial_query_customer",
+            "operations_query_case",
+        ),
+        scope_function="shared",
+        description="Drafts evidence-grounded customer and operator communication.",
+    ),
+    "scenario-comparator": AgentRegistryEntry(
+        agent_id="scenario-comparator",
+        allowed_tools=(
+            "twin_forecast",
+            "twin_compare_scenarios",
+            "network_query_state",
+            "commercial_query_order_revenue",
+        ),
+        scope_function="shared",
+        description="Compares supplied forecasts and what-if scenarios.",
+    ),
 }
