@@ -49,6 +49,28 @@ hard-coded literals.
 | **Fleet treasury FX** | [`api/functions/workflows/fleet_treasury_fx.py`](api/functions/workflows/fleet_treasury_fx.py) — 4 phases | Composed · `compose-domain` v3 |
 | **Creative campaign** | [`api/functions/workflows/creative_campaign.py`](api/functions/workflows/creative_campaign.py) — 10 phases | Composed · `compose-domain` v3 |
 
+### Telco vertical
+
+The optional Telco pack contains **37 executable process handles**: nine
+high-fidelity hero workflows and 28 standard process profiles. Standard
+profiles reuse six Durable engines, eight reasoning skills and four MCP
+capability packs while retaining distinct triggers, commands, world cases and
+success evidence.
+
+Run it locally with:
+
+```bash
+ZAVA_VERTICAL=telco ZAVA_TELCO_AGENT_MODE=deterministic make up
+```
+
+Open `http://localhost:5273/world` and select **Process Library**. Agency remains
+the default when `ZAVA_VERTICAL` is unset.
+
+The complete OSS/BSS implementation map lives in:
+
+- [`Telco OSS catalogue`](docs/superpowers/specs/2026-07-14-telco-oss-process-catalogue.md)
+- [`Telco BSS catalogue`](docs/superpowers/specs/2026-07-14-telco-bss-process-catalogue.md)
+
 > Each domain spawns at its own realistic cadence (`realistic_interval_seconds`
 > in [`api/shared/domains.py`](api/shared/domains.py)) scaled by
 > `DEMO_TIME_WARP_FACTOR` (default 60) — so AP-invoice spawns every ~30s of

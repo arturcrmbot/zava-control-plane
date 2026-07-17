@@ -58,6 +58,35 @@ This grouping is a starting hypothesis, not the final domain architecture.
 | Network security response | OSS-18 | Adversarial traffic, false positives and bounded mitigation |
 | Experience benchmarking | OSS-19 | Measurement campaigns, representativeness and optimisation feedback |
 
+## Zava executable process map
+
+Every source row has an independently triggerable workflow. Hero workflows keep
+bespoke simulation/UI; standard workflows run through the shared profile
+substrate and generic process-case view.
+
+| Source | Workflow type | Fidelity | Engine | Skills | MCP packs |
+|---|---|---|---|---|---|
+| OSS-01 | `predictive-site-maintenance` | hero | hero | site failure diagnosis | network, operations |
+| OSS-02 | `network-incident` | hero | hero | deterministic remediation | network |
+| OSS-03 | `ran-capacity-planning` | standard | FSP | evidence, risk, scenario, action | network, twin |
+| OSS-04 | `capacity-optimization` | hero | hero | capacity action planning | network, twin |
+| OSS-05 | `network-configuration-validation` | standard | RIG | evidence, risk, scenario, exception | network, operations, twin |
+| OSS-06 | `rollout-site-planning` | standard | FSP | scenario, action, resources | twin, operations |
+| OSS-07 | `network-slice-assurance` | standard | OFV | risk, scenario, action, resources | network, twin |
+| OSS-08 | `energy-optimization` | standard | DDA | evidence, risk, action | network, twin |
+| OSS-09 | `field-repair-dispatch` | hero | hero | field resource matching | operations |
+| OSS-10 | `spares-inventory-optimization` | standard | FSP | evidence, resources, action | operations, commercial, twin |
+| OSS-11 | `site-asset-health-monitoring` | standard | DDA | evidence, risk, action | network, operations |
+| OSS-12 | `backhaul-optimization` | standard | DDA | evidence, risk, action | network, twin |
+| OSS-13 | `core-network-anomaly-management` | standard | DDA | evidence, risk, exception | network, operations |
+| OSS-14 | `proactive-service-assurance` | standard | DDA | evidence, risk, communication | network, commercial |
+| OSS-15 | `service-ticket-resolution` | hero | hero | ticket root-cause correlation | operations, commercial, network |
+| OSS-16 | `network-change-release` | standard | RIG | risk, scenario, exception | network, operations, twin |
+| OSS-17 | `spectrum-interference-management` | standard | DDA | evidence, risk, action | network, twin |
+| OSS-18 | `network-security-response` | standard | RIG | evidence, risk, action | network, operations |
+| OSS-19 | `experience-benchmarking` | standard | FSP | evidence, scenario, action | network, twin |
+| OSS-20 | `outage-risk-management` | hero | hero | outage risk planning | network, operations, twin |
+
 ## Source catalogue
 
 ### OSS-01 - Predictive RAN equipment failure prevention

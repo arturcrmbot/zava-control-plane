@@ -58,6 +58,32 @@ This grouping is a starting hypothesis, not the final domain architecture.
 | Roaming experience and steering | BSS-15 | Partner quality, commercial agreements, steering and customer experience |
 | Customer experience modelling | BSS-17 | Journey simulation, network experience, behavioural response and change impact |
 
+## Zava executable process map
+
+Every source row has an independently triggerable workflow. Standard workflows
+share reusable engines, skills and MCP packs but retain their own trigger,
+command, world case and success evidence.
+
+| Source | Workflow type | Fidelity | Engine | Skills | MCP packs |
+|---|---|---|---|---|---|
+| BSS-01 | `contact-centre-agent-assist` | standard | ARA | evidence, risk, action, communication | commercial, operations, network |
+| BSS-02 | `autonomous-self-service` | standard | ARA | evidence, policy, exception, communication | commercial, operations, network |
+| BSS-03 | `proactive-customer-care` | hero | hero | entitlement, care execution | commercial, network |
+| BSS-04 | `retention-orchestration` | hero | hero | churn analysis, offer selection | commercial, twin |
+| BSS-05 | `next-best-action` | standard | ARA | risk, action, policy, communication | commercial, twin |
+| BSS-06 | `order-to-activate` | hero | hero | deterministic fulfilment | commercial, network |
+| BSS-07 | `service-provisioning-activation` | standard | OFV | resources, exception, risk | commercial, network |
+| BSS-08 | `billing-dispute-resolution` | standard | CTR | evidence, policy, exception, communication | commercial, operations |
+| BSS-09 | `revenue-assurance` | standard | RIG | evidence, risk, action | commercial, network |
+| BSS-10 | `collections-dunning` | standard | RIG | risk, policy, action, communication | commercial |
+| BSS-11 | `fraud-prevention` | standard | RIG | evidence, risk, action | commercial, operations |
+| BSS-12 | `customer-onboarding-kyc` | standard | RIG | evidence, risk, policy, exception | commercial, operations |
+| BSS-13 | `complaint-nps-closed-loop` | standard | CTR | evidence, risk, exception, communication | commercial, operations, network |
+| BSS-14 | `device-lifecycle-upgrade` | standard | OFV | policy, action, resources | commercial, operations |
+| BSS-15 | `roaming-experience-steering` | standard | DDA | evidence, risk, action, communication | commercial, network |
+| BSS-16 | `number-sim-porting` | standard | OFV | evidence, policy, exception | commercial, operations |
+| BSS-17 | `customer-experience-twin` | standard | FSP | evidence, risk, scenario, action | commercial, network, twin |
+
 ## Source catalogue
 
 ### BSS-01 - Contact-centre agent assist (copilot)
