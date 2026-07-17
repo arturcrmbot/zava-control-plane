@@ -209,6 +209,9 @@ class NetworkScenario:
         self._asset_ids: list[str] = []
         self._spare_stock_by_key: dict[tuple[str, str], str] = {}
         self._failed_sites_latched: set[str] = set()
+        self._asset_risk_regions_latched: set[str] = set()
+        self._outage_trace_by_region: dict[str, str] = {}
+        self._congested_sites_latched: set[str] = set()
         self._impacted_account_ids_by_trace: dict[str, tuple[str, ...]] = {}
         self.applied_commands: dict[str, SimulationEvent] = {}
 
@@ -493,6 +496,8 @@ class NetworkScenario:
             weather_term = power_risk
         elif asset.kind == "cooling":
             weather_term = cooling_risk
+        elif asset.kind == "radio-unit":
+            weather_term = ((power_risk + cooling_risk) / 2.0) * 1.3
         else:
             weather_term = (power_risk + cooling_risk) / 2.0
         base_temp = BASE_TEMP_C[asset.kind]
@@ -530,19 +535,73 @@ class NetworkScenario:
     def _operations_loop(self):
         while self.runtime.now < self.config.simulation_minutes:
             yield self.runtime.env.timeout(1)
+            risk_candidates: dict[
+                str,
+                list[tuple[NetworkAsset, SimulationEvent]],
+            ] = defaultdict(list)
             for asset_id in self._asset_ids:
                 asset = self.assets[asset_id]
                 prior_risk_band = asset.risk_band
                 self._decay_asset_health(asset)
                 if asset.risk_band == prior_risk_band:
                     continue
-                self.runtime.emit(
+                metrics = self.runtime.emit(
                     "asset.metrics",
                     actor_id=asset.id,
                     target_id=asset.site_id,
                     trace_id=f"asset-{asset.id}",
                     payload={**asdict(asset), "prior_risk_band": prior_risk_band},
                 )
+                region = self.sites[asset.site_id].region
+                if (
+                    asset.risk_band != "healthy"
+                    and region not in self._asset_risk_regions_latched
+                    and self._active_weather_for_region(region) is not None
+                ):
+                    risk_candidates[region].append((asset, metrics))
+            for region, candidates in risk_candidates.items():
+                asset, metrics = min(
+                    candidates,
+                    key=lambda item: (
+                        item[0].kind != "radio-unit",
+                        -item[0].failure_probability,
+                        item[0].id,
+                    ),
+                )
+                self._trip_asset_failure_risk(asset, metrics)
+
+    def _trip_asset_failure_risk(
+        self,
+        asset: NetworkAsset,
+        cause: SimulationEvent,
+    ) -> SimulationEvent:
+        site = self.sites[asset.site_id]
+        trace_id = f"maintenance-{asset.id}-{cause.event_id}"
+        parent_trace_id = self._outage_trace_by_region.get(
+            site.region,
+            cause.trace_id,
+        )
+        sensor = self.runtime.emit(
+            "sensor.tripped",
+            actor_id="sensor:asset_failure_risk",
+            target_id=asset.id,
+            cause_event_id=cause.event_id,
+            trace_id=trace_id,
+            payload={
+                "asset_id": asset.id,
+                "site_id": site.id,
+                "parent_trace_id": parent_trace_id,
+                "contributing_trace_ids": [parent_trace_id],
+                "measurements": {
+                    "health": asset.health,
+                    "temperature_c": asset.temperature_c,
+                    "failure_probability": asset.failure_probability,
+                    "risk_band": asset.risk_band,
+                },
+            },
+        )
+        self._asset_risk_regions_latched.add(site.region)
+        return sensor
 
     # -- perturbation ------------------------------------------------------
 
@@ -580,14 +639,38 @@ class NetworkScenario:
                 "utilization": site.utilization,
             },
         )
-        self.runtime.emit(
+        metrics = self.runtime.emit(
             "site.metrics",
             actor_id=site.id,
             cause_event_id=constrained.event_id,
             trace_id=constrained.trace_id,
             payload={**self._metrics_payload(site), "reason": "capacity_pressure"},
         )
+        self._trip_site_congestion(site, metrics, constrained.trace_id)
         return site.id
+
+    def _trip_site_congestion(
+        self,
+        site: CellSite,
+        cause: SimulationEvent,
+        parent_trace_id: str,
+    ) -> SimulationEvent:
+        trace_id = f"capacity-recovery-{site.id}-{cause.event_id}"
+        sensor = self.runtime.emit(
+            "sensor.tripped",
+            actor_id="sensor:site_congestion",
+            target_id=site.id,
+            cause_event_id=cause.event_id,
+            trace_id=trace_id,
+            payload={
+                "site_id": site.id,
+                "parent_trace_id": parent_trace_id,
+                "contributing_trace_ids": [parent_trace_id],
+                "measurements": self._metrics_payload(site),
+            },
+        )
+        self._congested_sites_latched.add(site.id)
+        return sensor
 
     def inject_weather_risk(
         self, region: str, severity: float, duration_minutes: float
@@ -611,12 +694,33 @@ class NetworkScenario:
             ends_at=ends_at,
         )
         self.weather_events[event_id] = weather
-        self.runtime.emit(
+        injected = self.runtime.emit(
             "weather.risk_injected",
             actor_id=event_id,
             target_id=f"region:{region}",
             trace_id=f"weather-{event_id}",
             payload=asdict(weather),
+        )
+        outage_trace_id = f"outage-risk-{event_id}-{injected.event_id}"
+        self._outage_trace_by_region[region] = outage_trace_id
+        self.runtime.emit(
+            "sensor.tripped",
+            actor_id="sensor:outage_risk",
+            target_id=f"region:{region}",
+            cause_event_id=injected.event_id,
+            trace_id=outage_trace_id,
+            payload={
+                "weather_event_id": event_id,
+                "region": region,
+                "parent_trace_id": injected.trace_id,
+                "contributing_trace_ids": [injected.trace_id],
+                "measurements": {
+                    "severity": weather.severity,
+                    "power_risk": weather.power_risk,
+                    "cooling_risk": weather.cooling_risk,
+                    "ends_at": weather.ends_at,
+                },
+            },
         )
         return event_id
 
@@ -840,12 +944,19 @@ class NetworkScenario:
         if requested_site_id not in self.sites:
             raise ValueError(f"unknown requested_site_id: {requested_site_id!r}")
         order_id = f"ORD-{len(self.orders) + 1:05d}"
+        requested_site = self.sites[requested_site_id]
+        insufficient_capacity = requested_site.utilization >= 0.9
         order = ServiceOrder(
             id=order_id,
             account_id=account_id,
             product=product,
             requested_site_id=requested_site_id,
-            status="pending",
+            status="infeasible" if insufficient_capacity else "pending",
+            reason=(
+                f"insufficient capacity at {requested_site_id}"
+                if insufficient_capacity
+                else None
+            ),
         )
         self.orders[order_id] = order
         trace_id = f"service-order-{order_id}"
@@ -887,7 +998,349 @@ class NetworkScenario:
             if reason is not None:
                 return self._reject_command(command, reason)
             return self._accept_service_order_activation(command)
+        if command.type == "prestage_field_resources":
+            reason = self._validate_prestage_field_resources(command)
+            if reason is not None:
+                return self._reject_command(command, reason)
+            return self._accept_prestage_field_resources(command)
+        if command.type == "create_maintenance_work_order":
+            reason = self._validate_maintenance_work_order(command)
+            if reason is not None:
+                return self._reject_command(command, reason)
+            return self._accept_maintenance_work_order(command)
+        if command.type == "dispatch_field_repair":
+            reason = self._validate_field_repair(command)
+            if reason is not None:
+                return self._reject_command(command, reason)
+            return self._accept_field_repair(command)
+        if command.type == "apply_capacity_action":
+            reason = self._validate_capacity_action(command)
+            if reason is not None:
+                return self._reject_command(command, reason)
+            return self._accept_capacity_action(command)
         return self._reject_command(command, f"unsupported command type: {command.type!r}")
+
+    def _record_command_accepted(
+        self,
+        command: SimulationCommand,
+        *,
+        target_id: str | None = None,
+    ) -> SimulationEvent:
+        accepted = self.runtime.emit(
+            "command.accepted",
+            actor_id=command.issued_by,
+            target_id=target_id,
+            trace_id=command.trace_id,
+            payload={"command": command.to_dict()},
+        )
+        self.applied_commands[command.command_id] = accepted
+        return accepted
+
+    def _validate_prestage_field_resources(
+        self,
+        command: SimulationCommand,
+    ) -> str | None:
+        region = command.payload.get("region")
+        if region not in REGIONS:
+            return f"unknown region: {region!r}"
+        technician_ids = command.payload.get("technician_ids")
+        if not isinstance(technician_ids, list) or not technician_ids:
+            return "technician_ids must be a non-empty list"
+        for technician_id in technician_ids:
+            technician = self.technicians.get(technician_id)
+            if technician is None:
+                return f"unknown technician_id: {technician_id!r}"
+            if technician.region != region:
+                return f"technician {technician_id} is not in {region}"
+            if technician.status != "available":
+                return f"technician {technician_id} is not available"
+        spare_part_kinds = command.payload.get("spare_part_kinds")
+        if not isinstance(spare_part_kinds, list) or not spare_part_kinds:
+            return "spare_part_kinds must be a non-empty list"
+        for part_kind in spare_part_kinds:
+            stock_id = self._spare_stock_by_key.get((region, part_kind))
+            if stock_id is None:
+                return f"unknown spare part {part_kind!r} for {region}"
+            if self.spare_stocks[stock_id].quantity <= 0:
+                return f"spare stock {stock_id} is unavailable"
+        estimated_cost = command.payload.get("estimated_cost_gbp", 0.0)
+        if (
+            isinstance(estimated_cost, bool)
+            or not isinstance(estimated_cost, (int, float))
+            or not math.isfinite(estimated_cost)
+            or estimated_cost < 0
+        ):
+            return "estimated_cost_gbp must be a finite non-negative number"
+        if (
+            float(estimated_cost) > 10_000.0
+            and command.payload.get("approval_decision") != "approve"
+        ):
+            return "delivery_lead approval required for exceptional spend"
+        return None
+
+    def _accept_prestage_field_resources(
+        self,
+        command: SimulationCommand,
+    ) -> SimulationEvent:
+        region = command.payload["region"]
+        accepted = self._record_command_accepted(
+            command,
+            target_id=f"region:{region}",
+        )
+        technician_ids = list(command.payload["technician_ids"])
+        for technician_id in technician_ids:
+            self.technicians[technician_id].status = "prestaged"
+        self.runtime.emit(
+            "resources.prestaged",
+            actor_id=f"region:{region}",
+            cause_event_id=accepted.event_id,
+            trace_id=command.trace_id,
+            payload={
+                "region": region,
+                "technician_ids": technician_ids,
+                "spare_part_kinds": list(command.payload["spare_part_kinds"]),
+            },
+        )
+        return accepted
+
+    def _validate_maintenance_work_order(
+        self,
+        command: SimulationCommand,
+    ) -> str | None:
+        asset = self.assets.get(command.payload.get("asset_id"))
+        if asset is None:
+            return f"unknown asset_id: {command.payload.get('asset_id')!r}"
+        if asset.status not in {"healthy", "degraded"}:
+            return f"asset {asset.id} cannot enter maintenance from {asset.status}"
+        if asset.risk_band == "healthy":
+            return f"asset {asset.id} has no actionable failure risk"
+        if any(
+            order.asset_id == asset.id and order.status != "completed"
+            for order in self.work_orders.values()
+        ):
+            return f"asset {asset.id} already has an active work order"
+        if command.payload.get("kind") not in {"repair", "replace"}:
+            return f"unsupported maintenance kind: {command.payload.get('kind')!r}"
+        if (
+            command.payload.get("kind") == "replace"
+            and command.payload.get("approval_decision") != "approve"
+        ):
+            return "delivery_lead approval required for asset replacement"
+        priority = command.payload.get("priority")
+        if isinstance(priority, bool) or not isinstance(priority, int):
+            return "priority must be an integer"
+        if not 1 <= priority <= 5:
+            return "priority must be between 1 and 5"
+        return None
+
+    def _accept_maintenance_work_order(
+        self,
+        command: SimulationCommand,
+    ) -> SimulationEvent:
+        asset = self.assets[command.payload["asset_id"]]
+        accepted = self._record_command_accepted(command, target_id=asset.id)
+        work_order_id = f"WO-{len(self.work_orders) + 1:05d}"
+        work_order = WorkOrder(
+            id=work_order_id,
+            site_id=asset.site_id,
+            asset_id=asset.id,
+            kind=command.payload["kind"],
+            priority=command.payload["priority"],
+            required_skill=asset.kind,
+            required_spare=asset.kind,
+            due_at=self.runtime.now + 60.0 * command.payload["priority"],
+        )
+        self.work_orders[work_order.id] = work_order
+        asset.status = "degraded"
+        created = self.runtime.emit(
+            "work_order.created",
+            actor_id=work_order.id,
+            target_id=asset.id,
+            cause_event_id=accepted.event_id,
+            trace_id=command.trace_id,
+            payload=asdict(work_order),
+        )
+        field_trace_id = f"field-repair-{work_order.id}-{created.event_id}"
+        self.runtime.emit(
+            "sensor.tripped",
+            actor_id="sensor:work_order_ready",
+            target_id=work_order.id,
+            cause_event_id=created.event_id,
+            trace_id=field_trace_id,
+            payload={
+                "work_order_id": work_order.id,
+                "asset_id": asset.id,
+                "parent_trace_id": command.trace_id,
+                "contributing_trace_ids": [command.trace_id],
+                "measurements": {
+                    "priority": work_order.priority,
+                    "failure_probability": asset.failure_probability,
+                    "risk_band": asset.risk_band,
+                },
+            },
+        )
+        return accepted
+
+    def _validate_field_repair(self, command: SimulationCommand) -> str | None:
+        work_order = self.work_orders.get(command.payload.get("work_order_id"))
+        if work_order is None:
+            return f"unknown work_order_id: {command.payload.get('work_order_id')!r}"
+        if work_order.status != "open":
+            return f"work order {work_order.id} is not open"
+        action = command.payload.get("action")
+        if action != work_order.kind:
+            return f"action {action!r} does not match work order kind {work_order.kind!r}"
+        technician = self.technicians.get(command.payload.get("technician_id"))
+        if technician is None:
+            return f"unknown technician_id: {command.payload.get('technician_id')!r}"
+        if technician.status not in {"available", "prestaged"}:
+            return f"technician {technician.id} is not dispatchable"
+        region = self.sites[work_order.site_id].region
+        if technician.region != region:
+            return f"technician {technician.id} is not in {region}"
+        if work_order.required_skill not in technician.skills:
+            return f"technician {technician.id} lacks {work_order.required_skill}"
+        local_stock_id = self._spare_stock_by_key.get(
+            (region, work_order.required_spare)
+        )
+        stock_id = command.payload.get("source_stock_id") or local_stock_id
+        stock = self.spare_stocks.get(stock_id)
+        if stock is None or stock.part_kind != work_order.required_spare:
+            return f"invalid source stock for {work_order.required_spare}"
+        if stock.quantity <= 0:
+            return f"spare {work_order.required_spare} is unavailable in {region}"
+        if (
+            stock.region != region
+            and command.payload.get("approval_decision") != "approve"
+        ):
+            return "delivery_lead approval required for cross-region spare"
+        return None
+
+    def _accept_field_repair(self, command: SimulationCommand) -> SimulationEvent:
+        work_order = self.work_orders[command.payload["work_order_id"]]
+        technician = self.technicians[command.payload["technician_id"]]
+        asset = self.assets[work_order.asset_id]
+        region = self.sites[work_order.site_id].region
+        local_stock_id = self._spare_stock_by_key[
+            (region, work_order.required_spare)
+        ]
+        stock = self.spare_stocks[
+            command.payload.get("source_stock_id") or local_stock_id
+        ]
+        accepted = self._record_command_accepted(
+            command,
+            target_id=work_order.id,
+        )
+        work_order.status = "completed"
+        work_order.technician_id = technician.id
+        technician.status = "available"
+        technician.assigned_work_order_id = None
+        stock.quantity -= 1
+        asset.health = 0.99 if command.payload["action"] == "replace" else 0.92
+        asset.status = "healthy"
+        self._derive_asset_metrics(asset)
+        self._asset_risk_regions_latched.discard(region)
+        event_type = (
+            "asset.replaced"
+            if command.payload["action"] == "replace"
+            else "asset.repaired"
+        )
+        self.runtime.emit(
+            event_type,
+            actor_id=asset.id,
+            target_id=work_order.id,
+            cause_event_id=accepted.event_id,
+            trace_id=command.trace_id,
+            payload={
+                "work_order": asdict(work_order),
+                "technician_id": technician.id,
+                "spare_stock_id": stock.id,
+                "remaining_spares": stock.quantity,
+                "asset": asdict(asset),
+            },
+        )
+        return accepted
+
+    def _validate_capacity_action(self, command: SimulationCommand) -> str | None:
+        site = self.sites.get(command.payload.get("site_id"))
+        if site is None:
+            return f"unknown site_id: {command.payload.get('site_id')!r}"
+        if site.status != "healthy":
+            return f"site {site.id} is not healthy"
+        action = command.payload.get("action")
+        if action not in {
+            "traffic_rebalance",
+            "temporary_capacity",
+            "capital_augmentation",
+        }:
+            return f"unsupported capacity action: {action!r}"
+        try:
+            increase = _require_finite_positive(
+                command.payload.get("capacity_increase_mbps"),
+                label="capacity_increase_mbps",
+            )
+        except ValueError as exc:
+            return str(exc)
+        projected_utilization = site.traffic_mbps / (site.capacity_mbps + increase)
+        if projected_utilization > 0.85:
+            return f"capacity action leaves {site.id} above safe utilization"
+        if (
+            action == "capital_augmentation"
+            and command.payload.get("approval_decision") != "approve"
+        ):
+            return "network_ops_director approval required"
+        return None
+
+    def _accept_capacity_action(
+        self,
+        command: SimulationCommand,
+    ) -> SimulationEvent:
+        site = self.sites[command.payload["site_id"]]
+        accepted = self._record_command_accepted(command, target_id=site.id)
+        prior_capacity = site.capacity_mbps
+        site.capacity_mbps = round(
+            site.capacity_mbps + float(command.payload["capacity_increase_mbps"]),
+            3,
+        )
+        self._derive_metrics(site)
+        capacity_reason = f"insufficient capacity at {site.id}"
+        released_orders = [
+            order
+            for order in self.orders.values()
+            if order.requested_site_id == site.id
+            and order.status == "infeasible"
+            and order.reason == capacity_reason
+        ]
+        for order in released_orders:
+            order.status = "pending"
+            order.reason = None
+        stable = self.runtime.emit(
+            "site.capacity.stable",
+            actor_id=site.id,
+            cause_event_id=accepted.event_id,
+            trace_id=command.trace_id,
+            payload={
+                **self._metrics_payload(site),
+                "action": command.payload["action"],
+                "prior_capacity_mbps": prior_capacity,
+                "released_order_ids": [order.id for order in released_orders],
+            },
+        )
+        self._congested_sites_latched.discard(site.id)
+        for order in released_orders:
+            self.runtime.emit(
+                "sensor.tripped",
+                actor_id="sensor:service_order",
+                target_id=order.id,
+                cause_event_id=stable.event_id,
+                trace_id=f"service-order-{order.id}-redrive-{stable.event_id}",
+                payload={
+                    "order_id": order.id,
+                    "parent_trace_id": command.trace_id,
+                    "contributing_trace_ids": [command.trace_id],
+                },
+            )
+        return accepted
 
     def _validate_service_order_activation(
         self, command: SimulationCommand
@@ -1276,11 +1729,100 @@ class NetworkScenario:
         from api.server.world.projection import project_network
 
         payload = sensor_event.get("payload") or {}
-        if sensor_event.get("actor_id") == "sensor:service_order":
+        actor_id = sensor_event.get("actor_id")
+        trace_context = {
+            "trace_id": sensor_event.get("trace_id"),
+            "sensor_event_id": sensor_event.get("event_id"),
+            "parent_trace_id": payload.get("parent_trace_id"),
+            "contributing_trace_ids": list(
+                payload.get("contributing_trace_ids") or []
+            ),
+        }
+        if actor_id == "sensor:outage_risk":
+            weather = self.weather_events[payload["weather_event_id"]]
+            return {
+                **trace_context,
+                "weather_event": self._weather_view(weather),
+                "available_technicians": [
+                    self._technician_view(technician)
+                    for technician in self.technicians.values()
+                    if technician.region == weather.region
+                    and technician.status == "available"
+                ],
+                "spare_stocks": [
+                    asdict(stock)
+                    for stock in self.spare_stocks.values()
+                    if stock.region == weather.region
+                ],
+                "at_risk_assets": [
+                    self._asset_view(asset)
+                    for asset in self.assets.values()
+                    if self.sites[asset.site_id].region == weather.region
+                ],
+                "allowed_commands": ["prestage_field_resources"],
+            }
+        if actor_id == "sensor:asset_failure_risk":
+            asset = self.assets[payload["asset_id"]]
+            site = self.sites[asset.site_id]
+            weather = self._active_weather_for_region(site.region)
+            return {
+                **trace_context,
+                "asset": self._asset_view(asset),
+                "site": self._site_view(site),
+                "weather_event": (
+                    self._weather_view(weather) if weather is not None else None
+                ),
+                "allowed_commands": ["create_maintenance_work_order"],
+            }
+        if actor_id == "sensor:work_order_ready":
+            work_order = self.work_orders[payload["work_order_id"]]
+            asset = self.assets[work_order.asset_id]
+            site = self.sites[work_order.site_id]
+            return {
+                **trace_context,
+                "work_order": asdict(work_order),
+                "asset": self._asset_view(asset),
+                "site": self._site_view(site),
+                "dispatchable_technicians": [
+                    self._technician_view(technician)
+                    for technician in self.technicians.values()
+                    if technician.region == site.region
+                    and technician.status in {"available", "prestaged"}
+                    and work_order.required_skill in technician.skills
+                ],
+                "spare_stock": asdict(
+                    self.spare_stocks[
+                        self._spare_stock_by_key[
+                            (site.region, work_order.required_spare)
+                        ]
+                    ]
+                ),
+                "alternate_spare_stocks": [
+                    asdict(stock)
+                    for stock in self.spare_stocks.values()
+                    if stock.region != site.region
+                    and stock.part_kind == work_order.required_spare
+                    and stock.quantity > 0
+                ],
+                "allowed_commands": ["dispatch_field_repair"],
+            }
+        if actor_id == "sensor:site_congestion":
+            site = self.sites[payload["site_id"]]
+            return {
+                **trace_context,
+                "site": self._site_view(site),
+                "blocked_orders": [
+                    asdict(order)
+                    for order in self.orders.values()
+                    if order.requested_site_id == site.id
+                    and order.status == "infeasible"
+                ],
+                "allowed_commands": ["apply_capacity_action"],
+            }
+        if actor_id == "sensor:service_order":
             order = self.orders[payload["order_id"]]
             return {
-                "trace_id": sensor_event.get("trace_id"),
-                "sensor_event_id": sensor_event.get("event_id"),
+                **trace_context,
                 "order": asdict(order),
                 "account": self._account_view(self.accounts[order.account_id]),
                 "requested_site": self._site_view(
@@ -1288,13 +1830,12 @@ class NetworkScenario:
                 ),
                 "allowed_commands": ["activate_service_order"],
             }
-        if sensor_event.get("actor_id") == "sensor:customer_impact":
+        if actor_id == "sensor:customer_impact":
             account_ids = self._impacted_account_ids_by_trace.get(
                 sensor_event.get("trace_id"), ()
             )
             return {
-                "trace_id": sensor_event.get("trace_id"),
-                "sensor_event_id": sensor_event.get("event_id"),
+                **trace_context,
                 "incident_site_id": (payload.get("measurements") or {}).get("site_id"),
                 "impacted_accounts": [
                     self._account_view(self.accounts[account_id])
