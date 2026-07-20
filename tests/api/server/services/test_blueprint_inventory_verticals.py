@@ -3,13 +3,10 @@ from __future__ import annotations
 from api.server.services.blueprint_inventory import _build_domain_manifest
 from api.shared.domains import DOMAINS as AGENCY_DOMAINS
 from api.shared.vertical_loader import build_runtime
+from verticals.telco.domains import TELCO_DOMAINS
 
 
-TELCO_WORKFLOW_TYPES = {
-    "network-incident",
-    "proactive-customer-care",
-    "order-to-activate",
-}
+TELCO_WORKFLOW_TYPES = set(TELCO_DOMAINS)
 
 
 def _live_workflow_types(manifest) -> set[str]:
