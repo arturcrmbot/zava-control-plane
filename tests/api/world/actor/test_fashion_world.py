@@ -5,10 +5,10 @@ import pytest
 from api.server.world.model import SimulationCommand
 from api.server.world.runtime import SimulationRuntime
 from verticals.fashion.process_profiles import FASHION_PROCESS_PROFILES
-from verticals.fashion.world import FashionScenario
+from verticals.fashion.world import DEMO_SEED, FashionScenario
 
 
-def _scenario(seed: int = 20260720) -> FashionScenario:
+def _scenario(seed: int = 42) -> FashionScenario:
     scenario = FashionScenario.demo(SimulationRuntime(seed))
     scenario.install()
     return scenario
@@ -388,3 +388,29 @@ def test_markdown_governance_records_a_recommendation_without_price_mutation() -
     assert {
         style.id: style.unit_retail_gbp for style in scenario.styles.values()
     } == prices_before
+
+
+def test_demo_factory_defaults_to_canonical_seed_42() -> None:
+    scenario = FashionScenario.demo()
+    scenario.install()
+
+    assert scenario.runtime.seed == DEMO_SEED
+    assert DEMO_SEED == 42
+
+
+def test_customers_have_explicit_cohort_assignments() -> None:
+    scenario = _scenario()
+    cohorts = {customer.cohort for customer in scenario.customers.values()}
+
+    assert len(cohorts) >= 2
+    assert all(customer.cohort for customer in scenario.customers.values())
+    assert len(scenario.customers) == 300
+
+
+def test_styles_have_explicit_lifecycle_stage() -> None:
+    scenario = _scenario()
+    lifecycles = {style.lifecycle for style in scenario.styles.values()}
+
+    assert len(lifecycles) >= 2
+    assert all(style.lifecycle for style in scenario.styles.values())
+    assert len(scenario.styles) == 24

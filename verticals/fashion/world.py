@@ -19,6 +19,8 @@ from verticals.fashion.reference_cases import (
     process_case_view,
 )
 
+DEMO_SEED: int = 42
+
 
 @dataclass(slots=True)
 class Location:
@@ -39,6 +41,7 @@ class Style:
     id: str
     brand_id: str
     season: str
+    lifecycle: str
     unit_retail_gbp: float
 
 
@@ -54,6 +57,7 @@ class Sku:
 class Customer:
     id: str
     region: str
+    cohort: str
 
 
 @dataclass(slots=True)
@@ -113,7 +117,9 @@ class FashionScenario:
         self.applied_commands: dict[str, SimulationEvent] = {}
 
     @classmethod
-    def demo(cls, runtime: SimulationRuntime) -> "FashionScenario":
+    def demo(cls, runtime: SimulationRuntime | None = None) -> "FashionScenario":
+        if runtime is None:
+            runtime = SimulationRuntime(DEMO_SEED)
         return cls(runtime)
 
     @property
@@ -169,6 +175,7 @@ class FashionScenario:
             "marketplace",
         )
         seasons = ("spring-summer", "autumn-winter")
+        lifecycles = ("new-arrival", "full-price", "sale", "clearance")
         colours = ("black", "navy")
         sizes = ("S", "M", "L", "XL")
         sku_index = 1
@@ -181,6 +188,9 @@ class FashionScenario:
                     id=style_id,
                     brand_id=brand_id,
                     season=seasons[style_slot],
+                    lifecycle=lifecycles[
+                        ((brand_index - 1) * 2 + style_slot) % len(lifecycles)
+                    ],
                     unit_retail_gbp=float(80 + brand_index * 5 + style_slot * 10),
                 )
                 for colour in colours:
@@ -196,12 +206,14 @@ class FashionScenario:
 
     def _create_customers_and_demand(self) -> None:
         regions = ("UK-North", "UK-South", "EU-North", "EU-South")
+        cohorts = ("premium", "mainstream", "value", "occasional")
         channels = ("store", "ecommerce")
         sku_ids = tuple(self.skus)
         for index in range(1, 301):
             customer_id = f"CUSTOMER-{index:04d}"
             region = regions[(index - 1) % len(regions)]
-            self.customers[customer_id] = Customer(customer_id, region)
+            cohort = cohorts[(index - 1) % len(cohorts)]
+            self.customers[customer_id] = Customer(customer_id, region, cohort)
             self.demand_history.append(
                 DemandRecord(
                     id=f"DEMAND-{index:05d}",
