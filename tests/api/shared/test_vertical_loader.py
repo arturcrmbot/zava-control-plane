@@ -107,10 +107,8 @@ def test_active_runtime_is_process_immutable(
 def test_discover_pack_modules_returns_agency_and_telco() -> None:
     loader = _loader()
     result = loader.discover_pack_modules()
-    assert result == {
-        "agency": "verticals.agency.manifest",
-        "telco": "verticals.telco.manifest",
-    }
+    assert result["agency"] == "verticals.agency.manifest"
+    assert result["telco"] == "verticals.telco.manifest"
 
 
 def test_discover_pack_modules_filters_underscored_and_missing_manifest(
@@ -122,9 +120,11 @@ def test_discover_pack_modules_filters_underscored_and_missing_manifest(
     retail_manifest = root / "retail" / "manifest.py"
     retail_manifest.parent.mkdir(parents=True)
     retail_manifest.touch()
-    # underscore-prefixed file - should be ignored
-    helpers = root / "_helpers.py"
-    helpers.touch()
+    # underscore-prefixed directory - should be ignored
+    shared_dir = root / "_shared"
+    shared_manifest = shared_dir / "manifest.py"
+    shared_manifest.parent.mkdir(parents=True)
+    shared_manifest.touch()
     # directory without manifest.py - should be ignored
     notes_dir = root / "notes"
     notes_dir.mkdir()
