@@ -142,8 +142,8 @@ The script applies all six pack-scoped steps idempotently:
 ## §10 — Function membership (v4)
 
 - [ ] §10.1 `brief.function` is one of the 10 canonical keys (`finance`, `hr`, `revenue`, `ops`, `legal`, `marketing`, `tech`, `data`, `customer-success`, `legacy`).
-- [ ] §10.2 graduate.sh §9 patches `api/shared/functions.py` appending the `workflow_type` to `FUNCTIONS["<fn>"].owns_domains` (idempotent via `# compose-domain:owns_domains:<fn>` sentinel).
-- [ ] §10.3 If `api/shared/functions.py` is absent (Phase 3 not merged), graduate.sh §9 logs `warn: api/shared/functions.py absent — skipping FUNCTIONS patch (Phase 3 will own this)` and exits 0 for that step. Remaining steps still run.
+- [ ] §10.2 graduate.sh step 5 registers the `workflow_type` in the selected pack's `verticals/<vertical>/functions.py`, appending to `FUNCTIONS["<fn>"].owns_domains` (idempotent via `# compose-domain:owns_domains:<fn>` sentinel). The global `api/shared/functions.py` is a read-only active-pack adapter and is never modified.
+- [ ] §10.3 The registration block in `verticals/<vertical>/functions.py` is guarded by `BEGIN/END compose-domain:<workflow_type>` sentinel comments (idempotent re-runs).
 - [ ] §10.4 The workflow_type is not also claimed by a *different* function in the registry (orphan/dup check by author-function-membership validator).
 
 ## §11 — Ambient trigger (v4, optional)

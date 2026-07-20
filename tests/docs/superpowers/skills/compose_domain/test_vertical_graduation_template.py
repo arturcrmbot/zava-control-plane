@@ -218,3 +218,27 @@ def test_orchestrator_tmpl_targets_durable_py() -> None:
     assert "registered in `function_app.py`" not in text
     assert "durable.py" in text
     assert "api/shared/constants.py" not in text
+
+
+def test_checklist_function_membership_targets_pack_functions_py() -> None:
+    """CHECKLIST §10.2–10.3 must describe function membership registration in
+    verticals/<vertical>/functions.py, not api/shared/functions.py (which is
+    read-only active-pack adapter). Must not reference stale step 9."""
+    text = CHECKLIST.read_text(encoding="utf-8")
+    # Verify the correct target file is mentioned
+    assert "verticals/<vertical>/functions.py" in text, (
+        "CHECKLIST §10 must mention verticals/<vertical>/functions.py"
+    )
+    # Verify read-only nature is documented
+    assert "read-only active-pack adapter" in text, (
+        "CHECKLIST must explain api/shared/functions.py is read-only"
+    )
+    # Verify no stale references to non-existent graduate.sh step 9 for functions
+    checklist_section_10 = text[text.find("## §10 —") : text.find("## §11 —")]
+    assert "graduate.sh §9" not in checklist_section_10, (
+        "CHECKLIST §10 must not reference stale graduate.sh §9"
+    )
+    # Verify it doesn't claim api/shared/functions.py is patched
+    assert (
+        "patches `api/shared/functions.py`" not in checklist_section_10
+    ), "CHECKLIST §10 must not claim api/shared/functions.py is patched"
