@@ -22,7 +22,7 @@ async def test_live_bus_overflow_drops_events_without_loop_errors(monkeypatch):
     monkeypatch.setattr(
         blueprint,
         "_OBSERVATORY_CAP",
-        SimpleNamespace(allow=lambda: True),
+        SimpleNamespace(allow=lambda: True, capacity=400),
     )
     monkeypatch.setattr(
         blueprint,

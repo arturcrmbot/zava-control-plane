@@ -155,6 +155,24 @@ const getJson = (route) => requestJson("GET", route);
 const postJson = (route, data) => requestJson("POST", route, data);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+async function tryResolveException(exceptionId) {
+  const route = `/api/exceptions/${encodeURIComponent(exceptionId)}/resolve`;
+  const response = await fetch(`${API}${route}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      resolution: "approve",
+      resolved_by: "telco-proof@zava.local",
+    }),
+  });
+  const body = await response.text();
+  if (response.status === 503) return false;
+  if (!response.ok) {
+    throw new ProofError(`POST ${route}: ${response.status} ${body}`);
+  }
+  return true;
+}
+
 async function waitFor(check, message, deadline = UI_DEADLINE_MS) {
   const end = Date.now() + deadline;
   let lastError;
@@ -208,10 +226,8 @@ async function resolveOpenExceptions(resolutions) {
   for (const exception of exceptions) {
     const id = exception.id;
     if (!id || resolutions.some((entry) => entry.exceptionId === id)) continue;
-    await postJson(`/api/exceptions/${encodeURIComponent(id)}/resolve`, {
-      resolution: "approve",
-      resolved_by: "telco-proof@zava.local",
-    });
+    const delivered = await tryResolveException(id);
+    if (!delivered) continue;
     resolutions.push({
       exceptionId: id,
       workflowId: exception.workflowId,
@@ -272,10 +288,25 @@ function installBrowserTracking(page, name, evidence) {
   });
 }
 
+async function gotoUi(page, url) {
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      await page.goto(url, {
+        waitUntil: "domcontentloaded",
+        timeout: UI_DEADLINE_MS,
+      });
+      return;
+    } catch (error) {
+      if (error.name !== "TimeoutError" || attempt === 2) throw error;
+      await sleep(1_000);
+    }
+  }
+}
+
 async function openConstellation(context, evidence) {
   const page = await context.newPage();
   installBrowserTracking(page, "constellation", evidence);
-  await page.goto(`${BLUEPRINT}/?view=constellation`);
+  await gotoUi(page, `${BLUEPRINT}/?view=constellation`);
   await page.locator("canvas").first().waitFor({ timeout: UI_DEADLINE_MS });
   await page
     .getByText("Live · org decisions and insights", { exact: true })
@@ -312,7 +343,7 @@ async function fetchDurable(instanceId) {
 async function assertLiveSurfaces(context, evidence, workflows, worldState, graph) {
   const page = await context.newPage();
   installBrowserTracking(page, "control-plane", evidence);
-  await page.goto(`${CONTROL_PLANE}/world`);
+  await gotoUi(page, `${CONTROL_PLANE}/world`);
   await page.getByTestId("telco-world-route").waitFor({ timeout: UI_DEADLINE_MS });
   await page.getByTestId("stat-sites").getByText("12 sites").waitFor();
   await page.getByTestId("stat-sessions").getByText("2200 sessions").waitFor();
@@ -741,7 +772,7 @@ async function runReplay() {
   const page = await context.newPage();
   installBrowserTracking(page, "replay", evidence);
   try {
-    await page.goto(`${BLUEPRINT}/?view=constellation`);
+    await gotoUi(page, `${BLUEPRINT}/?view=constellation`);
     await page.locator("canvas").first().waitFor({ timeout: UI_DEADLINE_MS });
     await page.evaluate(() => {
       window.__telcoReplayEvents = [];

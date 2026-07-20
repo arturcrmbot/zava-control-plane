@@ -102,6 +102,22 @@ def test_telco_proof_drives_all_four_real_scenarios_and_fails_fast():
     assert "if (error instanceof ProofError)" in source
 
 
+def test_telco_proof_uses_explicit_ui_readiness_after_dom_content_load():
+    source = DRIVER.read_text(encoding="utf-8")
+
+    assert 'waitUntil: "domcontentloaded"' in source
+    assert "for (let attempt = 1; attempt <= 2; attempt += 1)" in source
+    assert 'error.name !== "TimeoutError"' in source
+    assert 'page.locator("canvas").first().waitFor' in source
+
+
+def test_telco_proof_retries_transient_exception_delivery():
+    source = DRIVER.read_text(encoding="utf-8")
+
+    assert "if (response.status === 503) return false;" in source
+    assert "if (!delivered) continue;" in source
+
+
 def test_telco_proof_runs_every_standard_profile():
     source = DRIVER.read_text(encoding="utf-8")
 
@@ -114,7 +130,7 @@ def test_telco_proof_uses_deterministic_agents_and_indexes_nine_orchestrators():
     source = SCRIPT.read_text(encoding="utf-8")
 
     assert 'ZAVA_TELCO_AGENT_MODE="deterministic"' in source
-    assert 'MAX_OBSERVATORY_EVENTS_PER_SEC="2000"' in source
+    assert 'MAX_OBSERVATORY_EVENTS_PER_SEC="10000"' in source
     assert source.count("Orchestrator") >= 9
 
 

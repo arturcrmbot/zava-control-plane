@@ -77,6 +77,10 @@ def _make_event_cap() -> _TokenBucket:
 _OBSERVATORY_CAP = _make_event_cap()
 
 
+def _make_event_queue() -> asyncio.Queue[dict[str, Any]]:
+    return asyncio.Queue(maxsize=max(2_000, _OBSERVATORY_CAP.capacity))
+
+
 def _put_nowait_if_space(
     queue: asyncio.Queue[dict[str, Any]],
     event: dict[str, Any],
@@ -277,7 +281,7 @@ async def blueprint_stream(request: Request) -> EventSourceResponse:
 
     No global trickle. _stream_loop is gone.
     """
-    queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=2_000)
+    queue = _make_event_queue()
     loop = asyncio.get_running_loop()
 
     def _push_bus_event(event: FleetEvent) -> None:

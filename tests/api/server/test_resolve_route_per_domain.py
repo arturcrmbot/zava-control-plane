@@ -115,3 +115,27 @@ def test_resolve_route_falls_back_to_registry_when_cache_cold(client, monkeypatc
     assert resp.status_code == 200, resp.text
     assert raised
     assert raised[0][1] == gate.external_event
+
+
+def test_resolve_route_keeps_gate_open_when_durable_delivery_fails(
+    client, monkeypatch
+):
+    async def _fail_raise(instance_id, event_name, payload):
+        raise TimeoutError("durable host busy")
+
+    import api.server.services.durable_client as dc_module
+
+    monkeypatch.setattr(dc_module, "raise_orchestration_event", _fail_raise)
+    gate = registry.DOMAINS["vendor-kyc"].hitl_gates[0]
+    wid, exc_id = _seed_suspended_workflow("vendor-kyc", gate)
+
+    resp = client.post(
+        f"/api/exceptions/{exc_id}/resolve",
+        json={"resolution": "approve", "resolvedBy": "test@zava"},
+    )
+
+    assert resp.status_code == 503
+    assert app_state.store.get_exception(exc_id).resolved_at is None
+    workflow = app_state.store.get_workflow(wid)
+    assert workflow.status == "awaiting_hitl"
+    assert workflow.action_ledger == []

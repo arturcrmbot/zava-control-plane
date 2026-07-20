@@ -78,26 +78,19 @@ async def _resolve_one(exception_id: str, resolution: Resolution, resolved_by: s
     current_phase) if the cache is cold (e.g. FastAPI restart between
     suspend and operator click).
 
-    Returns True if the exception was found and resolved (regardless of
-    whether the orchestration event was raised — best-effort there).
+    Returns True if the exception was found and resolved. For a suspended
+    Durable workflow, resolution is committed only after the external event
+    has been delivered.
     """
     exc = app_state.store.get_exception(exception_id)
     if not exc:
         return False
-    app_state.store.resolve_exception(exception_id, resolved_by)
     w = app_state.store.get_workflow(exc.workflow_id)
     if not w:
+        app_state.store.resolve_exception(exception_id, resolved_by)
         return True
     if w.status != "awaiting_hitl":
-        return True
-    w.status = "in_progress"
-    w.action_ledger.append(ActionLedgerEntry(
-        workflow_id=w.id, timestamp=time.time(),
-        actor_kind="human", actor_id=resolved_by,
-        action=f"reviewer.decision:{resolution}",
-        revocable=False, details={"exception_id": exception_id},
-    ))
-    if not w.orchestration_instance_id:
+        app_state.store.resolve_exception(exception_id, resolved_by)
         return True
 
     # Cache → registry fallback for the external_event name.
@@ -117,20 +110,36 @@ async def _resolve_one(exception_id: str, resolution: Resolution, resolved_by: s
             event_name = "justification"
             payload["text"] = "Reviewer-side override accepted via Control Plane."
 
-    if event_name:
+    if event_name and w.orchestration_instance_id:
         from api.server.services.durable_client import raise_orchestration_event
         try:
-            await raise_orchestration_event(
+            delivered = await raise_orchestration_event(
                 w.orchestration_instance_id, event_name, payload,
             )
         except Exception as ex:
-            print(f"[exceptions] failed to raise {event_name} for {w.id}: {ex}")
-    else:
-        print(
-            f"[exceptions] no external_event registered for "
-            f"workflow_type={w.type} phase={w.current_phase!r}; "
-            f"orchestration {w.orchestration_instance_id} stays parked"
+            raise HTTPException(
+                503,
+                f"Durable event delivery failed for workflow {w.id}",
+            ) from ex
+        if delivered is False:
+            raise HTTPException(
+                503,
+                f"Durable instance unavailable for workflow {w.id}",
+            )
+    elif w.orchestration_instance_id:
+        raise HTTPException(
+            503,
+            f"No external event registered for workflow {w.id}",
         )
+
+    app_state.store.resolve_exception(exception_id, resolved_by)
+    w.status = "in_progress"
+    w.action_ledger.append(ActionLedgerEntry(
+        workflow_id=w.id, timestamp=time.time(),
+        actor_kind="human", actor_id=resolved_by,
+        action=f"reviewer.decision:{resolution}",
+        revocable=False, details={"exception_id": exception_id},
+    ))
     return True
 
 
