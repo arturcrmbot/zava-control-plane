@@ -2,15 +2,14 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[5]
-TEMPLATE = (
-    ROOT
-    / "docs"
-    / "superpowers"
-    / "skills"
-    / "compose-domain"
-    / "templates"
-    / "graduate.sh.tmpl"
+TEMPLATES_DIR = (
+    ROOT / "docs" / "superpowers" / "skills" / "compose-domain" / "templates"
 )
+TEMPLATE = TEMPLATES_DIR / "graduate.sh.tmpl"
+GRADUATION_TMPL = TEMPLATES_DIR / "GRADUATION.md.tmpl"
+ACTIVITY_TMPL = TEMPLATES_DIR / "activity.py.tmpl"
+ORCHESTRATOR_TMPL = TEMPLATES_DIR / "orchestrator.py.tmpl"
+SEGMENT_TRIGGER_TMPL = TEMPLATES_DIR / "segment_activity_trigger.py.tmpl"
 CHECKLIST = (
     ROOT
     / "docs"
@@ -134,3 +133,87 @@ def test_vertical_proof_doc_has_mandatory_concepts() -> None:
         assert concept in text, (
             f"docs/VERTICAL-PROOF.md missing mandatory concept: {concept!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Appendix-phrase regression tests — catch stale active-instruction text
+# ---------------------------------------------------------------------------
+
+
+def test_skill_md_no_stale_function_app_active_instructions() -> None:
+    """SKILL.md must not contain active-instruction phrases that describe
+    patching function_app.py. Safety prose (forbidden/never-edit) is allowed;
+    only specific instruction phrases are banned."""
+    text = COMPOSE_SKILL.read_text(encoding="utf-8")
+    stale_phrases = (
+        "patched into `function_app.py`",
+        "function_app.py patch block",
+        "applies the function_app.py patch",
+        "function_app.py gets ONE",
+        "a function_app.py patch from",
+        "function_app.py activity-trigger pair",
+    )
+    for phrase in stale_phrases:
+        assert phrase not in text, (
+            f"SKILL.md contains stale active-instruction phrase: {phrase!r}"
+        )
+
+
+def test_graduation_tmpl_no_global_patch_steps() -> None:
+    """GRADUATION.md.tmpl must not describe patching the three global files
+    as graduation steps. The safety prose in graduate.sh.tmpl prohibition
+    comments is not affected by this check."""
+    text = GRADUATION_TMPL.read_text(encoding="utf-8")
+    forbidden_steps = (
+        "Patch `function_app.py`",
+        "Patch `api/server/services/simulator_orchestrator.py`",
+        "Patch `api/server/services/blueprint_inventory.py`",
+    )
+    for phrase in forbidden_steps:
+        assert phrase not in text, (
+            f"GRADUATION.md.tmpl still claims global patch step: {phrase!r}"
+        )
+
+
+def test_graduation_tmpl_rollback_targets_pack_files() -> None:
+    """Rollback in GRADUATION.md.tmpl must reference pack-owned paths, not
+    the global files replaced by the vertical-pack authoring model."""
+    text = GRADUATION_TMPL.read_text(encoding="utf-8")
+    assert "verticals/{{VERTICAL_NAME}}/durable.py" in text
+    assert "verticals/{{VERTICAL_NAME}}/spawners.py" in text
+    # Must not revert global files that graduation no longer touches
+    assert "git checkout -- \\\n    function_app.py" not in text
+    assert "api/server/services/simulator_orchestrator.py" not in text
+    assert "api/server/services/blueprint_inventory.py" not in text
+
+
+def test_graduation_tmpl_six_step_table() -> None:
+    """GRADUATION.md.tmpl step table must describe exactly the six steps
+    performed by graduate.sh.tmpl."""
+    text = GRADUATION_TMPL.read_text(encoding="utf-8")
+    assert "Register Durable functions" in text
+    assert "Register pack business declarations" in text
+    assert "Validate and print smoke commands" in text
+
+
+def test_segment_trigger_tmpl_targets_durable_py() -> None:
+    """segment_activity_trigger.py.tmpl must not tell authors to patch
+    function_app.py; it must reference the pack's durable.py."""
+    text = SEGMENT_TRIGGER_TMPL.read_text(encoding="utf-8")
+    assert "function_app.py" not in text
+    assert "durable.py" in text
+
+
+def test_activity_tmpl_targets_durable_py() -> None:
+    """activity.py.tmpl docstring must reference durable.py, not function_app.py."""
+    text = ACTIVITY_TMPL.read_text(encoding="utf-8")
+    assert "function_app.py" not in text
+    assert "durable.py" in text
+
+
+def test_orchestrator_tmpl_targets_durable_py() -> None:
+    """orchestrator.py.tmpl must not say activities are registered in
+    function_app.py; it must reference the pack's durable.py."""
+    text = ORCHESTRATOR_TMPL.read_text(encoding="utf-8")
+    assert "registered in `function_app.py`" not in text
+    assert "durable.py" in text

@@ -347,7 +347,7 @@ per-phase MAF graph shape is now opt-in via `kind: graph` — see
   `api/functions/segments/<wt_snake>_<segment_letter>.py` with a
   Pydantic `Segment<Letter>Output` model and a matching
   `validate_<wt_snake>_segment_<letter>_output_activity_trigger`
-  patched into `function_app.py`. The orchestrator wraps the segment
+  registered in the pack's `durable.py`. The orchestrator wraps the segment
   in a retry loop driven by the validator (see
   `api/functions/workflows/hiring.py:120-162` for the canonical loop;
   `SEGMENT_MAX_RETRIES` defaults to 2). One runtime SKILL.md per
@@ -377,7 +377,7 @@ that exist only under the legacy `kind: graph` path.
 | activities module | `api/functions/workflows/<prefix>_<wt_snake>_activities.py` | always |
 | **segment activity** | `api/functions/segments/<wt_snake>_<segment_letter>.py` | `kind: agent` (default) |
 | **segment output Pydantic model** | inline in the segment file as `Segment<Letter>Output(BaseModel)` | `kind: agent` (default) |
-| **segment validator activity** | `validate_<wt_snake>_segment_<letter>_output_activity_trigger` patched into `function_app.py` | `kind: agent` (default) |
+| **segment validator activity** | `validate_<wt_snake>_segment_<letter>_output_activity_trigger` registered in the pack's `durable.py` | `kind: agent` (default) |
 | phase agent runtime SKILL.md | `api/server/skills/<wt>-<skill_name>/SKILL.md` | per-skill (both paths) |
 | persona SKILL.md | `api/server/personae/<role>/SKILL.md` | per HITL role |
 | MCP tool stub | `api/server/mcp_tools/<mcp_tool>.py` | per `external_systems[]` |
@@ -396,7 +396,7 @@ Template references (under `docs/superpowers/skills/compose-domain/templates/`):
 | Template | Purpose | Path |
 |---|---|---|
 | `segment.py.tmpl` | segment activity + Pydantic output model | `kind: agent` (default) |
-| `segment_activity_trigger.py.tmpl` | function_app.py activity-trigger pair (run + validate) | `kind: agent` (default) |
+| `segment_activity_trigger.py.tmpl` | pack `durable.py` activity-trigger pair (run + validate) | `kind: agent` (default) |
 | `activity.py.tmpl` | per-phase Durable activity wrappers for graph phases | deterministic + legacy graph |
 | `phase_graph.py.tmpl` | per-phase MAF graph (WorkflowBuilder) | **deterministic + legacy `kind: graph` only** |
 | `validator.py.tmpl` | in-graph validator returning `{ok: bool}` | **deterministic + legacy `kind: graph` only** |
@@ -440,11 +440,11 @@ structured output that the orchestrator hands to the next phase" case
 segment.
 
 Mechanically, `kind: agent` writes a segment file from
-`segment.py.tmpl` + a function_app.py patch from
+`segment.py.tmpl` + a durable registration snippet from
 `segment_activity_trigger.py.tmpl`. `kind: graph` writes a per-phase
 MAF graph from `phase_graph.py.tmpl` + an in-graph validator from
 `validator.py.tmpl` + an agent executor from `agent_executor.py.tmpl`,
-and is patched into `function_app.py` as a single
+and is registered in the pack's `durable.py` as a single
 `<wt_snake>_<phase>_activity_trigger` (no separate validator-trigger
 — validation happens inside the graph).
 
@@ -789,8 +789,8 @@ activity, not a MAF graph**:
      model, not in a separate file.
    - `SEGMENT_GOAL_SENTENCE` — one sentence describing the deliverable,
      matching the phase's `intent`.
-3. **Render `segment_activity_trigger.py.tmpl`** into the sandboxed
-   `function_app.py` patch block. This emits **two** activity triggers:
+3. **Render `segment_activity_trigger.py.tmpl`** to produce the
+   `durable.py` registration snippet. This emits **two** activity triggers:
    - `vendor_kyc_segment_b_activity_trigger` — calls
      `run_segment_b(input)`.
    - `validate_vendor_kyc_segment_b_output_activity_trigger` — Pydantic-
@@ -804,8 +804,8 @@ activity, not a MAF graph**:
    breaking when `validator["ok"]`. Copy the loop shape from
    `api/functions/workflows/hiring.py:120-162` byte-for-byte.
 5. **Graduate.** `graduate.sh` copies the segment file under
-   `api/functions/segments/` and applies the function_app.py patch
-   between the existing segment markers. No new file under
+   `api/functions/segments/` and appends the triggers to the pack's
+   `durable.py` between sentinel markers. No new file under
    `api/functions/graphs/` is created for this phase; no entry in
    `api/functions/graphs/__init__.py` is added.
 
@@ -843,7 +843,7 @@ under the segment path):
    `{"ok": bool, ...}` (NOT a Pydantic model; the graph terminal
    handles the `ok=False` branch).
 
-`function_app.py` gets ONE activity trigger
+The pack's `durable.py` gets ONE activity trigger
 (`vendor_kyc_kyc_diligence_activity_trigger`) instead of the pair, and
 the graph builder is exported from `api/functions/graphs/__init__.py`.
 The orchestrator calls the trigger once per attempt (no in-orchestrator
@@ -880,7 +880,8 @@ intent, not a regenerable source for those modules.
   expects them.
 - Writing the orchestrator before reading the 8 canonical examples in
   step 3 once in this session.
-- Editing `function_app.py` "just to make the smoke test work". That's
+- Directly editing live-tree pack files (`durable.py`, `domains.py`,
+  `spawners.py`, `functions.py`) "just to make the smoke test work". That's
   graduation. It happens by hand. By an engineer. After this skill ends.
 - Graduating "while you're at it" because the sandbox looks fine. Stop.
 - Pretending you finished when you didn't. If you got blocked, say so. If

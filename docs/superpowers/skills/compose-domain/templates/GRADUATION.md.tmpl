@@ -25,14 +25,11 @@ wrong mid-run, it aborts loudly. Rollback at the end of this doc.
 | # | Step | Affects |
 |---|---|---|
 | 1 | Validate prereqs | (read-only) |
-| 2 | Copy sandbox files | `api/server/skills/`, `api/server/personae/`, `api/server/mcp_tools/`, `api/functions/workflows/`, `api/functions/graphs/`, `api/functions/graphs/executors/agents/`, `api/functions/graphs/executors/validators/` |
-| 3 | Patch `function_app.py` | Adds orchestrator + activity decorators, between BEGIN/END markers |
-| 4 | Patch `api/functions/graphs/__init__.py` | Adds `build_*_workflow` exports |
-| 5 | Patch `api/server/services/simulator_orchestrator.py` | Adds `spawn_{{DOMAIN_NAME_SNAKE}}_workflow`; adds `{{WORKFLOW_TYPE}}` to `ramp_loop`'s `spawners` dict |
-| 6 | Patch `api/server/routes/simulator.py` | Adds `POST /api/simulator/{{DOMAIN_NAME}}` |
-| 7 | Patch `api/server/services/blueprint_inventory.py` | Adds DOMAINS entry with `workflow_type` + `phase_aliases` |
-| 8 | Patch `api/shared/constants.py` | Lifts `<PHASE>_TIMEOUT` constants out of orchestrator |
-| 9 | Print smoke commands + expected event sequence | (read-only) |
+| 2 | Copy sandbox files | `verticals/{{VERTICAL_NAME}}/skills/`, `verticals/{{VERTICAL_NAME}}/personae/`, `verticals/{{VERTICAL_NAME}}/mcp_tools/`, `verticals/{{VERTICAL_NAME}}/entity_projections/` |
+| 3 | Register Durable functions | `verticals/{{VERTICAL_NAME}}/durable.py` — appends orchestrator + activity triggers between sentinel markers |
+| 4 | Register graph builders | `api/functions/graphs/__init__.py` — adds `build_*_workflow` exports |
+| 5 | Register pack business declarations | `verticals/{{VERTICAL_NAME}}/spawners.py`, `verticals/{{VERTICAL_NAME}}/domains.py`, `verticals/{{VERTICAL_NAME}}/functions.py` — sentinel-guarded appends |
+| 6 | Validate and print smoke commands | (read-only) |
 
 Each patch step is idempotent: it checks for a unique anchor before
 appending, so re-running graduate.sh is safe.
@@ -95,19 +92,21 @@ not in the graduated code. Revert the graduation, fix the SKILL.md,
 re-run compose-domain, re-graduate.
 
 ```bash
-# Revert all the file patches.
+# Undo the sentinel-guarded appends in pack files.
+# Remove the BEGIN/END block for {{DOMAIN_NAME}} from each file, or revert:
 git checkout -- \
-    function_app.py \
-    api/functions/graphs/__init__.py \
-    api/server/services/simulator_orchestrator.py \
-    api/server/routes/simulator.py \
-    api/server/services/blueprint_inventory.py \
-    api/shared/constants.py
+    verticals/{{VERTICAL_NAME}}/durable.py \
+    verticals/{{VERTICAL_NAME}}/spawners.py \
+    verticals/{{VERTICAL_NAME}}/domains.py \
+    verticals/{{VERTICAL_NAME}}/functions.py \
+    api/functions/graphs/__init__.py
 
 # Remove all the copied files.
 rm -rf \
-    api/server/skills/{{DOMAIN_NAME}}-* \
-    api/server/personae/{{PERSONA_ROLES_SPACED}} \
+    verticals/{{VERTICAL_NAME}}/skills/{{DOMAIN_NAME}}-* \
+    verticals/{{VERTICAL_NAME}}/personae/{{PERSONA_ROLES_SPACED}} \
+    verticals/{{VERTICAL_NAME}}/mcp_tools/{{DOMAIN_NAME_SNAKE}}* \
+    verticals/{{VERTICAL_NAME}}/entity_projections/{{DOMAIN_NAME_SNAKE}}* \
     api/functions/workflows/{{DOMAIN_NAME_SNAKE}}.py \
     api/functions/workflows/{{DOMAIN_NAME_SNAKE}}_activities.py \
     api/functions/graphs/{{DOMAIN_NAME_SNAKE}}_*.py \
