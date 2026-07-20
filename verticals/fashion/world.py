@@ -6,20 +6,39 @@ from typing import Any
 
 from api.server.world.model import SimulationCommand, SimulationEvent
 from api.server.world.runtime import SimulationRuntime
+from verticals.fashion import signals
 from verticals.fashion.authority import FASHION_AUTHORITY
+from verticals.fashion.entities import (
+    DemandSignal,
+    Delivery,
+    MarkdownRecommendation,
+    Order,
+    Promotion,
+    Reservation,
+    Return,
+    SellerOffer,
+)
 from verticals.fashion.process_profiles import FASHION_PROCESS_PROFILES
 from verticals.fashion.reference_actions import (
     PROFILE_BY_COMMAND,
     apply_reference_command,
+    resolve_case_entity,
     validate_reference_command,
 )
 from verticals.fashion.reference_cases import (
+    DEFAULT_ACTIONS,
     FashionProcessCase,
     build_reference_case,
     process_case_view,
 )
 
 DEMO_SEED: int = 42
+
+HERO_SKU: str = "SKU-0001"
+HERO_STYLE: str = "STYLE-001"
+HERO_REGION_PREFIX: str = "UK"
+MARKDOWN_STYLE: str = "STYLE-004"
+MARKDOWN_ELIGIBLE_LIFECYCLES: frozenset[str] = frozenset({"sale", "clearance"})
 
 
 @dataclass(slots=True)
@@ -111,7 +130,15 @@ class FashionScenario:
         self.skus: dict[str, Sku] = {}
         self.customers: dict[str, Customer] = {}
         self.demand_history: list[DemandRecord] = []
+        self.demand_signals: dict[str, DemandSignal] = {}
         self.inventory: dict[str, InventoryPosition] = {}
+        self.orders: dict[str, Order] = {}
+        self.reservations: dict[str, Reservation] = {}
+        self.promotions: dict[str, Promotion] = {}
+        self.deliveries: dict[str, Delivery] = {}
+        self.returns: dict[str, Return] = {}
+        self.seller_offers: dict[str, SellerOffer] = {}
+        self.markdown_recommendations: dict[str, MarkdownRecommendation] = {}
         self.process_cases: dict[str, FashionProcessCase] = {}
         self.workflow_state: dict[str, dict[str, Any]] = {}
         self.applied_commands: dict[str, SimulationEvent] = {}
@@ -138,6 +165,19 @@ class FashionScenario:
         self._create_catalogue()
         self._create_customers_and_demand()
         self._create_inventory()
+        self._create_entities()
+
+    @property
+    def hero_style_sku_ids(self) -> tuple[str, ...]:
+        return tuple(
+            sku.id
+            for sku in self.skus.values()
+            if sku.style_id == HERO_STYLE
+        )
+
+    @property
+    def markdown_style_id(self) -> str:
+        return MARKDOWN_STYLE
 
     def _create_locations(self) -> None:
         store_specs = (
@@ -226,6 +266,54 @@ class FashionScenario:
                     quantity=1 + self.runtime.rng.randrange(2),
                 )
             )
+        self._seed_hero_demand_series(channels)
+
+    def _seed_hero_demand_series(
+        self,
+        channels: tuple[str, ...],
+    ) -> None:
+        """Lay down a deterministic 14-day demand series for the hero style in
+        the UK region, with a weather/campaign uplift concentrated in the
+        recent (days 8-14) window. Quantities stay at their unit base so the
+        cohort weighting is applied live at signal-derivation time."""
+        hero_skus = self.hero_style_sku_ids
+        uk_customers = [
+            customer_id
+            for customer_id, customer in self.customers.items()
+            if customer.region.startswith(HERO_REGION_PREFIX)
+        ]
+        base_per_day = 3
+        recent_uplift_per_day = 3
+        serial = 0
+        recent_uplift_units = 0
+        for day in range(1, 15):
+            uplift = recent_uplift_per_day if day >= 8 else 0
+            for slot in range(base_per_day + uplift):
+                serial += 1
+                customer_id = uk_customers[
+                    (day * 7 + slot) % len(uk_customers)
+                ]
+                self.demand_history.append(
+                    DemandRecord(
+                        id=f"HERO-DEMAND-{serial:05d}",
+                        customer_id=customer_id,
+                        sku_id=hero_skus[slot % len(hero_skus)],
+                        day=day,
+                        channel=channels[slot % len(channels)],
+                        quantity=1,
+                    )
+                )
+                if day >= 8 and slot >= base_per_day:
+                    recent_uplift_units += 1
+        self.demand_signals[f"{HERO_STYLE}@{HERO_REGION_PREFIX}"] = DemandSignal(
+            id=f"SIGNAL-{HERO_STYLE}-{HERO_REGION_PREFIX}",
+            sku_ids=hero_skus,
+            region=HERO_REGION_PREFIX,
+            channel=None,
+            kind="weather-campaign",
+            active=True,
+            recent_uplift_units=recent_uplift_units,
+        )
 
     def _create_inventory(self) -> None:
         for location_index, location in enumerate(self.locations.values()):
@@ -243,7 +331,7 @@ class FashionScenario:
                     presentation_minimum=2 if location.kind == "store" else 0,
                     safety_stock=3 if location.kind == "store" else 5,
                 )
-        hero_sku = "SKU-0001"
+        hero_sku = HERO_SKU
         source = self.inventory[f"INV-DC-UK-01-{hero_sku}"]
         destination = self.inventory[f"INV-STORE-UK-01-{hero_sku}"]
         eu_excess = self.inventory[f"INV-STORE-EU-01-{hero_sku}"]
@@ -254,18 +342,149 @@ class FashionScenario:
         destination.reserved = 1
         eu_excess.on_hand = 90
 
+    def _create_entities(self) -> None:
+        """Seed the concrete world entities the supporting workflows read and
+        mutate. Every record is versioned so a mutation is observable."""
+        self.reservations["RES-STORE-UK-01-" + HERO_SKU] = Reservation(
+            id="RES-STORE-UK-01-" + HERO_SKU,
+            location_id="STORE-UK-01",
+            sku_id=HERO_SKU,
+            reserved_units=4,
+            status="baseline",
+        )
+        self.promotions["PROMOTION-001"] = Promotion(
+            id="PROMOTION-001",
+            sku_id=HERO_SKU,
+            stock_ready=False,
+            content_ready=False,
+            channels_ready=(),
+            status="draft",
+        )
+        markdown_rec_id = f"MREC-{MARKDOWN_STYLE}-STORE-EU-01"
+        self.markdown_recommendations[markdown_rec_id] = MarkdownRecommendation(
+            id=markdown_rec_id,
+            style_id=MARKDOWN_STYLE,
+            location_id="STORE-EU-01",
+            recommendation=None,
+            status="pending",
+        )
+        self.deliveries["DEL-SUPPLIER-001-STYLE-003"] = Delivery(
+            id="DEL-SUPPLIER-001-STYLE-003",
+            supplier_id="SUPPLIER-001",
+            style_id="STYLE-003",
+            delay_days=6,
+            recovery_plan=None,
+            status="delayed",
+        )
+        self.orders["ORDER-001"] = Order(
+            id="ORDER-001",
+            sku_id=HERO_SKU,
+            location_id="STORE-UK-01",
+            quantity=3,
+            status="infeasible",
+            allocation_location_id=None,
+        )
+        self.seller_offers["OFFER-001"] = SellerOffer(
+            id="OFFER-001",
+            seller_id="SELLER-001",
+            sku_id="SKU-0002",
+            sla_breach_hours=8,
+            suppressed=False,
+            escalated=False,
+            status="breaching",
+        )
+        self.returns["RETURN-001"] = Return(
+            id="RETURN-001",
+            sku_id="SKU-0002",
+            condition="resalable",
+            disposition=None,
+            recovery_value_gbp=75.0,
+            status="inspected",
+        )
+
+    def demand_metrics(
+        self,
+        sku_ids: tuple[str, ...],
+        region_prefix: str,
+        *,
+        channel: str | None = None,
+    ) -> tuple[signals.DemandMetrics, bool]:
+        """Derive the cohort-weighted demand series and its aggregates for a
+        SKU set / region, plus whether a corroborating signal is active."""
+        series = signals.daily_series(
+            self.demand_history,
+            self.customers,
+            sku_ids=sku_ids,
+            region_prefix=region_prefix,
+            channel=channel,
+        )
+        sku_set = set(sku_ids)
+        signal_active = any(
+            signal.active
+            and sku_set & set(signal.sku_ids)
+            and (
+                signal.region.startswith(region_prefix)
+                or region_prefix.startswith(signal.region)
+            )
+            for signal in self.demand_signals.values()
+        )
+        metrics = signals.DemandMetrics(
+            series=tuple(series),
+            velocity_change=signals.velocity_change(series),
+            confidence=signals.demand_confidence(
+                series, signal_active=signal_active
+            ),
+            weekly_demand=signals.weekly_demand(series),
+        )
+        return metrics, signal_active
+
+    def _demand_signal_view(
+        self,
+        series: list[int],
+        signal_active: bool,
+    ) -> dict[str, Any]:
+        signal = self.demand_signals.get(f"{HERO_STYLE}@{HERO_REGION_PREFIX}")
+        uplift = signal.recent_uplift_units if signal else 0
+        return {
+            "kind": signal.kind if signal else "none",
+            "active": signal_active,
+            "recent_uplift_units": uplift if signal_active else 0,
+            "recent_share": (
+                signals.signal_recent_share(series, uplift)
+                if signal_active
+                else 0.0
+            ),
+        }
+
+    def _markdown_eligible(self, style_id: str) -> bool:
+        style = self.styles.get(style_id)
+        return bool(
+            style and style.lifecycle in MARKDOWN_ELIGIBLE_LIFECYCLES
+        )
+
+    def recommended_action(
+        self,
+        workflow_type: str,
+        subjects: tuple[str, ...],
+    ) -> str:
+        if workflow_type == "markdown-governance":
+            if self._markdown_eligible(subjects[0]):
+                return "recommend-markdown"
+            return "hold-full-price"
+        return DEFAULT_ACTIONS[workflow_type]
+
     def case_evidence(
         self,
         workflow_type: str,
     ) -> tuple[tuple[str, ...], dict[str, Any]]:
-        hero_sku = "SKU-0001"
+        hero_sku = HERO_SKU
         source_id = f"INV-DC-UK-01-{hero_sku}"
         destination_id = f"INV-STORE-UK-01-{hero_sku}"
         subjects = {
             "inventory-rebalancing": (source_id, destination_id, hero_sku),
             "demand-spike-response": ("STORE-UK-01", hero_sku),
             "promotion-readiness": ("PROMOTION-001", hero_sku),
-            "markdown-governance": ("STYLE-002", "STORE-EU-01"),
+            "markdown-governance": (MARKDOWN_STYLE, "STORE-EU-01"),
             "supplier-delay-recovery": ("SUPPLIER-001", "STYLE-003"),
             "fulfilment-exception-resolution": ("ORDER-001", hero_sku),
             "marketplace-seller-exception": (
@@ -274,47 +493,118 @@ class FashionScenario:
             ),
             "returns-disposition": ("RETURN-001", "SKU-0002"),
         }
-        facts = {
-            "inventory-rebalancing": {
-                "demand_confidence": 0.9,
-                "transfer_cost_gbp": 120.0,
-                "expected_recovered_margin_gbp": 800.0,
+        return subjects[workflow_type], self._derive_facts(
+            workflow_type, subjects[workflow_type]
+        )
+
+    def _derive_facts(
+        self,
+        workflow_type: str,
+        subjects: tuple[str, ...],
+    ) -> dict[str, Any]:
+        hero_skus = self.hero_style_sku_ids
+        if workflow_type == "inventory-rebalancing":
+            metrics, active = self.demand_metrics(hero_skus, HERO_REGION_PREFIX)
+            destination = self.inventory[subjects[1]]
+            recovered_units = 20
+            style = self.styles[self.skus[HERO_SKU].style_id]
+            unit_margin = round(style.unit_retail_gbp * 0.4, 2)
+            transfer_cost = 6.0 * recovered_units
+            return {
+                "demand_confidence": metrics.confidence,
+                "regional_velocity_change": metrics.velocity_change,
+                "transfer_cost_gbp": transfer_cost,
+                "expected_recovered_margin_gbp": round(
+                    recovered_units * unit_margin, 2
+                ),
                 "fairness_score": 0.8,
-                "weather_signal": "warm-campaign-spike",
-                "eu_excess_position_id": f"INV-STORE-EU-01-{hero_sku}",
-            },
-            "demand-spike-response": {
-                "regional_velocity_change": 0.45,
-                "available_units": 120,
-            },
-            "promotion-readiness": {
-                "stock_ready": True,
-                "content_ready": True,
+                "weeks_of_supply": signals.weeks_of_supply(
+                    destination.on_hand, list(metrics.series)
+                ),
+                "demand_signal": self._demand_signal_view(
+                    list(metrics.series), active
+                ),
+                "eu_excess_position_id": f"INV-STORE-EU-01-{HERO_SKU}",
+            }
+        if workflow_type == "demand-spike-response":
+            metrics, active = self.demand_metrics(hero_skus, HERO_REGION_PREFIX)
+            store = self.inventory[f"INV-STORE-UK-01-{HERO_SKU}"]
+            dc_source = self.inventory[f"INV-DC-UK-01-{HERO_SKU}"]
+            return {
+                "regional_velocity_change": metrics.velocity_change,
+                "demand_confidence": metrics.confidence,
+                "weeks_of_supply": signals.weeks_of_supply(
+                    store.on_hand, list(metrics.series)
+                ),
+                "available_units": dc_source.physically_available,
+                "demand_signal": self._demand_signal_view(
+                    list(metrics.series), active
+                ),
+            }
+        if workflow_type == "promotion-readiness":
+            promotion = self.promotions.get(subjects[0])
+            metrics, _ = self.demand_metrics(hero_skus, HERO_REGION_PREFIX)
+            return {
+                "stock_ready": bool(promotion and promotion.stock_ready),
+                "content_ready": bool(promotion and promotion.content_ready),
+                "regional_velocity_change": metrics.velocity_change,
                 "channels": ["store", "ecommerce"],
-            },
-            "markdown-governance": {
-                "weeks_of_supply": 14.0,
+            }
+        if workflow_type == "markdown-governance":
+            style_id, location_id = subjects
+            style = self.styles[style_id]
+            style_skus = tuple(
+                sku.id
+                for sku in self.skus.values()
+                if sku.style_id == style_id
+            )
+            on_hand = sum(
+                position.on_hand
+                for position in self.inventory.values()
+                if position.sku_id in set(style_skus)
+                and position.location_id == location_id
+            )
+            metrics, _ = self.demand_metrics(
+                style_skus, "EU", channel=None
+            )
+            return {
+                "lifecycle": style.lifecycle,
+                "markdown_eligible": self._markdown_eligible(style_id),
+                "weeks_of_supply": signals.weeks_of_supply(
+                    on_hand, list(metrics.series)
+                ),
                 "recommendation_only": True,
-            },
-            "supplier-delay-recovery": {
-                "milestone_delay_days": 6,
+            }
+        if workflow_type == "supplier-delay-recovery":
+            delivery = self.deliveries.get("DEL-SUPPLIER-001-STYLE-003")
+            return {
+                "milestone_delay_days": delivery.delay_days if delivery else 0,
                 "substitute_available": True,
-            },
-            "fulfilment-exception-resolution": {
-                "allocation_failure": "local-stockout",
+            }
+        if workflow_type == "fulfilment-exception-resolution":
+            order = self.orders.get(subjects[0])
+            return {
+                "allocation_failure": (
+                    order.status if order else "unknown"
+                ),
                 "alternate_location": "DC-UK-01",
-            },
-            "marketplace-seller-exception": {
+            }
+        if workflow_type == "marketplace-seller-exception":
+            offer = self.seller_offers.get(subjects[1])
+            return {
                 "seller_verified": True,
-                "sla_breach_hours": 8,
-            },
-            "returns-disposition": {
-                "condition": "resalable",
+                "sla_breach_hours": offer.sla_breach_hours if offer else 0,
+            }
+        if workflow_type == "returns-disposition":
+            returned = self.returns.get(subjects[0])
+            return {
+                "condition": returned.condition if returned else "unknown",
                 "ownership": "owned",
-                "recovery_value_gbp": 75.0,
-            },
-        }
-        return subjects[workflow_type], facts[workflow_type]
+                "recovery_value_gbp": (
+                    returned.recovery_value_gbp if returned else 0.0
+                ),
+            }
+        raise ValueError(f"unknown Fashion process: {workflow_type!r}")
 
     @property
     def reference_process_types(self) -> frozenset[str]:
@@ -393,7 +683,14 @@ class FashionScenario:
             "evidence_digest": evidence_digest,
         }
         if case.workflow_type != "inventory-rebalancing":
-            return common
+            return {
+                **common,
+                **{
+                    key: value
+                    for key, value in case.facts.items()
+                    if key not in common
+                },
+            }
         source = self.inventory[case.subject_ids[0]]
         destination = self.inventory[case.subject_ids[1]]
         sku = self.skus[source.sku_id]
@@ -768,6 +1065,16 @@ class FashionScenario:
     def process_case_view(self, case: FashionProcessCase) -> dict[str, Any]:
         return process_case_view(case)
 
+    def entity_snapshot(
+        self,
+        workflow_type: str,
+        case: FashionProcessCase,
+    ) -> dict[str, Any] | None:
+        """Serialisable view of the concrete entity a supporting workflow
+        reads and mutates, resolved from the case subjects."""
+        entity = resolve_case_entity(self, workflow_type, case.subject_ids)
+        return asdict(entity) if entity is not None else None
+
     def render_state(self) -> dict[str, Any]:
         return {
             "stores": [asdict(value) for value in self.stores.values()],
@@ -782,8 +1089,29 @@ class FashionScenario:
             "demand_history": [
                 asdict(value) for value in self.demand_history
             ],
+            "demand_signals": [
+                asdict(value) for value in self.demand_signals.values()
+            ],
             "inventory": [
                 asdict(value) for value in self.inventory.values()
+            ],
+            "orders": [asdict(value) for value in self.orders.values()],
+            "reservations": [
+                asdict(value) for value in self.reservations.values()
+            ],
+            "promotions": [
+                asdict(value) for value in self.promotions.values()
+            ],
+            "deliveries": [
+                asdict(value) for value in self.deliveries.values()
+            ],
+            "returns": [asdict(value) for value in self.returns.values()],
+            "seller_offers": [
+                asdict(value) for value in self.seller_offers.values()
+            ],
+            "markdown_recommendations": [
+                asdict(value)
+                for value in self.markdown_recommendations.values()
             ],
             "process_cases": [
                 process_case_view(value)

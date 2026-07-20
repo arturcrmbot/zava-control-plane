@@ -43,6 +43,9 @@ def build_reference_case(
     case_id: str,
 ) -> FashionProcessCase:
     subject_ids, facts = scenario.case_evidence(profile.workflow_type)
+    recommended_action = scenario.recommended_action(
+        profile.workflow_type, tuple(subject_ids)
+    )
     return FashionProcessCase(
         id=case_id,
         workflow_type=profile.workflow_type,
@@ -50,6 +53,6 @@ def build_reference_case(
         status="open",
         facts=facts,
         allowed_actions=profile.allowed_actions,
-        recommended_action=DEFAULT_ACTIONS[profile.workflow_type],
+        recommended_action=recommended_action,
     )
 
