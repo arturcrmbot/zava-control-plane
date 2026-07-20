@@ -51,15 +51,30 @@ world contracts, MCP tools, React/Vite, Playwright, Bash, JSONL replay.
 
 ### Tests and proof
 
-- `tests/verticals/fashion/test_pack.py`: pack inventory, ownership, and
-  isolation.
-- `tests/verticals/fashion/test_world.py`: deterministic world and golden cases.
-- `tests/verticals/fashion/test_commands.py`: typed command validation,
-  idempotency, authority, and KPI evaluation.
-- `tests/verticals/fashion/test_workflows.py`: hero and supporting workflow
-  execution contracts.
-- `tests/verticals/fashion/test_assets.py`: skill, persona, policy, projection,
-  and recording registration.
+- `tests/api/shared/test_fashion_vertical_pack.py`: pack inventory, functions,
+  personas, skills, and discovery isolation.
+- `tests/api/shared/test_fashion_process_profiles.py`: workflow declarations,
+  stub-free completeness, and profile contract.
+- `tests/api/shared/test_fashion_org_brief.py`: org-brief section completeness
+  and synthetic-boundary annotation.
+- `tests/api/shared/test_fashion_recordings.py`: curated recording registration
+  and evidence completeness.
+- `tests/api/world/actor/test_fashion_world.py`: deterministic world, golden
+  cases, and world-command contracts.
+- `tests/api/world/actor/test_fashion_causal_world.py`: causal-signal,
+  cohort/lifecycle, and real-entity world behaviours.
+- `tests/api/functions/test_fashion_mcp_tools.py`: typed MCP tool validation,
+  command schema, and evidence provenance.
+- `tests/api/functions/workflows/test_fashion_orchestration.py`: hero and
+  supporting workflow execution contracts.
+- `tests/api/server/test_fashion_runtime.py`: server runtime payload, pack
+  ownership, and process isolation.
+- `tests/api/server/services/test_fashion_projections.py`: projection
+  registration and entity-graph mapping.
+- `tests/api/routes/test_world_fashion_process_run.py`: world process-run route
+  behaviour.
+- `tests/tools/test_fashion_zava_e2e_proof.py`: proof-contract structure and
+  live-stack config assertions.
 - `tests/api/shared/test_vertical_loader.py`: automatic Fashion discovery.
 - `tests/api/server/test_main_verticals.py`: Fashion world lifecycle.
 - `Makefile`: generic `prove` target.
@@ -73,7 +88,7 @@ world contracts, MCP tools, React/Vite, Playwright, Bash, JSONL replay.
 **Files:**
 - Read: `docs/superpowers/specs/2026-07-20-fashion-retail-vertical-design.md`
 - Create: `verticals/fashion/**`
-- Create: `tests/verticals/fashion/**`
+- Create: `tests/api/**` (Fashion-specific test files)
 - Create: `tools/fashion_zava_e2e_proof.sh`
 - Create: `tools/fashion_zava_e2e_proof.mjs`
 - Modify: `Makefile`
@@ -129,9 +144,9 @@ Run:
 test -f verticals/fashion/manifest.py
 test -f verticals/fashion/org-brief.yaml
 test -f tools/fashion_zava_e2e_proof.sh
-find verticals/fashion tests/verticals/fashion -type f -print | sort
+find verticals/fashion -type f -print | sort
 git --no-pager log -8 --name-only --format= |
-  rg '^(verticals/fashion/|tests/verticals/fashion/|tools/fashion_|Makefile)'
+  rg '^(verticals/fashion/|tests/api/.*fashion|tools/fashion_|Makefile)'
 ```
 
 Expected: all customer-specific runtime code is under `verticals/fashion/`;
@@ -141,7 +156,7 @@ outside the pack.
 ## Task 2: Lock pack discovery, inventory, and isolation
 
 **Files:**
-- Create: `tests/verticals/fashion/test_pack.py`
+- Extend: `tests/api/shared/test_fashion_vertical_pack.py`
 - Modify: `tests/api/shared/test_vertical_loader.py`
 - Modify: `tests/api/shared/test_vertical_pack_inventory.py`
 - Modify: `tests/api/server/test_main_verticals.py`
@@ -149,36 +164,12 @@ outside the pack.
 
 - [ ] **Step 1: Write the discovery and inventory tests**
 
-Add:
+Extend `tests/api/shared/test_fashion_vertical_pack.py` with assertions for
+`discover_pack_modules`, `build_runtime` completeness, and process isolation.
+The file already covers `FASHION_WORKFLOWS`, `FASHION_FUNCTIONS`, stub-free
+domain checks, and an isolation subprocess probe. Add or verify these cases:
 
 ```python
-from __future__ import annotations
-
-import os
-import subprocess
-import sys
-
-from api.shared.vertical_loader import build_runtime, discover_pack_modules
-
-FASHION_WORKFLOWS = {
-    "inventory-rebalancing",
-    "demand-spike-response",
-    "promotion-readiness",
-    "markdown-governance",
-    "supplier-delay-recovery",
-    "fulfilment-exception-resolution",
-    "marketplace-seller-exception",
-    "returns-disposition",
-}
-
-FASHION_FUNCTIONS = {
-    "merchandising-planning",
-    "supply-chain-fulfilment",
-    "marketplace-operations",
-    "customer-returns",
-}
-
-
 def test_fashion_pack_is_discovered_and_complete(tmp_path) -> None:
     assert discover_pack_modules()["fashion"] == "verticals.fashion.manifest"
     runtime = build_runtime(
@@ -225,7 +216,7 @@ Run:
 
 ```bash
 uv run --frozen --no-sync pytest \
-  tests/verticals/fashion/test_pack.py \
+  tests/api/shared/test_fashion_vertical_pack.py \
   tests/api/shared/test_vertical_loader.py \
   tests/api/shared/test_vertical_pack_inventory.py -q
 ```
@@ -326,7 +317,7 @@ Run:
 
 ```bash
 uv run --frozen --no-sync pytest \
-  tests/verticals/fashion/test_pack.py \
+  tests/api/shared/test_fashion_vertical_pack.py \
   tests/api/shared/test_vertical_loader.py \
   tests/api/shared/test_vertical_pack_inventory.py \
   tests/api/server/test_main_verticals.py -q
@@ -337,7 +328,8 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add verticals/fashion tests/verticals/fashion \
+git add verticals/fashion \
+  tests/api/shared/test_fashion_vertical_pack.py \
   tests/api/shared/test_vertical_loader.py \
   tests/api/shared/test_vertical_pack_inventory.py \
   tests/api/server/test_main_verticals.py
@@ -347,7 +339,8 @@ git commit -m "feat(fashion): register vertical pack"
 ## Task 3: Prove the deterministic actor world
 
 **Files:**
-- Create: `tests/verticals/fashion/test_world.py`
+- Extend: `tests/api/world/actor/test_fashion_world.py`
+- Extend: `tests/api/world/actor/test_fashion_causal_world.py`
 - Modify: `verticals/fashion/world.py`
 - Modify: `verticals/fashion/worlds.py`
 - Modify: `verticals/fashion/reference_cases.py`
@@ -355,24 +348,11 @@ git commit -m "feat(fashion): register vertical pack"
 
 - [ ] **Step 1: Write the golden scenario tests**
 
-Add:
+Extend `tests/api/world/actor/test_fashion_world.py` with golden-scenario and
+reference-case coverage. The file already covers `FashionScenario` construction,
+command dispatch, and outcome branches. Add or verify these cases:
 
 ```python
-import pytest
-
-from api.shared.vertical_loader import build_runtime
-from verticals.fashion.reference_cases import FASHION_REFERENCE_CASES
-from verticals.fashion.world import FashionConfig, FashionScenario
-
-
-@pytest.fixture
-def runtime(tmp_path):
-    return build_runtime(
-        {"ZAVA_VERTICAL": "fashion"},
-        data_root=tmp_path,
-    )
-
-
 def test_demo_world_has_designed_scale(runtime) -> None:
     scenario = FashionScenario(
         runtime,
@@ -419,7 +399,8 @@ Run:
 
 ```bash
 uv run --frozen --no-sync pytest \
-  tests/verticals/fashion/test_world.py -q
+  tests/api/world/actor/test_fashion_world.py \
+  tests/api/world/actor/test_fashion_causal_world.py -q
 ```
 
 Expected: initial generated-code failures identify missing counts, cases, or
@@ -478,7 +459,8 @@ Run:
 
 ```bash
 uv run --frozen --no-sync pytest \
-  tests/verticals/fashion/test_world.py -q
+  tests/api/world/actor/test_fashion_world.py \
+  tests/api/world/actor/test_fashion_causal_world.py -q
 ```
 
 Expected: PASS.
@@ -489,14 +471,15 @@ Expected: PASS.
 git add verticals/fashion/world.py verticals/fashion/worlds.py \
   verticals/fashion/reference_cases.py \
   verticals/fashion/reference_actions.py \
-  tests/verticals/fashion/test_world.py
+  tests/api/world/actor/test_fashion_world.py \
+  tests/api/world/actor/test_fashion_causal_world.py
 git commit -m "feat(fashion): add causal retail world"
 ```
 
 ## Task 4: Enforce typed command and bounded authority
 
 **Files:**
-- Create: `tests/verticals/fashion/test_commands.py`
+- Extend: `tests/api/functions/test_fashion_mcp_tools.py`
 - Modify: `verticals/fashion/world.py`
 - Modify: `verticals/fashion/authority.py`
 - Modify: `verticals/fashion/personas.py`
@@ -505,50 +488,11 @@ git commit -m "feat(fashion): add causal retail world"
 
 - [ ] **Step 1: Write command boundary tests**
 
-Add:
+Extend `tests/api/functions/test_fashion_mcp_tools.py` with command boundary
+assertions. The file already covers tool-name completeness and evidence
+provenance. Add or verify transfer command cases:
 
 ```python
-import pytest
-
-from api.shared.vertical_loader import build_runtime
-from verticals.fashion.world import (
-    FashionConfig,
-    FashionScenario,
-    InventoryOwnership,
-    InventoryTransferCommand,
-    apply_inventory_transfer,
-)
-
-
-@pytest.fixture
-def world_state(tmp_path):
-    runtime = build_runtime(
-        {"ZAVA_VERTICAL": "fashion"},
-        data_root=tmp_path,
-    )
-    return FashionScenario(runtime, FashionConfig(seed=42)).state
-
-
-def command(**overrides):
-    values = {
-        "command_id": "cmd-001",
-        "workflow_id": "FIR-001",
-        "source_location_id": "store-eu-01",
-        "destination_location_id": "store-uk-01",
-        "sku_id": "sku-001",
-        "quantity": 20,
-        "retail_value_gbp": 4_000.0,
-        "ownership": InventoryOwnership.OWNED,
-        "expected_source_version": 1,
-        "expected_destination_version": 1,
-        "approval_reference": None,
-        "reason_code": "demand-imbalance",
-        "evidence_digest": "sha256:golden",
-    }
-    values.update(overrides)
-    return InventoryTransferCommand(**values)
-
-
 def test_low_risk_owned_transfer_executes_without_approval(world_state) -> None:
     result = apply_inventory_transfer(world_state, command())
     assert result.event_type == "inventory.transfer.completed"
@@ -582,7 +526,7 @@ Run:
 
 ```bash
 uv run --frozen --no-sync pytest \
-  tests/verticals/fashion/test_commands.py -q
+  tests/api/functions/test_fashion_mcp_tools.py -q
 ```
 
 Expected: FAIL until every threshold and rejection is explicit.
@@ -619,7 +563,7 @@ Run:
 
 ```bash
 uv run --frozen --no-sync pytest \
-  tests/verticals/fashion/test_commands.py \
+  tests/api/functions/test_fashion_mcp_tools.py \
   tests/api/server/skills/test_authority_invocation.py -q
 ```
 
@@ -628,21 +572,24 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add verticals/fashion tests/verticals/fashion/test_commands.py
+git add verticals/fashion tests/api/functions/test_fashion_mcp_tools.py
 git commit -m "feat(fashion): govern inventory commands"
 ```
 
 ## Task 5: Complete all workflow orchestrations
 
 **Files:**
-- Create: `tests/verticals/fashion/test_workflows.py`
+- Extend: `tests/api/functions/workflows/test_fashion_orchestration.py`
+- Extend: `tests/api/shared/test_fashion_process_profiles.py`
 - Modify: `verticals/fashion/domains.py`
 - Modify: `verticals/fashion/process_profiles.py`
 - Modify: `verticals/fashion/durable.py`
 
 - [ ] **Step 1: Write workflow shape tests**
 
-Add:
+Extend `tests/api/functions/workflows/test_fashion_orchestration.py` with hero
+phase-contract and completeness assertions. The file already covers orchestration
+dispatch for all eight workflow types. Add or verify:
 
 ```python
 from verticals.fashion.domains import FASHION_DOMAINS
@@ -676,7 +623,8 @@ Run:
 
 ```bash
 uv run --frozen --no-sync pytest \
-  tests/verticals/fashion/test_workflows.py -q
+  tests/api/functions/workflows/test_fashion_orchestration.py \
+  tests/api/shared/test_fashion_process_profiles.py -q
 ```
 
 Expected: FAIL for any missing phase, skill, or orchestration.
@@ -708,7 +656,8 @@ Run:
 
 ```bash
 ZAVA_VERTICAL=fashion uv run --frozen --no-sync pytest \
-  tests/verticals/fashion/test_workflows.py \
+  tests/api/functions/workflows/test_fashion_orchestration.py \
+  tests/api/shared/test_fashion_process_profiles.py \
   tests/api/functions/test_vertical_function_registration.py \
   tests/api/functions/test_vertical_skill_root.py -q
 ```
@@ -719,14 +668,17 @@ Expected: PASS with all eight orchestrator names and their activities indexed.
 
 ```bash
 git add verticals/fashion/{domains.py,process_profiles.py,durable.py} \
-  tests/verticals/fashion/test_workflows.py
+  tests/api/functions/workflows/test_fashion_orchestration.py \
+  tests/api/shared/test_fashion_process_profiles.py
 git commit -m "feat(fashion): run retail workflows"
 ```
 
 ## Task 6: Validate skills, personas, tools, projections, and UI
 
 **Files:**
-- Create: `tests/verticals/fashion/test_assets.py`
+- Extend: `tests/api/shared/test_fashion_vertical_pack.py`
+- Extend: `tests/api/server/services/test_fashion_projections.py`
+- Extend: `tests/api/server/test_fashion_runtime.py`
 - Modify: `verticals/fashion/agents.py`
 - Modify: `verticals/fashion/personas.py`
 - Modify: `verticals/fashion/authority.py`
@@ -739,7 +691,8 @@ git commit -m "feat(fashion): run retail workflows"
 
 - [ ] **Step 1: Write asset resolution tests**
 
-Add:
+Extend `tests/api/shared/test_fashion_vertical_pack.py` with asset-resolution
+assertions. The file already covers functions and personas. Add or verify:
 
 ```python
 from api.shared.vertical_loader import build_runtime
@@ -770,12 +723,14 @@ Run:
 
 ```bash
 uv run --frozen --no-sync pytest \
-  tests/verticals/fashion/test_assets.py \
+  tests/api/shared/test_fashion_vertical_pack.py \
+  tests/api/server/services/test_fashion_projections.py \
+  tests/api/server/test_fashion_runtime.py \
   tests/api/shared/test_vertical_pack_validation.py -q
 ```
 
-Expected: PASS. `validate_pack` must reject unresolved tools, skills, personas,
-policies, projections, and recordings.
+Expected: 19 passed. `validate_pack` must reject unresolved tools, skills,
+personas, policies, projections, and recordings.
 
 - [ ] **Step 3: Check skill/tool least privilege**
 
@@ -793,7 +748,10 @@ runtime prints `fashion:1`.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add verticals/fashion tests/verticals/fashion/test_assets.py
+git add verticals/fashion \
+  tests/api/shared/test_fashion_vertical_pack.py \
+  tests/api/server/services/test_fashion_projections.py \
+  tests/api/server/test_fashion_runtime.py
 git commit -m "feat(fashion): add governed retail assets"
 ```
 
@@ -806,21 +764,19 @@ git commit -m "feat(fashion): add governed retail assets"
 - Create: `verticals/fashion/recordings/*.jsonl`
 - Create: `proof/manifest.json`
 - Modify: `.gitignore`
-- Create: `tests/verticals/fashion/test_proof_contract.py`
+- Extend: `tests/tools/test_fashion_zava_e2e_proof.py`
 
 - [ ] **Step 1: Write proof contract tests**
 
-Add:
+Extend `tests/tools/test_fashion_zava_e2e_proof.py` with proof-contract
+assertions. The file already covers `--print-config` output, script/driver path
+existence, and manifest schema. Add or verify:
 
 ```python
-import json
-import subprocess
-from pathlib import Path
-
-
 def test_fashion_proof_print_config() -> None:
     result = subprocess.run(
-        ["bash", "tools/fashion_zava_e2e_proof.sh", "--print-config"],
+        ["bash", str(SCRIPT), "--print-config"],
+        cwd=ROOT,
         check=True,
         capture_output=True,
         text=True,
@@ -832,7 +788,7 @@ def test_fashion_proof_print_config() -> None:
 
 
 def test_makefile_exposes_pack_scoped_proof() -> None:
-    text = Path("Makefile").read_text(encoding="utf-8")
+    text = (ROOT / "Makefile").read_text(encoding="utf-8")
     assert ".PHONY: prove" in text
     assert "VERTICAL is required" in text
     assert "_zava_e2e_proof.sh" in text
@@ -910,7 +866,7 @@ Expected: PASS with Functions and the actor world disabled.
 git add .gitignore Makefile tools/fashion_zava_e2e_proof.sh \
   tools/fashion_zava_e2e_proof.mjs \
   verticals/fashion/recordings \
-  tests/verticals/fashion/test_proof_contract.py
+  tests/tools/test_fashion_zava_e2e_proof.py
 git commit -m "test(fashion): prove live and replay"
 ```
 
@@ -925,7 +881,18 @@ Run:
 
 ```bash
 uv run --frozen --no-sync pytest \
-  tests/verticals/fashion \
+  tests/api/shared/test_fashion_vertical_pack.py \
+  tests/api/shared/test_fashion_process_profiles.py \
+  tests/api/shared/test_fashion_org_brief.py \
+  tests/api/shared/test_fashion_recordings.py \
+  tests/api/world/actor/test_fashion_world.py \
+  tests/api/world/actor/test_fashion_causal_world.py \
+  tests/api/functions/test_fashion_mcp_tools.py \
+  tests/api/functions/workflows/test_fashion_orchestration.py \
+  tests/api/server/test_fashion_runtime.py \
+  tests/api/server/services/test_fashion_projections.py \
+  tests/api/routes/test_world_fashion_process_run.py \
+  tests/tools/test_fashion_zava_e2e_proof.py \
   tests/api/shared/test_vertical_loader.py \
   tests/api/shared/test_vertical_pack_inventory.py \
   tests/api/shared/test_vertical_pack_validation.py \
@@ -934,7 +901,7 @@ uv run --frozen --no-sync pytest \
   tests/api/functions/test_vertical_skill_root.py -q
 ```
 
-Expected: PASS.
+Expected: 161 passed.
 
 - [ ] **Step 2: Build both web applications**
 
