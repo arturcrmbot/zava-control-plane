@@ -149,6 +149,44 @@ def test_fashion_proof_runs_genuine_negative_probes():
     assert "deadLetters" in driver
 
 
+def test_fashion_proof_recovery_probe_requires_a_newly_triggered_workflow():
+    """The post-restart recovery check must be tied to the workflow the
+    recovery POST itself triggered, not to any prior completed
+    returns-disposition workflow (the earlier live forward proof already
+    completed one, so a stale "any completed" check would pass even if the
+    restart or the POST silently failed)."""
+    source = SCRIPT.read_text(encoding="utf-8")
+    driver = DRIVER.read_text(encoding="utf-8")
+
+    # No bare undeclared python3 — every interpreter used by the proof is one
+    # of the tools already required by preflight (node, already required).
+    assert "python3" not in source
+
+    # The shell script delegates recovery evidence to the driver instead of
+    # re-parsing /api/workflows itself, so it inherits the driver's shared
+    # completion-wait semantics (including HITL auto-resolution) rather than
+    # reimplementing a subtly different, easy-to-get-wrong poll.
+    assert "--probe-recovery" in source
+    assert 'node "$DRIVER" --probe-recovery' in source
+    assert "newly triggered returns-disposition workflow did not complete" in source
+
+    assert "async function runRecoveryProbe" in driver
+    # Known workflow ids are snapshotted *before* the trigger, so a workflow
+    # that already existed (e.g. completed by the earlier live forward
+    # chain) can never satisfy the post-restart wait.
+    assert (
+        "const known = new Set((await listWorkflows()).map((workflow) => workflow.id));"
+        in driver
+    )
+    # The trigger POST must itself report success with an identifiable case.
+    assert 'need(response.ok, `recovery trigger was rejected' in driver
+    assert "typeof response.case_id === \"string\" && response.case_id.length > 0" in driver
+    # Completion is confirmed via the same helper (and its 8-minute,
+    # HITL-resolving wait) the forward chain uses for every other workflow —
+    # not a bespoke, unproven poll.
+    assert 'waitForNewCompletedWorkflow("returns-disposition", known, []);' in driver
+
+
 def test_fashion_proof_fails_fast_and_gates_on_browser_errors():
     driver = DRIVER.read_text(encoding="utf-8")
 

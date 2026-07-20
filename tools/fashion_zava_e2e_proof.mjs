@@ -608,6 +608,45 @@ async function runFunctionsDisabledProbe() {
   }
 }
 
+async function runRecoveryProbe() {
+  await ensureEvidenceDirs();
+  const evidence = {
+    result: "PENDING",
+    probe: "recovery",
+    caseId: null,
+    workflowId: null,
+  };
+  try {
+    // Recovery must be tied to the workflow *this* trigger creates, never to
+    // any workflow the earlier live forward chain already completed — a
+    // stale "any completed returns-disposition" check would pass even if the
+    // restarted Functions host never actually processed the new one.
+    const known = new Set((await listWorkflows()).map((workflow) => workflow.id));
+    const response = await postJson(`/api/world/processes/returns-disposition/run`);
+    need(response.ok, `recovery trigger was rejected: ${JSON.stringify(response)}`);
+    need(
+      typeof response.case_id === "string" && response.case_id.length > 0,
+      `recovery trigger returned no case_id: ${JSON.stringify(response)}`,
+    );
+    evidence.caseId = response.case_id;
+
+    // Reuses the same completion wait the forward chain relies on, including
+    // its HITL auto-resolution, so recovery holds the returns-disposition
+    // workflow to the identical bar as the rest of the live proof.
+    const workflow = await waitForNewCompletedWorkflow("returns-disposition", known, []);
+    evidence.workflowId = workflow.id;
+
+    evidence.result = "PASS";
+    await writeJson("recovery.json", evidence);
+    console.log(JSON.stringify(evidence, null, 2));
+  } catch (error) {
+    evidence.result = "FAIL";
+    evidence.error = error.stack || error.message || String(error);
+    await writeJson("recovery.json", evidence);
+    throw error;
+  }
+}
+
 async function runReplay() {
   await ensureEvidenceDirs();
   const evidence = {
@@ -699,6 +738,8 @@ if (process.argv.includes("--replay")) {
   await runReplay();
 } else if (process.argv.includes("--probe-functions-disabled")) {
   await runFunctionsDisabledProbe();
+} else if (process.argv.includes("--probe-recovery")) {
+  await runRecoveryProbe();
 } else {
   await runLive();
 }

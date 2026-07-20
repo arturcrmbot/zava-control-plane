@@ -254,22 +254,21 @@ if [[ "$rc" -eq 0 ]]; then
     log "probe: restarting Functions host and confirming recovery"
     start_functions_host
     if grep -q "InventoryRebalancingOrchestrator" "$FUNC_LOG"; then
+      # Drives a fresh returns-disposition trigger (runRecoveryProbe in the
+      # driver) and, reusing the same waitForNewCompletedWorkflow() the
+      # forward chain uses (including its HITL auto-resolution), requires
+      # *that exact new* case/workflow to reach completed. Never satisfied by
+      # a workflow the earlier live forward proof already completed: the
+      # driver captures known workflow ids before triggering, requires the
+      # POST to return ok:true with a case_id, and fails closed otherwise.
       set +e
-      RECOVERY_OK="no"
-      curl -fsS -X POST "http://127.0.0.1:$API_PORT/api/world/processes/returns-disposition/run" >/dev/null 2>&1
-      for _ in $(seq 1 40); do
-        state="$(curl -s "http://127.0.0.1:$API_PORT/api/workflows" | python3 -c "import sys,json
-d=json.load(sys.stdin)
-w=[x for x in d if x.get('type')=='returns-disposition' and x.get('status')=='completed']
-print('yes' if w else 'no')" 2>/dev/null)"
-        [[ "$state" == "yes" ]] && { RECOVERY_OK="yes"; break; }
-        sleep 2
-      done
+      env "${DRIVER_ENV[@]}" node "$DRIVER" --probe-recovery
+      rc=$?
       set -e
-      if [[ "$RECOVERY_OK" == "yes" ]]; then
-        log "probe: recovery confirmed (returns-disposition completed after restart)"
+      if [[ "$rc" -eq 0 ]]; then
+        log "probe: recovery confirmed (new returns-disposition workflow completed after restart)"
       else
-        err "recovery: workflow did not complete after Functions restart"; rc=6
+        err "recovery: newly triggered returns-disposition workflow did not complete after Functions restart"
       fi
     else
       err "recovery: orchestrator not indexed after restart"; rc=4
