@@ -29,7 +29,7 @@ in the sandbox — that hides the procedure bug.
 
 ## §2 — Brief integrity
 
-- [ ] §2.1  The brief's `domain.workflow_type` matches `^[a-z][a-z0-9-]*$` and is **not** already in `api.shared.domains.DOMAINS`.
+- [ ] §2.1  The brief's `domain.workflow_type` matches `^[a-z][a-z0-9-]*$` and is **not** already in the selected pack's domains (`active_runtime().pack.domains`).
 - [ ] §2.2  Every phase listed in the orchestrator appears in the brief in the same order.
 - [ ] §2.3  Every persona referenced by a HITL phase appears in `personae` (or already lives under `api/server/personae/`).
 - [ ] §2.4  Every `external_systems[]` id referenced by any phase is defined.
@@ -98,36 +98,30 @@ in the sandbox — that hides the procedure bug.
 
 - [ ] §7.1  GRADUATION.md lists every file in §1 with target real-tree path.
 - [ ] §7.2  graduate.sh exists at the sandbox root, is executable.
-- [ ] §7.3  graduate.sh patches `function_app.py` (BEGIN/END markers; orchestrator decorator; activity decorators).
-- [ ] §7.4  graduate.sh patches `api/functions/graphs/__init__.py` (build_* exports).
-- [ ] §7.5  graduate.sh patches `api/server/services/simulator_orchestrator.py` (spawn helper + adds to `ramp_loop` spawners dict).
-- [ ] §7.6  graduate.sh patches `api/server/routes/simulator.py` (POST /api/simulator/<domain> handler).
-- [ ] §7.7  graduate.sh patches `api/server/services/blueprint_inventory.py` (DOMAINS entry with workflow_type + skills + phase_aliases).
-- [ ] §7.8  graduate.sh patches `api/shared/constants.py` (lifts `<PHASE>_TIMEOUT` constants and rewrites the orchestrator import).
-- [ ] §7.9  graduate.sh prints smoke commands + expected event sequence at the end.
-- [ ] §7.10 graduate.sh is idempotent: re-running on an already-graduated tree is a no-op (each step has a unique anchor it checks before appending).
+- [ ] §7.3  graduate.sh registers the orchestrator and activities on the selected pack's `durable.py` (BEGIN/END sentinel guards).
+- [ ] §7.4  graduate.sh exports graph builders into `api/functions/graphs/__init__.py` (build_* exports; sentinel-guarded).
+- [ ] §7.5  graduate.sh registers the spawn helper on the selected pack's `spawners.py` (BEGIN/END sentinel guards). Never patches a global service module.
+- [ ] §7.6  graduate.sh registers the domain declaration on the selected pack's `domains.py` (BEGIN/END sentinel guards).
+- [ ] §7.7  graduate.sh registers function membership on the selected pack's `functions.py` (BEGIN/END sentinel guards). Global compatibility adapters and Blueprint inventory are never patched.
+- [ ] §7.8  graduate.sh validates the active pack: `active_runtime().pack.domains` must include the new `workflow_type`; step exits non-zero otherwise.
+- [ ] §7.9  graduate.sh prints smoke commands at the end.
+- [ ] §7.10 graduate.sh is idempotent: re-running on an already-graduated tree is a no-op (each step checks its sentinel before appending).
 - [ ] §7.11 GRADUATION.md §Rollback lists every file/path graduate.sh touched.
 
 ---
 
 ## Graduation (mechanical, post-self-check)
 
-v3 graduation is one command: `bash <run-id>/graduate.sh` from repo root.
-The script applies every patch idempotently. Steps:
+Graduation is one command: `bash <run-id>/graduate.sh` from repo root.
+The script applies all six pack-scoped steps idempotently:
 
 1. Read `<run-id>/REPORT.md` end-to-end. Every item PASS or N/A.
 2. Read `<run-id>/GRADUATION.md` (so you know what graduate.sh will do).
 3. Run `bash <run-id>/graduate.sh` from repo root.
-4. Restart FastAPI (`./scripts/profile-friday.sh` or
-   `./scripts/profile-autonomous.sh`).
-5. Run the smoke command graduate.sh prints. Watch the FleetEvent
-   sequence on `/api/blueprint/stream`.
-6. (Optional) Record real walks for replay; commit; redeploy.
-
-If the smoke fails, the bug is in the SKILL.md (compose-domain or one
-of the sub-skills), not in the graduated files. Run the rollback
-command from GRADUATION.md §Rollback, fix the SKILL, delete the
-sandbox, re-invoke. Re-graduate.
+4. Restart FastAPI with `ZAVA_VERTICAL=<vertical>`.
+5. Run the smoke command graduate.sh prints. Confirm `active_runtime().pack.domains`
+   includes the new workflow_type.
+6. Collect evidence required by `docs/VERTICAL-PROOF.md`; commit recorded walks.
 
 ## §8 — Entity projection (v4)
 
@@ -159,4 +153,4 @@ sandbox, re-invoke. Re-graduate.
 - [ ] §11.3 The constructor is guarded by `if hasattr(_module, "AmbientAgent"):` so the file imports cleanly before Phase 3 lands the primitive.
 - [ ] §11.4 `ambient.function` matches `brief.function`.
 - [ ] §11.5 Each trigger entry sets exactly one of `bus | cypher | cadence` and supplies the kind-specific keys.
-- [ ] §11.6 Every `spawnable_workflow_types` entry is in `api.shared.domains.DOMAINS` OR equals the brief's own `workflow_type` (self-spawn forward-declaration).
+- [ ] §11.6 Every `spawnable_workflow_types` entry is in the selected pack's domains (`active_runtime().pack.domains`) OR equals the brief's own `workflow_type` (self-spawn forward-declaration).

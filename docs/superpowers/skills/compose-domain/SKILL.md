@@ -115,43 +115,24 @@ def fleet_<wt_snake>_orchestration(
 - Every `kind: "suspended"` payload MUST stamp
   `persona`, `external_event`, `context` keys (substrate-fix v2 contract).
 - Per-phase timeouts: declare locally as
-  `<PHASE>_TIMEOUT = timedelta(hours=...)`, then graduate.sh lifts them
-  to `api/shared/constants.py` and rewrites the import.
+  `<PHASE>_TIMEOUT = timedelta(hours=...)`.
 
-### Spawn helper (in `simulator_orchestrator.py`)
-Must mirror v3 graduated domains exactly (KR-1 in add-domain SKILL.md):
+### Spawn helper (in the pack's `spawners.py`)
+The generated block appended by graduate.sh step 5:
 ```python
 async def spawn_<wt_snake>_workflow(...) -> str:
     global _<seq>_seq; _<seq>_seq += 1
     wid = f"<PREFIX>-{_<seq>_seq:04d}"
     record = _pick_record("<wt>", scenario=scenario) or {}
-    w = build_fleet_<wt_snake>_workflow(wid, record=record)   # factory in synthetic_data.py
-    app_state.store.upsert_workflow(w)                         # CRITICAL — do not omit
-    payload = {"workflow_id": wid, "type": "<wt>", "<entity>": w.payload.get("<entity>")}
+    payload = {"workflow_id": wid, "type": "<wt>", "<entity>": record.get("<entity>")}
     try:
         result = await schedule_new_orchestration(payload, function_name="Fleet<Wt>Orchestrator")
-        w.orchestration_instance_id = result.get("id")
-        app_state.store.upsert_workflow(w)
     except Exception as ex:
         print(f"[orchestrator] failed to schedule {wid}: {ex}")
     return wid
 ```
-
-### `build_fleet_<wt_snake>_workflow()` factory (in `synthetic_data.py`)
-```python
-def build_fleet_<wt_snake>_workflow(workflow_id, record=None) -> Workflow:
-    r = record or {}
-    <entity> = r.get("<entity>") if "<entity>" in r else r
-    <entity> = <entity> or {}
-    <entity> = {"<field>": <entity>.get("<field>") or <default>, ...}
-    created_at, sla = _now_with_jitter()
-    return Workflow(
-        id=workflow_id, type="<wt>", current_phase="<first phase display name>",
-        created_at=created_at, sla_due_at=sla,
-        jurisdiction="London-Zava", agency="Zava",
-        payload={"<entity>": <entity>, "scenario": r.get("scenario")},
-    )
-```
+This block is written inside the selected pack's `spawners.py`, not into any
+global service module.
 
 ### HITL `external_event` byte-match
 Whenever a HITL phase reuses an existing persona under `api/server/personae/<role>/`,
@@ -248,7 +229,7 @@ v4 brief):
 
 ```yaml
 domain:
-  workflow_type: <kebab-case, ^[a-z][a-z0-9-]*$ — must NOT collide with api.shared.domains.DOMAINS>
+  workflow_type: <kebab-case, ^[a-z][a-z0-9-]*$ — must NOT collide with the selected pack's domains (active_runtime().pack.domains)>
   prefix: <snake_case file-name prefix, almost always "fleet">
   display_name: <human label>
   description: |
@@ -322,7 +303,7 @@ ambient:                              # OPTIONAL
 
 Validate the brief before you continue:
 
-- `domain.workflow_type` matches `^[a-z][a-z0-9-]*$` and is **not** already in `api.shared.domains.DOMAINS` (grep `api/shared/domains.py`).
+- `domain.workflow_type` matches `^[a-z][a-z0-9-]*$` and is **not** already in the selected pack's domains (check `active_runtime().pack.domains`; the pack is determined by `vertical=<name>` or `ZAVA_VERTICAL`).
 - `domain.prefix` matches `^[a-z][a-z0-9_]*$`.
 - Every phase referenced under `external_systems` exists in the top-level `external_systems` list.
 - Every persona referenced in a HITL phase exists in `personae` (or already as a folder under `api/server/personae/`).
@@ -331,7 +312,7 @@ Validate the brief before you continue:
 - At least one phase has `kind: hitl`.
 - `function:` is one of the 10 canonical keys above.
 - Every entity `kind` is in `_VALID_KINDS`; every relation `kind` is in `_VALID_RELS`.
-- If `ambient:` is present, `ambient.function == function` and every `spawnable_workflow_types[]` is either in `DOMAINS` or equals the brief's own `workflow_type`.
+- If `ambient:` is present, `ambient.function == function` and every `spawnable_workflow_types[]` is either already in the selected pack's domains or equals the brief's own `workflow_type` (forward-declared self-spawn).
 
 If validation fails, stop and tell the operator what's wrong. Do not
 proceed to step 2.
@@ -649,29 +630,23 @@ itself to write:
   vertical.
   Mark the file executable (`chmod +x`).
 
-  The graduate.sh script must:
-  1. Validate prereqs (live tree is a clean checkout of repo root).
-  2. Copy sandbox files to their real-tree paths.
-  3. Patch `function_app.py` (imports + orchestrator decorator + activity
-     decorators).
-  4. Patch `api/functions/graphs/__init__.py` (build_* exports).
-  5. Patch `api/server/services/simulator_orchestrator.py` (spawn helper
-     + add to `ramp_loop`'s `spawners` dict).
-  6. Patch `api/server/routes/simulator.py` (POST /api/simulator/<x> route).
-  7. Patch `api/server/services/blueprint_inventory.py` (DOMAINS entry
-     with workflow_type + phase_aliases).
-  8. Patch `api/shared/constants.py` (lift `<PHASE>_TIMEOUT` constants).
-  9. Print smoke commands + expected event sequence.
+  The graduate.sh script performs six idempotent pack-scoped steps:
+  1. Validate the selected pack and sandbox layout.
+  2. Copy generated files (`skills/`, `personae/`, `mcp_tools/`,
+     `entity_projections/`) into `verticals/<vertical>/`.
+  3. Register the orchestrator and activities on the pack's `durable.py`
+     (sentinel-guarded append).
+  4. Export graph builders into `api/functions/graphs/__init__.py`
+     (implementation modules may remain under `api/functions/`).
+  5. Register the spawner, domain declaration, and function membership on
+     the pack's `spawners.py` / `domains.py` / `functions.py`
+     (sentinel-guarded appends). Never patches global compatibility
+     adapters or another vertical's modules.
+  6. Validate the active pack (`active_runtime().pack.domains` must
+     include the new `workflow_type`) and print smoke commands.
 
-  Each patch step is idempotent: if the same domain has already been
-  graduated (entry/import already present), the step is a no-op.
-
-  **Note v3:** generated domains DO NOT add a `Workflow` record to
-  `app_state.store` (the existing `Workflow` / `ClaimData` / `HiringData`
-  types are domain-specific). The spawn helper omits the
-  `app_state.store.upsert_workflow(w)` call that `spawn_hiring_workflow`
-  uses. State lives in Durable + the FleetEvent stream + the bus's
-  `_workflow_types` cache.
+  Each step is idempotent: if the domain has already been graduated
+  (sentinel already present), the step is a no-op.
 
 ### Step 5 — Self-check
 
