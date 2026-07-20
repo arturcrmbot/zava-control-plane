@@ -106,6 +106,10 @@ print(json.dumps({
 def test_fashion_function_app_registers_only_fashion_orchestrators() -> None:
     environment = os.environ.copy()
     environment["ZAVA_VERTICAL"] = "fashion"
+    # Disable the entity plane so the subprocess does not compete for the
+    # KuzuDB file lock with the parent pytest process (which holds the lock
+    # whenever any test in the session has imported api.server.state).
+    environment["ENTITY_PLANE_ENABLED"] = "0"
     result = subprocess.run(
         [
             sys.executable,
