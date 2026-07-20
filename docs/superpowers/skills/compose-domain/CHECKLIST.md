@@ -142,8 +142,8 @@ The script applies all six pack-scoped steps idempotently:
 ## §10 — Function membership (v4)
 
 - [ ] §10.1 `brief.function` is one of the 10 canonical keys (`finance`, `hr`, `revenue`, `ops`, `legal`, `marketing`, `tech`, `data`, `customer-success`, `legacy`).
-- [ ] §10.2 graduate.sh step 5 registers the `workflow_type` in the selected pack's `verticals/<vertical>/functions.py`, appending to `FUNCTIONS["<fn>"].owns_domains` (idempotent via `# compose-domain:owns_domains:<fn>` sentinel). The global `api/shared/functions.py` is a read-only active-pack adapter and is never modified.
-- [ ] §10.3 The registration block in `verticals/<vertical>/functions.py` is guarded by `BEGIN/END compose-domain:<workflow_type>` sentinel comments (idempotent re-runs).
+- [ ] §10.2 graduate.sh step 5 registers the `workflow_type` in the selected pack's `verticals/<vertical>/functions.py`, appending to `FUNCTIONS["<fn>"].owns_domains`. The registration block is wrapped in sentinel comments `# === BEGIN compose-domain <workflow_type> ===` and `# === END compose-domain <workflow_type> ===`, guarded by grep `BEGIN compose-domain $MARKER` (idempotent re-runs). The global `api/shared/functions.py` is a read-only active-pack adapter and is never modified.
+- [ ] §10.3 Sentinel comments in `verticals/<vertical>/functions.py` follow the exact format `# === BEGIN compose-domain <workflow_type> ===` and matching END. These guard against duplicate registration on re-runs.
 - [ ] §10.4 The workflow_type is not also claimed by a *different* function in the registry (orphan/dup check by author-function-membership validator).
 
 ## §11 — Ambient trigger (v4, optional)

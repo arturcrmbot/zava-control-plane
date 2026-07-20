@@ -54,8 +54,11 @@ Pick **one** function the new domain belongs to. The valid keys are:
 ## Graduation patch
 
 `graduate.sh` appends the new `workflow_type` to
-`FUNCTIONS["<fn>"].owns_domains` in `api/shared/functions.py`,
-guarded by a sentinel comment `# compose-domain:owns_domains:<fn>`
-so re-running on an already-claimed domain is a no-op. If
-`api/shared/functions.py` is absent (Phase 3 not merged), the patch
-step is a logged no-op and graduate.sh continues.
+`FUNCTIONS["<fn>"].owns_domains` in `verticals/<vertical>/functions.py`,
+guarded by sentinel comments `# === BEGIN compose-domain <workflow_type> ===`
+and matching END, so re-running on an already-claimed domain is a no-op.
+
+The global `api/shared/functions.py` is a read-only active-pack compatibility
+adapter: it reexports the selected pack's `verticals/<vertical>/functions.py`
+registry at runtime (via `active_runtime().pack`), so authors never write to it.
+Only the pack-scoped `verticals/<vertical>/functions.py` is modified.

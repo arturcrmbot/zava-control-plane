@@ -242,3 +242,79 @@ def test_checklist_function_membership_targets_pack_functions_py() -> None:
     assert (
         "patches `api/shared/functions.py`" not in checklist_section_10
     ), "CHECKLIST §10 must not claim api/shared/functions.py is patched"
+
+
+def test_checklist_sentinel_format_exact() -> None:
+    """CHECKLIST §10.2–10.3 must specify exact sentinel format:
+    # === BEGIN compose-domain <workflow_type> ===
+    (and matching END), guarded by grep `BEGIN compose-domain $MARKER`.
+    Must not reference stale compose-domain:owns_domains:<fn> format."""
+    text = CHECKLIST.read_text(encoding="utf-8")
+    checklist_section_10 = text[text.find("## §10 —") : text.find("## §11 —")]
+    
+    # Verify exact sentinel format is documented
+    assert "# === BEGIN compose-domain <workflow_type> ===" in checklist_section_10, (
+        "CHECKLIST §10 must document exact BEGIN sentinel format"
+    )
+    assert "# === END compose-domain <workflow_type> ===" in checklist_section_10, (
+        "CHECKLIST §10 must document exact END sentinel format"
+    )
+    
+    # Verify grep guard pattern is documented
+    assert "BEGIN compose-domain $MARKER" in checklist_section_10, (
+        "CHECKLIST §10 must document grep guard pattern"
+    )
+    
+    # Verify stale format is NOT mentioned
+    assert "compose-domain:owns_domains:" not in checklist_section_10, (
+        "CHECKLIST §10 must not mention stale compose-domain:owns_domains: format"
+    )
+
+
+def test_author_function_membership_skill_targets_pack_functions_py() -> None:
+    """author-function-membership/SKILL.md 'Graduation patch' section must
+    target verticals/<vertical>/functions.py, not api/shared/functions.py."""
+    skill_md = (
+        ROOT
+        / "docs"
+        / "superpowers"
+        / "skills"
+        / "compose-domain"
+        / "sub-skills"
+        / "author-function-membership"
+        / "SKILL.md"
+    )
+    text = skill_md.read_text(encoding="utf-8")
+    
+    # Find the Graduation patch section
+    if "## Graduation patch" in text:
+        start = text.find("## Graduation patch")
+        # Find the next section or end of file
+        next_section = text.find("\n## ", start + 1)
+        if next_section == -1:
+            section = text[start:]
+        else:
+            section = text[start:next_section]
+        
+        # Verify it targets the pack's functions.py, not the global one
+        assert "verticals/<vertical>/functions.py" in section, (
+            "author-function-membership SKILL.md must target verticals/<vertical>/functions.py"
+        )
+        
+        # Verify it does NOT instruct writing/patching to api/shared/functions.py
+        assert "patches `api/shared/functions.py`" not in section, (
+            "author-function-membership SKILL.md must not say it patches api/shared/functions.py"
+        )
+        assert "append" not in section or "verticals/<vertical>/functions.py" in section, (
+            "author-function-membership SKILL.md append/modify instructions must reference pack functions.py"
+        )
+        
+        # Verify it explains api/shared/functions.py is an adapter
+        assert "read-only active-pack" in section or "read-only" in section, (
+            "author-function-membership SKILL.md must explain api/shared/functions.py is read-only"
+        )
+        
+        # Verify exact sentinel format
+        assert "# === BEGIN compose-domain" in section, (
+            "author-function-membership SKILL.md must use exact sentinel format"
+        )
