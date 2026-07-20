@@ -1,4 +1,4 @@
-.PHONY: install dev mcp mcp-authority server functions funcvenv test test-e2e clean azurite-up azurite-down reset up down up-with-authority-mock agt-doctor agt-verify snapshot-save snapshot-restore snapshot-list data-pack-save
+.PHONY: install dev mcp mcp-authority server functions funcvenv test test-e2e prove clean azurite-up azurite-down reset up down up-with-authority-mock agt-doctor agt-verify snapshot-save snapshot-restore snapshot-list data-pack-save
 
 install:
 	uv sync
@@ -93,6 +93,11 @@ test:
 # Playwright — requires the stack to already be running (`make up` in another terminal).
 test-e2e:
 	npx playwright test --reporter=list
+
+prove:
+	@test -n "$(VERTICAL)" || (echo "VERTICAL is required" >&2; exit 2)
+	@test -x "tools/$(VERTICAL)_zava_e2e_proof.sh" || (echo "no proof runner for $(VERTICAL)" >&2; exit 2)
+	ZAVA_VERTICAL="$(VERTICAL)" "tools/$(VERTICAL)_zava_e2e_proof.sh"
 
 clean:
 	docker compose down -v

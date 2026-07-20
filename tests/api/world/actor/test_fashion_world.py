@@ -156,6 +156,44 @@ def test_approved_high_value_transfer_preserves_governance_evidence() -> None:
     }
 
 
+def test_no_action_records_binding_constraints_without_moving_stock() -> None:
+    scenario = _scenario()
+    case, command = _case_command(scenario, "inventory-rebalancing")
+    source = scenario.inventory[command.payload["source_position_id"]]
+    destination = scenario.inventory[command.payload["destination_position_id"]]
+    before = (deepcopy(source), deepcopy(destination))
+    no_action = SimulationCommand(
+        command_id="cmd-no-action",
+        trace_id=command.trace_id,
+        issued_by=command.issued_by,
+        type=command.type,
+        payload={
+            **command.payload,
+            "action": "no-action",
+            "quantity": 0,
+            "evaluated_candidates": [
+                {
+                    "source_position_id": source.id,
+                    "destination_position_id": destination.id,
+                }
+            ],
+            "binding_constraints": ["transfer-cost"],
+            "kpi_comparison": {
+                "expected_recovered_margin_gbp": 100.0,
+                "transfer_cost_gbp": 200.0,
+            },
+        },
+    )
+
+    accepted = scenario.apply_command(no_action)
+
+    assert accepted.type == "command.accepted"
+    assert (source, destination) == before
+    assert case.outcome["action"] == "no-action"
+    assert case.outcome["binding_constraints"] == ["transfer-cost"]
+    assert case.outcome["evaluation"]["status"] == "pass"
+
+
 @pytest.mark.parametrize(
     "workflow_type",
     [

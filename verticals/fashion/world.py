@@ -387,6 +387,11 @@ class FashionScenario:
         if existing is not None:
             return existing
         if command.type == "inventory.transfer":
+            if command.payload.get("action") == "no-action":
+                reason = self._validate_no_action(command)
+                if reason is not None:
+                    return self._reject_command(command, reason)
+                return self._apply_no_action(command)
             reason = self._validate_inventory_transfer(command)
             if reason is not None:
                 return self._reject_command(command, reason)
@@ -400,6 +405,99 @@ class FashionScenario:
             command,
             f"unsupported command type: {command.type!r}",
         )
+
+    def _validate_no_action(
+        self,
+        command: SimulationCommand,
+    ) -> str | None:
+        payload = command.payload
+        case = self.process_cases.get(payload.get("case_id"))
+        if case is None or case.workflow_type != "inventory-rebalancing":
+            return "unknown inventory-rebalancing case"
+        if case.status != "open":
+            return f"case {case.id} is not open"
+        if not payload.get("workflow_id"):
+            return "workflow_id is required"
+        candidates = payload.get("evaluated_candidates")
+        if not isinstance(candidates, list) or not candidates:
+            return "no-action requires evaluated candidates"
+        constraints = payload.get("binding_constraints")
+        if not isinstance(constraints, list) or not constraints:
+            return "no-action requires binding constraints"
+        comparison = payload.get("kpi_comparison")
+        if not isinstance(comparison, dict) or not {
+            "expected_recovered_margin_gbp",
+            "transfer_cost_gbp",
+        } <= set(comparison):
+            return "no-action requires a KPI comparison"
+        if not payload.get("reason_code") or not payload.get(
+            "evidence_digest"
+        ):
+            return "reason code and evidence digest are required"
+        return None
+
+    def _apply_no_action(
+        self,
+        command: SimulationCommand,
+    ) -> SimulationEvent:
+        payload = command.payload
+        case = self.process_cases[payload["case_id"]]
+        accepted = self._record_command_accepted(
+            command,
+            target_id=case.id,
+        )
+        no_action = self.runtime.emit(
+            "inventory.rebalance.no_action",
+            actor_id=case.id,
+            cause_event_id=accepted.event_id,
+            trace_id=command.trace_id,
+            payload={
+                "evaluated_candidates": payload["evaluated_candidates"],
+                "binding_constraints": payload["binding_constraints"],
+                "kpi_comparison": payload["kpi_comparison"],
+            },
+        )
+        evaluation = {
+            "status": "pass",
+            "kpi_comparison": payload["kpi_comparison"],
+        }
+        case.status = "completed"
+        case.outcome = {
+            "action": "no-action",
+            "command_type": "inventory.transfer",
+            "mutation_family": "inventory",
+            "evaluated_candidates": payload["evaluated_candidates"],
+            "binding_constraints": payload["binding_constraints"],
+            "evaluation": evaluation,
+        }
+        self.workflow_state[case.workflow_type] = {
+            "status": "completed",
+            "case_id": case.id,
+            "action": "no-action",
+        }
+        profile = FASHION_PROCESS_PROFILES[case.workflow_type]
+        self.runtime.emit(
+            profile.success_event,
+            actor_id=case.id,
+            cause_event_id=no_action.event_id,
+            trace_id=command.trace_id,
+            payload={
+                "case": process_case_view(case),
+                "command_id": command.command_id,
+                "evaluation": evaluation,
+            },
+        )
+        self.runtime.emit(
+            "evaluation.completed",
+            actor_id=case.id,
+            cause_event_id=no_action.event_id,
+            trace_id=command.trace_id,
+            payload={
+                "workflow_type": case.workflow_type,
+                **evaluation,
+            },
+        )
+        return accepted
 
     def _validate_inventory_transfer(
         self,
