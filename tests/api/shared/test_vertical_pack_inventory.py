@@ -354,3 +354,55 @@ print(json.dumps(sorted(
     )
 
     assert json.loads(result.stdout.splitlines()[-1]) == []
+
+
+FASHION_WORKFLOWS = {
+    "inventory-rebalancing",
+    "demand-spike-response",
+    "promotion-readiness",
+    "markdown-governance",
+    "supplier-delay-recovery",
+    "fulfilment-exception-resolution",
+    "marketplace-seller-exception",
+    "returns-disposition",
+}
+FASHION_FUNCTIONS = {
+    "merchandising-planning",
+    "supply-chain-fulfilment",
+    "marketplace-operations",
+    "customer-returns",
+}
+
+_FASHION_MODULE_PREFIXES = (
+    "verticals.fashion.domains",
+    "verticals.fashion.functions",
+    "verticals.fashion.agents",
+    "verticals.fashion.authority",
+    "verticals.fashion.personas",
+)
+
+
+def test_agency_process_never_imports_fashion_business_modules() -> None:
+    """Default (Agency) vertical must not load any Fashion business-domain,
+    function, agent, authority, or persona modules."""
+    agency = _registry_snapshot(None)
+
+    for mod in _FASHION_MODULE_PREFIXES:
+        assert mod not in agency["modules"], (
+            f"Agency process imported Fashion module {mod!r}"
+        )
+    assert FASHION_WORKFLOWS.isdisjoint(agency["domains"])
+    assert FASHION_FUNCTIONS.isdisjoint(agency["functions"])
+
+
+def test_telco_process_never_imports_fashion_business_modules() -> None:
+    """ZAVA_VERTICAL=telco must not load any Fashion business-domain,
+    function, agent, authority, or persona modules."""
+    telco = _registry_snapshot("telco")
+
+    for mod in _FASHION_MODULE_PREFIXES:
+        assert mod not in telco["modules"], (
+            f"Telco process imported Fashion module {mod!r}"
+        )
+    assert FASHION_WORKFLOWS.isdisjoint(telco["domains"])
+    assert FASHION_FUNCTIONS.isdisjoint(telco["functions"])

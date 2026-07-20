@@ -111,6 +111,12 @@ def test_discover_pack_modules_returns_agency_and_telco() -> None:
     assert result["telco"] == "verticals.telco.manifest"
 
 
+def test_discover_pack_modules_includes_fashion() -> None:
+    loader = _loader()
+    result = loader.discover_pack_modules()
+    assert result["fashion"] == "verticals.fashion.manifest"
+
+
 def test_discover_pack_modules_filters_underscored_and_missing_manifest(
     tmp_path,
 ) -> None:
