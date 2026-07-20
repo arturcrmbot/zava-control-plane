@@ -47,7 +47,7 @@ The deploy skill mandates the **`azure-tenant-isolation`** skill (also in `aweso
 ## End-to-end steps
 
 1. Install `az` ≥ 2.60, `azd` (Azure Developer CLI), Docker, Node 20, Python 3.11, `uv`.
-2. Clone `aiappsgbb/zava-constellation`; follow the `azure-tenant-isolation` skill once per workstation.
+2. Install or read `skills/azure-tenant-isolation/SKILL.md` from <https://github.com/aiappsgbb/awesome-gbb> (sets `AZURE_CONFIG_DIR` and `AZD_CONFIG_DIR` once per workstation). Then clone `aiappsgbb/zava-constellation` for the compose and deploy skills.
 3. Provision shared infra (items 2–4 above) in the target subscription. Standard `az` commands or a small Bicep are fine; this is one-off and not Zava-specific.
 4. (Optional, recommended for customer-facing demos) Run `compose-org` to produce a proven vertical pack scoped to the customer's org.
 5. Clone `arturcrmbot/zava-control-plane` (or apply the proven pack from step 4).
