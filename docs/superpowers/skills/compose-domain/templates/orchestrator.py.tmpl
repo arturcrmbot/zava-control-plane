@@ -17,8 +17,7 @@ from typing import Any
 
 import azure.durable_functions as df
 
-# Per-phase HITL timeouts. Defined locally pre-graduation; graduate.sh lifts
-# them into api/shared/constants.py and rewrites this file's import.
+# Per-phase HITL timeouts. Defined locally and used by the orchestrator.
 {{TIMEOUT_CONSTANTS}}
 
 

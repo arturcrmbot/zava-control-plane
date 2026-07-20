@@ -217,3 +217,4 @@ def test_orchestrator_tmpl_targets_durable_py() -> None:
     text = ORCHESTRATOR_TMPL.read_text(encoding="utf-8")
     assert "registered in `function_app.py`" not in text
     assert "durable.py" in text
+    assert "api/shared/constants.py" not in text
