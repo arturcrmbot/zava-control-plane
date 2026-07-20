@@ -17,12 +17,9 @@ from api.shared.vertical_pack import (
 )
 
 
-PACK_MODULES = {
-    "agency": "verticals.agency.manifest",
-    "telco": "verticals.telco.manifest",
-}
 LEGACY_WORLD_OWNERS = {"support": "agency", "telco": "telco"}
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+_VERTICALS_ROOT = _REPO_ROOT / "verticals"
 _SKILL_NAME = re.compile(r"^name:\s*[\"']?([^\"'\n]+)", re.MULTILINE)
 _FRONTMATTER = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
 _DEFINE_TOOL_NAME = re.compile(
@@ -30,6 +27,27 @@ _DEFINE_TOOL_NAME = re.compile(
     r"([A-Za-z0-9_.-]+)[\"']",
     re.DOTALL,
 )
+
+
+def discover_pack_modules(root: Path = _VERTICALS_ROOT) -> dict[str, str]:
+    """Return a sorted mapping of vertical name -> module path for each
+    verticals/<name>/manifest.py that does not start with an underscore."""
+    result: dict[str, str] = {}
+    if not root.is_dir():
+        return result
+    for candidate in sorted(root.iterdir()):
+        if candidate.name.startswith("_"):
+            continue
+        if not candidate.is_dir():
+            continue
+        if not (candidate / "manifest.py").is_file():
+            continue
+        module_path = ".".join(candidate.relative_to(root.parent).parts) + ".manifest"
+        result[candidate.name] = module_path
+    return result
+
+
+PACK_MODULES = discover_pack_modules()
 
 
 def _normalise(value: str | None) -> str | None:

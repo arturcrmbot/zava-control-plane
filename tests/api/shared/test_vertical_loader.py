@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from importlib import import_module
+from pathlib import Path
 
 import pytest
 
@@ -101,3 +102,32 @@ def test_active_runtime_is_process_immutable(
     assert loader.active_runtime() is first
     assert loader.active_runtime().pack.name == "agency"
     loader.active_runtime.cache_clear()
+
+
+def test_discover_pack_modules_returns_agency_and_telco() -> None:
+    loader = _loader()
+    result = loader.discover_pack_modules()
+    assert result == {
+        "agency": "verticals.agency.manifest",
+        "telco": "verticals.telco.manifest",
+    }
+
+
+def test_discover_pack_modules_filters_underscored_and_missing_manifest(
+    tmp_path,
+) -> None:
+    loader = _loader()
+    root = tmp_path / "verticals"
+    # valid vertical
+    retail_manifest = root / "retail" / "manifest.py"
+    retail_manifest.parent.mkdir(parents=True)
+    retail_manifest.touch()
+    # underscore-prefixed file - should be ignored
+    helpers = root / "_helpers.py"
+    helpers.touch()
+    # directory without manifest.py - should be ignored
+    notes_dir = root / "notes"
+    notes_dir.mkdir()
+
+    result = loader.discover_pack_modules(root)
+    assert result == {"retail": "verticals.retail.manifest"}
