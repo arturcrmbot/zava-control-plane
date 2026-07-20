@@ -99,6 +99,15 @@ def fashion_command_activity(payload: dict[str, Any]) -> dict[str, Any]:
                     "approved_source_version",
                     command_payload.get("expected_source_version"),
                 ),
+                # The recommendation-generating persona, stamped from the
+                # process profile (same Fashion-persona namespace as
+                # ``approval_role``) so the world's self-approval guard can
+                # compare like with like. This is intentionally NOT
+                # ``issued_by`` below: ``issued_by`` is the function label
+                # CommandGateway matches against the claimed objective
+                # (``objective.claimed_by``), a disjoint identity that must
+                # never stand in for a persona.
+                "recommended_by": profile.recommender_persona,
             }
         )
     trace_id = str(payload["trace_id"])

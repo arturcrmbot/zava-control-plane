@@ -204,18 +204,25 @@ def test_high_value_transfer_rejects_a_free_form_or_unknown_approval_role() -> N
 
 
 def test_high_value_transfer_rejects_self_approval() -> None:
+    """Self-approval is an identity match between the recommendation's
+    persona (``recommended_by``) and the approving persona
+    (``approval_role``) — the SAME Fashion authority-persona namespace.
+    ``issued_by`` stays the function label (a disjoint namespace used only
+    by ``CommandGateway`` for objective ownership) and must NOT be the
+    field compared here, or the guard is dead on the real Durable path."""
     scenario = _scenario()
     case, command, source = _high_value_exception_case(scenario)
     self_approved = SimulationCommand(
         command_id="cmd-highvalue-self-approval",
         trace_id=command.trace_id,
-        issued_by="merchandising_director",
+        issued_by=command.issued_by,
         type=command.type,
         payload={
             **command.payload,
             "quantity": 60,
             "policy_decision": "approval_required",
             "approval_reference": "approval:merchandising_director:hv-001",
+            "recommended_by": "merchandising_director",
             "approval_role": "merchandising_director",
             "approved_source_version": source.version,
         },
@@ -385,24 +392,27 @@ def test_safety_stock_breach_with_authorized_approval_executes() -> None:
 
 
 def test_safety_stock_breach_self_approval_is_blocked() -> None:
-    """The entity that issues a command cannot be its own safety-stock approver.
-    Approval authority requires a separate human persona; the command issuer
-    appearing in approval_role constitutes a self-reference and must be
-    rejected so a recommendation generator cannot unilaterally approve itself."""
+    """The recommendation's persona (``recommended_by``) cannot be its own
+    safety-stock approver (``approval_role``) — both are Fashion
+    authority-persona role strings in the same namespace. ``issued_by``
+    (the function label ``CommandGateway`` matches to the claimed
+    objective) is a disjoint identity and is deliberately left as the
+    real function label here to prove the guard does not depend on it."""
     scenario = _scenario()
     case, command, source = _safety_stock_case(scenario)
     before = deepcopy(source)
-    # Use a valid human persona as issued_by AND approval_role — self-approval.
+    # Same persona recommended and "approved" this exception — self-approval.
     self_approved = SimulationCommand(
         command_id="cmd-self-approval",
         trace_id=command.trace_id,
-        issued_by="merchandising_director",
+        issued_by=command.issued_by,
         type=command.type,
         payload={
             **command.payload,
             "quantity": 30,
             "policy_decision": "approval_required",
             "approval_reference": "approval:merchandising_director:self-001",
+            "recommended_by": "merchandising_director",
             "approval_role": "merchandising_director",
             "approved_source_version": source.version,
         },
@@ -412,6 +422,32 @@ def test_safety_stock_breach_self_approval_is_blocked() -> None:
 
     assert rejected.type == "command.rejected"
     assert "self" in rejected.payload["reason"]
+    assert source == before
+    assert case.status == "open"
+
+
+def test_safety_stock_breach_missing_recommender_identity_is_blocked() -> None:
+    """A governed exception with no auditable recommender identity must
+    fail closed — an otherwise well-formed, authorised, non-stale approval
+    must not be able to execute when ``recommended_by`` is missing."""
+    scenario = _scenario()
+    case, command, source = _safety_stock_case(scenario)
+    before = deepcopy(source)
+    missing_recommender = _with_payload(
+        command,
+        command_id="cmd-safety-missing-recommender",
+        quantity=30,
+        policy_decision="approval_required",
+        approval_reference="approval:merchandising_director:ss-005",
+        recommended_by=None,
+        approval_role="merchandising_director",
+        approved_source_version=source.version,
+    )
+
+    rejected = scenario.apply_command(missing_recommender)
+
+    assert rejected.type == "command.rejected"
+    assert "recommender identity" in rejected.payload["reason"]
     assert source == before
     assert case.status == "open"
 

@@ -710,6 +710,11 @@ class FashionScenario:
             "retail_value_gbp": round(style.unit_retail_gbp * 20, 2),
             "policy_decision": "auto_approved",
             "approval_reference": None,
+            # The persona that owns/generates the inventory-rebalance
+            # recommendation. Same namespace as ``approval_role`` so the
+            # world's self-approval guard can meaningfully compare them —
+            # unlike the SimulationCommand's function-scoped ``issued_by``.
+            "recommended_by": profile.recommender_persona,
             "demand_confidence": case.facts["demand_confidence"],
             "transfer_cost_gbp": case.facts["transfer_cost_gbp"],
             "expected_recovered_margin_gbp": case.facts[
@@ -890,7 +895,6 @@ class FashionScenario:
                 source,
                 payload,
                 retail_value,
-                command.issued_by,
                 context="safety-stock breach",
                 missing_message="safety-stock breach requires approval",
             )
@@ -919,7 +923,6 @@ class FashionScenario:
                 source,
                 payload,
                 retail_value,
-                command.issued_by,
                 context="transfer exception",
                 missing_message=(
                     "approval reference is required for transfer exception"
@@ -940,7 +943,6 @@ class FashionScenario:
         source: InventoryPosition,
         payload: dict[str, Any],
         retail_value: float,
-        issued_by: str = "",
         *,
         context: str,
         missing_message: str,
@@ -958,27 +960,44 @@ class FashionScenario:
         differs (via ``context``/``missing_message``), the authority checks
         are identical.
 
+        Identity model: ``payload["recommended_by"]`` and
+        ``payload["approval_role"]`` are BOTH Fashion authority-persona
+        role strings — the same namespace as ``FASHION_AUTHORITY`` keys
+        (e.g. ``inventory_allocation_manager``, ``merchandising_director``).
+        ``command.issued_by`` is a *different*, function-scoped identity
+        (e.g. ``merchandising_planning``) that ``CommandGateway`` uses to
+        match the command to the objective it was claimed under; it is
+        never a valid stand-in for a persona and must not be compared to
+        ``approval_role``, or the guard is dead by construction.
+
         Rules (as supported by the pack authority model):
           * an approval reference must be present — otherwise the exception
             is routed to approval_required and blocked;
+          * the recommendation must carry an auditable recommender persona
+            (``recommended_by``) — a governed exception with no recorded
+            recommender identity fails closed;
+          * the recommender persona may not also serve as the approver — the
+            recommendation and the approval authority must be distinct
+            personas, checked before authorisation so self-dealing is
+            reported precisely rather than folded into "unauthorized";
           * the approving role must be an authorised persona whose approval
             actions cover the inventory-rebalancing HITL decision and whose
             spend limit covers the transfer value;
-          * the command issuer may not serve as their own approver — the
-            recommendation generator and the approval authority must be
-            distinct entities;
           * the approval must be bound to the current source version — an
             approval granted against a superseded version is stale.
         """
         if not payload.get("approval_reference"):
             return missing_message
+        recommended_by = payload.get("recommended_by")
+        if not recommended_by:
+            return f"{context} requires an auditable recommender identity"
         role = payload.get("approval_role")
+        if recommended_by == role:
+            return f"command recommender cannot self-approve a {context}"
         row = FASHION_AUTHORITY.get(role) if role else None
         action = FASHION_PROCESS_PROFILES["inventory-rebalancing"].hitl_event
         if row is None or action not in row.approval_actions:
             return f"{context} requires an authorized persona approval"
-        if issued_by and issued_by == role:
-            return f"command issuer cannot self-approve a {context}"
         if retail_value > row.spend_limit_gbp:
             return f"{context} approval exceeds persona spend limit"
         if payload.get("approved_source_version") != source.version:

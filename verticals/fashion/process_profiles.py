@@ -28,6 +28,12 @@ class FashionProcessProfile:
     success_event: str
     mutation_family: str
     case_id: str
+    # The Fashion authority-persona role that generates/owns the
+    # recommendation for this workflow (audit identity for the world's
+    # self-approval guard). Same namespace as FASHION_AUTHORITY keys and
+    # ``hitl_persona`` — distinct from ``function``, which is a
+    # CommandGateway ownership label, not a persona.
+    recommender_persona: str = ""
     stub: bool = False
 
 
@@ -64,6 +70,7 @@ FASHION_PROCESS_PROFILES: dict[str, FashionProcessProfile] = {
         success_event="inventory.transfer.completed",
         mutation_family="inventory",
         case_id="fashion-inventory-rebalance-auto",
+        recommender_persona="inventory_allocation_manager",
     ),
     "demand-spike-response": FashionProcessProfile(
         workflow_type="demand-spike-response",

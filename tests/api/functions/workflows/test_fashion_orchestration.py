@@ -51,6 +51,7 @@ class _Context:
                 now=scenario.runtime.now,
             ),
         }
+        self.scenario = scenario
         self.approval = _Task(approval)
         self.timer = _Task()
         self.external_event = None
@@ -165,6 +166,112 @@ def test_governed_inventory_rebalancing_carries_approval_reference() -> None:
             "expected_source_version"
         ]
     )
+
+
+def test_governed_inventory_rebalancing_carries_same_namespace_recommender_and_approver() -> None:
+    """The Durable command activity — not a hand-built SimulationCommand —
+    must stamp the recommendation-generating persona (``recommended_by``)
+    and the approving persona (``approval_role``) in the SAME Fashion
+    authority-persona namespace, so the world's self-approval guard
+    (which compares these two payload fields) can ever actually fire in
+    production. ``command["issued_by"]`` stays the function label
+    (``merchandising_planning``) that ``CommandGateway`` needs for
+    objective-ownership matching — it is a different concern and must not
+    be conflated with either persona identity."""
+    profile = FASHION_PROCESS_PROFILES["inventory-rebalancing"]
+    context = _Context(
+        profile.workflow_type,
+        requires_approval=True,
+        approval={
+            "decision": "approve",
+            "persona": profile.hitl_persona,
+            "approval_reference": "approval:merchandising-director:003",
+        },
+    )
+
+    result = _drive(context, profile.workflow_type)
+
+    command = result["command"]
+    payload = command["payload"]
+    assert payload["recommended_by"] == "inventory_allocation_manager"
+    assert payload["approval_role"] == "merchandising_director"
+    assert payload["recommended_by"] != payload["approval_role"]
+    # issued_by is the function label the CommandGateway checks — a
+    # disjoint namespace from either persona above.
+    assert command["issued_by"] == "merchandising_planning"
+
+
+def test_real_hitl_response_self_approval_is_rejected_without_mutating_world() -> None:
+    """A malicious or misconfigured HITL response that stamps the SAME
+    persona as both the recommender and the approver must be rejected by
+    the world when the resulting real Durable command payload is applied
+    — not merely by a hand-built SimulationCommand."""
+    profile = FASHION_PROCESS_PROFILES["inventory-rebalancing"]
+    context = _Context(
+        profile.workflow_type,
+        requires_approval=True,
+        approval={
+            "decision": "approve",
+            # Self-approval: the HITL responder stamps the recommender's
+            # own persona as the approving role.
+            "persona": "inventory_allocation_manager",
+            "approval_role": "inventory_allocation_manager",
+            "approval_reference": "approval:inventory_allocation_manager:self-001",
+        },
+    )
+    scenario = context.scenario
+    source = scenario.inventory[
+        context._input["observation"]["command_payload"]["source_position_id"]
+    ]
+    before_on_hand = source.on_hand
+
+    result = _drive(context, profile.workflow_type)
+    assert result["status"] == "decision_ready"
+
+    from api.server.world.model import SimulationCommand
+
+    command = SimulationCommand(**result["command"])
+    rejected = scenario.apply_command(command)
+
+    assert rejected.type == "command.rejected"
+    assert "self" in rejected.payload["reason"]
+    assert source.on_hand == before_on_hand
+
+
+def test_real_hitl_response_distinct_recommender_and_approver_succeeds() -> None:
+    """The legitimate operator/recommender persona (inventory_allocation_
+    manager) followed by a distinct approver persona (merchandising_
+    director) must be accepted end-to-end through the real Durable
+    command payload."""
+    profile = FASHION_PROCESS_PROFILES["inventory-rebalancing"]
+    context = _Context(
+        profile.workflow_type,
+        requires_approval=True,
+        approval={
+            "decision": "approve",
+            "persona": profile.hitl_persona,
+            "approval_reference": "approval:merchandising-director:004",
+        },
+    )
+    scenario = context.scenario
+    command_payload = context._input["observation"]["command_payload"]
+    source = scenario.inventory[command_payload["source_position_id"]]
+    destination = scenario.inventory[command_payload["destination_position_id"]]
+    quantity = command_payload["quantity"]
+    source_before = source.on_hand
+    destination_before = destination.on_hand
+
+    result = _drive(context, profile.workflow_type)
+    assert result["status"] == "decision_ready"
+
+    from api.server.world.model import SimulationCommand
+
+    command = SimulationCommand(**result["command"])
+    accepted = scenario.apply_command(command)
+
+    assert accepted.type == "command.accepted"
+    assert source.on_hand == source_before - quantity
+    assert destination.on_hand == destination_before + quantity
 
 
 def _payload_annotation(trigger) -> str:
