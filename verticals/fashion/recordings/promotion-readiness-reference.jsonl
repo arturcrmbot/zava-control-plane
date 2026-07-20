@@ -1,0 +1,10 @@
+{"ts_offset_ms":0,"event":{"type":"workflow.started","workflow_id":"FPR-REFERENCE-001","workflow_type":"promotion-readiness"}}
+{"ts_offset_ms":100,"event":{"type":"durable.step.completed","workflow_id":"FPR-REFERENCE-001","workflow_type":"promotion-readiness","phase":"Detect Readiness Risk"}}
+{"ts_offset_ms":200,"event":{"type":"durable.step.completed","workflow_id":"FPR-REFERENCE-001","workflow_type":"promotion-readiness","phase":"Assess Stock Content and Channel"}}
+{"ts_offset_ms":300,"event":{"type":"durable.step.completed","workflow_id":"FPR-REFERENCE-001","workflow_type":"promotion-readiness","phase":"Approve Readiness Exception"}}
+{"ts_offset_ms":400,"event":{"type":"durable.step.completed","workflow_id":"FPR-REFERENCE-001","workflow_type":"promotion-readiness","phase":"Apply Readiness Action"}}
+{"ts_offset_ms":500,"event":{"type":"durable.step.completed","workflow_id":"FPR-REFERENCE-001","workflow_type":"promotion-readiness","phase":"Verify Promotion Readiness"}}
+{"ts_offset_ms":600,"event":{"type":"typed.command.issued","workflow_id":"FPR-REFERENCE-001","workflow_type":"promotion-readiness","command_type":"promotion.prepare"}}
+{"ts_offset_ms":700,"event":{"type":"world.mutation.completed","workflow_id":"FPR-REFERENCE-001","workflow_type":"promotion-readiness","mutation_family":"promotion"}}
+{"ts_offset_ms":800,"event":{"type":"evaluation.completed","workflow_id":"FPR-REFERENCE-001","workflow_type":"promotion-readiness","status":"PASS"}}
+{"ts_offset_ms":900,"event":{"type":"durable.workflow.completed","workflow_id":"FPR-REFERENCE-001","workflow_type":"promotion-readiness","status":"completed"}}

@@ -1,0 +1,30 @@
+tools:
+  - id: fashion_query_demand
+    reversible: true
+    requires_authority: false
+    scope_function: merchandising-planning
+  - id: fashion_query_inventory
+    reversible: true
+    requires_authority: false
+    scope_function: merchandising-planning
+  - id: fashion_query_orders
+    reversible: true
+    requires_authority: false
+    scope_function: supply-chain-fulfilment
+  - id: fashion_query_partners
+    reversible: true
+    requires_authority: false
+    scope_function: marketplace-operations
+  - id: fashion_query_policies
+    reversible: true
+    requires_authority: false
+    scope_function: shared
+  - id: fashion_query_returns
+    reversible: true
+    requires_authority: false
+    scope_function: customer-returns
+  - id: fashion_prepare_command
+    reversible: true
+    requires_authority: true
+    scope_function: shared
+

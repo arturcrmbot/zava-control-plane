@@ -1,0 +1,13 @@
+{
+  "capabilities": ["blueprint", "world", "memory", "knowledge"],
+  "lenses": ["process-library", "order", "customer-impact", "control"],
+  "theme": {
+    "accent": "#ec4899",
+    "label": "Fashion Retail"
+  },
+  "phase_aliases": {},
+  "supplemental_domains": [],
+  "aspirational_domains": [],
+  "include_meta_skills": false
+}
+

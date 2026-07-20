@@ -1,0 +1,10 @@
+{"ts_offset_ms":0,"event":{"type":"workflow.started","workflow_id":"FRD-REFERENCE-001","workflow_type":"returns-disposition"}}
+{"ts_offset_ms":100,"event":{"type":"durable.step.completed","workflow_id":"FRD-REFERENCE-001","workflow_type":"returns-disposition","phase":"Inspect Returned Item"}}
+{"ts_offset_ms":200,"event":{"type":"durable.step.completed","workflow_id":"FRD-REFERENCE-001","workflow_type":"returns-disposition","phase":"Assess Disposition Options"}}
+{"ts_offset_ms":300,"event":{"type":"durable.step.completed","workflow_id":"FRD-REFERENCE-001","workflow_type":"returns-disposition","phase":"Approve Disposition Exception"}}
+{"ts_offset_ms":400,"event":{"type":"durable.step.completed","workflow_id":"FRD-REFERENCE-001","workflow_type":"returns-disposition","phase":"Execute Disposition"}}
+{"ts_offset_ms":500,"event":{"type":"durable.step.completed","workflow_id":"FRD-REFERENCE-001","workflow_type":"returns-disposition","phase":"Verify Recovery Outcome"}}
+{"ts_offset_ms":600,"event":{"type":"typed.command.issued","workflow_id":"FRD-REFERENCE-001","workflow_type":"returns-disposition","command_type":"return.disposition"}}
+{"ts_offset_ms":700,"event":{"type":"world.mutation.completed","workflow_id":"FRD-REFERENCE-001","workflow_type":"returns-disposition","mutation_family":"return"}}
+{"ts_offset_ms":800,"event":{"type":"evaluation.completed","workflow_id":"FRD-REFERENCE-001","workflow_type":"returns-disposition","status":"PASS"}}
+{"ts_offset_ms":900,"event":{"type":"durable.workflow.completed","workflow_id":"FRD-REFERENCE-001","workflow_type":"returns-disposition","status":"completed"}}

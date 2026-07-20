@@ -1,0 +1,2 @@
+"""Fashion Retail graph projections."""
+
