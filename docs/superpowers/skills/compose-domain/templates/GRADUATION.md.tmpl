@@ -52,7 +52,7 @@ appending, so re-running graduate.sh is safe.
 
 ```bash
 # 1. Restart FastAPI so it picks up the new orchestrator + ramp entry.
-./scripts/profile-autonomous.sh &     # or profile-friday.sh
+ZAVA_VERTICAL={{VERTICAL_NAME}} ./scripts/profile-autonomous.sh &     # or profile-friday.sh
 sleep 10
 
 # 2. Fire one workflow.

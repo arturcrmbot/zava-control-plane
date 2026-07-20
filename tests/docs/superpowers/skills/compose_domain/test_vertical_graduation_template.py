@@ -318,3 +318,13 @@ def test_author_function_membership_skill_targets_pack_functions_py() -> None:
         assert "# === BEGIN compose-domain" in section, (
             "author-function-membership SKILL.md must use exact sentinel format"
         )
+
+
+def test_graduation_template_smoke_restart_sets_zava_vertical() -> None:
+    """GRADUATION.md.tmpl smoke test must set ZAVA_VERTICAL={{VERTICAL_NAME}}
+    before ./scripts/profile-autonomous.sh to boot the selected vertical pack."""
+    text = GRADUATION_TMPL.read_text(encoding="utf-8")
+    assert "ZAVA_VERTICAL={{VERTICAL_NAME}} ./scripts/profile-autonomous.sh" in text, (
+        "GRADUATION.md.tmpl smoke restart must contain exact "
+        "'ZAVA_VERTICAL={{VERTICAL_NAME}} ./scripts/profile-autonomous.sh'"
+    )
