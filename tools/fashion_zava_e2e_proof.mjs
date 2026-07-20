@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { workflowMemoryIdMatched } from "./lib/memory_match.mjs";
 
 // Live end-to-end proof driver for the Fashion vertical. Every field it writes
 // is derived from a live observation of the running stack (FastAPI actor world,
@@ -394,11 +395,18 @@ async function runLive() {
       const kase = casesById[run.case_id];
       need(kase && kase.status === "completed" && kase.outcome, `world case ${run.case_id} did not complete`);
 
-      // memory (per-domain operational memory captured on completion)
+      // memory (per-domain operational memory captured on completion). A
+      // non-empty domain memory list is not sufficient evidence on its own —
+      // it only proves *some* workflow in this domain left memory, not that
+      // *this* completed workflow did. idMatched requires an exact,
+      // structured match on this workflow's id (see lib/memory_match.mjs),
+      // so unrelated same-domain memory (including an accidental substring
+      // collision, e.g. "wf-10" inside "wf-100") can never satisfy it.
       const memories = await getJson(`/api/memory/v2/memories?domain=${encodeURIComponent(type)}`);
       const memoryList = memories.memories || [];
       need(memoryList.length > 0, `no operational memory captured for ${type}`);
-      const idMatched = JSON.stringify(memoryList).includes(workflow.id);
+      const idMatched = workflowMemoryIdMatched(memoryList, workflow.id);
+      need(idMatched, `domain memory for ${type} does not reference workflow ${workflow.id}`);
       memoryEvidence[type] = { count: memoryList.length, id_matched: idMatched };
 
       const chain = {
@@ -427,7 +435,7 @@ async function runLive() {
           world: traceEvents.length > 0 ? "PASS" : "FAIL",
           "workflow-api": "PASS",
           drawer: "PENDING",
-          memory: memoryList.length > 0 ? "PASS" : "FAIL",
+          memory: idMatched ? "PASS" : "FAIL",
           knowledge: knowledgeOk ? "PASS" : "FAIL",
           "ag-ui": "PENDING",
           graph: knowledgeOk ? "PASS" : "FAIL",

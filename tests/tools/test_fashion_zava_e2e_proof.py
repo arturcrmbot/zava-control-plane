@@ -18,6 +18,7 @@ SCRIPT = ROOT / "tools" / "fashion_zava_e2e_proof.sh"
 DRIVER = ROOT / "tools" / "fashion_zava_e2e_proof.mjs"
 MANIFEST_TOOL = ROOT / "tools" / "fashion_proof_manifest.py"
 STACK_LIB = ROOT / "tools" / "lib" / "actor_world_proof_stack.sh"
+CLEAN_SOURCE_HELPER = ROOT / "tools" / "lib" / "require_clean_source.sh"
 WORKFLOWS = list(FASHION_PROCESS_PROFILES)
 
 
@@ -40,6 +41,127 @@ def test_fashion_proof_prints_isolated_stack_config():
     assert config["driver"] == "tools/fashion_zava_e2e_proof.mjs"
     # Isolated from the telco proof ports (11000-2/13101/17171/15273/15275).
     assert config["api_port"] != 13101 and config["functions_port"] != 17171
+
+
+def _init_git_repo(path: Path) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=path, check=True)
+    subprocess.run(["git", "config", "user.email", "proof@test.local"], cwd=path, check=True)
+    subprocess.run(["git", "config", "user.name", "proof"], cwd=path, check=True)
+    (path / "tracked.txt").write_text("original\n", encoding="utf-8")
+    subprocess.run(["git", "add", "tracked.txt"], cwd=path, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "initial"], cwd=path, check=True)
+
+
+def _run_clean_check(repo: Path):
+    return subprocess.run(
+        ["bash", str(CLEAN_SOURCE_HELPER), str(repo)],
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_require_clean_source_passes_on_a_clean_repo(tmp_path):
+    """A freshly committed repo with nothing pending must be reported clean,
+    so genuinely clean runs are never blocked."""
+    _init_git_repo(tmp_path)
+
+    result = _run_clean_check(tmp_path)
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_require_clean_source_fails_on_unstaged_tracked_edit(tmp_path):
+    """An unstaged edit to a tracked file means the working tree no longer
+    matches HEAD; source_commit=HEAD would misattribute this run."""
+    _init_git_repo(tmp_path)
+    (tmp_path / "tracked.txt").write_text("edited\n", encoding="utf-8")
+
+    result = _run_clean_check(tmp_path)
+
+    assert result.returncode != 0
+    assert "clean" in result.stderr.lower() or "dirty" in result.stderr.lower()
+
+
+def test_require_clean_source_fails_on_staged_change(tmp_path):
+    """A staged-but-uncommitted change is also not what HEAD reflects."""
+    _init_git_repo(tmp_path)
+    (tmp_path / "tracked.txt").write_text("staged edit\n", encoding="utf-8")
+    subprocess.run(["git", "add", "tracked.txt"], cwd=tmp_path, check=True)
+
+    result = _run_clean_check(tmp_path)
+
+    assert result.returncode != 0
+
+
+def test_require_clean_source_fails_on_untracked_file(tmp_path):
+    """Untracked files can affect execution (e.g. a stray module import) even
+    though `git diff` shows nothing, so they must fail the check too."""
+    _init_git_repo(tmp_path)
+    (tmp_path / "untracked.txt").write_text("new\n", encoding="utf-8")
+
+    result = _run_clean_check(tmp_path)
+
+    assert result.returncode != 0
+
+
+def test_require_clean_source_ignores_gitignored_output(tmp_path):
+    """Proof/runtime output that is gitignored (e.g. proof/, tmp/) must stay
+    ignored: `git status --porcelain` (without --ignored) never reports it, so
+    a run that only produced gitignored evidence is still clean."""
+    _init_git_repo(tmp_path)
+    (tmp_path / ".gitignore").write_text("proof/\n", encoding="utf-8")
+    subprocess.run(["git", "add", ".gitignore"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "ignore proof output"], cwd=tmp_path, check=True)
+    proof_dir = tmp_path / "proof"
+    proof_dir.mkdir()
+    (proof_dir / "manifest.json").write_text("{}\n", encoding="utf-8")
+
+    result = _run_clean_check(tmp_path)
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_fashion_proof_script_enforces_clean_source_for_full_and_replay():
+    """Both modes that stamp/consume source-bound evidence must call the
+    guard; --print-config/--print-contract must remain usable on a dirty
+    tree, so the guard is wired in after those early-exit branches."""
+    source = SCRIPT.read_text(encoding="utf-8")
+
+    print_config_idx = source.index('"--print-config"')
+    print_contract_idx = source.index('"--print-contract"')
+    guard_idx = source.index("require_clean_source")
+    replay_only_idx = source.index('"--replay-only"')
+
+    assert guard_idx > print_config_idx
+    assert guard_idx > print_contract_idx
+    # The guard call must precede the mode-specific full/replay-only bodies
+    # (both of which boot processes and must not run on a dirty tree).
+    assert guard_idx < source.index("start_azurite")
+    assert guard_idx > replay_only_idx or "MODE" in source[replay_only_idx:guard_idx]
+
+
+def test_fashion_proof_fails_fast_when_repo_is_dirty():
+    """Exercises the real script (not just the reusable helper): an untracked
+    file in the actual repo must make --replay-only refuse to run, and it
+    must do so before booting any of the stack (no ports touched, no
+    required-binary checks reached), so this stays fast and side-effect-free
+    even though it runs against the real ROOT."""
+    marker = ROOT / "tests" / "tools" / "_dirty_source_probe_marker.tmp"
+    assert not marker.exists()
+    marker.write_text("dirty-source-probe\n", encoding="utf-8")
+    try:
+        result = subprocess.run(
+            ["bash", str(SCRIPT), "--replay-only"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode != 0
+        combined = (result.stdout + result.stderr).lower()
+        assert "clean" in combined or "dirty" in combined
+    finally:
+        marker.unlink(missing_ok=True)
 
 
 def test_fashion_proof_sources_parse():
@@ -193,6 +315,27 @@ def test_fashion_proof_fails_fast_and_gates_on_browser_errors():
     assert "class ProofError" in driver
     assert "if (error instanceof ProofError)" in driver
     assert "evidence.browserErrors.length === 0" in driver
+
+
+def test_fashion_proof_hard_gates_memory_on_exact_workflow_id():
+    """Memory PASS must be workflow-scoped, not merely domain-scoped: a
+    non-empty domain memory list proves *some* workflow in that domain left
+    memory, not that *this* completed workflow did. The driver must hard
+    assert an exact structured-id match (lib/memory_match.mjs) per workflow
+    before deriving the memory surface, and must never fall back to the old
+    JSON.stringify(...).includes(...) substring check, which can be
+    satisfied by an unrelated same-domain memory entry."""
+    driver = DRIVER.read_text(encoding="utf-8")
+
+    assert "workflowMemoryIdMatched" in driver
+    assert "from \"./lib/memory_match.mjs\"" in driver
+    # No substring fallback left anywhere in the driver.
+    assert "JSON.stringify(memoryList).includes(workflow.id)" not in driver
+    # idMatched must be a hard gate (need(...)), not merely recorded.
+    assert 'need(idMatched, `domain memory for ${type} does not reference workflow ${workflow.id}`);' in driver
+    # The memory surface itself must be driven by idMatched, not raw count.
+    assert 'memory: idMatched ? "PASS" : "FAIL"' in driver
+    assert 'memory: memoryList.length > 0 ? "PASS" : "FAIL"' not in driver
 
 
 def test_fashion_proof_supports_replay_only_validation():

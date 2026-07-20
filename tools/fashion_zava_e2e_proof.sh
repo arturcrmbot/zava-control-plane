@@ -49,6 +49,17 @@ if [[ "${1:-}" == "--replay-only" ]]; then
   MODE="replay-only"
 fi
 
+# Both remaining modes (full and --replay-only) boot real processes and
+# attribute their result to source_commit=$(git rev-parse HEAD) (full stamps
+# it directly in the manifest; replay-only re-runs the driver against
+# whatever is on disk right now). A dirty tree — tracked or untracked — means
+# that attribution would be wrong, so fail fast here, before touching a
+# single port or process. --print-config/--print-contract already exited
+# above and stay usable on a dirty tree.
+# shellcheck source=tools/lib/require_clean_source.sh
+source "$ROOT/tools/lib/require_clean_source.sh"
+require_clean_source "$ROOT" || exit 2
+
 export ACTOR_PROOF_ROOT="$DATA_ROOT/run"
 export ACTOR_PROOF_AZ_BLOB_PORT="${AZURITE_PORTS[0]}"
 export ACTOR_PROOF_AZ_QUEUE_PORT="${AZURITE_PORTS[1]}"
