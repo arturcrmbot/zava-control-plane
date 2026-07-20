@@ -241,6 +241,38 @@ def test_safety_stock_breach_with_authorized_approval_executes() -> None:
     }
 
 
+def test_safety_stock_breach_self_approval_is_blocked() -> None:
+    """The entity that issues a command cannot be its own safety-stock approver.
+    Approval authority requires a separate human persona; the command issuer
+    appearing in approval_role constitutes a self-reference and must be
+    rejected so a recommendation generator cannot unilaterally approve itself."""
+    scenario = _scenario()
+    case, command, source = _safety_stock_case(scenario)
+    before = deepcopy(source)
+    # Use a valid human persona as issued_by AND approval_role — self-approval.
+    self_approved = SimulationCommand(
+        command_id="cmd-self-approval",
+        trace_id=command.trace_id,
+        issued_by="merchandising_director",
+        type=command.type,
+        payload={
+            **command.payload,
+            "quantity": 30,
+            "policy_decision": "approval_required",
+            "approval_reference": "approval:merchandising_director:self-001",
+            "approval_role": "merchandising_director",
+            "approved_source_version": source.version,
+        },
+    )
+
+    rejected = scenario.apply_command(self_approved)
+
+    assert rejected.type == "command.rejected"
+    assert "self" in rejected.payload["reason"]
+    assert source == before
+    assert case.status == "open"
+
+
 def test_safety_stock_breach_with_unauthorized_persona_is_blocked() -> None:
     scenario = _scenario()
     case, command, source = _safety_stock_case(scenario)

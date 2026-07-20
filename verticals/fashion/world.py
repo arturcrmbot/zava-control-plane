@@ -887,7 +887,7 @@ class FashionScenario:
             # reject: it can only execute with a valid, non-stale approval
             # reference from an authorised persona.
             reason = self._validate_safety_stock_approval(
-                source, payload, retail_value
+                source, payload, retail_value, command.issued_by
             )
             if reason is not None:
                 return reason
@@ -918,6 +918,7 @@ class FashionScenario:
         source: InventoryPosition,
         payload: dict[str, Any],
         retail_value: float,
+        issued_by: str = "",
     ) -> str | None:
         """Gate a protected safety-stock consumption behind the authorised
         persona's approval. Returns a rejection reason, or ``None`` to allow.
@@ -928,6 +929,9 @@ class FashionScenario:
           * the approving role must be an authorised persona whose approval
             actions cover the inventory-rebalancing HITL decision and whose
             spend limit covers the transfer value;
+          * the command issuer may not serve as their own approver — the
+            recommendation generator and the approval authority must be
+            distinct entities;
           * the approval must be bound to the current source version — an
             approval granted against a superseded version is stale.
         """
@@ -940,6 +944,8 @@ class FashionScenario:
             return (
                 "safety-stock breach requires an authorized persona approval"
             )
+        if issued_by and issued_by == role:
+            return "command issuer cannot self-approve a safety-stock breach"
         if retail_value > row.spend_limit_gbp:
             return "safety-stock approval exceeds persona spend limit"
         if payload.get("approved_source_version") != source.version:
