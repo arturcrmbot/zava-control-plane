@@ -1,6 +1,6 @@
 import { CompoundingDiagram } from "../components/CompoundingDiagram";
 
-const DESIGN_TIME_SKILLS = ["brainstorming", "humanizer", "writing-plans", "compose-domain", "compose-persona"];
+const COMPOSITION_STEPS = ["Research", "Design", "Build", "Prove"];
 
 export function MetaSkill() {
   return (
@@ -25,17 +25,18 @@ export function MetaSkill() {
 
         <div className="meta__extension">
           <div className="meta__extension-text">
-            <h3 className="passage-title">The skills that author skills.</h3>
+            <h3 className="passage-title">Two public steps, one executable org.</h3>
             <p className="body">
-              The substrate ships with a small library of design-time skills
-              that an agent uses while it&apos;s building the runtime skills
-              above. One turns a brief into a spec, another turns the spec
-              into a numbered plan, a third scaffolds the workflow or the
-              approver from that plan, a fourth cleans up the prose so the
-              result doesn&apos;t read like a model wrote it. This Copilot
-              session is using them right now, while we build out the article
-              you&apos;re reading. The same library is what your team uses to
-              extend the substrate after we leave (see{" "}
+              <strong>compose-org</strong> is a guided pipeline that walks{" "}
+              {COMPOSITION_STEPS.join(" → ")}. Research is source-backed —
+              drawn from the org&apos;s public footprint — but the actor world
+              it produces is fully synthetic and causal: every entity, sensor,
+              and objective is generated, not scraped. <strong>zava-workspace-deploy</strong>{" "}
+              takes that proven output and requires an explicit choice:
+              private-live (a live simulation running against real Azure infra)
+              or public-replay (a deterministic tape anyone can watch without
+              touching live systems). The two modes share one codebase; the
+              choice is a deploy-time flag. See{" "}
               <a
                 className="footer__link"
                 href="https://aiappsgbb.github.io/zava-constellation/"
@@ -44,14 +45,14 @@ export function MetaSkill() {
               >
                 zava-constellation
               </a>
-              {" "}for the companion pipeline).
+              {" "}for the companion skill library.
             </p>
           </div>
 
           <aside className="meta__sidebar">
-            <div className="meta__sidebar-title">Design-time skills</div>
+            <div className="meta__sidebar-title">compose-org pipeline</div>
             <div className="meta__sidebar-list">
-              {DESIGN_TIME_SKILLS.join(" · ")}
+              {COMPOSITION_STEPS.join(" → ")}
             </div>
           </aside>
         </div>

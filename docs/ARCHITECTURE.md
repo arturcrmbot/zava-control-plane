@@ -164,6 +164,46 @@ The 11 org **functions** are declared in
 `_wire_function_back_refs()` and `_validate_persona_hierarchy()` raise
 on orphan domains or persona roles missing a `SKILL.md`.
 
+### 2.1 Vertical-pack discovery and composition
+
+A **vertical pack** is the complete, self-contained unit of a new corporate
+function: domains, personas, agents, actor world, projections, lifecycle
+hooks, and seed data, all co-located under `verticals/<name>/`.
+
+**Automatic discovery.**
+[`api/shared/vertical_loader.py`](../api/shared/vertical_loader.py) scans
+`verticals/*/manifest.py` at import time (skipping names starting with `_`)
+and builds a `PACK_MODULES` dict keyed by vertical name. Any directory that
+contains a `manifest.py` is automatically registered; no manual wiring is
+needed. Each `manifest.py` constructs and exports a `VerticalPack` instance
+that carries the full set of registrations (`DurableFunctionRegistration`,
+`LifecycleRegistration`, `SeedRegistration`, `RecordingSources`).
+
+**External guided pipeline.**
+New vertical packs are authored by the `compose-org` skill
+([`aiappsgbb/zava-constellation`](https://github.com/aiappsgbb/zava-constellation)).
+`compose-org` is not a code generator that emits stubs — it runs a
+Research → Design → Build → Prove pipeline and only exits when the proof
+chain in [`docs/VERTICAL-PROOF.md`](VERTICAL-PROOF.md) passes. Research is
+sourced from the org's public footprint; the actor world produced is fully
+synthetic and causal (every entity and sensor is generated, not scraped).
+
+**Pack-scoped domain graduation.**
+Domains that originate inside a vertical pack (`TELCO_DOMAINS`,
+`AGENCY_DOMAINS`, …) are merged into the shared `DOMAINS` registry during
+pack load, keeping the same `Domain` contract used by the 38 legacy/function
+domains. A pack's domains are therefore first-class: they appear in the
+cosmic lens, the per-function FMs, and the ambient dispatcher without any
+special-casing.
+
+**Proof gate.**
+A vertical is considered shippable only after its full proof chain is
+documented and signed off per [`docs/VERTICAL-PROOF.md`](VERTICAL-PROOF.md).
+That document defines the mandatory evidence nodes (sensor fires → objective
+opened → Durable started → HITL gate raised → typed command issued → world
+mutation written → evaluation assertions pass) and the commands that must
+reproduce the same pass/fail verdict on a clean checkout.
+
 ---
 
 ## 3. Persona system

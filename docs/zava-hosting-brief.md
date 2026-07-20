@@ -6,17 +6,16 @@
 
 ## The recipe is already written — use it
 
-The MS GBB skills catalogue ships a three-skill pipeline. Overview & visuals: <https://aiappsgbb.github.io/awesome-gbb/zava/>
+The MS GBB skills catalogue ships a two-step pipeline. Overview & visuals: <https://aiappsgbb.github.io/zava-constellation/>
 
 | Order | Skill | Purpose | Wall clock |
 |---|---|---|---|
-| 1 (optional) | `research-company` | Profile a target company from its public footprint into an `org-brief.yaml` | 15–40 min |
-| 2 (optional) | `compose-org` | Fork the substrate into a customer-branded clone (rebrand, named ELT, vertical entity kinds, vertical workflow stubs) | 30–60 min |
-| 3 (required) | **`zava-workspace-deploy`** | `azd up` the substrate (branded or generic) to Azure Container Apps | ~10 min |
+| 1 (optional) | `compose-org` | Internally runs Research → Design → Build → Prove: profiles the org from its public footprint, designs and builds an executable vertical (domains, actor world, personas), and runs the proof chain before the pipeline exits. Output is a proven vertical pack, not a stub. | 45–90 min |
+| 2 (required) | **`zava-workspace-deploy`** | Requires proven `compose-org` output. Demands an explicit mode choice: **private-live** (live simulation on Azure infra) or **public-replay** (deterministic tape, no live systems). `azd up` deploys accordingly. | ~10 min |
 
-Skip steps 1–2 if a generic-looking demo is fine. Run them if you want the workspace to look like the customer's org.
+Skip step 1 if a generic-looking demo is fine. Run it if you want the workspace to reflect the customer's org with a proven executable vertical.
 
-**Skills repo:** <https://github.com/aiappsgbb/awesome-gbb>
+**Skills repo:** <https://github.com/aiappsgbb/zava-constellation>
 **Deploy skill:** `skills/zava-workspace-deploy/SKILL.md`
 **Substrate repo:** <https://github.com/arturcrmbot/zava-control-plane>
 
@@ -47,14 +46,15 @@ The deploy skill mandates the **`azure-tenant-isolation`** skill (also in `aweso
 
 ## End-to-end steps
 
-1. Install `az` ≥ 2.60, `azd` (Azure Developer CLI), Docker, Node 20, Python 3.13, `uv`.
-2. Clone `aiappsgbb/awesome-gbb`; follow the `azure-tenant-isolation` skill once per workstation.
+1. Install `az` ≥ 2.60, `azd` (Azure Developer CLI), Docker, Node 20, Python 3.11, `uv`.
+2. Clone `aiappsgbb/zava-constellation`; follow the `azure-tenant-isolation` skill once per workstation.
 3. Provision shared infra (items 2–4 above) in the target subscription. Standard `az` commands or a small Bicep are fine; this is one-off and not Zava-specific.
-4. (Optional, recommended for customer-facing demos) Run `research-company` then `compose-org` to produce a branded fork of the substrate.
-5. Clone `arturcrmbot/zava-control-plane` (or the branded fork from step 4).
+4. (Optional, recommended for customer-facing demos) Run `compose-org` to produce a proven vertical pack scoped to the customer's org.
+5. Clone `arturcrmbot/zava-control-plane` (or apply the proven pack from step 4).
 6. Follow `skills/zava-workspace-deploy/SKILL.md` step by step:
+   - Choose `private-live` or `public-replay` mode before proceeding.
    - `azd init` + `azd env new zava`
-   - `azd env set …` for ACR / App Insights / LLM endpoint values (full ~80-var reference in `.env.azd.example` in the repo).
+   - `azd env set …` for ACR / App Insights / LLM endpoint values (full reference in `.env.azd.example` in the repo).
    - `azd up` → ~10 min on first run.
 7. Smoke-test via the health / workflow / SSE `curl` commands at the bottom of the skill.
 8. Turn on Entra Easy Auth on the resulting Container App and lock ingress to your tenant's users.
