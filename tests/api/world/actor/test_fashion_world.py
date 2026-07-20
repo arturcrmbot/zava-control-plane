@@ -130,6 +130,11 @@ def test_high_value_transfer_requires_an_explicit_approval_reference() -> None:
 
 
 def test_approved_high_value_transfer_preserves_governance_evidence() -> None:
+    """A high-value (non-safety-stock) exception is only executable behind a
+    fully authorised approval: an exact Fashion authority role whose
+    approval actions cover this workflow, a spend limit that covers the
+    retail value, an issuer distinct from the approver, and an approved
+    source version matching the current one."""
     scenario = _scenario()
     case, command = _case_command(scenario, "inventory-rebalancing")
     source = scenario.inventory[command.payload["source_position_id"]]
@@ -143,7 +148,9 @@ def test_approved_high_value_transfer_preserves_governance_evidence() -> None:
             **command.payload,
             "quantity": 100,
             "policy_decision": "approval_required",
-            "approval_reference": "approval:merchandising-director:001",
+            "approval_reference": "approval:merchandising_director:001",
+            "approval_role": "merchandising_director",
+            "approved_source_version": source.version,
         },
     )
 
@@ -152,8 +159,144 @@ def test_approved_high_value_transfer_preserves_governance_evidence() -> None:
     assert accepted.type == "command.accepted"
     assert case.outcome["governance"] == {
         "policy_decision": "approval_required",
-        "approval_reference": "approval:merchandising-director:001",
+        "approval_reference": "approval:merchandising_director:001",
     }
+
+
+def _high_value_exception_case(
+    scenario: FashionScenario,
+) -> tuple[object, SimulationCommand, object]:
+    """Build an inventory-rebalancing command whose only binding constraint
+    is the general transfer-exception rule (quantity > 50), with safety
+    stock left wide open so only the generic governed-transfer-approval
+    path is exercised (not the safety-stock breach path)."""
+    case, command = _case_command(scenario, "inventory-rebalancing")
+    source = scenario.inventory[command.payload["source_position_id"]]
+    source.on_hand = 1000
+    source.reserved = 0
+    source.presentation_minimum = 0
+    source.safety_stock = 0
+    return case, command, source
+
+
+def test_high_value_transfer_rejects_a_free_form_or_unknown_approval_role() -> None:
+    """A high-value exception must authenticate the approval the same way a
+    safety-stock breach does: an unrecognised / free-form role string must
+    not stand in for a genuine Fashion authority persona."""
+    scenario = _scenario()
+    case, command, source = _high_value_exception_case(scenario)
+    unauthorized = _with_payload(
+        command,
+        command_id="cmd-highvalue-unknown-role",
+        quantity=60,
+        policy_decision="approval_required",
+        approval_reference="approval:merchandising-director:001",
+        approval_role="merchandising-director",  # hyphenated: not an authority key
+        approved_source_version=source.version,
+    )
+
+    rejected = scenario.apply_command(unauthorized)
+
+    assert rejected.type == "command.rejected"
+    assert "authorized persona" in rejected.payload["reason"]
+    assert source.on_hand == 1000
+    assert case.status == "open"
+
+
+def test_high_value_transfer_rejects_self_approval() -> None:
+    scenario = _scenario()
+    case, command, source = _high_value_exception_case(scenario)
+    self_approved = SimulationCommand(
+        command_id="cmd-highvalue-self-approval",
+        trace_id=command.trace_id,
+        issued_by="merchandising_director",
+        type=command.type,
+        payload={
+            **command.payload,
+            "quantity": 60,
+            "policy_decision": "approval_required",
+            "approval_reference": "approval:merchandising_director:hv-001",
+            "approval_role": "merchandising_director",
+            "approved_source_version": source.version,
+        },
+    )
+
+    rejected = scenario.apply_command(self_approved)
+
+    assert rejected.type == "command.rejected"
+    assert "self" in rejected.payload["reason"]
+    assert source.on_hand == 1000
+    assert case.status == "open"
+
+
+def test_high_value_transfer_rejects_approval_exceeding_persona_spend_limit() -> None:
+    scenario = _scenario()
+    case, command, source = _high_value_exception_case(scenario)
+    sku = scenario.skus[source.sku_id]
+    style = scenario.styles[sku.style_id]
+    style.unit_retail_gbp = 25_000.0
+    # 60 * GBP 25,000 = GBP 1,500,000 exceeds merchandising_director's
+    # GBP 1,000,000 spend limit.
+    over_limit = _with_payload(
+        command,
+        command_id="cmd-highvalue-over-limit",
+        quantity=60,
+        policy_decision="approval_required",
+        approval_reference="approval:merchandising_director:hv-002",
+        approval_role="merchandising_director",
+        approved_source_version=source.version,
+    )
+
+    rejected = scenario.apply_command(over_limit)
+
+    assert rejected.type == "command.rejected"
+    assert "spend limit" in rejected.payload["reason"]
+    assert source.on_hand == 1000
+    assert case.status == "open"
+
+
+def test_high_value_transfer_rejects_a_stale_approved_source_version() -> None:
+    scenario = _scenario()
+    case, command, source = _high_value_exception_case(scenario)
+    stale = _with_payload(
+        command,
+        command_id="cmd-highvalue-stale",
+        quantity=60,
+        policy_decision="approval_required",
+        approval_reference="approval:merchandising_director:hv-003",
+        approval_role="merchandising_director",
+        approved_source_version=source.version - 1,
+    )
+
+    rejected = scenario.apply_command(stale)
+
+    assert rejected.type == "command.rejected"
+    assert "stale" in rejected.payload["reason"]
+    assert source.on_hand == 1000
+    assert case.status == "open"
+
+
+def test_high_value_transfer_accepts_a_valid_non_self_authorized_approval() -> None:
+    scenario = _scenario()
+    case, command, source = _high_value_exception_case(scenario)
+    destination = scenario.inventory[command.payload["destination_position_id"]]
+    destination_before = destination.on_hand
+    approved = _with_payload(
+        command,
+        command_id="cmd-highvalue-valid",
+        quantity=60,
+        policy_decision="approval_required",
+        approval_reference="approval:merchandising_director:hv-004",
+        approval_role="merchandising_director",
+        approved_source_version=source.version,
+    )
+
+    accepted = scenario.apply_command(approved)
+
+    assert accepted.type == "command.accepted"
+    assert case.status == "completed"
+    assert source.on_hand == 1000 - 60
+    assert destination.on_hand == destination_before + 60
 
 
 def _safety_stock_case(

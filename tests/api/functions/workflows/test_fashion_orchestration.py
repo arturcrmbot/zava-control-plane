@@ -150,11 +150,20 @@ def test_governed_inventory_rebalancing_carries_approval_reference() -> None:
 
     result = _drive(context, profile.workflow_type)
 
-    assert result["command"]["payload"]["policy_decision"] == (
-        "approval_required"
-    )
-    assert result["command"]["payload"]["approval_reference"] == (
-        "approval:merchandising-director:002"
+    payload = result["command"]["payload"]
+    assert payload["policy_decision"] == "approval_required"
+    assert payload["approval_reference"] == "approval:merchandising-director:002"
+    # The world's generic governed-transfer approval validator
+    # (FashionScenario._validate_governed_transfer_approval) authenticates
+    # every conditional inventory-transfer exception against the Fashion
+    # authority model, so a legitimate HITL response must carry the typed
+    # approving role and the source version it was granted against — not
+    # just a free-form reference string.
+    assert payload["approval_role"] == profile.hitl_persona
+    assert payload["approved_source_version"] == (
+        context._input["observation"]["command_payload"][
+            "expected_source_version"
+        ]
     )
 
 

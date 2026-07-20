@@ -81,6 +81,24 @@ def fashion_command_activity(payload: dict[str, Any]) -> dict[str, Any]:
                     else "auto_approved"
                 ),
                 "approval_reference": approval.get("approval_reference"),
+                # The world's generic governed-transfer approval validator
+                # (FashionScenario._validate_governed_transfer_approval)
+                # authenticates every conditional exception against the
+                # Fashion authority model, so a legitimate HITL response
+                # must supply the approving persona's role and the source
+                # version it was granted against. ``persona`` is the
+                # human-readable field the responder already stamps on
+                # every decision, so it doubles as the typed approval_role
+                # when no more specific value is supplied. The source
+                # version defaults to the one the command was assessed
+                # against; a stale or superseded value must be supplied
+                # explicitly to reproduce a stale approval.
+                "approval_role": approval.get("approval_role")
+                or approval.get("persona"),
+                "approved_source_version": approval.get(
+                    "approved_source_version",
+                    command_payload.get("expected_source_version"),
+                ),
             }
         )
     trace_id = str(payload["trace_id"])

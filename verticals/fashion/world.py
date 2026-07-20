@@ -885,9 +885,14 @@ class FashionScenario:
         if breaches_safety_stock:
             # A safety-stock breach is a conditional HITL path, not a hard
             # reject: it can only execute with a valid, non-stale approval
-            # reference from an authorised persona.
-            reason = self._validate_safety_stock_approval(
-                source, payload, retail_value, command.issued_by
+            # from an authorised persona.
+            reason = self._validate_governed_transfer_approval(
+                source,
+                payload,
+                retail_value,
+                command.issued_by,
+                context="safety-stock breach",
+                missing_message="safety-stock breach requires approval",
             )
             if reason is not None:
                 return reason
@@ -903,8 +908,25 @@ class FashionScenario:
                 payload.get("policy_decision") == "approval_required",
             )
         )
-        if exception and not payload.get("approval_reference"):
-            return "approval reference is required for transfer exception"
+        if exception:
+            # Every conditional transfer exception — not just a safety-stock
+            # breach — is gated behind the same fully authenticated
+            # approval: a free-form or unauthorised approval_reference must
+            # not be able to execute a high-value, cross-border, low-
+            # confidence, negative-margin, low-fairness, or policy-flagged
+            # transfer.
+            reason = self._validate_governed_transfer_approval(
+                source,
+                payload,
+                retail_value,
+                command.issued_by,
+                context="transfer exception",
+                missing_message=(
+                    "approval reference is required for transfer exception"
+                ),
+            )
+            if reason is not None:
+                return reason
         if not payload.get("workflow_id"):
             return "workflow_id is required"
         if not payload.get("reason_code") or not payload.get(
@@ -913,19 +935,32 @@ class FashionScenario:
             return "reason code and evidence digest are required"
         return None
 
-    def _validate_safety_stock_approval(
+    def _validate_governed_transfer_approval(
         self,
         source: InventoryPosition,
         payload: dict[str, Any],
         retail_value: float,
         issued_by: str = "",
+        *,
+        context: str,
+        missing_message: str,
     ) -> str | None:
-        """Gate a protected safety-stock consumption behind the authorised
-        persona's approval. Returns a rejection reason, or ``None`` to allow.
+        """Gate ANY conditional inventory-transfer exception — a protected
+        safety-stock consumption or a general high-value/cross-border/low-
+        confidence/negative-margin/low-fairness/policy-flagged exception —
+        behind the authorised persona's approval. Returns a rejection
+        reason, or ``None`` to allow.
+
+        This is the single generic authority validator: both call sites in
+        ``_validate_inventory_transfer`` route through it so no conditional
+        transfer exception can execute on a free-form, unknown, self, stale,
+        or over-limit approval — only the safety-stock-specific wording
+        differs (via ``context``/``missing_message``), the authority checks
+        are identical.
 
         Rules (as supported by the pack authority model):
-          * an approval reference must be present — otherwise the breach is
-            routed to approval_required and blocked;
+          * an approval reference must be present — otherwise the exception
+            is routed to approval_required and blocked;
           * the approving role must be an authorised persona whose approval
             actions cover the inventory-rebalancing HITL decision and whose
             spend limit covers the transfer value;
@@ -936,20 +971,18 @@ class FashionScenario:
             approval granted against a superseded version is stale.
         """
         if not payload.get("approval_reference"):
-            return "safety-stock breach requires approval"
+            return missing_message
         role = payload.get("approval_role")
         row = FASHION_AUTHORITY.get(role) if role else None
         action = FASHION_PROCESS_PROFILES["inventory-rebalancing"].hitl_event
         if row is None or action not in row.approval_actions:
-            return (
-                "safety-stock breach requires an authorized persona approval"
-            )
+            return f"{context} requires an authorized persona approval"
         if issued_by and issued_by == role:
-            return "command issuer cannot self-approve a safety-stock breach"
+            return f"command issuer cannot self-approve a {context}"
         if retail_value > row.spend_limit_gbp:
-            return "safety-stock approval exceeds persona spend limit"
+            return f"{context} approval exceeds persona spend limit"
         if payload.get("approved_source_version") != source.version:
-            return "stale safety-stock approval"
+            return f"stale {context} approval"
         return None
 
     def _apply_inventory_transfer(
