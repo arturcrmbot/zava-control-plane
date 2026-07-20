@@ -6,6 +6,7 @@ from typing import Any
 
 from api.server.world.model import SimulationCommand, SimulationEvent
 from api.server.world.runtime import SimulationRuntime
+from verticals.fashion.authority import FASHION_AUTHORITY
 from verticals.fashion.process_profiles import FASHION_PROCESS_PROFILES
 from verticals.fashion.reference_actions import (
     PROFILE_BY_COMMAND,
@@ -86,6 +87,14 @@ class InventoryPosition:
             - self.presentation_minimum
             - self.safety_stock,
         )
+
+    @property
+    def physically_available(self) -> int:
+        """Units that can physically leave without breaching committed stock
+        (customer reservations and the presentation minimum). Consuming into
+        this band beyond ``available_to_transfer`` dips into the protected
+        safety-stock buffer; consuming beyond it entirely is impossible."""
+        return max(0, self.on_hand - self.reserved - self.presentation_minimum)
 
 
 class FashionScenario:
@@ -294,6 +303,24 @@ class FashionScenario:
             },
         }
         return subjects[workflow_type], facts[workflow_type]
+
+    @property
+    def reference_process_types(self) -> frozenset[str]:
+        """Reference-process types this world can run — one per pack domain.
+
+        Consumed by the vertical-agnostic world route so the proof (and any
+        operator) can drive every Fashion workflow through the same
+        ``POST /api/world/processes/{workflow_type}/run`` surface telco uses.
+        """
+        return frozenset(FASHION_PROCESS_PROFILES)
+
+    def run_reference_process(self, workflow_type: str) -> dict[str, str]:
+        """Adapter matching the ActorWorldService reference-process contract.
+
+        Telco names this ``run_reference_process``; the Fashion world's native
+        entry point is ``run_case``. Exposing both keeps the shared world
+        service and route free of any per-vertical branching."""
+        return self.run_case(workflow_type)
 
     def run_case(self, workflow_type: str) -> dict[str, str]:
         profile = FASHION_PROCESS_PROFILES.get(workflow_type)
@@ -535,13 +562,26 @@ class FashionScenario:
             or quantity <= 0
         ):
             return "quantity must be a positive integer"
-        if quantity > source.available_to_transfer:
-            return "insufficient available stock"
+        if quantity > source.physically_available:
+            # Non-negative physically-available invariant: a transfer may never
+            # drive on_hand below committed reservations and the presentation
+            # minimum, no matter what approval accompanies it.
+            return "insufficient physically available stock"
         source_location = self.locations[source.location_id]
         destination_location = self.locations[destination.location_id]
         cross_border = source_location.country != destination_location.country
         style = self.styles[self.skus[source.sku_id].style_id]
         retail_value = quantity * style.unit_retail_gbp
+        breaches_safety_stock = quantity > source.available_to_transfer
+        if breaches_safety_stock:
+            # A safety-stock breach is a conditional HITL path, not a hard
+            # reject: it can only execute with a valid, non-stale approval
+            # reference from an authorised persona.
+            reason = self._validate_safety_stock_approval(
+                source, payload, retail_value
+            )
+            if reason is not None:
+                return reason
         exception = any(
             (
                 retail_value > 10_000.0,
@@ -562,6 +602,39 @@ class FashionScenario:
             "evidence_digest"
         ):
             return "reason code and evidence digest are required"
+        return None
+
+    def _validate_safety_stock_approval(
+        self,
+        source: InventoryPosition,
+        payload: dict[str, Any],
+        retail_value: float,
+    ) -> str | None:
+        """Gate a protected safety-stock consumption behind the authorised
+        persona's approval. Returns a rejection reason, or ``None`` to allow.
+
+        Rules (as supported by the pack authority model):
+          * an approval reference must be present — otherwise the breach is
+            routed to approval_required and blocked;
+          * the approving role must be an authorised persona whose approval
+            actions cover the inventory-rebalancing HITL decision and whose
+            spend limit covers the transfer value;
+          * the approval must be bound to the current source version — an
+            approval granted against a superseded version is stale.
+        """
+        if not payload.get("approval_reference"):
+            return "safety-stock breach requires approval"
+        role = payload.get("approval_role")
+        row = FASHION_AUTHORITY.get(role) if role else None
+        action = FASHION_PROCESS_PROFILES["inventory-rebalancing"].hitl_event
+        if row is None or action not in row.approval_actions:
+            return (
+                "safety-stock breach requires an authorized persona approval"
+            )
+        if retail_value > row.spend_limit_gbp:
+            return "safety-stock approval exceeds persona spend limit"
+        if payload.get("approved_source_version") != source.version:
+            return "stale safety-stock approval"
         return None
 
     def _apply_inventory_transfer(

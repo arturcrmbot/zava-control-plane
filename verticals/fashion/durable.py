@@ -66,7 +66,11 @@ def fashion_command_activity(payload: dict[str, Any]) -> dict[str, Any]:
         **command_payload,
         "workflow_id": str(payload["workflow_id"]),
         "skill_outputs": dict(payload.get("skill_outputs") or {}),
-        "approval_decision": approval.get("decision", "not_required"),
+        "approval_decision": (
+            approval.get("decision", "not_required")
+            if requires_approval
+            else "approve"
+        ),
     }
     if profile.workflow_type == "inventory-rebalancing":
         merged_payload.update(
@@ -267,12 +271,12 @@ def ReturnsDispositionOrchestrator(
 
 
 @app.activity_trigger(input_name="payload")
-def fashion_skill_activity_trigger(payload: dict[str, Any]) -> dict[str, Any]:
+def fashion_skill_activity_trigger(payload: dict) -> dict:
     return fashion_skill_activity(payload)
 
 
 @app.activity_trigger(input_name="payload")
 def fashion_command_activity_trigger(
-    payload: dict[str, Any],
-) -> dict[str, Any]:
+    payload: dict,
+) -> dict:
     return fashion_command_activity(payload)

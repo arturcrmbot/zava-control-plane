@@ -156,3 +156,89 @@ def test_governed_inventory_rebalancing_carries_approval_reference() -> None:
     assert result["command"]["payload"]["approval_reference"] == (
         "approval:merchandising-director:002"
     )
+
+
+def _payload_annotation(trigger) -> str:
+    # Azure Functions wraps decorated triggers in a FunctionBuilder; the raw
+    # user function carries the annotations the Python worker validates.
+    user_function = trigger._function.get_user_function()
+    return str(user_function.__annotations__["payload"])
+
+
+def test_fashion_activity_triggers_use_worker_safe_payload_annotations() -> None:
+    # The Azure Functions Python worker rejects parameterised generics such as
+    # ``dict[str, Any]`` on a binding parameter ("invalid non-type
+    # annotation"), which stops the whole host from indexing. Telco activity
+    # triggers annotate ``payload: dict``; Fashion must too.
+    from verticals.fashion import durable
+
+    for name in (
+        "fashion_skill_activity_trigger",
+        "fashion_command_activity_trigger",
+    ):
+        annotation = _payload_annotation(getattr(durable, name))
+        assert annotation == "dict", f"{name} payload annotation is {annotation!r}"
+
+
+class _AmbientContext:
+    """Mirrors the live WorldBridge payload for the ambient (auto-approved)
+    flow: it carries NO ``requires_approval`` flag, exactly like
+    ``api/server/services/world_bridge.py`` schedules the orchestration."""
+
+    instance_id = "ambient-instance"
+    current_utc_datetime = datetime(2026, 7, 20)
+
+    def __init__(self, scenario: FashionScenario, workflow_type: str):
+        result = scenario.run_case(workflow_type)
+        sensor = next(
+            event
+            for event in scenario.runtime.journal
+            if event.event_id == result["sensor_event_id"]
+        )
+        self._input = {
+            "workflow_id": f"WF-{workflow_type}",
+            "type": workflow_type,
+            "trace_id": result["trace_id"],
+            "observation": scenario.build_observation(
+                sensor.to_dict(), now=scenario.runtime.now
+            ),
+        }
+
+    def get_input(self):
+        return self._input
+
+    def call_activity(self, name, payload):
+        if name == "fashion_skill_activity_trigger":
+            return fashion_skill_activity(payload)
+        if name == "fashion_command_activity_trigger":
+            return fashion_command_activity(payload)
+        return {}
+
+    def wait_for_external_event(self, name):
+        return _Task()
+
+    def create_timer(self, _deadline):
+        return _Task()
+
+    def task_any(self, _tasks):
+        return _Task()
+
+
+@pytest.mark.parametrize("workflow_type", FASHION_PROCESS_PROFILES)
+def test_ambient_workflow_command_is_accepted_by_the_world(
+    workflow_type: str,
+) -> None:
+    from api.server.world.model import SimulationCommand
+    from api.server.world.runtime import SimulationRuntime
+
+    scenario = FashionScenario.demo(SimulationRuntime(42))
+    scenario.install()
+    context = _AmbientContext(scenario, workflow_type)
+
+    output = _drive(context, workflow_type)
+    assert output["status"] == "decision_ready"
+
+    command = SimulationCommand(**output["command"])
+    applied = scenario.apply_command(command)
+
+    assert applied.type == "command.accepted", applied.payload.get("reason")

@@ -125,7 +125,7 @@ async def lifespan(app: FastAPI):
     world_task = None
     world_bridge = None
     world_name = None if blueprint_replay_only else runtime.world_name
-    if world_name in ("support", "telco"):
+    if world_name in ("support", "telco", "fashion"):
         from api.server.services.world_bridge import WorldBridge
         from api.server.world.service import ActorWorldService
 

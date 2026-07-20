@@ -107,6 +107,78 @@ uncertainties:
       WMS, PIM, marketplace, or returns platform.
     treatment: Expose typed pack-local MCP boundaries without naming a vendor.
 
+assumptions:
+  - id: transfer-value-approval-threshold
+    statement: >-
+      A demo inventory transfer whose retail value exceeds GBP 10,000 is
+      routed to human approval rather than auto-approved.
+    basis: synthetic-demo-assumption
+    design_relevance:
+      - inventory-rebalancing
+
+  - id: transfer-quantity-approval-threshold
+    statement: >-
+      A demo inventory transfer of more than 50 units is routed to human
+      approval rather than auto-approved.
+    basis: synthetic-demo-assumption
+    design_relevance:
+      - inventory-rebalancing
+
+  - id: demand-confidence-floor
+    statement: >-
+      A demo transfer backed by a demand-confidence signal below 0.7 is
+      routed to human approval.
+    basis: synthetic-demo-assumption
+    design_relevance:
+      - inventory-rebalancing
+      - demand-spike-response
+
+  - id: fairness-score-floor
+    statement: >-
+      A demo transfer whose cross-location fairness score is below 0.5 is
+      routed to human approval.
+    basis: synthetic-demo-assumption
+    design_relevance:
+      - inventory-rebalancing
+
+  - id: recovered-margin-over-transfer-cost
+    statement: >-
+      A demo transfer is only auto-approved when its expected recovered
+      margin (GBP) strictly exceeds its transfer cost (GBP); otherwise it is
+      routed to human approval.
+    basis: synthetic-demo-assumption
+    design_relevance:
+      - inventory-rebalancing
+      - markdown-governance
+
+  - id: safety-stock-buffer
+    statement: >-
+      Each demo inventory position protects a synthetic safety-stock buffer
+      that sits above customer reservations and the presentation minimum.
+      Consuming that buffer is a conditional human-approval path — never a
+      hard reject — and a transfer can never drive physically available
+      stock (on hand minus reservations minus presentation minimum)
+      negative.
+    basis: synthetic-demo-assumption
+    design_relevance:
+      - inventory-rebalancing
+
+  - id: actor-world-scale
+    statement: >-
+      The demo actor world is fixed at 8 stores, 2 distribution centres,
+      12 brands, 24 styles, 192 SKUs, 300 customers and 14 days of demand
+      history. These counts size the demo only and are not a market claim.
+    basis: synthetic-demo-assumption
+    design_relevance:
+      - inventory-rebalancing
+      - demand-spike-response
+      - promotion-readiness
+      - markdown-governance
+      - supplier-delay-recovery
+      - fulfilment-exception-resolution
+      - marketplace-seller-exception
+      - returns-disposition
+
 exclusions:
   - No named retailer is profiled.
   - No synthetic actor, customer, seller, product, order, inventory, or event

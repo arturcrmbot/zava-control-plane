@@ -270,13 +270,23 @@ async def run_telco_scenario(name: str) -> dict:
     return {"ok": True, **result}
 
 
+def _runnable_reference_processes(service: object) -> frozenset[str]:
+    """Reference-process types the *active* world can run.
+
+    A world scenario may declare its own ``reference_process_types`` (the
+    Fashion world does, one per pack domain). Scenarios that don't declare
+    them — telco/support — keep the historical telco standard-profile set, so
+    this route's contract for those worlds is unchanged.
+    """
+    scenario = getattr(service, "scenario", None)
+    declared = getattr(scenario, "reference_process_types", None)
+    if declared:
+        return frozenset(declared)
+    return frozenset(STANDARD_PROCESS_PROFILES)
+
+
 @router.post("/processes/{workflow_type}/run")
-async def run_telco_reference_process(workflow_type: str) -> dict:
-    if workflow_type not in STANDARD_PROCESS_PROFILES:
-        return {
-            "ok": False,
-            "error": f"unknown standard Telco process: {workflow_type!r}",
-        }
+async def run_reference_process(workflow_type: str) -> dict:
     service = getattr(app_state, "world_service", None)
     run = (
         getattr(service, "run_reference_process", None)
@@ -286,7 +296,12 @@ async def run_telco_reference_process(workflow_type: str) -> dict:
     if run is None:
         return {
             "ok": False,
-            "error": "telco world not enabled (set ZAVA_VERTICAL=telco)",
+            "error": "actor world not enabled (set ZAVA_VERTICAL)",
+        }
+    if workflow_type not in _runnable_reference_processes(service):
+        return {
+            "ok": False,
+            "error": f"unknown reference process: {workflow_type!r}",
         }
     try:
         result = run(workflow_type)
