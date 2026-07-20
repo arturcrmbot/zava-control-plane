@@ -331,8 +331,8 @@ The implementation adds:
 
 ### 12.2 Permanent proof command
 
-`tools/fashion_zava_e2e_proof.sh` is the clean-checkout acceptance command. It
-must:
+`make prove VERTICAL=fashion` is the permanent clean-checkout acceptance
+command. It delegates to `tools/fashion_zava_e2e_proof.sh`, which must:
 
 1. boot the Fashion API, Functions host, actor world, and web application
 2. execute the hero golden scenario and one deterministic case for every
@@ -344,10 +344,11 @@ must:
 7. run with Functions disabled and with the actor world disabled as required
 8. assert zero browser errors, zero dropped workflow events, and clean teardown
 
-The proof emits a manifest tied to the source commit and selected `fashion`
-pack. A shippable result requires all eight workflows to pass both live and
-replay evidence. Deployment remains blocked until the manifest reports PASS
-and matches the current source commit.
+The proof emits `proof/manifest.json`, tied to the source commit and selected
+`fashion` pack, plus screenshots, recordings, logs, and before/after
+snapshots beneath `proof/`. A shippable result requires all eight workflows to
+pass both live and replay evidence. Deployment remains blocked until the
+manifest reports PASS and matches the current source commit.
 
 ## 13. Completion criteria
 
