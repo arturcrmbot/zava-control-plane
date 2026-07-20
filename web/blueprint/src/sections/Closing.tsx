@@ -81,11 +81,10 @@ export function Closing() {
               Build this for your own organisation →
             </a>
             <span className="closing__cta-note">
-              The companion pipeline (<code className="mono">research-company</code>,{" "}
-              <code className="mono">compose-org</code>,{" "}
-              <code className="mono">zava-workspace-deploy</code>) takes a
-              company name and produces a branded fork of this substrate,
-              deployed to your Azure in a single session.
+              <code className="mono">compose-org</code> researches, designs,
+              builds and proves an executable vertical for your workflow.{" "}
+              <code className="mono">zava-workspace-deploy</code> publishes
+              it as private-live or public-replay.
             </span>
           </li>
         </ul>
