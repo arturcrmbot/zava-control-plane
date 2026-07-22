@@ -1,10 +1,12 @@
 ---
 name: inventory-imbalance-analysis
-description: Explain a Fashion inventory imbalance from supplied evidence.
-allowed-tools: fashion_query_demand, fashion_query_inventory
+description: Explain a stock imbalance from versioned demand and inventory evidence.
+allowed-tools: fashion_read_inventory
 ---
 
-Use only supplied demand, availability, ownership, reservation, and version
-evidence. Return the binding constraints, confidence, and candidate stock.
-Never mutate inventory.
+# Inventory imbalance analysis
+
+Use only supplied actor IDs, event IDs, availability, reservations, demand velocity,
+weeks of supply and ownership. Return measurements, constraints and uncertainty.
+Never invent stock and never mutate the world.
 

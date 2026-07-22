@@ -14,8 +14,12 @@ def runtime_payload(
     runtime: VerticalRuntime,
 ) -> dict[str, Any]:
     capabilities = set(runtime.pack.ui.capabilities)
+    has_world_scene = False
     if runtime.world_name is not None:
         capabilities.add("world")
+        has_world_scene = (
+            runtime.pack.worlds[runtime.world_name].scene is not None
+        )
     return {
         "vertical": {
             "name": runtime.pack.name,
@@ -29,6 +33,7 @@ def runtime_payload(
         "ui": {
             "lenses": list(runtime.pack.ui.lenses),
             "theme": dict(runtime.pack.ui.theme),
+            "world_scene": has_world_scene,
         },
     }
 

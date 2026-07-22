@@ -76,6 +76,10 @@ class TechnicianUnavailableRequest(BaseModel):
     technician_id: str = Field(min_length=1)
 
 
+class WorldResetRequest(BaseModel):
+    seed: int | None = None
+
+
 TELCO_SCENARIOS = frozenset(
     {
         "storm-cascade",
@@ -119,6 +123,32 @@ async def world_events(after: int = 0) -> dict:
         "latest_seq": len(service.runtime.journal),
         "events": service.events_after(after),
     }
+
+
+@router.get("/scene")
+async def world_scene() -> dict:
+    service = getattr(app_state, "world_service", None)
+    registration = getattr(service, "registration", None)
+    scene = getattr(registration, "scene", None)
+    if scene is None:
+        return {"enabled": False}
+    return {"enabled": True, **dict(scene)}
+
+
+@router.post("/reset")
+async def reset_world(body: WorldResetRequest = WorldResetRequest()) -> dict:
+    service = getattr(app_state, "world_service", None)
+    reset = getattr(service, "reset", None)
+    if reset is None:
+        return {"ok": False, "error": "actor world not enabled"}
+    seed = service.seed if body.seed is None else body.seed
+    bridge = getattr(app_state, "world_bridge", None)
+    if bridge is not None:
+        bridge.stop()
+    reset(seed)
+    if bridge is not None:
+        bridge.start()
+    return {"ok": True, "seed": seed, "sim_time": service.runtime.now}
 
 
 @router.post("/inject/demand_surge")
@@ -273,9 +303,8 @@ async def run_telco_scenario(name: str) -> dict:
 def _runnable_reference_processes(service: object) -> frozenset[str]:
     """Reference-process types the *active* world can run.
 
-    A world scenario may declare its own ``reference_process_types`` (the
-    Fashion world does, one per pack domain). Scenarios that don't declare
-    them — telco/support — keep the historical telco standard-profile set, so
+    A world scenario may declare its own ``reference_process_types``. Scenarios
+    that don't declare them keep the historical telco standard-profile set, so
     this route's contract for those worlds is unchanged.
     """
     scenario = getattr(service, "scenario", None)

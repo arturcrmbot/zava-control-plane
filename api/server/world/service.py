@@ -210,6 +210,11 @@ class ActorWorldService:
     def stop(self) -> None:
         self._stop_requested = True
 
+    def reset(self, seed: int | None = None) -> None:
+        self.seed = self.seed if seed is None else seed
+        self.runtime, self.scenario = self._install(self.seed)
+        self._stop_requested = False
+
     def inject_demand_surge(self, multiplier: float, duration_minutes: float) -> None:
         multiplier = _require_finite_positive(multiplier, label="multiplier", floor=1.0)
         duration_minutes = _require_finite_positive(duration_minutes, label="duration_minutes")

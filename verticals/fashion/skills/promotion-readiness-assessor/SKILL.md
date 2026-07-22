@@ -1,9 +1,11 @@
 ---
 name: promotion-readiness-assessor
-description: Assess stock, content, and channel promotion readiness.
-allowed-tools: fashion_query_demand, fashion_query_inventory, fashion_query_policies
+description: Assess channel, content and stock readiness for a promotion window.
+allowed-tools: fashion_assess_promotion
 ---
 
-Evaluate only supplied promotion-window evidence. Report blockers and a
-bounded readiness action without inventing stock or price claims.
+# Promotion readiness assessor
+
+Return evidence-backed readiness gaps and a bounded preparation recommendation.
+Do not activate a promotion or invent missing product content.
 

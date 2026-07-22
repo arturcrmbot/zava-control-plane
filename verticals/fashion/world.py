@@ -1,1182 +1,514 @@
 from __future__ import annotations
 
-import hashlib
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from typing import Any
 
 from api.server.world.model import SimulationCommand, SimulationEvent
 from api.server.world.runtime import SimulationRuntime
-from verticals.fashion import signals
-from verticals.fashion.authority import FASHION_AUTHORITY
-from verticals.fashion.entities import (
-    DemandSignal,
+from verticals.fashion.actors import (
+    Brand,
+    Customer,
     Delivery,
-    MarkdownRecommendation,
+    InventoryPosition,
+    Location,
     Order,
+    ProcessCase,
     Promotion,
-    Reservation,
     Return,
+    SKU,
     SellerOffer,
+    Staff,
+    Style,
+    view,
 )
-from verticals.fashion.process_profiles import FASHION_PROCESS_PROFILES
-from verticals.fashion.reference_actions import (
-    PROFILE_BY_COMMAND,
-    apply_reference_command,
-    resolve_case_entity,
-    validate_reference_command,
+from verticals.fashion.dynamics import (
+    HERO_SALE_TICKS,
+    ORDINARY_TICK_MINUTES,
+    customer_number,
+    should_cancel,
+    should_receive_delivery,
+    should_receive_return,
+    store_number,
 )
-from verticals.fashion.reference_cases import (
-    DEFAULT_ACTIONS,
-    FashionProcessCase,
-    build_reference_case,
-    process_case_view,
+from verticals.fashion.process_profiles import (
+    FASHION_PROCESS_PROFILES,
+    FashionProcessProfile,
+)
+from verticals.fashion.reference_cases import FASHION_REFERENCE_CASES
+from verticals.fashion.sensors import (
+    DESTINATION_LOCATION,
+    HERO_SKU,
+    SOURCE_LOCATION,
+    inventory_imbalance_crossed,
+    inventory_measurements,
 )
 
-DEMO_SEED: int = 42
 
-HERO_SKU: str = "SKU-0001"
-HERO_STYLE: str = "STYLE-001"
-HERO_REGION_PREFIX: str = "UK"
-MARKDOWN_STYLE: str = "STYLE-004"
-MARKDOWN_ELIGIBLE_LIFECYCLES: frozenset[str] = frozenset({"sale", "clearance"})
-
-
-@dataclass(slots=True)
-class Location:
-    id: str
-    kind: str
-    country: str
-    region: str
-
-
-@dataclass(slots=True)
-class Brand:
-    id: str
-    relationship: str
-
-
-@dataclass(slots=True)
-class Style:
-    id: str
-    brand_id: str
-    season: str
-    lifecycle: str
-    unit_retail_gbp: float
-
-
-@dataclass(slots=True)
-class Sku:
-    id: str
-    style_id: str
-    colour: str
-    size: str
-
-
-@dataclass(slots=True)
-class Customer:
-    id: str
-    region: str
-    cohort: str
-
-
-@dataclass(slots=True)
-class DemandRecord:
-    id: str
-    customer_id: str
-    sku_id: str
-    day: int
-    channel: str
-    quantity: int
-
-
-@dataclass(slots=True)
-class InventoryPosition:
-    id: str
-    location_id: str
-    sku_id: str
-    ownership: str
-    on_hand: int
-    reserved: int
-    presentation_minimum: int
-    safety_stock: int
-    version: int = 1
-
-    @property
-    def available_to_transfer(self) -> int:
-        return max(
-            0,
-            self.on_hand
-            - self.reserved
-            - self.presentation_minimum
-            - self.safety_stock,
-        )
-
-    @property
-    def physically_available(self) -> int:
-        """Units that can physically leave without breaching committed stock
-        (customer reservations and the presentation minimum). Consuming into
-        this band beyond ``available_to_transfer`` dips into the protected
-        safety-stock buffer; consuming beyond it entirely is impossible."""
-        return max(0, self.on_hand - self.reserved - self.presentation_minimum)
+STORE_DATA = (
+    ("STORE-UK-LON-01", "Oxford Street Flagship", "GB", "UK South"),
+    ("STORE-UK-MAN-01", "Manchester", "GB", "UK North"),
+    ("STORE-UK-EDI-01", "Edinburgh", "GB", "UK North"),
+    ("STORE-UK-BHM-01", "Birmingham", "GB", "UK Midlands"),
+    ("STORE-EU-PAR-01", "Paris Rivoli", "FR", "EU West"),
+    ("STORE-EU-BER-01", "Berlin Mitte", "DE", "EU Central"),
+    ("STORE-EU-AMS-01", "Amsterdam", "NL", "EU West"),
+    ("STORE-EU-MIL-01", "Milan", "IT", "EU South"),
+)
+DC_DATA = (
+    ("DC-UK-MID-01", "Midlands DC", "GB", "UK Midlands"),
+    ("DC-EU-LIL-01", "Lille EU DC", "FR", "EU West"),
+)
+COLOUR_PAIRS = (
+    ("BLK", "WHT"),
+    ("RED", "NAV"),
+    ("NAV", "CRM"),
+    ("TAN", "BLK"),
+    ("GRN", "CRM"),
+    ("BLU", "WHT"),
+)
+SIZES = ("XS", "S", "M", "L")
+STAFF_NAMES = (
+    "Maya Patel",
+    "Owen Hughes",
+    "Aisha Khan",
+    "Leo Martin",
+    "Sofia Rossi",
+    "Nora Weber",
+    "Lotte de Vries",
+    "Amelia Clarke",
+)
 
 
 class FashionScenario:
+    reference_process_types = tuple(FASHION_PROCESS_PROFILES)
+
     def __init__(self, runtime: SimulationRuntime) -> None:
         self.runtime = runtime
         self.stores: dict[str, Location] = {}
         self.distribution_centres: dict[str, Location] = {}
         self.brands: dict[str, Brand] = {}
         self.styles: dict[str, Style] = {}
-        self.skus: dict[str, Sku] = {}
+        self.skus: dict[str, SKU] = {}
         self.customers: dict[str, Customer] = {}
-        self.demand_history: list[DemandRecord] = []
-        self.demand_signals: dict[str, DemandSignal] = {}
-        self.inventory: dict[str, InventoryPosition] = {}
+        self.staff: dict[str, Staff] = {}
+        self.inventory: dict[tuple[str, str], InventoryPosition] = {}
         self.orders: dict[str, Order] = {}
-        self.reservations: dict[str, Reservation] = {}
-        self.promotions: dict[str, Promotion] = {}
         self.deliveries: dict[str, Delivery] = {}
         self.returns: dict[str, Return] = {}
+        self.promotions: dict[str, Promotion] = {}
         self.seller_offers: dict[str, SellerOffer] = {}
-        self.markdown_recommendations: dict[str, MarkdownRecommendation] = {}
-        self.process_cases: dict[str, FashionProcessCase] = {}
-        self.workflow_state: dict[str, dict[str, Any]] = {}
-        self.applied_commands: dict[str, SimulationEvent] = {}
-
-    @classmethod
-    def demo(cls, runtime: SimulationRuntime | None = None) -> "FashionScenario":
-        if runtime is None:
-            runtime = SimulationRuntime(DEMO_SEED)
-        return cls(runtime)
-
-    @property
-    def locations(self) -> dict[str, Location]:
-        return {**self.stores, **self.distribution_centres}
+        self.process_cases: dict[str, ProcessCase] = {}
+        self.demand_history: list[dict[str, Any]] = []
+        self.knowledge_relationships: list[dict[str, Any]] = []
+        self.hero_sales = 0
+        self._tick = 0
+        self._order_seq = 0
+        self._return_seq = 42
+        self._delivery_seq = 42
+        self._imbalance_active = False
+        self._applied_command_ids: set[str] = set()
 
     def install(self) -> None:
-        if self.stores:
-            raise ValueError("Fashion scenario is already installed")
-        self.runtime.emit(
-            "simulation.started",
-            actor_id="scenario:fashion",
-            payload={"seed": self.runtime.seed, "scale": "demo"},
-        )
-        self._create_locations()
-        self._create_catalogue()
-        self._create_customers_and_demand()
-        self._create_inventory()
-        self._create_entities()
+        self._seed_locations()
+        self._seed_catalogue()
+        self._seed_people()
+        self._seed_inventory()
+        self._seed_operations()
+        self.runtime.process(self._retail_lifecycle())
 
-    @property
-    def hero_style_sku_ids(self) -> tuple[str, ...]:
-        return tuple(
-            sku.id
-            for sku in self.skus.values()
-            if sku.style_id == HERO_STYLE
-        )
-
-    @property
-    def markdown_style_id(self) -> str:
-        return MARKDOWN_STYLE
-
-    def _create_locations(self) -> None:
-        store_specs = (
-            ("STORE-UK-01", "UK", "London"),
-            ("STORE-UK-02", "UK", "Manchester"),
-            ("STORE-UK-03", "UK", "Edinburgh"),
-            ("STORE-UK-04", "UK", "Birmingham"),
-            ("STORE-EU-01", "FR", "Paris"),
-            ("STORE-EU-02", "DE", "Berlin"),
-            ("STORE-EU-03", "NL", "Amsterdam"),
-            ("STORE-EU-04", "ES", "Madrid"),
-        )
-        for location_id, country, region in store_specs:
-            self.stores[location_id] = Location(
-                location_id, "store", country, region
-            )
+    def _seed_locations(self) -> None:
+        self.stores = {
+            item[0]: Location(item[0], item[1], "store", item[2], item[3])
+            for item in STORE_DATA
+        }
         self.distribution_centres = {
-            "DC-UK-01": Location("DC-UK-01", "dc", "UK", "Midlands"),
-            "DC-EU-01": Location("DC-EU-01", "dc", "NL", "Benelux"),
+            item[0]: Location(
+                item[0], item[1], "distribution-centre", item[2], item[3]
+            )
+            for item in DC_DATA
         }
 
-    def _create_catalogue(self) -> None:
-        relationships = (
-            "owned",
-            "owned",
-            "owned",
-            "owned",
-            "concession",
-            "concession",
-            "concession",
-            "concession",
-            "marketplace",
-            "marketplace",
-            "marketplace",
-            "marketplace",
-        )
-        seasons = ("spring-summer", "autumn-winter")
-        lifecycles = ("new-arrival", "full-price", "sale", "clearance")
-        colours = ("black", "navy")
-        sizes = ("S", "M", "L", "XL")
-        sku_index = 1
-        for brand_index, relationship in enumerate(relationships, start=1):
-            brand_id = f"BRAND-{brand_index:02d}"
-            self.brands[brand_id] = Brand(brand_id, relationship)
-            for style_slot in range(2):
-                style_id = f"STYLE-{(brand_index - 1) * 2 + style_slot + 1:03d}"
-                self.styles[style_id] = Style(
-                    id=style_id,
-                    brand_id=brand_id,
-                    season=seasons[style_slot],
-                    lifecycle=lifecycles[
-                        ((brand_index - 1) * 2 + style_slot) % len(lifecycles)
-                    ],
-                    unit_retail_gbp=float(80 + brand_index * 5 + style_slot * 10),
-                )
-                for colour in colours:
-                    for size in sizes:
-                        sku_id = f"SKU-{sku_index:04d}"
-                        self.skus[sku_id] = Sku(
-                            id=sku_id,
-                            style_id=style_id,
-                            colour=colour,
-                            size=size,
-                        )
-                        sku_index += 1
-
-    def _create_customers_and_demand(self) -> None:
-        regions = ("UK-North", "UK-South", "EU-North", "EU-South")
-        cohorts = ("premium", "mainstream", "value", "occasional")
-        channels = ("store", "ecommerce")
-        sku_ids = tuple(self.skus)
-        for index in range(1, 301):
-            customer_id = f"CUSTOMER-{index:04d}"
-            region = regions[(index - 1) % len(regions)]
-            cohort = cohorts[(index - 1) % len(cohorts)]
-            self.customers[customer_id] = Customer(customer_id, region, cohort)
-            self.demand_history.append(
-                DemandRecord(
-                    id=f"DEMAND-{index:05d}",
-                    customer_id=customer_id,
-                    sku_id=sku_ids[
-                        self.runtime.rng.randrange(len(sku_ids))
-                    ],
-                    day=((index - 1) % 14) + 1,
-                    channel=channels[index % 2],
-                    quantity=1 + self.runtime.rng.randrange(2),
-                )
+    def _seed_catalogue(self) -> None:
+        relationships = ("owned",) * 4 + ("concession",) * 4 + ("marketplace",) * 4
+        self.brands = {
+            f"BRAND-{number:02d}": Brand(
+                id=f"BRAND-{number:02d}",
+                name=f"Atelier {number:02d}",
+                relationship=relationships[number - 1],
             )
-        self._seed_hero_demand_series(channels)
-
-    def _seed_hero_demand_series(
-        self,
-        channels: tuple[str, ...],
-    ) -> None:
-        """Lay down a deterministic 14-day demand series for the hero style in
-        the UK region, with a weather/campaign uplift concentrated in the
-        recent (days 8-14) window. Quantities stay at their unit base so the
-        cohort weighting is applied live at signal-derivation time."""
-        hero_skus = self.hero_style_sku_ids
-        uk_customers = [
-            customer_id
-            for customer_id, customer in self.customers.items()
-            if customer.region.startswith(HERO_REGION_PREFIX)
-        ]
-        base_per_day = 3
-        recent_uplift_per_day = 3
-        serial = 0
-        recent_uplift_units = 0
-        for day in range(1, 15):
-            uplift = recent_uplift_per_day if day >= 8 else 0
-            for slot in range(base_per_day + uplift):
-                serial += 1
-                customer_id = uk_customers[
-                    (day * 7 + slot) % len(uk_customers)
-                ]
-                self.demand_history.append(
-                    DemandRecord(
-                        id=f"HERO-DEMAND-{serial:05d}",
-                        customer_id=customer_id,
-                        sku_id=hero_skus[slot % len(hero_skus)],
-                        day=day,
-                        channel=channels[slot % len(channels)],
-                        quantity=1,
+            for number in range(1, 13)
+        }
+        for number in range(1, 25):
+            style_id = f"STYLE-{number:02d}"
+            brand_id = f"BRAND-{((number - 1) % 12) + 1:02d}"
+            self.styles[style_id] = Style(
+                id=style_id,
+                brand_id=brand_id,
+                name=f"Seasonal style {number:02d}",
+                lifecycle="current-season",
+            )
+            colours = COLOUR_PAIRS[(number - 1) % len(COLOUR_PAIRS)]
+            for colour in colours:
+                for size in SIZES:
+                    sku_id = f"SKU-{style_id}-{colour}-{size}"
+                    self.skus[sku_id] = SKU(
+                        id=sku_id,
+                        style_id=style_id,
+                        colour=colour,
+                        size=size,
+                        retail_price_gbp=float(70 + ((number * 5) % 60)),
                     )
-                )
-                if day >= 8 and slot >= base_per_day:
-                    recent_uplift_units += 1
-        self.demand_signals[f"{HERO_STYLE}@{HERO_REGION_PREFIX}"] = DemandSignal(
-            id=f"SIGNAL-{HERO_STYLE}-{HERO_REGION_PREFIX}",
-            sku_ids=hero_skus,
-            region=HERO_REGION_PREFIX,
-            channel=None,
-            kind="weather-campaign",
-            active=True,
-            recent_uplift_units=recent_uplift_units,
-        )
 
-    def _create_inventory(self) -> None:
-        for location_index, location in enumerate(self.locations.values()):
-            for sku_index, sku in enumerate(self.skus.values()):
-                style = self.styles[sku.style_id]
-                ownership = self.brands[style.brand_id].relationship
-                position_id = f"INV-{location.id}-{sku.id}"
-                self.inventory[position_id] = InventoryPosition(
-                    id=position_id,
-                    location_id=location.id,
+    def _seed_people(self) -> None:
+        self.customers = {
+            f"CUST-{number:04d}": Customer(
+                id=f"CUST-{number:04d}",
+                home_region=("UK" if number % 3 else "EU"),
+                location_id="OFFSITE",
+                status="offsite",
+            )
+            for number in range(1, 301)
+        }
+        for store_index, store_id in enumerate(self.stores):
+            for staff_index in range(1, 4):
+                staff_id = f"STAFF-{store_id.split('-')[1]}-{store_index + 1:02d}-{staff_index:02d}"
+                self.staff[staff_id] = Staff(
+                    id=staff_id,
+                    name=STAFF_NAMES[(store_index + staff_index - 1) % len(STAFF_NAMES)],
+                    role=("style-advisor" if staff_index < 3 else "store-manager"),
+                    location_id=store_id,
+                    status="available",
+                )
+
+    def _seed_inventory(self) -> None:
+        locations = (*self.stores, *self.distribution_centres)
+        for sku_index, sku in enumerate(self.skus.values()):
+            brand = self.brands[self.styles[sku.style_id].brand_id]
+            for location_index, location_id in enumerate(locations):
+                is_dc = location_id.startswith("DC-")
+                on_hand = (
+                    70 + ((sku_index + location_index) % 25)
+                    if is_dc
+                    else 18 + ((sku_index * 3 + location_index) % 17)
+                )
+                safety = 20 if is_dc else 8
+                position = InventoryPosition(
+                    id=f"STOCK-{location_id}-{sku.id}",
+                    location_id=location_id,
                     sku_id=sku.id,
-                    ownership=ownership,
-                    on_hand=10 + ((location_index + sku_index) % 30),
-                    reserved=(location_index + sku_index) % 3,
-                    presentation_minimum=2 if location.kind == "store" else 0,
-                    safety_stock=3 if location.kind == "store" else 5,
+                    ownership=brand.relationship,
+                    on_hand=on_hand,
+                    reserved=(sku_index + location_index) % 4,
+                    safety_stock=safety,
+                    version=1,
+                    retail_price_gbp=sku.retail_price_gbp,
                 )
-        hero_sku = HERO_SKU
-        source = self.inventory[f"INV-DC-UK-01-{hero_sku}"]
-        destination = self.inventory[f"INV-STORE-UK-01-{hero_sku}"]
-        eu_excess = self.inventory[f"INV-STORE-EU-01-{hero_sku}"]
-        source.on_hand = 120
-        source.reserved = 5
+                self.inventory[(location_id, sku.id)] = position
+
+        source = self.inventory[(SOURCE_LOCATION, HERO_SKU)]
+        source.ownership = "owned"
+        source.on_hand = 90
+        source.reserved = 4
         source.safety_stock = 20
-        destination.on_hand = 2
-        destination.reserved = 1
-        eu_excess.on_hand = 90
+        source.retail_price_gbp = 90.0
+        destination = self.inventory[(DESTINATION_LOCATION, HERO_SKU)]
+        destination.ownership = "owned"
+        destination.on_hand = 20
+        destination.reserved = 8
+        destination.safety_stock = 12
+        destination.retail_price_gbp = 90.0
 
-    def _create_entities(self) -> None:
-        """Seed the concrete world entities the supporting workflows read and
-        mutate. Every record is versioned so a mutation is observable."""
-        self.reservations["RES-STORE-UK-01-" + HERO_SKU] = Reservation(
-            id="RES-STORE-UK-01-" + HERO_SKU,
-            location_id="STORE-UK-01",
-            sku_id=HERO_SKU,
-            reserved_units=4,
-            status="baseline",
-        )
-        self.promotions["PROMOTION-001"] = Promotion(
-            id="PROMOTION-001",
-            sku_id=HERO_SKU,
-            stock_ready=False,
-            content_ready=False,
-            channels_ready=(),
-            status="draft",
-        )
-        markdown_rec_id = f"MREC-{MARKDOWN_STYLE}-STORE-EU-01"
-        self.markdown_recommendations[markdown_rec_id] = MarkdownRecommendation(
-            id=markdown_rec_id,
-            style_id=MARKDOWN_STYLE,
-            location_id="STORE-EU-01",
-            recommendation=None,
-            status="pending",
-        )
-        self.deliveries["DEL-SUPPLIER-001-STYLE-003"] = Delivery(
-            id="DEL-SUPPLIER-001-STYLE-003",
-            supplier_id="SUPPLIER-001",
-            style_id="STYLE-003",
-            delay_days=6,
-            recovery_plan=None,
+        domestic_sku = "SKU-STYLE-02-RED-S"
+        domestic_source = self.inventory[("DC-UK-MID-01", domestic_sku)]
+        domestic_source.ownership = "owned"
+        domestic_source.on_hand = 100
+        domestic_source.reserved = 2
+        domestic_source.safety_stock = 20
+        domestic_destination = self.inventory[("STORE-UK-MAN-01", domestic_sku)]
+        domestic_destination.ownership = "owned"
+        domestic_destination.on_hand = 12
+        domestic_destination.reserved = 2
+        domestic_destination.safety_stock = 6
+
+    def _seed_operations(self) -> None:
+        self.demand_history = [
+            {
+                "day": day,
+                "orders": 92 + ((day * 17) % 31),
+                "returns": 8 + ((day * 3) % 7),
+                "full_price_sell_through": round(0.61 + day * 0.006, 3),
+            }
+            for day in range(-13, 1)
+        ]
+        self.deliveries["DELIVERY-IN-0042"] = Delivery(
+            id="DELIVERY-IN-0042",
+            location_id="DC-UK-MID-01",
+            supplier_id="SUPPLIER-07",
             status="delayed",
+            expected_at=48.0,
         )
-        self.orders["ORDER-001"] = Order(
-            id="ORDER-001",
-            sku_id=HERO_SKU,
-            location_id="STORE-UK-01",
-            quantity=3,
-            status="infeasible",
-            allocation_location_id=None,
+        self.returns["RETURN-0042"] = Return(
+            id="RETURN-0042",
+            order_id="ORDER-0042",
+            customer_id="CUST-0042",
+            sku_id="SKU-STYLE-05-GRN-M",
+            location_id="STORE-UK-LON-01",
+            status="received",
         )
-        self.seller_offers["OFFER-001"] = SellerOffer(
-            id="OFFER-001",
-            seller_id="SELLER-001",
-            sku_id="SKU-0002",
-            sla_breach_hours=8,
-            suppressed=False,
-            escalated=False,
-            status="breaching",
+        self.promotions["PROMO-AUTUMN-01"] = Promotion(
+            id="PROMO-AUTUMN-01",
+            name="Autumn city edit",
+            status="at-risk",
+            sku_ids=("SKU-STYLE-03-NAV-M",),
         )
-        self.returns["RETURN-001"] = Return(
-            id="RETURN-001",
-            sku_id="SKU-0002",
-            condition="resalable",
-            disposition=None,
-            recovery_value_gbp=75.0,
-            status="inspected",
+        self.seller_offers["OFFER-MKT-0003"] = SellerOffer(
+            id="OFFER-MKT-0003",
+            seller_id="SELLER-03",
+            sku_id="SKU-STYLE-09-NAV-M",
+            status="active",
         )
-
-    def demand_metrics(
-        self,
-        sku_ids: tuple[str, ...],
-        region_prefix: str,
-        *,
-        channel: str | None = None,
-    ) -> tuple[signals.DemandMetrics, bool]:
-        """Derive the cohort-weighted demand series and its aggregates for a
-        SKU set / region, plus whether a corroborating signal is active."""
-        series = signals.daily_series(
-            self.demand_history,
-            self.customers,
-            sku_ids=sku_ids,
-            region_prefix=region_prefix,
-            channel=channel,
-        )
-        sku_set = set(sku_ids)
-        signal_active = any(
-            signal.active
-            and sku_set & set(signal.sku_ids)
-            and (
-                signal.region.startswith(region_prefix)
-                or region_prefix.startswith(signal.region)
+        self.process_cases = {
+            workflow_type: ProcessCase(
+                id=case.id,
+                workflow_type=case.workflow_type,
+                subject_ids=case.subject_ids,
+                status="open",
+                facts=dict(case.facts),
+                allowed_actions=case.allowed_actions,
             )
-            for signal in self.demand_signals.values()
-        )
-        metrics = signals.DemandMetrics(
-            series=tuple(series),
-            velocity_change=signals.velocity_change(series),
-            confidence=signals.demand_confidence(
-                series, signal_active=signal_active
-            ),
-            weekly_demand=signals.weekly_demand(series),
-        )
-        return metrics, signal_active
-
-    def _demand_signal_view(
-        self,
-        series: list[int],
-        signal_active: bool,
-    ) -> dict[str, Any]:
-        signal = self.demand_signals.get(f"{HERO_STYLE}@{HERO_REGION_PREFIX}")
-        uplift = signal.recent_uplift_units if signal else 0
-        return {
-            "kind": signal.kind if signal else "none",
-            "active": signal_active,
-            "recent_uplift_units": uplift if signal_active else 0,
-            "recent_share": (
-                signals.signal_recent_share(series, uplift)
-                if signal_active
-                else 0.0
-            ),
+            for workflow_type, case in FASHION_REFERENCE_CASES.items()
         }
 
-    def _markdown_eligible(self, style_id: str) -> bool:
-        style = self.styles.get(style_id)
-        return bool(
-            style and style.lifecycle in MARKDOWN_ELIGIBLE_LIFECYCLES
-        )
-
-    def recommended_action(
-        self,
-        workflow_type: str,
-        subjects: tuple[str, ...],
-    ) -> str:
-        if workflow_type == "markdown-governance":
-            if self._markdown_eligible(subjects[0]):
-                return "recommend-markdown"
-            return "hold-full-price"
-        return DEFAULT_ACTIONS[workflow_type]
-
-    def case_evidence(
-        self,
-        workflow_type: str,
-    ) -> tuple[tuple[str, ...], dict[str, Any]]:
-        hero_sku = HERO_SKU
-        source_id = f"INV-DC-UK-01-{hero_sku}"
-        destination_id = f"INV-STORE-UK-01-{hero_sku}"
-        subjects = {
-            "inventory-rebalancing": (source_id, destination_id, hero_sku),
-            "demand-spike-response": ("STORE-UK-01", hero_sku),
-            "promotion-readiness": ("PROMOTION-001", hero_sku),
-            "markdown-governance": (MARKDOWN_STYLE, "STORE-EU-01"),
-            "supplier-delay-recovery": ("SUPPLIER-001", "STYLE-003"),
-            "fulfilment-exception-resolution": ("ORDER-001", hero_sku),
-            "marketplace-seller-exception": (
-                "SELLER-001",
-                "OFFER-001",
-            ),
-            "returns-disposition": ("RETURN-001", "SKU-0002"),
-        }
-        return subjects[workflow_type], self._derive_facts(
-            workflow_type, subjects[workflow_type]
-        )
-
-    def _derive_facts(
-        self,
-        workflow_type: str,
-        subjects: tuple[str, ...],
-    ) -> dict[str, Any]:
-        hero_skus = self.hero_style_sku_ids
-        if workflow_type == "inventory-rebalancing":
-            metrics, active = self.demand_metrics(hero_skus, HERO_REGION_PREFIX)
-            destination = self.inventory[subjects[1]]
-            recovered_units = 20
-            style = self.styles[self.skus[HERO_SKU].style_id]
-            unit_margin = round(style.unit_retail_gbp * 0.4, 2)
-            transfer_cost = 6.0 * recovered_units
-            return {
-                "demand_confidence": metrics.confidence,
-                "regional_velocity_change": metrics.velocity_change,
-                "transfer_cost_gbp": transfer_cost,
-                "expected_recovered_margin_gbp": round(
-                    recovered_units * unit_margin, 2
-                ),
-                "fairness_score": 0.8,
-                "weeks_of_supply": signals.weeks_of_supply(
-                    destination.on_hand, list(metrics.series)
-                ),
-                "demand_signal": self._demand_signal_view(
-                    list(metrics.series), active
-                ),
-                "eu_excess_position_id": f"INV-STORE-EU-01-{HERO_SKU}",
-            }
-        if workflow_type == "demand-spike-response":
-            metrics, active = self.demand_metrics(hero_skus, HERO_REGION_PREFIX)
-            store = self.inventory[f"INV-STORE-UK-01-{HERO_SKU}"]
-            dc_source = self.inventory[f"INV-DC-UK-01-{HERO_SKU}"]
-            return {
-                "regional_velocity_change": metrics.velocity_change,
-                "demand_confidence": metrics.confidence,
-                "weeks_of_supply": signals.weeks_of_supply(
-                    store.on_hand, list(metrics.series)
-                ),
-                "available_units": dc_source.physically_available,
-                "demand_signal": self._demand_signal_view(
-                    list(metrics.series), active
-                ),
-            }
-        if workflow_type == "promotion-readiness":
-            promotion = self.promotions.get(subjects[0])
-            metrics, _ = self.demand_metrics(hero_skus, HERO_REGION_PREFIX)
-            return {
-                "stock_ready": bool(promotion and promotion.stock_ready),
-                "content_ready": bool(promotion and promotion.content_ready),
-                "regional_velocity_change": metrics.velocity_change,
-                "channels": ["store", "ecommerce"],
-            }
-        if workflow_type == "markdown-governance":
-            style_id, location_id = subjects
-            style = self.styles[style_id]
-            style_skus = tuple(
-                sku.id
-                for sku in self.skus.values()
-                if sku.style_id == style_id
+    def _retail_lifecycle(self):
+        store_ids = tuple(self.stores)
+        staff_by_store = {
+            store_id: tuple(
+                person.id
+                for person in self.staff.values()
+                if person.location_id == store_id
             )
-            on_hand = sum(
-                position.on_hand
-                for position in self.inventory.values()
-                if position.sku_id in set(style_skus)
-                and position.location_id == location_id
-            )
-            metrics, _ = self.demand_metrics(
-                style_skus, "EU", channel=None
-            )
-            return {
-                "lifecycle": style.lifecycle,
-                "markdown_eligible": self._markdown_eligible(style_id),
-                "weeks_of_supply": signals.weeks_of_supply(
-                    on_hand, list(metrics.series)
-                ),
-                "recommendation_only": True,
-            }
-        if workflow_type == "supplier-delay-recovery":
-            delivery = self.deliveries.get("DEL-SUPPLIER-001-STYLE-003")
-            return {
-                "milestone_delay_days": delivery.delay_days if delivery else 0,
-                "substitute_available": True,
-            }
-        if workflow_type == "fulfilment-exception-resolution":
-            order = self.orders.get(subjects[0])
-            return {
-                "allocation_failure": (
-                    order.status if order else "unknown"
-                ),
-                "alternate_location": "DC-UK-01",
-            }
-        if workflow_type == "marketplace-seller-exception":
-            offer = self.seller_offers.get(subjects[1])
-            return {
-                "seller_verified": True,
-                "sla_breach_hours": offer.sla_breach_hours if offer else 0,
-            }
-        if workflow_type == "returns-disposition":
-            returned = self.returns.get(subjects[0])
-            return {
-                "condition": returned.condition if returned else "unknown",
-                "ownership": "owned",
-                "recovery_value_gbp": (
-                    returned.recovery_value_gbp if returned else 0.0
-                ),
-            }
-        raise ValueError(f"unknown Fashion process: {workflow_type!r}")
-
-    @property
-    def reference_process_types(self) -> frozenset[str]:
-        """Reference-process types this world can run — one per pack domain.
-
-        Consumed by the vertical-agnostic world route so the proof (and any
-        operator) can drive every Fashion workflow through the same
-        ``POST /api/world/processes/{workflow_type}/run`` surface telco uses.
-        """
-        return frozenset(FASHION_PROCESS_PROFILES)
-
-    def run_reference_process(self, workflow_type: str) -> dict[str, str]:
-        """Adapter matching the ActorWorldService reference-process contract.
-
-        Telco names this ``run_reference_process``; the Fashion world's native
-        entry point is ``run_case``. Exposing both keeps the shared world
-        service and route free of any per-vertical branching."""
-        return self.run_case(workflow_type)
-
-    def run_case(self, workflow_type: str) -> dict[str, str]:
-        profile = FASHION_PROCESS_PROFILES.get(workflow_type)
-        if profile is None:
-            raise ValueError(f"unknown Fashion process: {workflow_type!r}")
-        case_id = profile.case_id
-        if case_id in self.process_cases:
-            count = 2
-            while f"{case_id}-{count}" in self.process_cases:
-                count += 1
-            case_id = f"{case_id}-{count}"
-        case = build_reference_case(self, profile, case_id)
-        self.process_cases[case.id] = case
-        trace_id = f"fashion-{workflow_type}-{case.id}"
-        opened = self.runtime.emit(
-            "process_case.opened",
-            actor_id=case.id,
-            target_id=case.subject_ids[0],
-            trace_id=trace_id,
-            payload=process_case_view(case),
-        )
-        sensor = self.runtime.emit(
-            "sensor.tripped",
-            actor_id=profile.sensor_id,
-            target_id=case.id,
-            cause_event_id=opened.event_id,
-            trace_id=trace_id,
-            payload={
-                "case_id": case.id,
-                "workflow_type": workflow_type,
-                "measurements": dict(case.facts),
-            },
-        )
-        return {
-            "case_id": case.id,
-            "root_event_id": opened.event_id,
-            "sensor_event_id": sensor.event_id,
-            "trace_id": trace_id,
+            for store_id in store_ids
         }
+        while True:
+            yield self.runtime.env.timeout(ORDINARY_TICK_MINUTES)
+            self._tick += 1
+            customer = self.customers[
+                f"CUST-{customer_number(self._tick, len(self.customers)):04d}"
+            ]
+            hero_tick = self._tick in HERO_SALE_TICKS
+            store_id = (
+                DESTINATION_LOCATION
+                if hero_tick
+                else store_ids[store_number(self._tick, len(store_ids)) - 1]
+            )
+            customer.location_id = store_id
+            customer.status = "shopping"
+            entered = self.runtime.emit(
+                "customer.entered",
+                actor_id=customer.id,
+                target_id=store_id,
+                trace_id=f"retail-{self._tick:04d}",
+                payload={"location_id": store_id},
+            )
+            customer.last_event_id = entered.event_id
 
-    def command_payload(self, case_id: str) -> dict[str, Any]:
-        case = self.process_cases[case_id]
-        profile = FASHION_PROCESS_PROFILES[case.workflow_type]
-        evidence_digest = hashlib.sha256(
-            repr(sorted(case.facts.items())).encode("utf-8")
-        ).hexdigest()
-        common = {
-            "case_id": case.id,
-            "workflow_id": f"WF-{case.id}",
-            "subject_ids": list(case.subject_ids),
-            "action": case.recommended_action,
-            "skill_outputs": {
-                skill: {"reasoning": "deterministic Fashion evidence"}
-                for skill in profile.skills
-            },
-            "approval_decision": "approve",
-            "reason_code": f"{case.workflow_type}.reference",
-            "evidence_digest": evidence_digest,
-        }
-        if case.workflow_type != "inventory-rebalancing":
-            return {
-                **common,
-                **{
-                    key: value
-                    for key, value in case.facts.items()
-                    if key not in common
+            staff_id = staff_by_store[store_id][self._tick % len(staff_by_store[store_id])]
+            colleague = self.staff[staff_id]
+            colleague.status = "serving"
+            colleague.serving_customer_id = customer.id
+            served = self.runtime.emit(
+                "staff.served",
+                actor_id=colleague.id,
+                target_id=customer.id,
+                cause_event_id=entered.event_id,
+                trace_id=entered.trace_id,
+                payload={"location_id": store_id},
+            )
+            colleague.last_event_id = served.event_id
+
+            sku_id = (
+                HERO_SKU
+                if hero_tick
+                else "SKU-STYLE-02-RED-S"
+            )
+            self._order_seq += 1
+            order_id = f"ORDER-LIVE-{self._order_seq:05d}"
+            order = Order(
+                id=order_id,
+                customer_id=customer.id,
+                sku_id=sku_id,
+                quantity=1,
+                location_id=store_id,
+                channel=("store" if self._tick % 3 else "click-and-collect"),
+                status="confirmed",
+                created_at=self.runtime.now,
+            )
+            self.orders[order_id] = order
+            placed = self.runtime.emit(
+                "order.placed",
+                actor_id=order.id,
+                target_id=customer.id,
+                cause_event_id=served.event_id,
+                trace_id=entered.trace_id,
+                payload={
+                    "location_id": store_id,
+                    "sku_id": sku_id,
+                    "quantity": 1,
+                    "channel": order.channel,
                 },
-            }
-        source = self.inventory[case.subject_ids[0]]
-        destination = self.inventory[case.subject_ids[1]]
-        sku = self.skus[source.sku_id]
-        style = self.styles[sku.style_id]
-        return {
-            **common,
-            "source_position_id": source.id,
-            "destination_position_id": destination.id,
-            "source_location_id": source.location_id,
-            "destination_location_id": destination.location_id,
-            "sku_id": source.sku_id,
-            "quantity": 20,
-            "inventory_ownership": source.ownership,
-            "ownership": source.ownership,
-            "expected_source_version": source.version,
-            "expected_destination_version": destination.version,
-            "retail_value_gbp": round(style.unit_retail_gbp * 20, 2),
-            "policy_decision": "auto_approved",
-            "approval_reference": None,
-            # The persona that owns/generates the inventory-rebalance
-            # recommendation. Same namespace as ``approval_role`` so the
-            # world's self-approval guard can meaningfully compare them —
-            # unlike the SimulationCommand's function-scoped ``issued_by``.
-            "recommended_by": profile.recommender_persona,
-            "demand_confidence": case.facts["demand_confidence"],
-            "transfer_cost_gbp": case.facts["transfer_cost_gbp"],
-            "expected_recovered_margin_gbp": case.facts[
-                "expected_recovered_margin_gbp"
-            ],
-            "fairness_score": case.facts["fairness_score"],
-        }
-
-    def apply_command(self, command: SimulationCommand) -> SimulationEvent:
-        existing = self.applied_commands.get(command.command_id)
-        if existing is not None:
-            return existing
-        if command.type == "inventory.transfer":
-            if command.payload.get("action") == "no-action":
-                reason = self._validate_no_action(command)
-                if reason is not None:
-                    return self._reject_command(command, reason)
-                return self._apply_no_action(command)
-            reason = self._validate_inventory_transfer(command)
-            if reason is not None:
-                return self._reject_command(command, reason)
-            return self._apply_inventory_transfer(command)
-        if command.type in PROFILE_BY_COMMAND:
-            reason = validate_reference_command(self, command)
-            if reason is not None:
-                return self._reject_command(command, reason)
-            return apply_reference_command(self, command)
-        return self._reject_command(
-            command,
-            f"unsupported command type: {command.type!r}",
-        )
-
-    def _validate_no_action(
-        self,
-        command: SimulationCommand,
-    ) -> str | None:
-        payload = command.payload
-        case = self.process_cases.get(payload.get("case_id"))
-        if case is None or case.workflow_type != "inventory-rebalancing":
-            return "unknown inventory-rebalancing case"
-        if case.status != "open":
-            return f"case {case.id} is not open"
-        if not payload.get("workflow_id"):
-            return "workflow_id is required"
-        candidates = payload.get("evaluated_candidates")
-        if not isinstance(candidates, list) or not candidates:
-            return "no-action requires evaluated candidates"
-        constraints = payload.get("binding_constraints")
-        if not isinstance(constraints, list) or not constraints:
-            return "no-action requires binding constraints"
-        comparison = payload.get("kpi_comparison")
-        if not isinstance(comparison, dict) or not {
-            "expected_recovered_margin_gbp",
-            "transfer_cost_gbp",
-        } <= set(comparison):
-            return "no-action requires a KPI comparison"
-        if not payload.get("reason_code") or not payload.get(
-            "evidence_digest"
-        ):
-            return "reason code and evidence digest are required"
-        return None
-
-    def _apply_no_action(
-        self,
-        command: SimulationCommand,
-    ) -> SimulationEvent:
-        payload = command.payload
-        case = self.process_cases[payload["case_id"]]
-        accepted = self._record_command_accepted(
-            command,
-            target_id=case.id,
-        )
-        no_action = self.runtime.emit(
-            "inventory.rebalance.no_action",
-            actor_id=case.id,
-            cause_event_id=accepted.event_id,
-            trace_id=command.trace_id,
-            payload={
-                "evaluated_candidates": payload["evaluated_candidates"],
-                "binding_constraints": payload["binding_constraints"],
-                "kpi_comparison": payload["kpi_comparison"],
-            },
-        )
-        evaluation = {
-            "status": "pass",
-            "kpi_comparison": payload["kpi_comparison"],
-        }
-        case.status = "completed"
-        case.outcome = {
-            "action": "no-action",
-            "command_type": "inventory.transfer",
-            "mutation_family": "inventory",
-            "evaluated_candidates": payload["evaluated_candidates"],
-            "binding_constraints": payload["binding_constraints"],
-            "evaluation": evaluation,
-        }
-        self.workflow_state[case.workflow_type] = {
-            "status": "completed",
-            "case_id": case.id,
-            "action": "no-action",
-        }
-        profile = FASHION_PROCESS_PROFILES[case.workflow_type]
-        self.runtime.emit(
-            profile.success_event,
-            actor_id=case.id,
-            cause_event_id=no_action.event_id,
-            trace_id=command.trace_id,
-            payload={
-                "case": process_case_view(case),
-                "command_id": command.command_id,
-                "evaluation": evaluation,
-            },
-        )
-        self.runtime.emit(
-            "evaluation.completed",
-            actor_id=case.id,
-            cause_event_id=no_action.event_id,
-            trace_id=command.trace_id,
-            payload={
-                "workflow_type": case.workflow_type,
-                **evaluation,
-            },
-        )
-        return accepted
-
-    def _validate_inventory_transfer(
-        self,
-        command: SimulationCommand,
-    ) -> str | None:
-        payload = command.payload
-        case = self.process_cases.get(payload.get("case_id"))
-        if case is None or case.workflow_type != "inventory-rebalancing":
-            return "unknown inventory-rebalancing case"
-        if case.status != "open":
-            return f"case {case.id} is not open"
-        source = self.inventory.get(payload.get("source_position_id"))
-        destination = self.inventory.get(
-            payload.get("destination_position_id")
-        )
-        if source is None or destination is None:
-            return "unknown source or destination inventory position"
-        if source.id == destination.id or source.sku_id != destination.sku_id:
-            return "invalid source/destination combination"
-        if payload.get("expected_source_version") != source.version:
-            return "stale source version"
-        if payload.get("expected_destination_version") != destination.version:
-            return "stale destination version"
-        if (
-            payload.get("ownership") != "owned"
-            or payload.get("inventory_ownership") != "owned"
-            or source.ownership != "owned"
-            or destination.ownership != "owned"
-        ):
-            return "ineligible ownership for inventory transfer"
-        quantity = payload.get("quantity")
-        if (
-            isinstance(quantity, bool)
-            or not isinstance(quantity, int)
-            or quantity <= 0
-        ):
-            return "quantity must be a positive integer"
-        if quantity > source.physically_available:
-            # Non-negative physically-available invariant: a transfer may never
-            # drive on_hand below committed reservations and the presentation
-            # minimum, no matter what approval accompanies it.
-            return "insufficient physically available stock"
-        source_location = self.locations[source.location_id]
-        destination_location = self.locations[destination.location_id]
-        cross_border = source_location.country != destination_location.country
-        style = self.styles[self.skus[source.sku_id].style_id]
-        retail_value = quantity * style.unit_retail_gbp
-        breaches_safety_stock = quantity > source.available_to_transfer
-        if breaches_safety_stock:
-            # A safety-stock breach is a conditional HITL path, not a hard
-            # reject: it can only execute with a valid, non-stale approval
-            # from an authorised persona.
-            reason = self._validate_governed_transfer_approval(
-                source,
-                payload,
-                retail_value,
-                context="safety-stock breach",
-                missing_message="safety-stock breach requires approval",
             )
-            if reason is not None:
-                return reason
-        exception = any(
-            (
-                retail_value > 10_000.0,
-                quantity > 50,
-                cross_border,
-                float(payload.get("demand_confidence", 0.0)) < 0.7,
-                float(payload.get("expected_recovered_margin_gbp", 0.0))
-                <= float(payload.get("transfer_cost_gbp", 0.0)),
-                float(payload.get("fairness_score", 0.0)) < 0.5,
-                payload.get("policy_decision") == "approval_required",
+            order.last_event_id = placed.event_id
+
+            sale_location = (
+                DESTINATION_LOCATION if sku_id == HERO_SKU else store_id
             )
-        )
-        if exception:
-            # Every conditional transfer exception — not just a safety-stock
-            # breach — is gated behind the same fully authenticated
-            # approval: a free-form or unauthorised approval_reference must
-            # not be able to execute a high-value, cross-border, low-
-            # confidence, negative-margin, low-fairness, or policy-flagged
-            # transfer.
-            reason = self._validate_governed_transfer_approval(
-                source,
-                payload,
-                retail_value,
-                context="transfer exception",
-                missing_message=(
-                    "approval reference is required for transfer exception"
-                ),
+            position = self.inventory[(sale_location, sku_id)]
+            sold: SimulationEvent | None = None
+            if position.available > 0:
+                position.on_hand -= 1
+                position.version += 1
+                sold = self.runtime.emit(
+                    "inventory.sold",
+                    actor_id=position.id,
+                    target_id=order.id,
+                    cause_event_id=placed.event_id,
+                    trace_id=entered.trace_id,
+                    payload={
+                        "location_id": sale_location,
+                        "sku_id": sku_id,
+                        "available": position.available,
+                        "version": position.version,
+                    },
+                )
+                position.last_event_id = sold.event_id
+                inventory_event = sold
+                if sku_id == HERO_SKU:
+                    self.hero_sales += 1
+                    self._evaluate_inventory_sensor(sold)
+            else:
+                order.status = "cancelled"
+                stockout = self.runtime.emit(
+                    "inventory.stockout",
+                    actor_id=position.id,
+                    target_id=order.id,
+                    cause_event_id=placed.event_id,
+                    trace_id=entered.trace_id,
+                    payload={
+                        "location_id": sale_location,
+                        "sku_id": sku_id,
+                        "available": position.available,
+                        "version": position.version,
+                    },
+                )
+                cancelled = self.runtime.emit(
+                    "order.cancelled",
+                    actor_id=order.id,
+                    target_id=customer.id,
+                    cause_event_id=stockout.event_id,
+                    trace_id=entered.trace_id,
+                    payload={
+                        "location_id": store_id,
+                        "reason": "out_of_stock",
+                    },
+                )
+                order.last_event_id = cancelled.event_id
+                inventory_event = cancelled
+
+            if sold is not None and should_cancel(self._tick):
+                order.status = "cancelled"
+                cancelled = self.runtime.emit(
+                    "order.cancelled",
+                    actor_id=order.id,
+                    target_id=customer.id,
+                    cause_event_id=sold.event_id,
+                    trace_id=entered.trace_id,
+                    payload={"location_id": store_id, "reason": "customer_changed_mind"},
+                )
+                order.last_event_id = cancelled.event_id
+
+            if sold is not None and should_receive_return(self._tick):
+                self._return_seq += 1
+                return_id = f"RETURN-LIVE-{self._return_seq:05d}"
+                returned = Return(
+                    id=return_id,
+                    order_id=order.id,
+                    customer_id=customer.id,
+                    sku_id=sku_id,
+                    location_id=store_id,
+                    status="received",
+                )
+                self.returns[return_id] = returned
+                event = self.runtime.emit(
+                    "return.received",
+                    actor_id=returned.id,
+                    target_id=order.id,
+                    cause_event_id=order.last_event_id,
+                    trace_id=entered.trace_id,
+                    payload={"location_id": store_id, "sku_id": sku_id},
+                )
+                returned.last_event_id = event.event_id
+
+            if should_receive_delivery(self._tick):
+                self._delivery_seq += 1
+                delivery_id = f"DELIVERY-LIVE-{self._delivery_seq:05d}"
+                delivery = Delivery(
+                    id=delivery_id,
+                    location_id=store_id,
+                    supplier_id=f"SUPPLIER-{(self._tick % 12) + 1:02d}",
+                    status="arrived",
+                    expected_at=self.runtime.now,
+                )
+                self.deliveries[delivery_id] = delivery
+                event = self.runtime.emit(
+                    "delivery.arrived",
+                    actor_id=delivery.id,
+                    target_id=store_id,
+                    cause_event_id=inventory_event.event_id,
+                    trace_id=entered.trace_id,
+                    payload={"location_id": store_id},
+                )
+                delivery.last_event_id = event.event_id
+
+            customer.status = "departed"
+            customer.location_id = "OFFSITE"
+            moved = self.runtime.emit(
+                "customer.moved",
+                actor_id=customer.id,
+                target_id="OFFSITE",
+                cause_event_id=inventory_event.event_id,
+                trace_id=entered.trace_id,
+                payload={"location_id": "OFFSITE", "status": "departed"},
             )
-            if reason is not None:
-                return reason
-        if not payload.get("workflow_id"):
-            return "workflow_id is required"
-        if not payload.get("reason_code") or not payload.get(
-            "evidence_digest"
-        ):
-            return "reason code and evidence digest are required"
-        return None
+            customer.last_event_id = moved.event_id
+            colleague.status = "available"
+            colleague.serving_customer_id = None
 
-    def _validate_governed_transfer_approval(
-        self,
-        source: InventoryPosition,
-        payload: dict[str, Any],
-        retail_value: float,
-        *,
-        context: str,
-        missing_message: str,
-    ) -> str | None:
-        """Gate ANY conditional inventory-transfer exception — a protected
-        safety-stock consumption or a general high-value/cross-border/low-
-        confidence/negative-margin/low-fairness/policy-flagged exception —
-        behind the authorised persona's approval. Returns a rejection
-        reason, or ``None`` to allow.
-
-        This is the single generic authority validator: both call sites in
-        ``_validate_inventory_transfer`` route through it so no conditional
-        transfer exception can execute on a free-form, unknown, self, stale,
-        or over-limit approval — only the safety-stock-specific wording
-        differs (via ``context``/``missing_message``), the authority checks
-        are identical.
-
-        Identity model: ``payload["recommended_by"]`` and
-        ``payload["approval_role"]`` are BOTH Fashion authority-persona
-        role strings — the same namespace as ``FASHION_AUTHORITY`` keys
-        (e.g. ``inventory_allocation_manager``, ``merchandising_director``).
-        ``command.issued_by`` is a *different*, function-scoped identity
-        (e.g. ``merchandising_planning``) that ``CommandGateway`` uses to
-        match the command to the objective it was claimed under; it is
-        never a valid stand-in for a persona and must not be compared to
-        ``approval_role``, or the guard is dead by construction.
-
-        Rules (as supported by the pack authority model):
-          * an approval reference must be present — otherwise the exception
-            is routed to approval_required and blocked;
-          * the recommendation must carry an auditable recommender persona
-            (``recommended_by``) — a governed exception with no recorded
-            recommender identity fails closed;
-          * the recommender persona may not also serve as the approver — the
-            recommendation and the approval authority must be distinct
-            personas, checked before authorisation so self-dealing is
-            reported precisely rather than folded into "unauthorized";
-          * the approving role must be an authorised persona whose approval
-            actions cover the inventory-rebalancing HITL decision and whose
-            spend limit covers the transfer value;
-          * the approval must be bound to the current source version — an
-            approval granted against a superseded version is stale.
-        """
-        if not payload.get("approval_reference"):
-            return missing_message
-        recommended_by = payload.get("recommended_by")
-        if not recommended_by:
-            return f"{context} requires an auditable recommender identity"
-        role = payload.get("approval_role")
-        if recommended_by == role:
-            return f"command recommender cannot self-approve a {context}"
-        row = FASHION_AUTHORITY.get(role) if role else None
-        action = FASHION_PROCESS_PROFILES["inventory-rebalancing"].hitl_event
-        if row is None or action not in row.approval_actions:
-            return f"{context} requires an authorized persona approval"
-        if retail_value > row.spend_limit_gbp:
-            return f"{context} approval exceeds persona spend limit"
-        if payload.get("approved_source_version") != source.version:
-            return f"stale {context} approval"
-        return None
-
-    def _apply_inventory_transfer(
-        self,
-        command: SimulationCommand,
-    ) -> SimulationEvent:
-        payload = command.payload
-        case = self.process_cases[payload["case_id"]]
-        source = self.inventory[payload["source_position_id"]]
-        destination = self.inventory[payload["destination_position_id"]]
-        quantity = int(payload["quantity"])
-        source_before = source.on_hand
-        destination_before = destination.on_hand
-        accepted = self._record_command_accepted(
-            command,
-            target_id=destination.id,
-        )
-        source.on_hand -= quantity
-        destination.on_hand += quantity
-        source.version += 1
-        destination.version += 1
-        transfer = self.runtime.emit(
-            "inventory.transferred",
-            actor_id=source.id,
-            target_id=destination.id,
-            cause_event_id=accepted.event_id,
-            trace_id=command.trace_id,
-            payload={
-                "sku_id": source.sku_id,
-                "quantity": quantity,
-                "source_before": source_before,
-                "source_after": source.on_hand,
-                "destination_before": destination_before,
-                "destination_after": destination.on_hand,
-                "command_id": command.command_id,
-            },
-        )
-        evaluation = {
-            "status": "pass",
-            "full_price_demand_served_delta": quantity,
-            "projected_lost_sales_delta": -quantity,
-            "source_available_after": source.available_to_transfer,
-            "transfer_cost_gbp": payload["transfer_cost_gbp"],
-            "fairness_score": payload["fairness_score"],
-        }
-        case.status = "completed"
-        case.outcome = {
-            "action": "inventory.transfer",
-            "command_type": "inventory.transfer",
-            "mutation_family": "inventory",
-            "source_position_id": source.id,
-            "destination_position_id": destination.id,
-            "governance": {
-                "policy_decision": payload["policy_decision"],
-                "approval_reference": payload.get("approval_reference"),
-            },
-            "evaluation": evaluation,
-        }
-        self.workflow_state[case.workflow_type] = {
-            "status": "completed",
-            "case_id": case.id,
-            "action": "inventory.transfer",
-        }
-        profile = FASHION_PROCESS_PROFILES[case.workflow_type]
+    def _evaluate_inventory_sensor(self, cause: SimulationEvent) -> None:
+        crossed = inventory_imbalance_crossed(self)
+        if not crossed or self._imbalance_active:
+            return
+        self._imbalance_active = True
+        measurements = inventory_measurements(self)
         self.runtime.emit(
-            profile.success_event,
-            actor_id=case.id,
-            target_id=destination.id,
-            cause_event_id=transfer.event_id,
-            trace_id=command.trace_id,
+            "sensor.tripped",
+            actor_id="sensor:inventory_imbalance",
+            target_id=HERO_SKU,
+            cause_event_id=cause.event_id,
+            trace_id=cause.trace_id,
             payload={
-                "case": process_case_view(case),
-                "command_id": command.command_id,
-                "evaluation": evaluation,
+                "workflow_type": "inventory-rebalancing",
+                "measurements": measurements,
+                "threshold": {
+                    "crossed": True,
+                    "destination_available_lte": 8,
+                    "source_available_gte": 60,
+                    "demand_sales_gte": 4,
+                },
+                "source_location_id": SOURCE_LOCATION,
+                "destination_location_id": DESTINATION_LOCATION,
+                "ownership": "owned",
             },
         )
-        self.runtime.emit(
-            "evaluation.completed",
-            actor_id=case.id,
-            cause_event_id=transfer.event_id,
-            trace_id=command.trace_id,
-            payload={
-                "workflow_type": case.workflow_type,
-                **evaluation,
-            },
-        )
-        return accepted
-
-    def _record_command_accepted(
-        self,
-        command: SimulationCommand,
-        *,
-        target_id: str | None,
-    ) -> SimulationEvent:
-        accepted = self.runtime.emit(
-            "command.accepted",
-            actor_id=command.issued_by,
-            target_id=target_id,
-            trace_id=command.trace_id,
-            payload={"command": command.to_dict()},
-        )
-        self.applied_commands[command.command_id] = accepted
-        return accepted
-
-    def _reject_command(
-        self,
-        command: SimulationCommand,
-        reason: str,
-    ) -> SimulationEvent:
-        rejected = self.runtime.emit(
-            "command.rejected",
-            actor_id=command.issued_by,
-            trace_id=command.trace_id,
-            payload={"command": command.to_dict(), "reason": reason},
-        )
-        self.applied_commands[command.command_id] = rejected
-        return rejected
-
-    def process_case_view(self, case: FashionProcessCase) -> dict[str, Any]:
-        return process_case_view(case)
-
-    def entity_snapshot(
-        self,
-        workflow_type: str,
-        case: FashionProcessCase,
-    ) -> dict[str, Any] | None:
-        """Serialisable view of the concrete entity a supporting workflow
-        reads and mutates, resolved from the case subjects."""
-        entity = resolve_case_entity(self, workflow_type, case.subject_ids)
-        return asdict(entity) if entity is not None else None
-
-    def render_state(self) -> dict[str, Any]:
-        return {
-            "stores": [asdict(value) for value in self.stores.values()],
-            "distribution_centres": [
-                asdict(value)
-                for value in self.distribution_centres.values()
-            ],
-            "brands": [asdict(value) for value in self.brands.values()],
-            "styles": [asdict(value) for value in self.styles.values()],
-            "skus": [asdict(value) for value in self.skus.values()],
-            "customers": [asdict(value) for value in self.customers.values()],
-            "demand_history": [
-                asdict(value) for value in self.demand_history
-            ],
-            "demand_signals": [
-                asdict(value) for value in self.demand_signals.values()
-            ],
-            "inventory": [
-                asdict(value) for value in self.inventory.values()
-            ],
-            "orders": [asdict(value) for value in self.orders.values()],
-            "reservations": [
-                asdict(value) for value in self.reservations.values()
-            ],
-            "promotions": [
-                asdict(value) for value in self.promotions.values()
-            ],
-            "deliveries": [
-                asdict(value) for value in self.deliveries.values()
-            ],
-            "returns": [asdict(value) for value in self.returns.values()],
-            "seller_offers": [
-                asdict(value) for value in self.seller_offers.values()
-            ],
-            "markdown_recommendations": [
-                asdict(value)
-                for value in self.markdown_recommendations.values()
-            ],
-            "process_cases": [
-                process_case_view(value)
-                for value in self.process_cases.values()
-            ],
-            "workflow_state": dict(self.workflow_state),
-        }
 
     def build_observation(
         self,
@@ -1184,20 +516,423 @@ class FashionScenario:
         *,
         now: float,
     ) -> dict[str, Any]:
-        payload = sensor_event.get("payload") or {}
-        case = self.process_cases[payload["case_id"]]
-        profile = FASHION_PROCESS_PROFILES[case.workflow_type]
-        return {
-            "trace_id": sensor_event.get("trace_id"),
-            "sensor_event_id": sensor_event.get("event_id"),
-            "event_ids": [sensor_event.get("event_id")],
+        sensor_id = sensor_event.get("actor_id")
+        profile = next(
+            (
+                candidate
+                for candidate in FASHION_PROCESS_PROFILES.values()
+                if candidate.sensor_id == sensor_id
+            ),
+            None,
+        )
+        if profile is None:
+            raise ValueError(f"unknown Fashion sensor {sensor_id!r}")
+        case = self.process_cases[profile.workflow_type]
+        observation = {
+            "workflow_type": profile.workflow_type,
+            "case": self._case_view(case),
+            "actor_ids": list(case.subject_ids),
+            "event_ids": [sensor_event["event_id"]],
+            "trace_id": sensor_event["trace_id"],
             "as_of_sim_time": now,
-            "requires_approval": profile.kind == "supporting",
-            "case": process_case_view(case),
-            "command_payload": self.command_payload(case.id),
-            "skills": list(profile.skills),
-            "allowed_commands": [profile.command_type],
-            "subject_actors": [
-                {"id": subject_id} for subject_id in case.subject_ids
+            "skills": [profile.skill],
+            "mcp_tools": self._tools_for(profile),
+            "authority": {
+                "persona": profile.hitl_persona,
+                "external_event": profile.hitl_event,
+            },
+            "typed_command": profile.command_type,
+        }
+        if profile.workflow_type == "inventory-rebalancing":
+            observation.update(
+                {
+                    "measurements": inventory_measurements(self),
+                    "transfer_candidate": {
+                        "source_location_id": SOURCE_LOCATION,
+                        "destination_location_id": DESTINATION_LOCATION,
+                        "sku_id": HERO_SKU,
+                        "quantity": 24,
+                        "ownership": "owned",
+                        "expected_source_version": self.inventory[
+                            (SOURCE_LOCATION, HERO_SKU)
+                        ].version,
+                        "expected_destination_version": self.inventory[
+                            (DESTINATION_LOCATION, HERO_SKU)
+                        ].version,
+                        "cross_border": True,
+                    },
+                    "policy": {
+                        "decision": "approval_required",
+                        "reason": "cross-border transfer",
+                        "auto_value_limit_gbp": 10_000,
+                        "auto_quantity_limit": 50,
+                    },
+                }
+            )
+        return observation
+
+    @staticmethod
+    def _tools_for(profile: FashionProcessProfile) -> list[str]:
+        tools = {
+            "inventory-rebalancing": [
+                "fashion_read_inventory",
+                "fashion_prepare_inventory_transfer",
             ],
+            "demand-spike-response": ["fashion_read_inventory"],
+            "promotion-readiness": ["fashion_assess_promotion"],
+            "markdown-governance": ["fashion_prepare_markdown_recommendation"],
+            "supplier-delay-recovery": ["fashion_prepare_supplier_recovery"],
+            "fulfilment-exception-resolution": [
+                "fashion_prepare_fulfilment_resolution"
+            ],
+            "marketplace-seller-exception": [
+                "fashion_prepare_seller_suppression"
+            ],
+            "returns-disposition": ["fashion_prepare_return_disposition"],
+        }
+        return tools[profile.workflow_type]
+
+    def run_reference_process(self, workflow_type: str) -> dict[str, Any]:
+        profile = FASHION_PROCESS_PROFILES.get(workflow_type)
+        if profile is None:
+            raise ValueError(f"unknown Fashion process {workflow_type!r}")
+        case = self.process_cases[workflow_type]
+        event = self.runtime.emit(
+            "sensor.tripped",
+            actor_id=profile.sensor_id,
+            target_id=case.subject_ids[0] if case.subject_ids else case.id,
+            payload={
+                "workflow_type": workflow_type,
+                "case_id": case.id,
+                "measurements": {
+                    "risk_score": float(case.facts.get("risk_score") or 0.75)
+                },
+                "diagnostic": True,
+            },
+        )
+        return {
+            "event_id": event.event_id,
+            "trace_id": event.trace_id,
+            "case_id": case.id,
+        }
+
+    def command_for_reference_process(
+        self,
+        workflow_type: str,
+        *,
+        trace_id: str,
+        workflow_id: str,
+        approval_decision: str | None,
+    ) -> SimulationCommand:
+        profile = FASHION_PROCESS_PROFILES[workflow_type]
+        case = self.process_cases[workflow_type]
+        return SimulationCommand(
+            command_id=f"CMD-{profile.prefix.upper()}-{len(self._applied_command_ids) + 1:04d}",
+            trace_id=trace_id,
+            issued_by=profile.function,
+            type=profile.command_type,
+            payload={
+                "workflow_id": workflow_id,
+                "case_id": case.id,
+                "subject_ids": list(case.subject_ids),
+                "action": profile.command_type,
+                "approval_decision": approval_decision,
+                "approval_reference": (
+                    f"HITL-{profile.prefix.upper()}-001"
+                    if approval_decision == "approve"
+                    else None
+                ),
+                "skill_outputs": {
+                    profile.skill: {
+                        "recommendation": profile.command_type,
+                        "actor_ids": list(case.subject_ids),
+                    }
+                },
+                "evidence_digest": f"sha256:{profile.prefix}-evidence",
+            },
+        )
+
+    def apply_command(self, command: SimulationCommand) -> SimulationEvent:
+        if command.command_id in self._applied_command_ids:
+            return self.runtime.emit(
+                "command.duplicate",
+                actor_id=command.issued_by,
+                trace_id=command.trace_id,
+                payload={"command_id": command.command_id},
+            )
+        if command.type == "inventory.transfer":
+            return self._apply_inventory_transfer(command)
+        profile = next(
+            (
+                candidate
+                for candidate in FASHION_PROCESS_PROFILES.values()
+                if candidate.command_type == command.type
+            ),
+            None,
+        )
+        if profile is None:
+            return self._reject(command, f"unknown command type {command.type!r}")
+        return self._apply_reference_command(profile, command)
+
+    def _apply_inventory_transfer(
+        self,
+        command: SimulationCommand,
+    ) -> SimulationEvent:
+        payload = command.payload
+        required = {
+            "workflow_id",
+            "source_location_id",
+            "destination_location_id",
+            "sku_id",
+            "quantity",
+            "ownership",
+            "expected_source_version",
+            "expected_destination_version",
+            "policy_decision",
+            "evidence_digest",
+        }
+        missing = sorted(required - set(payload))
+        if missing:
+            return self._reject(command, f"missing transfer fields: {missing}")
+        source_key = (payload["source_location_id"], payload["sku_id"])
+        destination_key = (payload["destination_location_id"], payload["sku_id"])
+        source = self.inventory.get(source_key)
+        destination = self.inventory.get(destination_key)
+        if source is None or destination is None or source_key == destination_key:
+            return self._reject(command, "invalid source/destination combination")
+        if payload["ownership"] != "owned" or source.ownership != "owned":
+            return self._reject(
+                command,
+                "inventory.transfer accepts owned inventory only",
+            )
+        if source.version != payload["expected_source_version"]:
+            return self._reject(command, "stale source version")
+        if destination.version != payload["expected_destination_version"]:
+            return self._reject(command, "stale destination version")
+        quantity = payload["quantity"]
+        if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
+            return self._reject(command, "quantity must be a positive integer")
+        if quantity > 50 and not payload.get("approval_reference"):
+            return self._reject(command, "quantity above 50 requires approval")
+        if source.available - quantity < source.safety_stock:
+            return self._reject(command, "transfer would breach source safety stock")
+        retail_value = quantity * source.retail_price_gbp
+        if retail_value > 10_000 and not payload.get("approval_reference"):
+            return self._reject(command, "retail value above GBP 10000 requires approval")
+        source_location = self._location(source.location_id)
+        destination_location = self._location(destination.location_id)
+        cross_border = source_location.country != destination_location.country
+        if cross_border and not payload.get("approval_reference"):
+            return self._reject(command, "cross-border transfer requires approval")
+
+        accepted = self._accept(command, target_id=source.id)
+        source.on_hand -= quantity
+        source.version += 1
+        destination.on_hand += quantity
+        destination.version += 1
+        transferred = self.runtime.emit(
+            "inventory.transferred",
+            actor_id=source.id,
+            target_id=destination.id,
+            cause_event_id=accepted.event_id,
+            trace_id=command.trace_id,
+            payload={
+                "command_id": command.command_id,
+                "workflow_id": payload["workflow_id"],
+                "sku_id": source.sku_id,
+                "quantity": quantity,
+                "source_location_id": source.location_id,
+                "destination_location_id": destination.location_id,
+                "source_stock_id": source.id,
+                "destination_stock_id": destination.id,
+                "approval_reference": payload.get("approval_reference"),
+                "measurements": {
+                    "source_available": source.available,
+                    "destination_available": destination.available,
+                    "transfer_cost_gbp": 180.0,
+                    "expected_recovered_margin_gbp": 864.0,
+                    "fairness_score": 0.94,
+                },
+            },
+        )
+        source.last_event_id = transferred.event_id
+        destination.last_event_id = transferred.event_id
+        self.knowledge_relationships.append(
+            {
+                "workflow_id": payload["workflow_id"],
+                "event_id": transferred.event_id,
+                "source_id": source.id,
+                "relationship": "TRANSFERRED_TO",
+                "destination_id": destination.id,
+                "sku_id": source.sku_id,
+                "quantity": quantity,
+            }
+        )
+        case = self.process_cases["inventory-rebalancing"]
+        case.status = "completed"
+        case.outcome = dict(self.knowledge_relationships[-1])
+        return accepted
+
+    def _apply_reference_command(
+        self,
+        profile: FashionProcessProfile,
+        command: SimulationCommand,
+    ) -> SimulationEvent:
+        payload = command.payload
+        case = self.process_cases.get(profile.workflow_type)
+        if case is None or payload.get("case_id") != case.id:
+            return self._reject(command, "unknown process case")
+        if case.status != "open":
+            return self._reject(command, f"case {case.id} is not open")
+        if payload.get("action") != profile.command_type:
+            return self._reject(command, "action is outside process contract")
+        if tuple(payload.get("subject_ids") or ()) != case.subject_ids:
+            return self._reject(command, "command subject IDs do not match case")
+        skill_outputs = payload.get("skill_outputs")
+        if not isinstance(skill_outputs, dict) or profile.skill not in skill_outputs:
+            return self._reject(command, "command is missing declared skill output")
+        if profile.hitl_persona and payload.get("approval_decision") != "approve":
+            return self._reject(command, f"{profile.hitl_event} approval is required")
+
+        accepted = self._accept(command, target_id=case.id)
+        case.status = "completed"
+        case.outcome = {
+            "workflow_id": payload["workflow_id"],
+            "command_type": profile.command_type,
+            "subject_ids": list(case.subject_ids),
+            "approval_reference": payload.get("approval_reference"),
+        }
+        self._mutate_reference_state(profile, case)
+        self.runtime.emit(
+            profile.success_event,
+            actor_id=case.id,
+            target_id=case.subject_ids[0] if case.subject_ids else None,
+            cause_event_id=accepted.event_id,
+            trace_id=command.trace_id,
+            payload={
+                "workflow_id": payload["workflow_id"],
+                "command_id": command.command_id,
+                "case": self._case_view(case),
+                "measurements": {"contract_passed": 1, "risk_remaining": 0},
+            },
+        )
+        return accepted
+
+    def _mutate_reference_state(
+        self,
+        profile: FashionProcessProfile,
+        case: ProcessCase,
+    ) -> None:
+        if profile.workflow_type == "demand-spike-response":
+            case.outcome["allocation_status"] = "adjusted"
+        elif profile.workflow_type == "promotion-readiness":
+            self.promotions["PROMO-AUTUMN-01"].status = "ready"
+        elif profile.workflow_type == "markdown-governance":
+            case.outcome["price_mutated"] = False
+            case.outcome["recommendation_status"] = "approved"
+        elif profile.workflow_type == "supplier-delay-recovery":
+            self.deliveries["DELIVERY-IN-0042"].status = "recovery-planned"
+        elif profile.workflow_type == "fulfilment-exception-resolution":
+            case.outcome["fulfilment_status"] = "rerouted"
+        elif profile.workflow_type == "marketplace-seller-exception":
+            self.seller_offers["OFFER-MKT-0003"].status = "suppressed"
+        elif profile.workflow_type == "returns-disposition":
+            returned = self.returns["RETURN-0042"]
+            returned.status = "completed"
+            returned.disposition = "restock"
+            stock = self.inventory[(returned.location_id, returned.sku_id)]
+            stock.on_hand += 1
+            stock.version += 1
+
+    def _accept(
+        self,
+        command: SimulationCommand,
+        *,
+        target_id: str | None,
+    ) -> SimulationEvent:
+        self._applied_command_ids.add(command.command_id)
+        return self.runtime.emit(
+            "command.accepted",
+            actor_id=command.issued_by,
+            target_id=target_id,
+            trace_id=command.trace_id,
+            payload={"command": command.to_dict()},
+        )
+
+    def _reject(
+        self,
+        command: SimulationCommand,
+        reason: str,
+    ) -> SimulationEvent:
+        return self.runtime.emit(
+            "command.rejected",
+            actor_id=command.issued_by,
+            trace_id=command.trace_id,
+            payload={"command": command.to_dict(), "reason": reason},
+        )
+
+    def _location(self, location_id: str) -> Location:
+        location = self.stores.get(location_id) or self.distribution_centres.get(
+            location_id
+        )
+        if location is None:
+            raise ValueError(f"unknown Fashion location {location_id!r}")
+        return location
+
+    @staticmethod
+    def _case_view(case: ProcessCase) -> dict[str, Any]:
+        data = asdict(case)
+        data["subject_ids"] = list(case.subject_ids)
+        data["allowed_actions"] = list(case.allowed_actions)
+        return data
+
+    def _inventory_token_views(self) -> list[dict[str, Any]]:
+        visible_skus = {HERO_SKU, "SKU-STYLE-02-RED-S"}
+        tokens: list[dict[str, Any]] = []
+        for (location_id, sku_id), position in self.inventory.items():
+            if sku_id not in visible_skus:
+                continue
+            if (
+                location_id not in self.stores
+                and (location_id, sku_id)
+                not in {
+                    ("DC-UK-MID-01", "SKU-STYLE-02-RED-S"),
+                    ("DC-EU-LIL-01", HERO_SKU),
+                }
+            ):
+                continue
+            token = view(position)
+            token["status"] = f"{position.available} available"
+            tokens.append(token)
+        return tokens
+
+    def render_state(self) -> dict[str, Any]:
+        return {
+            "stores": [view(item) for item in self.stores.values()],
+            "distribution_centres": [
+                view(item) for item in self.distribution_centres.values()
+            ],
+            "brands": [view(item) for item in self.brands.values()],
+            "styles": [view(item) for item in self.styles.values()],
+            "skus": [view(item) for item in self.skus.values()],
+            "customers": [view(item) for item in self.customers.values()],
+            "staff": [view(item) for item in self.staff.values()],
+            "inventory": [view(item) for item in self.inventory.values()],
+            "inventory_tokens": self._inventory_token_views(),
+            "orders": [view(item) for item in self.orders.values()],
+            "deliveries": [view(item) for item in self.deliveries.values()],
+            "returns": [view(item) for item in self.returns.values()],
+            "promotions": [view(item) for item in self.promotions.values()],
+            "seller_offers": [view(item) for item in self.seller_offers.values()],
+            "process_cases": [
+                self._case_view(item) for item in self.process_cases.values()
+            ],
+            "demand_history": list(self.demand_history),
+            "threshold_state": {
+                "sensor_id": "sensor:inventory_imbalance",
+                "active": self._imbalance_active,
+                "measurements": inventory_measurements(self),
+            },
+            "knowledge_relationships": list(self.knowledge_relationships),
+            "ordinary_activity_count": self._order_seq,
         }

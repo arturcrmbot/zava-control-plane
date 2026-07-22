@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "generator": "compose-org",
+  "generator_version": "2.0.0",
+  "vertical": "fashion",
+  "display_name": "Fashion Retail",
+  "generated_assets": [
+    "tests/api/fashion/__init__.py",
+    "tests/api/fashion/test_durable_workflows.py",
+    "tests/api/fashion/test_living_world.py",
+    "tests/api/fashion/test_mcp_and_projections.py",
+    "tests/api/fashion/test_pack_contract.py",
+    "tests/api/fashion/test_proof_contract.py",
+    "tools/fashion_proof_manifest.py",
+    "tools/fashion_zava_e2e_proof.mjs",
+    "tools/fashion_zava_e2e_proof.sh",
+    "verticals/fashion/__init__.py",
+    "verticals/fashion/actors.py",
+    "verticals/fashion/agents.py",
+    "verticals/fashion/authority.py",
+    "verticals/fashion/domains.py",
+    "verticals/fashion/durable.py",
+    "verticals/fashion/dynamics.py",
+    "verticals/fashion/entity_projections/__init__.py",
+    "verticals/fashion/entity_projections/retail.py",
+    "verticals/fashion/functions.py",
+    "verticals/fashion/generation-manifest.json",
+    "verticals/fashion/lifecycle.py",
+    "verticals/fashion/manifest.py",
+    "verticals/fashion/mcp_tools/__init__.py",
+    "verticals/fashion/mcp_tools/common.py",
+    "verticals/fashion/mcp_tools/retail.py",
+    "verticals/fashion/org-brief.yaml",
+    "verticals/fashion/personae/fulfilment_manager/SKILL.md",
+    "verticals/fashion/personae/inventory_allocation_manager/SKILL.md",
+    "verticals/fashion/personae/marketplace_operations_director/SKILL.md",
+    "verticals/fashion/personae/merchandising_director/SKILL.md",
+    "verticals/fashion/personae/returns_operations_manager/SKILL.md",
+    "verticals/fashion/personae/supply_chain_director/SKILL.md",
+    "verticals/fashion/personas.py",
+    "verticals/fashion/policies/tools.yaml",
+    "verticals/fashion/process_profiles.py",
+    "verticals/fashion/projections.py",
+    "verticals/fashion/recordings/demand-spike-response-reference.jsonl",
+    "verticals/fashion/recordings/fulfilment-exception-resolution-reference.jsonl",
+    "verticals/fashion/recordings/inventory-rebalancing-reference.jsonl",
+    "verticals/fashion/recordings/markdown-governance-reference.jsonl",
+    "verticals/fashion/recordings/marketplace-seller-exception-reference.jsonl",
+    "verticals/fashion/recordings/promotion-readiness-reference.jsonl",
+    "verticals/fashion/recordings/returns-disposition-reference.jsonl",
+    "verticals/fashion/recordings/supplier-delay-recovery-reference.jsonl",
+    "verticals/fashion/reference_actions.py",
+    "verticals/fashion/reference_cases.py",
+    "verticals/fashion/sensors.py",
+    "verticals/fashion/skills/fulfilment-resolution-advisor/SKILL.md",
+    "verticals/fashion/skills/inventory-imbalance-analysis/SKILL.md",
+    "verticals/fashion/skills/inventory-rebalance-planner/SKILL.md",
+    "verticals/fashion/skills/markdown-option-advisor/SKILL.md",
+    "verticals/fashion/skills/promotion-readiness-assessor/SKILL.md",
+    "verticals/fashion/skills/returns-disposition-advisor/SKILL.md",
+    "verticals/fashion/skills/seller-exception-assessor/SKILL.md",
+    "verticals/fashion/skills/supplier-recovery-planner/SKILL.md",
+    "verticals/fashion/ui.json",
+    "verticals/fashion/ui/world-scene.json",
+    "verticals/fashion/world.py",
+    "verticals/fashion/worlds.py"
+  ],
+  "inputs": {
+    "seed": 42,
+    "approved_design": {
+      "path": "docs/superpowers/specs/2026-07-20-fashion-retail-vertical-design.md",
+      "sha256": "5161bc44d79ec8188aace721c079eac8b9f6bccb439a896acd5ba96533cf7202"
+    },
+    "vision_contract": {
+      "path": "verticals/fashion/org-brief.yaml",
+      "sha256": "316abe68f90f51decb86dab3d0da0dbf910dcd09ed594504f948042d72e78a2d"
+    },
+    "compose_org_skill": {
+      "path": "skills/compose-org/SKILL.md",
+      "sha256": "c059e21a849cb42f242f7af45fcc663b0ea24cca2780eeff0445cd3e3f918f18"
+    },
+    "proof_contract": {
+      "path": "skills/compose-org/references/proof-contract.md",
+      "sha256": "c5e0d90c06edb165d877c009e27d2b1ec6b83f7074936c294279b25ca8626d7d"
+    },
+    "vertical_pack_contract": {
+      "path": "skills/compose-org/references/vertical-pack-contract.md",
+      "sha256": "39a1d1de0f16dcb37c40c6a403c0d3c3ee138f214da8b6df34ea6b7b94427f22"
+    },
+    "retail_primer": {
+      "path": "skills/research-company/references/industry-primers/retail.md",
+      "sha256": "64a3dde523a9d386d46b665137a21faf22e810c758252acd5299aae9e883833b"
+    }
+  }
+}

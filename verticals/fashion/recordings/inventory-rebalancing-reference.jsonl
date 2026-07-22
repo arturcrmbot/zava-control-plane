@@ -1,11 +1,4 @@
-{"ts_offset_ms":0,"event":{"type":"workflow.started","workflow_id":"FIR-REFERENCE-001","workflow_type":"inventory-rebalancing"}}
-{"ts_offset_ms":100,"event":{"type":"durable.step.completed","workflow_id":"FIR-REFERENCE-001","workflow_type":"inventory-rebalancing","phase":"Detect Imbalance"}}
-{"ts_offset_ms":200,"event":{"type":"durable.step.completed","workflow_id":"FIR-REFERENCE-001","workflow_type":"inventory-rebalancing","phase":"Assess Demand and Constraints"}}
-{"ts_offset_ms":300,"event":{"type":"durable.step.completed","workflow_id":"FIR-REFERENCE-001","workflow_type":"inventory-rebalancing","phase":"Plan Rebalance"}}
-{"ts_offset_ms":400,"event":{"type":"durable.step.completed","workflow_id":"FIR-REFERENCE-001","workflow_type":"inventory-rebalancing","phase":"Approve Exception","status":"not_required"}}
-{"ts_offset_ms":500,"event":{"type":"durable.step.completed","workflow_id":"FIR-REFERENCE-001","workflow_type":"inventory-rebalancing","phase":"Execute Stock Action"}}
-{"ts_offset_ms":600,"event":{"type":"durable.step.completed","workflow_id":"FIR-REFERENCE-001","workflow_type":"inventory-rebalancing","phase":"Verify Outcome"}}
-{"ts_offset_ms":700,"event":{"type":"typed.command.issued","workflow_id":"FIR-REFERENCE-001","workflow_type":"inventory-rebalancing","command_type":"inventory.transfer"}}
-{"ts_offset_ms":800,"event":{"type":"world.mutation.completed","workflow_id":"FIR-REFERENCE-001","workflow_type":"inventory-rebalancing","mutation_family":"inventory"}}
-{"ts_offset_ms":900,"event":{"type":"evaluation.completed","workflow_id":"FIR-REFERENCE-001","workflow_type":"inventory-rebalancing","status":"PASS"}}
-{"ts_offset_ms":1000,"event":{"type":"durable.workflow.completed","workflow_id":"FIR-REFERENCE-001","workflow_type":"inventory-rebalancing","status":"completed"}}
+{"ts_offset_ms":0,"event":{"type":"workflow.started","workflow_id":"rebalance-evt-00000142","workflow_type":"inventory-rebalancing","trace_id":"evt-00000142"}}
+{"ts_offset_ms":600,"event":{"type":"step.completed","workflow_id":"rebalance-evt-00000142","workflow_type":"inventory-rebalancing","phase":"Plan Rebalance","actor_ids":["SKU-STYLE-01-BLK-M","STORE-EU-PAR-01","STORE-UK-LON-01"]}}
+{"ts_offset_ms":1200,"event":{"type":"workflow.completed","workflow_id":"rebalance-evt-00000142","workflow_type":"inventory-rebalancing","outcome":"inventory.transferred"}}
+

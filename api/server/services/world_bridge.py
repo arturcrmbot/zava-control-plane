@@ -78,6 +78,7 @@ class WorldBridge:
         self._workflow_by_objective: dict[str, tuple[str, str | None]] = {}
         self._decision_ready: set[str] = set()
         self._pending_evaluations: dict[str, dict] = {}
+        self._tasks: set[asyncio.Task] = set()
         self._off: list = []
         # Canonical Workflow lifecycle owner: mints the one StateStore Workflow
         # (deterministic sensor-event id) before Durable scheduling and routes
@@ -94,10 +95,18 @@ class WorldBridge:
         for off in self._off:
             off()
         self._off.clear()
+        for task in tuple(self._tasks):
+            task.cancel()
+        self._tasks.clear()
         self._in_flight_event_ids.clear()
         self._workflow_by_objective.clear()
         self._decision_ready.clear()
         self._pending_evaluations.clear()
+
+    def _spawn(self, coroutine) -> None:
+        task = asyncio.create_task(coroutine)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
     def _on_sensor(self, event: FleetEvent) -> None:
         simulation_event = getattr(event, "simulation_event", None)
@@ -111,7 +120,7 @@ class WorldBridge:
         if event_id in self._in_flight_event_ids:
             return
         self._in_flight_event_ids.add(event_id)
-        asyncio.create_task(self._drive(simulation_event))
+        self._spawn(self._drive(simulation_event))
 
     def _on_evaluation(self, event: FleetEvent) -> None:
         simulation_event = getattr(event, "simulation_event", None)
@@ -128,9 +137,7 @@ class WorldBridge:
         self._pending_evaluations[str(obj_id)] = outcome
         if obj_id not in self._decision_ready:
             return
-        asyncio.create_task(
-            self._complete_from_evaluation(str(obj_id), outcome)
-        )
+        self._spawn(self._complete_from_evaluation(str(obj_id), outcome))
 
     async def _complete_from_evaluation(
         self, objective_id: str, outcome: dict
@@ -190,13 +197,6 @@ class WorldBridge:
                 objective.id, "claimed", claimed_by=responder.owner_function
             )
 
-            requested = service.record_external(
-                "responder.requested",
-                trace_id=trace_id,
-                cause_event_id=simulation_event.get("event_id"),
-                payload={"observation": observation, "objective_id": objective.id},
-            )
-
             # Create/upsert exactly one canonical Workflow BEFORE scheduling the
             # Durable orchestration. The adapter derives the workflow id
             # deterministically from the sensor event id; it is the ONLY id used
@@ -204,6 +204,17 @@ class WorldBridge:
             # there is no independent prefix-trace reconstruction anywhere here.
             workflow_id = self._adapter.start(
                 simulation_event, objective, responder, observation
+            )
+            requested = service.record_external(
+                "responder.requested",
+                trace_id=trace_id,
+                cause_event_id=simulation_event.get("event_id"),
+                payload={
+                    "observation": observation,
+                    "objective_id": objective.id,
+                    "workflow_id": workflow_id,
+                    "workflow_type": responder.workflow_type,
+                },
             )
 
             payload = {
@@ -237,7 +248,12 @@ class WorldBridge:
                     "responder.failed",
                     trace_id=trace_id,
                     cause_event_id=requested.event_id,
-                    payload={"instance_id": instance_id, "error": "no orchestration output"},
+                    payload={
+                        "instance_id": instance_id,
+                        "error": "no orchestration output",
+                        "workflow_id": workflow_id,
+                        "workflow_type": responder.workflow_type,
+                    },
                 )
                 service.fail_objective(objective.id, cause_event_id=failed.event_id)
                 self._workflow_by_objective.pop(objective.id, None)
@@ -252,7 +268,12 @@ class WorldBridge:
                     "responder.deferred",
                     trace_id=trace_id,
                     cause_event_id=requested.event_id,
-                    payload={"instance_id": instance_id, "reasoning": reasoning},
+                    payload={
+                        "instance_id": instance_id,
+                        "reasoning": reasoning,
+                        "workflow_id": workflow_id,
+                        "workflow_type": responder.workflow_type,
+                    },
                 )
                 service.fail_objective(objective.id, cause_event_id=deferred.event_id)
                 self._workflow_by_objective.pop(objective.id, None)
@@ -267,7 +288,13 @@ class WorldBridge:
                 "responder.decided",
                 trace_id=trace_id,
                 cause_event_id=requested.event_id,
-                payload={"instance_id": instance_id, "command": command_data, "reasoning": reasoning},
+                payload={
+                    "instance_id": instance_id,
+                    "command": command_data,
+                    "reasoning": reasoning,
+                    "workflow_id": workflow_id,
+                    "workflow_type": responder.workflow_type,
+                },
             )
             command = SimulationCommand(**command_data)
             result = service.apply_typed_command(objective, command)

@@ -1,232 +1,36 @@
-meta:
-  vertical: fashion
-  industry: fashion-retail
-  geography:
-    - UK
-    - EU
-  status: approved
-  researched_at: "2026-07-20"
-  evidence_policy: source-backed-industry-facts-only
+version: 1
+status: signed
+target: Fashion Retail
+slug: fashion
+world: UK/EU multi-brand retailer
+research:
+  classification: approved synthetic operating assumptions
+  sources:
+    - docs/superpowers/specs/2026-07-20-fashion-retail-vertical-design.md
+    - skills/research-company/references/industry-primers/retail.md
+  note: No record represents a real retailer or customer.
+vision:
+  audience: enterprise seller/customer demo
+  autonomous: true
+  seed: 42
+  actors:
+    - stores
+    - distribution centres
+    - staff
+    - customers
+    - inventory
+    - orders
+    - deliveries
+    - cancellations
+    - returns
+    - promotions
+  ownership:
+    - owned
+    - concession
+    - marketplace
+  golden_story: ordinary retail activity crosses a real stock threshold and autonomously starts inventory-rebalancing
+  primary_path_forbids:
+    - /processes/*/run
+    - Run process button
+  seller_review: PENDING
 
-facts:
-  - id: uk-online-retail-series
-    value: >-
-      The UK Office for National Statistics maintains a Retail Sales Index
-      internet-sales dataset and publishes revisions as additional data or
-      method changes become available.
-    confidence: high
-    source_refs:
-      - ons-retail-internet-sales
-    design_relevance:
-      - demand-spike-response
-      - promotion-readiness
-      - inventory-rebalancing
-
-  - id: uk-distance-sale-reimbursement
-    value: >-
-      UK distance-sale reimbursement is due without undue delay and, for a
-      sales contract where the trader does not collect the goods, no later
-      than 14 days after the goods are received back or evidence of return is
-      supplied.
-    confidence: high
-    source_refs:
-      - uk-consumer-contracts-regulation-34
-    design_relevance:
-      - returns-disposition
-      - fulfilment-exception-resolution
-
-  - id: eu-marketplace-trader-transparency
-    value: >-
-      The EU Digital Services Act requires marketplaces to verify and display
-      seller contact details, provides mechanisms to flag illegal goods, and
-      requires greater marketplace product-traceability effort.
-    confidence: high
-    source_refs:
-      - eu-digital-services-act
-    design_relevance:
-      - marketplace-seller-exception
-
-  - id: eu-unsold-apparel-controls
-    value: >-
-      EU Ecodesign for Sustainable Products Regulation measures prohibit
-      destruction of unsold apparel, clothing accessories, and footwear by
-      large companies from 19 July 2026, with justified derogations and
-      disclosure requirements; the Commission identifies resale,
-      remanufacturing, donation, and reuse as alternatives.
-    confidence: high
-    source_refs:
-      - eu-unsold-apparel-rules
-    design_relevance:
-      - markdown-governance
-      - returns-disposition
-      - inventory-rebalancing
-
-  - id: uk-promotion-claim-transparency
-    value: >-
-      UK Competition and Markets Authority guidance says online urgency,
-      scarcity, and price-reduction claims must be transparent and must not
-      mislead consumers or create unfair pressure.
-    confidence: high
-    source_refs:
-      - uk-cma-urgency-price-reductions
-    design_relevance:
-      - promotion-readiness
-      - markdown-governance
-
-uncertainties:
-  - id: retailer-policy-thresholds
-    statement: >-
-      Public industry sources do not establish universal approval thresholds
-      for transfer value, transfer quantity, safety stock, or recovered-margin
-      ratios.
-    treatment: Keep all thresholds explicit synthetic demo assumptions.
-
-  - id: inventory-ownership-terms
-    statement: >-
-      Concession and marketplace inventory rights vary by retailer and partner
-      contract.
-    treatment: Model owned, concession, and marketplace rights separately and
-      fail closed when ownership or commitment evidence is missing.
-
-  - id: supplier-and-seller-slas
-    statement: >-
-      Supplier milestone and marketplace seller service levels are
-      organisation-specific and are not inferred from public regulation.
-    treatment: Use deterministic synthetic SLAs in the actor world.
-
-  - id: cross-border-obligations
-    statement: >-
-      Tax, customs, product, and consumer obligations depend on route, product,
-      operator role, and jurisdiction.
-    treatment: Require human approval for cross-border actions and do not
-      present the demo policy as legal advice.
-
-  - id: enterprise-system-stack
-    statement: >-
-      A reusable industry pack has no verified retailer-specific ERP, OMS,
-      WMS, PIM, marketplace, or returns platform.
-    treatment: Expose typed pack-local MCP boundaries without naming a vendor.
-
-assumptions:
-  - id: transfer-value-approval-threshold
-    statement: >-
-      A demo inventory transfer whose retail value exceeds GBP 10,000 is
-      routed to human approval rather than auto-approved.
-    basis: synthetic-demo-assumption
-    design_relevance:
-      - inventory-rebalancing
-
-  - id: transfer-quantity-approval-threshold
-    statement: >-
-      A demo inventory transfer of more than 50 units is routed to human
-      approval rather than auto-approved.
-    basis: synthetic-demo-assumption
-    design_relevance:
-      - inventory-rebalancing
-
-  - id: demand-confidence-floor
-    statement: >-
-      A demo transfer backed by a demand-confidence signal below 0.7 is
-      routed to human approval.
-    basis: synthetic-demo-assumption
-    design_relevance:
-      - inventory-rebalancing
-      - demand-spike-response
-
-  - id: fairness-score-floor
-    statement: >-
-      A demo transfer whose cross-location fairness score is below 0.5 is
-      routed to human approval.
-    basis: synthetic-demo-assumption
-    design_relevance:
-      - inventory-rebalancing
-
-  - id: recovered-margin-over-transfer-cost
-    statement: >-
-      A demo transfer is only auto-approved when its expected recovered
-      margin (GBP) strictly exceeds its transfer cost (GBP); otherwise it is
-      routed to human approval.
-    basis: synthetic-demo-assumption
-    design_relevance:
-      - inventory-rebalancing
-      - markdown-governance
-
-  - id: safety-stock-buffer
-    statement: >-
-      Each demo inventory position protects a synthetic safety-stock buffer
-      that sits above customer reservations and the presentation minimum.
-      Consuming that buffer is a conditional human-approval path — never a
-      hard reject — and a transfer can never drive physically available
-      stock (on hand minus reservations minus presentation minimum)
-      negative.
-    basis: synthetic-demo-assumption
-    design_relevance:
-      - inventory-rebalancing
-
-  - id: actor-world-scale
-    statement: >-
-      The demo actor world is fixed at 8 stores, 2 distribution centres,
-      12 brands, 24 styles, 192 SKUs, 300 customers and 14 days of demand
-      history. These counts size the demo only and are not a market claim.
-    basis: synthetic-demo-assumption
-    design_relevance:
-      - inventory-rebalancing
-      - demand-spike-response
-      - promotion-readiness
-      - markdown-governance
-      - supplier-delay-recovery
-      - fulfilment-exception-resolution
-      - marketplace-seller-exception
-      - returns-disposition
-
-exclusions:
-  - No named retailer is profiled.
-  - No synthetic actor, customer, seller, product, order, inventory, or event
-    is represented as a researched fact.
-  - No legal source is treated as a complete compliance determination.
-
-sources:
-  - id: ons-retail-internet-sales
-    url: >-
-      https://www.ons.gov.uk/businessindustryandtrade/retailindustry/datasets/retailsalesindexinternetsales
-    accessed: "2026-07-20"
-    kind: official-statistics
-    publisher: UK Office for National Statistics
-    used_for:
-      - uk-online-retail-series
-
-  - id: uk-consumer-contracts-regulation-34
-    url: >-
-      https://www.legislation.gov.uk/uksi/2013/3134/regulation/34/made
-    accessed: "2026-07-20"
-    kind: legislation
-    publisher: UK legislation
-    used_for:
-      - uk-distance-sale-reimbursement
-
-  - id: eu-digital-services-act
-    url: >-
-      https://digital-strategy.ec.europa.eu/en/policies/digital-services-act
-    accessed: "2026-07-20"
-    kind: official-guidance
-    publisher: European Commission
-    used_for:
-      - eu-marketplace-trader-transparency
-
-  - id: eu-unsold-apparel-rules
-    url: >-
-      https://environment.ec.europa.eu/news/new-eu-rules-stop-destruction-unsold-clothes-and-shoes-2026-02-09_en
-    accessed: "2026-07-20"
-    kind: official-announcement
-    publisher: European Commission
-    used_for:
-      - eu-unsold-apparel-controls
-
-  - id: uk-cma-urgency-price-reductions
-    url: >-
-      https://www.gov.uk/government/publications/using-urgency-and-price-reduction-claims-online
-    accessed: "2026-07-20"
-    kind: official-guidance
-    publisher: UK Competition and Markets Authority
-    used_for:
-      - uk-promotion-claim-transparency

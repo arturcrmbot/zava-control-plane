@@ -1,8 +1,8 @@
 {
   "capabilities": ["blueprint", "world", "memory", "knowledge"],
-  "lenses": ["process-library", "order", "customer-impact", "control"],
+  "lenses": ["process-library", "customer-impact", "order", "control"],
   "theme": {
-    "accent": "#ec4899",
+    "accent": "#be123c",
     "label": "Fashion Retail"
   },
   "phase_aliases": {},

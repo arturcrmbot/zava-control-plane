@@ -16,8 +16,9 @@ import { WorldInterventionStrip } from "@client/components/WorldInterventionStri
 import { WorldObjectiveStrip } from "@client/components/WorldObjectiveStrip";
 import { deriveCommonIntervention, type InterventionStep } from "@client/lib/worldIntervention";
 import { useRuntimeManifest } from "@client/hooks/useRuntimeManifest";
+import { useWorldScene } from "@client/hooks/useWorldScene";
 import TelcoWorld from "@client/routes/TelcoWorld";
-import FashionWorld from "@client/routes/FashionWorld";
+import SpatialWorld from "@client/components/world/SpatialWorld";
 
 const WAITING_CAP = 40;
 const IN_SERVICE_CAP = 40;
@@ -70,13 +71,19 @@ export default function World() {
   }
   return (
     <ActiveWorld
-      vertical={manifest.vertical.name}
       telco={manifest.ui.lenses.includes("telco-network")}
+      spatial={manifest.ui.world_scene === true}
     />
   );
 }
 
-function ActiveWorld({ vertical, telco }: { vertical: string; telco: boolean }) {
+function ActiveWorld({
+  telco,
+  spatial,
+}: {
+  telco: boolean;
+  spatial: boolean;
+}) {
   const {
     state,
     events,
@@ -86,7 +93,9 @@ function ActiveWorld({ vertical, telco }: { vertical: string; telco: boolean }) 
     injectSiteFailure,
     runScenario,
     runReferenceProcess,
+    resetWorld,
   } = useWorldSimulation();
+  const worldScene = useWorldScene(spatial);
   const [selectedActor, setSelectedActor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -189,6 +198,27 @@ function ActiveWorld({ vertical, telco }: { vertical: string; telco: boolean }) 
     );
   }
 
+  if (spatial && worldScene.loading) {
+    return <div role="status">Loading world scene…</div>;
+  }
+  if (spatial && worldScene.error) {
+    return <div role="alert">{worldScene.error}</div>;
+  }
+  if (spatial && worldScene.scene) {
+    return (
+      <SpatialWorld
+        scene={worldScene.scene}
+        state={state}
+        events={events}
+        error={error}
+        onReset={resetWorld}
+      />
+    );
+  }
+  if (spatial) {
+    return <div role="alert">Required world scene is unavailable.</div>;
+  }
+
   if (telco) {
     return (
       <TelcoWorld
@@ -202,17 +232,6 @@ function ActiveWorld({ vertical, telco }: { vertical: string; telco: boolean }) 
       />
     );
   }
-  if (vertical === "fashion") {
-    return (
-      <FashionWorld
-        state={state}
-        events={events}
-        error={error}
-        onRunProcess={runReferenceProcess}
-      />
-    );
-  }
-
   return (
     <div
       data-testid="world-route"

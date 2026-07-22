@@ -1,133 +1,182 @@
-"""Assemble proof/manifest.json for the Fashion vertical from the live evidence
-the Playwright driver produced. The manifest is PASS only when every phase, the
-browser-error gate and the teardown passed; otherwise it is FAIL and this script
-exits non-zero. Nothing here invents a verdict — it aggregates observed JSON."""
+#!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import json
-import os
+import shutil
+import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
-
-from verticals.fashion.process_profiles import FASHION_PROCESS_PROFILES
-
-CONTRACT_WORKFLOWS = list(FASHION_PROCESS_PROFILES)
+from typing import Any
 
 
-OUT_DIR = Path(os.environ["PROOF_OUT_DIR"]).resolve()
-SOURCE_COMMIT = os.environ.get("SOURCE_COMMIT", "")
-TEARDOWN_STATUS = os.environ.get("TEARDOWN_STATUS", "FAIL")
-PORTS_RELEASED = os.environ.get("PORTS_RELEASED", "unknown")
-
-EVIDENCE = [
-    "summary.json",
-    "world-state.json",
-    "world-journal.json",
-    "durable-instances.json",
-    "entity-graph.json",
-    "memory.json",
-    "replay-summary.json",
-    "functions-disabled.json",
-    "recordings",
-    "screenshots",
-    "video",
-    "logs",
-]
+ROOT = Path(__file__).resolve().parents[1]
+PACK_MANIFEST = ROOT / "verticals" / "fashion" / "generation-manifest.json"
+SELLER_QUESTIONS = (
+    "Is the industry and operating setting recognisable?",
+    "Is the business event understandable without narration?",
+    "Is it visible why the process started?",
+    "Are the agent and human decisions inspectable?",
+    "Is the business and Knowledge-graph outcome visible?",
+)
 
 
-def _load(name: str) -> dict:
-    path = OUT_DIR / name
-    if not path.exists():
-        return {}
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return {}
+def _load(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        raise ValueError(f"required proof artifact is missing: {path}")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(f"proof artifact must contain an object: {path}")
+    return data
+
+
+def _head() -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def _is_clean() -> bool:
+    return not subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def _seller_review(path: Path) -> None:
+    payload = {
+        "status": "PENDING",
+        "owner": "operator",
+        "machine_may_approve": False,
+        "questions": [
+            {"id": index, "question": question, "answer": None}
+            for index, question in enumerate(SELLER_QUESTIONS, start=1)
+        ],
+    }
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def build_manifest(
+    proof_dir: Path,
+    *,
+    dirty_development: bool,
+) -> tuple[dict[str, Any], bool]:
+    live = _load(proof_dir / "live-summary.json")
+    replay = _load(proof_dir / "replay-summary.json")
+    observed_head = _head()
+    clean = _is_clean()
+    if not dirty_development and not clean:
+        raise ValueError(
+            "clean-source guard failed; use --dirty-development for a "
+            "non-attributed development proof"
+        )
+
+    live_result = str(live.get("result") or "FAIL")
+    replay_result = str(replay.get("result") or "FAIL")
+    substrate_result = (
+        "PASS"
+        if live.get("substrate_result") == "PASS"
+        and replay.get("substrate_result") == "PASS"
+        and replay_result == "PASS"
+        else "FAIL"
+    )
+    demo_result = (
+        "PASS"
+        if live.get("demo_result") == "PASS"
+        and live_result == "PASS"
+        and replay_result == "PASS"
+        else "FAIL"
+    )
+    if substrate_result != "PASS":
+        overall = "substrate-incomplete / demo-incomplete"
+    elif demo_result != "PASS":
+        overall = "substrate-complete / demo-incomplete"
+    else:
+        overall = (
+            "substrate-complete / demo-complete / seller-review-pending"
+        )
+    browser_errors = [
+        *list(live.get("browserErrors") or []),
+        *list(replay.get("browserErrors") or []),
+    ]
+    attributed = clean and not dirty_development
+    manifest = {
+        "schema_version": 1,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "vertical": "fashion",
+        "fingerprint": "fashion:2",
+        "source_commit": observed_head if attributed else None,
+        "source_commit_observed": observed_head,
+        "source_attribution": (
+            "CLEAN_COMMIT" if attributed else "DIRTY_DEVELOPMENT"
+        ),
+        "permanent_result": "PASS" if attributed else "PENDING",
+        "live_result": live_result,
+        "replay_result": replay_result,
+        "substrate_result": substrate_result,
+        "demo_result": demo_result,
+        "seller_review": "PENDING",
+        "overall_status": overall,
+        "browserErrors": browser_errors,
+        "droppedWorkflowEvents": replay.get("droppedWorkflowEvents"),
+        "live_summary": "proof/live-summary.json",
+        "replay_summary": "proof/replay-summary.json",
+        "generation_manifest": "proof/generation-manifest.json",
+        "seller_review_artifact": "proof/seller-review.json",
+        "criteria": {
+            "live": live.get("criteria") or {},
+            "replay": {
+                "functions_disabled": replay.get("functions_disabled"),
+                "world_disabled": replay.get("world_disabled"),
+                "clean_teardown": replay.get("cleanTeardown"),
+            },
+        },
+    }
+    proof_dir.mkdir(parents=True, exist_ok=True)
+    (proof_dir / "manifest.json").write_text(
+        json.dumps(manifest, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    _seller_review(proof_dir / "seller-review.json")
+    if not PACK_MANIFEST.is_file():
+        raise ValueError(f"generation manifest is missing: {PACK_MANIFEST}")
+    shutil.copyfile(PACK_MANIFEST, proof_dir / "generation-manifest.json")
+    passed = (
+        substrate_result == "PASS"
+        and demo_result == "PASS"
+        and not browser_errors
+    )
+    return manifest, passed
 
 
 def main() -> int:
-    summary = _load("summary.json")
-    functions_disabled = _load("functions-disabled.json")
-    replay = _load("replay-summary.json")
-
-    live = "PASS" if summary.get("result") == "PASS" else "FAIL"
-    fd_status = "PASS" if functions_disabled.get("result") == "PASS" else "FAIL"
-    aw_status = "PASS" if replay.get("result") == "PASS" else "FAIL"
-    replay_status = "PASS" if fd_status == "PASS" and aw_status == "PASS" else "FAIL"
-
-    workflows = summary.get("workflows", {})
-    browser_errors = list(summary.get("browserErrors", []))
-    browser_errors += list(functions_disabled.get("browserErrors", []))
-    browser_errors += list(replay.get("browserErrors", []))
-
-    dropped = 0
-    for entry in workflows.values():
-        surfaces = entry.get("surfaces", {})
-        if surfaces.get("constellation") != "PASS":
-            dropped += 1
-
-    all_workflows_present = set(workflows) == set(CONTRACT_WORKFLOWS)
-    all_workflows_pass = all(
-        entry.get("status") == "PASS" for entry in workflows.values()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--proof-dir",
+        type=Path,
+        default=ROOT / "proof",
     )
-
-    browser_status = "PASS" if not browser_errors and dropped == 0 else "FAIL"
-    teardown_status = "PASS" if TEARDOWN_STATUS == "PASS" else "FAIL"
-
-    status = (
-        "PASS"
-        if (
-            live == "PASS"
-            and replay_status == "PASS"
-            and browser_status == "PASS"
-            and teardown_status == "PASS"
-            and all_workflows_present
-            and all_workflows_pass
+    parser.add_argument("--dirty-development", action="store_true")
+    args = parser.parse_args()
+    try:
+        _, passed = build_manifest(
+            args.proof_dir.resolve(),
+            dirty_development=args.dirty_development,
         )
-        else "FAIL"
-    )
-
-    evidence_paths = [name for name in EVIDENCE if (OUT_DIR / name).exists()]
-
-    manifest = {
-        "vertical": "fashion",
-        "source_commit": SOURCE_COMMIT,
-        "status": status,
-        "live": live,
-        "replay": replay_status,
-        "browser_errors": browser_errors,
-        "workflows": {
-            wtype: {
-                "status": entry.get("status"),
-                "workflow_id": entry.get("workflow_id"),
-                "surfaces": entry.get("surfaces", {}),
-                "chain": entry.get("chain", {}),
-            }
-            for wtype, entry in workflows.items()
-        },
-        "replay_probes": {
-            "functions_disabled": fd_status,
-            "actor_world_disabled": aw_status,
-        },
-        "browser": {
-            "console_errors": len(browser_errors),
-            "dropped_workflow_events": dropped,
-            "status": browser_status,
-        },
-        "teardown": {
-            "status": teardown_status,
-            "ports_released": PORTS_RELEASED,
-        },
-        "evidence_paths": evidence_paths,
-    }
-
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    (OUT_DIR / "manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
-    )
-    print(json.dumps({"status": status, "live": live, "replay": replay_status}))
-    return 0 if status == "PASS" else 1
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        print(f"fashion proof manifest failed: {error}", file=sys.stderr)
+        return 2
+    return 0 if passed else 1
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())
+

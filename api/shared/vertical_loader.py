@@ -15,6 +15,7 @@ from api.shared.vertical_pack import (
     VerticalPack,
     VerticalRuntime,
 )
+from api.shared.world_contracts import validate_world_scene
 
 
 LEGACY_WORLD_OWNERS = {"support": "agency", "telco": "telco"}
@@ -168,6 +169,8 @@ def validate_pack(pack: VerticalPack) -> None:
                 f"vertical {pack.name!r} world {world_name!r} has unknown "
                 f"default scale {world.default_scale!r}"
             )
+        if world.scene is not None:
+            validate_world_scene(world.scene)
 
     for workflow_type, domain in pack.domains.items():
         if workflow_type != domain.workflow_type:

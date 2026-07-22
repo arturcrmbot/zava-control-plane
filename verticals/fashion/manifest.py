@@ -18,6 +18,7 @@ from verticals.fashion.functions import FASHION_FUNCTIONS
 from verticals.fashion.lifecycle import bootstrap, start
 from verticals.fashion.personas import FASHION_PERSONAS
 from verticals.fashion.projections import FASHION_PROJECTIONS
+from verticals.fashion.process_profiles import FASHION_PROCESS_PROFILES
 from verticals.fashion.worlds import FASHION_WORLDS
 
 
@@ -37,7 +38,7 @@ def build_pack() -> VerticalPack:
         root=PACK_ROOT,
         name="fashion",
         display_name="Fashion Retail",
-        manifest_version="1",
+        manifest_version="2",
         domains=domains,
         organisation_functions=FASHION_FUNCTIONS,
         agents=FASHION_AGENTS,
@@ -47,11 +48,13 @@ def build_pack() -> VerticalPack:
         durable_functions=DurableFunctionRegistration(
             load_module=_load_durable_module,
             orchestrators=frozenset(
-                domain.orchestrator_name for domain in domains.values()
+                profile.orchestrator
+                for profile in FASHION_PROCESS_PROFILES.values()
             ),
             activities=frozenset(
                 {
-                    "fashion_skill_activity_trigger",
+                    "fashion_evidence_activity_trigger",
+                    "fashion_decision_activity_trigger",
                     "fashion_command_activity_trigger",
                 }
             ),
@@ -59,7 +62,7 @@ def build_pack() -> VerticalPack:
         personae_roots=(PACK_ROOT / "personae",),
         skill_roots=(PACK_ROOT / "skills",),
         mcp_modules=("verticals.fashion.mcp_tools.retail",),
-        external_capabilities=frozenset(),
+        external_capabilities=frozenset({"authority_check"}),
         worlds=FASHION_WORLDS,
         default_world="fashion",
         seed=SeedRegistration(bootstrap=bootstrap),

@@ -101,6 +101,20 @@ async def _resolve_one(exception_id: str, resolution: Resolution, resolved_by: s
         event_name = gate.get("external_event")
     if event_name is None:
         event_name = _registry.resolve_external_event(w.type, w.current_phase)
+    domain = _registry.DOMAINS.get(w.type)
+    if domain is not None:
+        authority_gate = next(
+            (
+                candidate
+                for candidate in domain.hitl_gates
+                if candidate.gate_phase == w.current_phase
+                or candidate.external_event == event_name
+            ),
+            None,
+        )
+        if authority_gate is not None:
+            payload["persona"] = authority_gate.persona
+            payload["decision_id"] = exception_id
     if event_name is None:
         # Legacy POC1 expense fallbacks for `Notify` / `Arbitrate` —
         # registry covers these but the Notify gate still needs a `text`

@@ -195,7 +195,7 @@ describe("useWorldSimulation", () => {
   });
 
   it("runs a standard Telco process then refreshes world state", async () => {
-    const fetchMock = vi.fn(async (url: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
       const value = String(url);
       if (value.includes("/api/world/processes/revenue-assurance/run")) {
         return jsonResponse({ ok: true, case_id: "CASE-BSS09-0001" });
@@ -219,6 +219,81 @@ describe("useWorldSimulation", () => {
       String(entry[0]).includes("/api/world/processes/revenue-assurance/run")
     );
     expect(call?.[1]).toEqual(expect.objectContaining({ method: "POST" }));
+  });
+
+  it("resets the active world and restarts the journal cursor", async () => {
+    const eventUrls: string[] = [];
+    const fetchMock = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
+      const value = String(url);
+      if (value.includes("/api/world/reset")) {
+        return jsonResponse({ ok: true, seed: 42, sim_time: 0 });
+      }
+      if (value.includes("/api/world/state")) return jsonResponse(BASE_STATE);
+      if (value.includes("/api/world/events")) {
+        eventUrls.push(value);
+        return jsonResponse({
+          enabled: true,
+          latest_seq: eventUrls.length === 1 ? 4 : 0,
+          events: eventUrls.length === 1 ? [mkEvent(4)] : [],
+        });
+      }
+      return jsonResponse({});
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { result } = renderHook(() => useWorldSimulation());
+    await act(async () => { await flush(); });
+    expect(result.current.events).toHaveLength(1);
+
+    await act(async () => {
+      await result.current.resetWorld();
+      await flush();
+    });
+
+    const resetCall = fetchMock.mock.calls.find((entry) =>
+      String(entry[0]).includes("/api/world/reset")
+    );
+    expect(resetCall?.[1]).toEqual(expect.objectContaining({ method: "POST" }));
+    expect(eventUrls.at(-1)).toContain("after=0");
+    expect(result.current.events).toEqual([]);
+  });
+
+  it("discards event responses that started before a reset", async () => {
+    let resolveOldEvents: ((response: Response) => void) | undefined;
+    const eventUrls: string[] = [];
+    const fetchMock = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
+      const value = String(url);
+      if (value.includes("/api/world/reset")) {
+        return jsonResponse({ ok: true, seed: 42, sim_time: 0 });
+      }
+      if (value.includes("/api/world/state")) return jsonResponse(BASE_STATE);
+      if (value.includes("/api/world/events")) {
+        eventUrls.push(value);
+        if (eventUrls.length === 1) {
+          return new Promise<Response>((resolve) => {
+            resolveOldEvents = resolve;
+          });
+        }
+        return jsonResponse({ enabled: true, latest_seq: 0, events: [] });
+      }
+      return jsonResponse({});
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { result } = renderHook(() => useWorldSimulation());
+    await act(async () => { await flush(); });
+
+    await act(async () => {
+      await result.current.resetWorld();
+      resolveOldEvents?.(jsonResponse({
+        enabled: true,
+        latest_seq: 999,
+        events: [mkEvent(999)],
+      }));
+      await flush();
+    });
+    await tick(300);
+
+    expect(result.current.events).toEqual([]);
+    expect(eventUrls.at(-1)).toContain("after=0");
   });
 
   it("clears both intervals and aborts in-flight fetches on unmount", async () => {

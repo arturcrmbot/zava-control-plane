@@ -1,2 +1,2 @@
-"""Reusable Fashion Retail vertical pack."""
+"""Fashion Retail vertical pack."""
 

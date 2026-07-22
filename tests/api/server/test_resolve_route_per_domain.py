@@ -89,6 +89,8 @@ def test_resolve_route_raises_per_domain_event_via_cache(client, monkeypatch):
                 f"{gate.external_event!r}"
             )
             assert payload["decision"] == "approve"
+            assert payload["persona"] == gate.persona
+            assert payload["decision_id"] == exc_id
 
 
 def test_resolve_route_falls_back_to_registry_when_cache_cold(client, monkeypatch):
