@@ -136,7 +136,15 @@ def fashion_orchestration(
     profile = FASHION_PROCESS_PROFILES[workflow_type]
     workflow_id = str(input_dict.get("workflow_id") or "?")
     instance_id = context.instance_id
-    requires_approval = bool(input_dict.get("requires_approval"))
+    observation = input_dict.get("observation")
+    observation_requires_approval = (
+        observation.get("requires_approval")
+        if isinstance(observation, dict)
+        else False
+    )
+    requires_approval = bool(
+        input_dict.get("requires_approval", observation_requires_approval)
+    )
 
     def checkpoint(kind: str, payload: dict[str, Any]) -> Any:
         return context.call_activity(

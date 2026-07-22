@@ -213,7 +213,18 @@ export interface TelcoProcessCase {
   status: string;
   facts: Record<string, unknown>;
   allowed_actions: string[];
+  recommended_action?: string;
   outcome: Record<string, unknown> | null;
+}
+
+export interface FashionInventoryPosition {
+  location_id: string;
+  sku_id: string;
+  ownership?: string;
+  on_hand: number;
+  reserved?: number;
+  safety_stock?: number;
+  version?: number;
 }
 
 // -- objective/command lifecycle: mirror world/model.py + objectives.py ------
@@ -271,6 +282,20 @@ export interface WorldState {
   retention_offers?: WorldRetentionOffer[];
   process_library?: TelcoProcessSummary[];
   process_cases?: TelcoProcessCase[];
+  // Fashion scenario fields
+  stores?: Array<{ id: string; country?: string; region?: string }>;
+  distribution_centres?: Array<{ id: string; country?: string; region?: string }>;
+  brands?: Array<{ id: string; relationship?: string }>;
+  styles?: Array<{ id: string; lifecycle?: string }>;
+  skus?: Array<{ id: string; style_id?: string }>;
+  inventory?: FashionInventoryPosition[];
+  reservations?: Array<{ id: string; status?: string }>;
+  promotions?: Array<{ id: string; status?: string }>;
+  deliveries?: Array<{ id: string; status?: string }>;
+  returns?: Array<{ id: string; status?: string; disposition?: string | null }>;
+  seller_offers?: Array<{ id: string; status?: string }>;
+  markdown_recommendations?: Array<{ id: string; status?: string }>;
+  workflow_state?: Record<string, Record<string, unknown>>;
   customer_impact?: {
     affected_account_count: number;
     notified_account_count: number;

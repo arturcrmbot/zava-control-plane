@@ -137,6 +137,26 @@ def test_policy_safe_inventory_rebalancing_skips_hitl() -> None:
     assert result["command"]["payload"]["approval_reference"] is None
 
 
+def test_orchestration_reads_approval_requirement_from_world_observation() -> None:
+    profile = FASHION_PROCESS_PROFILES["demand-spike-response"]
+    context = _Context(
+        profile.workflow_type,
+        requires_approval=False,
+        approval={
+            "decision": "approve",
+            "persona": profile.hitl_persona,
+            "approval_reference": "approval:inventory-allocation-manager:visible-demo",
+        },
+    )
+    del context._input["requires_approval"]
+    context._input["observation"]["requires_approval"] = True
+
+    result = _drive(context, profile.workflow_type)
+
+    assert context.external_event == profile.hitl_event
+    assert result["status"] == "decision_ready"
+
+
 def test_governed_inventory_rebalancing_carries_approval_reference() -> None:
     profile = FASHION_PROCESS_PROFILES["inventory-rebalancing"]
     context = _Context(
@@ -297,14 +317,13 @@ def test_fashion_activity_triggers_use_worker_safe_payload_annotations() -> None
 
 
 class _AmbientContext:
-    """Mirrors the live WorldBridge payload for the ambient (auto-approved)
-    flow: it carries NO ``requires_approval`` flag, exactly like
-    ``api/server/services/world_bridge.py`` schedules the orchestration."""
+    """Mirrors the live WorldBridge payload and autonomous persona response."""
 
     instance_id = "ambient-instance"
     current_utc_datetime = datetime(2026, 7, 20)
 
     def __init__(self, scenario: FashionScenario, workflow_type: str):
+        profile = FASHION_PROCESS_PROFILES[workflow_type]
         result = scenario.run_case(workflow_type)
         sensor = next(
             event
@@ -319,6 +338,13 @@ class _AmbientContext:
                 sensor.to_dict(), now=scenario.runtime.now
             ),
         }
+        self.approval = _Task(
+            {
+                "decision": "approve",
+                "persona": profile.hitl_persona,
+                "approval_reference": f"approval:{profile.hitl_persona}:ambient",
+            }
+        )
 
     def get_input(self):
         return self._input
@@ -331,13 +357,13 @@ class _AmbientContext:
         return {}
 
     def wait_for_external_event(self, name):
-        return _Task()
+        return self.approval
 
     def create_timer(self, _deadline):
         return _Task()
 
     def task_any(self, _tasks):
-        return _Task()
+        return self.approval
 
 
 @pytest.mark.parametrize("workflow_type", FASHION_PROCESS_PROFILES)

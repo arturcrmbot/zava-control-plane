@@ -17,6 +17,7 @@ import { WorldObjectiveStrip } from "@client/components/WorldObjectiveStrip";
 import { deriveCommonIntervention, type InterventionStep } from "@client/lib/worldIntervention";
 import { useRuntimeManifest } from "@client/hooks/useRuntimeManifest";
 import TelcoWorld from "@client/routes/TelcoWorld";
+import FashionWorld from "@client/routes/FashionWorld";
 
 const WAITING_CAP = 40;
 const IN_SERVICE_CAP = 40;
@@ -69,12 +70,13 @@ export default function World() {
   }
   return (
     <ActiveWorld
+      vertical={manifest.vertical.name}
       telco={manifest.ui.lenses.includes("telco-network")}
     />
   );
 }
 
-function ActiveWorld({ telco }: { telco: boolean }) {
+function ActiveWorld({ vertical, telco }: { vertical: string; telco: boolean }) {
   const {
     state,
     events,
@@ -196,6 +198,16 @@ function ActiveWorld({ telco }: { telco: boolean }) {
         error={error}
         onFailSite={injectSiteFailure}
         onRunScenario={runScenario}
+        onRunProcess={runReferenceProcess}
+      />
+    );
+  }
+  if (vertical === "fashion") {
+    return (
+      <FashionWorld
+        state={state}
+        events={events}
+        error={error}
         onRunProcess={runReferenceProcess}
       />
     );

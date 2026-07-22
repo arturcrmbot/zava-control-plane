@@ -1192,6 +1192,7 @@ class FashionScenario:
             "sensor_event_id": sensor_event.get("event_id"),
             "event_ids": [sensor_event.get("event_id")],
             "as_of_sim_time": now,
+            "requires_approval": profile.kind == "supporting",
             "case": process_case_view(case),
             "command_payload": self.command_payload(case.id),
             "skills": list(profile.skills),

@@ -48,6 +48,35 @@ def test_demo_scale_is_deterministic_and_matches_the_approved_actor_world() -> N
     assert first.runtime.canonical_journal() == second.runtime.canonical_journal()
 
 
+def test_observation_marks_supporting_hitl_as_required_but_keeps_hero_auto_case_safe() -> None:
+    scenario = _scenario()
+
+    supporting = scenario.run_case("demand-spike-response")
+    supporting_sensor = next(
+        event
+        for event in scenario.runtime.journal
+        if event.event_id == supporting["sensor_event_id"]
+    )
+    supporting_observation = scenario.build_observation(
+        supporting_sensor.to_dict(),
+        now=scenario.runtime.now,
+    )
+
+    hero = scenario.run_case("inventory-rebalancing")
+    hero_sensor = next(
+        event
+        for event in scenario.runtime.journal
+        if event.event_id == hero["sensor_event_id"]
+    )
+    hero_observation = scenario.build_observation(
+        hero_sensor.to_dict(),
+        now=scenario.runtime.now,
+    )
+
+    assert supporting_observation["requires_approval"] is True
+    assert hero_observation["requires_approval"] is False
+
+
 def test_policy_safe_owned_transfer_mutates_versions_and_is_idempotent() -> None:
     scenario = _scenario()
     case, command = _case_command(scenario, "inventory-rebalancing")
