@@ -7,7 +7,6 @@
 // overlay) and POSTs to /api/exceptions/{activeExceptionId}/resolve. On
 // backend failure the optimistic state is reverted.
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import type { HITLItem } from "@shared/feedItems";
 import CardShell from "../CardShell";

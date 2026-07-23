@@ -61,7 +61,6 @@ function humanizeAwaiting(reason: string | undefined): string | null {
 // `treasury_op`, `dpia`, `request`, `joiner`, `review`, `vendor`, `brief`) but
 // they all use these field names where applicable.
 function summariseDomainPayload(
-  type: string,
   payload: Record<string, unknown> | undefined,
 ): string | null {
   if (!payload) return null;
@@ -111,7 +110,7 @@ export function summariseWorkflow(w: Workflow): WorkflowSummary {
   }
   // 4. Generic fleet/generated domains — look in payload
   if (!headline) {
-    headline = summariseDomainPayload(w.type, w.payload);
+    headline = summariseDomainPayload(w.payload);
   }
   // Last-resort: domain label + phase
   if (!headline) {

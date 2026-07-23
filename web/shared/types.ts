@@ -105,18 +105,9 @@ export interface ActionLedgerEntry {
 
 export interface Workflow {
   id: string;
-  type:
-    | "invoice-p2p" | "expense-claim" | "hiring"
-    // Fleet/composed domains (compose-domain v3). Same shape as the rest;
-    // domain-specific inputs go in `payload`.
-    | "travel-preapproval" | "vendor-kyc" | "employee-onboarding"
-    | "it-access-request" | "contract-renewal" | "perf-review"
-    // Hand-graduated curve-proof domain.
-    | "ap-invoice"
-    // Hand-graduated wave 2: matrix-driven dynamic-persona domains.
-    | "purchase-order" | "contract-review" | "privacy-dpia" | "treasury-fx"
-    // Telco demonstrator domains.
-    | "network-incident" | "proactive-customer-care" | "order-to-activate";
+  // Active workflow types come from the runtime domain registry. Keeping this
+  // open lets newly graduated verticals render without a client release.
+  type: string;
   status: WorkflowStatus;
   currentPhase: PhaseName;
   createdAt: number;

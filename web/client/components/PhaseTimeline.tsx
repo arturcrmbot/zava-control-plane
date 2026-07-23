@@ -24,7 +24,7 @@ export default function PhaseTimeline({ phases, workflowType }: {
   phases: Phase[]; workflowType?: Workflow["type"];
 }) {
   const phaseList = phases ?? [];
-  const byName = new Map(phaseList.map(p => [p.name, p]));
+  const byName = new Map<string, Phase>(phaseList.map(p => [p.name, p]));
   const order = usePhaseOrderFor(workflowType);
   // Fallback: if the registry hasn't loaded yet (or this workflow_type
   // isn't in DOMAINS), render whatever phases the workflow itself

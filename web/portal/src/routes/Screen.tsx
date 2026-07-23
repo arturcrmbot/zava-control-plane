@@ -15,7 +15,7 @@ import { getScreenResolve, postCannedScreen, postTranscript } from "../lib/api";
  * 3. When the candidate clicks "End call", we stop the WebRTC connection,
  *    take the captured transcript, POST it to
  *    /api/portal/voice/{candidate_id}/transcript with the screen token,
- *    and redirect back to /portal?token=xxx.
+ *    and offer a link back to /portal?token=xxx.
  *
  * Demo-mode fallback: VITE_VOICE_TRANSPORT=canned renders a button that
  * POSTs the canned transcript via /api/portal/voice/{cid}/canned and skips

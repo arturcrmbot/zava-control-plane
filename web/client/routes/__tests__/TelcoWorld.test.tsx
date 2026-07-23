@@ -157,6 +157,7 @@ function hook(over: Partial<UseWorldSimulationResult> = {}): UseWorldSimulationR
     injectSiteFailure: vi.fn(async () => {}),
     runScenario: vi.fn(async () => {}),
     runReferenceProcess: vi.fn(async () => {}),
+    resetWorld: vi.fn(async () => {}),
     ...over,
   };
 }

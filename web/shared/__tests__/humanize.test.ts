@@ -216,6 +216,9 @@ describe("titleCase / prettyNoun", () => {
   it("title-cases plain snake_case", () => {
     expect(titleCase("some_other_role")).toBe("Some Other Role");
   });
+  it("title-cases dotted identifiers", () => {
+    expect(titleCase("tool.unheard_of")).toBe("Tool Unheard Of");
+  });
   it("returns empty for empty input", () => {
     expect(titleCase("")).toBe("");
     expect(prettyNoun("")).toBe("");

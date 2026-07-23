@@ -16,7 +16,14 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
-    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"]
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "baseUrl": ".",
+    "paths": {
+      "@portal/*": ["src/*"],
+      "@shared/*": ["../shared/*"],
+      "msw": ["node_modules/msw"],
+      "msw/*": ["node_modules/msw/*"]
+    }
   },
   "include": ["src", "../../tests/web/portal"]
 }

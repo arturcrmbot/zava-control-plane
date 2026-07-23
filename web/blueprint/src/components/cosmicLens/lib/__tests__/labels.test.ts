@@ -4,21 +4,26 @@ import { labelForCapability, labelForEntity, isReadEvent, isWriteEvent } from ".
 describe("labelForCapability", () => {
   it("renders persona thinking with the persona name", () => {
     expect(labelForCapability({ type: "persona.thinking", persona: "ap_clerk" })).toBe(
-      "awaiting HITL decision (ap_clerk)",
+      "AP Clerk is reviewing",
     );
   });
   it("renders persona decided", () => {
     expect(labelForCapability({ type: "persona.decided", persona: "controller" })).toBe(
-      "controller decided",
+      "Controller decided",
     );
   });
   it("renders running tool", () => {
     expect(labelForCapability({ type: "tool.invoked", tool_name: "stripe.charge" })).toBe(
-      "running stripe.charge",
+      "Running Stripe Charge",
+    );
+  });
+  it("renders completed tool", () => {
+    expect(labelForCapability({ type: "tool.completed", tool_name: "stripe.charge" })).toBe(
+      "Stripe Charge — done",
     );
   });
   it("falls back to type when fields are missing", () => {
-    expect(labelForCapability({ type: "completely.unknown" })).toBe("completely.unknown");
+    expect(labelForCapability({ type: "completely.unknown" })).toBe("Completely Unknown ran");
   });
 });
 
@@ -26,19 +31,19 @@ describe("labelForEntity", () => {
   it("renders read with id", () => {
     expect(
       labelForEntity({ type: "entity.read", entity_kind: "Person", entity_id: "CAND-0042" }),
-    ).toBe("reading person details CAND-0042");
+    ).toBe("Looked up person details CAND-0042");
   });
   it("renders update vs create", () => {
     expect(
       labelForEntity({ type: "entity.upserted", entity_kind: "Invoice", entity_id: "INV-0871", verb: "update" }),
-    ).toBe("updating invoice INV-0871");
+    ).toBe("Updated invoice INV-0871");
     expect(
       labelForEntity({ type: "entity.upserted", entity_kind: "Vendor", verb: "create" }),
-    ).toBe("creating vendor record");
+    ).toBe("Created vendor record");
   });
   it("renders link", () => {
     expect(labelForEntity({ type: "entity.linked", entity_kind: "Decision" })).toBe(
-      "linking decision",
+      "Connected decision",
     );
   });
 });

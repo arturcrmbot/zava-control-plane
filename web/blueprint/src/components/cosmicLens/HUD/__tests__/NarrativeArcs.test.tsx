@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { NarrativeArcs } from "../NarrativeArcs";
 
@@ -25,10 +25,16 @@ const SAMPLE = [
 ];
 
 describe("NarrativeArcs", () => {
+  beforeEach(() => localStorage.clear());
   afterEach(() => cleanup());
 
-  it("renders one card per arc with name, role, and one-liner", () => {
+  function renderExpanded() {
     render(<NarrativeArcs initialArcs={SAMPLE} />);
+    fireEvent.click(screen.getByTitle("Expand"));
+  }
+
+  it("renders one card per arc with name, role, and one-liner", () => {
+    renderExpanded();
     expect(screen.getAllByText("Aisha Khan").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Marcus Holt").length).toBeGreaterThan(0);
     expect(screen.getByText("finance_bp")).toBeTruthy();
@@ -36,21 +42,21 @@ describe("NarrativeArcs", () => {
     expect(
       screen.getByText("Finance BP, over-promoted into a regional role"),
     ).toBeTruthy();
-    expect(screen.getByText(/Cast \(2\)/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Cast/i })).toBeTruthy();
   });
 
   it("renders initials avatars when no real photo asset is wired up", () => {
-    render(<NarrativeArcs initialArcs={SAMPLE} />);
+    renderExpanded();
     expect(screen.getByText("AK")).toBeTruthy();
     expect(screen.getByText("MH")).toBeTruthy();
   });
 
-  it("toggles the card list when the hide/show button is clicked", () => {
-    render(<NarrativeArcs initialArcs={SAMPLE} />);
+  it("toggles the card list from the collapsible header", () => {
+    renderExpanded();
     expect(screen.getAllByText("Aisha Khan").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole("button", { name: /hide cast/i }));
+    fireEvent.click(screen.getByTitle("Collapse"));
     expect(screen.queryByText("Aisha Khan")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /show cast/i }));
+    fireEvent.click(screen.getByTitle("Expand"));
     expect(screen.getAllByText("Aisha Khan").length).toBeGreaterThan(0);
   });
 });

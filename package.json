@@ -22,6 +22,8 @@
     "demo:blueprint": "npm --prefix web/blueprint run dev -- --host 0.0.0.0 --port 5275",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
+    "posttest": "npm run test:node",
+    "test:node": "tsx --test mocks/authority-mcp/test/resolver.test.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium"
