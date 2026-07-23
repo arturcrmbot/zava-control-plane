@@ -984,7 +984,11 @@ def clear_proof_root() -> None:
 
 def teardown(services: Services) -> dict[str, list[int]]:
     services.shutdown()
-    observed = {str(port): lsof_pids(port) for port in PORTS}
+    try:
+        observed = {str(port): lsof_pids(port) for port in PORTS}
+    finally:
+        if RUNTIME.exists():
+            shutil.rmtree(RUNTIME)
     return {port: pids for port, pids in observed.items() if pids}
 
 

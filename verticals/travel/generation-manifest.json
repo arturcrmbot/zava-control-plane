@@ -9,9 +9,9 @@
       "path": "tools/travel_zava_browser_proof.mjs"
     },
     {
-      "content_hash": "8acb2b35d23f958f9cf4a7f520fba209fd2410752520de86b973adfc7c377d4c",
+      "content_hash": "8e613664fc5837dfe7379da3dd077e817ef4d4f9c9c6ed5b2819341e17e3a9d9",
       "generator_version": "0.2.0",
-      "input_hash": "5fe850322d789031d56dae9a10f6b600b9863cefae6ca4e1f6307ade0c4224f6",
+      "input_hash": "486bff839029a3d8573004f794ffc7bcb9a52646d7f09c5a157e598e23df1281",
       "ownership": "generated-external",
       "path": "tools/travel_zava_e2e_proof.py"
     },

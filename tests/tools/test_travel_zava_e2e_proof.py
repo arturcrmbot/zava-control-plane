@@ -13,6 +13,7 @@ import runpy
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 from verticals.travel.generator.render import generate
 
@@ -469,6 +470,35 @@ def test_client_vite_ignores_ephemeral_travel_proof_runtime() -> None:
     vite_config = (_REPO_ROOT / "vite.config.ts").read_text(encoding="utf-8")
 
     assert "**/.travel-proof-runtime/**" in vite_config
+
+
+def test_generated_teardown_removes_ephemeral_runtime(tmp_path: Path) -> None:
+    namespace = _generated_runner_namespace(tmp_path)
+    teardown = namespace["teardown"]
+    runtime_root = tmp_path / ".travel-proof-runtime"
+    runtime_root.mkdir()
+    (runtime_root / "state.sqlite").write_bytes(b"runtime")
+    shutdown_calls: list[str] = []
+
+    teardown.__globals__["RUNTIME"] = runtime_root
+    teardown.__globals__["lsof_pids"] = lambda _port: []
+    orphan_ports = teardown(
+        SimpleNamespace(shutdown=lambda: shutdown_calls.append("shutdown"))
+    )
+
+    assert shutdown_calls == ["shutdown"]
+    assert orphan_ports == {}
+    assert not runtime_root.exists()
+
+
+def test_git_ignores_ephemeral_travel_proof_runtime() -> None:
+    ignored = subprocess.run(
+        ["git", "check-ignore", "-q", ".travel-proof-runtime/state.sqlite"],
+        cwd=_REPO_ROOT,
+        check=False,
+    )
+
+    assert ignored.returncode == 0
 
 
 def test_browser_observes_the_hitl_gate_before_the_runner_approves_it(
