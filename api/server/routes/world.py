@@ -27,13 +27,60 @@ FastAPI process. No frontend, no rendering.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from api.server.state import app_state
 from verticals.telco.process_profiles import STANDARD_PROCESS_PROFILES
 
 router = APIRouter(prefix="/api/world", tags=["world"])
+_UI_SESSION_SAMPLE_PER_STATUS = 24
+
+
+def _compact_telco_state(snapshot: dict) -> dict:
+    if snapshot.get("scenario") != "telco":
+        return snapshot
+
+    compact = dict(snapshot)
+    sessions = compact.get("sessions")
+    if isinstance(sessions, list):
+        counts: dict[str, int] = {}
+        sampled_counts: dict[str, int] = {}
+        sampled_sessions: list[dict] = []
+        for session in sessions:
+            status = str(session.get("status", "unknown"))
+            counts[status] = counts.get(status, 0) + 1
+            sampled = sampled_counts.get(status, 0)
+            if sampled < _UI_SESSION_SAMPLE_PER_STATUS:
+                sampled_sessions.append(session)
+                sampled_counts[status] = sampled + 1
+        compact["session_counts"] = counts
+        compact["sessions"] = sampled_sessions
+
+    subscribers = compact.pop("subscribers", None)
+    if isinstance(subscribers, list):
+        compact["subscriber_count"] = len(subscribers)
+
+    subscriptions = compact.pop("subscriptions", None)
+    if isinstance(subscriptions, list):
+        compact["subscription_count"] = len(subscriptions)
+
+    accounts = compact.get("accounts")
+    if isinstance(accounts, list):
+        compact["account_count"] = len(accounts)
+        impact = compact.get("customer_impact")
+        impacted_ids = set(
+            impact.get("account_ids", [])
+            if isinstance(impact, dict)
+            else []
+        )
+        compact["accounts"] = [
+            account
+            for index, account in enumerate(accounts)
+            if index == 0 or account.get("id") in impacted_ids
+        ]
+
+    return compact
 
 
 class DemandSurgeRequest(BaseModel):
@@ -91,10 +138,12 @@ TELCO_SCENARIOS = frozenset(
 
 
 @router.get("/state")
-async def world_state() -> dict:
+async def world_state(compact: bool = False) -> dict:
     service = getattr(app_state, "world_service", None)
     if service is not None:
         snapshot = service.snapshot()
+        if compact:
+            snapshot = _compact_telco_state(snapshot)
         snapshot["last_response"] = getattr(app_state, "world_last_response", None)
         return snapshot
     engine = getattr(app_state, "world_engine", None)
@@ -113,15 +162,21 @@ async def world_state() -> dict:
 
 
 @router.get("/events")
-async def world_events(after: int = 0) -> dict:
+async def world_events(
+    after: int = 0,
+    limit: int | None = Query(default=None, ge=1, le=1_000),
+) -> dict:
     """Actor-world journal catch-up. Disabled unless the actor service runs."""
     service = getattr(app_state, "world_service", None)
     if service is None:
         return {"enabled": False, "latest_seq": 0, "events": []}
+    events = service.events_after(after)
+    if limit is not None:
+        events = events[-limit:]
     return {
         "enabled": True,
         "latest_seq": len(service.runtime.journal),
-        "events": service.events_after(after),
+        "events": events,
     }
 
 

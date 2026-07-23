@@ -65,6 +65,47 @@ async function tick(ms: number): Promise<void> {
 }
 
 describe("useWorldSimulation", () => {
+  it("uses compact state and bounded journal endpoints", async () => {
+    const urls: string[] = [];
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {
+      const value = String(url);
+      urls.push(value);
+      if (value.includes("/api/world/state")) return jsonResponse(BASE_STATE);
+      if (value.includes("/api/world/events")) {
+        return jsonResponse({ enabled: true, latest_seq: 0, events: [] });
+      }
+      return jsonResponse({});
+    }) as unknown as typeof fetch;
+
+    renderHook(() => useWorldSimulation());
+    await act(async () => { await flush(); });
+
+    expect(urls).toContain("/api/world/state?compact=true");
+    expect(urls).toContain("/api/world/events?after=0&limit=300");
+  });
+
+  it("polls the journal no more than once per second", async () => {
+    let eventCalls = 0;
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {
+      const value = String(url);
+      if (value.includes("/api/world/state")) return jsonResponse(BASE_STATE);
+      if (value.includes("/api/world/events")) {
+        eventCalls += 1;
+        return jsonResponse({ enabled: true, latest_seq: 0, events: [] });
+      }
+      return jsonResponse({});
+    }) as unknown as typeof fetch;
+
+    renderHook(() => useWorldSimulation());
+    await act(async () => { await flush(); });
+    expect(eventCalls).toBe(1);
+
+    await tick(999);
+    expect(eventCalls).toBe(1);
+    await tick(1);
+    expect(eventCalls).toBe(2);
+  });
+
   it("loads the initial snapshot and events on mount", async () => {
     globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {
       const u = String(url);
@@ -108,8 +149,7 @@ describe("useWorldSimulation", () => {
     await act(async () => { await flush(); });
     expect(eventsUrls[0]).toContain("after=0");
 
-    // Events poll again at 300ms; state poll (1000ms) has not fired yet.
-    await tick(300);
+    await tick(1000);
     expect(eventsUrls[1]).toContain("after=5");
   });
 
@@ -141,12 +181,12 @@ describe("useWorldSimulation", () => {
     await act(async () => { await flush(); });
     expect(result.current.events.map((event) => event.seq)).toEqual([10]);
 
-    await tick(300);
+    await tick(1000);
 
     expect(eventsUrls).toEqual([
-      "/api/world/events?after=0",
-      "/api/world/events?after=10",
-      "/api/world/events?after=0",
+      "/api/world/events?after=0&limit=300",
+      "/api/world/events?after=10&limit=300",
+      "/api/world/events?after=0&limit=300",
     ]);
     expect(result.current.events.map((event) => event.seq)).toEqual([1, 2, 3]);
   });
@@ -173,7 +213,7 @@ describe("useWorldSimulation", () => {
     await act(async () => { await flush(); });
     for (let i = 0; i < 40; i += 1) {
       // eslint-disable-next-line no-await-in-loop
-      await tick(300);
+      await tick(1000);
     }
 
     const seqs = result.current.events.map((e) => e.seq);
@@ -328,7 +368,7 @@ describe("useWorldSimulation", () => {
       }));
       await flush();
     });
-    await tick(300);
+    await tick(1000);
 
     expect(result.current.events).toEqual([]);
     expect(eventUrls.at(-1)).toContain("after=0");

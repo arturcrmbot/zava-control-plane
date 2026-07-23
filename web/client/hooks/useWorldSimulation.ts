@@ -2,8 +2,8 @@
 //
 // Single polling hook for the /world route. It reads the live actor world:
 //
-//   - GET /api/world/state          — actor snapshot, every 1000ms
-//   - GET /api/world/events?after=  — causal journal tail, every 300ms
+//   - GET /api/world/state          — compact actor snapshot, every 1000ms
+//   - GET /api/world/events?after=  — bounded causal journal tail, every 1000ms
 //   - POST /api/world/inject/demand_surge — the one write surface
 //
 // The events cursor advances to the response's latest_seq; events are merged
@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const STATE_POLL_MS = 1000;
-const EVENTS_POLL_MS = 300;
+const EVENTS_POLL_MS = 1000;
 const EVENT_RING_MAX = 300;
 const SURGE_MULTIPLIER = 4;
 const SURGE_DURATION_MINUTES = 90;
@@ -258,9 +258,13 @@ export interface WorldState {
   // telco scenario fields
   sites?: WorldSite[];
   sessions?: WorldSession[];
+  session_counts?: Partial<Record<WorldSession["status"], number>>;
   subscribers?: WorldSubscriber[];
+  subscriber_count?: number;
   accounts?: WorldAccount[];
+  account_count?: number;
   subscriptions?: WorldSubscription[];
+  subscription_count?: number;
   orders?: WorldOrder[];
   notifications?: WorldNotification[];
   credits?: WorldCredit[];
@@ -350,7 +354,9 @@ export function useWorldSimulation(): UseWorldSimulationResult {
     stateInFlight.current = true;
     const generation = generationRef.current;
     try {
-      const r = await fetch("/api/world/state", { signal: abortRef.current?.signal });
+      const r = await fetch("/api/world/state?compact=true", {
+        signal: abortRef.current?.signal,
+      });
       if (!r.ok) throw new Error(`world state HTTP ${r.status}`);
       const body = (await r.json()) as WorldState;
       if (generation !== generationRef.current) return;
@@ -372,9 +378,12 @@ export function useWorldSimulation(): UseWorldSimulationResult {
     const generation = generationRef.current;
     try {
       const requestedCursor = cursorRef.current;
-      let r = await fetch(`/api/world/events?after=${requestedCursor}`, {
+      let r = await fetch(
+        `/api/world/events?after=${requestedCursor}&limit=${EVENT_RING_MAX}`,
+        {
         signal: abortRef.current?.signal,
-      });
+        },
+      );
       if (!r.ok) throw new Error(`world events HTTP ${r.status}`);
       let body = (await r.json()) as WorldEventsResponse;
       if (generation !== generationRef.current) return;
@@ -384,7 +393,7 @@ export function useWorldSimulation(): UseWorldSimulationResult {
       ) {
         cursorRef.current = 0;
         setEvents([]);
-        r = await fetch("/api/world/events?after=0", {
+        r = await fetch(`/api/world/events?after=0&limit=${EVENT_RING_MAX}`, {
           signal: abortRef.current?.signal,
         });
         if (!r.ok) throw new Error(`world events HTTP ${r.status}`);

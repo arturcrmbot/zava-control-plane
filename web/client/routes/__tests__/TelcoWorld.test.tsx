@@ -216,6 +216,31 @@ describe("TelcoWorld route", () => {
     expect(within(rerouted).getByText("+2")).toBeTruthy();
   });
 
+  it("renders full totals from a compact presentation snapshot", () => {
+    mockUseWorld.mockReturnValue(hook({
+      state: {
+        ...TELCO_STATE,
+        sessions: [...DEGRADED.slice(0, 2), ...REROUTED.slice(0, 24), ...ACTIVE],
+        subscribers: undefined,
+        subscriber_count: 2_000,
+        session_counts: {
+          degraded: 3,
+          rerouted: 26,
+          dropped: 0,
+          active: 2_171,
+        },
+      },
+    }));
+
+    renderWorld();
+
+    expect(screen.getByTestId("stat-subscribers").textContent).toBe("2000 subscribers");
+    expect(screen.getByTestId("stat-sessions").textContent).toBe("2200 sessions");
+    expect(screen.getByTestId("session-count-degraded").textContent).toBe("3");
+    expect(screen.getByTestId("session-count-rerouted").textContent).toBe("26");
+    expect(within(screen.getByTestId("session-lane-rerouted")).getByText("+2")).toBeTruthy();
+  });
+
   it("renders the Durable causal chain with the real network-anomaly trace", () => {
     renderWorld();
     const strip = screen.getByTestId("telco-intervention");

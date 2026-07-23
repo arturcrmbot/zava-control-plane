@@ -95,6 +95,50 @@ def test_state_returns_actor_snapshot_and_last_response(client, monkeypatch):
     assert body["last_response"] == {"instance_id": "durable-1"}
 
 
+def test_compact_telco_state_omits_bulk_rows_but_preserves_display_totals(
+    client, monkeypatch
+):
+    fake = FakeActorWorldService()
+    sessions = [
+        {"id": f"ACTIVE-{i:02d}", "status": "active"} for i in range(30)
+    ] + [
+        {"id": f"REROUTED-{i:02d}", "status": "rerouted"} for i in range(26)
+    ] + [
+        {"id": f"DEGRADED-{i:02d}", "status": "degraded"} for i in range(2)
+    ]
+    fake.snapshot = lambda: {
+        "enabled": True,
+        "scenario": "telco",
+        "sessions": sessions,
+        "subscribers": [{"id": f"SUB-{i:02d}"} for i in range(40)],
+        "subscriptions": [{"id": f"PLAN-{i:02d}"} for i in range(40)],
+        "accounts": [
+            {"id": "ACC-00001"},
+            {"id": "ACC-00002"},
+            {"id": "ACC-00003"},
+        ],
+        "customer_impact": {"account_ids": ["ACC-00003"]},
+    }
+    monkeypatch.setattr(app_state, "world_service", fake, raising=False)
+
+    response = client.get("/api/world/state?compact=true")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["session_counts"] == {
+        "active": 30,
+        "rerouted": 26,
+        "degraded": 2,
+    }
+    assert len(body["sessions"]) == 24 + 24 + 2
+    assert body["subscriber_count"] == 40
+    assert body["subscription_count"] == 40
+    assert body["account_count"] == 3
+    assert body["accounts"] == [{"id": "ACC-00001"}, {"id": "ACC-00003"}]
+    assert "subscribers" not in body
+    assert "subscriptions" not in body
+
+
 def test_events_forwards_after_and_latest_seq(client, monkeypatch):
     fake = FakeActorWorldService()
     monkeypatch.setattr(app_state, "world_service", fake, raising=False)
@@ -107,6 +151,21 @@ def test_events_forwards_after_and_latest_seq(client, monkeypatch):
         "events": [{"seq": 3}, {"seq": 4}, {"seq": 5}, {"seq": 6}, {"seq": 7}],
     }
     assert fake.events_after_calls == [3]
+
+
+def test_events_limit_returns_only_the_newest_visual_tail(client, monkeypatch):
+    fake = FakeActorWorldService()
+    monkeypatch.setattr(app_state, "world_service", fake, raising=False)
+
+    response = client.get("/api/world/events?after=0&limit=3")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "enabled": True,
+        "latest_seq": len(fake.runtime.journal),
+        "events": [{"seq": 5}, {"seq": 6}, {"seq": 7}],
+    }
+    assert fake.events_after_calls == [0]
 
 
 def test_inject_demand_surge_uses_defaults_and_custom_values(client, monkeypatch):
