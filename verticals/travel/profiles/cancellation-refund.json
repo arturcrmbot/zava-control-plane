@@ -1,0 +1,72 @@
+{
+  "authority": {
+    "approval_actions": [
+      "cancel_and_refund_booking"
+    ],
+    "approval_bound_gbp": 2000.0,
+    "delegate_to": "head_of_customer_finance",
+    "role": "finance_operations_lead",
+    "spend_limit_gbp": 2000.0
+  },
+  "command": {
+    "command_type": "cancel_and_refund_booking",
+    "required_fields": [
+      "authorized_by",
+      "booking_id",
+      "disruption_id"
+    ]
+  },
+  "display_name": "Cancellation Refund",
+  "evaluation_contract": {
+    "evaluation_type": "refund_settled",
+    "evaluator_fn": "evaluate_refund_settled"
+  },
+  "function": "customer-finance",
+  "hero": false,
+  "maturity": "graduated",
+  "mutation_contract": {
+    "evaluation_timeout_minutes": 60.0,
+    "failure_event_types": [
+      "command.rejected"
+    ],
+    "success_event_types": [
+      "refund.issued"
+    ]
+  },
+  "objective": {
+    "description": "Settles an accepted customer cancellation: releases the booking's flight, hotel and transfer capacity and issues the bounded refund.",
+    "objective_type": "settle_cancelled_booking"
+  },
+  "orchestrator": {
+    "name": "CancellationRefundOrchestrator",
+    "timeout_seconds": 120.0,
+    "workflow_id_prefix": "cxr"
+  },
+  "phases": [
+    {
+      "kind": "deterministic",
+      "name": "detect_cancellation"
+    },
+    {
+      "kind": "agent",
+      "name": "assess_refund"
+    },
+    {
+      "kind": "deterministic",
+      "name": "settle"
+    }
+  ],
+  "skills": [
+    "cancellation-refund"
+  ],
+  "tools": [
+    "travel_operations_check_booking_status",
+    "travel_operations_release_booking_capacity"
+  ],
+  "trigger": {
+    "predicate": "a customer cancellation is accepted against a paid booking",
+    "sensor_id": "sensor:customer_cancellation_accepted",
+    "threshold": "open disruption of kind 'customer_cancellation_accepted'"
+  },
+  "workflow_type": "cancellation-refund"
+}

@@ -1,0 +1,18 @@
+workflow_type: payment-exception
+display_name: Payment Exception
+workflow_id_prefix: pex
+orchestrator_name: PaymentExceptionOrchestrator
+function: customer-finance
+operator_surface: finance-operations-lead
+hero: false
+phases:
+- name: detect_exception
+  kind: deterministic
+- name: assess_resolution
+  kind: agent
+- name: resolve
+  kind: deterministic
+skills:
+- payment-exception
+authority_role: payments_specialist
+hitl_gates: []

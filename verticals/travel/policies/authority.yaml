@@ -1,0 +1,73 @@
+roles:
+- role: travel_adviser
+  spend_limit_gbp: 2000.0
+  approval_actions:
+  - confirm_package_booking
+  delegate_to: head_of_commercial
+- role: revenue_manager
+  spend_limit_gbp: 5000.0
+  approval_actions:
+  - adjust_package_allotment
+  delegate_to: head_of_commercial
+- role: operations_controller
+  spend_limit_gbp: 750.0
+  approval_actions:
+  - reaccommodate_travellers
+  delegate_to: head_of_operations
+- role: accommodation_manager
+  spend_limit_gbp: 5000.0
+  approval_actions:
+  - move_hotel_allotment
+  delegate_to: head_of_accommodation
+- role: finance_operations_lead
+  spend_limit_gbp: 2000.0
+  approval_actions:
+  - cancel_and_refund_booking
+  delegate_to: head_of_customer_finance
+- role: payments_specialist
+  spend_limit_gbp: 5000.0
+  approval_actions:
+  - resolve_payment_exception
+  delegate_to: head_of_customer_finance
+- role: destination_operations_manager
+  spend_limit_gbp: 1000.0
+  approval_actions:
+  - dispatch_replacement_transfer
+  delegate_to: head_of_destination_operations
+- role: customer_care_lead
+  spend_limit_gbp: 500.0
+  approval_actions:
+  - issue_customer_care_action
+  delegate_to: head_of_customer_care
+- role: head_of_commercial
+  spend_limit_gbp: 50000.0
+  approval_actions:
+  - confirm_package_booking
+  - adjust_package_allotment
+  delegate_to: null
+- role: head_of_operations
+  spend_limit_gbp: 2000000.0
+  approval_actions:
+  - reaccommodate_travellers
+  delegate_to: null
+- role: head_of_accommodation
+  spend_limit_gbp: 50000.0
+  approval_actions:
+  - move_hotel_allotment
+  delegate_to: null
+- role: head_of_customer_finance
+  spend_limit_gbp: 50000.0
+  approval_actions:
+  - cancel_and_refund_booking
+  - resolve_payment_exception
+  delegate_to: null
+- role: head_of_destination_operations
+  spend_limit_gbp: 50000.0
+  approval_actions:
+  - dispatch_replacement_transfer
+  delegate_to: null
+- role: head_of_customer_care
+  spend_limit_gbp: 20000.0
+  approval_actions:
+  - issue_customer_care_action
+  delegate_to: null

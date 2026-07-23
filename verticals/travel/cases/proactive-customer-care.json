@@ -1,0 +1,18 @@
+{
+  "command_payload": {
+    "amount_gbp": 50.0,
+    "authorized_by": "customer_care_lead",
+    "booking_id": "BKG-1",
+    "disruption_id": "DIS-material_itinerary_change-BKG-1",
+    "kind": "goodwill_gesture",
+    "message": "We are sorry for the disruption to your holiday."
+  },
+  "detect_target_id": "BKG-1",
+  "disruption": {
+    "kind": "material_itinerary_change",
+    "resource_id": "BKG-1"
+  },
+  "expected_event_type": "care.action_issued",
+  "run_until_minutes": 80.0,
+  "workflow_type": "proactive-customer-care"
+}

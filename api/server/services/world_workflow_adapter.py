@@ -24,16 +24,14 @@ across history, ledger/audit, FleetEvents, Blueprint and AG-UI:
   the Durable route emits — so the adapter never re-implements phase / history
   logic.
 
-Event ownership (network-incident):
+Event ownership is pack-declared:
 
-* The **Durable orchestrator** is the sole owner of ``workflow.started`` and of
-  the two deterministic phase boundaries it actually executes —
-  ``Impact Diagnosis`` and ``Reroute Planning``. Those events arrive on this
-  same ingestor via ``internal_durable_event`` while the bridge awaits the
-  orchestration output. The adapter MUST NOT re-emit them: the ingestor only
-  deduplicates the StateStore phase *table*, so a second emit would duplicate
-  the orchestration history, ledger/audit, FleetEvents, Blueprint and AG-UI
-  RunStarted/StepStarted for the one workflow id.
+* A responder with ``lifecycle_start_via_bridge=False`` leaves
+  ``workflow.started`` to its Durable orchestrator. A responder with
+  ``lifecycle_start_via_bridge=True`` uses the adapter because its selected
+  Durable implementation has no lifecycle webhook activity. Exactly one
+  boundary owns the event, so the history remains contiguous without a
+  duplicate AG-UI run start.
 * The **bridge/adapter** owns only the boundaries that genuinely execute on its
   side: :meth:`scheduled` records ``Telemetry Correlation`` — the deterministic
   bridge-side sensor→observation gather that has already completed by scheduling
@@ -54,6 +52,7 @@ evaluate).
 """
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -68,6 +67,35 @@ log = logging.getLogger("world_workflow_adapter")
 # ``Impact Diagnosis`` / ``Reroute Planning`` are owned by the Durable
 # orchestrator, which executes them and checkpoints them itself.
 _TELEMETRY_CORRELATION = "Telemetry Correlation"
+
+
+def _json_compact(value: Any) -> str:
+    """Serialize any already-generic evidence/observation/outcome dict for
+    the operational-memory narrative. Never vertical-specific: whatever
+    keys the caller's own payload happens to carry (booking ids, decision
+    ids, command ids, customer ids, ...) pass through verbatim -- this
+    function knows nothing about any particular domain's shape. Falls back
+    to ``str(value)`` only for the rare non-JSON-serializable payload
+    (e.g. an exotic object nested somewhere), so capture never raises.
+    """
+    try:
+        return json.dumps(value, sort_keys=True, default=str)
+    except TypeError:
+        return str(value)
+
+
+
+def workflow_id_for(responder_prefix: str, sensor_event_id: str) -> str:
+    """Deterministic canonical Workflow id for one sensor event.
+
+    The ONE formula behind :meth:`WorldWorkflowAdapter.start`'s idempotent
+    lookup. Also called by the bridge BEFORE it opens/re-claims an objective,
+    so a sensor event redelivered after its workflow already exists (and has
+    already been scheduled) short-circuits without ever touching objective
+    state — there is still no independent prefix-id reconstruction anywhere
+    else.
+    """
+    return f"{responder_prefix}-{sensor_event_id}"
 
 
 class WorldWorkflowAdapter:
@@ -92,7 +120,7 @@ class WorldWorkflowAdapter:
         mints a second Workflow. Returns the canonical workflow id.
         """
         sensor_event_id = sensor_event["event_id"]
-        workflow_id = f"{responder.prefix}-{sensor_event_id}"
+        workflow_id = workflow_id_for(responder.prefix, sensor_event_id)
 
         existing = self._app.store.get_workflow(workflow_id)
         if existing is not None:
@@ -110,6 +138,10 @@ class WorldWorkflowAdapter:
             },
             domains=self._app.runtime.pack.domains,
         )
+        workflow.metadata = dict(workflow.metadata or {})
+        workflow.metadata["lifecycle_start_via_bridge"] = (
+            responder.lifecycle_start_via_bridge
+        )
         self._app.store.upsert_workflow(workflow)
         return workflow_id
 
@@ -118,19 +150,29 @@ class WorldWorkflowAdapter:
     async def scheduled(self, workflow_id: str, instance_id: str | None) -> None:
         """Record the bridge-side scheduling boundary and persist the Durable id.
 
-        Owns ONLY ``Telemetry Correlation`` — the deterministic sensor→observation
-        gather that completes on the bridge before scheduling and that the
-        orchestrator never checkpoints. It deliberately does NOT emit
-        ``workflow.started``: the Durable orchestrator owns that lifecycle event
-        (it arrives on this same ingestor via ``internal_durable_event``), so
-        emitting it here too would duplicate the logical run start across
-        history, ledger, FleetEvents, Blueprint and AG-UI.
+        The configured lifecycle boundary owns ``workflow.started``. The
+        adapter emits it only for responders that declare
+        ``lifecycle_start_via_bridge``; all other responders leave it to their
+        Durable webhook activity. It also records ``Telemetry Correlation``
+        only for the legacy network-incident bridge-side phase.
         """
         w = self._app.store.get_workflow(workflow_id)
         workflow_type = getattr(w, "type", None)
         if w is not None and instance_id:
             w.orchestration_instance_id = instance_id
             self._app.store.upsert_workflow(w)
+
+        # Some selected packs emit durable lifecycle webhooks from their
+        # own activities; others expose a real Durable orchestrator without a
+        # webhook activity. The responder registration makes that execution
+        # boundary explicit, so exactly one component owns workflow.started.
+        if w is not None and w.metadata.get("lifecycle_start_via_bridge"):
+            await self._ingest(
+                workflow_id,
+                instance_id,
+                "workflow.started",
+                {"workflow_type": workflow_type},
+            )
 
         # Telemetry Correlation belongs only to network-incident. Other
         # responders checkpoint their own first phase inside their orchestrator.
@@ -145,6 +187,8 @@ class WorldWorkflowAdapter:
         instance_id: str | None,
         command: Any,
         reasoning: str | None = None,
+        *,
+        evidence: dict[str, Any] | None = None,
     ) -> None:
         """Record the nonterminal world-side decision and stash the command.
 
@@ -153,6 +197,16 @@ class WorldWorkflowAdapter:
         re-record ``Impact Diagnosis`` / ``Reroute Planning``: those are the
         orchestrator's deterministic phase boundaries and it already checkpoints
         them on this same ingestor.
+
+        ``evidence`` is an optional, fully industry-neutral passthrough of
+        whatever generic evidence envelope the calling responder's own
+        orchestration output already carries (e.g. ordered phase records,
+        skills/tools used, reasoning, HITL audit, typed command, evaluation
+        intent) — stored verbatim on ``workflow.payload["evidence"]`` when
+        provided, never fabricated when absent. This lets any pack-owned
+        workflow-detail hook or Knowledge projection consume the real
+        terminal orchestration evidence without this shared adapter needing
+        to know anything about any particular vertical's own shape.
 
         NONTERMINAL: the world command has been applied but recovery /
         effectiveness evaluation is Phase 3, so the workflow is left
@@ -163,6 +217,8 @@ class WorldWorkflowAdapter:
             if not isinstance(w.payload, dict):
                 w.payload = {}
             w.payload["decision"] = {"command": command, "reasoning": reasoning}
+            if evidence is not None:
+                w.payload["evidence"] = evidence
             w.metadata = dict(w.metadata or {})
             # Truthful nonterminal marker: the reroute is decided + applied,
             # world recovery/effectiveness evaluation (Phase 3) is pending.
@@ -307,15 +363,36 @@ class WorldWorkflowAdapter:
     def _capture_operational_memory(
         self, workflow: Any, outcome: dict[str, Any] | None
     ) -> None:
+        """Write one operational-memory record for the resolved workflow.
+
+        Fully industry-neutral: this reads only the generic evidence the
+        shared adapter already owns -- ``workflow.type``/``workflow.status``,
+        whatever ``workflow.payload["evidence"]``/``["observation"]`` the
+        real orchestration/trigger already stored (never re-derived or
+        vertical-branched here), and the full ``outcome`` the world's own
+        generic :class:`~api.server.world.evaluations.Evaluation` produced
+        (its own ``id``/``command_id``/``trace_id``/``final_measurements``
+        already carry whatever real ids and actor identities the concrete
+        domain's terminal success event happened to publish). No Travel (or
+        any other vertical) name/id format is hardcoded here.
+        """
         if workflow is None:
             return
         memory = getattr(self._app, "domain_memories", {}).get(workflow.type)
         if memory is None:
             return
-        evidence = (outcome or {}).get("evidence_event_type") or "world evidence"
+        payload = workflow.payload if isinstance(workflow.payload, dict) else {}
+        evidence = payload.get("evidence") or {}
+        observation = payload.get("observation") or {}
+        outcome = outcome or {}
+        evidence_kind = outcome.get("evidence_event_type") or "world evidence"
+        trace_id = payload.get("trace_id", "")
         text = (
-            f"Workflow {workflow.id} resolved from {evidence}; "
-            f"trace_id={(workflow.payload or {}).get('trace_id', '')}."
+            f"Workflow {workflow.id} ({workflow.type}) resolved from {evidence_kind}; "
+            f"trace_id={trace_id}; status={workflow.status}; "
+            f"evidence={_json_compact(evidence)}; "
+            f"observation={_json_compact(observation)}; "
+            f"outcome={_json_compact(outcome)}."
         )
         try:
             memory.add(
@@ -324,7 +401,12 @@ class WorldWorkflowAdapter:
                 workflow_id=workflow.id,
                 extra_metadata={
                     "source": "world_outcome_evaluator",
-                    "evidence_event_type": evidence,
+                    "evidence_event_type": evidence_kind,
+                    "workflow_type": workflow.type,
+                    "workflow_status": workflow.status,
+                    "evidence": evidence,
+                    "observation": observation,
+                    "outcome": outcome,
                 },
             )
         except Exception:

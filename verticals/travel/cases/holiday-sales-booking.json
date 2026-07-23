@@ -1,0 +1,16 @@
+{
+  "command_payload": {
+    "allotment_id": "ALT-BLU-TFS",
+    "authorized_by": "travel_adviser",
+    "flight_id": "FLT-ZV102",
+    "hotel_id": "HTL-BLU-TFS",
+    "quote_id": "QTE-6",
+    "rooms": 1,
+    "transfer_id": "TRF-3"
+  },
+  "detect_target_id": "QTE-6",
+  "disruption": null,
+  "expected_event_type": "booking.paid",
+  "run_until_minutes": 50.0,
+  "workflow_type": "holiday-sales-booking"
+}

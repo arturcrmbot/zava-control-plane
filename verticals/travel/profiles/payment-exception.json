@@ -1,0 +1,74 @@
+{
+  "authority": {
+    "approval_actions": [
+      "resolve_payment_exception"
+    ],
+    "approval_bound_gbp": 5000.0,
+    "delegate_to": "head_of_customer_finance",
+    "role": "payments_specialist",
+    "spend_limit_gbp": 5000.0
+  },
+  "command": {
+    "command_type": "resolve_payment_exception",
+    "required_fields": [
+      "action",
+      "authorized_by",
+      "booking_id",
+      "disruption_id"
+    ]
+  },
+  "display_name": "Payment Exception",
+  "evaluation_contract": {
+    "evaluation_type": "payment_or_inventory_resolved",
+    "evaluator_fn": "evaluate_payment_or_inventory_resolved"
+  },
+  "function": "customer-finance",
+  "hero": false,
+  "maturity": "graduated",
+  "mutation_contract": {
+    "evaluation_timeout_minutes": 60.0,
+    "failure_event_types": [
+      "command.rejected"
+    ],
+    "success_event_types": [
+      "payment.succeeded",
+      "booking.cancelled"
+    ]
+  },
+  "objective": {
+    "description": "Resolves a failed balance payment by retrying it to complete the booking, or releasing the booking's inventory when retry is not viable.",
+    "objective_type": "preserve_payment_booking"
+  },
+  "orchestrator": {
+    "name": "PaymentExceptionOrchestrator",
+    "timeout_seconds": 120.0,
+    "workflow_id_prefix": "pex"
+  },
+  "phases": [
+    {
+      "kind": "deterministic",
+      "name": "detect_exception"
+    },
+    {
+      "kind": "agent",
+      "name": "assess_resolution"
+    },
+    {
+      "kind": "deterministic",
+      "name": "resolve"
+    }
+  ],
+  "skills": [
+    "payment-exception"
+  ],
+  "tools": [
+    "travel_operations_check_booking_status",
+    "travel_operations_release_booking_capacity"
+  ],
+  "trigger": {
+    "predicate": "a balance payment attempt on a booking fails or lapses",
+    "sensor_id": "sensor:balance_payment_exception",
+    "threshold": "open disruption of kind 'balance_payment_exception'"
+  },
+  "workflow_type": "payment-exception"
+}

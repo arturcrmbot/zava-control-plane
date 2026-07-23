@@ -60,6 +60,11 @@ type KindsSummary = {
 };
 type EntityPayload = Record<string, unknown> & { id?: string; _label?: string; name?: string };
 type TimelineRow = { timestamp?: number; action?: string; summary?: string };
+type RelationshipRow = { source: string; target: string; rel: string };
+
+function endpointId(endpoint: string | GraphNode): string {
+  return typeof endpoint === "string" ? endpoint : endpoint.id;
+}
 
 export default function Knowledge() {
   const [graph, setGraph] = useState<{ nodes: GraphNode[]; links: GraphLink[] }>({ nodes: [], links: [] });
@@ -185,6 +190,22 @@ export default function Knowledge() {
     () => Object.values(kindCounts).reduce((a, b) => a + (b ?? 0), 0),
     [kindCounts],
   );
+  const [relationshipQuery, setRelationshipQuery] = useState("");
+  const relationshipRows = useMemo(() => {
+    const query = relationshipQuery.trim().toLowerCase();
+    return graph.links
+      .map((link): RelationshipRow => ({
+        source: endpointId(link.source),
+        target: endpointId(link.target),
+        rel: link.rel,
+      }))
+      .filter((row) => !query || `${row.source} ${row.rel} ${row.target}`.toLowerCase().includes(query))
+      .sort((left, right) =>
+        `${left.source}:${left.rel}:${left.target}`.localeCompare(
+          `${right.source}:${right.rel}:${right.target}`,
+        ))
+      .slice(0, 50);
+  }, [graph.links, relationshipQuery]);
 
   return (
     <div className="flex-1 min-w-0 overflow-y-auto bg-slate-50 dark:bg-slate-950 p-6">
@@ -393,6 +414,36 @@ export default function Knowledge() {
                   </div>
                 </div>
               )}
+            </section>
+
+            <section aria-label="Visible relationships" className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3">
+              <h2 className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-2">
+                Relationships
+              </h2>
+              <label className="block text-[11px] text-slate-500 dark:text-slate-400">
+                Relationship search
+                <input
+                  aria-label="Relationship search"
+                  value={relationshipQuery}
+                  onChange={(event) => setRelationshipQuery(event.target.value)}
+                  placeholder="entity id or relationship"
+                  className="mt-1 w-full rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-2 py-1 text-xs text-slate-800 dark:text-slate-200"
+                />
+              </label>
+              <ul data-testid="knowledge-relationships" className="mt-2 max-h-40 space-y-1 overflow-y-auto font-mono text-[11px]">
+                {relationshipRows.map((row) => (
+                  <li
+                    key={`${row.source}:${row.rel}:${row.target}`}
+                    data-testid={`knowledge-edge-${row.source}-${row.rel}-${row.target}`}
+                    className="rounded bg-slate-50 px-2 py-1 text-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                  >
+                    {row.source} <span className="text-slate-400">{row.rel}</span> {row.target}
+                  </li>
+                ))}
+                {relationshipRows.length === 0 && (
+                  <li className="text-slate-400">no matching relationships</li>
+                )}
+              </ul>
             </section>
 
             <section className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3">

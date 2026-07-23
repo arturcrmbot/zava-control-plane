@@ -1,0 +1,74 @@
+{
+  "authority": {
+    "approval_actions": [
+      "adjust_package_allotment"
+    ],
+    "approval_bound_gbp": 5000.0,
+    "delegate_to": "head_of_commercial",
+    "role": "revenue_manager",
+    "spend_limit_gbp": 5000.0
+  },
+  "command": {
+    "command_type": "adjust_package_allotment",
+    "required_fields": [
+      "authorized_by",
+      "estimated_value_gbp",
+      "from_allotment_id",
+      "rooms",
+      "to_allotment_id"
+    ]
+  },
+  "display_name": "Capacity Yield Management",
+  "evaluation_contract": {
+    "evaluation_type": "capacity_within_bounds",
+    "evaluator_fn": "evaluate_capacity_within_bounds"
+  },
+  "function": "commercial",
+  "hero": false,
+  "maturity": "graduated",
+  "mutation_contract": {
+    "evaluation_timeout_minutes": 60.0,
+    "failure_event_types": [
+      "command.rejected"
+    ],
+    "success_event_types": [
+      "hotel.allotment_adjusted"
+    ]
+  },
+  "objective": {
+    "description": "Moves contracted room headroom between hotel allotments to relieve capacity pressure without ever breaching a supplier's contracted total.",
+    "objective_type": "protect_package_capacity"
+  },
+  "orchestrator": {
+    "name": "CapacityYieldManagementOrchestrator",
+    "timeout_seconds": 120.0,
+    "workflow_id_prefix": "cym"
+  },
+  "phases": [
+    {
+      "kind": "deterministic",
+      "name": "detect_pressure"
+    },
+    {
+      "kind": "agent",
+      "name": "plan_adjustment"
+    },
+    {
+      "kind": "deterministic",
+      "name": "execute_adjustment"
+    }
+  ],
+  "skills": [
+    "capacity-yield-management"
+  ],
+  "tools": [
+    "travel_operations_check_allotment_headroom",
+    "travel_operations_move_allotment_rooms"
+  ],
+  "trigger": {
+    "predicate": "a hotel allotment's booked-room ratio rises to or above its pressure threshold while a paired allotment still has spare rooms",
+    "sensor_id": "sensor:capacity_pressure",
+    "threshold": "allotment utilisation >= 0.85 with headroom available elsewhere"
+  },
+  "workflow_type": "capacity-yield-management"
+}

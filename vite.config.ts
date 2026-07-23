@@ -9,6 +9,9 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       port: 5273,
+      watch: {
+        ignored: ["**/.travel-proof-runtime/**"],
+      },
       proxy: {
         "/api": apiTarget,
         "/internal": apiTarget,

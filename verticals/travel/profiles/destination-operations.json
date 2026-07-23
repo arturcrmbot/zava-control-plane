@@ -1,0 +1,73 @@
+{
+  "authority": {
+    "approval_actions": [
+      "dispatch_replacement_transfer"
+    ],
+    "approval_bound_gbp": 1000.0,
+    "delegate_to": "head_of_destination_operations",
+    "role": "destination_operations_manager",
+    "spend_limit_gbp": 1000.0
+  },
+  "command": {
+    "command_type": "dispatch_replacement_transfer",
+    "required_fields": [
+      "authorized_by",
+      "disruption_id",
+      "estimated_cost_gbp",
+      "transfer_id"
+    ]
+  },
+  "display_name": "Destination Operations",
+  "evaluation_contract": {
+    "evaluation_type": "transfer_sla_restored",
+    "evaluator_fn": "evaluate_transfer_sla_restored"
+  },
+  "function": "destination-operations",
+  "hero": false,
+  "maturity": "graduated",
+  "mutation_contract": {
+    "evaluation_timeout_minutes": 45.0,
+    "failure_event_types": [
+      "command.rejected"
+    ],
+    "success_event_types": [
+      "transfer.replacement_dispatched"
+    ]
+  },
+  "objective": {
+    "description": "Dispatches a replacement resort transfer when an arrival is at risk, rebinding any travellers on the at-risk transfer to the replacement.",
+    "objective_type": "restore_destination_journey"
+  },
+  "orchestrator": {
+    "name": "DestinationOperationsOrchestrator",
+    "timeout_seconds": 90.0,
+    "workflow_id_prefix": "dop"
+  },
+  "phases": [
+    {
+      "kind": "deterministic",
+      "name": "detect_risk"
+    },
+    {
+      "kind": "agent",
+      "name": "plan_replacement"
+    },
+    {
+      "kind": "deterministic",
+      "name": "dispatch"
+    }
+  ],
+  "skills": [
+    "destination-operations"
+  ],
+  "tools": [
+    "travel_operations_check_transfer_risk",
+    "travel_operations_dispatch_replacement_transfer"
+  ],
+  "trigger": {
+    "predicate": "a resort transfer is flagged at risk of missing its arrival window",
+    "sensor_id": "sensor:transfer_arrival_risk",
+    "threshold": "open disruption of kind 'transfer_arrival_risk'"
+  },
+  "workflow_type": "destination-operations"
+}

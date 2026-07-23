@@ -1,0 +1,76 @@
+{
+  "authority": {
+    "approval_actions": [
+      "confirm_package_booking"
+    ],
+    "approval_bound_gbp": 2000.0,
+    "delegate_to": "head_of_commercial",
+    "role": "travel_adviser",
+    "spend_limit_gbp": 2000.0
+  },
+  "command": {
+    "command_type": "confirm_package_booking",
+    "required_fields": [
+      "allotment_id",
+      "authorized_by",
+      "flight_id",
+      "hotel_id",
+      "quote_id",
+      "rooms",
+      "transfer_id"
+    ]
+  },
+  "display_name": "Holiday Sales Booking",
+  "evaluation_contract": {
+    "evaluation_type": "booking_confirmed_and_paid",
+    "evaluator_fn": "evaluate_booking_confirmed_and_paid"
+  },
+  "function": "commercial",
+  "hero": false,
+  "maturity": "graduated",
+  "mutation_contract": {
+    "evaluation_timeout_minutes": 60.0,
+    "failure_event_types": [
+      "command.rejected"
+    ],
+    "success_event_types": [
+      "booking.paid"
+    ]
+  },
+  "objective": {
+    "description": "Confirms a priced holiday-package quote as a paid booking: reserves flight, hotel allotment and transfer capacity and records payment in one bounded, authorised action.",
+    "objective_type": "convert_holiday_demand"
+  },
+  "orchestrator": {
+    "name": "HolidaySalesBookingOrchestrator",
+    "timeout_seconds": 120.0,
+    "workflow_id_prefix": "hsb"
+  },
+  "phases": [
+    {
+      "kind": "deterministic",
+      "name": "detect_demand"
+    },
+    {
+      "kind": "agent",
+      "name": "assess_quote"
+    },
+    {
+      "kind": "deterministic",
+      "name": "confirm_and_pay"
+    }
+  ],
+  "skills": [
+    "holiday-sales-booking"
+  ],
+  "tools": [
+    "travel_operations_check_quote_offer",
+    "travel_operations_reserve_package_capacity"
+  ],
+  "trigger": {
+    "predicate": "a customer quote reaches status 'ready' with a live flight, hotel and transfer still holding availability",
+    "sensor_id": "sensor:quote_ready",
+    "threshold": "any quote whose status becomes 'ready'"
+  },
+  "workflow_type": "holiday-sales-booking"
+}

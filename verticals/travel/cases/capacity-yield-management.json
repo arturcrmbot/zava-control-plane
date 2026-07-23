@@ -1,0 +1,14 @@
+{
+  "command_payload": {
+    "authorized_by": "revenue_manager",
+    "estimated_value_gbp": 500.0,
+    "from_allotment_id": "ALT-SUN-AYT",
+    "rooms": 5,
+    "to_allotment_id": "ALT-SUN-PMI"
+  },
+  "detect_target_id": "ALT-SUN-PMI",
+  "disruption": null,
+  "expected_event_type": "hotel.allotment_adjusted",
+  "run_until_minutes": 80.0,
+  "workflow_type": "capacity-yield-management"
+}

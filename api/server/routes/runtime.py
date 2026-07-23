@@ -16,6 +16,14 @@ def runtime_payload(
     capabilities = set(runtime.pack.ui.capabilities)
     if runtime.world_name is not None:
         capabilities.add("world")
+
+    ui: dict[str, Any] = {
+        "lenses": list(runtime.pack.ui.lenses),
+        "theme": dict(runtime.pack.ui.theme),
+    }
+    if runtime.pack.ui.world_scene is not None:
+        ui["world_scene"] = runtime.pack.ui.world_scene.to_metadata()
+
     return {
         "vertical": {
             "name": runtime.pack.name,
@@ -26,10 +34,7 @@ def runtime_payload(
         "world": runtime.world_name,
         "world_scale": runtime.world_scale_name,
         "capabilities": sorted(capabilities),
-        "ui": {
-            "lenses": list(runtime.pack.ui.lenses),
-            "theme": dict(runtime.pack.ui.theme),
-        },
+        "ui": ui,
     }
 
 

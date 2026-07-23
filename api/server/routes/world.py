@@ -27,10 +27,13 @@ FastAPI process. No frontend, no rendering.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter
+from typing import Literal
+
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from api.server.state import app_state
+from api.server.services.world_bridge import WorldBridge
 from verticals.telco.process_profiles import STANDARD_PROCESS_PROFILES
 
 router = APIRouter(prefix="/api/world", tags=["world"])
@@ -76,6 +79,12 @@ class TechnicianUnavailableRequest(BaseModel):
     technician_id: str = Field(min_length=1)
 
 
+class DirectDiagnosticRequest(BaseModel):
+    """Explicit opt-in for a pack-owned disabled-world diagnostic."""
+
+    mode: Literal["direct-diagnostic"]
+
+
 TELCO_SCENARIOS = frozenset(
     {
         "storm-cascade",
@@ -118,6 +127,61 @@ async def world_events(after: int = 0) -> dict:
         "enabled": True,
         "latest_seq": len(service.runtime.journal),
         "events": service.events_after(after),
+    }
+
+
+@router.post("/diagnostics/{workflow_type}")
+async def run_actor_world_diagnostic(
+    workflow_type: str,
+    body: DirectDiagnosticRequest,
+) -> dict:
+    """Run a pack-owned Durable diagnostic only while its actor world is off."""
+    if getattr(app_state, "world_service", None) is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="actor-world diagnostic requires the live actor world to be disabled",
+        )
+
+    runtime = app_state.runtime
+    registration = runtime.pack.worlds.get(runtime.world_name or "")
+    build_input = (
+        getattr(registration, "build_diagnostic_input", None)
+        if registration is not None
+        else None
+    )
+    if build_input is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"no disabled-world diagnostic is registered for {workflow_type!r}",
+        )
+
+    try:
+        sensor_event, observation = build_input(workflow_type)
+        responder = next(
+            candidate
+            for candidate in registration.responders.values()
+            if candidate.workflow_type == workflow_type
+        )
+    except (StopIteration, ValueError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    workflow_id = await WorldBridge(app_state).start_diagnostic(
+        sensor_event=sensor_event,
+        responder=responder,
+        observation=observation,
+    )
+    source_sensor_event_id = (sensor_event.get("payload") or {}).get(
+        "source_sensor_event_id"
+    )
+    if not isinstance(source_sensor_event_id, str):
+        raise HTTPException(
+            status_code=500,
+            detail="diagnostic input did not preserve its source sensor event id",
+        )
+    return {
+        "workflow_id": workflow_id,
+        "mode": body.mode,
+        "source_sensor_event_id": source_sensor_event_id,
     }
 
 

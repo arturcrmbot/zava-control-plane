@@ -1,0 +1,12 @@
+tools:
+  - id: travel_operations_check_flight_disruption
+    reversible: true
+    requires_authority: false
+    scope_function: operations-control
+    description: Read the current flight-disruption evidence.
+  - id: travel_operations_reaccommodate_booking
+    reversible: false
+    requires_authority: true
+    value_field: incremental_cost_gbp
+    scope_function: operations-control
+    description: Build a bounded traveller-reaccommodation plan.

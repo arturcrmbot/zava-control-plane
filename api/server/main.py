@@ -30,6 +30,7 @@ from api.server.services.fleet_manager_service import FleetManagerService
 from api.server.services import simulator_orchestrator
 from api.shared.otel import init_otel
 from api.server.services.compose.mcp_server import mcp as compose_mcp
+from api.server.services.world_activation import should_start_actor_world
 
 
 def _on_live(ev: dict):
@@ -125,7 +126,12 @@ async def lifespan(app: FastAPI):
     world_task = None
     world_bridge = None
     world_name = None if blueprint_replay_only else runtime.world_name
-    if world_name in ("support", "telco", "fashion"):
+    actor_world_enabled = os.getenv("ZAVA_ACTOR_WORLD_ENABLED", "1") != "0"
+    if should_start_actor_world(
+        runtime,
+        world_name=world_name,
+        actor_world_enabled=actor_world_enabled,
+    ):
         from api.server.services.world_bridge import WorldBridge
         from api.server.world.service import ActorWorldService
 

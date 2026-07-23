@@ -1,0 +1,15 @@
+{
+  "command_payload": {
+    "authorized_by": "finance_operations_lead",
+    "booking_id": "BKG-2",
+    "disruption_id": "DIS-customer_cancellation_accepted-BKG-2"
+  },
+  "detect_target_id": "BKG-2",
+  "disruption": {
+    "kind": "customer_cancellation_accepted",
+    "resource_id": "BKG-2"
+  },
+  "expected_event_type": "refund.issued",
+  "run_until_minutes": 80.0,
+  "workflow_type": "cancellation-refund"
+}

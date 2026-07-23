@@ -1,0 +1,18 @@
+workflow_type: capacity-yield-management
+display_name: Capacity Yield Management
+workflow_id_prefix: cym
+orchestrator_name: CapacityYieldManagementOrchestrator
+function: commercial
+operator_surface: commercial-manager
+hero: false
+phases:
+- name: detect_pressure
+  kind: deterministic
+- name: plan_adjustment
+  kind: agent
+- name: execute_adjustment
+  kind: deterministic
+skills:
+- capacity-yield-management
+authority_role: revenue_manager
+hitl_gates: []

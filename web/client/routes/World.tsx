@@ -18,6 +18,8 @@ import { deriveCommonIntervention, type InterventionStep } from "@client/lib/wor
 import { useRuntimeManifest } from "@client/hooks/useRuntimeManifest";
 import TelcoWorld from "@client/routes/TelcoWorld";
 import FashionWorld from "@client/routes/FashionWorld";
+import SpatialWorld from "@client/routes/SpatialWorld";
+import type { WorldSceneMetadata } from "@shared/runtime";
 
 const WAITING_CAP = 40;
 const IN_SERVICE_CAP = 40;
@@ -72,11 +74,20 @@ export default function World() {
     <ActiveWorld
       vertical={manifest.vertical.name}
       telco={manifest.ui.lenses.includes("telco-network")}
+      scene={manifest.ui.world_scene}
     />
   );
 }
 
-function ActiveWorld({ vertical, telco }: { vertical: string; telco: boolean }) {
+function ActiveWorld({
+  vertical,
+  telco,
+  scene,
+}: {
+  vertical: string;
+  telco: boolean;
+  scene?: WorldSceneMetadata;
+}) {
   const {
     state,
     events,
@@ -187,6 +198,10 @@ function ActiveWorld({ vertical, telco }: { vertical: string; telco: boolean }) 
         {loading ? "Loading world…" : error ?? "No world snapshot available."}
       </div>
     );
+  }
+
+  if (scene) {
+    return <SpatialWorld scene={scene} snapshot={state as unknown as Record<string, unknown>} events={events} />;
   }
 
   if (telco) {
