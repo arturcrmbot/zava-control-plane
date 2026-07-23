@@ -434,6 +434,10 @@ class WorkflowEventIngestor:
             reason = payload.get("reason", "approval")
             wait_kind = payload.get("wait_kind", "operator_review")
             is_external_party = wait_kind == "external_party"
+            enriched_context = dict(payload.get("context") or {})
+            phase = payload.get("phase")
+            if phase and "phase" not in enriched_context:
+                enriched_context["phase"] = phase
             if not is_external_party:
                 compose_hitl_exception(app_state.store, wid, reason)
             self._ledger(wid, kind="agent", actor_id="orchestrator",
@@ -450,6 +454,8 @@ class WorkflowEventIngestor:
             w = app_state.store.get_workflow(wid)
             if w:
                 w.status = "awaiting_hitl"
+                if phase:
+                    w.current_phase = phase
                 # Stash neutral metadata for downstream consumers. Domain-specific
                 # surfaces (recruiter portal, reviewer queue) translate these into
                 # domain-friendly copy; the generic admin shell uses the wait_kind
@@ -457,6 +463,12 @@ class WorkflowEventIngestor:
                 w.metadata = dict(w.metadata or {})
                 w.metadata["awaiting_reason"] = reason
                 w.metadata["wait_kind"] = wait_kind
+                w.payload = dict(w.payload or {})
+                w.payload["hitl_context"] = {
+                    **enriched_context,
+                    "persona": payload.get("persona"),
+                    "external_event": payload.get("external_event"),
+                }
             # Forward persona-responder fields onto the FleetEvent. Generated
             # domains stash `persona`, `external_event`, and `context` in the
             # suspended payload so the responder can close the gate without a
@@ -468,17 +480,13 @@ class WorkflowEventIngestor:
             # payload; merging it into `context` here means SKILL.md
             # decision_policy blocks can read `context["phase"]` without
             # caring about the FleetEvent shape.
-            _enriched_context = dict(payload.get("context") or {})
-            _phase = payload.get("phase")
-            if _phase and "phase" not in _enriched_context:
-                _enriched_context["phase"] = _phase
             self._emit(
                 "workflow.hitl.requested", wid,
                 reason=reason, wait_kind=wait_kind,
                 instance_id=instance_id,
                 persona=payload.get("persona"),
                 external_event=payload.get("external_event"),
-                context=_enriched_context,
+                context=enriched_context,
             )
             # Canonical durable.suspended carries the same payload so the
             # observatory can render the pause + the recorder can capture it.
@@ -504,6 +512,8 @@ class WorkflowEventIngestor:
                 if w.metadata:
                     w.metadata = {k: v for k, v in w.metadata.items()
                                   if k not in {"awaiting_reason", "wait_kind"}}
+                w.payload = dict(w.payload or {})
+                w.payload.pop("hitl_context", None)
             # When the orchestrator resumes via raiseEvent, the HITL exception that
             # gated the suspension is defunct. Resolve any still-open exceptions
             # for this workflow so the operator queue doesn't leak stale entries.

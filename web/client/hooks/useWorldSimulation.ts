@@ -371,14 +371,28 @@ export function useWorldSimulation(): UseWorldSimulationResult {
     eventsInFlight.current = true;
     const generation = generationRef.current;
     try {
-      const r = await fetch(`/api/world/events?after=${cursorRef.current}`, {
+      const requestedCursor = cursorRef.current;
+      let r = await fetch(`/api/world/events?after=${requestedCursor}`, {
         signal: abortRef.current?.signal,
       });
       if (!r.ok) throw new Error(`world events HTTP ${r.status}`);
-      const body = (await r.json()) as WorldEventsResponse;
+      let body = (await r.json()) as WorldEventsResponse;
       if (generation !== generationRef.current) return;
+      if (
+        typeof body.latest_seq === "number"
+        && body.latest_seq < requestedCursor
+      ) {
+        cursorRef.current = 0;
+        setEvents([]);
+        r = await fetch("/api/world/events?after=0", {
+          signal: abortRef.current?.signal,
+        });
+        if (!r.ok) throw new Error(`world events HTTP ${r.status}`);
+        body = (await r.json()) as WorldEventsResponse;
+        if (generation !== generationRef.current) return;
+      }
       if (typeof body.latest_seq === "number") {
-        cursorRef.current = Math.max(cursorRef.current, body.latest_seq);
+        cursorRef.current = body.latest_seq;
       }
       if (body.events && body.events.length > 0) {
         setEvents((prev) => mergeEvents(prev, body.events));

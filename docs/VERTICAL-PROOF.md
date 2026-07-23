@@ -26,6 +26,9 @@ actor world
 
 Every node that does not apply to a given workflow (e.g. a workflow with no
 HITL gate) is marked **N/A** and skipped. All other nodes are **mandatory**.
+At every HITL node, additionally prove that the real governance authority
+matrix allows the emitted action/category/value and that the suspended Workflow
+API record persists `payload.hitl_context` for recovery sweeps.
 
 ---
 
@@ -82,6 +85,16 @@ run completes:
 - **Clean teardown** — after stopping the stack, no orphan processes on the
   Functions or FastAPI ports (`7071`, `3101`, `5273`). Verify with
   `lsof -ti :<port>` returning empty.
+- **Click-to-first-visible latency** — every named scenario must render its
+  first journal/state change within one second of the browser click. Time the
+  browser, not only the POST response.
+- **Backend restart recovery** — keep the page mounted while restarting or
+  resetting the actor-world backend. If the new journal's `latest_seq` is lower
+  than the client's cursor, the client must replay from `after=0`; no manual
+  page refresh is allowed.
+- **HITL completion latency** — with `PERSONA_AUTO_CLOSE=*`, every generated
+  HITL gate must show a persona decision, `durable.resumed`, and terminal
+  workflow state within 15 seconds. A gate that only times out is a failure.
 
 ---
 
@@ -114,12 +127,14 @@ A vertical proof is **complete** when:
 3. Both §3 replay probes pass.
 4. The §4 browser error gate passes.
 5. Hero and every shared-engine workflow each have distinct §5 evidence.
-6. The graduate.sh validation step (`step 6/6`) exits 0 on a clean run:
+6. Every HITL action passes the real authority-matrix check and every suspended
+   workflow persists `payload.hitl_context`.
+7. The graduate.sh validation step (`step 6/6`) exits 0 on a clean run:
    `ZAVA_VERTICAL=<vertical> bash <run-id>/graduate.sh`
-7. A recorded walk (`data/blueprint-recordings/<wt>-*.jsonl`) exists for
+8. A recorded walk (`data/blueprint-recordings/<wt>-*.jsonl`) exists for
    every workflow, committed to the repository.
 
-**Do not claim a vertical is shipped until all seven criteria are met.**
+**Do not claim a vertical is shipped until all eight criteria are met.**
 
 ---
 

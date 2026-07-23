@@ -113,6 +113,44 @@ describe("useWorldSimulation", () => {
     expect(eventsUrls[1]).toContain("after=5");
   });
 
+  it("replays from zero when the backend journal sequence regresses", async () => {
+    const eventsUrls: string[] = [];
+    let eventsCall = 0;
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {
+      const value = String(url);
+      if (value.includes("/api/world/state")) return jsonResponse(BASE_STATE);
+      if (value.includes("/api/world/events")) {
+        eventsUrls.push(value);
+        eventsCall += 1;
+        if (eventsCall === 1) {
+          return jsonResponse({ enabled: true, latest_seq: 10, events: [mkEvent(10)] });
+        }
+        if (eventsCall === 2) {
+          return jsonResponse({ enabled: true, latest_seq: 3, events: [] });
+        }
+        return jsonResponse({
+          enabled: true,
+          latest_seq: 3,
+          events: [mkEvent(1), mkEvent(2), mkEvent(3)],
+        });
+      }
+      return jsonResponse({});
+    }) as unknown as typeof fetch;
+
+    const { result } = renderHook(() => useWorldSimulation());
+    await act(async () => { await flush(); });
+    expect(result.current.events.map((event) => event.seq)).toEqual([10]);
+
+    await tick(300);
+
+    expect(eventsUrls).toEqual([
+      "/api/world/events?after=0",
+      "/api/world/events?after=10",
+      "/api/world/events?after=0",
+    ]);
+    expect(result.current.events.map((event) => event.seq)).toEqual([1, 2, 3]);
+  });
+
   it("de-duplicates events by seq and bounds the ring to 300", async () => {
     // Each poll returns 20 seqs stepping the base by 10 so consecutive
     // batches overlap by 10 (genuine duplicates). One poll fires on mount and

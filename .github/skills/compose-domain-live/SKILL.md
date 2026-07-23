@@ -31,7 +31,10 @@ exactly — this skill only governs *how you communicate*, not *what you build*.
 5. `report_stage("graduating", ...)` then run graduate.sh + the Phase-4b/4c
    hand-stitches (domains.py, entity_projections/__init__.py, AGT matrix, etc.).
 6. `report_stage("verifying", ...)` then run add-domain Phase 4d verification.
-   If a check fails, fix it and re-verify — narrate what you're doing.
+   Include compose-domain CHECKLIST §12: live authority closure, persisted
+   HITL recovery context, persona/Durable resume timing, and browser event
+   recovery across a lower `latest_seq`. If a check fails, fix it and
+   re-verify — narrate what you're doing.
 7. On success call
    `composition_complete(workflow_type, display_name)`. Do not restart the
    server yourself — the UI's Ignite control handles the restart.

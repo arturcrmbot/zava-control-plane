@@ -127,6 +127,50 @@ def test_order_capacity_exception_routes_to_delivery_lead() -> None:
     assert result.approver_role == "delivery_lead"
 
 
+@pytest.mark.parametrize(
+    ("role", "action", "category", "value", "rule_id"),
+    [
+        (
+            "network_ops_director",
+            "network_ops_director_decision",
+            "prestage_field_resources",
+            13_000.0,
+            "TELCO-NETOPS-001",
+        ),
+        (
+            "delivery_lead",
+            "delivery_lead_decision",
+            "dispatch_field_repair",
+            3_500.0,
+            "TELCO-DELIVERY-001",
+        ),
+        (
+            "cs_manager",
+            "cs_manager_decision",
+            "apply_retention_offer",
+            75.0,
+            "TELCO-CS-001",
+        ),
+    ],
+)
+def test_telco_personae_can_close_cascade_hitl_gates(
+    role: str,
+    action: str,
+    category: str,
+    value: float,
+    rule_id: str,
+) -> None:
+    result = kernel().check_authority(
+        role=role,
+        action=action,
+        category=category,
+        value=value,
+    )
+
+    assert result.allowed is True
+    assert result.governing_rule_id == rule_id
+
+
 # ---------------------------------------------------------------------------
 # kernel.check_authority — primary, escalation, denied
 # ---------------------------------------------------------------------------

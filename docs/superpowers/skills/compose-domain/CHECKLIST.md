@@ -154,3 +154,24 @@ The script applies all six pack-scoped steps idempotently:
 - [ ] §11.4 `ambient.function` matches `brief.function`.
 - [ ] §11.5 Each trigger entry sets exactly one of `bus | cypher | cadence` and supplies the kind-specific keys.
 - [ ] §11.6 Every `spawnable_workflow_types` entry is in the selected pack's domains (`active_runtime().pack.domains`) OR equals the brief's own `workflow_type` (self-spawn forward-declaration).
+
+## §12 — Live demo runtime gates
+
+- [ ] §12.1 Every HITL action/category/value emitted by the workflow matches a
+  real governance authority matrix rule. Run
+  `kernel().check_authority(role=..., action=..., category=..., value=...)`
+  with representative live context and require `allowed=True`.
+- [ ] §12.2 With `PERSONA_AUTO_CLOSE=*`, trigger each HITL path and require
+  `persona.decided`, `durable.resumed`, and a terminal workflow status within
+  15 seconds. No workflow may remain in `awaiting_hitl`.
+- [ ] §12.3 While suspended, `GET /api/workflows/<id>` exposes
+  `payload.hitl_context` containing `persona`, `external_event`, `phase`, and
+  decision context. Invoke `POST /api/personas/sweep` and prove the same gate
+  can be reconstructed if its original bus event is missed.
+- [ ] §12.4 Keep the world page mounted while the backend journal is reset or
+  restarted. When `/api/world/events` reports `latest_seq` below the client's
+  cursor, the client must clear stale events, retry with `after=0`, and display
+  new events without a page reload.
+- [ ] §12.5 For every named demo scenario, measure click-to-first-visible event
+  at the browser. It must be at most one second; API success without visible UI
+  evidence is a failure.
