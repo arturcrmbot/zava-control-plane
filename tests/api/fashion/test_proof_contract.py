@@ -258,10 +258,17 @@ def test_manifest_writer_fails_closed_when_demo_proof_fails(
     assert manifest["overall_status"] == "substrate-complete / demo-incomplete"
 
 
-def test_clean_source_guard_blocks_this_dirty_development_tree() -> None:
+def test_clean_source_guard_blocks_dirty_tree(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    script = repo / "tools" / SCRIPT.name
+    script.parent.mkdir(parents=True)
+    script.write_bytes(SCRIPT.read_bytes())
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "add", str(script.relative_to(repo))], cwd=repo, check=True)
+
     result = subprocess.run(
-        ["bash", str(SCRIPT), "--check-source"],
-        cwd=ROOT,
+        ["bash", str(script), "--check-source"],
+        cwd=repo,
         capture_output=True,
         text=True,
     )
