@@ -127,6 +127,34 @@ async def test_suspended_then_resumed_toggles_status():
     assert state.store.get_workflow("ING-6").status == "in_progress"
 
 
+async def test_suspended_persists_persona_gate_for_recovery_sweeps():
+    state, _ = _app_state()
+    _seed(state, "ING-HITL", "field-repair-dispatch")
+    ing = WorkflowEventIngestor(state)
+
+    await ing.ingest("ING-HITL", "I-HITL", "suspended", {
+        "reason": "awaiting_approval",
+        "wait_kind": "operator_review",
+        "phase": "Approve Dispatch Exception",
+        "persona": "delivery_lead",
+        "external_event": "delivery_lead_decision",
+        "context": {
+            "action": "delivery_lead_decision",
+            "request": {"amount": 3500.0, "category": "dispatch_field_repair"},
+        },
+    })
+
+    workflow = state.store.get_workflow("ING-HITL")
+    assert workflow.current_phase == "Approve Dispatch Exception"
+    assert workflow.payload["hitl_context"] == {
+        "action": "delivery_lead_decision",
+        "request": {"amount": 3500.0, "category": "dispatch_field_repair"},
+        "phase": "Approve Dispatch Exception",
+        "persona": "delivery_lead",
+        "external_event": "delivery_lead_decision",
+    }
+
+
 async def test_workflow_completed_sets_completed_status():
     state, captured = _app_state()
     _seed(state, "ING-7")

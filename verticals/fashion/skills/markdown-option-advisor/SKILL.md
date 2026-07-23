@@ -1,9 +1,11 @@
 ---
 name: markdown-option-advisor
-description: Propose governed markdown options without changing prices.
-allowed-tools: fashion_query_demand, fashion_query_inventory, fashion_query_policies
+description: Compare markdown recommendations against margin and authority policy.
+allowed-tools: fashion_prepare_markdown_recommendation
 ---
 
-Return an explainable recommendation and evidence digest. Every markdown
-requires merchandising approval; never issue a price mutation.
+# Markdown option advisor
+
+Return an auditable recommendation and margin evidence. Price mutation is forbidden;
+every recommendation requires a merchandising decision.
 

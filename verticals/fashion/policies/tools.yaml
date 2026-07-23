@@ -1,30 +1,78 @@
 tools:
-  - id: fashion_query_demand
+  - id: fashion_read_inventory
     reversible: true
+    requires_capability: null
     requires_authority: false
+    value_field: null
     scope_function: merchandising-planning
-  - id: fashion_query_inventory
+    description: Read versioned inventory and demand evidence.
+  - id: fashion_prepare_inventory_transfer
     reversible: true
+    requires_capability: null
     requires_authority: false
+    value_field: null
     scope_function: merchandising-planning
-  - id: fashion_query_orders
+    description: Prepare an inventory transfer for world validation.
+  - id: fashion_assess_promotion
     reversible: true
+    requires_capability: null
     requires_authority: false
+    value_field: null
+    scope_function: merchandising-planning
+    description: Assess promotion stock and channel readiness.
+  - id: fashion_prepare_markdown_recommendation
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: merchandising-planning
+    description: Prepare a markdown recommendation without changing price.
+  - id: fashion_prepare_supplier_recovery
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
     scope_function: supply-chain-fulfilment
-  - id: fashion_query_partners
+    description: Prepare a supplier recovery proposal.
+  - id: fashion_prepare_fulfilment_resolution
     reversible: true
+    requires_capability: null
     requires_authority: false
+    value_field: null
+    scope_function: supply-chain-fulfilment
+    description: Prepare a fulfilment resolution proposal.
+  - id: fashion_prepare_seller_suppression
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
     scope_function: marketplace-operations
-  - id: fashion_query_policies
+    description: Prepare a seller offer suppression for authority review.
+  - id: fashion_prepare_return_disposition
     reversible: true
+    requires_capability: null
     requires_authority: false
-    scope_function: shared
-  - id: fashion_query_returns
-    reversible: true
-    requires_authority: false
+    value_field: null
     scope_function: customer-returns
-  - id: fashion_prepare_command
-    reversible: true
-    requires_authority: true
-    scope_function: shared
+    description: Prepare a return disposition proposal.
 
+version: 1
+vertical: fashion
+policies:
+  inventory.transfer:
+    auto_execute_when:
+      max_retail_value_gbp: 10000
+      max_quantity: 50
+      owned_stock_only: true
+      cross_border: false
+      source_safety_stock_preserved: true
+      expected_margin_exceeds_transfer_cost: true
+      fairness_guardrail_passed: true
+    approval_event: merchandising_director_decision
+  markdown.recommend:
+    approval_required: true
+    mutates_price: false
+  seller.offer.suppress:
+    approval_required: true
+  return.disposition:
+    high_value_approval_required: true

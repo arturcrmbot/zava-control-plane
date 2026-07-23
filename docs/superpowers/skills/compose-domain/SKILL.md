@@ -463,6 +463,10 @@ Always:
   script. Mechanically copies files + edits the live trees described in
   step 4.7.
 
+Before declaring the graduated domain demo-ready, run the runtime gates in
+`CHECKLIST.md` §12. Static generation checks do not prove persona completion,
+Durable resume latency, or browser recovery after a backend journal reset.
+
 ### Conventions (codified for determinism)
 
 These were free choices in earlier drafts; codifying them removes
@@ -486,6 +490,16 @@ improvisation from the procedure.
 - **HITL external event name.** For every phase whose `kind: hitl`, the
   orchestrator's `wait_for_external_event(...)` name and the persona
   SKILL.md's `external_event` frontmatter MUST match byte-for-byte.
+- **HITL authority closure.** The governance authority matrix used by
+  `api.server.services.governance.kernel` MUST contain a rule matching each
+  HITL persona's emitted `action`, representative `category`, and value band.
+  A persona folder or pack `AuthorityRow` alone does not prove the runtime
+  kernel will approve it. Run `kernel().check_authority(...)` with a real
+  generated gate context and require `allowed=True`.
+- **HITL recovery metadata.** After a live suspend, the Workflow API payload
+  MUST contain `hitl_context` with `persona`, `external_event`, `phase`, and
+  the decision context. This is what `sweep_pending_hitl()` uses after a missed
+  bus event or server restart.
 - **Activity-trigger names.** `<domain.name with - replaced by _>_<phase_name>_activity_trigger`.
   E.g. `fleet_travel_preapproval_employee_lookup_activity_trigger`.
 - **Graph builder names.** `build_<domain.name with - replaced by _>_<phase_name>_workflow`.

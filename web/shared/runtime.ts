@@ -50,6 +50,6 @@ export interface RuntimeManifest {
   ui: {
     lenses: string[];
     theme: Record<string, string>;
-    world_scene?: WorldSceneMetadata;
+    world_scene?: WorldSceneMetadata | boolean;
   };
 }

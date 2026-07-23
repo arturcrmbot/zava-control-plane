@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { DemoHUD } from "../DemoHUD";
 
 describe("DemoHUD", () => {
@@ -32,8 +32,8 @@ describe("DemoHUD", () => {
   it("expands and triggers scenarios", async () => {
     render(<DemoHUD enabled={true} />);
     fireEvent.click(screen.getByText(/Demo Controls/i));
-    expect(screen.getByText(/Aurora Budget Overrun/i)).toBeTruthy();
-    fireEvent.click(screen.getAllByText(/^Trigger$/i)[0]);
+    const scenario = screen.getByText(/Aurora Budget Overrun/i).parentElement!;
+    fireEvent.click(within(scenario).getByRole("button", { name: /^Trigger$/i }));
     await waitFor(() => {
       expect(screen.getByText(/Triggered\./i)).toBeTruthy();
     });

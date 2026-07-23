@@ -1,8 +1,10 @@
 ---
-name: inventory_allocation_manager
-description: Review routine allocation and promotion exceptions.
+name: inventory-allocation-manager
+description: Reviews routine allocation and promotion readiness decisions.
 ---
 
-Check current versions, availability, presentation minimums, and fairness.
-Escalate outside delegated authority to the merchandising director.
+# Inventory Allocation Manager
+
+Review actor IDs, versions and availability evidence. Escalate value, safety-stock,
+partner or cross-border exceptions to the Merchandising Director.
 

@@ -92,6 +92,12 @@ export default function TelcoWorld({
   const toggle = (id: string | null) => setSelected((c) => (c === id ? null : id));
   const sites = state.sites ?? [];
   const sessions = state.sessions ?? [];
+  const sessionCounts = state.session_counts ?? {};
+  const sessionCount = Object.values(sessionCounts).reduce(
+    (total, count) => total + (count ?? 0),
+    0,
+  ) || sessions.length;
+  const subscriberCount = state.subscriber_count ?? state.subscribers?.length ?? 0;
   const intervention = useMemo(() => deriveIntervention(events), [events]);
   // Persisted incident site from the journal (survives fast recovery), plus
   // its neighbours for the affected-relationship highlight.
@@ -129,11 +135,11 @@ export default function TelcoWorld({
     setBusy(true);
     try { await onRunScenario(name); } finally { setBusy(false); }
   }
-  const lanes: Array<{ id: string; title: string; list: WorldSession[]; tone: string }> = [
-    { id: "degraded", title: "Degraded", list: degraded, tone: "text-red-600 dark:text-red-400" },
-    { id: "rerouted", title: "Rerouted", list: rerouted, tone: "text-emerald-600 dark:text-emerald-400" },
-    { id: "dropped", title: "Dropped", list: dropped, tone: "text-slate-500" },
-    { id: "active", title: "Active", list: active, tone: "text-slate-600 dark:text-slate-300" },
+  const lanes: Array<{ id: WorldSession["status"]; title: string; list: WorldSession[]; count: number; tone: string }> = [
+    { id: "degraded", title: "Degraded", list: degraded, count: sessionCounts.degraded ?? degraded.length, tone: "text-red-600 dark:text-red-400" },
+    { id: "rerouted", title: "Rerouted", list: rerouted, count: sessionCounts.rerouted ?? rerouted.length, tone: "text-emerald-600 dark:text-emerald-400" },
+    { id: "dropped", title: "Dropped", list: dropped, count: sessionCounts.dropped ?? dropped.length, tone: "text-slate-500" },
+    { id: "active", title: "Active", list: active, count: sessionCounts.active ?? active.length, tone: "text-slate-600 dark:text-slate-300" },
   ];
 
   return (
@@ -149,8 +155,8 @@ export default function TelcoWorld({
                 <span>seed {state.seed ?? "—"}</span>
                 <span>status {state.status ?? "—"}</span>
                 <span data-testid="stat-sites">{sites.length} sites</span>
-                <span data-testid="stat-sessions">{sessions.length} sessions</span>
-                <span data-testid="stat-subscribers">{state.subscribers?.length ?? 0} subscribers</span>
+                <span data-testid="stat-sessions">{sessionCount} sessions</span>
+                <span data-testid="stat-subscribers">{subscriberCount} subscribers</span>
               </div>
             </div>
           </div>
@@ -232,7 +238,7 @@ export default function TelcoWorld({
             <div key={lane.id} data-testid={`session-lane-${lane.id}`} className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2">
               <div className="flex items-baseline justify-between px-1 pb-2">
                 <h2 className={`text-[11px] font-semibold uppercase tracking-wide ${lane.tone}`}>{lane.title}</h2>
-                <span data-testid={`session-count-${lane.id}`} className="text-[11px] tabular-nums text-slate-500 dark:text-slate-400">{lane.list.length}</span>
+                <span data-testid={`session-count-${lane.id}`} className="text-[11px] tabular-nums text-slate-500 dark:text-slate-400">{lane.count}</span>
               </div>
               <div className="flex flex-wrap gap-1">
                 {lane.list.length === 0 ? (
@@ -243,8 +249,8 @@ export default function TelcoWorld({
                     className={`text-[10px] font-mono px-1 py-0.5 rounded border ${s.kind === "voice" ? "border-blue-300 dark:border-blue-800" : "border-slate-200 dark:border-slate-700"} ${selected === s.id ? "bg-blue-100 dark:bg-blue-900/40" : "bg-slate-50 dark:bg-slate-800/40"}`}
                   >{s.id.replace("SESSION-", "S-")}</button>
                 ))}
-                {lane.list.length > TOKEN_CAP && (
-                  <span className="text-[10px] text-slate-400 dark:text-slate-600 px-1 py-0.5">+{lane.list.length - TOKEN_CAP}</span>
+                {lane.count > Math.min(lane.list.length, TOKEN_CAP) && (
+                  <span className="text-[10px] text-slate-400 dark:text-slate-600 px-1 py-0.5">+{lane.count - Math.min(lane.list.length, TOKEN_CAP)}</span>
                 )}
               </div>
             </div>

@@ -65,6 +65,47 @@ async function tick(ms: number): Promise<void> {
 }
 
 describe("useWorldSimulation", () => {
+  it("uses compact state and bounded journal endpoints", async () => {
+    const urls: string[] = [];
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {
+      const value = String(url);
+      urls.push(value);
+      if (value.includes("/api/world/state")) return jsonResponse(BASE_STATE);
+      if (value.includes("/api/world/events")) {
+        return jsonResponse({ enabled: true, latest_seq: 0, events: [] });
+      }
+      return jsonResponse({});
+    }) as unknown as typeof fetch;
+
+    renderHook(() => useWorldSimulation());
+    await act(async () => { await flush(); });
+
+    expect(urls).toContain("/api/world/state?compact=true");
+    expect(urls).toContain("/api/world/events?after=0&limit=300");
+  });
+
+  it("polls the journal no more than once per second", async () => {
+    let eventCalls = 0;
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {
+      const value = String(url);
+      if (value.includes("/api/world/state")) return jsonResponse(BASE_STATE);
+      if (value.includes("/api/world/events")) {
+        eventCalls += 1;
+        return jsonResponse({ enabled: true, latest_seq: 0, events: [] });
+      }
+      return jsonResponse({});
+    }) as unknown as typeof fetch;
+
+    renderHook(() => useWorldSimulation());
+    await act(async () => { await flush(); });
+    expect(eventCalls).toBe(1);
+
+    await tick(999);
+    expect(eventCalls).toBe(1);
+    await tick(1);
+    expect(eventCalls).toBe(2);
+  });
+
   it("loads the initial snapshot and events on mount", async () => {
     globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {
       const u = String(url);
@@ -108,9 +149,46 @@ describe("useWorldSimulation", () => {
     await act(async () => { await flush(); });
     expect(eventsUrls[0]).toContain("after=0");
 
-    // Events poll again at 300ms; state poll (1000ms) has not fired yet.
-    await tick(300);
+    await tick(1000);
     expect(eventsUrls[1]).toContain("after=5");
+  });
+
+  it("replays from zero when the backend journal sequence regresses", async () => {
+    const eventsUrls: string[] = [];
+    let eventsCall = 0;
+    globalThis.fetch = vi.fn(async (url: RequestInfo | URL) => {
+      const value = String(url);
+      if (value.includes("/api/world/state")) return jsonResponse(BASE_STATE);
+      if (value.includes("/api/world/events")) {
+        eventsUrls.push(value);
+        eventsCall += 1;
+        if (eventsCall === 1) {
+          return jsonResponse({ enabled: true, latest_seq: 10, events: [mkEvent(10)] });
+        }
+        if (eventsCall === 2) {
+          return jsonResponse({ enabled: true, latest_seq: 3, events: [] });
+        }
+        return jsonResponse({
+          enabled: true,
+          latest_seq: 3,
+          events: [mkEvent(1), mkEvent(2), mkEvent(3)],
+        });
+      }
+      return jsonResponse({});
+    }) as unknown as typeof fetch;
+
+    const { result } = renderHook(() => useWorldSimulation());
+    await act(async () => { await flush(); });
+    expect(result.current.events.map((event) => event.seq)).toEqual([10]);
+
+    await tick(1000);
+
+    expect(eventsUrls).toEqual([
+      "/api/world/events?after=0&limit=300",
+      "/api/world/events?after=10&limit=300",
+      "/api/world/events?after=0&limit=300",
+    ]);
+    expect(result.current.events.map((event) => event.seq)).toEqual([1, 2, 3]);
   });
 
   it("de-duplicates events by seq and bounds the ring to 300", async () => {
@@ -135,7 +213,7 @@ describe("useWorldSimulation", () => {
     await act(async () => { await flush(); });
     for (let i = 0; i < 40; i += 1) {
       // eslint-disable-next-line no-await-in-loop
-      await tick(300);
+      await tick(1000);
     }
 
     const seqs = result.current.events.map((e) => e.seq);
@@ -195,7 +273,7 @@ describe("useWorldSimulation", () => {
   });
 
   it("runs a standard Telco process then refreshes world state", async () => {
-    const fetchMock = vi.fn(async (url: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
       const value = String(url);
       if (value.includes("/api/world/processes/revenue-assurance/run")) {
         return jsonResponse({ ok: true, case_id: "CASE-BSS09-0001" });
@@ -219,6 +297,81 @@ describe("useWorldSimulation", () => {
       String(entry[0]).includes("/api/world/processes/revenue-assurance/run")
     );
     expect(call?.[1]).toEqual(expect.objectContaining({ method: "POST" }));
+  });
+
+  it("resets the active world and restarts the journal cursor", async () => {
+    const eventUrls: string[] = [];
+    const fetchMock = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
+      const value = String(url);
+      if (value.includes("/api/world/reset")) {
+        return jsonResponse({ ok: true, seed: 42, sim_time: 0 });
+      }
+      if (value.includes("/api/world/state")) return jsonResponse(BASE_STATE);
+      if (value.includes("/api/world/events")) {
+        eventUrls.push(value);
+        return jsonResponse({
+          enabled: true,
+          latest_seq: eventUrls.length === 1 ? 4 : 0,
+          events: eventUrls.length === 1 ? [mkEvent(4)] : [],
+        });
+      }
+      return jsonResponse({});
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { result } = renderHook(() => useWorldSimulation());
+    await act(async () => { await flush(); });
+    expect(result.current.events).toHaveLength(1);
+
+    await act(async () => {
+      await result.current.resetWorld();
+      await flush();
+    });
+
+    const resetCall = fetchMock.mock.calls.find((entry) =>
+      String(entry[0]).includes("/api/world/reset")
+    );
+    expect(resetCall?.[1]).toEqual(expect.objectContaining({ method: "POST" }));
+    expect(eventUrls.at(-1)).toContain("after=0");
+    expect(result.current.events).toEqual([]);
+  });
+
+  it("discards event responses that started before a reset", async () => {
+    let resolveOldEvents: ((response: Response) => void) | undefined;
+    const eventUrls: string[] = [];
+    const fetchMock = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => {
+      const value = String(url);
+      if (value.includes("/api/world/reset")) {
+        return jsonResponse({ ok: true, seed: 42, sim_time: 0 });
+      }
+      if (value.includes("/api/world/state")) return jsonResponse(BASE_STATE);
+      if (value.includes("/api/world/events")) {
+        eventUrls.push(value);
+        if (eventUrls.length === 1) {
+          return new Promise<Response>((resolve) => {
+            resolveOldEvents = resolve;
+          });
+        }
+        return jsonResponse({ enabled: true, latest_seq: 0, events: [] });
+      }
+      return jsonResponse({});
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { result } = renderHook(() => useWorldSimulation());
+    await act(async () => { await flush(); });
+
+    await act(async () => {
+      await result.current.resetWorld();
+      resolveOldEvents?.(jsonResponse({
+        enabled: true,
+        latest_seq: 999,
+        events: [mkEvent(999)],
+      }));
+      await flush();
+    });
+    await tick(1000);
+
+    expect(result.current.events).toEqual([]);
+    expect(eventUrls.at(-1)).toContain("after=0");
   });
 
   it("clears both intervals and aborts in-flight fetches on unmount", async () => {

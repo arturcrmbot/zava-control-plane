@@ -173,7 +173,7 @@ const ABBREV = new Set(["KYC", "UBO", "JD", "CV", "SLA", "AI", "ID", "API", "URL
 
 export function titleCase(snake: string): string {
   return snake
-    .split(/[_\s]+/)
+    .split(/[._\s-]+/)
     .filter(Boolean)
     .map((w) => (ABBREV.has(w.toUpperCase()) ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1)))
     .join(" ");

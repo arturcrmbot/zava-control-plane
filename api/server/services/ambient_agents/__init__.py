@@ -12,10 +12,9 @@ This module exposes:
   every ``*.py`` sibling module. Phase 6 (TASK-035..-037) plants the
   three concrete agent declarations; until then the dict is empty.
 
-Cross-validation: every discovered agent must have ``agent.function in
-FUNCTIONS`` AND ``agent.name in FUNCTIONS[agent.function].ambient_agents``
-(loud failure on mismatch — same discipline as the active pack's function
-ownership wiring in ``verticals._helpers.wire_domain_functions``).
+Cross-validation applies to active-pack functions only. Declarations for an
+inactive pack are skipped; active declarations must also be listed in
+``FUNCTIONS[agent.function].ambient_agents``.
 """
 from __future__ import annotations
 
@@ -107,10 +106,7 @@ def _discover_ambient_agents() -> dict[str, AmbientAgent]:
             if not isinstance(value, AmbientAgent):
                 continue
             if value.function not in FUNCTIONS:
-                raise ValueError(
-                    f"AmbientAgent '{value.name}' (in {full_name}) declares "
-                    f"function='{value.function}' which is not in FUNCTIONS"
-                )
+                continue
             allowed = FUNCTIONS[value.function].ambient_agents
             if value.name not in allowed:
                 raise ValueError(

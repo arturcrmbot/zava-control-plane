@@ -1628,5 +1628,55 @@
       "program_manager"
     ],
     "basis": "Activation on a site at or above 90 percent utilisation requires delivery-lead approval."
+  },
+  {
+    "rule_id": "TELCO-NETOPS-001",
+    "action": "network_ops_director_decision",
+    "category": "*",
+    "value_band_gbp": {
+      "min": 0,
+      "max": 1000000
+    },
+    "business_unit": "*",
+    "geography": "*",
+    "requester_role": "*",
+    "approver_role": "network_ops_director",
+    "escalation_chain": [],
+    "basis": "Network Operations Director approves exceptional Telco network actions within the registered authority limit."
+  },
+  {
+    "rule_id": "TELCO-DELIVERY-001",
+    "action": "delivery_lead_decision",
+    "category": "*",
+    "value_band_gbp": {
+      "min": 0,
+      "max": 10000
+    },
+    "business_unit": "*",
+    "geography": "*",
+    "requester_role": "*",
+    "approver_role": "delivery_lead",
+    "escalation_chain": [
+      "network_ops_director"
+    ],
+    "basis": "Delivery Lead approves Telco delivery exceptions within the registered authority limit."
+  },
+  {
+    "rule_id": "TELCO-CS-001",
+    "action": "cs_manager_decision",
+    "category": "*",
+    "value_band_gbp": {
+      "min": 0,
+      "max": 10000
+    },
+    "business_unit": "*",
+    "geography": "*",
+    "requester_role": "*",
+    "approver_role": "cs_manager",
+    "escalation_chain": [
+      "cs_account_director",
+      "cs_director"
+    ],
+    "basis": "Customer Success Manager approves Telco care and retention actions within the registered authority limit."
   }
 ]

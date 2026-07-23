@@ -1,10 +1,4 @@
-{"ts_offset_ms":0,"event":{"type":"workflow.started","workflow_id":"FDS-REFERENCE-001","workflow_type":"demand-spike-response"}}
-{"ts_offset_ms":100,"event":{"type":"durable.step.completed","workflow_id":"FDS-REFERENCE-001","workflow_type":"demand-spike-response","phase":"Detect Demand Spike"}}
-{"ts_offset_ms":200,"event":{"type":"durable.step.completed","workflow_id":"FDS-REFERENCE-001","workflow_type":"demand-spike-response","phase":"Assess Allocation Options"}}
-{"ts_offset_ms":300,"event":{"type":"durable.step.completed","workflow_id":"FDS-REFERENCE-001","workflow_type":"demand-spike-response","phase":"Approve Allocation Exception"}}
-{"ts_offset_ms":400,"event":{"type":"durable.step.completed","workflow_id":"FDS-REFERENCE-001","workflow_type":"demand-spike-response","phase":"Apply Allocation Response"}}
-{"ts_offset_ms":500,"event":{"type":"durable.step.completed","workflow_id":"FDS-REFERENCE-001","workflow_type":"demand-spike-response","phase":"Verify Demand Coverage"}}
-{"ts_offset_ms":600,"event":{"type":"typed.command.issued","workflow_id":"FDS-REFERENCE-001","workflow_type":"demand-spike-response","command_type":"allocation.respond"}}
-{"ts_offset_ms":700,"event":{"type":"world.mutation.completed","workflow_id":"FDS-REFERENCE-001","workflow_type":"demand-spike-response","mutation_family":"allocation"}}
-{"ts_offset_ms":800,"event":{"type":"evaluation.completed","workflow_id":"FDS-REFERENCE-001","workflow_type":"demand-spike-response","status":"PASS"}}
-{"ts_offset_ms":900,"event":{"type":"durable.workflow.completed","workflow_id":"FDS-REFERENCE-001","workflow_type":"demand-spike-response","status":"completed"}}
+{"ts_offset_ms":0,"event":{"type":"workflow.started","workflow_id":"demand-evt-00000201","workflow_type":"demand-spike-response","trace_id":"evt-00000201"}}
+{"ts_offset_ms":500,"event":{"type":"step.completed","workflow_id":"demand-evt-00000201","workflow_type":"demand-spike-response","phase":"Assess Stock Exposure"}}
+{"ts_offset_ms":1000,"event":{"type":"workflow.completed","workflow_id":"demand-evt-00000201","workflow_type":"demand-spike-response","outcome":"allocation.adjusted"}}
+

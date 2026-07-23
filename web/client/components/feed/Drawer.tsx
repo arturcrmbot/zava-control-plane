@@ -4,7 +4,7 @@
 // sections (Decision · Activity · Audit) in the role-dictated order. Esc
 // or the ✕ button fires onClose. The drawer width is fluid (50–65 % of
 // viewport via Tailwind responsive utilities); below 1024px it's full-screen.
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactElement } from "react";
 import type {
   Workflow, Phase, OtelSpan, Exception, SkillAmplification,
   McpCall, Economics, Narrative,
@@ -106,7 +106,7 @@ export default function Drawer({
     );
   }
 
-  const sections: Record<string, JSX.Element> = {
+  const sections: Record<string, ReactElement> = {
     decision: (
       <DrawerDecision data={d} role={role} onRefresh={refresh} />
     ),

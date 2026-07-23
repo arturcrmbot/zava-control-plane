@@ -87,6 +87,19 @@ print('<wt> in pack:', '<wt>' in rt.pack.domains)
 
 Expected: `<wt> in pack: True`.
 
+### 4b — Prove live demo behavior
+
+These are blocking checks, not optional polish:
+
+1. Call the real governance `kernel().check_authority(...)` for every HITL
+   persona using the action, category, and value emitted by the workflow.
+2. Trigger each gate with `PERSONA_AUTO_CLOSE=*`; require
+   `persona.decided`, `durable.resumed`, and terminal status within 15 seconds.
+3. Inspect the suspended Workflow API record and require
+   `payload.hitl_context` (`persona`, `external_event`, `phase`, context).
+4. Keep the browser mounted across a backend restart; require cursor rewind on
+   lower `latest_seq` and a visible event within one second of the next click.
+
 ### 5 — Satisfy docs/VERTICAL-PROOF.md
 
 Before claiming the domain is shipped, collect the evidence required by
@@ -94,6 +107,16 @@ Before claiming the domain is shipped, collect the evidence required by
 
 - Full proof chain (actor world → sensor → Durable → typed command →
   world mutation → evaluation).
+- Every HITL action has a matching authority matrix rule. With
+  `PERSONA_AUTO_CLOSE=*`, a representative gate must emit
+  `persona.decided`, resume Durable, and leave no workflow in
+  `awaiting_hitl`.
+- HITL recovery survives missed events and restarts: the workflow persists
+  `hitl_context` (`persona`, `external_event`, `phase`, decision context) so
+  the periodic sweep can reconstruct the resolving event.
+- A browser kept open across a backend restart must detect a lower
+  `latest_seq`, replay `/api/world/events?after=0`, and show the first visible
+  scenario event within one second of the click.
 - Identity consistency across all eight surfaces.
 - Both replay probes (Functions disabled; actor world disabled).
 - Zero browser errors; clean process teardown.
@@ -119,3 +142,7 @@ Before claiming the domain is shipped, collect the evidence required by
   `tests/api/shared/test_vertical_pack_inventory.py`.
 - **Completion requires VERTICAL-PROOF.md.** A vertical is not shippable
   until all criteria in `docs/VERTICAL-PROOF.md` §6 are satisfied.
+- **No self-certifying HITL.** Matching persona names and external-event strings
+  is insufficient. Run the real governance `authority_check` with the action,
+  category, and value emitted by the workflow, then prove the live orchestration
+  resumes.

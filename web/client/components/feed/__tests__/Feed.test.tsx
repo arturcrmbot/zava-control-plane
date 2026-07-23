@@ -46,7 +46,7 @@ describe("Feed", () => {
     await waitFor(() => {
       expect(screen.getByText("W-1")).toBeTruthy();
     });
-    expect(screen.getByRole("button", { name: /Needs you/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^● Needs you$/i })).toBeTruthy();
   });
 
   it("switching to All activity calls the same query but with different filter", async () => {

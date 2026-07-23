@@ -1,2 +1,2 @@
-"""Fashion Retail graph projections."""
+"""Fashion workflow graph projections."""
 

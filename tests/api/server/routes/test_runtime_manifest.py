@@ -30,9 +30,10 @@ def test_runtime_payload_defaults_to_agency(tmp_path) -> None:
         "ui": {
             "lenses": ["agency-operations"],
             "theme": {"accent": "#2563eb", "label": "Agency"},
+            "world_scene": False,
         },
     }
-    assert "world_scene" not in runtime_route.runtime_payload(runtime)["ui"]
+    assert runtime_route.runtime_payload(runtime)["ui"]["world_scene"] is False
 
 
 def test_runtime_payload_exposes_world_scene_metadata_when_registered(tmp_path) -> None:

@@ -21,6 +21,6 @@
       "@client/*": ["web/client/*"]
     }
   },
-  "include": ["web", "mocks", "tests/web"],
-  "exclude": ["tests/e2e", "node_modules", "dist"]
+  "include": ["web/client", "web/shared", "mocks", "tests/web"],
+  "exclude": ["tests/e2e", "tests/web/portal", "node_modules", "dist"]
 }

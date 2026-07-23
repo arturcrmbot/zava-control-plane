@@ -1,11 +1,11 @@
 from verticals._helpers import lazy_projection
-from verticals.fashion.process_profiles import FASHION_PROCESS_PROFILES
+from verticals.fashion.domains import FASHION_DOMAINS
 
 
 FASHION_PROJECTIONS = {
     workflow_type: lazy_projection(
-        "verticals.fashion.entity_projections.common"
+        "verticals.fashion.entity_projections.retail"
     )
-    for workflow_type in FASHION_PROCESS_PROFILES
+    for workflow_type in FASHION_DOMAINS
 }
 

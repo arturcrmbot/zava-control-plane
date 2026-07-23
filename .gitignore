@@ -68,6 +68,7 @@ web/portal/tsconfig.tsbuildinfo
 web/blueprint/src/**/*.js
 web/blueprint/vite.config.js
 mocks/**/*-mcp/server.js
+mocks/**/*.test.js
 tests/web/**/*.test.js
 
 # Azure Functions Core Tools auto-generates host.json on first start when

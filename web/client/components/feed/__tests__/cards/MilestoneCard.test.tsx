@@ -26,10 +26,10 @@ describe("MilestoneCard", () => {
     expect(screen.getByText(/completed/i)).toBeTruthy();
   });
 
-  it("fires onOpenDrawer when Open is clicked", () => {
+  it("fires onOpenDrawer when the card is clicked", () => {
     const onOpen = vi.fn();
     render(<MemoryRouter><MilestoneCard item={item} onOpenDrawer={onOpen} /></MemoryRouter>);
-    fireEvent.click(screen.getByRole("button", { name: /Open/i }));
+    fireEvent.click(screen.getByTestId("card-WF-9"));
     expect(onOpen).toHaveBeenCalledWith("WF-9");
   });
 });

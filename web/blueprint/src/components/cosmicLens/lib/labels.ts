@@ -16,7 +16,7 @@
  * `persona.*` event type leak into the UI.
  */
 
-import { humanizeLabel, prettyActor } from "../../../../../shared/humanize";
+import { humanizeLabel, prettyActor, titleCase } from "../../../../../shared/humanize";
 
 export interface RocketEvent {
   type: string;
@@ -40,11 +40,11 @@ export function labelForCapability(ev: RocketEvent): string {
       return `${prettyActor(ev.persona ?? "human")} decided`;
     case "tool.invoked": {
       const name = ev.tool_name ?? ev.agent_name ?? "tool";
-      return `Running ${humanizeLabel(name).text}`;
+      return `Running ${titleCase(name)}`;
     }
     case "tool.completed": {
       const name = ev.tool_name ?? ev.agent_name ?? "tool";
-      return `${humanizeLabel(name).text} — done`;
+      return `${titleCase(name)} — done`;
     }
     case "ambient.decided":
       return `${prettyActor(ev.agent_name ?? "agent")} reasoned`;

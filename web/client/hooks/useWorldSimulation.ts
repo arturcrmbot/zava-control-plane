@@ -2,8 +2,8 @@
 //
 // Single polling hook for the /world route. It reads the live actor world:
 //
-//   - GET /api/world/state          — actor snapshot, every 1000ms
-//   - GET /api/world/events?after=  — causal journal tail, every 300ms
+//   - GET /api/world/state          — compact actor snapshot, every 1000ms
+//   - GET /api/world/events?after=  — bounded causal journal tail, every 1000ms
 //   - POST /api/world/inject/demand_surge — the one write surface
 //
 // The events cursor advances to the response's latest_seq; events are merged
@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const STATE_POLL_MS = 1000;
-const EVENTS_POLL_MS = 300;
+const EVENTS_POLL_MS = 1000;
 const EVENT_RING_MAX = 300;
 const SURGE_MULTIPLIER = 4;
 const SURGE_DURATION_MINUTES = 90;
@@ -217,16 +217,6 @@ export interface TelcoProcessCase {
   outcome: Record<string, unknown> | null;
 }
 
-export interface FashionInventoryPosition {
-  location_id: string;
-  sku_id: string;
-  ownership?: string;
-  on_hand: number;
-  reserved?: number;
-  safety_stock?: number;
-  version?: number;
-}
-
 // -- objective/command lifecycle: mirror world/model.py + objectives.py ------
 
 export interface WorldObjective {
@@ -254,6 +244,7 @@ export interface WorldEvaluation {
 }
 
 export interface WorldState {
+  [key: string]: unknown;
   enabled: boolean;
   scenario?: string;
   seed?: number;
@@ -261,15 +252,19 @@ export interface WorldState {
   sim_time?: number;
   speed?: number;
   latest_seq?: number;
-  customers?: Array<{ id: string }>;
+  customers?: Array<{ id: string; [key: string]: unknown }>;
   tickets?: WorldTicket[];
   workers?: WorldWorker[];
   // telco scenario fields
   sites?: WorldSite[];
   sessions?: WorldSession[];
+  session_counts?: Partial<Record<WorldSession["status"], number>>;
   subscribers?: WorldSubscriber[];
+  subscriber_count?: number;
   accounts?: WorldAccount[];
+  account_count?: number;
   subscriptions?: WorldSubscription[];
+  subscription_count?: number;
   orders?: WorldOrder[];
   notifications?: WorldNotification[];
   credits?: WorldCredit[];
@@ -282,20 +277,6 @@ export interface WorldState {
   retention_offers?: WorldRetentionOffer[];
   process_library?: TelcoProcessSummary[];
   process_cases?: TelcoProcessCase[];
-  // Fashion scenario fields
-  stores?: Array<{ id: string; country?: string; region?: string }>;
-  distribution_centres?: Array<{ id: string; country?: string; region?: string }>;
-  brands?: Array<{ id: string; relationship?: string }>;
-  styles?: Array<{ id: string; lifecycle?: string }>;
-  skus?: Array<{ id: string; style_id?: string }>;
-  inventory?: FashionInventoryPosition[];
-  reservations?: Array<{ id: string; status?: string }>;
-  promotions?: Array<{ id: string; status?: string }>;
-  deliveries?: Array<{ id: string; status?: string }>;
-  returns?: Array<{ id: string; status?: string; disposition?: string | null }>;
-  seller_offers?: Array<{ id: string; status?: string }>;
-  markdown_recommendations?: Array<{ id: string; status?: string }>;
-  workflow_state?: Record<string, Record<string, unknown>>;
   customer_impact?: {
     affected_account_count: number;
     notified_account_count: number;
@@ -334,6 +315,7 @@ export interface UseWorldSimulationResult {
   injectSiteFailure: () => Promise<void>;
   runScenario: (name: TelcoScenarioName) => Promise<void>;
   runReferenceProcess: (workflowType: string) => Promise<void>;
+  resetWorld: () => Promise<void>;
 }
 
 export type TelcoScenarioName =
@@ -362,6 +344,7 @@ export function useWorldSimulation(): UseWorldSimulationResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const cursorRef = useRef(0);
+  const generationRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const stateInFlight = useRef(false);
   const eventsInFlight = useRef(false);
@@ -369,14 +352,19 @@ export function useWorldSimulation(): UseWorldSimulationResult {
   const fetchState = useCallback(async (): Promise<void> => {
     if (stateInFlight.current) return;
     stateInFlight.current = true;
+    const generation = generationRef.current;
     try {
-      const r = await fetch("/api/world/state", { signal: abortRef.current?.signal });
+      const r = await fetch("/api/world/state?compact=true", {
+        signal: abortRef.current?.signal,
+      });
       if (!r.ok) throw new Error(`world state HTTP ${r.status}`);
       const body = (await r.json()) as WorldState;
+      if (generation !== generationRef.current) return;
       setState(body);
       setError(null);
     } catch (err) {
       if (isAbort(err)) return;
+      if (generation !== generationRef.current) return;
       setError((err as Error).message || "failed to load world state");
     } finally {
       stateInFlight.current = false;
@@ -387,20 +375,40 @@ export function useWorldSimulation(): UseWorldSimulationResult {
   const fetchEvents = useCallback(async (): Promise<void> => {
     if (eventsInFlight.current) return;
     eventsInFlight.current = true;
+    const generation = generationRef.current;
     try {
-      const r = await fetch(`/api/world/events?after=${cursorRef.current}`, {
+      const requestedCursor = cursorRef.current;
+      let r = await fetch(
+        `/api/world/events?after=${requestedCursor}&limit=${EVENT_RING_MAX}`,
+        {
         signal: abortRef.current?.signal,
-      });
+        },
+      );
       if (!r.ok) throw new Error(`world events HTTP ${r.status}`);
-      const body = (await r.json()) as WorldEventsResponse;
+      let body = (await r.json()) as WorldEventsResponse;
+      if (generation !== generationRef.current) return;
+      if (
+        typeof body.latest_seq === "number"
+        && body.latest_seq < requestedCursor
+      ) {
+        cursorRef.current = 0;
+        setEvents([]);
+        r = await fetch(`/api/world/events?after=0&limit=${EVENT_RING_MAX}`, {
+          signal: abortRef.current?.signal,
+        });
+        if (!r.ok) throw new Error(`world events HTTP ${r.status}`);
+        body = (await r.json()) as WorldEventsResponse;
+        if (generation !== generationRef.current) return;
+      }
       if (typeof body.latest_seq === "number") {
-        cursorRef.current = Math.max(cursorRef.current, body.latest_seq);
+        cursorRef.current = body.latest_seq;
       }
       if (body.events && body.events.length > 0) {
         setEvents((prev) => mergeEvents(prev, body.events));
       }
     } catch (err) {
       if (isAbort(err)) return;
+      if (generation !== generationRef.current) return;
       // Transient events failure: keep the last journal, let the next tick retry.
     } finally {
       eventsInFlight.current = false;
@@ -478,6 +486,7 @@ export function useWorldSimulation(): UseWorldSimulationResult {
             signal: abortRef.current?.signal,
           },
         );
+
         if (!response.ok) {
           throw new Error(`run process HTTP ${response.status}`);
         }
@@ -486,6 +495,31 @@ export function useWorldSimulation(): UseWorldSimulationResult {
       } catch (err) {
         if (isAbort(err)) return;
         setError((err as Error).message || "failed to run process");
+        return;
+      }
+      await Promise.all([fetchState(), fetchEvents()]);
+    },
+    [fetchState, fetchEvents],
+  );
+
+  const resetWorld = useCallback(
+    async (): Promise<void> => {
+      try {
+        const response = await fetch("/api/world/reset", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+          signal: abortRef.current?.signal,
+        });
+        if (!response.ok) throw new Error(`reset world HTTP ${response.status}`);
+        const result = await response.json() as { ok?: boolean; error?: string };
+        if (!result.ok) throw new Error(result.error || "world reset rejected");
+        generationRef.current += 1;
+        cursorRef.current = 0;
+        setEvents([]);
+      } catch (err) {
+        if (isAbort(err)) return;
+        setError((err as Error).message || "failed to reset world");
         return;
       }
       await Promise.all([fetchState(), fetchEvents()]);
@@ -516,5 +550,6 @@ export function useWorldSimulation(): UseWorldSimulationResult {
     injectSiteFailure,
     runScenario,
     runReferenceProcess,
+    resetWorld,
   };
 }

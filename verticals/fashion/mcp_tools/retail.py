@@ -2,64 +2,80 @@ from __future__ import annotations
 
 from copilot.tools import ToolResult, define_tool
 
-from verticals.fashion.mcp_tools.common import (
-    FashionCommandParams,
-    FashionEvidenceParams,
-    command_result,
-    evidence_result,
-)
+from .common import RetailEvidence, evidence_result
+
 
 TOOL_NAMES = {
-    "fashion_query_demand",
-    "fashion_query_inventory",
-    "fashion_query_orders",
-    "fashion_query_partners",
-    "fashion_query_policies",
-    "fashion_query_returns",
-    "fashion_prepare_command",
+    "fashion_read_inventory",
+    "fashion_prepare_inventory_transfer",
+    "fashion_assess_promotion",
+    "fashion_prepare_markdown_recommendation",
+    "fashion_prepare_supplier_recovery",
+    "fashion_prepare_fulfilment_resolution",
+    "fashion_prepare_seller_suppression",
+    "fashion_prepare_return_disposition",
 }
 
 
-def _query(
-    params: FashionEvidenceParams,
-    operation: str,
-) -> ToolResult:
-    return evidence_result(params, operation=operation)
-
-
-@define_tool(name="fashion_query_demand", description="Read synthetic demand evidence.")
-def fashion_query_demand_tool(params: FashionEvidenceParams) -> ToolResult:
-    return _query(params, "query_demand")
-
-
-@define_tool(name="fashion_query_inventory", description="Read inventory evidence.")
-def fashion_query_inventory_tool(params: FashionEvidenceParams) -> ToolResult:
-    return _query(params, "query_inventory")
-
-
-@define_tool(name="fashion_query_orders", description="Read order evidence.")
-def fashion_query_orders_tool(params: FashionEvidenceParams) -> ToolResult:
-    return _query(params, "query_orders")
-
-
-@define_tool(name="fashion_query_partners", description="Read partner evidence.")
-def fashion_query_partners_tool(params: FashionEvidenceParams) -> ToolResult:
-    return _query(params, "query_partners")
-
-
-@define_tool(name="fashion_query_policies", description="Read demo policy evidence.")
-def fashion_query_policies_tool(params: FashionEvidenceParams) -> ToolResult:
-    return _query(params, "query_policies")
-
-
-@define_tool(name="fashion_query_returns", description="Read returns evidence.")
-def fashion_query_returns_tool(params: FashionEvidenceParams) -> ToolResult:
-    return _query(params, "query_returns")
+@define_tool(
+    name="fashion_read_inventory",
+    description="Read versioned Fashion inventory and demand evidence.",
+)
+def fashion_read_inventory(params: RetailEvidence) -> ToolResult:
+    return evidence_result(params, operation="read_inventory")
 
 
 @define_tool(
-    name="fashion_prepare_command",
-    description="Prepare a typed Fashion command without mutating world state.",
+    name="fashion_prepare_inventory_transfer",
+    description="Prepare, but never directly apply, a typed inventory transfer.",
 )
-def fashion_prepare_command_tool(params: FashionCommandParams) -> ToolResult:
-    return command_result(params)
+def fashion_prepare_inventory_transfer(params: RetailEvidence) -> ToolResult:
+    return evidence_result(params, operation="prepare_inventory_transfer")
+
+
+@define_tool(
+    name="fashion_assess_promotion",
+    description="Assess promotion stock, content and channel readiness.",
+)
+def fashion_assess_promotion(params: RetailEvidence) -> ToolResult:
+    return evidence_result(params, operation="assess_promotion")
+
+
+@define_tool(
+    name="fashion_prepare_markdown_recommendation",
+    description="Prepare a governed markdown recommendation without changing price.",
+)
+def fashion_prepare_markdown_recommendation(params: RetailEvidence) -> ToolResult:
+    return evidence_result(params, operation="prepare_markdown_recommendation")
+
+
+@define_tool(
+    name="fashion_prepare_supplier_recovery",
+    description="Prepare a supplier delay recovery option.",
+)
+def fashion_prepare_supplier_recovery(params: RetailEvidence) -> ToolResult:
+    return evidence_result(params, operation="prepare_supplier_recovery")
+
+
+@define_tool(
+    name="fashion_prepare_fulfilment_resolution",
+    description="Prepare a typed order fulfilment resolution.",
+)
+def fashion_prepare_fulfilment_resolution(params: RetailEvidence) -> ToolResult:
+    return evidence_result(params, operation="prepare_fulfilment_resolution")
+
+
+@define_tool(
+    name="fashion_prepare_seller_suppression",
+    description="Prepare a marketplace offer suppression for human approval.",
+)
+def fashion_prepare_seller_suppression(params: RetailEvidence) -> ToolResult:
+    return evidence_result(params, operation="prepare_seller_suppression")
+
+
+@define_tool(
+    name="fashion_prepare_return_disposition",
+    description="Prepare a typed return disposition from inspection evidence.",
+)
+def fashion_prepare_return_disposition(params: RetailEvidence) -> ToolResult:
+    return evidence_result(params, operation="prepare_return_disposition")

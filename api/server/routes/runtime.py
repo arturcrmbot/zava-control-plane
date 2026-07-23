@@ -14,12 +14,15 @@ def runtime_payload(
     runtime: VerticalRuntime,
 ) -> dict[str, Any]:
     capabilities = set(runtime.pack.ui.capabilities)
+    has_world_scene = False
     if runtime.world_name is not None:
         capabilities.add("world")
+        has_world_scene = runtime.pack.worlds[runtime.world_name].scene is not None
 
     ui: dict[str, Any] = {
         "lenses": list(runtime.pack.ui.lenses),
         "theme": dict(runtime.pack.ui.theme),
+        "world_scene": has_world_scene,
     }
     if runtime.pack.ui.world_scene is not None:
         ui["world_scene"] = runtime.pack.ui.world_scene.to_metadata()

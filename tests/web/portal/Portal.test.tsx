@@ -1,18 +1,10 @@
 import "@testing-library/jest-dom/vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import Portal from "@portal/routes/Portal";
+import Portal, { type StatusResponse } from "@portal/routes/Portal";
 
-type StatusBody = {
-  candidate: { id: string; name: string; email: string };
-  phase: string;
-  next_action: string | null;
-  offer_letter_url: string | null;
-  onboarding_video_url: string | null;
-};
-
-let nextStatus: StatusBody;
+let nextStatus: StatusResponse;
 let lastOfferDecision: string | null = null;
 
 const server = setupServer(
@@ -41,6 +33,8 @@ describe("Portal", () => {
       next_action: "decide_offer",
       offer_letter_url: "https://example.com/offer.pdf",
       onboarding_video_url: null,
+      screen_token: null,
+      offer_token: "OFFER123",
     };
     render(<Portal />);
     const acceptBtn = await screen.findByRole("button", { name: /accept/i });
@@ -50,10 +44,7 @@ describe("Portal", () => {
 
     // Click Accept; verify the API was called with decision=accept.
     fireEvent.click(acceptBtn);
-    await new Promise((r) => setTimeout(r, 50));
-    // Wait briefly for the fetch to round-trip.
-    await screen.findByRole("button", { name: /accept/i });
-    expect(lastOfferDecision).toBe("accept");
+    await waitFor(() => expect(lastOfferDecision).toBe("accept"));
   });
 
   test("phase=onboarding renders an autoplaying video at the SAS url", async () => {
@@ -63,6 +54,8 @@ describe("Portal", () => {
       next_action: null,
       offer_letter_url: null,
       onboarding_video_url: "https://example.com/welcome.mp4",
+      screen_token: null,
+      offer_token: null,
     };
     render(<Portal />);
     const video = (await screen.findByTestId("hg-video")) as HTMLVideoElement;
@@ -72,16 +65,20 @@ describe("Portal", () => {
     expect(video.hasAttribute("autoplay")).toBe(true);
   });
 
-  test("phase=screening shows a Book a screening call link to /screen", async () => {
+  test("phase=screening shows its token-specific screening link", async () => {
     nextStatus = {
       candidate: { id: "C-3", name: "Cara", email: "cara@example.com" },
       phase: "screening",
       next_action: "rsvp_screening",
       offer_letter_url: null,
       onboarding_video_url: null,
+      screen_token: "SCREEN123",
+      offer_token: null,
     };
     render(<Portal />);
-    const link = (await screen.findByRole("link", { name: /book/i })) as HTMLAnchorElement;
-    expect(link.getAttribute("href")).toBe("/screen?token=DEMO123");
+    const link = (await screen.findByRole("link", {
+      name: /start screening call/i,
+    })) as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toBe("/screen?token=SCREEN123");
   });
 });

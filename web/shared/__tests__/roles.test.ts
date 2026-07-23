@@ -19,7 +19,7 @@ describe("role presets", () => {
     expect(r.visibleCardTypes).toEqual(
       expect.arrayContaining(["hitl", "exception", "external-wait", "resolved"]),
     );
-    expect(r.drawerSectionOrder).toEqual(["decision", "activity", "audit"]);
+    expect(r.drawerSectionOrder).toEqual(["decision", "reasoning", "activity", "audit"]);
   });
 
   it("executive is read-only with audit-first drawer order", () => {

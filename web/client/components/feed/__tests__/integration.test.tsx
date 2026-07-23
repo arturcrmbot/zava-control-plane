@@ -14,7 +14,12 @@ beforeEach(() => {
           currentPhase: "Intake", createdAt: 1, slaDueAt: 9999, jurisdiction: "UK",
           agency: "Z", actionLedger: [], tokensSpent: 0, costUSD: 0 },
         phases: [], spans: [], amplifications: [], activeException: null,
-        mcpCalls: [], economics: { activeWorkflowCount: 0, totalWorkflowCount: 0, autoApprovedCount: 0, escalationCount: 0, averageCostPerWorkflow: 0 },
+        mcpCalls: [],
+        economics: {
+          modelCostUsd: 0, inputTokens: 0, outputTokens: 0, pricingSource: "test",
+          perModel: [], computeCostUsd: 0, modelCalls: 0, toolCalls: 0,
+          daysElapsed: 0, slaToken: "green",
+        },
         narrative: null,
       }) } as Response);
     }

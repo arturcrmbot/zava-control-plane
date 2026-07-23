@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { useFeedItems } from "../useFeedItems";
 import { ResolutionProvider } from "../useResolutionStore";
 import { useResolutionStore as useResolutionStoreImported } from "../useResolutionStore";
-import { getRolePreset } from "@shared/roles";
+import { getRolePreset, type FilterMode } from "@shared/roles";
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <ResolutionProvider>{children}</ResolutionProvider>
@@ -154,14 +154,15 @@ describe("useFeedItems", () => {
 
     const role = getRolePreset("sre");
     const { result, rerender } = renderHook(
-      ({ mode }) => useFeedItems(role, { mode, domains: [], severity: null, search: "" }),
-      { wrapper, initialProps: { mode: "needs-you" as const } },
+      ({ mode }: { mode: FilterMode }) =>
+        useFeedItems(role, { mode, domains: [], severity: null, search: "" }),
+      { wrapper, initialProps: { mode: "needs-you" as FilterMode } },
     );
 
     await waitFor(() => expect(result.current.length).toBeGreaterThan(0));
     expect(result.current.find((i) => i.id === "milestone:W-Done")).toBeUndefined();
 
-    rerender({ mode: "all-activity" as const });
+    rerender({ mode: "all-activity" });
     await waitFor(() => {
       expect(result.current.find((i) => i.id === "milestone:W-Done")).toBeDefined();
     });

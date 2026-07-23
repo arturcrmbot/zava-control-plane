@@ -16,9 +16,10 @@ import { WorldInterventionStrip } from "@client/components/WorldInterventionStri
 import { WorldObjectiveStrip } from "@client/components/WorldObjectiveStrip";
 import { deriveCommonIntervention, type InterventionStep } from "@client/lib/worldIntervention";
 import { useRuntimeManifest } from "@client/hooks/useRuntimeManifest";
+import { useWorldScene } from "@client/hooks/useWorldScene";
 import TelcoWorld from "@client/routes/TelcoWorld";
-import FashionWorld from "@client/routes/FashionWorld";
-import SpatialWorld from "@client/routes/SpatialWorld";
+import RegisteredSpatialWorld from "@client/components/world/SpatialWorld";
+import EmbeddedSpatialWorld from "@client/routes/SpatialWorld";
 import type { WorldSceneMetadata } from "@shared/runtime";
 
 const WAITING_CAP = 40;
@@ -70,23 +71,24 @@ export default function World() {
       </div>
     );
   }
+  const scene = manifest.ui.world_scene;
   return (
     <ActiveWorld
-      vertical={manifest.vertical.name}
       telco={manifest.ui.lenses.includes("telco-network")}
-      scene={manifest.ui.world_scene}
+      embeddedScene={typeof scene === "object" ? scene : undefined}
+      spatial={scene === true}
     />
   );
 }
 
 function ActiveWorld({
-  vertical,
   telco,
-  scene,
+  embeddedScene,
+  spatial,
 }: {
-  vertical: string;
   telco: boolean;
-  scene?: WorldSceneMetadata;
+  embeddedScene?: WorldSceneMetadata;
+  spatial: boolean;
 }) {
   const {
     state,
@@ -97,7 +99,9 @@ function ActiveWorld({
     injectSiteFailure,
     runScenario,
     runReferenceProcess,
+    resetWorld,
   } = useWorldSimulation();
+  const worldScene = useWorldScene(spatial);
   const [selectedActor, setSelectedActor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -200,8 +204,34 @@ function ActiveWorld({
     );
   }
 
-  if (scene) {
-    return <SpatialWorld scene={scene} snapshot={state as unknown as Record<string, unknown>} events={events} />;
+  if (embeddedScene) {
+    return (
+      <EmbeddedSpatialWorld
+        scene={embeddedScene}
+        snapshot={state as unknown as Record<string, unknown>}
+        events={events}
+      />
+    );
+  }
+  if (spatial && worldScene.loading) {
+    return <div role="status">Loading world scene…</div>;
+  }
+  if (spatial && worldScene.error) {
+    return <div role="alert">{worldScene.error}</div>;
+  }
+  if (spatial && worldScene.scene) {
+    return (
+      <RegisteredSpatialWorld
+        scene={worldScene.scene}
+        state={state}
+        events={events}
+        error={error}
+        onReset={resetWorld}
+      />
+    );
+  }
+  if (spatial) {
+    return <div role="alert">Required world scene is unavailable.</div>;
   }
 
   if (telco) {
@@ -217,17 +247,6 @@ function ActiveWorld({
       />
     );
   }
-  if (vertical === "fashion") {
-    return (
-      <FashionWorld
-        state={state}
-        events={events}
-        error={error}
-        onRunProcess={runReferenceProcess}
-      />
-    );
-  }
-
   return (
     <div
       data-testid="world-route"

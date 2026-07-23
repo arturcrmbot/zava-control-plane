@@ -3,10 +3,10 @@ from __future__ import annotations
 from api.shared.function_contracts import Function, PersonaTree
 
 
-FASHION_FUNCTIONS = {
+FASHION_FUNCTIONS: dict[str, Function] = {
     "merchandising-planning": Function(
         name="merchandising-planning",
-        display="Merchandising and Planning",
+        display="Merchandising & Planning",
         operator_surface="merchandising-planning",
         owns_domains=(
             "inventory-rebalancing",
@@ -14,7 +14,7 @@ FASHION_FUNCTIONS = {
             "promotion-readiness",
             "markdown-governance",
         ),
-        ambient_agents=(),
+        ambient_agents=("inventory-imbalance-analysis",),
         kpis=(
             "full-price-sell-through",
             "lost-sales",
@@ -28,19 +28,14 @@ FASHION_FUNCTIONS = {
     ),
     "supply-chain-fulfilment": Function(
         name="supply-chain-fulfilment",
-        display="Supply Chain and Fulfilment",
+        display="Supply Chain & Fulfilment",
         operator_surface="supply-chain-fulfilment",
         owns_domains=(
             "supplier-delay-recovery",
             "fulfilment-exception-resolution",
         ),
         ambient_agents=(),
-        kpis=(
-            "on-time-availability",
-            "transfer-lead-time",
-            "fulfilment-success",
-            "cost-to-serve",
-        ),
+        kpis=("on-time-availability", "transfer-lead-time", "cost-to-serve"),
         persona_hierarchy=PersonaTree(
             role="supply_chain_director",
             manages=(PersonaTree(role="fulfilment_manager"),),
@@ -52,14 +47,8 @@ FASHION_FUNCTIONS = {
         operator_surface="marketplace-operations",
         owns_domains=("marketplace-seller-exception",),
         ambient_agents=(),
-        kpis=(
-            "seller-fulfilment-rate",
-            "stock-accuracy",
-            "partner-response-time",
-        ),
-        persona_hierarchy=PersonaTree(
-            role="marketplace_operations_director"
-        ),
+        kpis=("seller-fulfilment-rate", "stock-accuracy", "partner-response-time"),
+        persona_hierarchy=PersonaTree(role="marketplace_operations_director"),
     ),
     "customer-returns": Function(
         name="customer-returns",
@@ -67,11 +56,7 @@ FASHION_FUNCTIONS = {
         operator_surface="customer-returns",
         owns_domains=("returns-disposition",),
         ambient_agents=(),
-        kpis=(
-            "refund-cycle-time",
-            "recovery-value",
-            "waste-avoided",
-        ),
+        kpis=("refund-cycle-time", "recovery-value", "waste-avoided"),
         persona_hierarchy=PersonaTree(role="returns_operations_manager"),
     ),
 }

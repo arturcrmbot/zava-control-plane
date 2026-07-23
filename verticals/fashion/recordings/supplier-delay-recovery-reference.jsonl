@@ -1,10 +1,4 @@
-{"ts_offset_ms":0,"event":{"type":"workflow.started","workflow_id":"FSR-REFERENCE-001","workflow_type":"supplier-delay-recovery"}}
-{"ts_offset_ms":100,"event":{"type":"durable.step.completed","workflow_id":"FSR-REFERENCE-001","workflow_type":"supplier-delay-recovery","phase":"Detect Supplier Delay"}}
-{"ts_offset_ms":200,"event":{"type":"durable.step.completed","workflow_id":"FSR-REFERENCE-001","workflow_type":"supplier-delay-recovery","phase":"Plan Recovery"}}
-{"ts_offset_ms":300,"event":{"type":"durable.step.completed","workflow_id":"FSR-REFERENCE-001","workflow_type":"supplier-delay-recovery","phase":"Approve Recovery Exception"}}
-{"ts_offset_ms":400,"event":{"type":"durable.step.completed","workflow_id":"FSR-REFERENCE-001","workflow_type":"supplier-delay-recovery","phase":"Execute Recovery Action"}}
-{"ts_offset_ms":500,"event":{"type":"durable.step.completed","workflow_id":"FSR-REFERENCE-001","workflow_type":"supplier-delay-recovery","phase":"Verify Availability Recovery"}}
-{"ts_offset_ms":600,"event":{"type":"typed.command.issued","workflow_id":"FSR-REFERENCE-001","workflow_type":"supplier-delay-recovery","command_type":"supplier.recover"}}
-{"ts_offset_ms":700,"event":{"type":"world.mutation.completed","workflow_id":"FSR-REFERENCE-001","workflow_type":"supplier-delay-recovery","mutation_family":"supplier-delivery"}}
-{"ts_offset_ms":800,"event":{"type":"evaluation.completed","workflow_id":"FSR-REFERENCE-001","workflow_type":"supplier-delay-recovery","status":"PASS"}}
-{"ts_offset_ms":900,"event":{"type":"durable.workflow.completed","workflow_id":"FSR-REFERENCE-001","workflow_type":"supplier-delay-recovery","status":"completed"}}
+{"ts_offset_ms":0,"event":{"type":"workflow.started","workflow_id":"supplier-evt-00000204","workflow_type":"supplier-delay-recovery","trace_id":"evt-00000204"}}
+{"ts_offset_ms":500,"event":{"type":"step.completed","workflow_id":"supplier-evt-00000204","workflow_type":"supplier-delay-recovery","phase":"Approve Recovery Spend","persona":"supply_chain_director"}}
+{"ts_offset_ms":1000,"event":{"type":"workflow.completed","workflow_id":"supplier-evt-00000204","workflow_type":"supplier-delay-recovery","outcome":"supplier.recovery.planned"}}
+

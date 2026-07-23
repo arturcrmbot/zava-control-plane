@@ -41,7 +41,7 @@ const server = setupServer(
   http.post("*/api/portal/voice/:cid/transcript", async ({ request }) => {
     const body = await request.json();
     lastTranscriptPost = { url: request.url, body };
-    return HttpResponse.json({ ok: true });
+    return HttpResponse.json({ ok: true, portal_url: "/portal?token=SCRTOK" });
   }),
   http.post("*/api/portal/voice/:cid/canned", async ({ request }) => {
     const url = new URL(request.url);
@@ -106,10 +106,6 @@ beforeEach(() => {
   FakeRTCPeerConnection.instances = [];
   window.history.replaceState({}, "", "/screen?token=SCRTOK");
   vi.stubEnv("VITE_VOICE_TRANSPORT", "accelerator");
-  Object.defineProperty(window, "location", {
-    value: { ...window.location, assign: vi.fn(), search: "?token=SCRTOK" },
-    writable: true,
-  });
 });
 
 afterEach(() => {
@@ -139,7 +135,7 @@ describe("Screen (native WebRTC)", () => {
     expect(FakeRTCPeerConnection.instances).toHaveLength(1);
   });
 
-  test("on End call, captured transcript is POSTed and we redirect to /portal", async () => {
+  test("on End call, captured transcript is POSTed and the portal link appears", async () => {
     render(<Screen />);
     const start = await screen.findByTestId("btn-start-call");
     await act(async () => { fireEvent.click(start); });
@@ -176,11 +172,10 @@ describe("Screen (native WebRTC)", () => {
       role: "agent",
       text: "Welcome to the call.",
     });
-    await waitFor(() => {
-      expect((window.location.assign as any)).toHaveBeenCalledWith(
-        "/portal?token=SCRTOK",
-      );
+    const portalLink = await screen.findByRole("link", {
+      name: /view my application status/i,
     });
+    expect(portalLink.getAttribute("href")).toBe("/portal?token=SCRTOK");
   });
 
   test("expired token (410) renders a clear error message", async () => {
@@ -192,10 +187,6 @@ describe("Screen (native WebRTC)", () => {
 
   test("missing token in URL shows error without hitting screen-resolve", async () => {
     window.history.replaceState({}, "", "/screen");
-    Object.defineProperty(window, "location", {
-      value: { ...window.location, assign: vi.fn(), search: "" },
-      writable: true,
-    });
     render(<Screen />);
     expect(await screen.findByText(/missing token/i)).toBeTruthy();
   });

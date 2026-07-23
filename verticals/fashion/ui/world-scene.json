@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "title": "Fashion Retail Live Operations",
+  "subtitle": "UK/EU stores, distribution centres, customers, colleagues and stock",
+  "locations": [
+    {"id": "STORE-UK-LON-01", "label": "Oxford Street", "kind": "flagship store", "country": "GB", "x": 5, "y": 8, "width": 23, "height": 30},
+    {"id": "STORE-UK-MAN-01", "label": "Manchester", "kind": "city store", "country": "GB", "x": 31, "y": 8, "width": 18, "height": 30},
+    {"id": "STORE-UK-EDI-01", "label": "Edinburgh", "kind": "city store", "country": "GB", "x": 52, "y": 8, "width": 18, "height": 30},
+    {"id": "STORE-UK-BHM-01", "label": "Birmingham", "kind": "city store", "country": "GB", "x": 73, "y": 8, "width": 18, "height": 30},
+    {"id": "STORE-EU-PAR-01", "label": "Paris Rivoli", "kind": "flagship store", "country": "FR", "x": 5, "y": 45, "width": 18, "height": 27},
+    {"id": "STORE-EU-BER-01", "label": "Berlin Mitte", "kind": "city store", "country": "DE", "x": 26, "y": 45, "width": 18, "height": 27},
+    {"id": "STORE-EU-AMS-01", "label": "Amsterdam", "kind": "city store", "country": "NL", "x": 47, "y": 45, "width": 18, "height": 27},
+    {"id": "STORE-EU-MIL-01", "label": "Milan", "kind": "city store", "country": "IT", "x": 68, "y": 45, "width": 18, "height": 27},
+    {"id": "DC-UK-MID-01", "label": "Midlands DC", "kind": "distribution centre", "country": "GB", "x": 10, "y": 79, "width": 35, "height": 16},
+    {"id": "DC-EU-LIL-01", "label": "Lille EU DC", "kind": "distribution centre", "country": "FR", "x": 55, "y": 79, "width": 35, "height": 16}
+  ],
+  "layers": [
+    {"state_key": "customers", "kind": "customer", "label": "Customers", "id_field": "id", "location_field": "location_id", "status_field": "status", "colour": "#f43f5e"},
+    {"state_key": "staff", "kind": "staff", "label": "Colleagues", "id_field": "id", "location_field": "location_id", "status_field": "status", "colour": "#0ea5e9"},
+    {"state_key": "orders", "kind": "order", "label": "Orders", "id_field": "id", "location_field": "location_id", "status_field": "status", "colour": "#f59e0b"},
+    {"state_key": "inventory_tokens", "kind": "stock", "label": "Stock", "id_field": "id", "location_field": "location_id", "status_field": "status", "colour": "#10b981"},
+    {"state_key": "deliveries", "kind": "delivery", "label": "Deliveries", "id_field": "id", "location_field": "location_id", "status_field": "status", "colour": "#8b5cf6"},
+    {"state_key": "returns", "kind": "return", "label": "Returns", "id_field": "id", "location_field": "location_id", "status_field": "status", "colour": "#64748b"}
+  ],
+  "event_mappings": [
+    {"event_type": "customer.entered", "layer": "customers", "animation": "move"},
+    {"event_type": "customer.moved", "layer": "customers", "animation": "move"},
+    {"event_type": "staff.served", "layer": "staff", "animation": "pulse"},
+    {"event_type": "order.placed", "layer": "orders", "animation": "appear"},
+    {"event_type": "order.cancelled", "layer": "orders", "animation": "status"},
+    {"event_type": "inventory.sold", "layer": "inventory_tokens", "animation": "status"},
+    {"event_type": "inventory.transferred", "layer": "inventory_tokens", "animation": "move"},
+    {"event_type": "delivery.arrived", "layer": "deliveries", "animation": "move"},
+    {"event_type": "return.received", "layer": "returns", "animation": "appear"}
+  ],
+  "process_event_types": ["sensor.tripped", "responder.requested", "responder.decided", "inventory.transferred", "evaluation.resolved"],
+  "knowledge_relationship_label": "Stock moved from Paris Rivoli to Oxford Street",
+  "knowledge_actor_ids": ["SKU-STYLE-01-BLK-M", "STORE-EU-PAR-01", "STORE-UK-LON-01"]
+}
+

@@ -176,6 +176,9 @@ async def test_sensor_schedules_actor_observation_and_applies_typed_command(monk
     assert [kind for kind, _ in state.world_service.recorded] == [
         "responder.requested", "responder.decided"
     ]
+    for _, recorded in state.world_service.recorded:
+        assert recorded["payload"]["workflow_id"] == "surge-evt-sensor"
+        assert recorded["payload"]["workflow_type"] == "surge-staffing"
     assert state.world_service.objective_events == [
         ("opened", "obj-evt-sensor"),
         ("claimed", "obj-evt-sensor"),
@@ -254,6 +257,38 @@ async def test_duplicate_sensor_delivery_after_scheduling_does_not_reschedule(mo
     assert schedule.await_count == 1, (
         "duplicate sensor delivery must not schedule a second Durable orchestration"
     )
+
+
+@pytest.mark.asyncio
+async def test_stop_cancels_in_flight_responses_before_world_reset(monkeypatch):
+    state = app_state()
+    bridge = WorldBridge(state)
+    monkeypatch.setattr(
+        "api.server.services.world_bridge.schedule_new_orchestration",
+        AsyncMock(
+            return_value={
+                "id": "durable-reset",
+                "statusQueryGetUri": "status://reset",
+            }
+        ),
+    )
+
+    async def never_complete(*_args, **_kwargs):
+        await asyncio.Future()
+
+    bridge._await_output = never_complete
+    bridge.start()
+    state.bus.emit(sensor("trace-reset"))
+    await asyncio.sleep(0)
+    tasks = tuple(bridge._tasks)
+    assert tasks
+
+    bridge.stop()
+    await asyncio.sleep(0)
+
+    assert all(task.cancelled() for task in tasks)
+    assert state.world_service.applied == []
+    assert bridge._in_flight_event_ids == set()
 
 
 @pytest.mark.asyncio

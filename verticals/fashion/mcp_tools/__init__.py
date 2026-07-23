@@ -1,2 +1,2 @@
-"""Fashion Retail MCP tools."""
+"""Fashion MCP tool pack."""
 

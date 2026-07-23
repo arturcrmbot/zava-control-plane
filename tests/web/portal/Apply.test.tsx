@@ -2,7 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { vi } from "vitest";
+import { vi, type MockInstance } from "vitest";
 import Apply from "../../../web/portal/src/routes/Apply";
 
 // MSW intercepts the network call so the component sees a 202 response.
@@ -18,7 +18,7 @@ const server = setupServer(
   ),
 );
 
-let fetchSpy: ReturnType<typeof vi.spyOn>;
+let fetchSpy: MockInstance<typeof globalThis.fetch>;
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(() => {
@@ -34,9 +34,7 @@ describe("Apply", () => {
   test("submits multipart form to /api/portal/apply and shows confirmation on 202", async () => {
     render(<Apply />);
 
-    fireEvent.change(screen.getByLabelText(/role/i), {
-      target: { value: "REQ-SDE-USA-DEMO" },
-    });
+    fireEvent.click(screen.getByRole("radio", { name: /USA.*Senior Data Engineer/i }));
     fireEvent.change(screen.getByLabelText(/name/i), {
       target: { value: "Alice Engineer" },
     });
@@ -60,7 +58,7 @@ describe("Apply", () => {
 
     // findBy* returns a promise that polls until the element appears (auto-act).
     await screen.findByText(/C-XYZ/, {}, { timeout: 3000 });
-    expect(screen.getByText(/Application submitted/i)).toBeTruthy();
+    expect(screen.getByText(/Application received/i)).toBeTruthy();
 
     // Verify the component called fetch with a FormData body (multipart
     // submission, not JSON) carrying the right fields. We inspect the
@@ -86,11 +84,10 @@ describe("Apply", () => {
     expect(screen.getByText(/C-XYZ/)).toBeTruthy();
   });
 
-  test("renders all three demo roles in the dropdown", () => {
+  test("renders all three demo role choices", () => {
     render(<Apply />);
-    const roleSelect = screen.getByLabelText(/role/i) as HTMLSelectElement;
-    const options = Array.from(roleSelect.options).map((o) => o.value);
-    expect(options).toEqual(
+    const roles = screen.getAllByRole("radio") as HTMLInputElement[];
+    expect(roles.map((role) => role.value)).toEqual(
       expect.arrayContaining([
         "REQ-SDE-USA-DEMO",
         "REQ-SDE-DE-DEMO",
