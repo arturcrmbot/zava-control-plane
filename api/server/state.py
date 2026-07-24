@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 
@@ -94,6 +95,7 @@ class AppState:
         self.store = StateStore()
         self.audit = AuditLogger()
         self.world_last_response = None
+        self.world_task: asyncio.Task[None] | None = None
 
         # Dream-pass daily LLM cost budget — in-process per-domain hard
         # stop. Resets implicitly per UTC day and on process restart;

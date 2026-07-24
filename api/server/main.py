@@ -123,7 +123,6 @@ async def lifespan(app: FastAPI):
     # actuators are wired internally via WorldEngine.attach(), so no
     # WorldBridge is armed there (the bridge only understands actor
     # observations/commands, not aggregate stocks/signals).
-    world_task = None
     world_bridge = None
     world_name = None if blueprint_replay_only else runtime.world_name
     actor_world_enabled = os.getenv("ZAVA_ACTOR_WORLD_ENABLED", "1") != "0"
@@ -150,7 +149,7 @@ async def lifespan(app: FastAPI):
             ),
         )
         app_state.world_service = world_service
-        world_task = asyncio.create_task(world_service.run())
+        app_state.world_task = asyncio.create_task(world_service.run())
         world_bridge = WorldBridge(app_state)
         world_bridge.start()
         app_state.world_bridge = world_bridge
@@ -348,7 +347,8 @@ async def lifespan(app: FastAPI):
         world_service = getattr(app_state, "world_service", None)
         if world_service is not None:
             world_service.stop()
-        if world_task is not None:
+        world_task = app_state.world_task
+        if world_task is not None and not world_task.done():
             world_task.cancel()
         # Await the cancelled tasks so their teardown actually completes
         # before the lifespan returns. Without this, a partially-running
@@ -367,6 +367,7 @@ async def lifespan(app: FastAPI):
         app_state.world_engine = None
         app_state.world_bridge = None
         app_state.world_last_response = None
+        app_state.world_task = None
         try:
             _portal_orch_off()
         except Exception:

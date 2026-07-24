@@ -27,6 +27,7 @@ FastAPI process. No frontend, no rendering.
 """
 from __future__ import annotations
 
+import asyncio
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
@@ -265,6 +266,9 @@ async def reset_world(body: WorldResetRequest = WorldResetRequest()) -> dict:
     if bridge is not None:
         bridge.stop()
     reset(seed)
+    world_task = app_state.world_task
+    if world_task is None or world_task.done():
+        app_state.world_task = asyncio.create_task(service.run())
     if bridge is not None:
         bridge.start()
     return {"ok": True, "seed": seed, "sim_time": service.runtime.now}

@@ -186,18 +186,37 @@ async def test_lifespan_selects_expected_world_for_vertical(
     manager = lifespan(app)
     await manager.__aenter__()
     await asyncio.sleep(0)
+    replacement_task = None
     try:
         assert current_player() is None
         assert requested_worlds == [expected_world]
         assert app_state.world_service is fake_service
+        initial_world_task = app_state.world_task
+        assert initial_world_task is not None
+        assert not initial_world_task.done()
         assert fake_bridge is not None
         assert fake_bridge.started == 1
+
+        initial_world_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await initial_world_task
+        replacement_task = asyncio.create_task(_sleep_forever())
+        app_state.world_task = replacement_task
     finally:
         await manager.__aexit__(None, None, None)
 
     assert stopped == ["service"]
     assert fake_bridge is not None
     assert fake_bridge.stopped == 1
+    try:
+        assert replacement_task is not None
+        assert replacement_task.cancelled()
+        assert app_state.world_task is None
+    finally:
+        if replacement_task is not None and not replacement_task.done():
+            replacement_task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await replacement_task
 
 
 @pytest.mark.asyncio
