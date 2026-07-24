@@ -23,6 +23,7 @@ Ed25519 keypair design in `api.server.services.governance.identity`.
 from __future__ import annotations
 import asyncio
 import json
+import logging
 import os
 import time
 import uuid
@@ -46,7 +47,10 @@ if len(app_state.runtime.pack.skill_roots) != 1:
 _SKILLS_DIR = app_state.runtime.pack.skill_roots[0]
 SKILLS_DIR = _SKILLS_DIR
 _tracer = trace.get_tracer("zava.agents.finance")
+log = logging.getLogger(__name__)
 _MAX_RESPONSE_EVENT_BYTES = 4096
+_WEBHOOK_FLUSH_TIMEOUT_S = 5.0
+_WEBHOOK_COMPLETION_TIMEOUT_S = 5.0
 
 
 # Skill → dream-pass domain mapping. A skill belongs to at most one
@@ -146,11 +150,110 @@ def _load_skill(skill_dir: Path) -> str:
     return (skill_dir / "SKILL.md").read_text(encoding="utf-8")
 
 
+def _first_not_none(value, fallback):
+    return value if value is not None else fallback
+
+
+def _normalise_tool_value(value):
+    to_dict = getattr(value, "to_dict", None)
+    return to_dict() if callable(to_dict) else value
+
+
+def _serialise_tool_value(value) -> str:
+    value = _normalise_tool_value(value)
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value)
+    except Exception:
+        return str(value)
+
+
+class _OrderedWebhookQueue:
+    """Schedule best-effort webhook delivery without blocking SDK callbacks."""
+
+    def __init__(self, loop: asyncio.AbstractEventLoop | None = None) -> None:
+        self._loop = loop or asyncio.get_running_loop()
+        self._queue: asyncio.Queue[tuple[str, str | None, str, dict]] = asyncio.Queue()
+        self._consumer: asyncio.Task | None = None
+        self._accepting = True
+
+    async def _consume(self) -> None:
+        while not self._queue.empty():
+            workflow_id, instance_id, kind, payload = self._queue.get_nowait()
+            try:
+                from api.functions.webhook import emit as _webhook_emit
+
+                await _webhook_emit(workflow_id, instance_id, kind, payload)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                pass
+            finally:
+                self._queue.task_done()
+
+    def enqueue(
+        self,
+        workflow_id: str,
+        instance_id: str | None,
+        kind: str,
+        payload: dict,
+    ) -> None:
+        if not self._accepting:
+            return
+
+        def _schedule() -> None:
+            if not self._accepting:
+                return
+            self._queue.put_nowait((workflow_id, instance_id, kind, payload))
+            if self._consumer is None or self._consumer.done():
+                self._consumer = self._loop.create_task(self._consume())
+
+        try:
+            if asyncio.get_running_loop() is self._loop:
+                _schedule()
+            else:
+                self._loop.call_soon_threadsafe(_schedule)
+        except RuntimeError:
+            try:
+                self._loop.call_soon_threadsafe(_schedule)
+            except (RuntimeError, TypeError):
+                pass
+
+    async def cancel(self) -> None:
+        self._accepting = False
+        await asyncio.sleep(0)
+        if self._consumer is not None and not self._consumer.done():
+            self._consumer.cancel()
+            await asyncio.gather(self._consumer, return_exceptions=True)
+
+    async def flush(self, timeout_s: float) -> None:
+        if not self._accepting:
+            return
+        await asyncio.sleep(0)
+        self._accepting = False
+        if self._consumer is None:
+            return
+        try:
+            await asyncio.wait_for(self._consumer, timeout=timeout_s)
+        except TimeoutError:
+            pass
+        except BaseException:
+            await self.cancel()
+            raise
+
+
 def _make_session_otel_bridge(
     tool_calls_out: list[dict],
     *,
     workflow_id: str | None = None,
+    instance_id: str | None = None,
     skill_label: str | None = None,
+    phase: str | None = None,
+    covered_phases: list[str] | None = None,
+    agent_run_id: str | None = None,
+    invocation_id: str | None = None,
+    webhook_queue: _OrderedWebhookQueue | None = None,
 ) -> callable:
     """Build an OTEL bridge callable for GHCP session events.
 
@@ -168,6 +271,7 @@ def _make_session_otel_bridge(
     """
     open_spans: dict[str, object] = {}
     open_meta: dict[str, dict] = {}
+    pending_call_ids: list[str] = []
     parent_ctx = trace.set_span_in_context(trace.get_current_span())
     # Capture the running loop so the synchronous SDK callback can schedule
     # async emits without blocking.
@@ -175,71 +279,144 @@ def _make_session_otel_bridge(
         _loop = asyncio.get_running_loop()
     except RuntimeError:
         _loop = None
+    webhooks = _OrderedWebhookQueue(_loop) if webhook_queue is None and _loop is not None else webhook_queue
 
-    def _fire_tool_webhook(stage: str, tool_name: str, *, latency_ms: int = 0) -> None:
-        if _loop is None or workflow_id is None:
+    def _fire_tool_webhook(
+        stage: str,
+        tool_name: str,
+        *,
+        tool_call_id: str | None = None,
+        args: str | None = None,
+        result: str | None = None,
+        success: bool | None = None,
+        latency_ms: int = 0,
+    ) -> None:
+        if webhooks is None or workflow_id is None:
             return
-        from api.functions.webhook import emit as _webhook_emit
-
-        async def _send():
-            await _webhook_emit(
-                workflow_id, workflow_id, "tool.invoked",
-                {
-                    "tool": tool_name,
-                    "skill": skill_label,
-                    "stage": stage,
-                    "duration_ms": latency_ms,
-                },
-            )
-        try:
-            _loop.call_soon_threadsafe(
-                lambda: _loop.create_task(_send()),
-            )
-        except Exception:
-            pass
+        payload = {
+            "tool": tool_name,
+            "skill": skill_label,
+            "stage": stage,
+            "duration_ms": latency_ms,
+        }
+        if agent_run_id is not None:
+            payload["agent_run_id"] = agent_run_id
+        if invocation_id is not None:
+            payload["invocation_id"] = invocation_id
+        if phase is not None:
+            payload["phase"] = phase
+        if covered_phases:
+            payload["covered_phases"] = covered_phases
+        if tool_call_id is not None:
+            payload["tool_call_id"] = tool_call_id
+        if args is not None:
+            payload["args"] = args
+        if result is not None:
+            payload["result"] = result
+        if success is not None:
+            payload["success"] = success
+        webhooks.enqueue(
+            workflow_id,
+            instance_id,
+            "tool.invoked",
+            payload,
+        )
 
     def on_event(event) -> None:
         try:
             if event.type == SessionEventType.TOOL_EXECUTION_START:
                 data = event.data
                 name = getattr(data, "tool_name", "unknown")
-                call_id = getattr(data, "tool_call_id", None)
-                args = getattr(data, "tool_args", None) or getattr(data, "arguments", None) or ""
-                if not isinstance(args, str):
-                    try:
-                        args = json.dumps(args)
-                    except Exception:
-                        args = str(args)
+                raw_call_id = _first_not_none(
+                    getattr(data, "tool_call_id", None),
+                    getattr(data, "call_id", None),
+                )
+                call_id = str(raw_call_id).strip() if raw_call_id is not None else ""
+                if not call_id:
+                    call_id = f"tool-{uuid.uuid4().hex}"
+                args = _first_not_none(
+                    getattr(data, "tool_args", None),
+                    getattr(data, "arguments", None),
+                )
+                args = _serialise_tool_value("" if args is None else args)
                 span = _tracer.start_span(f"tool.{name}", context=parent_ctx)
                 span.set_attribute("zava.tool.name", str(name))
-                if call_id:
-                    span.set_attribute("zava.tool.call_id", str(call_id))
-                    open_spans[call_id] = span
-                    open_meta[call_id] = {
-                        "name": str(name), "args": args, "started_at": time.monotonic(),
-                    }
+                span.set_attribute("zava.tool.call_id", call_id)
+                if agent_run_id is not None:
+                    span.set_attribute("gen_ai.agent.run.id", agent_run_id)
+                if invocation_id is not None:
+                    span.set_attribute("zava.invocation.id", invocation_id)
+                if phase is not None:
+                    span.set_attribute("workflow.phase", phase)
+                    span.set_attribute("zava.workflow.phase", phase)
+                if covered_phases:
+                    span.set_attribute(
+                        "workflow.covered_phases",
+                        covered_phases,
+                    )
+                    span.set_attribute(
+                        "zava.workflow.covered_phases",
+                        covered_phases,
+                    )
+                open_spans[call_id] = span
+                open_meta[call_id] = {
+                    "name": str(name), "args": args, "started_at": time.monotonic(),
+                }
+                if call_id not in pending_call_ids:
+                    pending_call_ids.append(call_id)
                 # Fire an observatory webhook so the page lights up the
                 # skill -> tool edge in near-real-time.
-                _fire_tool_webhook("start", str(name))
+                _fire_tool_webhook(
+                    "start",
+                    str(name),
+                    tool_call_id=call_id,
+                    args=args,
+                )
             elif event.type == SessionEventType.TOOL_EXECUTION_COMPLETE:
                 data = event.data
-                call_id = getattr(data, "tool_call_id", None)
-                span = open_spans.pop(call_id, None) if call_id else None
-                meta = open_meta.pop(call_id, None) if call_id else None
+                raw_call_id = _first_not_none(
+                    getattr(data, "tool_call_id", None),
+                    getattr(data, "call_id", None),
+                )
+                call_id = str(raw_call_id).strip() if raw_call_id is not None else ""
+                if not call_id:
+                    call_id = next(
+                        (candidate for candidate in pending_call_ids if candidate in open_meta),
+                        "",
+                    )
+                if not call_id:
+                    return
+                try:
+                    pending_call_ids.remove(call_id)
+                except ValueError:
+                    pass
+                span = open_spans.pop(call_id, None)
+                meta = open_meta.pop(call_id, None)
                 if span is not None:
                     success = getattr(data, "success", None)
                     if success is False:
                         span.set_status(Status(StatusCode.ERROR, "tool reported failure"))
                     span.end()
                 if meta is not None:
-                    result_text = getattr(data, "result", None) or getattr(data, "output", None) or ""
-                    if not isinstance(result_text, str):
-                        try:
-                            result_text = json.dumps(result_text)
-                        except Exception:
-                            result_text = str(result_text)
+                    result = _first_not_none(
+                        getattr(data, "result", None),
+                        getattr(data, "output", None),
+                    )
+                    error = getattr(data, "error", None)
+                    if getattr(data, "success", None) is False and error is not None:
+                        normalised_error = _normalise_tool_value(error)
+                        result = (
+                            {"error": normalised_error}
+                            if result is None
+                            else {
+                                "result": _normalise_tool_value(result),
+                                "error": normalised_error,
+                            }
+                        )
+                    result_text = _serialise_tool_value("" if result is None else result)
                     latency_ms = int((time.monotonic() - meta["started_at"]) * 1000)
                     tool_calls_out.append({
+                        "tool_call_id": call_id,
                         "name": meta["name"],
                         "tool": meta["name"],   # working_memory_capture reads this key; keep "name" for legacy readers.
                         "args": meta["args"],
@@ -247,7 +424,15 @@ def _make_session_otel_bridge(
                         "success": getattr(data, "success", True) is not False,
                         "latency_ms": latency_ms,
                     })
-                    _fire_tool_webhook("complete", meta["name"], latency_ms=latency_ms)
+                    _fire_tool_webhook(
+                        "complete",
+                        meta["name"],
+                        tool_call_id=call_id,
+                        args=meta["args"],
+                        result=result_text,
+                        success=getattr(data, "success", True) is not False,
+                        latency_ms=latency_ms,
+                    )
         except Exception:
             pass
 
@@ -284,6 +469,9 @@ async def run_agent_session(
     model: str = "gpt-4.1",
     attachments: list[dict] | None = None,
     workflow_id: str | None = None,
+    instance_id: str | None = None,
+    phase: str | None = None,
+    covered_phases: list[str] | tuple[str, ...] | None = None,
 ) -> dict:
     """Run an ephemeral per-skill agent session and return the parsed JSON response.
 
@@ -295,11 +483,27 @@ async def run_agent_session(
             in the online subscriber.
         model: Model id (default `gpt-4.1`).
         attachments: Optional multimodal attachments for `send_and_wait`.
-        workflow_id: Durable Functions instance_id, plumbed through from the
-            executor's input dict, so eval rows can be joined to the workflow
-            on the control plane.
+        workflow_id: Canonical control-plane workflow id.
+        instance_id: Durable Functions orchestration instance id.
+        phase: Canonical declared phase for a graph-backed invocation.
+        covered_phases: Canonical declared phases covered by one segment session.
     """
     tools = tools or []
+    from api.functions.graphs._tracked_executor import (
+        current_execution_invocation_id,
+        current_execution_phase,
+    )
+
+    if phase is None:
+        phase = current_execution_phase()
+    agent_run_id = f"ar-{uuid.uuid4().hex}"
+    invocation_id = current_execution_invocation_id() or agent_run_id
+    phase = str(phase) if phase is not None else None
+    normalised_covered_phases = [
+        str(value)
+        for value in (covered_phases or ())
+        if value is not None and str(value).strip()
+    ]
     skill_text = _load_skill(skill_dir) if skill_dir else None
     # Phase B: pull active lessons for this skill's domain and prepend them
     # to the system message so the agent benefits from past learning.
@@ -331,6 +535,7 @@ async def run_agent_session(
     # neither is available (e.g. test harness without a skill).
     agent_name = skill_label or (skill_dir.name if skill_dir else "finance-agent")
     tool_calls_collected: list[dict] = []
+    webhook_queue = _OrderedWebhookQueue()
     started_at = time.monotonic()
     in_tok = out_tok = None
 
@@ -338,6 +543,8 @@ async def run_agent_session(
         span.set_attribute("gen_ai.system", "github_copilot")
         span.set_attribute("gen_ai.request.model", model)
         span.set_attribute("gen_ai.agent.name", agent_name)
+        span.set_attribute("gen_ai.agent.run.id", agent_run_id)
+        span.set_attribute("zava.invocation.id", invocation_id)
         if skill_label:
             span.set_attribute("zava.skill", skill_label)
         # 2026-05-05: workflow_id stamped so Foundry Tracing can filter
@@ -345,6 +552,18 @@ async def run_agent_session(
         if workflow_id:
             span.set_attribute("workflow.id", workflow_id)
             span.set_attribute("zava.workflow.id", workflow_id)
+        if phase is not None:
+            span.set_attribute("workflow.phase", phase)
+            span.set_attribute("zava.workflow.phase", phase)
+        if normalised_covered_phases:
+            span.set_attribute(
+                "workflow.covered_phases",
+                normalised_covered_phases,
+            )
+            span.set_attribute(
+                "zava.workflow.covered_phases",
+                normalised_covered_phases,
+            )
         span.set_attribute("zava.tools.count", len(tools))
         if attachments:
             span.set_attribute("gen_ai.attachments.count", len(attachments))
@@ -364,33 +583,45 @@ async def run_agent_session(
         on_event = _make_session_otel_bridge(
             tool_calls_collected,
             workflow_id=workflow_id,
+            instance_id=instance_id,
             skill_label=skill_label,
+            phase=phase,
+            covered_phases=normalised_covered_phases,
+            agent_run_id=agent_run_id,
+            invocation_id=invocation_id,
+            webhook_queue=webhook_queue,
         )
 
         runtime = _get_runtime()
-        result: LLMRuntimeResult = await runtime.run_session(
-            prompt=prompt,
-            system_message=skill_text,
-            skill_directories=all_skill_dirs or None,
-            tools=tools,
-            permission_handler=permission_handler,
-            attachments=attachments,
-            model=model,
-            timeout_s=240.0,
-            event_subscriber=on_event,
-        )
+        try:
+            result: LLMRuntimeResult = await runtime.run_session(
+                prompt=prompt,
+                system_message=skill_text,
+                skill_directories=all_skill_dirs or None,
+                tools=tools,
+                permission_handler=permission_handler,
+                attachments=attachments,
+                model=model,
+                timeout_s=240.0,
+                event_subscriber=on_event,
+            )
+            text = result.text
+            in_tok = result.input_tokens
+            out_tok = result.output_tokens
+            for tool_call in result.tool_calls:
+                if tool_call not in tool_calls_collected:
+                    tool_calls_collected.append(tool_call)
 
-        text = result.text
-        in_tok = result.input_tokens
-        out_tok = result.output_tokens
+            event_text = text[:_MAX_RESPONSE_EVENT_BYTES]
+            span.add_event("gen_ai.response", {"gen_ai.response.text": event_text})
 
-        event_text = text[:_MAX_RESPONSE_EVENT_BYTES]
-        span.add_event("gen_ai.response", {"gen_ai.response.text": event_text})
-
-        if in_tok is not None:
-            span.set_attribute("gen_ai.usage.input_tokens", int(in_tok))
-        if out_tok is not None:
-            span.set_attribute("gen_ai.usage.output_tokens", int(out_tok))
+            if in_tok is not None:
+                span.set_attribute("gen_ai.usage.input_tokens", int(in_tok))
+            if out_tok is not None:
+                span.set_attribute("gen_ai.usage.output_tokens", int(out_tok))
+        except BaseException:
+            await webhook_queue.cancel()
+            raise
 
     # Note: the OTEL span above is recorded in this (Functions host) process.
     # The FastAPI process — which serves /api/fleet/economics — receives the
@@ -409,6 +640,11 @@ async def run_agent_session(
     # compatible for non-tool-using callers (Segments B/D/E).
     if isinstance(parsed, dict) and tool_calls_collected:
         parsed["_raw_tool_calls"] = tool_calls_collected
+    persisted_extracted_json = (
+        {key: value for key, value in parsed.items() if key != "_raw_tool_calls"}
+        if isinstance(parsed, dict)
+        else parsed
+    )
 
     try:
         from api.server.eval.evaluator_set import extract_context
@@ -428,10 +664,15 @@ async def run_agent_session(
     #   underreports multimodal calls by 10x.
     payload = {
         "agent_label": skill_label or "unknown",
-        "agent_run_id": f"ar-{uuid.uuid4().hex[:8]}",
+        "agent_run_id": agent_run_id,
+        "invocation_id": invocation_id,
         "prompt": prompt,
         "response_text": text,
-        "extracted_json": parsed,
+        "messages": [
+            {"role": "user", "content": prompt},
+            {"role": "assistant", "content": text},
+        ],
+        "extracted_json": persisted_extracted_json,
         "tool_calls": tool_calls_collected,
         "context": context,
         "model": model,
@@ -444,11 +685,33 @@ async def run_agent_session(
         },
         "latency_ms": elapsed_ms,
     }
+    if phase is not None:
+        payload["phase"] = phase
+    if normalised_covered_phases:
+        payload["covered_phases"] = normalised_covered_phases
+    await webhook_queue.flush(_WEBHOOK_FLUSH_TIMEOUT_S)
     try:
         from api.functions.webhook import emit as _webhook_emit
-        await _webhook_emit(workflow_id or "?", workflow_id, "agent.completed", payload)
+
+        await asyncio.wait_for(
+            _webhook_emit(
+                workflow_id or "?",
+                instance_id,
+                "agent.completed",
+                payload,
+            ),
+            timeout=_WEBHOOK_COMPLETION_TIMEOUT_S,
+        )
+    except TimeoutError:
+        log.warning(
+            "agent.completed webhook timed out for workflow %s",
+            workflow_id or "?",
+        )
     except Exception:
-        pass
+        log.exception(
+            "agent.completed webhook failed for workflow %s",
+            workflow_id or "?",
+        )
 
     return parsed
 
@@ -460,6 +723,7 @@ async def run_agent_skill(
     model: str = "gpt-4.1",
     attachments: list[dict] | None = None,
     workflow_id: str | None = None,
+    instance_id: str | None = None,
 ) -> dict:
     """Deprecated alias — prefer `run_agent_session(skill_dir=..., tools=[...])`."""
     candidate = _SKILLS_DIR / skill_name
@@ -472,4 +736,5 @@ async def run_agent_skill(
         model=model,
         attachments=attachments,
         workflow_id=workflow_id,
+        instance_id=instance_id,
     )

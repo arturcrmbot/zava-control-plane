@@ -48,9 +48,9 @@ function reducer(s: RunState, ev: Ev): RunState {
   switch (ev.type) {
     case "__CONNECTED":     return { ...s, connected: true };
     case "__DISCONNECTED":  return { ...s, connected: false };
-    case "RUN_STARTED":     return { ...s, finished: false, error: null };
-    case "RUN_FINISHED":    return { ...s, finished: true };
-    case "RUN_ERROR":       return { ...s, finished: true, error: ev.message ?? "error" };
+    case "RUN_STARTED":     return { ...s, interrupt: null, finished: false, error: null };
+    case "RUN_FINISHED":    return { ...s, interrupt: null, finished: true };
+    case "RUN_ERROR":       return { ...s, interrupt: null, finished: true, error: ev.message ?? "error" };
     case "RUN_INTERRUPTED": return { ...s, interrupt: { reason: ev.reason, persona: ev.persona } };
     case "TEXT_MESSAGE_START":
       return { ...s, messages: replaceOrAppendById(s.messages, { id: ev.messageId, role: ev.role ?? "assistant", text: "", closed: false }) };
@@ -67,6 +67,7 @@ function reducer(s: RunState, ev: Ev): RunState {
     case "STATE_DELTA":
       return { ...s, state: applyJsonPatch(s.state, ev.delta ?? []) };
     case "CUSTOM":
+      if (ev.name === "hitl.resumed") return { ...s, interrupt: null };
       return { ...s, customEvents: [...s.customEvents, { name: ev.name, value: ev.value }] };
     default: return s;
   }
@@ -99,6 +100,16 @@ export default function DrawerReasoning({ data }: { data: DrawerData }) {
   }, [wfId]);
 
   const hasContent = s.messages.length > 0 || s.toolCalls.length > 0 || Object.keys(s.state).length > 0;
+  const hasPersistedAgentEvidence = Array.isArray(data.timeline) && data.timeline.some(
+    (row) => ["reasoning", "agent", "agentOutput"].includes(row.kind),
+  );
+  const workflowIsTerminal = ["completed", "failed"].includes(data.workflow.status);
+  const isTerminal = s.finished || workflowIsTerminal;
+  const completedWithoutError = !s.error && (
+    s.finished || data.workflow.status === "completed"
+  );
+  const activeInterrupt = isTerminal ? null : s.interrupt;
+  const isLive = s.connected && !isTerminal;
 
   return (
     <section className="space-y-3">
@@ -106,9 +117,9 @@ export default function DrawerReasoning({ data }: { data: DrawerData }) {
         <h2 className="text-[11px] uppercase tracking-wide font-semibold text-slate-500 dark:text-slate-400">
           Live reasoning
         </h2>
-        <span className={`w-2 h-2 rounded-full ${s.connected ? "bg-green-500 animate-pulse" : "bg-slate-300 dark:bg-slate-600"}`}
-              title={s.connected ? "SSE connected" : "Disconnected"} />
-        {s.finished && (
+        <span className={`w-2 h-2 rounded-full ${isLive ? "bg-green-500 animate-pulse" : "bg-slate-300 dark:bg-slate-600"}`}
+              title={isTerminal ? "Run finished" : s.connected ? "SSE connected" : "Disconnected"} />
+        {completedWithoutError && (
           <span className="text-[10px] uppercase tracking-wide bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-1.5 py-0.5 rounded">
             finished
           </span>
@@ -120,13 +131,25 @@ export default function DrawerReasoning({ data }: { data: DrawerData }) {
         )}
       </div>
 
-      {s.interrupt && (
+      {activeInterrupt && (
         <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 text-sm text-amber-800 dark:text-amber-300">
-          ⏸ Awaiting <strong>{s.interrupt.persona ?? "human"}</strong>: {s.interrupt.reason}
+          ⏸ Awaiting <strong>{activeInterrupt.persona ?? "human"}</strong>: {activeInterrupt.reason}
         </div>
       )}
 
-      {!hasContent && s.connected && (
+      {!hasContent && completedWithoutError && !hasPersistedAgentEvidence && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Deterministic execution — no agent session was used
+        </p>
+      )}
+
+      {!hasContent && hasPersistedAgentEvidence && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Agent evidence is available in the Activity timeline
+        </p>
+      )}
+
+      {!hasContent && !hasPersistedAgentEvidence && isLive && !activeInterrupt && (
         <p className="text-xs text-slate-400 dark:text-slate-500 italic">
           Listening for agent events…
         </p>

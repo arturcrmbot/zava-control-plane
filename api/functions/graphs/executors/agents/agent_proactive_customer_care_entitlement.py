@@ -20,5 +20,6 @@ async def execute(input: dict) -> dict:
         skill_dir=_SKILL_DIR,
         skill_label="proactive-customer-care-entitlement",
         workflow_id=input.get("workflow_id"),
+        instance_id=input.get("instance_id"),
     )
     return result

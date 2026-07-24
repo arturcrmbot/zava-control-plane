@@ -15,6 +15,7 @@ FleetEvent emission.
 """
 from __future__ import annotations
 
+import json
 import logging
 import time
 import uuid
@@ -61,6 +62,84 @@ def _bounded_set(d: dict, key, value, max_size: int) -> None:
         except StopIteration:
             pass
     d[key] = value
+
+
+def _as_mcp_object(value, key: str) -> dict:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError:
+            decoded = value
+    else:
+        decoded = value
+    if decoded is None:
+        return {}
+    return decoded if isinstance(decoded, dict) else {key: decoded}
+
+
+_TOOL_CALL_ALIASES = {
+    "tool_call_id", "toolCallId", "call_id", "callId", "id",
+    "tool", "name", "toolName",
+    "args", "arguments", "request",
+    "result", "response", "output",
+    "duration_ms", "durationMs", "latency_ms", "latencyMs",
+    "success", "status", "status_code", "statusCode",
+}
+
+
+def _first_tool_value(tool_call: dict, aliases: tuple[str, ...]):
+    return next(
+        (tool_call[key] for key in aliases if tool_call.get(key) is not None),
+        None,
+    )
+
+
+def _normalise_tool_call(tool_call: dict) -> dict:
+    normalised = {
+        key: value
+        for key, value in tool_call.items()
+        if key not in _TOOL_CALL_ALIASES
+    }
+    aliases = {
+        "tool_call_id": ("tool_call_id", "toolCallId", "call_id", "callId", "id"),
+        "tool": ("tool", "name", "toolName"),
+        "args": ("args", "arguments", "request"),
+        "result": ("result", "response", "output"),
+        "duration_ms": ("duration_ms", "durationMs", "latency_ms", "latencyMs"),
+    }
+    for canonical, names in aliases.items():
+        value = _first_tool_value(tool_call, names)
+        if value is not None:
+            normalised[canonical] = value
+
+    status_code = _first_tool_value(tool_call, ("status_code", "statusCode"))
+    status = tool_call.get("status")
+    success = tool_call.get("success")
+    if status_code is None and isinstance(status, (int, float)):
+        status_code = int(status)
+    if success is None and isinstance(status, str):
+        lowered = status.lower()
+        if lowered in {"ok", "success", "succeeded", "complete", "completed"}:
+            success = True
+        elif lowered in {"error", "failed", "failure"}:
+            success = False
+    if status_code is not None:
+        normalised["status_code"] = int(status_code)
+        if success is None:
+            success = int(status_code) < 400
+    elif success is not None:
+        normalised["status_code"] = 200 if bool(success) else 500
+    if success is not None:
+        normalised["success"] = bool(success)
+    return normalised
+
+
+def _mcp_status_code(tool_call: dict) -> int:
+    if tool_call.get("status_code") is not None:
+        return int(tool_call["status_code"])
+    return 200 if tool_call.get("success") is not False else 500
 
 
 class WorkflowEventIngestor:
@@ -136,6 +215,53 @@ class WorkflowEventIngestor:
         for e in self._app.store.list_exceptions(include_resolved=False):
             if e.workflow_id == workflow_id:
                 self._app.store.resolve_exception(e.id, resolved_by)
+                self._app.store.upsert_exception(e)
+
+    def _record_phase(
+        self,
+        workflow_id: str,
+        phase_name: str,
+        *,
+        status: str,
+        at: float,
+        agent_id: str | None = None,
+    ) -> None:
+        phases = self._app.store.get_phases(workflow_id)
+        existing = next((phase for phase in phases if phase.name == phase_name), None)
+        if existing is None:
+            self._app.store.append_phase(
+                workflow_id,
+                Phase(
+                    workflow_id=workflow_id,
+                    name=phase_name,
+                    status=status,  # type: ignore[arg-type]
+                    started_at=at,
+                    completed_at=at if status in {"completed", "failed"} else None,
+                    agent_id=agent_id or "system",
+                ),
+            )
+        else:
+            patch = {
+                "status": status,
+                "completed_at": at if status in {"completed", "failed"} else None,
+            }
+            if existing.started_at is None:
+                patch["started_at"] = at
+            if agent_id:
+                patch["agent_id"] = agent_id
+            self._app.store.update_phase(workflow_id, phase_name, **patch)
+        workflow = self._app.store.get_workflow(workflow_id)
+        if workflow is not None:
+            workflow.current_phase = phase_name
+
+    def _append_mcp_call_if_missing(self, call: McpCall) -> None:
+        tool_call_id = call.tool_call_id
+        if tool_call_id is not None and any(
+            existing.tool_call_id == tool_call_id
+            for existing in self._app.store.get_mcp_calls(call.workflow_id)
+        ):
+            return
+        self._app.store.append_mcp_call(call)
 
     # -- ingestion -------------------------------------------------------
 
@@ -183,7 +309,12 @@ class WorkflowEventIngestor:
                     pass
             hist = []
             app_state.orchestration_history[wid] = hist
-        hist.append({"kind": kind, "payload": payload, "at": now})
+        hist.append({
+            "kind": kind,
+            "payload": payload,
+            "at": now,
+            "instance_id": instance_id,
+        })
         if len(hist) > _ORCH_HISTORY_PER_WID_MAX:
             # FIFO: keep the most recent N events. The UI shows the full
             # history but is happy with the last 500 in practice; truncating
@@ -208,12 +339,30 @@ class WorkflowEventIngestor:
         elif kind == "step.started":
             step = payload.get("step")
             if step:
-                # Idempotent: Durable Functions may replay; skip if phase exists.
-                if not any(p.name == step for p in app_state.store.get_phases(wid)):
+                existing = next(
+                    (
+                        phase
+                        for phase in app_state.store.get_phases(wid)
+                        if phase.name == step
+                    ),
+                    None,
+                )
+                if existing is None:
                     app_state.store.append_phase(wid, Phase(
                         workflow_id=wid, name=step,  # type: ignore[arg-type]
                         status="in_progress", started_at=now,
+                        agent_id=payload.get("agent_id") or payload.get("agentId") or "system",
                     ))
+                elif existing.status == "failed":
+                    updates = {
+                        "status": "in_progress",
+                        "started_at": now,
+                        "completed_at": None,
+                    }
+                    agent_id = payload.get("agent_id") or payload.get("agentId")
+                    if agent_id:
+                        updates["agent_id"] = agent_id
+                    app_state.store.update_phase(wid, step, **updates)
                 # Sync the workflow's current_phase so the UI reflects progression
                 # past Intake. The orchestrator advances through phases internally,
                 # but nothing was lifting that state up to the workflow record.
@@ -230,7 +379,11 @@ class WorkflowEventIngestor:
             step = payload.get("step")
             dur = payload.get("duration_ms", 0)
             if step:
-                app_state.store.update_phase(wid, step, status="completed", completed_at=now)
+                updates = {"status": "completed", "completed_at": now}
+                agent_id = payload.get("agent_id") or payload.get("agentId")
+                if agent_id:
+                    updates["agent_id"] = agent_id
+                app_state.store.update_phase(wid, step, **updates)
                 self._ledger(wid, kind="agent", actor_id=f"phase:{step}",
                              action=f"phase.completed:{step}", details={"duration_ms": dur})
                 self._emit("workflow.phase.completed", wid, phase=step, durationMs=dur)
@@ -240,9 +393,11 @@ class WorkflowEventIngestor:
             step = payload.get("step")
             reason = str(payload.get("error") or payload.get("reason") or "step failed")
             if step:
-                app_state.store.update_phase(
-                    wid, step, status="failed", completed_at=now
-                )
+                updates = {"status": "failed", "completed_at": now}
+                agent_id = payload.get("agent_id") or payload.get("agentId")
+                if agent_id:
+                    updates["agent_id"] = agent_id
+                app_state.store.update_phase(wid, step, **updates)
                 self._ledger(
                     wid,
                     kind="agent",
@@ -251,6 +406,54 @@ class WorkflowEventIngestor:
                     details={"reason": reason},
                 )
                 self._emit("workflow.phase.failed", wid, phase=step, reason=reason)
+
+        elif kind in {
+            "segment.failed",
+            "segment.failed.irreversible",
+            "segment.rejected",
+        }:
+            covered_phases = (
+                payload.get("covered_phases")
+                if payload.get("covered_phases") is not None
+                else payload.get("coveredPhases")
+            )
+            if isinstance(covered_phases, (list, tuple)):
+                phase_names = [
+                    str(value)
+                    for value in covered_phases
+                    if value is not None and str(value).strip()
+                ]
+            else:
+                phase = payload.get("phase") or payload.get("step")
+                phase_names = [str(phase)] if phase is not None else []
+            reason = str(
+                payload.get("error")
+                or payload.get("reason")
+                or payload.get("errors")
+                or kind
+            )
+            agent_id = payload.get("agent_id") or payload.get("agentId")
+            for phase_name in dict.fromkeys(phase_names):
+                self._record_phase(
+                    wid,
+                    phase_name,
+                    status="failed",
+                    at=now,
+                    agent_id=agent_id,
+                )
+                self._ledger(
+                    wid,
+                    kind="agent",
+                    actor_id=f"phase:{phase_name}",
+                    action=f"phase.failed:{phase_name}",
+                    details={"reason": reason},
+                )
+                self._emit(
+                    "workflow.phase.failed",
+                    wid,
+                    phase=phase_name,
+                    reason=reason,
+                )
 
         elif kind == "executor.invoked":
             name = str(payload.get("name", "?"))
@@ -272,6 +475,12 @@ class WorkflowEventIngestor:
             # the agent wrapper fires per TOOL_EXECUTION_*; this branch is for
             # the executor pulse itself, not the tool fan-out.
             attrs = payload.get("attributes") or {}
+            invocation_id = payload.get("invocation_id")
+            invocation_fields = (
+                {"invocation_id": str(invocation_id)}
+                if invocation_id is not None
+                else {}
+            )
             self._emit(
                 "durable.executor.invoked", wid,
                 name=name,
@@ -281,65 +490,39 @@ class WorkflowEventIngestor:
                 skill=attrs.get("skill") or attrs.get("skill_label") or skill_label,
                 tool=attrs.get("tool"),
                 duration_ms=int(payload.get("duration_ms", 0)),
+                **invocation_fields,
             )
+            span_key = (wid, str(invocation_id or name))
             if stage == "start":
-                _bounded_set(self._span_starts, (wid, name), now, _SPAN_STARTS_MAX)
+                _bounded_set(self._span_starts, span_key, now, _SPAN_STARTS_MAX)
             elif stage in ("complete", "error"):
                 dur_ms = int(payload.get("duration_ms", 0))
                 dur_s = dur_ms / 1000.0
-                start = self._span_starts.pop((wid, name), now - dur_s)
+                start = self._span_starts.pop(span_key, now - dur_s)
+                span_attributes = {
+                    "workflow.id": wid,
+                    "executor.name": name,
+                    "executor.type": etype,
+                }
+                if invocation_id is not None:
+                    span_attributes["zava.invocation.id"] = str(invocation_id)
+                phase = payload.get("stage_label") or payload.get("phase")
+                if phase:
+                    span_attributes["workflow.phase"] = phase
                 app_state.store.append_span(OtelSpan(
                     trace_id=wid,  # group all spans under the workflow id as trace
                     span_id=uuid.uuid4().hex[:16],
                     name=f"executor.{name}",
                     start_ms=start * 1000,
                     end_ms=(start + dur_s) * 1000,
-                    attributes={
-                        "workflow.id": wid,
-                        "executor.name": name,
-                        "executor.type": etype,
-                    },
+                    attributes=span_attributes,
                     status="error" if stage == "error" else "ok",
                 ))
-                # Synthesize an MCP-call entry per executor so the Timeline tab
-                # populates with per-step records. The actual HTTP traffic happens
-                # inside GHCP SDK tool invocations and isn't currently captured —
-                # this gives the operator the same per-step inspection surface
-                # (executor name, type, phase, duration, outcome) for both agents
-                # and validators / deterministic steps.
-                phase = payload.get("stage_label") or payload.get("phase")
-                request_preview: dict = {"executor": name, "type": etype}
-                if phase:
-                    request_preview["phase"] = phase
-                extra = payload.get("attributes")
-                if isinstance(extra, dict):
-                    request_preview.update(
-                        {k: v for k, v in extra.items() if k not in ("tool",)}
-                    )
-                inferred_url = (
-                    f"local://tool/{extra.get('tool')}" if isinstance(extra, dict) and extra.get("tool")
-                    else f"local://executor/{name}"
-                )
-                response_preview: dict = {
-                    "duration_ms": dur_ms,
-                    "outcome": "error" if stage == "error" else "ok",
-                }
-                app_state.store.append_mcp_call(McpCall(
-                    workflow_id=wid,
-                    timestamp=now,
-                    tool=name,
-                    url=inferred_url,
-                    method="EXEC",
-                    request=request_preview,
-                    response=response_preview,
-                    status_code=500 if stage == "error" else 200,
-                    duration_ms=dur_ms,
-                ))
-
         elif kind == "mcp.call":
             p = payload
-            app_state.store.append_mcp_call(McpCall(
+            self._append_mcp_call_if_missing(McpCall(
                 workflow_id=wid,
+                tool_call_id=p.get("tool_call_id") or p.get("toolCallId"),
                 timestamp=now,
                 tool=p.get("tool", "?"),
                 url=p.get("url", ""),
@@ -381,7 +564,20 @@ class WorkflowEventIngestor:
             # tool name populated, so the observatory orbit can flare the
             # skill -> tool edge in near-real time. Replays losslessly via
             # the recorder.
-            p = payload or {}
+            p = _normalise_tool_call(payload or {})
+            if p.get("stage") == "complete":
+                self._append_mcp_call_if_missing(McpCall(
+                    workflow_id=wid,
+                    tool_call_id=p.get("tool_call_id"),
+                    timestamp=now,
+                    tool=str(p.get("tool") or "?"),
+                    url=f"local://tool/{p.get('tool') or '?'}",
+                    method="EXEC",
+                    request=_as_mcp_object(p.get("args"), "args"),
+                    response=_as_mcp_object(p.get("result"), "result"),
+                    status_code=_mcp_status_code(p),
+                    duration_ms=int(p.get("duration_ms", 0)),
+                ))
             self._emit(
                 "durable.executor.invoked", wid,
                 name=f"tool:{p.get('tool', '?')}",
@@ -389,9 +585,17 @@ class WorkflowEventIngestor:
                 stage=p.get("stage"),
                 skill=p.get("skill"),
                 tool=p.get("tool"),
+                tool_call_id=p.get("tool_call_id"),
+                args=p.get("args"),
+                result=p.get("result"),
+                success=p.get("success"),
                 duration_ms=int(p.get("duration_ms", 0)),
+                **{
+                    field: p[field]
+                    for field in ("agent_run_id", "invocation_id")
+                    if p.get(field) is not None
+                },
             )
-
         elif kind == "claim_routed":
             verdict = (payload.get("verdict") or "").lower()
             if verdict in {"green", "amber", "red"}:
@@ -417,6 +621,7 @@ class WorkflowEventIngestor:
             self._emit(
                 "workflow.exception.detected", wid,
                 category="validator-blocked", severity="high",
+                reason=payload.get("reason", "validation failed"),
             )
             self._emit(
                 "durable.validator.blocked", wid,
@@ -438,6 +643,14 @@ class WorkflowEventIngestor:
             phase = payload.get("phase")
             if phase and "phase" not in enriched_context:
                 enriched_context["phase"] = phase
+            if phase:
+                self._record_phase(
+                    wid,
+                    str(phase),
+                    status="in_progress",
+                    at=now,
+                    agent_id=payload.get("agent_id") or payload.get("agentId"),
+                )
             if not is_external_party:
                 compose_hitl_exception(app_state.store, wid, reason)
             self._ledger(wid, kind="agent", actor_id="orchestrator",
@@ -499,6 +712,15 @@ class WorkflowEventIngestor:
             )
 
         elif kind == "resumed":
+            resumed_phase = payload.get("phase")
+            if resumed_phase:
+                self._record_phase(
+                    wid,
+                    str(resumed_phase),
+                    status="completed",
+                    at=now,
+                    agent_id=payload.get("agent_id") or payload.get("agentId"),
+                )
             self._ledger(wid, kind="agent", actor_id="orchestrator",
                          action="resumed", details={})
             # Gate is closed; drop its cache entry so a stale pending row
@@ -532,7 +754,12 @@ class WorkflowEventIngestor:
             agent = str(p.get("agent") or "")
             output = p.get("output") or {}
             if agent and isinstance(output, dict):
-                app_state.store.append_agent_output(wid, agent, output)
+                app_state.store.append_agent_output(
+                    wid,
+                    agent,
+                    output,
+                    recorded_at=now,
+                )
 
         elif kind == "creative.phase.output":
             # POC3 Phase 5: per-phase output stash for the creative-campaign
@@ -638,14 +865,41 @@ class WorkflowEventIngestor:
             #      cv_crystalliser passes the shortlist threshold.
             #   3. The workflow ledger — store.append_agent_reasoning persists
             #      the full trace (messages + tool_calls + extracted_json) so
-            #      the admin Traces tab and any domain view can show what the
-            #      AI thought, not just that it ran.
+            #      the admin Traces tab and any domain view can show the
+            #      model-visible exchange and returned evidence.
             #   4. economics.compute() — needs a gen_ai.generate_content span
             #      with `gen_ai.usage.*` attributes in *this* process's store.
             #      The wrapper's own OTEL span lives in the Functions host
             #      process, so we synthesize one here from the webhook payload.
             payload_ac = {k: v for k, v in (payload or {}).items() if k != "type"}
-            app_state.store.append_agent_reasoning(wid, payload_ac)
+            raw_tool_calls = (
+                payload_ac.get("tool_calls")
+                if payload_ac.get("tool_calls") is not None
+                else payload_ac.get("toolCalls")
+            )
+            tool_calls_ac = [
+                _normalise_tool_call(tool_call)
+                for tool_call in (raw_tool_calls or [])
+                if isinstance(tool_call, dict)
+            ]
+            for tool_call in tool_calls_ac:
+                tool_call_id = tool_call.get("tool_call_id")
+                if tool_call_id is None or not str(tool_call_id).strip():
+                    continue
+                tool_name = tool_call.get("tool")
+                self._append_mcp_call_if_missing(McpCall(
+                    workflow_id=wid,
+                    tool_call_id=str(tool_call_id),
+                    timestamp=now,
+                    tool=str(tool_name or "?"),
+                    url=f"local://tool/{tool_name or '?'}",
+                    method="EXEC",
+                    request=_as_mcp_object(tool_call.get("args"), "args"),
+                    response=_as_mcp_object(tool_call.get("result"), "result"),
+                    status_code=_mcp_status_code(tool_call),
+                    duration_ms=int(tool_call.get("duration_ms", 0)),
+                ))
+            app_state.store.append_agent_reasoning(wid, payload_ac, completed_at=now)
             usage = payload_ac.get("usage") or {}
             in_tok = usage.get("input_tokens")
             out_tok = usage.get("output_tokens")
@@ -665,7 +919,7 @@ class WorkflowEventIngestor:
             if in_tok is None:
                 input_chars = len(payload_ac.get("prompt") or "")
                 input_chars += int(payload_ac.get("skill_chars") or 0)
-                for tc in payload_ac.get("tool_calls") or []:
+                for tc in tool_calls_ac:
                     input_chars += len(str(tc.get("args") or ""))
                     input_chars += len(str(tc.get("result") or ""))
                 in_tok = max(1, input_chars // 4)
@@ -688,6 +942,14 @@ class WorkflowEventIngestor:
             }
             if payload_ac.get("agent_label"):
                 attrs["zava.skill"] = payload_ac["agent_label"]
+            if payload_ac.get("agent_run_id"):
+                attrs["gen_ai.agent.run_id"] = payload_ac["agent_run_id"]
+            if payload_ac.get("invocation_id"):
+                attrs["zava.invocation.id"] = payload_ac["invocation_id"]
+            if payload_ac.get("phase"):
+                attrs["workflow.phase"] = payload_ac["phase"]
+            if payload_ac.get("covered_phases"):
+                attrs["workflow.covered_phases"] = payload_ac["covered_phases"]
             app_state.store.append_span(OtelSpan(
                 trace_id=wid,
                 span_id=uuid.uuid4().hex[:16],
@@ -710,7 +972,7 @@ class WorkflowEventIngestor:
             try:
                 if domain and domain in app_state.domain_memories:
                     response = str(payload_ac.get("response_text") or "")
-                    tool_calls = payload_ac.get("tool_calls") or []
+                    tool_calls = tool_calls_ac
                     tool_summary = "; ".join(
                         f"called {tc.get('tool', '?')}" for tc in tool_calls[:5]
                     )
@@ -745,12 +1007,12 @@ class WorkflowEventIngestor:
             self._emit("agent.completed", wid, **payload_ac)
 
         elif kind == "workflow.completed":
-            self._ledger(wid, kind="agent", actor_id="orchestrator",
-                         action="workflow.completed", details={})
             w = app_state.store.get_workflow(wid)
             if w:
                 w.status = "completed"
             self._auto_resolve_open(wid, "auto-resolved:completed")
+            self._ledger(wid, kind="agent", actor_id="orchestrator",
+                         action="workflow.completed", details={})
             # Canonical durable.workflow.completed marks the orbit terminal.
             # Legacy workflow.resolved kept for the existing UI consumer.
             self._emit("durable.workflow.completed", wid, status="completed")
@@ -772,13 +1034,6 @@ class WorkflowEventIngestor:
         elif kind == "workflow.failed":
             reason = str(payload.get("reason") or "workflow failed")
             failed_by = str(payload.get("by") or "orchestrator")
-            self._ledger(
-                wid,
-                kind="agent",
-                actor_id=failed_by,
-                action="workflow.failed",
-                details={"reason": reason},
-            )
             w = app_state.store.get_workflow(wid)
             if w:
                 w.status = "failed"
@@ -792,6 +1047,13 @@ class WorkflowEventIngestor:
                 w.metadata["failure_reason"] = reason
                 w.metadata["failed_by"] = failed_by
             self._auto_resolve_open(wid, "auto-resolved:failed")
+            self._ledger(
+                wid,
+                kind="agent",
+                actor_id=failed_by,
+                action="workflow.failed",
+                details={"reason": reason},
+            )
             self._emit("workflow.failed", wid, reason=reason)
             pending_gates.clear(wid)
             self._workflow_types.pop(wid, None)
@@ -799,20 +1061,14 @@ class WorkflowEventIngestor:
                 self._span_starts.pop(key, None)
 
         elif kind == "workflow.rejected":
-            self._ledger(wid, kind="human",
-                         actor_id=payload.get("by") or "operator",
-                         action="workflow.rejected",
-                         details={"reason": payload.get("reason", "operator rejected")})
-            app_state.bus.emit(FleetEvent(
-                type="workflow.resolved", workflow_id=wid, resolution="rejected"
-            ))
-            # C3: top-level workflow.failed makes the FM exception widget +
-            # cosmic-lens completion handler treat rejection as a terminal
-            # failure rather than a benign resolution.
-            self._emit("workflow.failed", wid, reason=payload.get("reason", "operator rejected"))
+            reason = str(payload.get("reason") or "operator rejected")
+            rejected_by = str(payload.get("by") or "operator")
             w = app_state.store.get_workflow(wid)
+            rejection_phase = payload.get("phase")
             if w:
                 w.status = "failed"
+                if rejection_phase is None:
+                    rejection_phase = w.current_phase
                 # NOTE: legacy invoice-p2p code used to overwrite current_phase
                 # to "Approval" here; that was a P2P-specific assumption that's
                 # now wrong for hiring (Interview/Offer rejection) and the six
@@ -826,9 +1082,33 @@ class WorkflowEventIngestor:
                     w.metadata = {k: v for k, v in w.metadata.items()
                                   if k not in {"awaiting_reason", "wait_kind"}}
                 w.metadata = dict(w.metadata or {})
-                w.metadata["rejected_at_phase"] = w.current_phase
-                w.metadata["rejected_by"] = payload.get("by") or "operator"
+                w.metadata["rejected"] = True
+                w.metadata["rejection_reason"] = reason
+                w.metadata["rejected_at_phase"] = rejection_phase
+                w.metadata["rejected_by"] = rejected_by
+            if rejection_phase is not None:
+                self._record_phase(
+                    wid,
+                    str(rejection_phase),
+                    status="failed",
+                    at=now,
+                    agent_id=payload.get("agent_id") or payload.get("agentId"),
+                )
             self._auto_resolve_open(wid, "auto-resolved:rejected")
+            self._ledger(
+                wid,
+                kind="human",
+                actor_id=rejected_by,
+                action="workflow.rejected",
+                details={"phase": rejection_phase, "reason": reason},
+            )
+            app_state.bus.emit(FleetEvent(
+                type="workflow.resolved", workflow_id=wid, resolution="rejected"
+            ))
+            # C3: top-level workflow.failed makes the FM exception widget +
+            # cosmic-lens completion handler treat rejection as a terminal
+            # failure rather than a benign resolution.
+            self._emit("workflow.failed", wid, reason=reason)
             pending_gates.clear(wid)
             # Drop the workflow_type cache entry + any leftover span starts
             # for this workflow; it has reached a terminal state. Mirrors the

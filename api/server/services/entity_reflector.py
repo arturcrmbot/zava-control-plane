@@ -22,7 +22,8 @@ Design notes
   ``entity.write.failed`` for each casualty.
 * **No new lock.** Every write goes through ``EntityGraph.upsert`` /
   ``link`` / ``record_decision``, all of which are already lock-protected.
-  The reflector itself is stateless beyond the ``off`` callback stash.
+  The reflector keeps only a bounded LRU of successful projection
+  fingerprints in addition to the ``off`` callback stash.
 * **None-permissive substrate.** ``governance`` and ``audit`` are
   optional ctor params; ``None`` skips the gate / log entirely (mirrors
   ``EntityGraph.attach``'s pattern).
@@ -39,9 +40,13 @@ Design notes
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
-from datetime import datetime
+from collections import OrderedDict
 from collections.abc import Mapping
+from dataclasses import asdict, is_dataclass
+from datetime import datetime
 from typing import Any, Callable
 
 from api.server.services.entity_graph import (
@@ -59,6 +64,7 @@ log = logging.getLogger(__name__)
 
 _REFLECTOR_ACTOR = "reflector.entity_reflector"
 _REFLECTOR_TOOL = "entity.write"
+_PROJECTION_FINGERPRINT_CACHE_MAX = 10_000
 
 
 def _describe_op(op: Any) -> tuple[str, str]:
@@ -70,6 +76,28 @@ def _describe_op(op: Any) -> tuple[str, str]:
     if isinstance(op, DecisionWrite):
         return "Decision", f"{op.workflow_id}:{op.phase}"
     return type(op).__name__, ""
+
+
+def _projection_fingerprint(
+    workflow_op: EntityWrite,
+    ops: list[EntityWrite | RelWrite | DecisionWrite],
+) -> str:
+    """Return a stable digest of every graph write in one projection."""
+    payload = [
+        {
+            "type": type(op).__name__,
+            "op": asdict(op) if is_dataclass(op) else repr(op),
+        }
+        for op in (workflow_op, *ops)
+    ]
+    canonical = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        default=str,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 class EntityReflector:
@@ -91,6 +119,8 @@ class EntityReflector:
         self._audit = audit
         self._projections = projections if projections is not None else PROJECTIONS
         self._off: Callable[[], None] | None = None
+        self._projection_fingerprints: OrderedDict[str, str] = OrderedDict()
+        self._projection_fingerprint_cache_max = _PROJECTION_FINGERPRINT_CACHE_MAX
 
     # -- lifecycle -------------------------------------------------------
 
@@ -184,22 +214,31 @@ class EntityReflector:
             if isinstance(op, EntityWrite):
                 op.attrs.setdefault("workflow_id", workflow_id)
 
+        workflow_op = EntityWrite(
+            kind="Workflow",
+            id=str(workflow_id),
+            attrs={
+                "workflow_type": workflow_type or "unknown",
+                "status": getattr(workflow, "status", "") or "",
+            },
+            source_workflows=(),
+        )
+        fingerprint = _projection_fingerprint(workflow_op, ops)
+        workflow_key = str(workflow_id)
+        if self._projection_fingerprints.get(workflow_key) == fingerprint:
+            self._projection_fingerprints.move_to_end(workflow_key)
+            return
+
         # Always materialise the dispatching workflow as a Workflow node
         # before applying the projection's ops. Without this, the SUB_WORKFLOW_OF
         # rel table can never accumulate rows (its endpoints would be unanchored)
         # and any future Workflow-targeted edge has nothing to point at. The
         # upsert is idempotent on id so re-dispatching the same workflow is safe.
+        dispatch_succeeded = True
         try:
-            self._graph.upsert(EntityWrite(
-                kind="Workflow",
-                id=str(workflow_id),
-                attrs={
-                    "workflow_type": workflow_type or "unknown",
-                    "status": getattr(workflow, "status", "") or "",
-                },
-                source_workflows=(),
-            ))
+            self._graph.upsert(workflow_op)
         except Exception as exc:
+            dispatch_succeeded = False
             log.warning(
                 "entity_reflector: Workflow node upsert failed for %s: %s",
                 workflow_id, exc,
@@ -212,6 +251,7 @@ class EntityReflector:
             try:
                 self._dispatch_op(op)
             except Exception as exc:
+                dispatch_succeeded = False
                 kind, ent_id = _describe_op(op)
                 log.exception(
                     "entity_reflector: op %d (%s id=%s) failed",
@@ -231,6 +271,17 @@ class EntityReflector:
                         "workflow_id": getattr(event, "workflow_id", None),
                     },
                 )
+
+        if dispatch_succeeded:
+            self._projection_fingerprints[workflow_key] = fingerprint
+            self._projection_fingerprints.move_to_end(workflow_key)
+            while (
+                len(self._projection_fingerprints)
+                > self._projection_fingerprint_cache_max
+            ):
+                self._projection_fingerprints.popitem(last=False)
+        else:
+            self._projection_fingerprints.pop(workflow_key, None)
 
     def _dispatch_op(self, op: EntityWrite | RelWrite | DecisionWrite) -> None:
         if isinstance(op, EntityWrite):

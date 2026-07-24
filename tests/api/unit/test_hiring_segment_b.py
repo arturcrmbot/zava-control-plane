@@ -1,6 +1,9 @@
 """Phase 3 of plan/refactor-substrate-agentic-segments-1.md."""
 from __future__ import annotations
 import os
+from datetime import datetime, timezone
+from typing import Any, Iterable
+
 os.environ["AZURE_STORAGE_CONNECTION_STRING"] = ""
 
 import pytest
@@ -78,10 +81,6 @@ def test_segment_mode_parser_removed() -> None:
 # --------------------------------------------------------------------------
 # Orchestrator branch tests (Task 4)
 # --------------------------------------------------------------------------
-from datetime import datetime, timezone
-from typing import Any, Iterable
-
-
 class _StubTimerEvent:
     def __init__(self, fire_at):
         self.fire_at = fire_at
@@ -212,7 +211,32 @@ def test_orchestrator_segment_b_yields_segment_activities(monkeypatch):
     assert "validate_segment_b_output_activity_trigger" in activities
 
 
+def test_hiring_segments_preserve_workflow_instance_and_phase_provenance():
+    ctx = _SegmentBStubContext()
+    _drive_until_done_or_error(ctx)
+    expected_coverage = {
+        "hiring_segment_b_activity_trigger": [
+            "Job Design",
+            "Sourcing",
+            "Triage",
+            "Screening",
+        ],
+        "hiring_segment_d_activity_trigger": ["Interview"],
+        "hiring_segment_e_activity_trigger": ["Compliance", "Offer"],
+        "hiring_segment_f_activity_trigger": ["Onboarding"],
+    }
+
+    for activity_name, covered_phases in expected_coverage.items():
+        payload = next(
+            payload for name, payload in ctx.calls if name == activity_name
+        )
+        assert payload["workflow_id"] == "HIRE-SEGB-1"
+        assert payload["instance_id"] == "instance-segb-1"
+        assert payload["covered_phases"] == covered_phases
+
+
 def test_orchestrator_segment_b_retry_on_validation_failure(monkeypatch):
+    monkeypatch.setenv("SEGMENT_MAX_RETRIES", "1")
     valid_output = {
         "verdict": "strong",
         "jd_draft_id": "JD-1",
@@ -230,6 +254,34 @@ def test_orchestrator_segment_b_retry_on_validation_failure(monkeypatch):
     activities = [c[0] for c in ctx.calls]
     assert activities.count("hiring_segment_b_activity_trigger") == 2
     assert activities.count("validate_segment_b_output_activity_trigger") == 2
+    retry_input = [
+        payload for name, payload in ctx.calls
+        if name == "hiring_segment_b_activity_trigger"
+    ][1]
+    assert retry_input["prior_validator_error"] == "['bad verdict']"
+    failure = next(
+        payload for name, payload in ctx.calls
+        if name == "checkpoint_activity_trigger"
+        and payload.get("kind") == "segment.failed"
+    )
+    assert failure == {
+        "workflow_id": "HIRE-SEGB-1",
+        "instance_id": "instance-segb-1",
+        "kind": "segment.failed",
+        "payload": {
+            "segment": "b",
+            "phase": "Screening",
+            "covered_phases": [
+                "Job Design", "Sourcing", "Triage", "Screening",
+            ],
+            "attempt": 1,
+            "max_attempts": 2,
+            "retrying": True,
+            "error": "segment validation failed",
+            "errors": ["bad verdict"],
+            "validation": {"ok": False, "errors": ["bad verdict"]},
+        },
+    }
 
 
 def test_orchestrator_segment_b_retry_exhaustion(monkeypatch):
@@ -246,14 +298,17 @@ def test_orchestrator_segment_b_retry_exhaustion(monkeypatch):
     )
     with pytest.raises(RuntimeError, match="Segment B validation failed"):
         _drive_until_done_or_error(ctx)
-    # Failure checkpoint was emitted.
     failure_checkpoints = [
         payload for (name, payload) in ctx.calls
         if name == "checkpoint_activity_trigger"
         and payload.get("kind") == "segment.failed"
     ]
-    assert len(failure_checkpoints) == 1
-    assert failure_checkpoints[0]["segment"] == "b"
+    assert [checkpoint["payload"]["attempt"] for checkpoint in failure_checkpoints] == [1, 2]
+    assert [checkpoint["payload"]["retrying"] for checkpoint in failure_checkpoints] == [
+        True, False,
+    ]
+    assert failure_checkpoints[-1]["payload"]["errors"] == ["e2"]
+    assert all("segment" not in checkpoint for checkpoint in failure_checkpoints)
 
 
 def test_orchestrator_segment_b_runs_to_completion(monkeypatch):

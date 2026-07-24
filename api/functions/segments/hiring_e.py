@@ -55,5 +55,7 @@ async def run_segment_e(input: dict) -> dict:
         skill_directories=skill_dirs[1:],
         skill_label="hiring-segment-e",
         workflow_id=input.get("workflow_id"),
+        instance_id=input.get("instance_id"),
+        covered_phases=input.get("covered_phases"),
         model="gpt-4.1",
     )

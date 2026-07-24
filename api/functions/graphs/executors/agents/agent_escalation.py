@@ -45,5 +45,6 @@ async def execute(input: dict) -> dict:
         skill_dir=_SKILL_DIR,
         skill_label="escalation-advisor",
         workflow_id=workflow_id,
+        instance_id=input.get("instance_id"),
     )
     return {"escalation": recommendation}

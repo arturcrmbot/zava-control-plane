@@ -141,7 +141,7 @@ export interface Phase {
   status: "pending" | "in_progress" | "completed" | "failed";
   startedAt?: number;
   completedAt?: number;
-  agentId: "finance-agent";
+  agentId: string;
   toolCalls: ToolCall[];
   spanIds: string[];
 }
@@ -216,6 +216,7 @@ export interface AutonomyPolicy {
 
 export interface McpCall {
   workflowId: string;
+  toolCallId?: string | null;
   timestamp: number;
   tool: string;
   url: string;
@@ -224,6 +225,82 @@ export interface McpCall {
   response: Record<string, unknown>;
   statusCode: number;
   durationMs: number;
+}
+
+export type CanonicalExecutionTimelineKind =
+  | "workflow"
+  | "phase"
+  | "reasoning"
+  | "agentOutput"
+  | "tool"
+  | "output"
+  | "decision"
+  | "ledger";
+
+export type LegacyExecutionTimelineKind = "agent" | "system" | "error";
+export type ExecutionTimelineKind = CanonicalExecutionTimelineKind | LegacyExecutionTimelineKind;
+
+export interface ExecutionTimelineRow {
+  id: string;
+  ts: number;
+  kind: ExecutionTimelineKind;
+  label: string;
+  status?: string | null;
+  verdict?: string | null;
+  actor?: string | null;
+  actorKind?: string | null;
+  agent?: string | null;
+  agentId?: string | null;
+  personaRole?: string | null;
+  currentPhase?: string | null;
+  phase?: string | null;
+  name?: string | null;
+  skill?: string | null;
+  model?: string | null;
+  startedAt?: number | string | null;
+  completedAt?: number | string | null;
+  completed_at?: number | string | null;
+  decidedAt?: number | string | null;
+  timestamp?: number | string | null;
+  durationMs?: number | null;
+  latencyMs?: number | null;
+  tokens?: number | null;
+  tokensIn?: number | null;
+  tokensOut?: number | null;
+  costUsd?: number | null;
+  tool?: string | null;
+  toolCallId?: string | null;
+  mcpCallIndex?: number | null;
+  method?: string | null;
+  url?: string | null;
+  request?: Record<string, unknown> | null;
+  response?: Record<string, unknown> | null;
+  statusCode?: number | null;
+  resultSummary?: string | null;
+  result_summary?: string | null;
+  messages?: Array<Record<string, unknown>>;
+  toolCalls?: unknown[];
+  extractedJson?: unknown;
+  command?: unknown;
+  reasoning?: unknown;
+  results?: unknown;
+  reason?: string | null;
+  details?: unknown;
+  attributes?: Record<string, unknown>;
+  spanIds?: string[];
+  traceId?: string | null;
+  spanId?: string | null;
+  parentSpanId?: string | null;
+  childWorkflowId?: string | null;
+  childWorkflowType?: string | null;
+  revocable?: boolean | null;
+  decisionId?: string | null;
+  policyVersion?: string | null;
+  enforcementMode?: string | null;
+  prevHash?: string | null;
+  entryHash?: string | null;
+  actorJws?: string | null;
+  ledger?: Record<string, unknown>;
 }
 
 export interface EconomicsPerModel {
@@ -253,6 +330,19 @@ export interface Narrative {
   whatHappened: string;
   whatAgentTried: string[];
   agentRecommendation: string;
+}
+
+export interface WorkflowDetailResponse {
+  workflow: Workflow;
+  phases: Phase[];
+  spans: OtelSpan[];
+  amplifications: SkillAmplification[];
+  activeException: Exception | null;
+  mcpCalls: McpCall[];
+  economics: Economics;
+  narrative: Narrative | null;
+  timeline: ExecutionTimelineRow[];
+  auditBlobUrl?: string | null;
 }
 
 export interface FleetEconomics {

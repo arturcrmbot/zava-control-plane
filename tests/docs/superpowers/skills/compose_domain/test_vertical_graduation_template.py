@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[5]
 TEMPLATES_DIR = (
     ROOT / "docs" / "superpowers" / "skills" / "compose-domain" / "templates"
@@ -10,6 +9,8 @@ GRADUATION_TMPL = TEMPLATES_DIR / "GRADUATION.md.tmpl"
 ACTIVITY_TMPL = TEMPLATES_DIR / "activity.py.tmpl"
 ORCHESTRATOR_TMPL = TEMPLATES_DIR / "orchestrator.py.tmpl"
 SEGMENT_TRIGGER_TMPL = TEMPLATES_DIR / "segment_activity_trigger.py.tmpl"
+SEGMENT_TMPL = TEMPLATES_DIR / "segment.py.tmpl"
+AGENT_EXECUTOR_TMPL = TEMPLATES_DIR / "agent_executor.py.tmpl"
 CHECKLIST = (
     ROOT
     / "docs"
@@ -218,6 +219,56 @@ def test_orchestrator_tmpl_targets_durable_py() -> None:
     assert "registered in `function_app.py`" not in text
     assert "durable.py" in text
     assert "api/shared/constants.py" not in text
+
+
+def test_orchestrator_template_forwards_canonical_workflow_identity() -> None:
+    text = " ".join(ORCHESTRATOR_TMPL.read_text(encoding="utf-8").split())
+    assert (
+        'enriched = { **input_dict, "workflow_id": workflow_id, '
+        '"instance_id": context.instance_id, }'
+    ) in text
+
+
+def test_agent_templates_forward_workflow_and_orchestration_identity() -> None:
+    for template in (SEGMENT_TMPL, AGENT_EXECUTOR_TMPL):
+        text = template.read_text(encoding="utf-8")
+        call = text[text.index("run_agent_session(") :]
+        assert 'input.get("workflow_id")' in text, template
+        assert 'input.get("instance_id")' in text, template
+        assert "workflow_id=" in call, template
+        assert "instance_id=" in call, template
+        assert "send_and_wait" not in text, template
+
+
+def test_agent_templates_forward_canonical_phase_provenance() -> None:
+    graph_text = AGENT_EXECUTOR_TMPL.read_text(encoding="utf-8")
+    segment_text = SEGMENT_TMPL.read_text(encoding="utf-8")
+
+    assert 'phase=input.get("phase")' in graph_text
+    assert 'covered_phases=input.get("covered_phases")' in segment_text
+
+
+def test_segment_authoring_contract_preserves_ids_and_covered_phases() -> None:
+    text = COMPOSE_SKILL.read_text(encoding="utf-8")
+
+    assert '"workflow_id": workflow_id' in text
+    assert '"instance_id": context.instance_id' in text
+    assert '"covered_phases"' in text
+
+
+def test_visibility_docs_validate_observed_evidence_not_predicted_branches() -> None:
+    proof_text = VERTICAL_PROOF.read_text(encoding="utf-8")
+    checklist_text = CHECKLIST.read_text(encoding="utf-8")
+
+    for raw_text in (proof_text, checklist_text):
+        text = " ".join(raw_text.split())
+        assert "Actual execution evidence must be visible and self-consistent" in text
+        assert "Conditional branches may omit phases" in text
+        assert "Validate only tool calls that occurred" in text or (
+            "Only tool calls that occurred are checked" in text
+        )
+        assert "executed prefix through the rejected HITL phase" not in text
+        assert "covered declared phases" not in text
 
 
 def test_checklist_function_membership_targets_pack_functions_py() -> None:

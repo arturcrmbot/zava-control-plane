@@ -115,6 +115,92 @@ async def test_mutation_capture(tmp_path: Path, isolated_app_state):
     assert any(r["kind"] == "workflow" for r in records)
 
 
+async def test_tool_completion_mutation_is_taped_with_triggering_event(
+    tmp_path: Path,
+    isolated_app_state,
+):
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from api.server.services.replay.recorder import Recorder
+    from api.server.services.workflow_event_ingestor import WorkflowEventIngestor
+
+    workflow_id = "wf-tool-association"
+    app_state.store.upsert_workflow(Workflow(
+        id=workflow_id,
+        type="vendor-kyc",
+        status="in_progress",
+        current_phase="KYC Diligence",
+        created_at=1_716_399_200.0,
+        sla_due_at=1_716_485_600.0,
+        jurisdiction="London-Zava",
+        agency="Zava",
+    ))
+    ingestor = WorkflowEventIngestor(SimpleNamespace(
+        bus=app_state.bus,
+        store=app_state.store,
+        hub=MagicMock(),
+        audit=MagicMock(),
+        orchestration_history={},
+        domain_memories={},
+        cost_budget=MagicMock(),
+    ))
+    out_path = tmp_path / "tool-association.tar.gz"
+    recorder = Recorder(out_path=out_path, flush_interval_s=300.0)
+
+    await recorder.start()
+    try:
+        await ingestor.ingest(
+            workflow_id,
+            "instance-tool-association",
+            "tool.invoked",
+            {
+                "tool": "vendor_registry_lookup",
+                "stage": "complete",
+                "tool_call_id": "call-tape-1",
+                "args": '{"vendorId":"V-1"}',
+                "result": '{"status":"active"}',
+                "success": True,
+                "duration_ms": 7,
+            },
+            at=1_716_399_201.0,
+        )
+        await asyncio.sleep(0.05)
+        app_state.bus.emit(FleetEvent(
+            type="fleet.tick",
+            workflow_id=workflow_id,
+        ))
+    finally:
+        await recorder.stop()
+
+    with tarfile.open(out_path, "r:gz") as tf:
+        events = [
+            json.loads(line)
+            for line in tf.extractfile("./events.ndjson").read().decode().splitlines()  # type: ignore[union-attr]
+        ]
+        mutations = [
+            json.loads(line)
+            for line in tf.extractfile("./mutations.ndjson").read().decode().splitlines()  # type: ignore[union-attr]
+        ]
+
+    tool_event = next(
+        record
+        for record in events
+        if record["event"]["type"] == "durable.executor.invoked"
+    )
+    marker_event = next(
+        record for record in events if record["event"]["type"] == "fleet.tick"
+    )
+    tool_mutation = next(
+        record
+        for record in mutations
+        if record["kind"] == "mcp_call"
+        and record["patch"]["toolCallId"] == "call-tape-1"
+    )
+    assert tool_event["t"] <= tool_mutation["t"] < marker_event["t"]
+    assert tool_mutation["t"] == pytest.approx(tool_event["t"], abs=0.01)
+
+
 async def test_meta_json_shape(tmp_path: Path, isolated_app_state):
     """meta.json contains all required fields with correct types and values."""
     from api.server.services.replay.recorder import Recorder

@@ -116,9 +116,7 @@ class Player:
 
         try:
             if rec.kind == "workflow" and rec.op == "upsert":
-                from api.shared.types import Workflow
-
-                app_state.store.upsert_workflow(Workflow.model_validate(rec.patch))
+                app_state.store.upsert_workflow_replay_patch(rec.patch)
             elif rec.kind == "exception" and rec.op == "upsert":
                 from api.shared.types import Exception_ as ExceptionModel
 

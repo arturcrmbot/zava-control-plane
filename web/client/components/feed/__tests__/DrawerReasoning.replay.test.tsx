@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import DrawerReasoning from "../DrawerReasoning";
@@ -22,6 +22,7 @@ class FakeEventSource {
 
 describe("DrawerReasoning replay", () => {
   afterEach(() => {
+    cleanup();
     vi.restoreAllMocks();
   });
 
@@ -56,4 +57,101 @@ describe("DrawerReasoning replay", () => {
     expect(screen.getAllByText("policy_search")).toHaveLength(1);
     expect(consoleError).not.toHaveBeenCalled();
   });
+
+  it.each([
+    [{ type: "CUSTOM", name: "hitl.resumed", value: {} }],
+    [{ type: "RUN_STARTED", runId: "run-resumed" }],
+    [{ type: "RUN_FINISHED", runId: "run-finished" }],
+    [{ type: "RUN_ERROR", message: "terminal failure" }],
+  ])("clears a replayed interrupt when the run resumes or terminates", (nextEvent) => {
+    vi.stubGlobal("EventSource", FakeEventSource);
+    render(
+      <DrawerReasoning
+        data={{ workflow: { id: `workflow-clear-${nextEvent.type}` } } as any}
+      />,
+    );
+
+    act(() => {
+      FakeEventSource.instance.onmessage?.({
+        data: JSON.stringify({
+          type: "RUN_INTERRUPTED",
+          reason: "approval required",
+          persona: "network-director",
+        }),
+      });
+      FakeEventSource.instance.onmessage?.({ data: JSON.stringify(nextEvent) });
+    });
+
+    const section = screen.getByRole("heading", { name: /Live reasoning/i }).closest("section");
+    expect(section?.textContent).not.toContain("network-director");
+  });
+
+  it("describes a finished deterministic run without implying it is listening", () => {
+    vi.stubGlobal("EventSource", FakeEventSource);
+    render(
+      <DrawerReasoning
+        data={{ workflow: { id: "workflow-finished-deterministic" } } as any}
+      />,
+    );
+
+    act(() => {
+      FakeEventSource.instance.onopen?.();
+      FakeEventSource.instance.onmessage?.({
+        data: JSON.stringify({ type: "RUN_FINISHED", runId: "run-finished" }),
+      });
+    });
+
+    expect(screen.getByText(/Deterministic execution — no agent session was used/i)).toBeTruthy();
+    expect(screen.queryByText(/Listening for agent events/i)).toBeNull();
+  });
+
+  it("uses completed workflow state when a replay has no lifecycle events", () => {
+    vi.stubGlobal("EventSource", FakeEventSource);
+    render(
+      <DrawerReasoning
+        data={{
+          workflow: { id: "workflow-completed-without-events", status: "completed" },
+        } as any}
+      />,
+    );
+
+    act(() => {
+      FakeEventSource.instance.onopen?.();
+    });
+
+    expect(screen.getByText(/Deterministic execution — no agent session was used/i)).toBeTruthy();
+    expect(screen.queryByText(/Listening for agent events/i)).toBeNull();
+  });
+
+  it.each(["reasoning", "agent", "agentOutput"])(
+    "does not claim deterministic execution when replay timeline has %s evidence",
+    (kind) => {
+      vi.stubGlobal("EventSource", FakeEventSource);
+      render(
+        <DrawerReasoning
+          data={{
+            workflow: {
+              id: `workflow-restored-${kind}`,
+              status: "completed",
+            },
+            timeline: [{
+              id: `${kind}:persisted`,
+              ts: 1_234.5,
+              kind,
+              label: "risk-reviewer",
+              status: "completed",
+              messages: [{ role: "assistant", content: "Checked evidence" }],
+            }],
+          } as any}
+        />,
+      );
+
+      expect(
+        screen.queryByText(/Deterministic execution — no agent session was used/i),
+      ).toBeNull();
+      expect(
+        screen.getByText(/Agent evidence is available in the Activity timeline/i),
+      ).toBeTruthy();
+    },
+  );
 });

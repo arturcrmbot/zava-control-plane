@@ -49,5 +49,7 @@ async def run_segment_d(input: dict) -> dict:
     return await run_agent_session(
         prompt=prompt, tools=[], skill_dir=skill_dirs[0],
         skill_label="hiring-segment-d", workflow_id=input.get("workflow_id"),
+        instance_id=input.get("instance_id"),
+        covered_phases=input.get("covered_phases"),
         model="gpt-4.1",
     )

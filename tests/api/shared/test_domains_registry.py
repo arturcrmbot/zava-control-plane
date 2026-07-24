@@ -5,6 +5,7 @@ Per TASK-006 of plan/feature-fleet-domain-substrate-1.md.
 """
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import yaml
@@ -15,6 +16,31 @@ from verticals.telco.domains import TELCO_DOMAINS
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PERSONAE_DIR = REPO_ROOT / "api" / "server" / "personae"
+
+_AGENCY_STRATEGIC_STUBS = {
+    "hire-to-productive",
+    "vendor-risk-to-pay",
+    "lead-to-cash",
+    "fy-close",
+    "board-prep",
+    "media-pitch-to-win",
+    "account-onboarding",
+    "intercompany-recharge",
+    "talent-redeployment",
+    "agency-network-roll-up",
+    "m-and-a-integration",
+    "crisis-response",
+    "creative-awards-submission",
+    "client-renewal",
+    "freelancer-onboarding",
+    "data-clean-room-setup",
+    "weekly-pitch-review",
+    "monthly-client-pnl",
+    "quarterly-creative-awards",
+    "annual-budget-setting",
+    "new-business-pipeline-scrub",
+    "intercompany-talent-transfer",
+}
 
 
 def test_workflow_types_unique():
@@ -56,6 +82,37 @@ def test_agency_orchestrator_names_are_declared_by_pack():
             f"{wt}: orchestrator_name={d.orchestrator_name!r} not declared "
             "by the Agency pack"
         )
+
+
+def test_agency_stub_inventory_matches_stub_implementations():
+    from verticals.agency.domains import AGENCY_DOMAINS
+
+    durable_tree = ast.parse(
+        (REPO_ROOT / "verticals" / "agency" / "durable.py").read_text()
+    )
+    durable_stubs = {
+        keyword.value.value
+        for node in ast.walk(durable_tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_strategic_stub_orchestration"
+        for keyword in node.keywords
+        if keyword.arg == "domain"
+        and isinstance(keyword.value, ast.Constant)
+        and isinstance(keyword.value.value, str)
+    }
+    declared_stubs = {
+        workflow_type
+        for workflow_type, domain in AGENCY_DOMAINS.items()
+        if domain.stub
+    }
+
+    assert durable_stubs == _AGENCY_STRATEGIC_STUBS
+    assert declared_stubs == _AGENCY_STRATEGIC_STUBS | {
+        "creative-campaign",
+        "policy_set",
+    }
+    assert "hiring" not in declared_stubs
 
 
 def test_telco_orchestrator_names_are_declared_by_pack(tmp_path):

@@ -11,6 +11,7 @@ from api.server.services.entity_projections import (
     slug,
 )
 from api.shared.types import Workflow
+from verticals.telco.entity_projections._config import graph_detail_cap
 
 WORKFLOW_TYPE = "proactive-customer-care"
 
@@ -18,9 +19,12 @@ WORKFLOW_TYPE = "proactive-customer-care"
 def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
     payload = workflow.payload or {}
     impact = payload.get("customer_impact") or {}
+    impacted_accounts = impact.get("impacted_accounts") or []
+    detail_cap = graph_detail_cap()
     sw = (workflow.id,)
     site_id = str(impact.get("incident_site_id") or "unknown")
     site_asset_id = f"ASSET-site-{slug(site_id)}"
+    impact_asset_id = f"ASSET-customer-impact-{slug(workflow.id)}-{slug(site_id)}"
     ops: list[EntityWrite | RelWrite | DecisionWrite] = [
         EntityWrite(
             kind="Workflow",
@@ -31,8 +35,29 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
         EntityWrite(
             kind="Asset",
             id=site_asset_id,
-            attrs={"kind": "cell-site", "identifier": site_id},
+            attrs={
+                "kind": "cell-site",
+                "identifier": site_id,
+            },
             source_workflows=sw,
+        ),
+        EntityWrite(
+            kind="Asset",
+            id=impact_asset_id,
+            attrs={
+                "kind": "customer-impact-summary",
+                "identifier": f"{workflow.id}:{site_id}",
+                "attributes": json.dumps(
+                    {"affected_account_count": len(impacted_accounts)},
+                    sort_keys=True,
+                ),
+            },
+            source_workflows=sw,
+        ),
+        RelWrite(
+            src_id=impact_asset_id,
+            rel="HOSTED_ON",
+            dst_id=site_asset_id,
         ),
     ]
 
@@ -42,7 +67,7 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
         if item.get("account_id")
     }
     account_ids: list[str] = []
-    for account in impact.get("impacted_accounts") or []:
+    for account in impacted_accounts[:detail_cap]:
         account_id = str(account.get("id") or "")
         subscriber_id = str(account.get("subscriber_id") or "")
         if not account_id or not subscriber_id:

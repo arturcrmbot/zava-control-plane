@@ -26,6 +26,7 @@ from api.server.services.entity_projections import (
     slug,
 )
 from api.shared.types import Workflow
+from verticals.telco.entity_projections._config import graph_detail_cap
 
 WORKFLOW_TYPE = "network-incident"
 
@@ -42,6 +43,11 @@ def _incident_site(payload: dict) -> dict:
 def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
     payload = workflow.payload or {}
     site = _incident_site(payload)
+    incident = payload.get("incident") or {}
+    if "affected_sessions" not in incident and isinstance(incident.get("incident"), dict):
+        incident = incident["incident"]
+    affected_sessions = incident.get("affected_sessions") or []
+    detail_cap = graph_detail_cap()
     site_id = str(site.get("id") or workflow.id)
     asset_id = f"ASSET-site-{slug(site_id)}"
     sw = (workflow.id,)
@@ -54,6 +60,7 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
                 "region": site.get("region"),
                 "status": site.get("status"),
                 "capacity_mbps": site.get("capacity_mbps"),
+                "affected_session_count": len(affected_sessions),
             },
             sort_keys=True,
             default=str,
@@ -75,10 +82,7 @@ def project(workflow: Workflow) -> list[EntityWrite | RelWrite | DecisionWrite]:
         ),
     ]
 
-    incident = payload.get("incident") or {}
-    if "affected_sessions" not in incident and isinstance(incident.get("incident"), dict):
-        incident = incident["incident"]
-    for session in incident.get("affected_sessions") or []:
+    for session in affected_sessions[:detail_cap]:
         session_id = str(session.get("id") or "")
         if not session_id:
             continue

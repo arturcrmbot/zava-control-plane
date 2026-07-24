@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from api.functions.activities import telco_profiled
 from api.functions.activities.telco_profiled import (
     telco_profile_command_activity,
     telco_profile_skill_activity,
@@ -88,6 +89,37 @@ def test_deterministic_mode_returns_each_strict_skill_contract():
         )
         result = telco_profile_skill_activity(_payload(workflow_type, skill))
         assert set(result) == expected_keys
+
+
+def test_live_skill_threads_declared_phase_to_agent_session(monkeypatch):
+    captured = {}
+
+    async def fake_run_agent_session(prompt: str, **kwargs):
+        captured["prompt"] = prompt
+        captured.update(kwargs)
+        return {
+            "evidence_groups": [],
+            "causal_links": [],
+            "confidence": 0.8,
+            "reasoning": "Evidence is correlated.",
+        }
+
+    monkeypatch.setattr(
+        telco_profiled,
+        "run_agent_session",
+        fake_run_agent_session,
+    )
+    payload = _payload("ran-capacity-planning", "evidence-correlator")
+    payload.update({
+        "agent_mode": "live",
+        "instance_id": "profile-instance-1",
+        "phase": "Evidence Correlator",
+    })
+
+    result = telco_profile_skill_activity(payload)
+
+    assert captured["phase"] == "Evidence Correlator"
+    assert result["confidence"] == 0.8
 
 
 def test_command_activity_returns_profile_typed_command():

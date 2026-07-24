@@ -23,6 +23,7 @@ const d: DrawerData = {
     daysElapsed: 0, slaToken: "green",
   },
   narrative: null,
+  timeline: [],
 };
 
 describe("DrawerAudit", () => {

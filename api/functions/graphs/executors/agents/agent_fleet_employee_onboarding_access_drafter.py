@@ -61,5 +61,6 @@ async def execute(input: dict) -> dict:
         skill_dir=_SKILL_DIR,
         skill_label="fleet-employee-onboarding-access-drafter",
         workflow_id=workflow_id,
+        instance_id=input.get("instance_id"),
     )
     return {"access_drafter": result}

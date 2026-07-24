@@ -51,7 +51,7 @@ async def _run_workflow(
     import time as _t
     t0 = _t.time()
     try:
-        events = await wf.run(payload)
+        events = await wf.run({**payload, "phase": step_name})
     except Exception as ex:
         await emit(payload.get("workflow_id", "?"), payload.get("instance_id"),
                    "step.failed", {"step": step_name, "error": str(ex)})

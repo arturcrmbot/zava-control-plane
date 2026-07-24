@@ -235,11 +235,13 @@ def test_live_decision_uses_the_registered_workflow_skill(monkeypatch):
         },
     )
     payload["agent_mode"] = "live"
+    payload["phase"] = "Plan Pre-Staging"
 
     result = telco_cascade.telco_cascade_decision(payload)
 
     assert captured["skill_label"] == "outage-risk-planning"
     assert captured["workflow_id"] == "WF-TELCO-001"
+    assert captured["phase"] == "Plan Pre-Staging"
     assert captured["skill_dir"].name == "outage-risk-planning"
     assert result["command"]["payload"]["technician_ids"] == ["TECH-WEST-01"]
 

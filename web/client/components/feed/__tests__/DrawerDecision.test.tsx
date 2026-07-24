@@ -24,13 +24,19 @@ const d: DrawerData = {
     },
   },
   phases: [], spans: [], amplifications: [],
-  activeException: null, mcpCalls: [],
+  activeException: {
+    id: "EXC-1", workflowId: "WF-1", composedBy: "fleet-manager",
+    severity: "high", category: "compliance", summary: "Approval required",
+    recommendation: "approve", options: [], relatedPolicyRefs: [],
+    confidence: 1, createdAt: 2,
+  }, mcpCalls: [],
   economics: {
     modelCostUsd: 0, inputTokens: 0, outputTokens: 0, pricingSource: "test",
     perModel: [], computeCostUsd: 0, modelCalls: 0, toolCalls: 0,
     daysElapsed: 0, slaToken: "green",
   },
   narrative: null,
+  timeline: [],
 };
 
 describe("DrawerDecision", () => {
@@ -59,5 +65,71 @@ describe("DrawerDecision", () => {
   it("hides actions for executive role", () => {
     render(<MemoryRouter><ResolutionProvider><DrawerDecision data={d} role={getRolePreset("executive")} onRefresh={() => {}} /></ResolutionProvider></MemoryRouter>);
     expect(screen.queryByRole("button", { name: /Approve/i })).toBeNull();
+  });
+
+  it.each(["completed", "failed"] as const)(
+    "shows decision evidence but no controls for a %s workflow",
+    (status) => {
+      render(
+        <MemoryRouter>
+          <ResolutionProvider>
+            <DrawerDecision
+              data={{ ...d, workflow: { ...d.workflow, status } }}
+              role={getRolePreset("ops-reviewer")}
+              onRefresh={() => {}}
+            />
+          </ResolutionProvider>
+        </MemoryRouter>,
+      );
+
+      expect(screen.getByText(/CL-1/)).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /^Approve$/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Reject$/ })).toBeNull();
+    },
+  );
+
+  it("hides controls when the HITL exception is already resolved", () => {
+    render(
+      <MemoryRouter>
+        <ResolutionProvider>
+          <DrawerDecision
+            data={{
+              ...d,
+              activeException: { ...d.activeException!, resolvedAt: 3, resolvedBy: "reviewer" },
+            }}
+            role={getRolePreset("ops-reviewer")}
+            onRefresh={() => {}}
+          />
+        </ResolutionProvider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("button", { name: /^Approve$/ })).toBeNull();
+  });
+
+  it("keeps read-only exception evidence but hides intervention protocols for terminal workflows", () => {
+    render(
+      <MemoryRouter>
+        <ResolutionProvider>
+          <DrawerDecision
+            data={{
+              ...d,
+              workflow: { ...d.workflow, status: "completed" },
+              narrative: {
+                whatHappened: "workflow finished",
+                whatAgentTried: ["reviewed evidence"],
+                agentRecommendation: "close",
+              },
+            }}
+            role={getRolePreset("ops-reviewer")}
+            onRefresh={() => {}}
+          />
+        </ResolutionProvider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("exception-analysis")).toBeTruthy();
+    expect(screen.queryByTestId("intervention-protocols")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Approve$/ })).toBeNull();
   });
 });

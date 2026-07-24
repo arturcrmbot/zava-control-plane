@@ -91,6 +91,179 @@ def test_get_agent_outputs_returns_copy():
     assert "bogus" not in w.agent_outputs
 
 
+def test_agent_output_timestamp_is_parallel_to_the_domain_output_shape():
+    store = StateStore()
+    store.upsert_workflow(_make_workflow("HIRE-TIMESTAMP"))
+    output = {
+        "verdict": "green",
+        "profile": {"current_title": "Senior Data Engineer"},
+    }
+
+    store.append_agent_output(
+        "HIRE-TIMESTAMP",
+        "cv_crystalliser",
+        output,
+        recorded_at=1_234.5,
+    )
+
+    assert store.get_agent_outputs("HIRE-TIMESTAMP") == {
+        "cv_crystalliser": output,
+    }
+    assert store.get_agent_output_recorded_at(
+        "HIRE-TIMESTAMP",
+        "cv_crystalliser",
+    ) == 1_234.5
+    assert "recorded_at" not in output
+
+    store.append_agent_output(
+        "HIRE-TIMESTAMP",
+        "cv_crystalliser",
+        {"verdict": "amber"},
+        recorded_at=1_235.5,
+    )
+    assert store.get_agent_output_recorded_at(
+        "HIRE-TIMESTAMP",
+        "cv_crystalliser",
+    ) == 1_235.5
+    assert store.get_agent_output_recorded_at(
+        "HIRE-TIMESTAMP",
+        "unknown-agent",
+    ) is None
+
+
+def test_replacing_workflow_clears_agent_output_timestamps():
+    store = StateStore()
+    store.upsert_workflow(_make_workflow("HIRE-REPLACED"))
+    store.append_agent_output(
+        "HIRE-REPLACED",
+        "cv_crystalliser",
+        {"verdict": "green"},
+        recorded_at=1_234.5,
+    )
+
+    store.upsert_workflow(_make_workflow("HIRE-REPLACED"))
+
+    assert store.get_agent_output_recorded_at(
+        "HIRE-REPLACED",
+        "cv_crystalliser",
+    ) is None
+
+
+def test_upserting_same_workflow_after_output_clear_removes_stale_timestamp():
+    store = StateStore()
+    store.upsert_workflow(_make_workflow("HIRE-CLEARED"))
+    store.append_agent_output(
+        "HIRE-CLEARED",
+        "cv_crystalliser",
+        {"verdict": "green"},
+        recorded_at=1_234.5,
+    )
+    workflow = store.get_workflow("HIRE-CLEARED")
+    assert workflow is not None
+    workflow.agent_outputs.clear()
+
+    store.upsert_workflow(workflow)
+
+    assert store.get_agent_output_recorded_at(
+        "HIRE-CLEARED",
+        "cv_crystalliser",
+    ) is None
+    assert "_agentOutputRecordedAt" not in store.workflow_replay_patch(workflow)
+
+
+def test_upsert_after_workflow_map_clear_does_not_reuse_orphaned_timestamp():
+    store = StateStore()
+    store.upsert_workflow(_make_workflow("HIRE-MAP-CLEARED"))
+    store.append_agent_output(
+        "HIRE-MAP-CLEARED",
+        "cv_crystalliser",
+        {"verdict": "old"},
+        recorded_at=1_234.5,
+    )
+    store._workflows.clear()
+
+    replacement = _make_workflow("HIRE-MAP-CLEARED")
+    replacement.agent_outputs = {"cv_crystalliser": {"verdict": "replacement"}}
+    store.upsert_workflow(replacement)
+
+    assert store.get_agent_output_recorded_at(
+        "HIRE-MAP-CLEARED",
+        "cv_crystalliser",
+    ) is None
+
+
+def test_append_agent_output_strips_root_wrapper_private_tool_calls_with_one_copy():
+    store = StateStore()
+    store.upsert_workflow(_make_workflow("HIRE-SANITIZED"))
+    output = {
+        "verdict": "green",
+        "summary": "Candidate evidence is complete.",
+        "_raw_tool_calls": [{
+            "tool": "candidate_lookup",
+            "result": {"marker": "EXACT-TOOL-EVIDENCE"},
+        }],
+        "profile": {
+            "headline": "Senior engineer",
+            "_raw_tool_calls": [{"result": {"marker": "NESTED-EVIDENCE"}}],
+        },
+        "items": [
+            {"value": 7, "_raw_tool_calls": [{"result": "LIST-EVIDENCE"}]},
+        ],
+    }
+
+    store.append_agent_output(
+        "HIRE-SANITIZED",
+        "cv_crystalliser",
+        output,
+        recorded_at=1_234.5,
+    )
+
+    assert store.get_agent_outputs("HIRE-SANITIZED") == {
+        "cv_crystalliser": {
+            "verdict": "green",
+            "summary": "Candidate evidence is complete.",
+            "profile": {
+                "headline": "Senior engineer",
+                "_raw_tool_calls": [{"result": {"marker": "NESTED-EVIDENCE"}}],
+            },
+            "items": [
+                {"value": 7, "_raw_tool_calls": [{"result": "LIST-EVIDENCE"}]},
+            ],
+        },
+    }
+    stored = store.get_agent_outputs("HIRE-SANITIZED")["cv_crystalliser"]
+    assert stored is not output
+    assert stored["profile"] is output["profile"]
+    assert output["_raw_tool_calls"][0]["result"]["marker"] == "EXACT-TOOL-EVIDENCE"
+    assert output["profile"]["_raw_tool_calls"][0]["result"]["marker"] == "NESTED-EVIDENCE"
+
+
+def test_upsert_workflow_sanitizes_private_tool_calls_from_replay_state():
+    store = StateStore()
+    workflow = _make_workflow("HIRE-REPLAY-SANITIZED")
+    workflow.agent_outputs = {
+        "cv_crystalliser": {
+            "_raw_tool_calls": [{"result": {"marker": "REPLAY-EVIDENCE"}}],
+            "profile": {
+                "headline": "Senior engineer",
+            },
+        },
+    }
+
+    store.upsert_workflow(workflow)
+
+    assert store.get_agent_outputs("HIRE-REPLAY-SANITIZED") == {
+        "cv_crystalliser": {
+            "profile": {"headline": "Senior engineer"},
+        },
+    }
+    assert (
+        workflow.agent_outputs["cv_crystalliser"]["_raw_tool_calls"]
+        [0]["result"]["marker"]
+        == "REPLAY-EVIDENCE"
+    )
+
+
 def test_build_hiring_workflow_lifts_fixture_component_spec():
     """POC2 §4.21 fixture loader: hand-authored component_spec on a CV
     fixture must land on the workflow's agent_outputs.cv_crystalliser at

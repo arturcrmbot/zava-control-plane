@@ -6,45 +6,22 @@ response, capture FleetEvent emissions via app_state.bus, and assert the
 shape.
 """
 from __future__ import annotations
-from unittest.mock import MagicMock
-
 import pytest
 
-from api.shared.events import FleetEvent
+from api.functions.graphs.executors.agents.runtime import LLMRuntimeResult
 
 
-class _FakeResponseEvent:
-    def __init__(self, text: str):
-        self.data = MagicMock(content=text, usage=MagicMock(input_tokens=10, output_tokens=5))
-
-
-class _FakeSession:
+class _FakeRuntime:
     def __init__(self, response_text: str):
         self._response_text = response_text
-        self._unsub = lambda: None
 
-    def on(self, callback):
-        return self._unsub
-
-    async def send_and_wait(self, prompt, **_):
-        return _FakeResponseEvent(self._response_text)
-
-    async def disconnect(self):
-        pass
-
-
-class _FakeClient:
-    def __init__(self, response_text='{"verdict": "Red"}'):
-        self._response_text = response_text
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *a):
-        pass
-
-    async def create_session(self, **kwargs):
-        return _FakeSession(self._response_text)
+    async def run_session(self, **_):
+        return LLMRuntimeResult(
+            text=self._response_text,
+            tool_calls=[],
+            input_tokens=10,
+            output_tokens=5,
+        )
 
 
 @pytest.mark.asyncio
@@ -61,8 +38,7 @@ async def test_run_agent_session_emits_agent_completed_via_webhook(monkeypatch):
     monkeypatch.setattr(webhook_mod, "emit", fake_webhook_emit)
 
     from api.functions.graphs.executors.agents import _wrapper
-    monkeypatch.setattr(_wrapper, "_gh_token", lambda: "fake-token")
-    monkeypatch.setattr(_wrapper, "CopilotClient", lambda config: _FakeClient())
+    monkeypatch.setattr(_wrapper, "_get_runtime", lambda: _FakeRuntime('{"verdict": "Red"}'))
 
     parsed = await _wrapper.run_agent_session(
         prompt="classify CLM-001",
@@ -98,8 +74,7 @@ async def test_webhook_emit_failure_does_not_propagate(monkeypatch):
     monkeypatch.setattr(webhook_mod, "emit", boom)
 
     from api.functions.graphs.executors.agents import _wrapper
-    monkeypatch.setattr(_wrapper, "_gh_token", lambda: "fake-token")
-    monkeypatch.setattr(_wrapper, "CopilotClient", lambda config: _FakeClient())
+    monkeypatch.setattr(_wrapper, "_get_runtime", lambda: _FakeRuntime('{"verdict": "Red"}'))
 
     parsed = await _wrapper.run_agent_session(
         prompt="q", tools=[], skill_dir=None, skill_label="x", workflow_id=None,

@@ -13,5 +13,10 @@ async def execute(input: dict) -> dict:
         f"Extracted invoice:\n{json.dumps(extracted)}\n\n"
         f"Assess anomalies per your role."
     )
-    result = await run_agent_skill("anomaly_flagger", prompt, workflow_id=workflow_id)
+    result = await run_agent_skill(
+        "anomaly_flagger",
+        prompt,
+        workflow_id=workflow_id,
+        instance_id=input.get("instance_id"),
+    )
     return {"anomaly": result, "extracted": extracted}

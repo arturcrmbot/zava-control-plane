@@ -1,6 +1,9 @@
 """Phase 4 of plan/refactor-substrate-agentic-segments-1.md."""
 from __future__ import annotations
 import os
+from datetime import datetime, timezone
+from typing import Any, Iterable
+
 os.environ["AZURE_STORAGE_CONNECTION_STRING"] = ""
 
 import pytest
@@ -65,10 +68,6 @@ def test_validate_activity_rejects_invalid() -> None:
 # --------------------------------------------------------------------------
 # Orchestrator branch tests (Phase 4 Task 4)
 # --------------------------------------------------------------------------
-from datetime import datetime, timezone
-from typing import Any, Iterable
-
-
 class _StubTimerEvent:
     def __init__(self, fire_at):
         self.fire_at = fire_at
@@ -166,6 +165,7 @@ def test_orchestrator_segment_e_yields_segment_activities(monkeypatch):
 
 
 def test_orchestrator_segment_e_retry_on_validation_failure(monkeypatch):
+    monkeypatch.setenv("SEGMENT_MAX_RETRIES", "1")
     valid = {
         "offer_letter_id": "OFFER-1",
         "jurisdiction": "USA",
@@ -182,6 +182,27 @@ def test_orchestrator_segment_e_retry_on_validation_failure(monkeypatch):
     activities = [c[0] for c in ctx.calls]
     assert activities.count("hiring_segment_e_activity_trigger") == 2
     assert activities.count("validate_segment_e_output_activity_trigger") == 2
+    retry_input = [
+        payload for name, payload in ctx.calls
+        if name == "hiring_segment_e_activity_trigger"
+    ][1]
+    assert retry_input["prior_validator_error"] == "['bad jurisdiction']"
+    failure = next(
+        payload for name, payload in ctx.calls
+        if name == "checkpoint_activity_trigger"
+        and payload.get("kind") == "segment.failed"
+    )
+    assert failure["payload"] == {
+        "segment": "e",
+        "phase": "Offer",
+        "covered_phases": ["Compliance", "Offer"],
+        "attempt": 1,
+        "max_attempts": 2,
+        "retrying": True,
+        "error": "segment validation failed",
+        "errors": ["bad jurisdiction"],
+        "validation": {"ok": False, "errors": ["bad jurisdiction"]},
+    }
 
 
 def test_orchestrator_segment_e_retry_exhaustion(monkeypatch):
@@ -200,5 +221,9 @@ def test_orchestrator_segment_e_retry_exhaustion(monkeypatch):
         if name == "checkpoint_activity_trigger"
         and payload.get("kind") == "segment.failed"
     ]
-    assert len(failure_checkpoints) == 1
-    assert failure_checkpoints[0]["segment"] == "e"
+    assert [checkpoint["payload"]["attempt"] for checkpoint in failure_checkpoints] == [1, 2]
+    assert [checkpoint["payload"]["retrying"] for checkpoint in failure_checkpoints] == [
+        True, False,
+    ]
+    assert failure_checkpoints[-1]["payload"]["errors"] == ["e2"]
+    assert all("segment" not in checkpoint for checkpoint in failure_checkpoints)

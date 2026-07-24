@@ -10,20 +10,24 @@ from pathlib import Path
 # (ACS_EMAIL_CONNECTION_STRING, AZURE_STORAGE_CONNECTION_STRING, etc.) and
 # the Phase 6 send_screen_email_activity would silently fall through to the
 # offline outbox even when ACS Email is configured.
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:  # pragma: no cover - test env may lack optional dep
+    def load_dotenv(*args, **kwargs):
+        return False
 
 load_dotenv()
 
 from typing import TYPE_CHECKING
 
-from api.server.services.event_bus import EventBus
-from api.server.services.state_store import StateStore
 from api.server.services.audit_logger import AuditLogger
-from api.server.services.sse_hub import SSEHub
-from api.server.services.magic_link import MagicLinkStore
-from api.server.services.kpi_store import KpiStore
 from api.server.services.email_send import EmailSender
+from api.server.services.event_bus import EventBus
+from api.server.services.kpi_store import KpiStore
+from api.server.services.magic_link import MagicLinkStore
 from api.server.services.replay.mode import is_replay
+from api.server.services.sse_hub import SSEHub
+from api.server.services.state_store import StateStore
 
 if TYPE_CHECKING:
     from api.server.services.dream_pass.orchestrator import DreamPassOrchestrator
@@ -58,6 +62,27 @@ def _build_blob_store():
         return None
 
 
+def _memory_backend_mode() -> str:
+    raw = os.getenv("MEMORY_BACKEND")
+    if raw is None or not raw.strip():
+        return "auto"
+    mode = raw.strip().lower()
+    if mode not in {"auto", "fallback", "mem0"}:
+        raise ValueError(
+            "Invalid MEMORY_BACKEND value "
+            f"{raw!r}; expected auto, fallback, mem0, or empty"
+        )
+    return mode
+
+
+def _env_flag_enabled(name: str, default: str = "1") -> bool:
+    raw = os.getenv(name, default)
+    if raw is None:
+        return True
+    value = raw.strip().lower()
+    return value not in {"0", "false", "off"}
+
+
 class AppState:
     def __init__(self, runtime: "VerticalRuntime | None" = None) -> None:
         from api.shared.vertical_loader import active_runtime
@@ -89,7 +114,7 @@ class AppState:
         # so only the FastAPI worker owns the entity graph + reflector.
         # Cross-process workflow events still flow via Durable Task storage
         # (Azurite) → FastAPI's simulator/durable client → in-process bus.
-        self._entity_plane_enabled = os.getenv("ENTITY_PLANE_ENABLED", "1") == "1"
+        self._entity_plane_enabled = _env_flag_enabled("ENTITY_PLANE_ENABLED")
 
         # Governance kernel singleton — canonical entry-point for every
         # later actor (reflector, ambient dispatcher, cadence loop). Cheap
@@ -179,60 +204,51 @@ class AppState:
         # Dream-pass memory stack. Domain memories are built eagerly; the
         # orchestrator itself stays lazy to avoid circular imports during
         # AppState construction.
-        try:
-            from api.server.services.lessons.mem0_store import build_default_memory
-            from api.server.services.memory.domain_memory import (
-                DomainMemory, build_domain_memories, configured_memory_domains,
-            )
+        memory_backend_mode = _memory_backend_mode()
+        if is_replay():
+            memory_backend_mode = "fallback"
+        from api.server.services.memory.domain_memory import (
+            DomainMemory, build_domain_memories, configured_memory_domains,
+        )
 
-            # In replay mode the tape carries the working notes / lessons
-            # that hydrate writes via memory_store.add(). Routing those
-            # writes through a real Mem0 + Chroma + Azure-OpenAI-embed
-            # stack is pointless (the data is already authoritative on
-            # the tape) and frequently silently drops entries when the
-            # embed endpoint rate-limits — leaving the Memory page
-            # blank. Force in-process FallbackMemory in replay so
-            # hydrate writes land where list_by_kind reads them.
-            if is_replay():
-                raise RuntimeError("replay mode → using FallbackMemory for tape hydration")
+        _memory_domains = configured_memory_domains(
+            raw=os.getenv("MEMORY_DOMAINS"),
+            allowed=self.runtime.pack.memory_workflow_types,
+        )
+        if memory_backend_mode == "fallback":
+            from api.server.services.memory.fallback_memory import get_fallback_memory
 
-            _mem0_backend = build_default_memory(self.data_dir)
-            _memory_domains = configured_memory_domains(
-                raw=os.getenv("MEMORY_DOMAINS"),
-                allowed=self.runtime.pack.memory_workflow_types,
-            )
             self.domain_memories: dict[str, DomainMemory] = build_domain_memories(
                 domains=_memory_domains,
-                memory=_mem0_backend,
+                memory=get_fallback_memory(),
             )
-        except Exception as _mem0_ex:
+        else:
             import logging
 
-            logging.getLogger(__name__).warning(
-                "Mem0 backend unavailable (%s); using in-process FallbackMemory "
-                "so the dream-pass demo runs without Azure OpenAI / Chroma.",
-                _mem0_ex,
-            )
             try:
-                from api.server.services.memory.domain_memory import (
-                    DomainMemory, build_domain_memories, configured_memory_domains,
+                from api.server.services.lessons.mem0_store import build_default_memory
+
+                _mem0_backend = build_default_memory(self.data_dir)
+                self.domain_memories = build_domain_memories(
+                    domains=_memory_domains,
+                    memory=_mem0_backend,
                 )
-                from api.server.services.memory.fallback_memory import (
-                    get_fallback_memory,
+            except Exception as _mem0_ex:
+                if memory_backend_mode == "mem0":
+                    raise RuntimeError(
+                        "MEMORY_BACKEND=mem0 requires a working Mem0 backend"
+                    ) from _mem0_ex
+                logging.getLogger(__name__).warning(
+                    "Mem0 backend unavailable (%s); using in-process FallbackMemory "
+                    "so the dream-pass demo runs without Azure OpenAI / Chroma.",
+                    _mem0_ex,
                 )
-                _memory_domains = configured_memory_domains(
-                    raw=os.getenv("MEMORY_DOMAINS"),
-                    allowed=self.runtime.pack.memory_workflow_types,
-                )
-                self.domain_memories: dict[str, DomainMemory] = build_domain_memories(
+                from api.server.services.memory.fallback_memory import get_fallback_memory
+
+                self.domain_memories = build_domain_memories(
                     domains=_memory_domains,
                     memory=get_fallback_memory(),
                 )
-            except Exception:
-                logging.getLogger(__name__).exception(
-                    "FallbackMemory wiring failed; domain memories will be empty."
-                )
-                self.domain_memories = {}
         self._dream_pass_orchestrator: "DreamPassOrchestrator | None" = None
 
     @property

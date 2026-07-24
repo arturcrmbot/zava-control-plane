@@ -89,6 +89,7 @@ def telco_profile_orchestration(
                     **input_dict,
                     "instance_id": instance_id,
                     "skill": phase.skill,
+                    "phase": phase.name,
                     "prior_outputs": skill_outputs,
                 },
             )

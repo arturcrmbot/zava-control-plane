@@ -100,6 +100,16 @@ These are blocking checks, not optional polish:
 4. Keep the browser mounted across a backend restart; require cursor rewind on
    lower `latest_seq` and a visible event within one second of the next click.
 
+### 4c — Pass the blocking execution-visibility gate
+
+Actual execution evidence must be visible and self-consistent. Every active
+non-stub workflow type needs an inspected instance; validate only phases,
+reasoning, tool calls, decisions, lineage, outputs, and failures that actually
+occurred. Use `run_agent_session` for agent work so canonical
+`agent.completed` and tool-call evidence persist. Run
+`tools/workflow_visibility_proof.py` with the live/replay commands in
+`docs/superpowers/skills/compose-domain/CHECKLIST.md` §13.
+
 ### 5 — Satisfy docs/VERTICAL-PROOF.md
 
 Before claiming the domain is shipped, collect the evidence required by
@@ -122,6 +132,7 @@ Before claiming the domain is shipped, collect the evidence required by
 - Zero browser errors; clean process teardown.
 - Distinct evidence for hero and each shared-engine workflow.
 - Recorded walks committed (`data/blueprint-recordings/<wt>-*.jsonl`).
+- The blocking execution-visibility gate passes for every active non-stub workflow type.
 
 ## Hard rules
 

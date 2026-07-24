@@ -50,7 +50,7 @@ in the sandbox — that hides the procedure bug.
 - [ ] §4.1  Orchestrator file imports `from collections.abc import Generator` and `from typing import Any` and `import azure.durable_functions as df`. Mirrors `expense_claim.py`.
 - [ ] §4.2  Activities module uses `_run_workflow` imported from `api.functions.workflows.activities` (does not redefine it).
 - [ ] §4.3  Per-phase graphs build `WorkflowBuilder(start_executor=n1).add_edge(...)…build()` exactly like `classify.py`.
-- [ ] §4.4  Agent executors mirror `agent_rag_classifier.py`: `from ._wrapper import SKILLS_DIR, run_agent_session`, `_SKILL_DIR = SKILLS_DIR / "<skill-name>"`, `await run_agent_session(...)`.
+- [ ] §4.4  Agent executors mirror `agent_rag_classifier.py`: `from ._wrapper import SKILLS_DIR, run_agent_session`, `_SKILL_DIR = SKILLS_DIR / "<skill-name>"`, `await run_agent_session(...)`. Segment and legacy graph-agent templates forward both canonical `workflow_id=input.get("workflow_id")` and real orchestration `instance_id=input.get("instance_id")`.
 - [ ] §4.5  Validators return `{"ok": bool, ...}` — never raise on shape errors at the in-graph layer.
 - [ ] §4.6  MCP tool stubs use `@traced_tool(...)` and `@define_tool(...)` decorators; Pydantic params class is `_<Op>Params(BaseModel)`.
 - [ ] §4.7  MCP tool stubs are pure (no `time`, no `random`, no `os.environ`, no network). Same input → byte-identical output.
@@ -175,3 +175,48 @@ The script applies all six pack-scoped steps idempotently:
 - [ ] §12.5 For every named demo scenario, measure click-to-first-visible event
   at the browser. It must be at most one second; API success without visible UI
   evidence is a failure.
+
+## §13 — Blocking execution-visibility gate
+
+Actual execution evidence must be visible and self-consistent. For every active
+non-stub workflow type, inspect at least one instance:
+
+- [ ] §13.1 Its timeline is non-empty, with exactly one `workflow.started` row
+  and one terminal lifecycle row matching the final status.
+- [ ] §13.2 Observed phase rows are non-empty and name only declared domain
+  phases. Conditional branches may omit phases. Terminal workflows leave any
+  observed phase rows terminal or explicitly skipped.
+- [ ] §13.3 Canonical `agent.completed` reasoning rows, when present, carry
+  stable run identity, completion time, and declared phase provenance. A domain
+  declaring agent/graph work needs at least one such row total.
+- [ ] §13.4 Validate only tool calls that occurred. Reasoning tool IDs,
+  canonical `mcpCalls`, and Tool timeline rows match exactly, including
+  persistent ID, `request`, `response`, `statusCode`, and `durationMs`.
+- [ ] §13.5 Observed HITL decisions carry a persona, verdict, and reason; the
+  persona resolves in the active pack. Observed lineage, deterministic output,
+  errors, and retries are shape-valid.
+- [ ] §13.6 Live and replay source modes expose the same user-visible detail.
+
+Generated agent/LLM code uses `run_agent_session`; direct uninstrumented model
+calls remain a hard failure. Do not fabricate evidence to satisfy this gate.
+
+After all live workflows are terminal, capture and check every instance:
+
+```bash
+ZAVA_VERTICAL=<vertical> .venv/bin/python tools/workflow_visibility_proof.py \
+  --vertical <vertical> --base-url http://localhost:3101 \
+  --save-dir proof/workflow-details/live
+```
+
+Switch to replay, then capture the same full workflow-ID set and compare:
+
+```bash
+ZAVA_VERTICAL=<vertical> .venv/bin/python tools/workflow_visibility_proof.py \
+  --vertical <vertical> --base-url http://localhost:3101 \
+  --compare-dir proof/workflow-details/live \
+  --save-dir proof/workflow-details/replay
+```
+
+For offline proof, use `--details-dir proof/workflow-details/replay` instead of
+`--base-url`. Keep ignored `proof/` snapshots local; they may contain workflow
+payloads.

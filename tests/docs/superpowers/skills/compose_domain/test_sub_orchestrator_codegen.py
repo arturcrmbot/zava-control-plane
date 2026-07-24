@@ -107,6 +107,15 @@ def test_derive_classname(codegen):
 def test_single_sub_orchestrator_emits_call(codegen, single_sub_brief):
     body = codegen.render_orchestrator(single_sub_brief)
     ast.parse(body)
+    normalized = " ".join(body.split())
+    assert (
+        'enriched = { **input_dict, "workflow_id": workflow_id, '
+        '"instance_id": context.instance_id, }'
+    ) in normalized
+    assert (
+        '"fetch_joiner_agent_activity", '
+        '{**enriched, "phase": "fetch_joiner"}'
+    ) in body
     assert "call_sub_orchestrator(\"FleetItAccessRequestOrchestrator\"" in body
     # HITL still emits wait_for_external_event.
     assert "wait_for_external_event(\"manager_signoff_decision\")" in body

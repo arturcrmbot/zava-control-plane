@@ -13,4 +13,10 @@ async def execute(input: dict) -> dict:
         f"Classification: {json.dumps(classification)}\n\n"
         f"Explain root cause per your role."
     )
-    return {"root_cause": await run_agent_skill("root_cause_explainer", prompt, workflow_id=workflow_id)}
+    root_cause = await run_agent_skill(
+        "root_cause_explainer",
+        prompt,
+        workflow_id=workflow_id,
+        instance_id=input.get("instance_id"),
+    )
+    return {"root_cause": root_cause}

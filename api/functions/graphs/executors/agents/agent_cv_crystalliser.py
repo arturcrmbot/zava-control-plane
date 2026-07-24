@@ -124,6 +124,7 @@ async def execute(input: dict) -> dict:
         skill_dir=_SKILL_DIR,
         skill_label="cv_crystalliser",
         workflow_id=workflow_id,
+        instance_id=instance_id,
     )
 
     # Extraction can fail honestly: parse_error from the JSON extractor, or a

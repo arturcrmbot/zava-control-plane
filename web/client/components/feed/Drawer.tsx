@@ -6,8 +6,7 @@
 // viewport via Tailwind responsive utilities); below 1024px it's full-screen.
 import { useEffect, useState, useCallback, type ReactElement } from "react";
 import type {
-  Workflow, Phase, OtelSpan, Exception, SkillAmplification,
-  McpCall, Economics, Narrative,
+  WorkflowDetailResponse,
 } from "@shared/types";
 import type { RolePreset } from "@shared/roles";
 import DrawerDecision from "./DrawerDecision";
@@ -15,17 +14,7 @@ import DrawerActivity from "./DrawerActivity";
 import DrawerAudit from "./DrawerAudit";
 import DrawerReasoning from "./DrawerReasoning";
 
-export interface DrawerData {
-  workflow: Workflow;
-  phases: Phase[];
-  spans: OtelSpan[];
-  amplifications: SkillAmplification[];
-  activeException: Exception | null;
-  mcpCalls: McpCall[];
-  economics: Economics;
-  narrative: Narrative | null;
-  auditBlobUrl?: string | null;
-}
+export type DrawerData = WorkflowDetailResponse;
 
 export default function Drawer({
   workflowId, role, onClose,

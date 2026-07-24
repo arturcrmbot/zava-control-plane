@@ -497,6 +497,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
     # image fixtures under data/synthetic/creative-campaign/cached/; Phases
     # 2–4 swap stubs for real Foundry gpt-image-2 + brand-RAG.
     "creative-campaign": Domain(
+        stub=True,
         workflow_type="creative-campaign",
         display_name="Creative Campaign",
         workflow_id_prefix="CMP",
@@ -547,6 +548,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
     # they exist primarily to populate the entity graph and exercise the
     # substrate end-to-end.
     "hire-to-productive": Domain(
+        stub=True,
         workflow_type="hire-to-productive",
         display_name="Hire to Productive",
         workflow_id_prefix="H2P",
@@ -567,6 +569,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         realistic_interval_seconds=604800,
     ),
     "vendor-risk-to-pay": Domain(
+        stub=True,
         workflow_type="vendor-risk-to-pay",
         display_name="Vendor Risk to Pay",
         workflow_id_prefix="VRP",
@@ -587,6 +590,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         realistic_interval_seconds=86400,
     ),
     "lead-to-cash": Domain(
+        stub=True,
         workflow_type="lead-to-cash",
         display_name="Lead to Cash",
         workflow_id_prefix="L2C",
@@ -607,6 +611,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         realistic_interval_seconds=259200,
     ),
     "fy-close": Domain(
+        stub=True,
         workflow_type="fy-close",
         display_name="Fiscal-Year Close",
         workflow_id_prefix="FYC",
@@ -627,6 +632,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         realistic_interval_seconds=2592000,
     ),
     "board-prep": Domain(
+        stub=True,
         workflow_type="board-prep",
         display_name="Board Pack Preparation",
         workflow_id_prefix="BRD",
@@ -655,6 +661,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
     # via SUB_WORKFLOW_OF. The projection itself emits a single Workflow
     # node (the parent stamp); rels are owned by the reflector.
     "media-pitch-to-win": Domain(
+        stub=True,
         workflow_type="media-pitch-to-win",
         display_name="Media Pitch to Win",
         workflow_id_prefix="MPW",
@@ -674,6 +681,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         realistic_interval_seconds=1209600,
     ),
     "account-onboarding": Domain(
+        stub=True,
         workflow_type="account-onboarding",
         display_name="Account Onboarding",
         workflow_id_prefix="AOB",
@@ -693,6 +701,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         realistic_interval_seconds=604800,
     ),
     "intercompany-recharge": Domain(
+        stub=True,
         workflow_type="intercompany-recharge",
         display_name="Intercompany Recharge",
         workflow_id_prefix="ICR",
@@ -712,6 +721,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         realistic_interval_seconds=2592000,
     ),
     "talent-redeployment": Domain(
+        stub=True,
         workflow_type="talent-redeployment",
         display_name="Talent Redeployment",
         workflow_id_prefix="TLR",
@@ -731,6 +741,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         realistic_interval_seconds=1209600,
     ),
     "agency-network-roll-up": Domain(
+        stub=True,
         workflow_type="agency-network-roll-up",
         display_name="Agency Network Roll-Up",
         workflow_id_prefix="ANR",
@@ -750,6 +761,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         realistic_interval_seconds=2592000,
     ),
     "m-and-a-integration": Domain(
+        stub=True,
         workflow_type="m-and-a-integration",
         display_name="M&A Integration",
         workflow_id_prefix="MAI",
@@ -772,6 +784,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         slow_burn=True,
     ),
     "crisis-response": Domain(
+        stub=True,
         workflow_type="crisis-response",
         display_name="Crisis Response",
         workflow_id_prefix="CRS",
@@ -798,6 +811,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
     # the pitch-e1 agency-domain kinds (Brand/Campaign/Pitch/MediaPlan)
     # naturally fits, the projection emits it.
     "creative-awards-submission": Domain(
+        stub=True,
         workflow_type="creative-awards-submission",
         display_name="Creative Awards Submission",
         workflow_id_prefix="CAS",
@@ -817,6 +831,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         realistic_interval_seconds=2592000,
     ),
     "client-renewal": Domain(
+        stub=True,
         workflow_type="client-renewal",
         display_name="Client Renewal",
         workflow_id_prefix="CLR",
@@ -838,6 +853,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         slow_burn=True,
     ),
     "freelancer-onboarding": Domain(
+        stub=True,
         workflow_type="freelancer-onboarding",
         display_name="Freelancer Onboarding",
         workflow_id_prefix="FOB",
@@ -857,6 +873,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         realistic_interval_seconds=86400,
     ),
     "data-clean-room-setup": Domain(
+        stub=True,
         workflow_type="data-clean-room-setup",
         display_name="Data Clean-Room Setup",
         workflow_id_prefix="DCR",
@@ -877,6 +894,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         realistic_interval_seconds=259200,
     ),
     "weekly-pitch-review": Domain(
+        stub=True,
         workflow_type="weekly-pitch-review",
         display_name="Weekly Pitch Review",
         workflow_id_prefix="WPR",
@@ -896,6 +914,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         realistic_interval_seconds=604800,
     ),
     "monthly-client-pnl": Domain(
+        stub=True,
         workflow_type="monthly-client-pnl",
         display_name="Monthly Client P&L",
         workflow_id_prefix="MCP",
@@ -915,6 +934,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         realistic_interval_seconds=2592000,
     ),
     "quarterly-creative-awards": Domain(
+        stub=True,
         workflow_type="quarterly-creative-awards",
         display_name="Quarterly Creative Awards",
         workflow_id_prefix="QCA",
@@ -934,6 +954,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         realistic_interval_seconds=7776000,
     ),
     "annual-budget-setting": Domain(
+        stub=True,
         workflow_type="annual-budget-setting",
         display_name="Annual Budget Setting",
         workflow_id_prefix="ABS",
@@ -955,6 +976,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         slow_burn=True,
     ),
     "new-business-pipeline-scrub": Domain(
+        stub=True,
         workflow_type="new-business-pipeline-scrub",
         display_name="New-Business Pipeline Scrub",
         workflow_id_prefix="NBP",
@@ -974,6 +996,7 @@ AGENCY_DOMAINS: dict[str, Domain] = {
         realistic_interval_seconds=604800,
     ),
     "intercompany-talent-transfer": Domain(
+        stub=True,
         workflow_type="intercompany-talent-transfer",
         display_name="Intercompany Talent Transfer",
         workflow_id_prefix="ITT",

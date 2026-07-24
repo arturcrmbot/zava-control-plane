@@ -8,7 +8,9 @@ input+output dict to the next node.
 emission so the UI can render type-specific icons.
 """
 from __future__ import annotations
+from contextvars import ContextVar
 import time
+import uuid
 from typing import Awaitable, Callable
 from agent_framework import Executor, Workflow, WorkflowBuilder, WorkflowContext, handler
 from opentelemetry import trace
@@ -19,6 +21,22 @@ from api.functions.webhook import emit
 ExecuteFn = Callable[[dict], Awaitable[dict]]
 
 _tracer = trace.get_tracer("zava.graphs.executor")
+_current_phase: ContextVar[str | None] = ContextVar(
+    "zava_graph_phase",
+    default=None,
+)
+_current_invocation_id: ContextVar[str | None] = ContextVar(
+    "zava_graph_invocation_id",
+    default=None,
+)
+
+
+def current_execution_phase() -> str | None:
+    return _current_phase.get()
+
+
+def current_execution_invocation_id() -> str | None:
+    return _current_invocation_id.get()
 
 
 class TrackedExecutor(Executor):
@@ -36,9 +54,16 @@ class TrackedExecutor(Executor):
         wid = input.get("workflow_id", "?")
         iid = input.get("instance_id")
         phase = input.get("phase")
+        phase_fields = {"phase": str(phase)} if phase is not None else {}
+        invocation_id = f"ar-{uuid.uuid4().hex}"
+        invocation_fields = {"invocation_id": invocation_id}
         t0 = time.time()
         await emit(wid, iid, "executor.invoked", {
-            "name": self._name, "type": self._executor_type, "stage": "start"
+            "name": self._name,
+            "type": self._executor_type,
+            "stage": "start",
+            **phase_fields,
+            **invocation_fields,
         })
         with _tracer.start_as_current_span(f"executor.{self._name}") as span:
             span.set_attribute("zava.workflow.id", str(wid))
@@ -48,22 +73,36 @@ class TrackedExecutor(Executor):
                 span.set_attribute("zava.workflow.phase", str(phase))
             span.set_attribute("zava.executor.type", self._executor_type)
             span.set_attribute("zava.executor.name", self._name)
+            span.set_attribute("zava.invocation.id", invocation_id)
             if self._executor_type == "agent":
                 # Each executor name corresponds to a skill, which is its
                 # own agent in the AGT design. Tag the span with the
                 # executor name so audit/Foundry can attribute by agent.
                 span.set_attribute("gen_ai.agent.name", self._name)
 
+            phase_token = _current_phase.set(
+                str(phase) if phase is not None else None
+            )
+            invocation_token = _current_invocation_id.set(invocation_id)
             try:
-                result = await self._fn(input)
-            except Exception as ex:
-                span.record_exception(ex)
-                span.set_status(Status(StatusCode.ERROR, str(ex)))
-                await emit(wid, iid, "executor.invoked", {
-                    "name": self._name, "type": self._executor_type, "stage": "error",
-                    "error": str(ex), "duration_ms": int((time.time() - t0) * 1000)
-                })
-                raise
+                try:
+                    result = await self._fn(input)
+                except Exception as ex:
+                    span.record_exception(ex)
+                    span.set_status(Status(StatusCode.ERROR, str(ex)))
+                    await emit(wid, iid, "executor.invoked", {
+                        "name": self._name,
+                        "type": self._executor_type,
+                        "stage": "error",
+                        "error": str(ex),
+                        "duration_ms": int((time.time() - t0) * 1000),
+                        **phase_fields,
+                        **invocation_fields,
+                    })
+                    raise
+            finally:
+                _current_invocation_id.reset(invocation_token)
+                _current_phase.reset(phase_token)
 
             if self._executor_type == "validator" and result.get("ok") is False:
                 reason = result.get("blocked_reason") or result.get("missing") or "validation failed"
@@ -72,14 +111,19 @@ class TrackedExecutor(Executor):
 
         await emit(wid, iid, "executor.invoked", {
             "name": self._name, "type": self._executor_type, "stage": "complete",
-            "duration_ms": int((time.time() - t0) * 1000)
+            "duration_ms": int((time.time() - t0) * 1000),
+            **phase_fields,
+            **invocation_fields,
         })
         # Merge input + result so downstream nodes have full context
         merged = {**input, **result}
         # If a validator failed, emit dedicated event
         if self._executor_type == "validator" and result.get("ok") is False:
             await emit(wid, iid, "validator.blocked", {
-                "name": self._name, "reason": result.get("blocked_reason") or result.get("missing") or "validation failed"
+                "name": self._name,
+                "reason": result.get("blocked_reason") or result.get("missing") or "validation failed",
+                **phase_fields,
+                **invocation_fields,
             })
             # Still forward -- orchestration generator decides what to do with ok=False
         await ctx.send_message(merged)

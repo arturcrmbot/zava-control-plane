@@ -17,7 +17,7 @@ from api.server.services.replay.tape_format import META_NAME, MUTATIONS_NAME, SN
 from api.server.services.replay.tape_loader import TapeLoader
 from api.server.services.state_store import StateStore
 from api.server.state import app_state
-from api.shared.types import Exception_, Workflow
+from api.shared.types import Exception_, McpCall, Workflow
 
 from api.server.services.replay.hydrate import hydrate_from_snapshot
 
@@ -126,6 +126,18 @@ def test_hydrate_from_snapshot_restores_workflows_and_domain_memories(
         metadata={"role_id": "role-123"},
     )
     app_state.store.upsert_workflow(workflow)
+    app_state.store.append_mcp_call(McpCall(
+        workflow_id=workflow.id,
+        timestamp=1_716_399_201.0,
+        tool="policy_lookup",
+        url="local://tool/policy_lookup",
+        method="EXEC",
+        request={"claimId": "C-1"},
+        response={"eligible": True},
+        status_code=200,
+        duration_ms=7,
+        tool_call_id="snapshot-call-1",
+    ))
     app_state.store.upsert_candidate({"id": "candidate-stale", "name": "Stale Candidate"})
     app_state.domain_memories["hiring"].add(
         "Controller asked for supporting evidence.",
@@ -139,6 +151,8 @@ def test_hydrate_from_snapshot_restores_workflows_and_domain_memories(
 
     snapshot_dir = tmp_path / "snapshot_t0"
     take_snapshot(snapshot_dir)
+    snapshot_calls = json.loads((snapshot_dir / "mcp_calls.json").read_text(encoding="utf-8"))
+    assert snapshot_calls[workflow.id][0]["toolCallId"] == "snapshot-call-1"
 
     # Stale per-workflow mcp_calls that exist ONLY post-snapshot get
     # wiped by hydrate's clear pass (and aren't restored since they're
@@ -173,6 +187,98 @@ def test_hydrate_from_snapshot_restores_workflows_and_domain_memories(
     assert [entry["metadata"]["kind"] for entry in vendor_entries] == ["lesson"]
     assert app_state.store.list_candidates() == []
     assert app_state.store.get_mcp_calls("wf-stale") == []
+    restored_call = app_state.store.get_mcp_calls(workflow.id)[0]
+    assert restored_call.tool_call_id == "snapshot-call-1"
+    assert restored_call.model_dump(by_alias=True)["toolCallId"] == "snapshot-call-1"
+
+
+def test_hydrate_replacement_clears_stale_agent_output_timestamp(
+    tmp_path: Path,
+    isolated_app_state,
+) -> None:
+    workflow_id = "wf-hydrate-output-replacement"
+    app_state.store.upsert_workflow(Workflow(
+        id=workflow_id,
+        created_at=100.0,
+        sla_due_at=200.0,
+        jurisdiction="UK",
+        agency="Zava",
+        agent_outputs={"risk_reviewer": {"verdict": "old"}},
+    ))
+    app_state.store.append_agent_output(
+        workflow_id,
+        "risk_reviewer",
+        {"verdict": "old"},
+        recorded_at=123.0,
+    )
+    replacement = Workflow(
+        id=workflow_id,
+        created_at=300.0,
+        sla_due_at=400.0,
+        jurisdiction="UK",
+        agency="Zava",
+        agent_outputs={"risk_reviewer": {"verdict": "replacement"}},
+    )
+    loader = _make_loader(
+        tmp_path,
+        workflows=[replacement.model_dump(by_alias=True, mode="json")],
+    )
+
+    try:
+        hydrate_from_snapshot(loader)
+    finally:
+        loader.close()
+
+    assert app_state.store.get_agent_outputs(workflow_id) == {
+        "risk_reviewer": {"verdict": "replacement"},
+    }
+    assert app_state.store.get_agent_output_recorded_at(
+        workflow_id,
+        "risk_reviewer",
+    ) is None
+
+
+def test_snapshot_hydration_preserves_agent_output_timestamp(
+    tmp_path: Path,
+    isolated_app_state,
+) -> None:
+    workflow_id = "wf-hydrate-output-timestamp"
+    app_state.store.upsert_workflow(Workflow(
+        id=workflow_id,
+        created_at=100.0,
+        sla_due_at=200.0,
+        jurisdiction="UK",
+        agency="Zava",
+    ))
+    app_state.store.append_agent_output(
+        workflow_id,
+        "risk_reviewer",
+        {"verdict": "recorded"},
+        recorded_at=123.0,
+    )
+    snapshot_dir = tmp_path / "snapshot_with_agent_output_timestamp"
+    take_snapshot(snapshot_dir)
+
+    app_state.store.append_agent_output(
+        workflow_id,
+        "risk_reviewer",
+        {"verdict": "newer"},
+        recorded_at=999.0,
+    )
+    loader = _make_loader(tmp_path, snapshot_dir=snapshot_dir)
+
+    try:
+        hydrate_from_snapshot(loader)
+    finally:
+        loader.close()
+
+    assert app_state.store.get_agent_outputs(workflow_id) == {
+        "risk_reviewer": {"verdict": "recorded"},
+    }
+    assert app_state.store.get_agent_output_recorded_at(
+        workflow_id,
+        "risk_reviewer",
+    ) == 123.0
 
 
 def test_hydrate_from_snapshot_restores_exceptions(tmp_path: Path, isolated_app_state) -> None:

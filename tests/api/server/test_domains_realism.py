@@ -7,11 +7,9 @@ from api.shared.domains import DOMAINS, Domain, live_domains
 def test_live_domains_excludes_stubs() -> None:
     live = live_domains()
     assert all(not d.stub for d in live)
-    # 39 live domains: the pitch-c1/c2/c3 waves brought the count to 36,
-    # then fleet compose-domain v4 added employee-transfer + training-request
-    # (38), and the telco actor-world pack added network-incident (39).
-    # Was 14 originally.
-    assert len(live) == 39
+    assert len(live) == 15
+    assert "creative-campaign" not in {d.workflow_type for d in live}
+    assert "hiring" in {d.workflow_type for d in live}
 
 
 def test_every_live_domain_has_spawn_fn() -> None:
@@ -22,12 +20,12 @@ def test_every_live_domain_has_spawn_fn() -> None:
         )
 
 
-def test_stub_domains_have_no_spawn_fn() -> None:
-    for d in DOMAINS.values():
-        if d.stub:
-            assert d.spawn_fn is None, (
-                f"stub domain {d.workflow_type} should not declare spawn_fn"
-            )
+def test_registered_strategic_stubs_keep_spawn_registration() -> None:
+    registered_stubs = [d for d in DOMAINS.values() if d.stub and d.spawn_fn]
+    assert len(registered_stubs) == 23
+    assert "creative-campaign" in {d.workflow_type for d in registered_stubs}
+    assert all("." in d.spawn_fn for d in registered_stubs)
+    assert DOMAINS["policy_set"].spawn_fn is None
 
 
 def test_resolve_spawner_imports_callable() -> None:
@@ -105,7 +103,6 @@ def test_effective_cadence_falls_back_to_legacy_env(monkeypatch) -> None:
     monkeypatch.setenv("DEMO_TIME_WARP_FACTOR", "60")
     monkeypatch.setenv("SIMULATOR_RAMP_AVG_INTERVAL_SECONDS", "120")
     from api.server.services.simulator_orchestrator import _effective_interval
-    from api.shared.domains import Domain
     # A hand-crafted domain with no realistic_interval_seconds → fallback.
     d = Domain(
         workflow_type="x", display_name="x", workflow_id_prefix="X",

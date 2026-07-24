@@ -117,6 +117,69 @@ pass the §2 identity consistency table independently.
 
 ---
 
+## 5a. Blocking execution-visibility gate
+
+Actual execution evidence must be visible and self-consistent. Every active
+non-stub workflow type has at least one inspected instance:
+
+1. Its timeline is non-empty, with exactly one `workflow.started` row and one
+   terminal lifecycle row matching the final status.
+2. Observed phase rows are non-empty and use only declared phases. Conditional
+   branches may omit phases; terminal workflows leave observed rows terminal or
+   explicitly skipped.
+3. Canonical `agent.completed` reasoning rows, when present, have stable run
+   identity, completion time, and declared phase provenance. A domain declaring
+   agent/graph work needs at least one reasoning row total.
+4. Only tool calls that occurred are checked. Reasoning tool IDs, canonical
+   `mcpCalls`, and Tool timeline rows match exactly by persistent ID,
+   `request`, `response`, `statusCode`, and `durationMs`.
+5. Observed HITL decisions have a persona, verdict, and reason, and that persona
+   resolves in the active pack. Observed lineage, deterministic output, errors,
+   and retries are shape-valid.
+6. Live and replay source modes have full user-visible parity.
+
+Use `run_agent_session` for generated agent work. Never fabricate an Agent row
+or other evidence.
+
+After all live workflows are terminal, capture and run the full checker:
+
+```bash
+ZAVA_VERTICAL=<vertical> .venv/bin/python tools/workflow_visibility_proof.py \
+  --vertical <vertical> --base-url http://localhost:3101 \
+  --save-dir proof/workflow-details/live
+```
+
+Switch the server to replay, then capture every same workflow ID and run the
+same checker on both snapshots:
+
+```bash
+ZAVA_VERTICAL=<vertical> .venv/bin/python tools/workflow_visibility_proof.py \
+  --vertical <vertical> --base-url http://localhost:3101 \
+  --compare-dir proof/workflow-details/live \
+  --save-dir proof/workflow-details/replay
+```
+
+Online capture always reads `/api/replay/meta`. Snapshot schema v2 persists its
+`sourceMode`: the first pass must be `live`, the compared pass must be `replay`,
+and directory names cannot override provenance. For offline comparison, replace
+the second command's `--base-url` with
+`--details-dir proof/workflow-details/replay`; both snapshots must retain their
+explicit live/replay modes.
+
+Parity uses a stable projection of every visible timeline row, in endpoint
+order, plus workflow status/current phase and exact MCP payloads in endpoint
+order. It includes phase status, Agent messages/output/tool refs/tokens/model,
+decisions and evidence, deterministic outputs, child IDs/types, and ledger
+errors/retries. The only exclusions are
+workflow create/update/start/completion timestamps, timeline timestamps (`ts`,
+`timestamp`, started/completed aliases), non-canonical row latency/duration,
+and MCP `timestamp`; canonical Tool/MCP duration remains exact, so live and
+replay agree through the terminal event. Workflow SLA remains exact. The
+ignored `proof/` snapshots may contain workflow
+payloads; do not print or commit them.
+
+---
+
 ## 6. Completion criteria
 
 A vertical proof is **complete** when:
@@ -133,8 +196,10 @@ A vertical proof is **complete** when:
    `ZAVA_VERTICAL=<vertical> bash <run-id>/graduate.sh`
 8. A recorded walk (`data/blueprint-recordings/<wt>-*.jsonl`) exists for
    every workflow, committed to the repository.
+9. The §5a blocking execution-visibility gate passes for every active non-stub
+   workflow type.
 
-**Do not claim a vertical is shipped until all eight criteria are met.**
+**Do not claim a vertical is shipped until all nine criteria are met.**
 
 ---
 

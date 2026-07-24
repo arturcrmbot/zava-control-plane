@@ -19,7 +19,6 @@ activities are registered in `function_app.py` by graduate.sh.
 from __future__ import annotations
 import os
 from collections.abc import Generator
-from datetime import timedelta
 from typing import Any
 
 import azure.durable_functions as df
@@ -50,7 +49,11 @@ def fleet_employee_transfer_orchestration(
     # payload so internal_durable_event populates its _workflow_types
     # cache and forwards `workflow_type` onto every downstream FleetEvent.
     workflow_type = input_dict.get("type", "employee-transfer")
-    enriched = {**input_dict, "instance_id": context.instance_id}
+    enriched = {
+        **input_dict,
+        "workflow_id": workflow_id,
+        "instance_id": context.instance_id,
+    }
 
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
@@ -75,7 +78,10 @@ def fleet_employee_transfer_orchestration(
 
     # Phase 3: Eligibility Check (agent segment B) — segments-by-default
     # retry loop. Mirrors api/functions/workflows/hiring.py:120-162.
-    segment_input = {**enriched, "workflow_id": context.instance_id}
+    segment_input = {
+        **enriched,
+        "covered_phases": ["Eligibility Check"],
+    }
     segment_b_result = None
     validator_b: dict = {}
     for attempt in range(segment_max_retries + 1):
@@ -116,8 +122,8 @@ def fleet_employee_transfer_orchestration(
         "workflow_id": workflow_id, "instance_id": context.instance_id,
         "kind": "suspended",
         "payload": {
-            "reason": "awaiting_releasing_manager_approval",
-            "phase": "releasing_manager_approval",
+            "reason": "awaiting_manager_approval",
+            "phase": "manager_approval",
             "wait_kind": "operator_review",
             "workflow_type": workflow_type,
             # Persona-responder contract: tell the responder which persona
@@ -144,11 +150,11 @@ def fleet_employee_transfer_orchestration(
             "kind": "workflow.completed",
             "payload": {
                 "status": "timeout",
-                "phase": "releasing_manager_approval",
+                "phase": "manager_approval",
                 "workflow_type": workflow_type,
             },
         })
-        return {"status": "timeout", "phase": "releasing_manager_approval"}
+        return {"status": "timeout", "phase": "manager_approval"}
     manager_timeout.cancel()
 
     enriched["manager_approval_decision"] = manager_event.result
@@ -157,13 +163,16 @@ def fleet_employee_transfer_orchestration(
         "workflow_id": workflow_id, "instance_id": context.instance_id,
         "kind": "resumed",
         "payload": {
-            "phase": "releasing_manager_approval",
+            "phase": "manager_approval",
             "workflow_type": workflow_type,
         },
     })
 
     # Phase 5: Compensation Remap (agent segment D)
-    segment_input = {**enriched, "workflow_id": context.instance_id}
+    segment_input = {
+        **enriched,
+        "covered_phases": ["Compensation Remap"],
+    }
     segment_d_result = None
     validator_d: dict = {}
     for attempt in range(segment_max_retries + 1):

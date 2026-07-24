@@ -35,6 +35,12 @@ exactly — this skill only governs *how you communicate*, not *what you build*.
    HITL recovery context, persona/Durable resume timing, and browser event
    recovery across a lower `latest_seq`. If a check fails, fix it and
    re-verify — narrate what you're doing.
+   Also enforce the **blocking execution-visibility gate**: actual execution
+   evidence must be visible and self-consistent for every active non-stub
+   workflow type. Validate observed evidence rather than predicting conditional
+   branches. Generated agents use `run_agent_session`; run the live/replay
+   `tools/workflow_visibility_proof.py` commands from compose-domain CHECKLIST
+   §13.
 7. On success call
    `composition_complete(workflow_type, display_name)`. Do not restart the
    server yourself — the UI's Ignite control handles the restart.

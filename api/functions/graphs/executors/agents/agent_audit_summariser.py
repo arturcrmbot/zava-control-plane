@@ -56,6 +56,7 @@ async def execute(input: dict) -> dict:
         skill_dir=_SKILL_DIR,
         skill_label="audit-summariser",
         workflow_id=workflow_id,
+        instance_id=input.get("instance_id"),
     )
     _emit_audit_event(workflow_id or "?", summary if isinstance(summary, dict) else {})
     return {"audit": summary}

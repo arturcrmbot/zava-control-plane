@@ -25,6 +25,7 @@ beforeEach(() => {
         daysElapsed: 0, slaToken: "green",
       },
       narrative: null,
+      timeline: [],
     }),
   } as Response);
 });

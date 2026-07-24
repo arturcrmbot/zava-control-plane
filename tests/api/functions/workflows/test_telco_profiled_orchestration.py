@@ -111,6 +111,16 @@ def test_each_engine_returns_its_profile_command(engine, workflow_type):
     ]
     assert checkpoint_kinds[0] == "workflow.started"
     assert "workflow.completed" not in checkpoint_kinds
+    expected_agent_phases = {
+        phase.skill: phase.name
+        for phase in profile.phases
+        if phase.kind == "agent"
+    }
+    assert {
+        payload["skill"]: payload["phase"]
+        for name, payload in context.calls
+        if name == "telco_profile_skill_activity_trigger"
+    } == expected_agent_phases
 
 
 def test_profile_orchestration_waits_for_declared_persona():

@@ -23,7 +23,7 @@ def _snapshot_workflows() -> list[dict[str, Any]]:
     if store is None or not hasattr(store, "list_workflows"):
         return []
     return [
-        workflow.model_dump(by_alias=True, mode="json")
+        store.workflow_replay_patch(workflow)
         for workflow in store.list_workflows()
     ]
 

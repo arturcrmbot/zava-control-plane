@@ -78,5 +78,6 @@ async def execute(input: dict) -> dict:
         skill_dir=_SKILL_DIR,
         skill_label="fleet-contract-renewal-renewal-terms-drafter",
         workflow_id=workflow_id,
+        instance_id=input.get("instance_id"),
     )
     return {"renewal_terms_drafter": result}

@@ -202,6 +202,8 @@ async def _live_skill(payload: dict[str, Any]) -> dict[str, Any]:
         skill_dir=_SKILL_ROOT / skill,
         skill_label=skill,
         workflow_id=payload.get("workflow_id"),
+        instance_id=payload.get("instance_id"),
+        phase=payload.get("phase"),
     )
     return result
 

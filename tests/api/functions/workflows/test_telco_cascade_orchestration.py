@@ -103,6 +103,12 @@ def test_cascade_orchestration_returns_decision_without_terminal_checkpoint():
     assert checkpoint_kinds[0] == "workflow.started"
     assert "workflow.completed" not in checkpoint_kinds
     assert context.external_event is None
+    decision_payload = next(
+        payload
+        for name, payload in context.calls
+        if name == "telco_cascade_decision_activity_trigger"
+    )
+    assert decision_payload["phase"] == "Plan Pre-Staging"
 
 
 def test_cascade_orchestration_waits_for_registered_approver():

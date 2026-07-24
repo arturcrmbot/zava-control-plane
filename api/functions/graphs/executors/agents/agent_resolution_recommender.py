@@ -15,4 +15,10 @@ async def execute(input: dict) -> dict:
         f"Root cause: {json.dumps(root_cause)}\n\n"
         f"Recommend per your role."
     )
-    return {"resolution_recommendation": await run_agent_skill("resolution_recommender", prompt, workflow_id=workflow_id)}
+    recommendation = await run_agent_skill(
+        "resolution_recommender",
+        prompt,
+        workflow_id=workflow_id,
+        instance_id=input.get("instance_id"),
+    )
+    return {"resolution_recommendation": recommendation}

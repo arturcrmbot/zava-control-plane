@@ -85,6 +85,8 @@ async def run_segment_{{SEGMENT_LETTER}}(input: dict) -> dict:
     # auto-discovers their SKILL.md files for on-demand invocation.
     prior_err = input.get("prior_validator_error")
     prompt = _build_segment_{{SEGMENT_LETTER}}_prompt(input, prior_validator_error=prior_err)
+    workflow_id = input.get("workflow_id")
+    instance_id = input.get("instance_id")
 
     return await run_agent_session(
         prompt=prompt,
@@ -92,6 +94,8 @@ async def run_segment_{{SEGMENT_LETTER}}(input: dict) -> dict:
         skill_dir=skill_dirs[0],
         skill_directories=skill_dirs[1:],
         skill_label="{{WORKFLOW_TYPE}}-segment-{{SEGMENT_LETTER}}",
-        workflow_id=input.get("workflow_id"),
+        workflow_id=workflow_id,
+        instance_id=instance_id,
+        covered_phases=input.get("covered_phases"),
         model="gpt-4.1",
     )

@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 import time
+import uuid
 import httpx
 
 
@@ -14,6 +15,7 @@ async def call_mcp(
     args: dict,
     workflow_id: str | None = None,
     instance_id: str | None = None,
+    tool_call_id: str | None = None,
 ) -> dict:
     """POST to an MCP endpoint. Emits a durable `mcp.call` event with the
     request, response, status, and duration when `workflow_id` is provided
@@ -27,6 +29,10 @@ async def call_mcp(
     ``AGT_ENFORCE=1``. The decision_id is propagated onto the event
     payload so the Execution Timeline + audit chain can correlate.
     """
+    stable_tool_call_id = str(tool_call_id).strip() if tool_call_id is not None else ""
+    if not stable_tool_call_id:
+        stable_tool_call_id = f"mcp-{uuid.uuid4().hex}"
+
     # Local import: keeps the kernel a soft dep at module-import time
     # so the Functions worker can be loaded for non-MCP graphs even if
     # the kernel is mid-rebuild. Real cost is one dict lookup per call.
@@ -62,6 +68,7 @@ async def call_mcp(
         # Local import avoids circular deps during module load.
         from api.functions.webhook import emit
         await emit(workflow_id, instance_id, "mcp.call", {
+            "tool_call_id": stable_tool_call_id,
             "tool": tool, "url": url, "method": "POST",
             "request": args, "response": resp_json,
             "status_code": status_code, "duration_ms": duration_ms,

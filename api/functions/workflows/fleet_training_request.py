@@ -40,7 +40,11 @@ def fleet_training_request_orchestration(
     # payload so internal_durable_event populates its _workflow_types
     # cache and forwards `workflow_type` onto every downstream FleetEvent.
     workflow_type = input_dict.get("type", "training-request")
-    enriched = {**input_dict, "instance_id": context.instance_id}
+    enriched = {
+        **input_dict,
+        "workflow_id": workflow_id,
+        "instance_id": context.instance_id,
+    }
 
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
@@ -59,7 +63,10 @@ def fleet_training_request_orchestration(
 
     # Phase 2: Eligibility & Catalogue (agent segment B) — segments-by-default
     # retry loop. Mirrors api/functions/workflows/hiring.py:120-162.
-    segment_input = {**enriched, "workflow_id": context.instance_id}
+    segment_input = {
+        **enriched,
+        "covered_phases": ["Eligibility & Catalogue"],
+    }
     segment_b_result = None
     validator_b: dict = {}
     for attempt in range(segment_max_retries + 1):

@@ -51,5 +51,6 @@ async def execute(input: dict) -> dict:
         skill_dir=_SKILL_DIR,
         skill_label="fleet-travel-preapproval-policy-fit-checker",
         workflow_id=workflow_id,
+        instance_id=input.get("instance_id"),
     )
     return {"policy_fit_check": result}

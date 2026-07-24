@@ -200,7 +200,7 @@ class Phase(BaseModel):
     status: Literal["pending", "in_progress", "completed", "failed"] = "pending"
     started_at: float | None = None
     completed_at: float | None = None
-    agent_id: str = "finance-agent"
+    agent_id: str = "system"
     tool_calls: list[ToolCall] = Field(default_factory=list)
     span_ids: list[str] = Field(default_factory=list)
 
@@ -218,6 +218,7 @@ class OtelSpan(BaseModel):
 
 class McpCall(BaseModel):
     workflow_id: str
+    tool_call_id: str | None = None
     timestamp: float
     tool: str
     url: str

@@ -5,7 +5,7 @@ from typing import Any
 from api.server.services.replay.mutation_bus import get_active_bus, set_active_bus
 from api.server.services.replay.tape_loader import TapeLoader
 from api.server.state import app_state
-from api.shared.types import Exception_, McpCall, OtelSpan, Phase, Workflow
+from api.shared.types import Exception_, McpCall, OtelSpan, Phase
 
 
 def hydrate_from_snapshot(loader: TapeLoader) -> None:
@@ -56,13 +56,14 @@ def _clear_state_store(store: Any) -> None:
     # WhatIfPanel → user sees just "Select a policy" forever).
     store._amplifications.clear()
     store._mcp_calls.clear()
+    store._agent_output_recorded_at.clear()
     store._candidates.clear()
     store._role_index.clear()
 
 
 def _hydrate_workflows(store: Any, dicts: list[dict[str, Any]]) -> None:
     for item in dicts:
-        store.upsert_workflow(Workflow.model_validate(item))
+        store.upsert_workflow_replay_patch(item)
 
 
 def _hydrate_phases(store: Any, by_workflow_id: dict[str, list[dict[str, Any]]]) -> None:

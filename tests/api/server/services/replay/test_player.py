@@ -3,14 +3,11 @@ from __future__ import annotations
 import asyncio
 import io
 import json
-import os
 import tarfile
 import time
 from pathlib import Path
 
 import pytest
-
-os.environ.setdefault("ENTITY_PLANE_ENABLED", "0")
 
 from api.server.services.event_bus import EventBus
 from api.server.services.memory.domain_memory import build_domain_memories
@@ -22,6 +19,7 @@ from api.server.services.replay.tape_format import (
     MUTATIONS_NAME,
     SNAPSHOT_DIR,
     TAPE_FORMAT_VERSION,
+    MutationRecord,
 )
 from api.server.services.replay.tape_loader import TapeLoader
 from api.server.services.state_store import StateStore
@@ -296,6 +294,72 @@ async def test_player_applies_workflow_mutation_before_later_event(
         await player.stop()
     finally:
         loader.close()
+
+
+def test_player_workflow_mutation_restores_agent_output_timestamp(
+    tmp_path: Path,
+    isolated_app_state,
+) -> None:
+    from api.server.services.replay.player import Player
+
+    workflow = _workflow("wf-mutated-output-timestamp")
+    workflow.agent_outputs = {"risk_reviewer": {"verdict": "amber"}}
+    patch = workflow.model_dump(by_alias=True, mode="json")
+    patch["_agentOutputRecordedAt"] = {"risk_reviewer": 456.0}
+    loader = _build_tape(tmp_path, duration_s=1.0)
+    player = Player(loader)
+
+    try:
+        player._apply_mutation(MutationRecord(
+            t=0.5,
+            op="upsert",
+            kind="workflow",
+            id=workflow.id,
+            patch=patch,
+        ))
+    finally:
+        loader.close()
+
+    assert app_state.store.get_agent_output_recorded_at(
+        workflow.id,
+        "risk_reviewer",
+    ) == 456.0
+
+
+def test_player_mcp_mutation_preserves_persistent_tool_call_identity(
+    tmp_path: Path,
+    isolated_app_state,
+) -> None:
+    from api.server.services.replay.player import Player
+
+    loader = _build_tape(tmp_path, duration_s=1.0)
+    player = Player(loader)
+
+    try:
+        player._apply_mutation(MutationRecord(
+            t=0.5,
+            op="append",
+            kind="mcp_call",
+            id="wf-tool-replay",
+            patch={
+                "workflowId": "wf-tool-replay",
+                "timestamp": 123.0,
+                "tool": "policy_lookup",
+                "url": "local://tool/policy_lookup",
+                "method": "EXEC",
+                "request": {"claimId": "C-1"},
+                "response": {"eligible": True},
+                "statusCode": 200,
+                "durationMs": 7,
+                "toolCallId": "replay-call-1",
+            },
+        ))
+    finally:
+        loader.close()
+
+    restored = app_state.store.get_mcp_calls("wf-tool-replay")[0]
+    assert restored.tool_call_id == "replay-call-1"
+    assert restored.model_dump(by_alias=True)["toolCallId"] == "replay-call-1"
 
 
 async def test_player_can_restart_after_stop(

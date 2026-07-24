@@ -111,12 +111,12 @@ def _render_phase_block(phase: dict, brief_prefix: str | None) -> str:
     if kind == "deterministic":
         return (
             f'    {name}_result = yield context.call_activity('
-            f'"{name}_activity", enriched)\n'
+            f'"{name}_activity", {{**enriched, "phase": "{name}"}})\n'
         )
     if kind == "agent":
         return (
             f'    {name}_result = yield context.call_activity('
-            f'"{name}_agent_activity", enriched)\n'
+            f'"{name}_agent_activity", {{**enriched, "phase": "{name}"}})\n'
         )
     if kind == "hitl":
         ev = phase.get("external_event") or f"{name}_decision"
@@ -220,7 +220,11 @@ def {snake}_orchestration(context: df.DurableOrchestrationContext) -> Generator[
     input_dict = context.get_input() or {{}}
     workflow_id = input_dict.get("workflow_id", "?")
     workflow_type = input_dict.get("type", "{workflow_type}")
-    enriched = {{**input_dict, "instance_id": context.instance_id}}
+    enriched = {{
+        **input_dict,
+        "workflow_id": workflow_id,
+        "instance_id": context.instance_id,
+    }}
 
     yield context.call_activity("checkpoint_activity_trigger", {{
         "workflow_id": workflow_id, "instance_id": context.instance_id,

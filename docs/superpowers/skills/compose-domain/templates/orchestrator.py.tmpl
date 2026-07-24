@@ -31,7 +31,11 @@ def {{DOMAIN_NAME_SNAKE}}_orchestration(context: df.DurableOrchestrationContext)
     # Without this, recordings come out tagged unknown-... and SSE events
     # arrive with domain=null. See docs/superpowers/specs/2026-05-03-substrate-fix-design.md.
     workflow_type = input_dict.get("type", "{{WORKFLOW_TYPE}}")
-    enriched = {**input_dict, "instance_id": context.instance_id}
+    enriched = {
+        **input_dict,
+        "workflow_id": workflow_id,
+        "instance_id": context.instance_id,
+    }
 
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
@@ -51,4 +55,3 @@ def {{DOMAIN_NAME_SNAKE}}_orchestration(context: df.DurableOrchestrationContext)
         "status": "completed",
         {{PHASE_RESULT_KEYS}}
     }
-

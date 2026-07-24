@@ -1,9 +1,19 @@
 from __future__ import annotations
+
 from api.shared.types import (
     Workflow, Phase, OtelSpan, Exception_ as Exception, ActionLedgerEntry,
     AutonomyPolicy, SkillAmplification, McpCall
 )
 from api.server.services.replay.mutation_bus import emit_mutation
+
+
+_AGENT_OUTPUT_RECORDED_AT_PATCH_KEY = "_agentOutputRecordedAt"
+
+
+def _sanitize_agent_output(output: dict) -> dict:
+    sanitized = dict(output)
+    sanitized.pop("_raw_tool_calls", None)
+    return sanitized
 
 
 class StateStore:
@@ -15,6 +25,7 @@ class StateStore:
         self._policies: dict[str, AutonomyPolicy] = {}
         self._amplifications: dict[str, list[SkillAmplification]] = {}
         self._mcp_calls: dict[str, list[McpCall]] = {}
+        self._agent_output_recorded_at: dict[str, dict[str, float]] = {}
         # Candidate-portal state — keyed by candidate_id ("C-XXXXXXXX"). Each
         # entry stashes the dict that the /apply route built (id, name, email,
         # cv_url, role_id), plus a `workflow_id` once attach_candidate_to_role
@@ -26,6 +37,28 @@ class StateStore:
         self._role_index: dict[str, str] = {}
 
     def upsert_workflow(self, w: Workflow) -> None:
+        existing = self._workflows.get(w.id)
+        replacing_workflow = existing is not w
+        sanitized_outputs = {
+            agent: _sanitize_agent_output(output) if isinstance(output, dict) else output
+            for agent, output in w.agent_outputs.items()
+        }
+        if sanitized_outputs != w.agent_outputs:
+            w = w.model_copy(update={"agent_outputs": sanitized_outputs})
+        if replacing_workflow:
+            self._agent_output_recorded_at.pop(w.id, None)
+        else:
+            timestamps = self._agent_output_recorded_at.get(w.id)
+            if timestamps is not None:
+                retained = {
+                    agent: recorded_at
+                    for agent, recorded_at in timestamps.items()
+                    if agent in w.agent_outputs
+                }
+                if retained:
+                    self._agent_output_recorded_at[w.id] = retained
+                else:
+                    self._agent_output_recorded_at.pop(w.id, None)
         self._workflows[w.id] = w
         # Maintain the role_id -> workflow_id reverse index so the candidate
         # portal's /apply route can attach a candidate to the matching seeded
@@ -37,8 +70,40 @@ class StateStore:
             op="upsert",
             kind="workflow",
             id=w.id,
-            patch=w.model_dump(by_alias=True, mode="json"),
+            patch=self.workflow_replay_patch(w),
         )
+
+    def workflow_replay_patch(self, w: Workflow) -> dict:
+        patch = w.model_dump(by_alias=True, mode="json")
+        timestamps = {
+            agent: recorded_at
+            for agent, recorded_at in self._agent_output_recorded_at.get(w.id, {}).items()
+            if agent in w.agent_outputs
+        }
+        if timestamps:
+            patch[_AGENT_OUTPUT_RECORDED_AT_PATCH_KEY] = dict(timestamps)
+        return patch
+
+    def upsert_workflow_replay_patch(self, patch: dict) -> Workflow:
+        workflow_data = dict(patch)
+        timestamps = workflow_data.pop(_AGENT_OUTPUT_RECORDED_AT_PATCH_KEY, None)
+        workflow = Workflow.model_validate(workflow_data)
+        self.upsert_workflow(workflow)
+
+        restored: dict[str, float] = {}
+        if isinstance(timestamps, dict):
+            for agent, value in timestamps.items():
+                if agent not in workflow.agent_outputs:
+                    continue
+                try:
+                    restored[str(agent)] = float(value)
+                except (TypeError, ValueError):
+                    continue
+        if restored:
+            self._agent_output_recorded_at[workflow.id] = restored
+        else:
+            self._agent_output_recorded_at.pop(workflow.id, None)
+        return self._workflows[workflow.id]
 
     def get_workflow(self, id: str) -> Workflow | None:
         return self._workflows.get(id)
@@ -151,7 +216,7 @@ class StateStore:
                 op="upsert",
                 kind="workflow",
                 id=w.id,
-                patch=w.model_dump(by_alias=True, mode="json"),
+                patch=self.workflow_replay_patch(w),
             )
 
     def upsert_policy(self, p: AutonomyPolicy) -> None:
@@ -166,7 +231,14 @@ class StateStore:
     def get_amplifications(self, workflow_id: str) -> list[SkillAmplification]:
         return self._amplifications.get(workflow_id, [])
 
-    def append_agent_output(self, workflow_id: str, agent: str, output: dict) -> None:
+    def append_agent_output(
+        self,
+        workflow_id: str,
+        agent: str,
+        output: dict,
+        *,
+        recorded_at: float | None = None,
+    ) -> None:
         """POC2 §4.21 AG-UI: lift a structured agent output onto the
         workflow's `agent_outputs` map so the Control Plane can render any
         `component_spec` entries in WorkflowDetail.
@@ -174,23 +246,48 @@ class StateStore:
         No-op if the workflow is unknown — agent outputs without a workflow
         record have nowhere to land. The map is keyed by agent name (last
         write wins per agent; downstream re-runs replace earlier outputs).
+        ``recorded_at`` is kept in a parallel map so domain output payloads
+        retain their original shape.
         """
         w = self._workflows.get(workflow_id)
         if w is None:
             return
-        w.agent_outputs[agent] = output
+        w.agent_outputs[agent] = _sanitize_agent_output(output)
+        if recorded_at is None:
+            timestamps = self._agent_output_recorded_at.get(workflow_id)
+            if timestamps is not None:
+                timestamps.pop(agent, None)
+                if not timestamps:
+                    self._agent_output_recorded_at.pop(workflow_id, None)
+        else:
+            self._agent_output_recorded_at.setdefault(workflow_id, {})[agent] = float(
+                recorded_at
+            )
         emit_mutation(
             op="upsert",
             kind="workflow",
             id=w.id,
-            patch=w.model_dump(by_alias=True, mode="json"),
+            patch=self.workflow_replay_patch(w),
         )
 
     def get_agent_outputs(self, workflow_id: str) -> dict:
         w = self._workflows.get(workflow_id)
         return dict(w.agent_outputs) if w else {}
 
-    def append_agent_reasoning(self, workflow_id: str, entry: dict) -> None:
+    def get_agent_output_recorded_at(
+        self,
+        workflow_id: str,
+        agent: str,
+    ) -> float | None:
+        return self._agent_output_recorded_at.get(workflow_id, {}).get(agent)
+
+    def append_agent_reasoning(
+        self,
+        workflow_id: str,
+        entry: dict,
+        *,
+        completed_at: float | None = None,
+    ) -> None:
         """Persist one agent.completed reasoning entry on the workflow.
 
         Each entry should carry the canonical wrapper shape — `agent_label`,
@@ -199,8 +296,8 @@ class StateStore:
         tool the agent invoked), `extracted_json` (the structured output the
         agent produced), `latency_ms`, `tokens_in`/`tokens_out`. Surfaces in
         the admin Traces tab and any domain view (recruiter candidate page,
-        reviewer queue, …) so we always know what the AI thought, not just
-        that it ran.
+        reviewer queue, …) so we retain the model-visible exchange and
+        returned evidence, not hidden reasoning.
 
         Append-only: re-runs of the same agent on the same workflow each get
         their own entry. Last entry per agent_label is the authoritative
@@ -209,6 +306,12 @@ class StateStore:
         w = self._workflows.get(workflow_id)
         if w is None:
             return
+        persisted_entry = dict(entry)
+        if "completed_at" not in persisted_entry and "completedAt" not in persisted_entry:
+            if completed_at is None:
+                import time as _time
+                completed_at = _time.time()
+            persisted_entry["completed_at"] = completed_at
         if not hasattr(w, "agent_reasoning") or w.agent_reasoning is None:
             try:
                 w.agent_reasoning = []
@@ -217,12 +320,12 @@ class StateStore:
                 # via the model's __dict__. Workflow uses arbitrary types
                 # in tests so this is the conservative path.
                 w.__dict__["agent_reasoning"] = []
-        w.agent_reasoning.append(entry)
+        w.agent_reasoning.append(persisted_entry)
         emit_mutation(
             op="upsert",
             kind="workflow",
             id=w.id,
-            patch=w.model_dump(by_alias=True, mode="json"),
+            patch=self.workflow_replay_patch(w),
         )
 
     def get_agent_reasoning(self, workflow_id: str) -> list[dict]:

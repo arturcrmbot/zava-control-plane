@@ -1,6 +1,10 @@
 """Test the network-incident projection (telco actor-world domain)."""
 from __future__ import annotations
 
+import json
+
+import pytest
+
 from api.server.services.entity_graph import DecisionWrite, EntityWrite, RelWrite
 from verticals.telco.entity_projections.network_incident import (
     project, WORKFLOW_TYPE,
@@ -100,3 +104,73 @@ def test_projection_connects_affected_service_to_incident_site():
         rel="HOSTED_ON",
         dst_id="ASSET-site-site-03",
     ) in ops
+
+
+def test_projection_caps_sessions_to_deterministic_prefix_and_keeps_exact_count(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("TELCO_GRAPH_DETAIL_CAP", "2")
+    incident = _incident_payload()
+    incident["affected_sessions"] = [
+        {
+            "id": f"SESS-{index:05d}",
+            "subscriber_id": f"SUB-{index:05d}",
+            "kind": "voice",
+        }
+        for index in range(1, 5)
+    ]
+    wf = make_workflow("NI-CAP", WORKFLOW_TYPE, incident, nest_under="incident")
+
+    first = project(wf)
+    second = project(wf)
+
+    services = [
+        op
+        for op in first
+        if isinstance(op, EntityWrite) and op.attrs.get("kind") == "network-session"
+    ]
+    assert [service.id for service in services] == [
+        "ASSET-session-sess-00001",
+        "ASSET-session-sess-00002",
+    ]
+    assert first == second
+
+    site = next(
+        op
+        for op in first
+        if isinstance(op, EntityWrite) and op.attrs.get("kind") == "cell-site"
+    )
+    assert json.loads(site.attrs["attributes"])["affected_session_count"] == 4
+
+
+def test_projection_defaults_to_25_session_details(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.delenv("TELCO_GRAPH_DETAIL_CAP", raising=False)
+    incident = _incident_payload()
+    incident["affected_sessions"] = [
+        {"id": f"SESS-{index:05d}", "subscriber_id": f"SUB-{index:05d}"}
+        for index in range(30)
+    ]
+    wf = make_workflow("NI-DEFAULT-CAP", WORKFLOW_TYPE, incident, nest_under="incident")
+
+    services = [
+        op
+        for op in project(wf)
+        if isinstance(op, EntityWrite) and op.attrs.get("kind") == "network-session"
+    ]
+
+    assert len(services) == 25
+    assert services[-1].id == "ASSET-session-sess-00024"
+
+
+@pytest.mark.parametrize("value", ["", "0", "-1", "not-an-integer"])
+def test_projection_rejects_invalid_graph_detail_cap(
+    monkeypatch: pytest.MonkeyPatch,
+    value: str,
+):
+    monkeypatch.setenv("TELCO_GRAPH_DETAIL_CAP", value)
+    wf = make_workflow("NI-BAD-CAP", WORKFLOW_TYPE, _incident_payload(), nest_under="incident")
+
+    with pytest.raises(ValueError, match="TELCO_GRAPH_DETAIL_CAP.*positive integer"):
+        project(wf)

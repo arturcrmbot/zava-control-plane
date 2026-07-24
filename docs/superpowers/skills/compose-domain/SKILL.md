@@ -467,6 +467,13 @@ Before declaring the graduated domain demo-ready, run the runtime gates in
 `CHECKLIST.md` §12. Static generation checks do not prove persona completion,
 Durable resume latency, or browser recovery after a backend journal reset.
 
+The **blocking execution-visibility gate** in `CHECKLIST.md` §13 applies to
+every active non-stub workflow type. Actual execution evidence must be visible
+and self-consistent; validate observed evidence rather than predicting
+conditional branches. Generated agent paths use `run_agent_session`. Use the
+live/replay `tools/workflow_visibility_proof.py` commands in `CHECKLIST.md`
+§13.
+
 ### Conventions (codified for determinism)
 
 These were free choices in earlier drafts; codifying them removes
@@ -816,7 +823,13 @@ activity, not a MAF graph**:
    `for attempt in range(segment_max_retries + 1)` loop, feeding
    `validator["errors"]` back as `prior_validator_error` on retry, and
    breaking when `validator["ok"]`. Copy the loop shape from
-   `api/functions/workflows/hiring.py:120-162` byte-for-byte.
+   `api/functions/workflows/hiring.py:120-162`. Keep the canonical
+   control-plane and Durable identities separate in `enriched` as
+   `"workflow_id": workflow_id` and
+   `"instance_id": context.instance_id`; never replace the former with
+   the latter. Add `"covered_phases"` to `segment_input`, listing every
+   declared phase handled by that one CopilotSession, and forward it to
+   `run_agent_session`.
 5. **Graduate.** `graduate.sh` copies the segment file under
    `api/functions/segments/` and appends the triggers to the pack's
    `durable.py` between sentinel markers. No new file under

@@ -61,5 +61,6 @@ async def execute(input: dict) -> dict:
         skill_label="receipt-validator",
         attachments=attachments,
         workflow_id=workflow_id,
+        instance_id=input.get("instance_id"),
     )
     return {"receipt_validation": validation}

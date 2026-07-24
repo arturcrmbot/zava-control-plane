@@ -44,7 +44,10 @@ async def execute(input: dict) -> dict:
         f"Classify per your role."
     )
     resolution = await run_agent_skill(
-        "exception_classifier", prompt, workflow_id=workflow_id
+        "exception_classifier",
+        prompt,
+        workflow_id=workflow_id,
+        instance_id=input.get("instance_id"),
     )
     try:
         if isinstance(resolution, dict):

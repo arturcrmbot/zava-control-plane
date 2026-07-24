@@ -75,6 +75,8 @@ async def run_segment_f(input: dict) -> dict:
         skill_dir=_skills_dir() / "onboarding-buddy",
         skill_label="hiring-segment-f",
         workflow_id=input.get("workflow_id"),
+        instance_id=input.get("instance_id"),
+        covered_phases=input.get("covered_phases"),
         model="gpt-4.1",
     )
     # Surface a flat list of (tool_name, reversible) records so the

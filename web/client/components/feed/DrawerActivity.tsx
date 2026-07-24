@@ -3,7 +3,7 @@
 // Second drawer section: merges WorkflowDetail's separate Phases, Timeline,
 // and Traces tabs + the Ledger tab into one filterable activity stream
 // fronted by a 3-view toggle.
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import type { DrawerData } from "./Drawer";
 import OtelSpanTree from "@client/components/OtelSpanTree";
 import ExecutionTimelineTab from "@client/components/apex/ExecutionTimelineTab";
@@ -15,16 +15,8 @@ type View = typeof VIEWS[number];
 
 export default function DrawerActivity({ data }: { data: DrawerData }) {
   const [view, setView] = useState<View>("Timeline");
-
-  const logAction = useCallback(async (action: string) => {
-    await fetch("/internal/durable-event", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        workflow_id: data.workflow.id, kind: "log.action",
-        payload: { by: "operator", action },
-      }),
-    }).catch(() => {});
-  }, [data.workflow.id]);
+  const timeline = Array.isArray(data.timeline) ? data.timeline : [];
+  const mcpCalls = Array.isArray(data.mcpCalls) ? data.mcpCalls : [];
 
   return (
     <section className="space-y-3">
@@ -36,6 +28,7 @@ export default function DrawerActivity({ data }: { data: DrawerData }) {
               key={v}
               type="button"
               onClick={() => setView(v)}
+              aria-pressed={view === v}
               className={`text-xs px-3 py-1 font-medium ${view === v ? "bg-blue-600 text-white" : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
             >{v}</button>
           ))}
@@ -48,7 +41,7 @@ export default function DrawerActivity({ data }: { data: DrawerData }) {
       <PhaseRibbon workflow={data.workflow} phases={data.phases} />
 
       {view === "Timeline" && (
-        <ExecutionTimelineTab mcpCalls={data.mcpCalls} workflowId={data.workflow.id} onLogAction={logAction} />
+        <ExecutionTimelineTab timeline={timeline} mcpCalls={mcpCalls} />
       )}
       {view === "Spans" && <OtelSpanTree spans={data.spans} />}
       {view === "Ledger" && (

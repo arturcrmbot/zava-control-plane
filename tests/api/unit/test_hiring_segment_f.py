@@ -1,6 +1,9 @@
 """Phase 4 of plan/refactor-substrate-agentic-segments-1.md."""
 from __future__ import annotations
 import os
+from datetime import datetime, timezone
+from typing import Any, Iterable
+
 os.environ["AZURE_STORAGE_CONNECTION_STRING"] = ""
 
 import pytest
@@ -116,10 +119,6 @@ def test_is_reversible_classifier():
 # --------------------------------------------------------------------------
 # Orchestrator branch tests (Phase 4 Task 4)
 # --------------------------------------------------------------------------
-from datetime import datetime, timezone
-from typing import Any, Iterable
-
-
 class _StubTimerEvent:
     def __init__(self, fire_at):
         self.fire_at = fire_at
@@ -220,6 +219,7 @@ def test_orchestrator_segment_f_yields_segment_activities(monkeypatch):
 
 
 def test_orchestrator_segment_f_retry_on_validation_failure(monkeypatch):
+    monkeypatch.setenv("SEGMENT_MAX_RETRIES", "1")
     valid = {
         "onboarding_kickoff_id": "ONB-1",
         "avatar_video_url": "https://example.test/avatar.mp4",
@@ -236,6 +236,27 @@ def test_orchestrator_segment_f_retry_on_validation_failure(monkeypatch):
     activities = [c[0] for c in ctx.calls]
     assert activities.count("hiring_segment_f_activity_trigger") == 2
     assert activities.count("validate_segment_f_output_activity_trigger") == 2
+    retry_input = [
+        payload for name, payload in ctx.calls
+        if name == "hiring_segment_f_activity_trigger"
+    ][1]
+    assert retry_input["prior_validator_error"] == "['bad provisioning']"
+    failure = next(
+        payload for name, payload in ctx.calls
+        if name == "checkpoint_activity_trigger"
+        and payload.get("kind") == "segment.failed"
+    )
+    assert failure["payload"] == {
+        "segment": "f",
+        "phase": "Onboarding",
+        "covered_phases": ["Onboarding"],
+        "attempt": 1,
+        "max_attempts": 2,
+        "retrying": True,
+        "error": "segment validation failed",
+        "errors": ["bad provisioning"],
+        "validation": {"ok": False, "errors": ["bad provisioning"]},
+    }
 
 
 def test_orchestrator_segment_f_retry_exhaustion(monkeypatch):
@@ -254,8 +275,12 @@ def test_orchestrator_segment_f_retry_exhaustion(monkeypatch):
         if name == "checkpoint_activity_trigger"
         and payload.get("kind") == "segment.failed"
     ]
-    assert len(failure_checkpoints) == 1
-    assert failure_checkpoints[0]["segment"] == "f"
+    assert [checkpoint["payload"]["attempt"] for checkpoint in failure_checkpoints] == [1, 2]
+    assert [checkpoint["payload"]["retrying"] for checkpoint in failure_checkpoints] == [
+        True, False,
+    ]
+    assert failure_checkpoints[-1]["payload"]["errors"] == ["e2"]
+    assert all("segment" not in checkpoint for checkpoint in failure_checkpoints)
 
 
 def test_orchestrator_segment_f_skips_retry_after_irreversible_tool_call(monkeypatch):
@@ -279,5 +304,18 @@ def test_orchestrator_segment_f_skips_retry_after_irreversible_tool_call(monkeyp
         and payload.get("kind") == "segment.failed.irreversible"
     ]
     assert len(irrev_checkpoints) == 1
-    assert irrev_checkpoints[0]["segment"] == "f"
-    assert irrev_checkpoints[0]["irreversible_tools"] == ["servicenow.create_ticket"]
+    assert irrev_checkpoints[0]["payload"] == {
+        "segment": "f",
+        "phase": "Onboarding",
+        "covered_phases": ["Onboarding"],
+        "attempt": 1,
+        "max_attempts": 3,
+        "retrying": False,
+        "error": "segment validation failed after irreversible tool calls",
+        "errors": ["invalid onboarding output"],
+        "validation": {
+            "ok": False,
+            "errors": ["invalid onboarding output"],
+        },
+        "irreversible_tools": ["servicenow.create_ticket"],
+    }

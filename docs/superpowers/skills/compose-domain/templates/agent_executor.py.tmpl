@@ -17,6 +17,7 @@ _SKILL_DIR = SKILLS_DIR / "{{DOMAIN_NAME}}-{{PHASE_NAME}}"
 
 async def execute(input: dict) -> dict:
     workflow_id = input.get("workflow_id")
+    instance_id = input.get("instance_id")
     {{INPUT_EXTRACTIONS}}
     prompt = (
         {{PROMPT_LINES}}
@@ -27,5 +28,7 @@ async def execute(input: dict) -> dict:
         skill_dir=_SKILL_DIR,
         skill_label="{{DOMAIN_NAME}}-{{PHASE_NAME}}",
         workflow_id=workflow_id,
+        instance_id=instance_id,
+        phase=input.get("phase"),
     )
     return {"{{PHASE_NAME}}": result}

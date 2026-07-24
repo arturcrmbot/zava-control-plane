@@ -58,9 +58,15 @@ export default function DrawerDecision({
   onRefresh: () => Promise<void> | void;
 }) {
   const w = data.workflow;
+  const activeException = data.activeException;
   const [busy, setBusy] = useState<string | null>(null);
 
-  const exceptionId = data.activeException?.id ?? w.activeExceptionId;
+  const hasActiveHitlException = (
+    w.status === "awaiting_hitl"
+    && activeException != null
+    && activeException.resolvedAt == null
+  );
+  const exceptionId = hasActiveHitlException ? activeException?.id : undefined;
   const act = async (id: string) => {
     if (!exceptionId) return;
     setBusy(id);
@@ -96,14 +102,14 @@ export default function DrawerDecision({
 
       {w.claim && <ReceiptPanel claim={w.claim} />}
 
-      {data.narrative && data.activeException && (
-        <>
-          <ExceptionAnalysisCard narrative={data.narrative} />
-          <InterventionProtocols exception={data.activeException} onResolved={onRefresh} />
-        </>
+      {data.narrative && activeException && (
+        <ExceptionAnalysisCard narrative={data.narrative} />
+      )}
+      {data.narrative && activeException && hasActiveHitlException && (
+        <InterventionProtocols exception={activeException} onResolved={onRefresh} />
       )}
 
-      {!role.hideActionButtons && (
+      {!role.hideActionButtons && hasActiveHitlException && (
         <DecisionActions
           busy={busy}
           disabled={!exceptionId}
