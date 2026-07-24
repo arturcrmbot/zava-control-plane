@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import json
 import re
@@ -113,6 +114,13 @@ def load_pack(name: str) -> VerticalPack:
 
 def _freeze_mapping(values: Mapping) -> MappingProxyType:
     return MappingProxyType(dict(values))
+
+
+def _scene_fingerprint_component(scene) -> str:
+    digest = hashlib.sha256(
+        json.dumps(scene.to_metadata(), sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    return digest[:16]
 
 
 def freeze_pack(pack: VerticalPack) -> VerticalPack:
@@ -259,6 +267,22 @@ def validate_pack(pack: VerticalPack) -> None:
         raise ValueError(
             f"vertical {pack.name!r} has unknown UI lenses {unknown_lenses}"
         )
+
+    if pack.ui.world_scene is not None:
+        scene = pack.ui.world_scene
+        if not scene.source_path.is_file():
+            raise ValueError(
+                f"vertical {pack.name!r} has missing world scene source "
+                f"{str(scene.source_path)!r}"
+            )
+        try:
+            scene.source_path.resolve().relative_to(pack.root.resolve())
+        except ValueError:
+            raise ValueError(
+                f"vertical {pack.name!r} world scene source "
+                f"{str(scene.source_path)!r} is outside pack root "
+                f"{str(pack.root)!r}"
+            ) from None
 
     skill_names: set[str] = set()
     skill_tools: dict[str, tuple[str, ...]] = {}
@@ -414,12 +438,15 @@ def build_runtime(
             )
 
     root = data_root or resolve_data_root(environment)
+    fingerprint = f"{pack.name}:{pack.manifest_version}"
+    if pack.ui.world_scene is not None:
+        fingerprint = f"{fingerprint}:{_scene_fingerprint_component(pack.ui.world_scene)}"
     return VerticalRuntime(
         pack=pack,
         world_name=world_name,
         world_scale_name=world_scale_name,
         data_dir=root / pack.name,
-        fingerprint=f"{pack.name}:{pack.manifest_version}",
+        fingerprint=fingerprint,
     )
 
 

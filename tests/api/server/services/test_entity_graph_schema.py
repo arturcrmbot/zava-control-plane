@@ -71,6 +71,15 @@ EXPECTED_REL_TABLES = {
     "BOOKED_AGAINST_CC",
     "COSTED_TO",
     "COSTED_TO_BRAND",
+    # Task 7: generic workflow-recovery topology (industry-neutral)
+    "TRIGGERED_BY",
+    "AFFECTS_ASSET",
+    "RELATED_ASSET",
+    "SUPPLIED_BY_ASSET",
+    "ISSUED_COMMAND",
+    "EVALUATED_BY",
+    "APPROVED_BY",
+    "RESOLVED_OBJECTIVE",
 }
 
 

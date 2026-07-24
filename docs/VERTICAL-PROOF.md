@@ -66,9 +66,11 @@ Restart the Functions host and confirm normal operation resumes.
 ### 3b — Actor world disabled
 
 Stop the actor world process. Trigger the workflow via the direct API path
-(POST to the simulator route). The Durable orchestration must complete without
-the actor world, all API surfaces must agree, and no dead letter entries must
-appear. Restart the actor world and confirm the full chain works again.
+(POST to the pack-owned simulator/diagnostic route). The Durable orchestration
+must complete without the actor world, all API surfaces must agree, and no dead
+letter entries must appear. The diagnostic must preserve its real source
+sensor input and must not claim a world mutation while the world is disabled.
+Restart the actor world and confirm the full chain works again.
 
 ---
 

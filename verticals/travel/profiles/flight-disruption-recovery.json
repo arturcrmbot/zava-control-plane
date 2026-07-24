@@ -1,0 +1,85 @@
+{
+  "authority": {
+    "approval_actions": [
+      "reaccommodate_travellers"
+    ],
+    "approval_bound_gbp": 750.0,
+    "delegate_to": "head_of_operations",
+    "role": "operations_controller",
+    "spend_limit_gbp": 750.0
+  },
+  "command": {
+    "command_type": "reaccommodate_travellers",
+    "required_fields": [
+      "authorized_by",
+      "booking_id",
+      "disruption_id",
+      "estimated_cost_gbp",
+      "to_flight_id",
+      "to_transfer_id"
+    ]
+  },
+  "display_name": "Flight Disruption Recovery",
+  "evaluation_contract": {
+    "evaluation_type": "travellers_reaccommodated",
+    "evaluator_fn": "evaluate_travellers_reaccommodated"
+  },
+  "function": "operations-control",
+  "hero": true,
+  "hitl_gate": {
+    "external_event": "reaccommodation_approval",
+    "gate_phase": "escalate",
+    "persona": "head_of_operations",
+    "wait_probability": 0.3
+  },
+  "maturity": "graduated",
+  "mutation_contract": {
+    "evaluation_timeout_minutes": 90.0,
+    "failure_event_types": [
+      "command.rejected"
+    ],
+    "success_event_types": [
+      "booking.reaccommodated"
+    ]
+  },
+  "objective": {
+    "description": "Recovers travellers stranded by a cancelled flight: moves the affected booking's flight and transfer to a validated alternative, escalating material or high-cost cases to Head of Operations.",
+    "objective_type": "recover_cancelled_flight"
+  },
+  "orchestrator": {
+    "name": "FlightDisruptionRecoveryOrchestrator",
+    "timeout_seconds": 180.0,
+    "workflow_id_prefix": "fdr"
+  },
+  "phases": [
+    {
+      "kind": "deterministic",
+      "name": "detect_cancellation"
+    },
+    {
+      "kind": "agent",
+      "name": "assess_impact"
+    },
+    {
+      "kind": "hitl",
+      "name": "escalate"
+    },
+    {
+      "kind": "deterministic",
+      "name": "reaccommodate"
+    }
+  ],
+  "skills": [
+    "flight-disruption-recovery"
+  ],
+  "tools": [
+    "travel_operations_check_flight_disruption",
+    "travel_operations_reaccommodate_booking"
+  ],
+  "trigger": {
+    "predicate": "a flight is cancelled while it still has confirmed, paid bookings attached to it",
+    "sensor_id": "sensor:flight_cancellation_impact",
+    "threshold": "flight.status == 'cancelled' and booking_count > 0"
+  },
+  "workflow_type": "flight-disruption-recovery"
+}

@@ -1,0 +1,12 @@
+{
+  "aspirational_domains": [],
+  "capabilities": [
+    "world"
+  ],
+  "include_meta_skills": false,
+  "lenses": [],
+  "phase_aliases": {},
+  "supplemental_domains": [],
+  "theme": {},
+  "world_scene": "ui/world-scene.json"
+}

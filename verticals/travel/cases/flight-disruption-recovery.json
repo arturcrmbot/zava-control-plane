@@ -1,0 +1,18 @@
+{
+  "command_payload": {
+    "authorized_by": "operations_controller",
+    "booking_id": "BKG-1",
+    "disruption_id": "DIS-flight_cancellation-FLT-ZV101",
+    "estimated_cost_gbp": 500.0,
+    "to_flight_id": "FLT-ZV204",
+    "to_transfer_id": "TRF-2"
+  },
+  "detect_target_id": "FLT-ZV101",
+  "disruption": {
+    "kind": "flight_cancellation",
+    "resource_id": "FLT-ZV101"
+  },
+  "expected_event_type": "booking.reaccommodated",
+  "run_until_minutes": 80.0,
+  "workflow_type": "flight-disruption-recovery"
+}

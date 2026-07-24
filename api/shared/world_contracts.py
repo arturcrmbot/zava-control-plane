@@ -24,6 +24,7 @@ class ResponderRegistration:
     owner_function: str
     timeout_seconds: float
     observation_key: str = "observation"
+    lifecycle_start_via_bridge: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +41,9 @@ class WorldPackRegistration:
     default_scale: str
     objective_routes: tuple[ObjectiveRoute, ...]
     responders: Mapping[str, ResponderRegistration]
+    build_diagnostic_input: (
+        Callable[[str], tuple[dict[str, Any], dict[str, Any]]] | None
+    ) = None
     scene: Mapping[str, Any] | None = None
 
 

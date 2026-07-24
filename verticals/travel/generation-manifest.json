@@ -1,0 +1,579 @@
+{
+  "generator_version": "0.2.0",
+  "records": [
+    {
+      "content_hash": "e9f5854a38b7b02d3c9cbe4cf126c6cd846e053bfb6d56bfcf4474d220258fb9",
+      "generator_version": "0.2.0",
+      "input_hash": "5d91eb03cb8a30cde860b00afa78f6e193e1fd90ea2d827fcfa12262a271e321",
+      "ownership": "generated-external",
+      "path": "tools/travel_zava_browser_proof.mjs"
+    },
+    {
+      "content_hash": "8e613664fc5837dfe7379da3dd077e817ef4d4f9c9c6ed5b2819341e17e3a9d9",
+      "generator_version": "0.2.0",
+      "input_hash": "486bff839029a3d8573004f794ffc7bcb9a52646d7f09c5a157e598e23df1281",
+      "ownership": "generated-external",
+      "path": "tools/travel_zava_e2e_proof.py"
+    },
+    {
+      "content_hash": "052166f0c4037ded1f088246df3e4730eda8a7f5c516f11052173a8b5b5577e1",
+      "generator_version": "0.2.0",
+      "input_hash": "25f980276ec7b3e8589cefe9eb4a7ce98fdde2a7a29910a5bf20f6bd5ec737a5",
+      "ownership": "generated-external",
+      "path": "tools/travel_zava_e2e_proof.sh"
+    },
+    {
+      "content_hash": "40b9bad2241e1adbb0c058f3e288563393cd35d7e6f9f5954307cafb4340a195",
+      "generator_version": "0.2.0",
+      "input_hash": "8a37d12b975e1dfe1ce81980df34948fa29f01b629c0b77eabe706a354f96bff",
+      "ownership": "generated",
+      "path": "verticals/travel/__init__.py"
+    },
+    {
+      "content_hash": "fa64dbffa0cc6181cfe22e22a681c77f428492e31291ea2490108c39012a6b7e",
+      "generator_version": "0.2.0",
+      "input_hash": "b0a82fd3f0363eb482b4595b2730020275309570ec3b39a7e5349d81c42d8dfd",
+      "ownership": "generated",
+      "path": "verticals/travel/actions/__init__.py"
+    },
+    {
+      "content_hash": "3d3c2a505f0c06bc82e92b502370f8b7cdcbc37a3dc23f1097c3391f482ec778",
+      "generator_version": "0.2.0",
+      "input_hash": "a3417319e9f10819176aefc6d2705407ab3d0a5b48204458314b701547cfbc04",
+      "ownership": "generated",
+      "path": "verticals/travel/actions/commands.py"
+    },
+    {
+      "content_hash": "0c2fd4c4964ce8acd5582d151949775449b7bea6776930212b70ca9dac468af3",
+      "generator_version": "0.2.0",
+      "input_hash": "75b2b08dae950729b5c2d4d15126cbe04a7996a9233163640bdd6a079a614a30",
+      "ownership": "generated",
+      "path": "verticals/travel/agents.py"
+    },
+    {
+      "content_hash": "85e9d7c9a436b5811738e16f762fe11446ad1e9f114bd2ba8f267332576a2cae",
+      "generator_version": "0.2.0",
+      "input_hash": "2a3713235f75cd95095edb7ecdf2e0b73f20fe900bd9c61e5f8f1157f2e3532a",
+      "ownership": "generated",
+      "path": "verticals/travel/authority.py"
+    },
+    {
+      "content_hash": "94a9604088dede83cc5dd7a00aac5f2793c5d5d4eb9550cab68b5918e50629a5",
+      "generator_version": "0.2.0",
+      "input_hash": "8e819c90a52e38542e9f4a573ce8117603a7fe608dc11258178c63c95918cd5d",
+      "ownership": "generated",
+      "path": "verticals/travel/cases/cancellation-refund.json"
+    },
+    {
+      "content_hash": "55d211372cf9a0063ad75d0feca92cbe51cdfa7853d1ed5dfe20dd8a55fa3b8c",
+      "generator_version": "0.2.0",
+      "input_hash": "8500fc52bfa9cf4b5747bc07a6ec5598c94002593a61c587f5d7273a39dcba24",
+      "ownership": "generated",
+      "path": "verticals/travel/cases/capacity-yield-management.json"
+    },
+    {
+      "content_hash": "c8a71933e652c41257417bee077f0f36fb7631c0f2ad60665161da2df672a86d",
+      "generator_version": "0.2.0",
+      "input_hash": "8fce7e2c4abcad3c885ac976e4d91523ccf24e1e67f2c8f4eb03bdd1d1eb7bdd",
+      "ownership": "generated",
+      "path": "verticals/travel/cases/destination-operations.json"
+    },
+    {
+      "content_hash": "acc2e3d6fa8cf592d1933f69890e8d91c2818d3b1b74b5818044e5df8d0c273e",
+      "generator_version": "0.2.0",
+      "input_hash": "a1f0c6c07671464b824358d65654f54e0aa4fb6f8ebae12391df6b0917d34a94",
+      "ownership": "generated",
+      "path": "verticals/travel/cases/flight-disruption-recovery.json"
+    },
+    {
+      "content_hash": "ee33f6b4e52ddcb0780b8c908db6136997f83993e10d3ea31a0309998c5d4c2e",
+      "generator_version": "0.2.0",
+      "input_hash": "23a0fbf9615122df5d698cc0936cfc01581450d84459f1c74a08599c5aef9f9f",
+      "ownership": "generated",
+      "path": "verticals/travel/cases/holiday-sales-booking.json"
+    },
+    {
+      "content_hash": "5649cc1a3897e792f5ef3b3f6609af426721e91573e56610888747f305c7eece",
+      "generator_version": "0.2.0",
+      "input_hash": "ce56b57fb2d481c7b976e34095f801c7b767e28de8c845a625a2c55f292aee9c",
+      "ownership": "generated",
+      "path": "verticals/travel/cases/hotel-supplier-recovery.json"
+    },
+    {
+      "content_hash": "30c6042d1ce86b8cea22a20146f084977b815fb0b99bbac8a3a67e3c914bd409",
+      "generator_version": "0.2.0",
+      "input_hash": "7f79251091071cdd48593fe6b33062698c16bc8acd0fa7a1dbe29dc1fbc7ab9b",
+      "ownership": "generated",
+      "path": "verticals/travel/cases/payment-exception.json"
+    },
+    {
+      "content_hash": "2a7a8380e08c4f493f8e5fecdf63d8227cef5ed2f9842cd43850db695c185514",
+      "generator_version": "0.2.0",
+      "input_hash": "2160816a8fed8dc882f8aa976e4681caabf45fef844be1778df075027a580d87",
+      "ownership": "generated",
+      "path": "verticals/travel/cases/proactive-customer-care.json"
+    },
+    {
+      "content_hash": "0f4ec236a0f52fd755ce9e057df975c3928139dd1fe7ffc24db53b30e8928e85",
+      "generator_version": "0.2.0",
+      "input_hash": "2f79ff5977f451ff1a6387b2a8666f8bd698f5fbf9b16390b3817dfed1dd335b",
+      "ownership": "generated",
+      "path": "verticals/travel/detail.py"
+    },
+    {
+      "content_hash": "c66aa76c5165491768673bb76e9c0fdc179b7e2ae7e97162b4ac7a1c71665ce3",
+      "generator_version": "0.2.0",
+      "input_hash": "9d4dd59b7030ae47cbda5bddd7a88aa40e1f0b212ed805e432bd73797afb1872",
+      "ownership": "generated",
+      "path": "verticals/travel/domains.py"
+    },
+    {
+      "content_hash": "a7fe90e54057a6d511d0cce3275f38fedde7308bc21222f08cf0af6e071aac55",
+      "generator_version": "0.2.0",
+      "input_hash": "ec7c9fb748bb88e05755aad8b0f1e29ffd7f3d8f01fd48de4adcdbfaa915d0a9",
+      "ownership": "generated",
+      "path": "verticals/travel/domains/cancellation-refund.yaml"
+    },
+    {
+      "content_hash": "dca0dffaceb475d6d1869d134ab49e01a98e3c7c2804d819d3af1f9bf1ab917f",
+      "generator_version": "0.2.0",
+      "input_hash": "7e753302f6b2c91f10ce07eb0b02fbe92e323ee9a4323632ba85a0ba2fc2496f",
+      "ownership": "generated",
+      "path": "verticals/travel/domains/capacity-yield-management.yaml"
+    },
+    {
+      "content_hash": "4c8c0055d8a7fbb933a6ac6d4df375217e96c67dc5702dd0ab9669f5d0bbce98",
+      "generator_version": "0.2.0",
+      "input_hash": "41dc065529001dcf2d814c9c4ef1d4f35f52c89765209bdfd5820a4a17caa667",
+      "ownership": "generated",
+      "path": "verticals/travel/domains/destination-operations.yaml"
+    },
+    {
+      "content_hash": "61fb50cc503dede489677df5cfdbf25acfb571ef2a83e71debb3780fd21faf5b",
+      "generator_version": "0.2.0",
+      "input_hash": "fc850709528228532ed390334be10bda04f9cf0ca6cb43b5576f30b0fbbf026b",
+      "ownership": "generated",
+      "path": "verticals/travel/domains/flight-disruption-recovery.yaml"
+    },
+    {
+      "content_hash": "1f9ab5a6b5f06b6ad15c81e263cc8b598b1dd2769a8c1a50c8dc83dc7f8a6b4a",
+      "generator_version": "0.2.0",
+      "input_hash": "539711fc9f11280855f48f374b767eadf0b8f8f65b44ca8070d69d178e5442f5",
+      "ownership": "generated",
+      "path": "verticals/travel/domains/holiday-sales-booking.yaml"
+    },
+    {
+      "content_hash": "2b9875c031f2ba8c43f78873706c4e1988782173e26f51ac9a070db266b29389",
+      "generator_version": "0.2.0",
+      "input_hash": "4b024bdb2729785a22baf3f9e974667c25521b5a7ab142f1cf77cc602122b07d",
+      "ownership": "generated",
+      "path": "verticals/travel/domains/hotel-supplier-recovery.yaml"
+    },
+    {
+      "content_hash": "2d7ee3ec1a427ce0f791b174524d022e889e889b568b332bf33d0af28ec61bbe",
+      "generator_version": "0.2.0",
+      "input_hash": "35f4af8a4f4171484a8940a473cbbc449cb083adf8cdc17415f403aa1f81451b",
+      "ownership": "generated",
+      "path": "verticals/travel/domains/payment-exception.yaml"
+    },
+    {
+      "content_hash": "b85249f9797525c9a7659f4fe4a043af1e4073048ee3a05a722a19dfba49e12a",
+      "generator_version": "0.2.0",
+      "input_hash": "c8ba2d3b9b3f5fbb05eeb9303093f5e503b4b772d0d408007e43d9ee78186709",
+      "ownership": "generated",
+      "path": "verticals/travel/domains/proactive-customer-care.yaml"
+    },
+    {
+      "content_hash": "d8fe56df33e63036f6042e5be9775e4d52ced5ffe3192e5d0e43a677ef545f2f",
+      "generator_version": "0.2.0",
+      "input_hash": "f2a5a1493ec8272def152d501086e01758413459dba86d6d0abad15c4a563e58",
+      "ownership": "generated",
+      "path": "verticals/travel/durable/__init__.py"
+    },
+    {
+      "content_hash": "8cb62c19988e237dd32c2b89c1471b3bd5b865259672e9937d7d1f0794d9cf6c",
+      "generator_version": "0.2.0",
+      "input_hash": "55a8b649487891dd9e21dd24a6ed911153018a683db4e7e1cac4ce15001e1a11",
+      "ownership": "generated",
+      "path": "verticals/travel/durable/engine.py"
+    },
+    {
+      "content_hash": "4ab3b7ac5e77416cbab2a3001a75bf2217bbf7eeacd5096c1eb7bc4c0246e803",
+      "generator_version": "0.2.0",
+      "input_hash": "341fe77fe8990ad9ef0cb2134dd3879364b4d01723af4ade14583d8791b85991",
+      "ownership": "generated",
+      "path": "verticals/travel/durable/functions.py"
+    },
+    {
+      "content_hash": "c744cc11daecdeea14fff1d5fe748483dcf8c7dab2be05d8c8f2261d7d4134f2",
+      "generator_version": "0.2.0",
+      "input_hash": "18f6c7ae5757e64f787228505ff076273c21ad6a6aa69d9b004d36beb3c59771",
+      "ownership": "generated",
+      "path": "verticals/travel/durable/orchestrators.py"
+    },
+    {
+      "content_hash": "85c9581825aa3e1db774e2550ddc1e4500f6fe318752576136b9e259791fedfe",
+      "generator_version": "0.2.0",
+      "input_hash": "2cd20e89e67ca78b6dd227ae9920d41b0bab45b5cbca0dfd315261a8aa018ddd",
+      "ownership": "generated",
+      "path": "verticals/travel/functions.py"
+    },
+    {
+      "content_hash": "23828a5b5e0c174c35aa46897491b6152fb6f85d84724364c4a66d6d408514e7",
+      "generator_version": "0.2.0",
+      "input_hash": "2ec25543d5638be51aaa3023b9336637acf3ffb9ccea5987792a77cad813d396",
+      "ownership": "generated",
+      "path": "verticals/travel/lifecycle.py"
+    },
+    {
+      "content_hash": "1908c7401fe6da81cde420111c37cc73e1c94434fa95f543c4c9af3c74fa5079",
+      "generator_version": "0.2.0",
+      "input_hash": "b760e1a1ca3eecc4b5aea6de1d19afec9119981ee2b9b0f4ffa11cbb57afc0dd",
+      "ownership": "generated",
+      "path": "verticals/travel/manifest.py"
+    },
+    {
+      "content_hash": "52398f8c96a250b665d9da76eaca731a7b380beda7571db3f9eeea72fcf960c5",
+      "generator_version": "0.2.0",
+      "input_hash": "7da4f6921bfaa4cd8bf4e6dadd29a08525dbc9d7f0cf039caa2b1982c38d8a76",
+      "ownership": "generated",
+      "path": "verticals/travel/mcps/__init__.py"
+    },
+    {
+      "content_hash": "04d4440135c9f69de850cc2e70bd4c257a62d51aa34ec65695a12525b1526f7e",
+      "generator_version": "0.2.0",
+      "input_hash": "58331ca15de18c49a4487df29f4278a22f389ba80f63fb8bc81fec9fb4002b8f",
+      "ownership": "generated",
+      "path": "verticals/travel/mcps/travel_operations.py"
+    },
+    {
+      "content_hash": "efd1ca3ee8bc2b5439be296ca44ec3a91e8298736ae36b662264fef99debf0b9",
+      "generator_version": "0.2.0",
+      "input_hash": "a848b581c1f99778029de1c196a76751b4608b8bb7318e8f2ff5b5758122db62",
+      "ownership": "generated",
+      "path": "verticals/travel/personae/accommodation_manager/SKILL.md"
+    },
+    {
+      "content_hash": "7e23a166c13e66853de9e7ed48d8022bdf10008c28a8dd94ec848aecb52e526e",
+      "generator_version": "0.2.0",
+      "input_hash": "62342fd4ddd00dad7886e9496742b13f7a2db9d5b0497d61392eb18b36f3486f",
+      "ownership": "generated",
+      "path": "verticals/travel/personae/customer_care_lead/SKILL.md"
+    },
+    {
+      "content_hash": "cc9634afe06638e982501a5222f66334e962dd0b4a8126b9072570ed0c386547",
+      "generator_version": "0.2.0",
+      "input_hash": "b3d60a3a6f4cc5ed746db6bd324dbcce004d345d9f2acef25efb28a8baca4291",
+      "ownership": "generated",
+      "path": "verticals/travel/personae/destination_operations_manager/SKILL.md"
+    },
+    {
+      "content_hash": "d2efe16d6982933c56860561c35398cab2dbe3f11340be3b36f6cae91a57612c",
+      "generator_version": "0.2.0",
+      "input_hash": "4970e5e2afc0433b79e12754be1188c7caaf55bc4e789939a0f956a6af76f851",
+      "ownership": "generated",
+      "path": "verticals/travel/personae/finance_operations_lead/SKILL.md"
+    },
+    {
+      "content_hash": "d0c85204ed704b5c8c3522503deb29990f29bba62b5ccbdc0b3059171b357a92",
+      "generator_version": "0.2.0",
+      "input_hash": "7a2ac1ad353d0d602deb4a3f31bf0077363b3523d4d79a48f432c1feb32c6e37",
+      "ownership": "generated",
+      "path": "verticals/travel/personae/head_of_accommodation/SKILL.md"
+    },
+    {
+      "content_hash": "f98a53c8f06c250ab851d2a38ed60ec409286ff0f2b4365a247f14f38f0df45c",
+      "generator_version": "0.2.0",
+      "input_hash": "30dfc0a9b11e2e51aae2d0999da32356b0228ab671fb8a47453c2a1e553376c6",
+      "ownership": "generated",
+      "path": "verticals/travel/personae/head_of_commercial/SKILL.md"
+    },
+    {
+      "content_hash": "45164b91d5ba4bf3f8b90a49a5130bea7547920e68f152f3eca7c2b7e2e6a942",
+      "generator_version": "0.2.0",
+      "input_hash": "b02cb5229e2064c4ea6bf7e0eaecd0beaf0ac45aaa5592f04a688a667d04a899",
+      "ownership": "generated",
+      "path": "verticals/travel/personae/head_of_customer_care/SKILL.md"
+    },
+    {
+      "content_hash": "31cf843871f210509a7e67c7439b7b9fcf17b678aeaaddbd6fe5e833bfe6e107",
+      "generator_version": "0.2.0",
+      "input_hash": "588e29aa344339c6c2eb0cf97d63e3e0bc527cd8ec677bdef1d4e49fd8a39b5b",
+      "ownership": "generated",
+      "path": "verticals/travel/personae/head_of_customer_finance/SKILL.md"
+    },
+    {
+      "content_hash": "3ac6a31a42737a6fbeebb603589e7469f3a1f5fdf012bca6238b105616551772",
+      "generator_version": "0.2.0",
+      "input_hash": "ebda5ce74c9afd213f19a0473de8195d2955225479d6b78ce669181f84ce0320",
+      "ownership": "generated",
+      "path": "verticals/travel/personae/head_of_destination_operations/SKILL.md"
+    },
+    {
+      "content_hash": "4a0f33e867a9cfc43f3d8e9d1f6f0aec4db5323989c37dc84649bc60456be9e8",
+      "generator_version": "0.2.0",
+      "input_hash": "984f16bbc62e784c39b51d55243d46a1528b6c7d5bfbfc6f3f7539cb928c89d4",
+      "ownership": "generated",
+      "path": "verticals/travel/personae/head_of_operations/SKILL.md"
+    },
+    {
+      "content_hash": "75629629dc5a6a754554f463a43444b9d46b0c14c5e1b2859407a9dd82f0cf14",
+      "generator_version": "0.2.0",
+      "input_hash": "418f860c7ea3e039a34a4cdf68a758674f82df19999a072cff3e5eefd237e451",
+      "ownership": "generated",
+      "path": "verticals/travel/personae/operations_controller/SKILL.md"
+    },
+    {
+      "content_hash": "42392f7b9fd9e34dd5bf996986fcd44df49a96b0736de804f856796d65bba92a",
+      "generator_version": "0.2.0",
+      "input_hash": "2c41235b6e388cd3c3ece2aa12538ee8326b82603671321dd44f4037aafa813c",
+      "ownership": "generated",
+      "path": "verticals/travel/personae/payments_specialist/SKILL.md"
+    },
+    {
+      "content_hash": "3cc80a3ce0f061b85d1e580eb8936cbb70d3f89cc0861539b7ad7f8a3e80af88",
+      "generator_version": "0.2.0",
+      "input_hash": "239b85ee4e6adff6414de8d59eff9800cc05019b1f5a93dde14f39d9fd4bf5d0",
+      "ownership": "generated",
+      "path": "verticals/travel/personae/revenue_manager/SKILL.md"
+    },
+    {
+      "content_hash": "3412df0eaf229e8aa754ae4a729018a9b2fec89417da26a78a18dbd259255433",
+      "generator_version": "0.2.0",
+      "input_hash": "1364c2965d667f13ca24401d367320ce72e0b829599a9292d6d8c5ea5a1f301f",
+      "ownership": "generated",
+      "path": "verticals/travel/personae/travel_adviser/SKILL.md"
+    },
+    {
+      "content_hash": "6587ff1423e46323b997d0a76ae9bc9733c7abf39aff3c73f56aa0c99bf50393",
+      "generator_version": "0.2.0",
+      "input_hash": "e13882b77cd03c5a2fbb86c4d023e521aec928eb01d2d7deb7f878fb035abaed",
+      "ownership": "generated",
+      "path": "verticals/travel/personas.py"
+    },
+    {
+      "content_hash": "0605bf5e58b97206e227ee23e8571d1e42b880e432a39a5af5367b8ce6bbd164",
+      "generator_version": "0.2.0",
+      "input_hash": "efac94be2de2a1ede1a60e72abfeee672031c6fd953e703e69e0533e0ef0e676",
+      "ownership": "generated",
+      "path": "verticals/travel/policies/authority.yaml"
+    },
+    {
+      "content_hash": "aa802719fd0c0d70c3ca3a531873d5e3475fe48d032e75c3ba5a1df2d710b8a8",
+      "generator_version": "0.2.0",
+      "input_hash": "6033b657ac8590526c5c9bba235a28c43a8719540c71cc5af9c08b2c455d6c90",
+      "ownership": "generated",
+      "path": "verticals/travel/policies/tools.yaml"
+    },
+    {
+      "content_hash": "c9dafd7d242258ef1f2ca449da48c5e07b68beccc5f744c451595a0ccfffb840",
+      "generator_version": "0.2.0",
+      "input_hash": "8b0649b5b2d0fd6830996351dc4c349f28bcf26768efadbe2554fa61b8713636",
+      "ownership": "generated",
+      "path": "verticals/travel/profiles/cancellation-refund.json"
+    },
+    {
+      "content_hash": "c71ca2b99d38edc3acd54df2e62698d724d696517faba7dfc60f4b876e9be520",
+      "generator_version": "0.2.0",
+      "input_hash": "86c0b45ebf1b7e6d6c358efb0b50ef22f0c63b91a6579bfc2ed76fad23d730dd",
+      "ownership": "generated",
+      "path": "verticals/travel/profiles/capacity-yield-management.json"
+    },
+    {
+      "content_hash": "fc0488defd469461c6058e056b68cfa9ddbfb7e36b3dcdf9063fb0fa40857fc8",
+      "generator_version": "0.2.0",
+      "input_hash": "9d620ff3879fb70ade0b173bb4e97c1e5b73a13bf3050c23e4c9011a9a26052d",
+      "ownership": "generated",
+      "path": "verticals/travel/profiles/destination-operations.json"
+    },
+    {
+      "content_hash": "eb389338113c472d3212a84752d911f6c22ae2f749b6a915941c3fb74f87d2e0",
+      "generator_version": "0.2.0",
+      "input_hash": "797ab6fb79ca2af2d57114d13f42e577d79d65588a9825952cef9225394385a3",
+      "ownership": "generated",
+      "path": "verticals/travel/profiles/flight-disruption-recovery.json"
+    },
+    {
+      "content_hash": "86df58f283111db8de919a150834fdd5833549899826e321e6970bf804202fa9",
+      "generator_version": "0.2.0",
+      "input_hash": "dc945a3b06703dbb340e76ba76b97bce8641d7481ad58c67e470c9eb18874dc2",
+      "ownership": "generated",
+      "path": "verticals/travel/profiles/holiday-sales-booking.json"
+    },
+    {
+      "content_hash": "4d079f50c6d5a27b5e5c0b5e7de43e9a02e748dcc4aea2faca0064390f11dfd2",
+      "generator_version": "0.2.0",
+      "input_hash": "780ab8d35d4c7be6ae8cbf2fbec7b1b8ab394e6ec4758b9cae3556804e5394ff",
+      "ownership": "generated",
+      "path": "verticals/travel/profiles/hotel-supplier-recovery.json"
+    },
+    {
+      "content_hash": "c7efee895b78260737fc75b6714ac451410ea9e1529be83b0fe177de1715925a",
+      "generator_version": "0.2.0",
+      "input_hash": "c7bcb0fff77b0aeb047e3b4e4fe30ab5a638b2f2898797ca19c49422d2faa5d1",
+      "ownership": "generated",
+      "path": "verticals/travel/profiles/payment-exception.json"
+    },
+    {
+      "content_hash": "b2e3846e5104561ac9c70530bb6be8b76a94e8c155a3eda0a797f267add40a74",
+      "generator_version": "0.2.0",
+      "input_hash": "68463ff3ca514519ed4f2d4a3c53a6a05cfd2fc1d1b341dae95bc0c7a568d24d",
+      "ownership": "generated",
+      "path": "verticals/travel/profiles/proactive-customer-care.json"
+    },
+    {
+      "content_hash": "53af650b99e1729e0ac9074923a9ff1cf93e388a98ed3354e5af7fe7f4125c69",
+      "generator_version": "0.2.0",
+      "input_hash": "4fd14c0a3cdfef2a33a670876ca6d9bbd054bbca1a45c22662621288a16bf0c0",
+      "ownership": "generated",
+      "path": "verticals/travel/projections/__init__.py"
+    },
+    {
+      "content_hash": "d610d9a7ff7caa99fb379c25df021d0161a06a8a7f2d72d82b3ed5c25c065e46",
+      "generator_version": "0.2.0",
+      "input_hash": "c10a4773fe06a79359cc239d03a9d56e9a9098e748e136020adeb8b406e3fc77",
+      "ownership": "generated",
+      "path": "verticals/travel/projections/knowledge.py"
+    },
+    {
+      "content_hash": "3e37c785244f8c380b8e82dcb556f516277a75bdc0400d1b4a059790cf0b046d",
+      "generator_version": "0.2.0",
+      "input_hash": "3e49e620871388daacc78d3beb807dfe6922e4b917b645e2df8ee288bf1803a8",
+      "ownership": "generated",
+      "path": "verticals/travel/recovery/__init__.py"
+    },
+    {
+      "content_hash": "aed7790dc77c9ee7af8ea8c41aa60672f9be43f0ea17cd3aa4a09366f40b148e",
+      "generator_version": "0.2.0",
+      "input_hash": "1b66710853f1b28298ab11b81d2d0605891dafd4e7d7132a5d4277a1489ab074",
+      "ownership": "generated",
+      "path": "verticals/travel/recovery/planner.py"
+    },
+    {
+      "content_hash": "2bf1cb87292320dfd20ae095d226b2833d2a99198153d012afdba57c9e37f144",
+      "generator_version": "0.2.0",
+      "input_hash": "6a6bc85657366e3b271130eb52d0b6269a247fb7d3310794b5eb48bb7444810a",
+      "ownership": "generated",
+      "path": "verticals/travel/seed.py"
+    },
+    {
+      "content_hash": "e9f1fde5720f4583142ebe1a7e7d5229ba712fe041f29c17f7aea4a915d32b24",
+      "generator_version": "0.2.0",
+      "input_hash": "09d5d79a65bb730c3190047db0569ac2ffb09d0453c01994f7676e24770dab18",
+      "ownership": "generated",
+      "path": "verticals/travel/skills/cancellation-refund/SKILL.md"
+    },
+    {
+      "content_hash": "42da41975a5c275abc5d7e77da3ab5e1c491b3e7741349d93c192ca5ce92d97d",
+      "generator_version": "0.2.0",
+      "input_hash": "fe3f2a7f69e60b21b4f739581e96eb392250d1698b1006e60bd4de71259444ec",
+      "ownership": "generated",
+      "path": "verticals/travel/skills/capacity-yield-management/SKILL.md"
+    },
+    {
+      "content_hash": "88f520616abb4c9e2151c19a969e85adff4bc73e8f620a7209a04164ee939174",
+      "generator_version": "0.2.0",
+      "input_hash": "f2bf6dc5881bad6aafe508a81bbabbc4f70ddf3e514bd055cf4bbd3df3abf0af",
+      "ownership": "generated",
+      "path": "verticals/travel/skills/destination-operations/SKILL.md"
+    },
+    {
+      "content_hash": "9dfad1d1c188426f00a49ffc859a4f9d3d0418f2662704adeb97f604949b072a",
+      "generator_version": "0.2.0",
+      "input_hash": "e7883a2834e4af8f4e4c6b8c2a6511c517e4eaa0b74ce5f5781aaafcfff823cc",
+      "ownership": "generated",
+      "path": "verticals/travel/skills/flight-disruption-recovery/SKILL.md"
+    },
+    {
+      "content_hash": "303d2c362bcb8d033d809c427f84429a82f666bf92756d0eb8011d4ddc644bfe",
+      "generator_version": "0.2.0",
+      "input_hash": "171787a9968d19c3c2fb8bcc1678ab8fcc9274c7e1022e3f179ce725a8c9f82e",
+      "ownership": "generated",
+      "path": "verticals/travel/skills/holiday-sales-booking/SKILL.md"
+    },
+    {
+      "content_hash": "8eb0f53387f6e7710631e99eea16609941c6c25ac96b06599016adec396ba142",
+      "generator_version": "0.2.0",
+      "input_hash": "5b66610104f1cdd886d09ce02b6638c6790507db1f40aef04dd176ea45a4ddd2",
+      "ownership": "generated",
+      "path": "verticals/travel/skills/hotel-supplier-recovery/SKILL.md"
+    },
+    {
+      "content_hash": "69823bd0664a541a24b676d6ae5ca42af9be1a654c4c275334414274a1695921",
+      "generator_version": "0.2.0",
+      "input_hash": "00d729362e92cf1afc5538e7188f5094ad27c7e8fc1ab71c1c9cde37733d8de4",
+      "ownership": "generated",
+      "path": "verticals/travel/skills/payment-exception/SKILL.md"
+    },
+    {
+      "content_hash": "4b98341c1e488425205d47e784909657882098ebd54e1b2a2c600baa0d717aed",
+      "generator_version": "0.2.0",
+      "input_hash": "540740945ecfb9f344b50c02fa26a3a301120df665111915d4051f98edfb7553",
+      "ownership": "generated",
+      "path": "verticals/travel/skills/proactive-customer-care/SKILL.md"
+    },
+    {
+      "content_hash": "f0e1ab63e8a1a6d2e1f35296f79e10fe957ae4cd6796d85f6a1d8ae185c0ab74",
+      "generator_version": "0.2.0",
+      "input_hash": "814509473a71e17e331511553a5d80171c4aa4035ec4c23b4a888c113ff8e1c4",
+      "ownership": "generated",
+      "path": "verticals/travel/ui.json"
+    },
+    {
+      "content_hash": "2a2add6a5d4f8d159f0aafcca2c0287dad1af7d857d6d410db23a819da834719",
+      "generator_version": "0.2.0",
+      "input_hash": "d64194e783237e720c6b695f6accf496bb486c361bec3ce4e1e2161a5f9138e7",
+      "ownership": "generated",
+      "path": "verticals/travel/ui/world-scene.json"
+    },
+    {
+      "content_hash": "e06a139d4bd447f1a079fd62bdfc21314d850a602c5da8aa01173d4a35bd4183",
+      "generator_version": "0.2.0",
+      "input_hash": "a1328d051e10f9b7707829c1bb089bd7958d5338b919869e4ab368273bae196f",
+      "ownership": "generated",
+      "path": "verticals/travel/worlds/__init__.py"
+    },
+    {
+      "content_hash": "6dbe739cea444318a80924f37bd8c4bd009e82523ad19eb458f464ac389f51df",
+      "generator_version": "0.2.0",
+      "input_hash": "24423481eeeb0498a1d17c487424abce73f1eb96bf74cc9e4920bf5d3cbbfa24",
+      "ownership": "generated",
+      "path": "verticals/travel/worlds/diagnostics.py"
+    },
+    {
+      "content_hash": "7d93dc22157ac74655d218a3712524793fcc9296a0cd8156fcc90f0230f41b81",
+      "generator_version": "0.2.0",
+      "input_hash": "146d9c17bc94046ffafb4095d1e1f943440f69be06ae87cf87cf4b8594653430",
+      "ownership": "generated",
+      "path": "verticals/travel/worlds/model.py"
+    },
+    {
+      "content_hash": "ff7af2641c610c6f7a91ee3d11984732cc3a2c94a6d092a326fda8011b88c4b8",
+      "generator_version": "0.2.0",
+      "input_hash": "cd724275f5818da26dc9f779734f3b972dc69721828a1fa38be000f792565892",
+      "ownership": "generated",
+      "path": "verticals/travel/worlds/processes.py"
+    },
+    {
+      "content_hash": "adba15f22920f2ac14208d2390d787f28d24536d292f34ba6fee9718b76f4620",
+      "generator_version": "0.2.0",
+      "input_hash": "33fcd0be40347bec60f903c9b8c98db336f4a1902676557f02c2099ae52a396a",
+      "ownership": "generated",
+      "path": "verticals/travel/worlds/reference_data.py"
+    },
+    {
+      "content_hash": "d53fe13a794e13f42e19bd625de8621fdeaa4047384d7bcbcb32a89e463f92fe",
+      "generator_version": "0.2.0",
+      "input_hash": "084476d87e6896ecc9dc2f90d984ac6e040a3ffdda4ca45e99a980ba13a35c2b",
+      "ownership": "generated",
+      "path": "verticals/travel/worlds/registration.py"
+    },
+    {
+      "content_hash": "c782d54cfc74c04ad67609ec1fc21f2f72f77691fea174c3be868c5522443eec",
+      "generator_version": "0.2.0",
+      "input_hash": "cbc855cb13d4b5a5b2e050cfd2beeed053e21810c232a77006b0ccd42a092d72",
+      "ownership": "generated",
+      "path": "verticals/travel/worlds/scenario.py"
+    }
+  ]
+}

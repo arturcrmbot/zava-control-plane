@@ -1,0 +1,18 @@
+workflow_type: destination-operations
+display_name: Destination Operations
+workflow_id_prefix: dop
+orchestrator_name: DestinationOperationsOrchestrator
+function: destination-operations
+operator_surface: destination-operations-manager
+hero: false
+phases:
+- name: detect_risk
+  kind: deterministic
+- name: plan_replacement
+  kind: agent
+- name: dispatch
+  kind: deterministic
+skills:
+- destination-operations
+authority_role: destination_operations_manager
+hitl_gates: []

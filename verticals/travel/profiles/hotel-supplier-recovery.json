@@ -1,0 +1,79 @@
+{
+  "authority": {
+    "approval_actions": [
+      "move_hotel_allotment"
+    ],
+    "approval_bound_gbp": 5000.0,
+    "delegate_to": "head_of_accommodation",
+    "role": "accommodation_manager",
+    "spend_limit_gbp": 5000.0
+  },
+  "command": {
+    "command_type": "move_hotel_allotment",
+    "required_fields": [
+      "authorized_by",
+      "disruption_id",
+      "estimated_value_gbp",
+      "from_allotment_id",
+      "rooms",
+      "to_allotment_id"
+    ]
+  },
+  "display_name": "Hotel Supplier Recovery",
+  "evaluation_contract": {
+    "evaluation_type": "accommodation_restored",
+    "evaluator_fn": "evaluate_accommodation_restored"
+  },
+  "function": "accommodation-supply",
+  "hero": true,
+  "maturity": "graduated",
+  "mutation_contract": {
+    "evaluation_timeout_minutes": 90.0,
+    "failure_event_types": [
+      "command.rejected"
+    ],
+    "success_event_types": [
+      "hotel.allotment_moved"
+    ]
+  },
+  "objective": {
+    "description": "Restores accommodation for a shortfall-hit hotel allotment by moving contracted rooms from a donor allotment with headroom, resolving the reported supplier shortfall.",
+    "objective_type": "restore_hotel_accommodation"
+  },
+  "orchestrator": {
+    "name": "HotelSupplierRecoveryOrchestrator",
+    "timeout_seconds": 180.0,
+    "workflow_id_prefix": "hsr"
+  },
+  "phases": [
+    {
+      "kind": "deterministic",
+      "name": "detect_shortfall"
+    },
+    {
+      "kind": "agent",
+      "name": "assess_recovery"
+    },
+    {
+      "kind": "agent",
+      "name": "plan_move"
+    },
+    {
+      "kind": "deterministic",
+      "name": "execute_move"
+    }
+  ],
+  "skills": [
+    "hotel-supplier-recovery"
+  ],
+  "tools": [
+    "travel_operations_check_allotment_headroom",
+    "travel_operations_move_allotment_rooms"
+  ],
+  "trigger": {
+    "predicate": "a hotel allotment supplier shortfall disruption is reported against a live allotment",
+    "sensor_id": "sensor:hotel_allotment_shortfall",
+    "threshold": "open disruption of kind 'hotel_allotment_shortfall'"
+  },
+  "workflow_type": "hotel-supplier-recovery"
+}

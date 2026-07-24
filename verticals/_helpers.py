@@ -8,6 +8,7 @@ from typing import Any
 
 from api.shared.projection_contracts import ProjectionFn
 from api.shared.vertical_pack import VerticalUiManifest
+from api.shared.world_scene_contracts import load_world_scene
 
 
 def lazy_projection(module_name: str) -> ProjectionFn:
@@ -48,10 +49,15 @@ def load_ui_manifest(path: Path) -> VerticalUiManifest:
         "supplemental_domains",
         "aspirational_domains",
         "include_meta_skills",
+        "world_scene",
     }
     unknown = sorted(set(data) - expected)
     if unknown:
         raise ValueError(f"unknown UI manifest keys: {unknown}")
+    world_scene = None
+    if "world_scene" in data:
+        pack_root = path.parent
+        world_scene = load_world_scene(pack_root / data["world_scene"], pack_root=pack_root)
     return VerticalUiManifest(
         capabilities=frozenset(data["capabilities"]),
         lenses=tuple(data["lenses"]),
@@ -60,6 +66,7 @@ def load_ui_manifest(path: Path) -> VerticalUiManifest:
         supplemental_domains=tuple(data.get("supplemental_domains", ())),
         aspirational_domains=tuple(data.get("aspirational_domains", ())),
         include_meta_skills=bool(data.get("include_meta_skills", False)),
+        world_scene=world_scene,
     )
 
 

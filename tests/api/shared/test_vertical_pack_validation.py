@@ -13,6 +13,7 @@ from api.shared.vertical_pack import (
     DurableFunctionRegistration,
     VerticalUiManifest,
 )
+from api.shared.world_scene_contracts import load_world_scene
 from tests.api.shared.vertical_pack_fakes import make_test_pack
 
 
@@ -235,6 +236,65 @@ def test_validation_rejects_missing_policy_and_foreign_recording(tmp_path) -> No
                 ),
             )
         )
+
+
+def _write_scene_source(root, relative: str = "ui/world-scene.json"):
+    data = {
+        "version": "1",
+        "title": "Demo Scene",
+        "locations": [{"id": "hub", "label": "Hub", "x": 0.1, "y": 0.1}],
+        "actor_bindings": [
+            {
+                "collection": "units",
+                "kind": "unit",
+                "id_field": "id",
+                "state_field": "status",
+                "location_field": "current_hub_id",
+            }
+        ],
+        "event_mappings": [
+            {
+                "event_type": "unit.moved",
+                "animation_type": "move",
+                "actor_id_field": "payload.unit_id",
+            }
+        ],
+    }
+    path = root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data), encoding="utf-8")
+    return path
+
+
+def test_validation_accepts_a_pack_owned_world_scene(tmp_path) -> None:
+    pack = _pack_with_domain(tmp_path)
+    source_path = _write_scene_source(pack.root)
+    scene = load_world_scene(source_path, pack_root=pack.root)
+    pack = replace(pack, ui=replace(pack.ui, world_scene=scene))
+
+    validate_pack(pack)
+
+
+def test_validation_rejects_world_scene_missing_from_disk(tmp_path) -> None:
+    pack = _pack_with_domain(tmp_path)
+    source_path = _write_scene_source(pack.root)
+    scene = load_world_scene(source_path, pack_root=pack.root)
+    source_path.unlink()
+    pack = replace(pack, ui=replace(pack.ui, world_scene=scene))
+
+    with pytest.raises(ValueError, match="missing world scene source"):
+        validate_pack(pack)
+
+
+def test_validation_rejects_world_scene_outside_pack_root(tmp_path) -> None:
+    pack = _pack_with_domain(tmp_path)
+    other_root = tmp_path / "elsewhere"
+    source_path = _write_scene_source(other_root)
+    scene = load_world_scene(source_path, pack_root=other_root)
+    pack = replace(pack, ui=replace(pack.ui, world_scene=scene))
+
+    with pytest.raises(ValueError, match="outside pack root"):
+        validate_pack(pack)
 
 
 def test_validation_rejects_unresolved_skill_tool(tmp_path) -> None:

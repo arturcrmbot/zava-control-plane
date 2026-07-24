@@ -550,6 +550,21 @@ _REL_TABLES: tuple[tuple[str, str], ...] = (
     ("LESSON_SUPERSEDES", "CREATE REL TABLE IF NOT EXISTS LESSON_SUPERSEDES (FROM Lesson TO Lesson, recorded_at TIMESTAMP)"),
     ("EXPERIMENT_FOR_LESSON", "CREATE REL TABLE IF NOT EXISTS EXPERIMENT_FOR_LESSON (FROM Experiment TO Lesson, recorded_at TIMESTAMP)"),
     ("EXPERIMENT_USED_PERSONA", "CREATE REL TABLE IF NOT EXISTS EXPERIMENT_USED_PERSONA (FROM Experiment TO Person, arm STRING, recorded_at TIMESTAMP)"),
+    # ----- generic workflow-recovery topology (industry-neutral; first
+    # consumer is a pack-owned "recovery" Knowledge projection, but every
+    # table name/shape below is domain-agnostic and reusable by any
+    # vertical whose workflow needs to relate a triggering asset, an
+    # affected asset, related-asset chains (e.g. an old asset replaced by
+    # a new one), an asset's supplying organisation, or a
+    # decision/command/evaluation chain back to its originating workflow.
+    ("TRIGGERED_BY", "CREATE REL TABLE IF NOT EXISTS TRIGGERED_BY (FROM Workflow TO Asset, decided_at TIMESTAMP)"),
+    ("AFFECTS_ASSET", "CREATE REL TABLE IF NOT EXISTS AFFECTS_ASSET (FROM Workflow TO Asset, role STRING, decided_at TIMESTAMP)"),
+    ("RELATED_ASSET", "CREATE REL TABLE IF NOT EXISTS RELATED_ASSET (FROM Asset TO Asset, role STRING, decided_at TIMESTAMP)"),
+    ("SUPPLIED_BY_ASSET", "CREATE REL TABLE IF NOT EXISTS SUPPLIED_BY_ASSET (FROM Asset TO Organisation, decided_at TIMESTAMP)"),
+    ("ISSUED_COMMAND", "CREATE REL TABLE IF NOT EXISTS ISSUED_COMMAND (FROM Decision TO Decision, decided_at TIMESTAMP)"),
+    ("EVALUATED_BY", "CREATE REL TABLE IF NOT EXISTS EVALUATED_BY (FROM Decision TO Decision, decided_at TIMESTAMP)"),
+    ("APPROVED_BY", "CREATE REL TABLE IF NOT EXISTS APPROVED_BY (FROM Decision TO Decision, decided_at TIMESTAMP)"),
+    ("RESOLVED_OBJECTIVE", "CREATE REL TABLE IF NOT EXISTS RESOLVED_OBJECTIVE (FROM Decision TO Workflow, decided_at TIMESTAMP)"),
 )
 
 # Decision target kind → rel-table name. Keys must match :data:`_VALID_KINDS`

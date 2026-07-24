@@ -1,0 +1,18 @@
+workflow_type: cancellation-refund
+display_name: Cancellation Refund
+workflow_id_prefix: cxr
+orchestrator_name: CancellationRefundOrchestrator
+function: customer-finance
+operator_surface: finance-operations-lead
+hero: false
+phases:
+- name: detect_cancellation
+  kind: deterministic
+- name: assess_refund
+  kind: agent
+- name: settle
+  kind: deterministic
+skills:
+- cancellation-refund
+authority_role: finance_operations_lead
+hitl_gates: []

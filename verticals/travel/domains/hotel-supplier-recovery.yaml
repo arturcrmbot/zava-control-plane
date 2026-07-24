@@ -1,0 +1,20 @@
+workflow_type: hotel-supplier-recovery
+display_name: Hotel Supplier Recovery
+workflow_id_prefix: hsr
+orchestrator_name: HotelSupplierRecoveryOrchestrator
+function: accommodation-supply
+operator_surface: accommodation-manager
+hero: true
+phases:
+- name: detect_shortfall
+  kind: deterministic
+- name: assess_recovery
+  kind: agent
+- name: plan_move
+  kind: agent
+- name: execute_move
+  kind: deterministic
+skills:
+- hotel-supplier-recovery
+authority_role: accommodation_manager
+hitl_gates: []

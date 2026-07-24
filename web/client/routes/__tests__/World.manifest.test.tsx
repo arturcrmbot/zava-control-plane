@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 
 const { mockRuntime, mockWorld, mockScene } = vi.hoisted(() => ({
   mockRuntime: vi.fn(),
@@ -131,6 +132,47 @@ describe("World runtime manifest routing", () => {
 
     expect(screen.getByRole("status").textContent).toContain("Loading world");
     expect(screen.queryByTestId("telco-world-route")).toBeNull();
+  });
+
+  it("routes a scene-enabled pack through the generic spatial world", () => {
+    mockRuntime.mockReturnValue({
+      loading: false,
+      error: null,
+      manifest: {
+        vertical: { name: "operations", display_name: "Operations" },
+        world: "operations",
+        ui: {
+          lenses: [],
+          world_scene: {
+            version: "1",
+            title: "Operations map",
+            locations: [{ id: "site-a", label: "Site A", x: 0.5, y: 0.5 }],
+            actor_bindings: [{
+              collection: "units", kind: "unit", id_field: "id", state_field: "status",
+              position: { location_field: "site" },
+            }],
+            event_mappings: [],
+          },
+        },
+      },
+    });
+    mockWorld.mockReturnValue({
+      state: { enabled: true, units: [{ id: "unit-1", status: "ready", site: "site-a" }] },
+      events: [],
+      loading: false,
+      error: null,
+      injectSurge: vi.fn(),
+      injectSiteFailure: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter>
+        <World />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("spatial-world-route")).toBeTruthy();
+    expect(screen.getByTestId("scene-actor-unit-1")).toBeTruthy();
   });
 
   it("uses a pack-owned spatial scene without exposing a run-process path", async () => {

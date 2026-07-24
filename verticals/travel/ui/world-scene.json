@@ -1,0 +1,302 @@
+{
+  "actor_bindings": [
+    {
+      "collection": "flights",
+      "id_field": "id",
+      "kind": "flight",
+      "progress_field": "progress",
+      "route_field": "route_location_ids",
+      "state_field": "status"
+    },
+    {
+      "collection": "transfers",
+      "id_field": "id",
+      "kind": "transfer",
+      "progress_field": "progress",
+      "route_field": "route_location_ids",
+      "state_field": "status"
+    },
+    {
+      "collection": "parties",
+      "id_field": "id",
+      "kind": "party",
+      "location_field": "current_location_id",
+      "state_field": "state"
+    },
+    {
+      "collection": "customers",
+      "id_field": "id",
+      "kind": "customer",
+      "location_field": "current_location_id",
+      "state_field": "status"
+    },
+    {
+      "collection": "staff",
+      "id_field": "id",
+      "kind": "staff",
+      "location_field": "current_location_id",
+      "state_field": "last_action"
+    },
+    {
+      "collection": "hotels",
+      "id_field": "id",
+      "kind": "hotel",
+      "location_field": "id",
+      "state_field": "occupancy_status"
+    },
+    {
+      "collection": "bookings",
+      "id_field": "id",
+      "kind": "booking",
+      "location_field": "current_location_id",
+      "state_field": "recovery_status"
+    },
+    {
+      "collection": "disruptions",
+      "id_field": "id",
+      "kind": "disruption",
+      "location_field": "current_location_id",
+      "state_field": "status"
+    },
+    {
+      "collection": "recovery_decisions",
+      "id_field": "id",
+      "kind": "recovery_decision",
+      "location_field": "current_location_id",
+      "state_field": "outcome"
+    },
+    {
+      "collection": "recovery_decisions",
+      "id_field": "workflow_id",
+      "kind": "workflow",
+      "location_field": "current_location_id",
+      "state_field": "outcome"
+    }
+  ],
+  "event_mappings": [
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "depart",
+      "event_type": "flight.departed"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "arrive",
+      "event_type": "flight.arrived"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "alert",
+      "event_type": "flight.cancelled"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "capacity",
+      "event_type": "flight.capacity_released"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "capacity",
+      "event_type": "flight.capacity_reserved"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "depart",
+      "event_type": "transfer.departed"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "arrive",
+      "event_type": "transfer.completed"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "capacity",
+      "event_type": "transfer.capacity_released"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "capacity",
+      "event_type": "transfer.capacity_reserved"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "move",
+      "event_type": "party.checked_in"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "move",
+      "event_type": "party.boarded"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "move",
+      "event_type": "party.disembarked"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "move",
+      "event_type": "party.arrived_at_resort"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "state",
+      "event_type": "party.reaccommodated"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "state",
+      "event_type": "customer.browsed"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "state",
+      "event_type": "customer.engaged"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "state",
+      "event_type": "customer.booked"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "state",
+      "event_type": "booking.confirmed"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "state",
+      "event_type": "booking.deposit_paid"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "state",
+      "event_type": "booking.paid"
+    },
+    {
+      "actor_id_field": "target_id",
+      "animation_type": "state",
+      "event_type": "payment.succeeded"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "state",
+      "event_type": "staff.handled_checkin"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "state",
+      "event_type": "staff.handled_arrival"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "alert",
+      "event_type": "disruption.reported"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "state",
+      "event_type": "disruption.resolved"
+    },
+    {
+      "actor_id_field": "target_id",
+      "animation_type": "alert",
+      "event_type": "sensor.tripped"
+    },
+    {
+      "actor_id_field": "payload.observation.booking_id",
+      "animation_type": "state",
+      "event_type": "responder.requested"
+    },
+    {
+      "actor_id_field": "payload.command.payload.booking_id",
+      "animation_type": "state",
+      "event_type": "responder.decided"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "move",
+      "event_type": "booking.reaccommodated"
+    },
+    {
+      "actor_id_field": "actor_id",
+      "animation_type": "state",
+      "event_type": "recovery.decision_recorded"
+    },
+    {
+      "actor_id_field": "target_id",
+      "animation_type": "state",
+      "event_type": "recovery.command_recorded"
+    },
+    {
+      "actor_id_field": "target_id",
+      "animation_type": "state",
+      "event_type": "recovery.evaluation_recorded"
+    }
+  ],
+  "locations": [
+    {
+      "id": "APT-LGW",
+      "label": "London Gatwick",
+      "x": 0.08,
+      "y": 0.35
+    },
+    {
+      "id": "APT-MAN",
+      "label": "Manchester Airport",
+      "x": 0.05,
+      "y": 0.15
+    },
+    {
+      "id": "APT-BHX",
+      "label": "Birmingham Airport",
+      "x": 0.08,
+      "y": 0.55
+    },
+    {
+      "id": "DST-PMI",
+      "label": "Palma de Mallorca",
+      "x": 0.75,
+      "y": 0.3
+    },
+    {
+      "id": "DST-TFS",
+      "label": "Tenerife South",
+      "x": 0.65,
+      "y": 0.75
+    },
+    {
+      "id": "DST-AYT",
+      "label": "Antalya",
+      "x": 0.9,
+      "y": 0.55
+    },
+    {
+      "id": "HTL-SUN-PMI",
+      "label": "Sunseeker Palma Bay Resort",
+      "x": 0.8,
+      "y": 0.25
+    },
+    {
+      "id": "HTL-BLU-TFS",
+      "label": "Bluewave Tenerife Gardens",
+      "x": 0.7,
+      "y": 0.8
+    },
+    {
+      "id": "HTL-SUN-AYT",
+      "label": "Sunseeker Antalya Bay Resort",
+      "x": 0.95,
+      "y": 0.6
+    },
+    {
+      "id": "home",
+      "label": "Sales & Service Hub",
+      "x": 0.05,
+      "y": 0.9
+    }
+  ],
+  "title": "Travel Operations World",
+  "version": "1"
+}

@@ -1,0 +1,24 @@
+workflow_type: flight-disruption-recovery
+display_name: Flight Disruption Recovery
+workflow_id_prefix: fdr
+orchestrator_name: FlightDisruptionRecoveryOrchestrator
+function: operations-control
+operator_surface: operations-controller
+hero: true
+phases:
+- name: detect_cancellation
+  kind: deterministic
+- name: assess_impact
+  kind: agent
+- name: escalate
+  kind: hitl
+- name: reaccommodate
+  kind: deterministic
+skills:
+- flight-disruption-recovery
+authority_role: operations_controller
+hitl_gates:
+- gate_phase: escalate
+  external_event: reaccommodation_approval
+  persona: head_of_operations
+  wait_probability: 0.3

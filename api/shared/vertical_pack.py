@@ -10,8 +10,9 @@ from api.shared.authority_contracts import AuthorityRow
 from api.shared.domain_contracts import Domain
 from api.shared.function_contracts import Function
 from api.shared.persona_contracts import Persona
-from api.shared.projection_contracts import ProjectionFn
+from api.shared.projection_contracts import ProjectionFn, WorkflowDetailHook
 from api.shared.world_contracts import WorldPackRegistration
+from api.shared.world_scene_contracts import WorldSceneContract
 
 
 StopAction = Callable[[], Any]
@@ -38,6 +39,7 @@ class VerticalUiManifest:
     supplemental_domains: tuple[Mapping[str, Any], ...] = ()
     aspirational_domains: tuple[str, ...] = ()
     include_meta_skills: bool = False
+    world_scene: WorldSceneContract | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +78,15 @@ class VerticalPack:
     recordings: RecordingSources
     ui: VerticalUiManifest
     ramp_workflow_types: tuple[str, ...]
+    # Optional pack-owned hook assembling a richer, per-workflow-type detail
+    # payload than a `ProjectionFn` can (it may read live `app_state`, e.g.
+    # world/objective state). Defaults to `None` so every pre-existing
+    # `VerticalPack(...)` call site across every other vertical stays valid
+    # without modification. See `api.shared.projection_contracts
+    # .WorkflowDetailHook` and the generic `GET /api/workflows/{id}` route,
+    # which merges a non-`None` result under one namespaced `"packDetail"`
+    # response key with zero vertical-specific branching.
+    workflow_detail_hook: WorkflowDetailHook | None = None
 
 
 @dataclass(frozen=True, slots=True)

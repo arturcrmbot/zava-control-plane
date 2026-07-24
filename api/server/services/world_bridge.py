@@ -32,13 +32,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from types import SimpleNamespace
 
 import httpx
 
 from api.shared.events import FleetEvent
 from api.server.services.durable_client import schedule_new_orchestration
 from api.server.services.world_responders import resolve_responder
-from api.server.services.world_workflow_adapter import WorldWorkflowAdapter
+from api.server.services.world_workflow_adapter import WorldWorkflowAdapter, workflow_id_for
 from api.server.world.model import SimulationCommand
 from api.server.world.objectives import objective_id
 from api.server.world.registry import resolve_objective_route
@@ -54,6 +55,47 @@ _EVALUATION_EVENTS = (
 
 _TERMINAL_OK = "Completed"
 _TERMINAL_BAD = {"Failed", "Terminated", "Canceled"}
+
+
+def _hitl_gate(data) -> dict | None:
+    """Extract a HITL wait declaration from a Durable status-query response.
+
+    Any generated orchestrator (of any vertical) may call the standard,
+    non-Travel-specific ``context.set_custom_status(...)`` right before
+    racing a HITL wait; that value round-trips onto this same status-query
+    response's ``customStatus`` field. Returns the raw ``customStatus`` dict
+    only when it plausibly declares an active wait -- a truthy ``phase`` AND
+    a truthy ``external_event`` -- else ``None``. Never guesses or fabricates
+    a gate from a missing/malformed ``customStatus``; pure and side-effect
+    free so it needs no HTTP/async fixture to test.
+    """
+    if not isinstance(data, dict):
+        return None
+    status = data.get("customStatus")
+    if not isinstance(status, dict):
+        return None
+    if not status.get("phase") or not status.get("external_event"):
+        return None
+    return status
+
+
+def _sensor_id(simulation_event: dict) -> str | None:
+    """Resolve the registered ``ObjectiveRoute.sensor_id`` for a raw sensor event.
+
+    Most detectors reuse ``actor_id`` to carry the sensor id directly. Some
+    need ``actor_id`` for their own causal-chain identity instead (e.g. which
+    disruption/resource record tripped the condition) and publish the
+    intended route's sensor id inside ``payload["sensor_id"]``. Prefers the
+    payload value when present so both conventions route correctly; falls
+    back to ``actor_id`` so every existing detector without that payload key
+    keeps working unchanged. Pure and side-effect free.
+    """
+    payload = simulation_event.get("payload")
+    if isinstance(payload, dict):
+        sensor_id = payload.get("sensor_id")
+        if sensor_id:
+            return sensor_id
+    return simulation_event.get("actor_id")
 
 
 def _command_failure_reason(result) -> str:
@@ -81,7 +123,7 @@ class WorldBridge:
         self._tasks: set[asyncio.Task] = set()
         self._off: list = []
         # Canonical Workflow lifecycle owner: mints the one StateStore Workflow
-        # (deterministic sensor-event id) before Durable scheduling and routes
+        # only after Durable accepts the deterministic sensor-event id, then routes
         # every lifecycle transition through the shared WorkflowEventIngestor.
         self._adapter = WorldWorkflowAdapter(app_state)
 
@@ -90,6 +132,108 @@ class WorldBridge:
         for event_type in _EVALUATION_EVENTS:
             self._off.append(self._bus.on(event_type, self._on_evaluation))
         log.info("world_bridge: armed; listening for %s", SENSOR_EVENT)
+
+    async def start_diagnostic(
+        self,
+        *,
+        sensor_event: dict,
+        responder,
+        observation: dict,
+    ) -> str:
+        """Start a real Durable diagnostic without a live actor-world service."""
+        sensor_event_id = sensor_event["event_id"]
+        workflow_id = workflow_id_for(responder.prefix, sensor_event_id)
+        existing = self._app.store.get_workflow(workflow_id)
+        if existing is not None:
+            return workflow_id
+
+        trace_id = sensor_event.get("trace_id")
+        objective = SimpleNamespace(
+            id=f"diagnostic-{sensor_event_id}",
+            trace_id=trace_id,
+        )
+        payload = {
+            "workflow_id": workflow_id,
+            "type": responder.workflow_type,
+            "trace_id": trace_id,
+            "objective_id": objective.id,
+            "observation": observation,
+        }
+        response = await schedule_new_orchestration(payload, responder.orchestrator)
+        instance_id = response.get("id")
+        status_uri = response.get("statusQueryGetUri")
+        workflow_id = self._adapter.start(
+            sensor_event, objective, responder, observation
+        )
+        self._workflow_by_objective[objective.id] = (workflow_id, instance_id)
+        await self._adapter.scheduled(workflow_id, instance_id)
+        asyncio.create_task(
+            self._finish_diagnostic(
+                objective.id,
+                workflow_id,
+                instance_id,
+                status_uri,
+                responder.timeout_seconds,
+                sensor_event,
+            )
+        )
+        return workflow_id
+
+    async def _finish_diagnostic(
+        self,
+        objective_id: str,
+        workflow_id: str,
+        instance_id: str | None,
+        status_uri: str | None,
+        timeout: float,
+        sensor_event: dict,
+    ) -> None:
+        """Close only a diagnostic result with a real typed command."""
+        try:
+            output = await self._await_output(instance_id, status_uri, timeout)
+            if not isinstance(output, dict):
+                await self._adapter.failed(
+                    workflow_id, instance_id, "diagnostic Durable output was unavailable"
+                )
+                return
+            if output.get("workflow_id") != workflow_id:
+                await self._adapter.failed(
+                    workflow_id, instance_id, "diagnostic Durable output changed workflow id"
+                )
+                return
+            if not isinstance(output.get("command"), dict):
+                await self._adapter.failed(
+                    workflow_id, instance_id, "diagnostic Durable output had no typed command"
+                )
+                return
+            workflow = self._app.store.get_workflow(workflow_id)
+            if workflow is not None:
+                if not isinstance(workflow.payload, dict):
+                    workflow.payload = {}
+                workflow.payload["evidence"] = output
+                workflow.payload["diagnostic"] = {
+                    "source_sensor_event_id": (
+                        sensor_event.get("payload") or {}
+                    ).get("source_sensor_event_id"),
+                    "actor_world_enabled": False,
+                }
+                workflow.metadata = dict(workflow.metadata or {})
+                workflow.metadata["diagnostic_only"] = True
+                self._app.store.upsert_workflow(workflow)
+            await self._adapter.resolved(
+                workflow_id,
+                instance_id,
+                {
+                    "status": "diagnostic_completed",
+                    "diagnostic": True,
+                    "evidence_event_type": "Durable diagnostic",
+                },
+            )
+        except Exception as ex:  # noqa: BLE001 -- persist diagnostic failure
+            log.exception("world_bridge: diagnostic failed workflow=%s", workflow_id)
+            await self._adapter.failed(workflow_id, instance_id, str(ex))
+        finally:
+            self._workflow_by_objective.pop(objective_id, None)
 
     def stop(self) -> None:
         for off in self._off:
@@ -162,17 +306,16 @@ class WorldBridge:
         instance_id = None
         try:
             service = self._app.world_service
+            sensor_id = _sensor_id(simulation_event)
             try:
-                route = resolve_objective_route(
-                    service.registration, simulation_event.get("actor_id")
-                )
+                route = resolve_objective_route(service.registration, sensor_id)
             except ValueError:
                 service.record_external(
                     "objective.unroutable",
                     trace_id=trace_id,
                     cause_event_id=simulation_event.get("event_id"),
                     payload={
-                        "sensor_id": simulation_event.get("actor_id"),
+                        "sensor_id": sensor_id,
                         "sensor_event_id": simulation_event.get("event_id"),
                     },
                 )
@@ -183,6 +326,36 @@ class WorldBridge:
                 self._app.runtime,
                 route.objective_type,
             )
+
+            # Transport-level duplicate guard: the canonical Workflow id is
+            # deterministic in the sensor event id alone
+            # (`workflow_id_for`/`WorldWorkflowAdapter.start`). If a workflow
+            # for THIS exact event id already carries a Durable
+            # `orchestration_instance_id`, this is a redelivery (e.g.
+            # at-least-once transport replay) of an event we have already
+            # scheduled -- a pure no-op, checked BEFORE opening/re-claiming
+            # any objective so a redelivery can never re-run the claim/act
+            # sequence or schedule a second orchestration. This is stronger
+            # than the "already active" objective check below: that one only
+            # stops a *different*, overlapping sensor event while a prior
+            # objective for the same (type, target) is still live: it does
+            # nothing once the objective has gone terminal (or a permissive
+            # world hands back a fresh-looking objective for the identical
+            # id), since `objective.id` still equals `objective_id(event_id)`
+            # in either case.
+            sensor_event_id = simulation_event.get("event_id")
+            prospective_workflow_id = workflow_id_for(responder.prefix, sensor_event_id)
+            already_scheduled = self._app.store.get_workflow(prospective_workflow_id)
+            if already_scheduled is not None and already_scheduled.orchestration_instance_id:
+                log.info(
+                    "world_bridge: workflow %s already scheduled instance=%s; "
+                    "skipping duplicate delivery trace=%s",
+                    prospective_workflow_id,
+                    already_scheduled.orchestration_instance_id,
+                    trace_id,
+                )
+                return
+
             objective = service.open_objective(
                 simulation_event, route, owner_function=responder.owner_function
             )
@@ -197,14 +370,6 @@ class WorldBridge:
                 objective.id, "claimed", claimed_by=responder.owner_function
             )
 
-            # Create/upsert exactly one canonical Workflow BEFORE scheduling the
-            # Durable orchestration. The adapter derives the workflow id
-            # deterministically from the sensor event id; it is the ONLY id used
-            # for the Durable payload, StateStore, AG-UI and EntityReflector —
-            # there is no independent prefix-trace reconstruction anywhere here.
-            workflow_id = self._adapter.start(
-                simulation_event, objective, responder, observation
-            )
             requested = service.record_external(
                 "responder.requested",
                 trace_id=trace_id,
@@ -212,13 +377,17 @@ class WorldBridge:
                 payload={
                     "observation": observation,
                     "objective_id": objective.id,
-                    "workflow_id": workflow_id,
+                    "workflow_id": prospective_workflow_id,
                     "workflow_type": responder.workflow_type,
                 },
             )
 
             payload = {
-                "workflow_id": workflow_id,
+                # The deterministic id is known before any state mutation. Keep
+                # it in the real Durable input, but do not materialise a local
+                # workflow until the Functions host actually accepts it: an
+                # unavailable host must not leave a phantom failed workflow.
+                "workflow_id": prospective_workflow_id,
                 "type": responder.workflow_type,
                 "trace_id": trace_id,
                 "objective_id": objective.id,
@@ -227,6 +396,9 @@ class WorldBridge:
             resp = await schedule_new_orchestration(payload, responder.orchestrator)
             instance_id = resp.get("id")
             status_uri = resp.get("statusQueryGetUri")
+            workflow_id = self._adapter.start(
+                simulation_event, objective, responder, observation
+            )
             self._workflow_by_objective[objective.id] = (workflow_id, instance_id)
             log.info("world_bridge: scheduled %s instance=%s trace=%s",
                      responder.orchestrator, instance_id, trace_id)
@@ -322,7 +494,7 @@ class WorldBridge:
             # Workflow. NONTERMINAL by design: the world command has been applied
             # but its recovery/effectiveness is evaluated in Phase 3, so the
             # bridge never marks the workflow completed/resolved here.
-            await self._adapter.decided(workflow_id, instance_id, command_data, reasoning)
+            await self._adapter.decided(workflow_id, instance_id, command_data, reasoning, evidence=output)
             self._decision_ready.add(objective.id)
             pending = self._pending_evaluations.get(objective.id)
             if pending is None:
@@ -361,24 +533,113 @@ class WorldBridge:
             self._in_flight_event_ids.discard(simulation_event.get("event_id"))
 
     async def _await_output(self, instance_id, status_uri, timeout: float | None = None):
-        """Poll the Durable status endpoint until the orchestration is terminal."""
+        """Poll the Durable status endpoint until the orchestration is terminal.
+
+        Whenever a poll's response carries a ``customStatus`` HITL gate (see
+        ``_hitl_gate``), ingest it as a ``"suspended"`` durable event exactly
+        once -- reusing the already-generic, already-tested
+        ``WorkflowEventIngestor`` "suspended"/"resumed" handling (the same
+        path a hand-built domain's suspend/resume already drives), so the
+        gate becomes visible through the StateStore workflow status,
+        ``pending_gates`` cache, and the existing
+        ``/api/exceptions/{id}/resolve`` operator route with zero new
+        vertical-specific plumbing. The paired ``"resumed"`` event is ingested
+        once more, right before returning, whenever a gate was seen -- so no
+        terminal orchestration ever leaves a stale "awaiting" gate behind.
+
+        The signature is deliberately unchanged from before this gate was
+        added -- ``workflow_id`` is recovered from ``self._workflow_by_objective``
+        (keyed by the globally-unique Durable ``instance_id``, already
+        populated by ``_drive`` before scheduling completes) rather than
+        threaded through as a new parameter, so any test double that already
+        replaces this whole method with a fixed-arity stub keeps working
+        unmodified.
+
+        Only narrow, transient HTTP transport/status/JSON-decode errors from
+        the poll itself are caught and retried. The ``"suspended"``/``"resumed"``
+        ingest calls are state-mutating (StateStore, ``pending_gates``, ledger,
+        audit) and are deliberately NOT covered by that catch: a genuine ingest
+        bug raises straight out of this method rather than being silently
+        swallowed and repolled until the deadline -- which would otherwise
+        risk losing a real, already-Completed Durable ``output`` and
+        misreporting a successful recovery as though nothing had come back at
+        all.
+        """
         if not status_uri:
             log.error("world_bridge: no statusQueryGetUri for %s", instance_id)
             return None
+        workflow_id = next(
+            (wid for wid, iid in self._workflow_by_objective.values() if iid == instance_id),
+            None,
+        )
         deadline = asyncio.get_event_loop().time() + (timeout or self._poll_timeout)
+        suspended = False
         async with httpx.AsyncClient() as c:
             while asyncio.get_event_loop().time() < deadline:
                 try:
-                    data = (await c.get(status_uri, timeout=5)).json()
-                    status = data.get("runtimeStatus")
-                    if status == _TERMINAL_OK:
-                        return data.get("output")
-                    if status in _TERMINAL_BAD:
-                        log.error("world_bridge: %s ended %s: %s",
-                                  instance_id, status, data.get("output"))
-                        return None
-                except Exception:  # noqa: BLE001 — transient poll errors are fine
-                    pass
+                    response = await c.get(status_uri, timeout=5)
+                    response.raise_for_status()
+                    data = response.json()
+                except (httpx.HTTPError, ValueError) as poll_error:
+                    # Narrow, transient transport/status/JSON-decode errors
+                    # only -- retry on the next tick. The ingest calls below
+                    # are deliberately OUTSIDE this except: they mutate real
+                    # StateStore/pending-gates/ledger/audit state, so a
+                    # genuine ingest bug must raise and surface immediately
+                    # rather than being swallowed and silently retried.
+                    log.warning(
+                        "world_bridge: transient poll error for %s: %s",
+                        instance_id, poll_error,
+                    )
+                    await asyncio.sleep(1.0)
+                    continue
+
+                status = data.get("runtimeStatus")
+                gate = _hitl_gate(data) if workflow_id else None
+                if gate is not None and not suspended:
+                    wait_seconds = gate.get("wait_seconds")
+                    if (
+                        isinstance(wait_seconds, (int, float))
+                        and not isinstance(wait_seconds, bool)
+                        and 0 < wait_seconds < float("inf")
+                    ):
+                        deadline = max(
+                            deadline,
+                            asyncio.get_event_loop().time() + float(wait_seconds),
+                        )
+                    await self._app.workflow_event_ingestor.ingest(
+                        workflow_id, instance_id, "suspended",
+                        {
+                            "phase": gate.get("phase"),
+                            "external_event": gate.get("external_event"),
+                            "reason": gate.get("reason", "approval"),
+                            "wait_kind": gate.get("wait_kind", "operator_review"),
+                        },
+                    )
+                    # Only bookkeep locally once the ingest itself actually
+                    # succeeded -- an ingest failure raises above and leaves
+                    # this gate un-recorded rather than being silently
+                    # treated as already-handled.
+                    suspended = True
+                if status == _TERMINAL_OK:
+                    # Capture the terminal output before the "resumed"
+                    # bookkeeping ingest -- a real Completed output must
+                    # never be lost or turned into None by anything that
+                    # happens afterward.
+                    output = data.get("output")
+                    if suspended:
+                        await self._app.workflow_event_ingestor.ingest(
+                            workflow_id, instance_id, "resumed", {}
+                        )
+                    return output
+                if status in _TERMINAL_BAD:
+                    log.error("world_bridge: %s ended %s: %s",
+                              instance_id, status, data.get("output"))
+                    if suspended:
+                        await self._app.workflow_event_ingestor.ingest(
+                            workflow_id, instance_id, "resumed", {}
+                        )
+                    return None
                 await asyncio.sleep(1.0)
         log.error("world_bridge: timed out awaiting %s", instance_id)
         return None

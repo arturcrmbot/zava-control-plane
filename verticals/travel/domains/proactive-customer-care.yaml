@@ -1,0 +1,18 @@
+workflow_type: proactive-customer-care
+display_name: Proactive Customer Care
+workflow_id_prefix: pcc
+orchestrator_name: ProactiveCustomerCareOrchestrator
+function: customer-care
+operator_surface: customer-care-lead
+hero: false
+phases:
+- name: detect_change
+  kind: deterministic
+- name: assess_care
+  kind: agent
+- name: issue_action
+  kind: deterministic
+skills:
+- proactive-customer-care
+authority_role: customer_care_lead
+hitl_gates: []

@@ -1,0 +1,18 @@
+workflow_type: holiday-sales-booking
+display_name: Holiday Sales Booking
+workflow_id_prefix: hsb
+orchestrator_name: HolidaySalesBookingOrchestrator
+function: commercial
+operator_surface: commercial-manager
+hero: false
+phases:
+- name: detect_demand
+  kind: deterministic
+- name: assess_quote
+  kind: agent
+- name: confirm_and_pay
+  kind: deterministic
+skills:
+- holiday-sales-booking
+authority_role: travel_adviser
+hitl_gates: []

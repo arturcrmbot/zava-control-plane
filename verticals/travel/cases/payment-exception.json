@@ -1,0 +1,16 @@
+{
+  "command_payload": {
+    "action": "retry",
+    "authorized_by": "payments_specialist",
+    "booking_id": "BKG-3",
+    "disruption_id": "DIS-balance_payment_exception-BKG-3"
+  },
+  "detect_target_id": "BKG-3",
+  "disruption": {
+    "kind": "balance_payment_exception",
+    "resource_id": "BKG-3"
+  },
+  "expected_event_type": "payment.succeeded",
+  "run_until_minutes": 60.0,
+  "workflow_type": "payment-exception"
+}

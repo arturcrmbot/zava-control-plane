@@ -1,0 +1,16 @@
+{
+  "command_payload": {
+    "authorized_by": "destination_operations_manager",
+    "disruption_id": "DIS-transfer_arrival_risk-TRF-1",
+    "estimated_cost_gbp": 150.0,
+    "transfer_id": "TRF-1"
+  },
+  "detect_target_id": "TRF-1",
+  "disruption": {
+    "kind": "transfer_arrival_risk",
+    "resource_id": "TRF-1"
+  },
+  "expected_event_type": "transfer.replacement_dispatched",
+  "run_until_minutes": 45.0,
+  "workflow_type": "destination-operations"
+}

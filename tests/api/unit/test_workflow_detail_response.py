@@ -1,5 +1,8 @@
 import json
 import time
+from types import SimpleNamespace
+
+import pytest
 from fastapi.testclient import TestClient
 from api.server.main import app
 from api.server.state import app_state
@@ -1525,3 +1528,62 @@ def test_deterministic_executor_span_is_system_evidence_not_agent() -> None:
     span = next(row for row in rows if row["id"] == "span:det-span-1")
 
     assert span["kind"] == "system"
+# ---------------------------------------------------------------------------
+# Task 7 quality issue #2: `get_workflow`'s pack `workflow_detail_hook` call
+# must not be wrapped in a broad `except Exception` that turns a genuine hook
+# bug into a silent HTTP 200 with `packDetail: null`. A hook returning `None`
+# is the ONE legitimate, truthful way to signal "no applicable detail" -- a
+# hook that instead *raises* has a real bug that must propagate/surface
+# explicitly, never be swallowed into the same success-shaped response.
+# ---------------------------------------------------------------------------
+
+
+class _SentinelHookBug(RuntimeError):
+    """Distinguishes a genuine hook bug from any other exception the route
+    or its dependencies might legitimately raise, so the assertion below is
+    unambiguous about what it's proving."""
+
+
+def test_pack_detail_is_none_when_hook_returns_none() -> None:
+    """A hook that legitimately has no detail to add for this workflow type
+    returns `None`; the route must expose this as a truthful `packDetail:
+    null` (200 OK) -- this is the correct, non-buggy "absence" path and must
+    keep working after issue #2's fix."""
+    client = TestClient(app)
+    wid = "W-DET-PACKHOOK-NONE"
+    _seed(wid)
+    previous_runtime = app_state.runtime
+    try:
+        app_state.runtime = SimpleNamespace(
+            pack=SimpleNamespace(workflow_detail_hook=lambda workflow, state: None),
+        )
+        r = client.get(f"/api/workflows/{wid}")
+    finally:
+        app_state.runtime = previous_runtime
+    assert r.status_code == 200
+    assert r.json()["packDetail"] is None
+
+
+def test_pack_detail_hook_bug_surfaces_instead_of_a_silent_200_null() -> None:
+    """A hook that raises has a genuine bug -- the route must let that
+    propagate (surfacing as a real error) rather than swallowing it into the
+    same success-shaped `packDetail: null` response a legitimate absence
+    would produce. Silently returning 200/null here would be
+    indistinguishable from the correct "no detail" case and would hide a
+    real regression from both callers and operators."""
+    client = TestClient(app)
+    wid = "W-DET-PACKHOOK-BUG"
+    _seed(wid)
+    previous_runtime = app_state.runtime
+
+    def _buggy_hook(workflow, state):
+        raise _SentinelHookBug("pack hook exploded")
+
+    try:
+        app_state.runtime = SimpleNamespace(
+            pack=SimpleNamespace(workflow_detail_hook=_buggy_hook),
+        )
+        with pytest.raises(_SentinelHookBug, match="pack hook exploded"):
+            client.get(f"/api/workflows/{wid}")
+    finally:
+        app_state.runtime = previous_runtime

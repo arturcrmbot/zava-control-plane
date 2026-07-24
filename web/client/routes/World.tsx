@@ -18,7 +18,9 @@ import { deriveCommonIntervention, type InterventionStep } from "@client/lib/wor
 import { useRuntimeManifest } from "@client/hooks/useRuntimeManifest";
 import { useWorldScene } from "@client/hooks/useWorldScene";
 import TelcoWorld from "@client/routes/TelcoWorld";
-import SpatialWorld from "@client/components/world/SpatialWorld";
+import RegisteredSpatialWorld from "@client/components/world/SpatialWorld";
+import EmbeddedSpatialWorld from "@client/routes/SpatialWorld";
+import type { WorldSceneMetadata } from "@shared/runtime";
 
 const WAITING_CAP = 40;
 const IN_SERVICE_CAP = 40;
@@ -69,19 +71,23 @@ export default function World() {
       </div>
     );
   }
+  const scene = manifest.ui.world_scene;
   return (
     <ActiveWorld
       telco={manifest.ui.lenses.includes("telco-network")}
-      spatial={manifest.ui.world_scene === true}
+      embeddedScene={typeof scene === "object" ? scene : undefined}
+      spatial={scene === true}
     />
   );
 }
 
 function ActiveWorld({
   telco,
+  embeddedScene,
   spatial,
 }: {
   telco: boolean;
+  embeddedScene?: WorldSceneMetadata;
   spatial: boolean;
 }) {
   const {
@@ -198,6 +204,15 @@ function ActiveWorld({
     );
   }
 
+  if (embeddedScene) {
+    return (
+      <EmbeddedSpatialWorld
+        scene={embeddedScene}
+        snapshot={state as unknown as Record<string, unknown>}
+        events={events}
+      />
+    );
+  }
   if (spatial && worldScene.loading) {
     return <div role="status">Loading world scene…</div>;
   }
@@ -206,7 +221,7 @@ function ActiveWorld({
   }
   if (spatial && worldScene.scene) {
     return (
-      <SpatialWorld
+      <RegisteredSpatialWorld
         scene={worldScene.scene}
         state={state}
         events={events}

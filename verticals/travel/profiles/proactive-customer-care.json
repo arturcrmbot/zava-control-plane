@@ -1,0 +1,75 @@
+{
+  "authority": {
+    "approval_actions": [
+      "issue_customer_care_action"
+    ],
+    "approval_bound_gbp": 500.0,
+    "delegate_to": "head_of_customer_care",
+    "role": "customer_care_lead",
+    "spend_limit_gbp": 500.0
+  },
+  "command": {
+    "command_type": "issue_customer_care_action",
+    "required_fields": [
+      "amount_gbp",
+      "authorized_by",
+      "booking_id",
+      "disruption_id",
+      "kind",
+      "message"
+    ]
+  },
+  "display_name": "Proactive Customer Care",
+  "evaluation_contract": {
+    "evaluation_type": "customer_notified_and_supported",
+    "evaluator_fn": "evaluate_customer_notified_and_supported"
+  },
+  "function": "customer-care",
+  "hero": false,
+  "maturity": "graduated",
+  "mutation_contract": {
+    "evaluation_timeout_minutes": 30.0,
+    "failure_event_types": [
+      "command.rejected"
+    ],
+    "success_event_types": [
+      "care.action_issued"
+    ]
+  },
+  "objective": {
+    "description": "Proactively notifies and, where warranted, extends a small bounded goodwill gesture to a customer whose itinerary materially changed.",
+    "objective_type": "protect_disrupted_customer"
+  },
+  "orchestrator": {
+    "name": "ProactiveCustomerCareOrchestrator",
+    "timeout_seconds": 60.0,
+    "workflow_id_prefix": "pcc"
+  },
+  "phases": [
+    {
+      "kind": "deterministic",
+      "name": "detect_change"
+    },
+    {
+      "kind": "agent",
+      "name": "assess_care"
+    },
+    {
+      "kind": "deterministic",
+      "name": "issue_action"
+    }
+  ],
+  "skills": [
+    "proactive-customer-care"
+  ],
+  "tools": [
+    "travel_operations_check_booking_status",
+    "travel_operations_issue_care_action"
+  ],
+  "trigger": {
+    "predicate": "a booking's itinerary changes materially enough to warrant proactive customer contact",
+    "sensor_id": "sensor:material_itinerary_change",
+    "threshold": "open disruption of kind 'material_itinerary_change'"
+  },
+  "workflow_type": "proactive-customer-care"
+}

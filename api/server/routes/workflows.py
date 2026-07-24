@@ -1,5 +1,6 @@
 from __future__ import annotations
 import datetime as dt
+import logging
 import math
 import time
 from fastapi import APIRouter, HTTPException
@@ -9,6 +10,7 @@ from api.shared.types import Workflow
 from api.shared import domains as _registry
 
 router = APIRouter(prefix="/api/workflows")
+log = logging.getLogger(__name__)
 
 _TERMINAL_PHASE_STATUSES = {"completed", "failed"}
 _MIN_PLAUSIBLE_UNIX_SECONDS = 946684800.0  # 2000-01-01T00:00:00Z
@@ -1016,6 +1018,21 @@ async def get_workflow(id: str):
         exception_narrative.compose(w, active, w.action_ledger)
         if active else None
     )
+    # Optional pack-owned enrichment (Task 7 Required B): any vertical may
+    # register `VerticalPack.workflow_detail_hook` to expose a richer,
+    # per-workflow-type detail payload than the generic fields above carry
+    # (e.g. trigger evidence, ordered phase records, reasoning, HITL,
+    # command, evaluation). Merged under one namespaced key with zero
+    # vertical-specific branching here. A hook returning `None` is the one
+    # legitimate, truthful "no applicable detail" signal; a hook that
+    # *raises* has a genuine bug and that exception is left to propagate
+    # (surfacing as a real error) rather than being swallowed into the same
+    # success-shaped `packDetail: null` response a legitimate absence would
+    # produce.
+    pack_detail = None
+    hook = getattr(getattr(app_state.runtime, "pack", None), "workflow_detail_hook", None)
+    if hook is not None:
+        pack_detail = hook(w, app_state)
     return {
         "workflow": w.model_dump(by_alias=True, exclude={"agent_reasoning"}),
         "phases": [p.model_dump(by_alias=True) for p in phases],
@@ -1034,6 +1051,7 @@ async def get_workflow(id: str):
         # Live append-blob URL for AC #12 immutable audit. None when the
         # cloud audit path isn't configured (CI / unit tests).
         "auditBlobUrl": app_state.audit.blob_url_for(id),
+        "packDetail": pack_detail,
     }
 
 
