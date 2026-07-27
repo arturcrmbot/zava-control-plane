@@ -27,7 +27,9 @@ exactly — this skill only governs *how you communicate*, not *what you build*.
    returned `{approved, yaml}` — if the operator edited the YAML, use their
    version; if `approved` is false, revise and present again.
 4. `report_stage("composing", ...)` then run compose-domain (add-domain Phase 3)
-   into the sandbox.
+   into the sandbox. Run compose-domain **inline in this session**. Do not
+   dispatch this critical path to a nested subagent: if nested dispatch fails,
+   no sandbox exists and there is nothing to graduate.
 5. `report_stage("graduating", ...)` then run graduate.sh + the Phase-4b/4c
    hand-stitches (domains.py, entity_projections/__init__.py, AGT matrix, etc.).
 6. `report_stage("verifying", ...)` then run add-domain Phase 4d verification.
@@ -41,9 +43,12 @@ exactly — this skill only governs *how you communicate*, not *what you build*.
    branches. Generated agents use `run_agent_session`; run the live/replay
    `tools/workflow_visibility_proof.py` commands from compose-domain CHECKLIST
    §13.
-7. On success call
-   `composition_complete(workflow_type, display_name)`. Do not restart the
-   server yourself — the UI's Ignite control handles the restart.
+7. Only call `composition_complete(workflow_type, display_name)` after the
+   sandbox exists, graduation completed, the active pack contains the new
+   `workflow_type`, and every verification gate above passed. A missing sandbox
+   or failed verification is a failure: report the exact error and stop. Never
+   report the domain as ready when it was not built. Do not restart the server
+   yourself — the UI's Ignite control handles the restart.
 
 Narrate briefly as you go (your normal assistant messages appear in the UI as
 the agent's "voice"). Think out loud — your reasoning is shown as the thought
