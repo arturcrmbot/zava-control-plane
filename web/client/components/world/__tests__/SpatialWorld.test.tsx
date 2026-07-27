@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import SpatialWorld, {
@@ -138,11 +144,12 @@ afterEach(cleanup);
 function renderWorld(
   state: WorldState = baseline,
   events: WorldEvent[] = [],
+  sceneOverride: WorldSceneContract = scene,
 ) {
   return render(
     <MemoryRouter>
       <SpatialWorld
-        scene={scene}
+        scene={sceneOverride}
         state={state}
         events={events}
         error={null}
@@ -171,7 +178,10 @@ describe("SpatialWorld", () => {
 
   it("moves a real actor only when snapshot and journal evidence change", () => {
     const { rerender } = renderWorld();
-    const before = screen.getByTestId("actor-CUST-0042").style.left;
+    expect(
+      within(screen.getByTestId("location-STORE-EU-PAR-01"))
+        .getByTestId("actor-CUST-0042"),
+    ).toBeTruthy();
     const movedState: WorldState = {
       ...baseline,
       sim_time: 39,
@@ -206,8 +216,8 @@ describe("SpatialWorld", () => {
       </MemoryRouter>,
     );
 
-    const after = screen.getByTestId("actor-CUST-0042");
-    expect(after.style.left).not.toBe(before);
+    const after = within(screen.getByTestId("location-STORE-UK-LON-01"))
+      .getByTestId("actor-CUST-0042");
     expect(after.dataset.eventId).toBe("evt-00000143");
   });
 
@@ -309,6 +319,40 @@ describe("SpatialWorld", () => {
     );
   });
 
+  it("keeps automatic workflow cards after their journal events expire", () => {
+    const completed: WorldState = {
+      ...baseline,
+      story: {
+        stages: [
+          {
+            workflow_type: "inventory-rebalancing",
+            workflow_id: "rebalance-evt-00000142",
+            status: "completed",
+          },
+        ],
+      },
+    };
+
+    renderWorld(completed, []);
+
+    expect(screen.getByText("inventory-rebalancing")).toBeTruthy();
+    expect(screen.getByText("story stage completed")).toBeTruthy();
+    expect(
+      screen.getByRole("link", {
+        name: /inspect workflow rebalance-evt-00000142/i,
+      }).getAttribute("href"),
+    ).toBe("/workflows/rebalance-evt-00000142");
+  });
+
+  it("does not claim a world outcome before relationship evidence exists", () => {
+    renderWorld(baseline, []);
+
+    expect(screen.getByText("Awaiting journal-backed outcome.")).toBeTruthy();
+    expect(
+      screen.queryByText("Stock moved from Paris to Oxford Street"),
+    ).toBeNull();
+  });
+
   it("shows the same changed relationship and links to Knowledge", () => {
     const completed: WorldState = {
       ...baseline,
@@ -328,5 +372,83 @@ describe("SpatialWorld", () => {
     expect(screen.getByText(/TRANSFERRED_TO/)).toBeTruthy();
     expect(screen.getByRole("link", { name: /open knowledge/i }).getAttribute("href"))
       .toBe("/knowledge");
+  });
+
+  it("keeps high-volume transaction layers readable", () => {
+    const busyScene: WorldSceneContract = {
+      ...scene,
+      layers: [
+        ...scene.layers,
+        {
+          state_key: "orders",
+          kind: "order",
+          label: "Orders",
+          id_field: "id",
+          location_field: "location_id",
+          status_field: "status",
+          colour: "#f59e0b",
+        },
+        {
+          state_key: "deliveries",
+          kind: "delivery",
+          label: "Deliveries",
+          id_field: "id",
+          location_field: "location_id",
+          status_field: "status",
+          colour: "#8b5cf6",
+        },
+        {
+          state_key: "returns",
+          kind: "return",
+          label: "Returns",
+          id_field: "id",
+          location_field: "location_id",
+          status_field: "status",
+          colour: "#64748b",
+        },
+      ],
+    };
+    const busyState: WorldState = {
+      ...baseline,
+      orders: Array.from({ length: 12 }, (_, index) => ({
+        id: `ORDER-LIVE-${String(index + 1).padStart(5, "0")}`,
+        location_id: "STORE-EU-PAR-01",
+        status: "confirmed",
+        last_event_id: `evt-${String(index + 1).padStart(8, "0")}`,
+      })) as unknown as NonNullable<WorldState["orders"]>,
+      deliveries: Array.from({ length: 6 }, (_, index) => ({
+        id: `DELIVERY-LIVE-${String(index + 1).padStart(5, "0")}`,
+        location_id: "STORE-EU-PAR-01",
+        status: "arrived",
+        last_event_id: `evt-${String(index + 20).padStart(8, "0")}`,
+      })),
+      returns: Array.from({ length: 6 }, (_, index) => ({
+        id: `RETURN-LIVE-${String(index + 1).padStart(5, "0")}`,
+        location_id: "STORE-EU-PAR-01",
+        status: "received",
+        last_event_id: `evt-${String(index + 30).padStart(8, "0")}`,
+      })),
+    };
+
+    renderWorld(busyState, [], busyScene);
+
+    expect(screen.getAllByTestId(/^actor-ORDER-LIVE-/)).toHaveLength(2);
+    expect(screen.getAllByTestId(/^actor-DELIVERY-LIVE-/)).toHaveLength(1);
+    expect(screen.getAllByTestId(/^actor-RETURN-LIVE-/)).toHaveLength(1);
+    expect(screen.getByTestId("actor-ORDER-LIVE-00012")).toBeTruthy();
+    expect(screen.queryByTestId("actor-ORDER-LIVE-00001")).toBeNull();
+
+    const visibleTransactions = [
+      ...screen.getAllByTestId(/^actor-ORDER-LIVE-/),
+      ...screen.getAllByTestId(/^actor-DELIVERY-LIVE-/),
+      ...screen.getAllByTestId(/^actor-RETURN-LIVE-/),
+    ];
+    for (const actor of visibleTransactions) {
+      expect(actor.className).not.toContain("absolute");
+      expect(actor.closest('[data-testid^="location-"]')).toBeTruthy();
+    }
+    expect(
+      screen.getByTestId("location-STORE-EU-PAR-01").className,
+    ).toContain("overflow-hidden");
   });
 });

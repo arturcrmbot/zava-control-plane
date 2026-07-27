@@ -68,6 +68,9 @@ COLOUR_PAIRS = (
     ("BLU", "WHT"),
 )
 SIZES = ("XS", "S", "M", "L")
+RENDER_ORDER_LIMIT = 80
+RENDER_DELIVERY_LIMIT = 32
+RENDER_RETURN_LIMIT = 32
 STAFF_NAMES = (
     "Maya Patel",
     "Owen Hughes",
@@ -1083,9 +1086,18 @@ class FashionScenario:
             "staff": [view(item) for item in self.staff.values()],
             "inventory": [view(item) for item in self.inventory.values()],
             "inventory_tokens": self._inventory_token_views(),
-            "orders": [view(item) for item in self.orders.values()],
-            "deliveries": [view(item) for item in self.deliveries.values()],
-            "returns": [view(item) for item in self.returns.values()],
+            "orders": [
+                view(item)
+                for item in list(self.orders.values())[-RENDER_ORDER_LIMIT:]
+            ],
+            "deliveries": [
+                view(item)
+                for item in list(self.deliveries.values())[-RENDER_DELIVERY_LIMIT:]
+            ],
+            "returns": [
+                view(item)
+                for item in list(self.returns.values())[-RENDER_RETURN_LIMIT:]
+            ],
             "promotions": [view(item) for item in self.promotions.values()],
             "seller_offers": [view(item) for item in self.seller_offers.values()],
             "process_cases": [

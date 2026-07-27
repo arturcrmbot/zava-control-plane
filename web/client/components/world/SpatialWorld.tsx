@@ -64,7 +64,22 @@ type KnowledgeRelationship = {
   destination_id?: string;
 };
 
-const ACTORS_PER_LOCATION_PER_LAYER = 18;
+const ACTORS_PER_LOCATION: Record<string, number> = {
+  customers: 2,
+  staff: 2,
+  orders: 2,
+  inventory_tokens: 2,
+  deliveries: 1,
+  returns: 1,
+};
+const ACTOR_LABELS: Record<string, string> = {
+  customers: "Customer",
+  staff: "Colleague",
+  orders: "Order",
+  inventory_tokens: "Stock",
+  deliveries: "Delivery",
+  returns: "Return",
+};
 const JOURNAL_LIMIT = 40;
 const PROCESS_LIMIT = 8;
 
@@ -88,17 +103,11 @@ function actorRecords(state: WorldState, layer: SceneLayer): ActorRecord[] {
   return Array.isArray(records)
     ? records.filter((record): record is ActorRecord => (
       typeof record === "object" && record !== null
+    )).sort((left, right) => (
+      text(right.last_event_id ?? right[layer.id_field])
+        .localeCompare(text(left.last_event_id ?? left[layer.id_field]))
     ))
     : [];
-}
-
-
-function stableOffset(id: string, modulus: number): number {
-  let value = 0;
-  for (let index = 0; index < id.length; index += 1) {
-    value = ((value * 31) + id.charCodeAt(index)) >>> 0;
-  }
-  return value % modulus;
 }
 
 
@@ -112,16 +121,56 @@ function recentEventByActor(events: WorldEvent[]): Map<string, WorldEvent> {
 }
 
 
+interface ProcessItem {
+  workflowId: string;
+  workflowType: string;
+  event?: WorldEvent;
+  sensor?: WorldEvent;
+  storyStatus?: string;
+}
+
+
 function processEvents(
   events: WorldEvent[],
   configuredTypes: string[],
-): Array<{ workflowId: string; workflowType: string; event: WorldEvent; sensor?: WorldEvent }> {
+  state: WorldState,
+): ProcessItem[] {
   const accepted = new Set(configuredTypes);
   const byWorkflow = new Map<string, WorldEvent>();
   for (const event of events) {
     if (accepted.size > 0 && !accepted.has(event.type)) continue;
     const workflowId = text(event.payload.workflow_id);
     if (workflowId) byWorkflow.set(workflowId, event);
+  }
+  const story = (
+    typeof state.story === "object" && state.story !== null
+      ? state.story as Record<string, unknown>
+      : {}
+  );
+  const stages = Array.isArray(story.stages)
+    ? story.stages.filter((stage): stage is Record<string, unknown> => (
+      typeof stage === "object" && stage !== null
+    ))
+    : [];
+  const storyProcesses = stages.flatMap((stage): ProcessItem[] => {
+    const workflowId = text(stage.workflow_id);
+    if (!workflowId) return [];
+    const event = byWorkflow.get(workflowId);
+    return [{
+      workflowId,
+      workflowType: text(stage.workflow_type) || "workflow",
+      event,
+      sensor: event
+        ? events.find((candidate) => (
+          candidate.trace_id === event.trace_id
+          && candidate.type === "sensor.tripped"
+        ))
+        : undefined,
+      storyStatus: text(stage.status),
+    }];
+  });
+  if (storyProcesses.length > 0) {
+    return storyProcesses.slice(0, PROCESS_LIMIT);
   }
   return Array.from(byWorkflow.entries())
     .map(([workflowId, event]) => ({
@@ -162,8 +211,8 @@ export default function SpatialWorld({
   const [resetting, setResetting] = useState(false);
   const latestByActor = useMemo(() => recentEventByActor(events), [events]);
   const processes = useMemo(
-    () => processEvents(events, scene.process_event_types ?? []),
-    [events, scene.process_event_types],
+    () => processEvents(events, scene.process_event_types ?? [], state),
+    [events, scene.process_event_types, state],
   );
   const relationships = (
     Array.isArray(state.knowledge_relationships)
@@ -251,74 +300,79 @@ export default function SpatialWorld({
               ))}
             </div>
 
-            {scene.locations.map((location) => (
-              <div
-                key={location.id}
-                data-testid={`location-${location.id}`}
-                className="absolute rounded-lg border border-stone-300 bg-white/75 p-2 shadow-sm backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/75"
-                style={{
-                  left: `${location.x}%`,
-                  top: `${location.y}%`,
-                  width: `${location.width}%`,
-                  height: `${location.height}%`,
-                }}
-              >
-                <div className="pointer-events-none flex items-start justify-between gap-2">
-                  <div>
-                    <div className="text-[11px] font-semibold text-slate-800 dark:text-slate-100">
-                      {location.label}
-                    </div>
-                    <div className="font-mono text-[9px] text-slate-500">
-                      {location.id}
-                    </div>
-                  </div>
-                  <span className="text-[9px] uppercase tracking-wide text-slate-400">
-                    {location.kind}
-                  </span>
-                </div>
-              </div>
-            ))}
-
-            {scene.layers.flatMap((layer) => (
-              scene.locations.flatMap((location) => (
+            {scene.locations.map((location) => {
+              const visibleActors = scene.layers.flatMap((layer) => (
                 actorRecords(state, layer)
                   .filter((actor) => text(actor[layer.location_field]) === location.id)
-                  .slice(0, ACTORS_PER_LOCATION_PER_LAYER)
-                  .map((actor, index) => {
-                    const actorId = text(actor[layer.id_field]);
-                    const status = text(actor[layer.status_field]);
-                    const recent = latestByActor.get(actorId);
-                    const columns = 6;
-                    const slot = stableOffset(actorId, 17) + index;
-                    const left = location.x + 1.2 + ((slot % columns) * Math.max(2.5, (location.width - 4) / columns));
-                    const top = location.y + 8 + ((Math.floor(slot / columns) % 5) * 4.4);
-                    return (
-                      <button
-                        key={`${layer.state_key}:${actorId}`}
-                        type="button"
-                        data-testid={`actor-${actorId}`}
-                        data-event-id={recent?.event_id}
-                        title={`${layer.kind} ${actorId} · ${status}`}
-                        onClick={() => setSelectedActor((current) => current === actorId ? null : actorId)}
-                        className={
-                          "absolute z-10 max-w-[180px] truncate rounded-full border bg-white px-1.5 py-0.5 font-mono text-[8px] shadow-sm transition-all duration-700 dark:bg-slate-950 " +
-                          (selectedActor === actorId ? "ring-2 ring-slate-900 dark:ring-white " : "") +
-                          (recent ? "scene-event-pulse" : "")
-                        }
-                        style={{
-                          left: `${left}%`,
-                          top: `${top}%`,
-                          borderColor: layer.colour,
-                          color: layer.colour,
-                        }}
-                      >
-                        <span>{actorId}</span>
-                        {status && <span className="ml-1 opacity-75">· {status}</span>}
-                      </button>
-                    );
-                  })
-              ))
-            ))}
+                  .slice(0, ACTORS_PER_LOCATION[layer.state_key] ?? 2)
+                  .map((actor) => ({ actor, layer }))
+              ));
+              return (
+                <div
+                  key={location.id}
+                  data-testid={`location-${location.id}`}
+                  className="absolute overflow-hidden rounded-lg border border-stone-300 bg-white/75 p-2 shadow-sm backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/75"
+                  style={{
+                    left: `${location.x}%`,
+                    top: `${location.y}%`,
+                    width: `${location.width}%`,
+                    height: `${location.height}%`,
+                  }}
+                >
+                  <div className="pointer-events-none flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-[11px] font-semibold text-slate-800 dark:text-slate-100">
+                        {location.label}
+                      </div>
+                      <div className="truncate font-mono text-[9px] text-slate-500">
+                        {location.id}
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-right text-[9px] uppercase tracking-wide text-slate-400">
+                      {location.kind}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-1">
+                    {visibleActors.map(({ actor, layer }) => {
+                      const actorId = text(actor[layer.id_field]);
+                      const status = text(actor[layer.status_field]);
+                      const recent = latestByActor.get(actorId);
+                      return (
+                        <button
+                          key={`${layer.state_key}:${actorId}`}
+                          type="button"
+                          data-testid={`actor-${actorId}`}
+                          data-event-id={recent?.event_id}
+                          title={`${layer.kind} ${actorId} · ${status}`}
+                          onClick={() => setSelectedActor((current) => (
+                            current === actorId ? null : actorId
+                          ))}
+                          className={
+                            "flex min-w-0 items-center gap-1 overflow-hidden rounded border bg-white px-1.5 py-0.5 text-left font-mono text-[8px] shadow-sm dark:bg-slate-950 " +
+                            (selectedActor === actorId ? "ring-2 ring-slate-900 dark:ring-white " : "") +
+                            (recent ? "scene-event-pulse" : "")
+                          }
+                          style={{
+                            borderColor: layer.colour,
+                            color: layer.colour,
+                          }}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="h-1.5 w-1.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: layer.colour }}
+                          />
+                          <span className="sr-only">{actorId} · </span>
+                          <span className="truncate">
+                            {ACTOR_LABELS[layer.state_key] ?? layer.kind} · {status || "active"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <aside className="space-y-3">
@@ -411,7 +465,13 @@ function ProcessCards({
       <div className="mt-2 space-y-2">
         {processes.length === 0 ? (
           <p className="text-[11px] text-slate-400">Waiting for a state threshold.</p>
-        ) : processes.map(({ workflowId, workflowType, event, sensor }) => (
+        ) : processes.map(({
+          workflowId,
+          workflowType,
+          event,
+          sensor,
+          storyStatus,
+        }) => (
           <article key={workflowId} className="rounded border border-slate-200 p-2 dark:border-slate-700">
             <div className="text-xs font-semibold text-slate-800 dark:text-slate-100">
               {workflowType}
@@ -421,7 +481,9 @@ function ProcessCards({
               {triggerSummary(sensor)}
             </p>
             <div className="mt-1 text-[9px] text-slate-400">
-              latest evidence {event.type} · {event.event_id}
+              {event
+                ? `latest evidence ${event.type} · ${event.event_id}`
+                : `story stage ${storyStatus || "active"}`}
             </div>
             <Link
               to={`/workflows/${encodeURIComponent(workflowId)}`}
@@ -452,7 +514,9 @@ function KnowledgeOutcome({
         World + Knowledge outcome
       </h2>
       <p className="mt-1 text-[10px] text-emerald-900 dark:text-emerald-200">
-        {label ?? "Journal-backed relationships appear here after execution."}
+        {relationships.length > 0
+          ? (label ?? "Journal-backed relationships appear here after execution.")
+          : "Awaiting journal-backed outcome."}
       </p>
       {relationships.map((relationship, index) => (
         <div key={`${relationship.workflow_id}:${index}`} className="mt-2 rounded bg-white/80 p-2 font-mono text-[9px] text-slate-700 dark:bg-slate-900/70 dark:text-slate-200">

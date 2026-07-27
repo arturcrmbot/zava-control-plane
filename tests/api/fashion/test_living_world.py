@@ -372,6 +372,23 @@ def test_sustained_activity_records_stockouts_without_negative_inventory() -> No
     )
 
 
+def test_render_state_bounds_high_volume_transaction_history() -> None:
+    runtime, scenario = _scenario()
+    runtime.run_until(1_200)
+
+    state = scenario.render_state()
+
+    assert len(scenario.orders) > 80
+    assert len(scenario.deliveries) > 32
+    assert len(scenario.returns) > 32
+    assert len(state["orders"]) == 80
+    assert len(state["deliveries"]) == 32
+    assert len(state["returns"]) == 32
+    assert state["orders"][-1]["id"] == next(reversed(scenario.orders))
+    assert state["deliveries"][-1]["id"] == next(reversed(scenario.deliveries))
+    assert state["returns"][-1]["id"] == next(reversed(scenario.returns))
+
+
 def test_departed_customers_leave_the_spatial_store_world() -> None:
     runtime, scenario = _scenario()
 
