@@ -121,7 +121,9 @@ def test_proof_sources_parse_and_keep_hero_out_of_diagnostic_route() -> None:
     source = DRIVER.read_text(encoding="utf-8")
 
     assert "/api/world/processes/inventory-rebalancing/run" not in source
+    assert "/api/world/processes/${encodeURIComponent(workflowType)}/run" not in source
     assert "SUPPORTING_WORKFLOWS = WORKFLOWS.slice(1)" in source
+    assert '"autonomous_story_cascade"' in source
     assert 'getByRole("button", { name: /run process' not in source.lower()
     assert "baseline.latest_seq" in source
     assert "actorStateBefore" in source

@@ -531,16 +531,9 @@ async function runLive() {
     });
 
     for (const workflowType of SUPPORTING_WORKFLOWS) {
-      const beforeIds = new Set(
-        (await listWorkflows()).map((workflow) => workflow.id),
-      );
-      const response = await postJson(
-        `/api/world/processes/${encodeURIComponent(workflowType)}/run`,
-      );
-      need(response.ok === true, `diagnostic contract rejected ${workflowType}`);
       const workflow = await waitForWorkflow(
         workflowType,
-        beforeIds,
+        knownWorkflowIdsAtBaseline,
         evidence.resolutions,
       );
       evidence.workflows[workflowType] = workflow;
@@ -604,7 +597,7 @@ async function runLive() {
       supporting_workflows: SUPPORTING_WORKFLOWS.map((workflowType) => ({
         workflow_type: workflowType,
         workflow_id: evidence.workflows[workflowType].id,
-        origin: "diagnostic_contract",
+        origin: "autonomous_story_cascade",
       })),
       primary_path: {
         origin: "autonomous_state_threshold",
