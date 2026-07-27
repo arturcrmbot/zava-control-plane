@@ -42,6 +42,8 @@ class FakeObjective:
 class FakeWorld:
     def __init__(self):
         self.applied = []
+        self.bound_workflows = []
+        self.failed_workflows = []
         self.recorded = []
         self.objective_events = []
         self._objectives = {}
@@ -104,6 +106,12 @@ class FakeWorld:
     def apply_typed_command(self, objective, command):
         self.applied.append(command)
         return SimpleNamespace(event_id="evt-command", type="command.accepted")
+
+    def bind_workflow(self, sensor_event, workflow_id):
+        self.bound_workflows.append((sensor_event, workflow_id))
+
+    def fail_workflow(self, workflow_id, reason):
+        self.failed_workflows.append((workflow_id, reason))
 
 
 def app_state():
@@ -173,6 +181,18 @@ async def test_sensor_schedules_actor_observation_and_applies_typed_command(monk
     assert w.status == "in_progress"
     assert w.payload["decision"]["command"]["command_id"] == "cmd-1"
     assert state.world_service.applied[0].command_id == "cmd-1"
+    assert state.world_service.bound_workflows == [
+        (
+            {
+                "event_id": "evt-sensor",
+                "trace_id": "trace-1",
+                "actor_id": "sensor:support_pressure",
+                "type": "sensor.tripped",
+                "payload": {"actor_ids": ["TKT-1"]},
+            },
+            "surge-evt-sensor",
+        )
+    ]
     assert [kind for kind, _ in state.world_service.recorded] == [
         "responder.requested", "responder.decided"
     ]
@@ -309,11 +329,31 @@ async def test_no_command_records_deferred_without_mutation(monkeypatch):
     assert state.world_service.applied == []
     assert state.world_service.recorded[-1][0] == "responder.deferred"
     assert state.world_service._objectives["obj-evt-sensor"].status == "failed"
+    assert state.world_service.failed_workflows == [
+        ("surge-evt-sensor", "no reserve workers")
+    ]
     assert state.world_last_response is None
     # Canonical workflow reflects the genuine failure (nothing applied) — but
     # is NOT completed/resolved.
     w = state.store.get_workflow("surge-evt-sensor")
     assert w is not None and w.status == "failed"
+
+
+@pytest.mark.asyncio
+async def test_no_orchestration_output_fails_the_bound_workflow(monkeypatch):
+    state = app_state()
+    bridge = WorldBridge(state)
+    monkeypatch.setattr(
+        "api.server.services.world_bridge.schedule_new_orchestration",
+        AsyncMock(return_value={"id": "durable-1", "statusQueryGetUri": "status://1"}),
+    )
+    bridge._await_output = AsyncMock(return_value=None)
+
+    await bridge._drive(sensor().simulation_event)
+
+    assert state.world_service.failed_workflows == [
+        ("surge-evt-sensor", "no orchestration output")
+    ]
 
 
 @pytest.mark.asyncio
@@ -380,6 +420,9 @@ async def test_command_rejected_routes_workflow_failure_without_decision_ready(m
     decided.assert_not_awaited()
     failed.assert_awaited_once()
     assert failed.await_args.args == ("surge-evt-sensor", "durable-1", rejection_reason)
+    assert state.world_service.failed_workflows == [
+        ("surge-evt-sensor", rejection_reason)
+    ]
 
     w = state.store.get_workflow("surge-evt-sensor")
     assert w is not None
@@ -1127,3 +1170,6 @@ async def test_drive_surfaces_the_true_resumed_ingest_error_not_a_fabricated_no_
     # exception unwound from inside `_await_output`), so nothing was
     # fabricated as decided/applied either.
     assert state.world_service.applied == []
+    assert state.world_service.failed_workflows == [
+        ("surge-evt-sensor", "resumed ingest exploded")
+    ]

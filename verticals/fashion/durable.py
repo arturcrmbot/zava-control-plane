@@ -136,6 +136,7 @@ def fashion_command_activity(payload: dict[str, Any]) -> dict[str, Any]:
             "approval_reference": _approval_reference(approval),
             "reason_code": "DEMAND_STOCK_IMBALANCE",
             "evidence_digest": evidence["evidence_digest"],
+            "story_id": observation.get("story_id"),
         }
     else:
         case = observation.get("case")
@@ -150,6 +151,7 @@ def fashion_command_activity(payload: dict[str, Any]) -> dict[str, Any]:
             "approval_reference": _approval_reference(approval),
             "skill_outputs": dict(payload.get("skill_outputs") or {}),
             "evidence_digest": evidence["evidence_digest"],
+            "story_id": observation.get("story_id"),
         }
     command = {
         "command_id": (

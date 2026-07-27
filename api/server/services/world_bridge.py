@@ -399,6 +399,7 @@ class WorldBridge:
             workflow_id = self._adapter.start(
                 simulation_event, objective, responder, observation
             )
+            service.bind_workflow(simulation_event, workflow_id)
             self._workflow_by_objective[objective.id] = (workflow_id, instance_id)
             log.info("world_bridge: scheduled %s instance=%s trace=%s",
                      responder.orchestrator, instance_id, trace_id)
@@ -429,6 +430,7 @@ class WorldBridge:
                 )
                 service.fail_objective(objective.id, cause_event_id=failed.event_id)
                 self._workflow_by_objective.pop(objective.id, None)
+                service.fail_workflow(workflow_id, "no orchestration output")
                 await self._adapter.failed(workflow_id, instance_id, "no orchestration output")
                 log.error("world_bridge: %s produced no output for trace=%s", instance_id, trace_id)
                 return
@@ -449,6 +451,10 @@ class WorldBridge:
                 )
                 service.fail_objective(objective.id, cause_event_id=deferred.event_id)
                 self._workflow_by_objective.pop(objective.id, None)
+                service.fail_workflow(
+                    workflow_id,
+                    reasoning or "responder deferred",
+                )
                 await self._adapter.failed(
                     workflow_id, instance_id, reasoning or "responder deferred"
                 )
@@ -485,6 +491,7 @@ class WorldBridge:
             if result.type == "command.rejected":
                 reason = _command_failure_reason(result)
                 self._workflow_by_objective.pop(objective.id, None)
+                service.fail_workflow(workflow_id, reason)
                 await self._adapter.failed(workflow_id, instance_id, reason)
                 log.info("world_bridge: %s rejected command=%s trace=%s reason=%s",
                          instance_id, command.type, trace_id, reason)
@@ -512,18 +519,23 @@ class WorldBridge:
                      instance_id, command.type, trace_id)
         except Exception as ex:  # noqa: BLE001 — bridge must never crash the simulation
             log.exception("world_bridge: drive failed for trace=%s: %s", trace_id, ex)
-            if service is not None and trace_id:
+            if service is not None:
                 try:
-                    failed = service.record_external(
-                        "responder.failed",
-                        trace_id=trace_id,
-                        cause_event_id=requested.event_id if requested is not None else None,
-                        payload={"error": str(ex)},
-                    )
-                    if objective is not None:
+                    failed = None
+                    if trace_id:
+                        failed = service.record_external(
+                            "responder.failed",
+                            trace_id=trace_id,
+                            cause_event_id=(
+                                requested.event_id if requested is not None else None
+                            ),
+                            payload={"error": str(ex)},
+                        )
+                    if objective is not None and failed is not None:
                         service.fail_objective(objective.id, cause_event_id=failed.event_id)
                         self._workflow_by_objective.pop(objective.id, None)
                     if workflow_id is not None:
+                        service.fail_workflow(workflow_id, str(ex))
                         await self._adapter.failed(workflow_id, instance_id, str(ex))
                 except Exception:  # noqa: BLE001 — never let failure-reporting itself crash
                     log.exception(

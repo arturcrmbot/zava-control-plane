@@ -289,6 +289,15 @@ async def test_resolved_captures_truthful_operational_memory():
     adapter = WorldWorkflowAdapter(state)
     responder = resolve_responder("network_service_recovery")
     workflow_id = adapter.start(_sensor(), _objective(), responder, _observation())
+    workflow = state.store.get_workflow(workflow_id)
+    workflow.payload["evidence"] = {
+        "command": {"id": "cmd-1", "payload": {"alpha": 1}},
+        "workflow_id": workflow_id,
+    }
+    workflow.payload["observation"] = {
+        "readings": [1, {"site": "SITE-01"}],
+        "site": {"id": "SITE-01"},
+    }
 
     await adapter.resolved(
         workflow_id,
@@ -299,8 +308,100 @@ async def test_resolved_captures_truthful_operational_memory():
     memory.add.assert_called_once()
     text = memory.add.call_args.args[0]
     assert "site.recovered" in text
+    assert '"command"' in text
+    assert '"readings"' in text
+    assert '"status":"resolved"' in text
+    assert "SITE-01" in text
     assert memory.add.call_args.kwargs["workflow_id"] == workflow_id
     assert memory.add.call_args.kwargs["agent_skill"] == ""
+
+
+def test_capture_operational_memory_uses_scalar_metadata_and_compact_json():
+    state, _ = _app_state()
+
+    class CapturingMemory:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def add(self, text, *, agent_skill="", workflow_id="", extra_metadata=None):
+            self.calls.append(
+                {
+                    "text": text,
+                    "agent_skill": agent_skill,
+                    "workflow_id": workflow_id,
+                    "extra_metadata": extra_metadata,
+                }
+            )
+            return []
+
+    memory = CapturingMemory()
+    state.domain_memories["network-incident"] = memory
+    adapter = WorldWorkflowAdapter(state)
+    responder = resolve_responder("network_service_recovery")
+    workflow_id = adapter.start(_sensor(), _objective(), responder, _observation())
+    workflow = state.store.get_workflow(workflow_id)
+    workflow.payload["evidence"] = {
+        "workflow_id": workflow_id,
+        "command": {"id": "cmd-1", "payload": {"alpha": 1, "beta": True}},
+        "nested": {"z": 2, "a": 1},
+    }
+    workflow.payload["observation"] = {
+        "site": {"id": "SITE-01", "region": "north"},
+        "readings": [3, {"b": 2, "a": 1}],
+    }
+    workflow.status = "completed"
+    final_measurements = {
+        "status": "resolved",
+        "evidence_event_type": "site.recovered",
+        "final_measurements": {"z": 2, "a": 1},
+    }
+
+    adapter._capture_operational_memory(workflow, final_measurements)
+
+    assert len(memory.calls) == 1
+    call = memory.calls[0]
+    metadata = call["extra_metadata"]
+    assert call["workflow_id"] == workflow_id
+    assert workflow_id in call["text"]
+    assert all(isinstance(value, (str, int, float, bool)) for value in metadata.values())
+    assert metadata["source"] == "world_outcome_evaluator"
+    assert metadata["evidence_event_type"] == "site.recovered"
+    assert metadata["workflow_type"] == "network-incident"
+    assert metadata["workflow_status"] == "completed"
+    assert metadata["evidence_json"] == (
+        '{"command":{"id":"cmd-1","payload":{"alpha":1,"beta":true}},'
+        '"nested":{"a":1,"z":2},"workflow_id":"' + workflow_id + '"}'
+    )
+    assert metadata["observation_json"] == (
+        '{"readings":[3,{"a":1,"b":2}],"site":{"id":"SITE-01","region":"north"}}'
+    )
+    assert metadata["outcome_json"] == (
+        '{"evidence_event_type":"site.recovered","final_measurements":{"a":1,"z":2},'
+        '"status":"resolved"}'
+    )
+
+
+def test_capture_operational_memory_swallows_serialization_failure_and_skips_memory_add(
+    caplog,
+):
+    state, _ = _app_state()
+    memory = MagicMock()
+    state.domain_memories["network-incident"] = memory
+    adapter = WorldWorkflowAdapter(state)
+    responder = resolve_responder("network_service_recovery")
+    workflow_id = adapter.start(_sensor(), _objective(), responder, _observation())
+    workflow = state.store.get_workflow(workflow_id)
+    workflow.payload["evidence"] = {1: "one", "two": 2}
+    workflow.status = "completed"
+
+    with caplog.at_level("ERROR", logger="world_workflow_adapter"):
+        adapter._capture_operational_memory(
+            workflow,
+            {"status": "resolved", "evidence_event_type": "site.recovered"},
+        )
+
+    memory.add.assert_not_called()
+    assert "operational memory write failed for workflow=" in caplog.text
 
 
 def test_start_supports_support_world_observation_key():

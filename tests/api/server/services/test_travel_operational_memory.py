@@ -188,20 +188,24 @@ async def test_real_autonomous_travel_recovery_captures_operational_memory_with_
 
     # -- exact structural proof: real ids, not fuzzy text matching ----------
     metadata = record["extra_metadata"]
+    assert all(isinstance(value, (str, int, float, bool)) for value in metadata.values())
     assert metadata["workflow_type"] == WORKFLOW_TYPE
     assert metadata["workflow_status"] == "completed"
-    assert metadata["evidence"]["workflow_id"] == workflow_id
-    assert metadata["evidence"]["booking_id"] == _GOLDEN_BOOKING_ID
-    assert metadata["evidence"]["command"]["command_id"] == command_id
-    assert metadata["evidence"]["command"]["payload"]["decision_id"] == decision_id
+    evidence = json.loads(metadata["evidence_json"])
+    observation = json.loads(metadata["observation_json"])
+    outcome = json.loads(metadata["outcome_json"])
+    assert evidence["workflow_id"] == workflow_id
+    assert evidence["booking_id"] == _GOLDEN_BOOKING_ID
+    assert evidence["command"]["command_id"] == command_id
+    assert evidence["command"]["payload"]["decision_id"] == decision_id
     assert (
-        metadata["evidence"]["evaluation_intent"]["expected_success_event_type"]
+        evidence["evaluation_intent"]["expected_success_event_type"]
         == "booking.reaccommodated"
     )
-    assert metadata["observation"]["member_customer_ids"] == list(_GOLDEN_MEMBER_CUSTOMER_IDS)
-    assert metadata["outcome"]["command_id"] == command_id
-    assert metadata["outcome"]["trace_id"] == trace_id
-    assert metadata["outcome"]["status"] == "resolved"
+    assert observation["member_customer_ids"] == list(_GOLDEN_MEMBER_CUSTOMER_IDS)
+    assert outcome["command_id"] == command_id
+    assert outcome["trace_id"] == trace_id
+    assert outcome["status"] == "resolved"
 
     # -- every required id/outcome substring genuinely present in the
     # combined narrative + metadata haystack ---------------------------------

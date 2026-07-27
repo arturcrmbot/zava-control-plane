@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from importlib import import_module
 
 from api.server.services.event_bus import EventBus
@@ -30,6 +31,7 @@ def _hero_command(
     destination_version: int | None = None,
     approval_reference: str | None = "HITL-MERCH-001",
     ownership: str = "owned",
+    story_id: str | None = None,
 ) -> SimulationCommand:
     source = scenario.inventory[(SOURCE, HERO_SKU)]
     destination = scenario.inventory[(DESTINATION, HERO_SKU)]
@@ -57,6 +59,7 @@ def _hero_command(
             "approval_reference": approval_reference,
             "reason_code": "DEMAND_STOCK_IMBALANCE",
             "evidence_digest": "sha256:deterministic-fashion-evidence",
+            **({"story_id": story_id} if story_id else {}),
         },
     )
 
@@ -111,6 +114,227 @@ def test_ordinary_retail_activity_precedes_real_threshold_sensor() -> None:
     later = [event for event in runtime.canonical_journal() if event["seq"] > sensor_seq]
     assert any(event["type"] == "customer.entered" for event in later)
     assert any(event["type"] == "order.placed" for event in later)
+
+
+def test_inventory_threshold_starts_one_causal_trading_shock_with_two_root_sensors() -> None:
+    runtime, scenario = _scenario()
+
+    runtime.run_until(60)
+
+    story_id = "fashion-trading-shock-42"
+    story_events = [
+        event for event in runtime.canonical_journal()
+        if event["type"] == "retail.trading-shock.detected"
+    ]
+    sensors = [
+        event for event in runtime.canonical_journal()
+        if event["type"] == "sensor.tripped"
+        and event["payload"].get("story_id") == story_id
+    ]
+
+    assert len(story_events) == 1
+    assert story_events[0]["trace_id"] == story_id
+    assert story_events[0]["cause_event_id"] is not None
+    assert set(story_events[0]["payload"]["baseline_kpis"]) == {
+        "availability_pct",
+        "projected_lost_sales_gbp",
+        "full_price_sell_through_pct",
+        "fulfilment_success_pct",
+        "markdown_exposure_gbp",
+        "recovery_value_gbp",
+    }
+    assert Counter(event["payload"]["workflow_type"] for event in sensors) == {
+        "demand-spike-response": 1,
+        "inventory-rebalancing": 1,
+    }
+    inventory_sensor = next(
+        event for event in sensors
+        if event["payload"]["workflow_type"] == "inventory-rebalancing"
+    )
+    assert inventory_sensor["actor_id"] == "sensor:inventory_imbalance"
+    assert inventory_sensor["payload"]["measurements"]["destination_available"] <= 8
+    assert inventory_sensor["payload"]["threshold"]["crossed"] is True
+    assert inventory_sensor["payload"]["source_location_id"] == SOURCE
+    assert inventory_sensor["payload"]["destination_location_id"] == DESTINATION
+    assert inventory_sensor["payload"]["ownership"] == "owned"
+
+
+def test_story_observation_and_render_state_expose_story_id_and_view() -> None:
+    runtime, scenario = _scenario()
+    runtime.run_until(60)
+    sensor = next(
+        event.to_dict()
+        for event in runtime.journal
+        if event.type == "sensor.tripped"
+        and event.payload.get("story_id") == "fashion-trading-shock-42"
+        and event.payload["workflow_type"] == "inventory-rebalancing"
+    )
+
+    observation = scenario.build_observation(sensor, now=runtime.now)
+    story = scenario.render_state()["story"]
+
+    assert observation["story_id"] == "fashion-trading-shock-42"
+    assert story["id"] == "fashion-trading-shock-42"
+    assert story["trace_id"] == "fashion-trading-shock-42"
+    assert story["status"] == "running"
+    assert story["cause_event_id"] is not None
+    assert all(values["before"] is not None for values in story["kpis"].values())
+    assert all(values["after"] is None for values in story["kpis"].values())
+
+
+def test_story_completion_sequence_unlocks_all_eight_sensors_once() -> None:
+    runtime, scenario = _scenario()
+    runtime.run_until(60)
+    story_id = "fashion-trading-shock-42"
+
+    def story_sensor(workflow_type: str) -> dict:
+        return next(
+            event.to_dict()
+            for event in runtime.journal
+            if event.type == "sensor.tripped"
+            and event.payload.get("story_id") == story_id
+            and event.payload["workflow_type"] == workflow_type
+        )
+
+    def complete_reference(workflow_type: str) -> None:
+        sensor = story_sensor(workflow_type)
+        workflow_id = f"story-{workflow_type}"
+        scenario.bind_story_workflow(sensor, workflow_id)
+        command = scenario.command_for_reference_process(
+            workflow_type,
+            trace_id=story_id,
+            workflow_id=workflow_id,
+            approval_decision="approve",
+        )
+        command = SimulationCommand(
+            command_id=command.command_id,
+            trace_id=command.trace_id,
+            issued_by=command.issued_by,
+            type=command.type,
+            payload={**command.payload, "story_id": story_id},
+        )
+        assert scenario.apply_command(command).type == "command.accepted"
+
+    complete_reference("demand-spike-response")
+    inventory_sensor = story_sensor("inventory-rebalancing")
+    inventory_workflow_id = "story-inventory-rebalancing"
+    scenario.bind_story_workflow(inventory_sensor, inventory_workflow_id)
+    inventory_command = _hero_command(
+        scenario,
+        command_id="CMD-STORY-REBALANCE",
+        story_id=story_id,
+    )
+    assert scenario.apply_command(
+        SimulationCommand(
+            command_id="CMD-STORY-REBALANCE",
+            trace_id=story_id,
+            issued_by="merchandising-planning",
+            type="inventory.transfer",
+            payload={
+                **inventory_command.payload,
+                "workflow_id": inventory_workflow_id,
+            },
+        )
+    ).type == "command.accepted"
+    for workflow_type in (
+        "promotion-readiness",
+        "supplier-delay-recovery",
+        "marketplace-seller-exception",
+        "fulfilment-exception-resolution",
+        "markdown-governance",
+        "returns-disposition",
+    ):
+        complete_reference(workflow_type)
+
+    story_sensors = [
+        event
+        for event in runtime.journal
+        if event.type == "sensor.tripped" and event.payload.get("story_id") == story_id
+    ]
+    assert Counter(
+        event.payload["workflow_type"] for event in story_sensors
+    ) == {
+        "demand-spike-response": 1,
+        "inventory-rebalancing": 1,
+        "promotion-readiness": 1,
+        "supplier-delay-recovery": 1,
+        "marketplace-seller-exception": 1,
+        "fulfilment-exception-resolution": 1,
+        "markdown-governance": 1,
+        "returns-disposition": 1,
+    }
+    assert scenario.trading_shock.view()["status"] == "completed"
+    assert any(
+        values["after"] is not None
+        for values in scenario.trading_shock.view()["kpis"].values()
+    )
+
+
+def test_story_command_completes_only_after_real_inventory_mutation() -> None:
+    runtime, scenario = _scenario()
+    runtime.run_until(60)
+    story_id = "fashion-trading-shock-42"
+    sensor = next(
+        event.to_dict()
+        for event in runtime.journal
+        if event.type == "sensor.tripped"
+        and event.payload.get("story_id") == story_id
+        and event.payload["workflow_type"] == "inventory-rebalancing"
+    )
+    workflow_id = "story-inventory"
+    scenario.bind_story_workflow(sensor, workflow_id)
+    source_before = scenario.inventory[(SOURCE, HERO_SKU)].on_hand
+    destination_before = scenario.inventory[(DESTINATION, HERO_SKU)].on_hand
+    command = _hero_command(
+        scenario, command_id="CMD-STORY-SUCCESS", story_id=story_id
+    )
+    command = SimulationCommand(
+        command_id=command.command_id,
+        trace_id=story_id,
+        issued_by=command.issued_by,
+        type=command.type,
+        payload={**command.payload, "workflow_id": workflow_id},
+    )
+
+    assert scenario.trading_shock.stage("inventory-rebalancing").status == "active"
+    assert scenario.apply_command(command).type == "command.accepted"
+    assert scenario.inventory[(SOURCE, HERO_SKU)].on_hand == source_before - 24
+    assert scenario.inventory[(DESTINATION, HERO_SKU)].on_hand == destination_before + 24
+    assert scenario.trading_shock.stage("inventory-rebalancing").status == "completed"
+
+
+def test_rejected_story_command_fails_its_stage_without_unlocking_dependants() -> None:
+    runtime, scenario = _scenario()
+    runtime.run_until(60)
+    story_id = "fashion-trading-shock-42"
+    sensor = next(
+        event.to_dict()
+        for event in runtime.journal
+        if event.type == "sensor.tripped"
+        and event.payload.get("story_id") == story_id
+        and event.payload["workflow_type"] == "inventory-rebalancing"
+    )
+    workflow_id = "story-rejected-inventory"
+    scenario.bind_story_workflow(sensor, workflow_id)
+    command = _hero_command(
+        scenario,
+        command_id="CMD-STORY-REJECTED",
+        approval_reference=None,
+        story_id=story_id,
+    )
+    command = SimulationCommand(
+        command_id=command.command_id,
+        trace_id=story_id,
+        issued_by=command.issued_by,
+        type=command.type,
+        payload={**command.payload, "workflow_id": workflow_id},
+    )
+
+    assert scenario.apply_command(command).type == "command.rejected"
+    assert scenario.trading_shock.stage("inventory-rebalancing").status == "failed"
+    assert scenario.trading_shock.ready_to_trigger() == ()
+    scenario.fail_story_workflow(workflow_id, "bridge rejection confirmation")
+    assert scenario.trading_shock.stage("inventory-rebalancing").status == "failed"
 
 
 def test_hero_demand_and_stock_depletion_share_the_destination_store() -> None:

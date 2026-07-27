@@ -70,18 +70,13 @@ _TELEMETRY_CORRELATION = "Telemetry Correlation"
 
 
 def _json_compact(value: Any) -> str:
-    """Serialize any already-generic evidence/observation/outcome dict for
-    the operational-memory narrative. Never vertical-specific: whatever
-    keys the caller's own payload happens to carry (booking ids, decision
-    ids, command ids, customer ids, ...) pass through verbatim -- this
-    function knows nothing about any particular domain's shape. Falls back
-    to ``str(value)`` only for the rare non-JSON-serializable payload
-    (e.g. an exotic object nested somewhere), so capture never raises.
-    """
-    try:
-        return json.dumps(value, sort_keys=True, default=str)
-    except TypeError:
-        return str(value)
+    """Serialize operational-memory payloads as deterministic compact JSON."""
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
 
 
 
@@ -387,14 +382,17 @@ class WorldWorkflowAdapter:
         outcome = outcome or {}
         evidence_kind = outcome.get("evidence_event_type") or "world evidence"
         trace_id = payload.get("trace_id", "")
-        text = (
-            f"Workflow {workflow.id} ({workflow.type}) resolved from {evidence_kind}; "
-            f"trace_id={trace_id}; status={workflow.status}; "
-            f"evidence={_json_compact(evidence)}; "
-            f"observation={_json_compact(observation)}; "
-            f"outcome={_json_compact(outcome)}."
-        )
         try:
+            evidence_json = _json_compact(evidence)
+            observation_json = _json_compact(observation)
+            outcome_json = _json_compact(outcome)
+            text = (
+                f"Workflow {workflow.id} ({workflow.type}) resolved from {evidence_kind}; "
+                f"trace_id={trace_id}; status={workflow.status}; "
+                f"evidence={evidence_json}; "
+                f"observation={observation_json}; "
+                f"outcome={outcome_json}."
+            )
             memory.add(
                 text,
                 agent_skill="",
@@ -404,9 +402,9 @@ class WorldWorkflowAdapter:
                     "evidence_event_type": evidence_kind,
                     "workflow_type": workflow.type,
                     "workflow_status": workflow.status,
-                    "evidence": evidence,
-                    "observation": observation,
-                    "outcome": outcome,
+                    "evidence_json": evidence_json,
+                    "observation_json": observation_json,
+                    "outcome_json": outcome_json,
                 },
             )
         except Exception:

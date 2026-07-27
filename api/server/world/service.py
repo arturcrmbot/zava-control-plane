@@ -357,6 +357,16 @@ class ActorWorldService:
 
     # -- write surfaces ----------------------------------------------------
 
+    def bind_workflow(self, sensor_event: dict[str, Any], workflow_id: str) -> None:
+        bind = getattr(self.scenario, "bind_story_workflow", None)
+        if bind is not None:
+            bind(sensor_event, workflow_id)
+
+    def fail_workflow(self, workflow_id: str, reason: str) -> None:
+        fail = getattr(self.scenario, "fail_story_workflow", None)
+        if fail is not None:
+            fail(workflow_id, reason)
+
     def apply_command(self, command: SimulationCommand) -> SimulationEvent:
         start = len(self.runtime.journal)
         result = self.scenario.apply_command(command)

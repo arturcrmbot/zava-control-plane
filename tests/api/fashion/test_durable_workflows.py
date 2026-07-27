@@ -30,6 +30,7 @@ class _Context:
         *,
         policy_decision: str = "approval_required",
         approval: dict[str, Any] | None = None,
+        story_id: str | None = None,
     ) -> None:
         profile = FASHION_PROCESS_PROFILES[workflow_type]
         case = FASHION_REFERENCE_CASES[workflow_type]
@@ -54,6 +55,8 @@ class _Context:
             },
             "typed_command": profile.command_type,
         }
+        if story_id is not None:
+            observation["story_id"] = story_id
         if workflow_type == "inventory-rebalancing":
             observation.update(
                 {
@@ -189,6 +192,27 @@ def test_cross_border_hero_waits_for_exact_authority_event() -> None:
 
 
 @pytest.mark.parametrize(
+    "workflow_type",
+    ("inventory-rebalancing", "demand-spike-response"),
+)
+def test_typed_command_propagates_story_id(workflow_type: str) -> None:
+    profile = FASHION_PROCESS_PROFILES[workflow_type]
+    context = _Context(
+        workflow_type,
+        approval={
+            "decision": "approve",
+            "persona": profile.hitl_persona,
+            "decision_id": f"HITL-{profile.prefix.upper()}-STORY",
+        },
+        story_id="fashion-trading-shock-42",
+    )
+
+    result = _drive(context)
+
+    assert result["command"]["payload"]["story_id"] == "fashion-trading-shock-42"
+
+
+@pytest.mark.parametrize(
     "approval",
     [
         {"decision": "reject", "persona": "merchandising_director"},
@@ -229,4 +253,3 @@ def test_durable_module_registers_exactly_eight_named_orchestrators() -> None:
     assert durable.ORCHESTRATOR_NAMES == frozenset(
         profile.orchestrator for profile in FASHION_PROCESS_PROFILES.values()
     )
-
