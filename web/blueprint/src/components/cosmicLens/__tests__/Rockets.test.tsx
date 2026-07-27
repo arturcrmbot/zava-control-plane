@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useRef } from "react";
 import type { ReactNode } from "react";
 
@@ -74,5 +74,55 @@ describe("Rockets", () => {
     fireEvent.pointerOver(meshes[0]);
     expect(screen.getByText("VKY-0042")).toBeTruthy();
     expect(screen.getByText("Reviewing vendor KYC")).toBeTruthy();
+  });
+
+  it("spawns from an executor flash before in-flight polling catches up", () => {
+    vi.useFakeTimers();
+    const flashesRef = {
+      current: {
+        buffer: [{
+          type: "durable.executor.invoked",
+          ts: Date.now() / 1000,
+          workflow_id: "rebalance-evt-00000098",
+          stage: "start",
+          skill: "inventory-imbalance-analysis",
+          executor_type: "agent",
+        } satisfies CosmicFlash],
+        version: 1,
+      },
+    };
+    const rocketRegistry = new RocketRegistry();
+    const trailRegistry = new TrailRegistry();
+    const exhaustRegistry = new ExhaustRegistry();
+
+    render(
+      <Rockets
+        flashesRef={flashesRef}
+        inFlight={[]}
+        cities={[{
+          id: "inventory-imbalance-analysis",
+          kind: "skill",
+          label: "inventory-imbalance-analysis",
+        }]}
+        functions={[{
+          name: "merchandising-planning",
+          ownsDomains: ["inventory-rebalancing"],
+        }]}
+        mode="capabilities"
+        trailRegistry={trailRegistry}
+        exhaustRegistry={exhaustRegistry}
+        rocketRegistry={rocketRegistry}
+      />,
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+
+    const rocket = rocketRegistry.forWorkflow("rebalance-evt-00000098");
+    expect(rocket).toBeTruthy();
+    expect(rocket?.phase).toBe("travelling");
+    expect(rocket?.target_city_id).toBe("inventory-imbalance-analysis");
+    vi.useRealTimers();
   });
 });

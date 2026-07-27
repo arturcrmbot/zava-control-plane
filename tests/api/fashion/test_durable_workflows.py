@@ -253,3 +253,88 @@ def test_durable_module_registers_exactly_eight_named_orchestrators() -> None:
     assert durable.ORCHESTRATOR_NAMES == frozenset(
         profile.orchestrator for profile in FASHION_PROCESS_PROFILES.values()
     )
+
+
+def test_hybrid_mode_uses_ghcp_session_for_selected_workflow(
+    monkeypatch,
+) -> None:
+    durable = import_module("verticals.fashion.durable")
+    context = _Context("inventory-rebalancing")
+    payload = {
+        **context.get_input(),
+        "instance_id": "fashion-live-instance",
+        "phase": "Assess Demand and Constraints",
+        "prior_outputs": {},
+    }
+    captured: dict[str, Any] = {}
+
+    async def fake_run_agent_session(prompt: str, **kwargs):
+        captured["prompt"] = prompt
+        captured.update(kwargs)
+        return {
+            "skill": "inventory-imbalance-analysis",
+            "phase": "Assess Demand and Constraints",
+            "recommendation": "inventory.transfer",
+            "actor_ids": payload["observation"]["actor_ids"],
+            "event_ids": payload["observation"]["event_ids"],
+            "constraints": {
+                "ownership": "explicit",
+                "authority": "merchandising_director",
+                "stale_evidence": "reject",
+            },
+            "reasoning": "Live agent correlated demand and inventory evidence.",
+            "_raw_tool_calls": [
+                {
+                    "name": "report_intent",
+                    "success": True,
+                },
+                {
+                    "name": "fashion_read_inventory",
+                    "success": True,
+                }
+            ],
+        }
+
+    monkeypatch.setenv("ZAVA_FASHION_AGENT_MODE", "hybrid")
+    monkeypatch.setenv(
+        "ZAVA_FASHION_LIVE_WORKFLOWS",
+        "inventory-rebalancing,markdown-governance",
+    )
+    monkeypatch.setattr(durable, "run_agent_session", fake_run_agent_session)
+
+    result = durable.fashion_decision_activity(payload)
+
+    assert result["reasoning"].startswith("Live agent")
+    assert captured["workflow_id"] == payload["workflow_id"]
+    assert captured["instance_id"] == "fashion-live-instance"
+    assert captured["phase"] == "Assess Demand and Constraints"
+    assert captured["skill_label"] == "inventory-imbalance-analysis"
+    assert captured["tools"]
+
+
+def test_hybrid_mode_keeps_unselected_workflow_deterministic(
+    monkeypatch,
+) -> None:
+    durable = import_module("verticals.fashion.durable")
+    context = _Context("demand-spike-response")
+    payload = {
+        **context.get_input(),
+        "instance_id": "fashion-deterministic-instance",
+        "phase": "Assess Stock Exposure",
+        "prior_outputs": {},
+    }
+
+    async def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("unselected workflow must not open an agent session")
+
+    monkeypatch.setenv("ZAVA_FASHION_AGENT_MODE", "hybrid")
+    monkeypatch.setenv(
+        "ZAVA_FASHION_LIVE_WORKFLOWS",
+        "inventory-rebalancing,markdown-governance",
+    )
+    monkeypatch.setattr(durable, "run_agent_session", fail_if_called)
+
+    result = durable.fashion_decision_activity(payload)
+
+    assert result["skill"] == "inventory-imbalance-analysis"
+    assert result["reasoning"].startswith("inventory-imbalance-analysis selected")

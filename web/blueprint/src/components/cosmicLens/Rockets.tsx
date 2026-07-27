@@ -167,8 +167,43 @@ export function Rockets({ flashesRef, inFlight, cities, functions, mode, trailRe
       for (const flash of tail) {
         const workflowId = flash.workflow_id ?? flash.caller_workflow_id;
         if (!workflowId) continue;
-        const r = rocketRegistry.forWorkflow(workflowId);
-        if (!r) continue; // workflow not in inFlight snapshot yet — wait for next poll
+        let r = rocketRegistry.forWorkflow(workflowId);
+        if (!r) {
+          const wfTypeMap = buildWorkflowTypeToFunction(functions);
+          const workflowType = workflowTypeFromId(workflowId) || "";
+          const fn = resolveFunction(
+            {
+              id: workflowId,
+              workflow_type: workflowType,
+              function: "",
+              status: "in_progress",
+            },
+            wfTypeMap,
+          );
+          const moonPos = moonPosition(
+            workflowId,
+            fn,
+            functions,
+            performance.now() / 1000,
+            moonRegistry,
+          );
+          r = rocketRegistry.upsertForWorkflow(workflowId, () => ({
+            id: workflowId,
+            workflow_id: workflowId,
+            origin_workflow_id: workflowId,
+            phase: "idle",
+            color: colorForFunction(fn),
+            current_city_id: null,
+            target_city_id: null,
+            current_pos: moonPos,
+            travel_from: null,
+            travel_to: null,
+            phase_started_at: now,
+            spawned_at: now,
+            is_wounded: false,
+          }));
+          wfFn.set(workflowId, fn);
+        }
 
         // Completion: fly home and burst.
         const isCompletion =

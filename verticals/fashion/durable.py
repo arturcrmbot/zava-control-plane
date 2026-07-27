@@ -1,19 +1,37 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+import os
 from collections.abc import Generator
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 import azure.durable_functions as df
 
 from api.functions.kernel_registration import create_app
+from verticals.fashion.agents import FASHION_AGENTS
 from verticals.fashion.domains import FASHION_DOMAINS
+from verticals.fashion.mcp_tools.retail import TOOL_BY_NAME
 from verticals.fashion.process_profiles import FASHION_PROCESS_PROFILES
 
 
 app = create_app()
+_SKILL_ROOT = Path(__file__).resolve().parent / "skills"
+_DECISION_OUTPUT_KEYS = {
+    "skill",
+    "phase",
+    "recommendation",
+    "actor_ids",
+    "event_ids",
+    "constraints",
+    "reasoning",
+}
+_DEFAULT_LIVE_WORKFLOWS = frozenset(
+    {"inventory-rebalancing", "markdown-governance"}
+)
 ORCHESTRATOR_NAMES = frozenset(
     profile.orchestrator for profile in FASHION_PROCESS_PROFILES.values()
 )
@@ -61,7 +79,7 @@ def _phase_skill(workflow_type: str, phase_name: str) -> str:
     return skills[0]
 
 
-def fashion_decision_activity(payload: dict[str, Any]) -> dict[str, Any]:
+def _deterministic_decision(payload: dict[str, Any]) -> dict[str, Any]:
     workflow_type = str(payload["type"])
     phase_name = str(payload["phase"])
     skill = _phase_skill(workflow_type, phase_name)
@@ -86,6 +104,166 @@ def fashion_decision_activity(payload: dict[str, Any]) -> dict[str, Any]:
             f"{workflow_type} evidence."
         ),
     }
+
+
+async def run_agent_session(prompt: str, **kwargs) -> dict[str, Any]:
+    from api.functions.graphs.executors.agents._wrapper import (
+        run_agent_session as run,
+    )
+
+    return await run(prompt, **kwargs)
+
+
+def _live_workflows() -> frozenset[str]:
+    raw = os.environ.get("ZAVA_FASHION_LIVE_WORKFLOWS", "").strip()
+    if not raw:
+        return _DEFAULT_LIVE_WORKFLOWS
+    return frozenset(
+        workflow_type.strip()
+        for workflow_type in raw.split(",")
+        if workflow_type.strip()
+    )
+
+
+def _uses_live_agent(payload: dict[str, Any], workflow_type: str) -> bool:
+    mode = str(
+        payload.get("agent_mode")
+        or os.environ.get("ZAVA_FASHION_AGENT_MODE", "deterministic")
+    ).strip().lower()
+    if mode == "deterministic":
+        return False
+    if mode == "live":
+        return True
+    if mode == "hybrid":
+        return workflow_type in _live_workflows()
+    raise ValueError(f"unsupported Fashion agent mode: {mode!r}")
+
+
+async def _live_decision(payload: dict[str, Any]) -> dict[str, Any]:
+    workflow_type = str(payload["type"])
+    phase_name = str(payload["phase"])
+    skill = _phase_skill(workflow_type, phase_name)
+    profile = FASHION_PROCESS_PROFILES[workflow_type]
+    observation = _require_observation(payload)
+    agent = FASHION_AGENTS[skill]
+    tool_name = agent.allowed_tools[0]
+    tool_input = {
+        "data": observation,
+        "actor_ids": list(observation.get("actor_ids") or []),
+        "event_ids": list(observation.get("event_ids") or []),
+        "trace_id": str(observation.get("trace_id") or payload.get("trace_id") or ""),
+        "as_of_sim_time": float(observation.get("as_of_sim_time") or 0),
+    }
+    prompt = (
+        "Use the registered Fashion tool exactly once before deciding. "
+        "Return one JSON object only; no markdown and no extra keys. "
+        f"The exact keys are {sorted(_DECISION_OUTPUT_KEYS)}. "
+        "Do not invent actor IDs, event IDs, actions, policy, stock or money.\n"
+        f"workflow_type={workflow_type}\n"
+        f"phase={phase_name}\n"
+        f"skill={skill}\n"
+        f"required_tool={tool_name}\n"
+        f"tool_input={json.dumps(tool_input, sort_keys=True)}\n"
+        f"allowed_recommendation={profile.command_type}\n"
+        f"required_actor_ids={json.dumps(tool_input['actor_ids'])}\n"
+        f"required_event_ids={json.dumps(tool_input['event_ids'])}\n"
+        "required_constraints="
+        + json.dumps(
+            {
+                "ownership": "explicit",
+                "authority": profile.hitl_persona,
+                "stale_evidence": "reject",
+            },
+            sort_keys=True,
+        )
+        + "\n"
+        f"prior_outputs={json.dumps(payload.get('prior_outputs') or {}, sort_keys=True)}"
+    )
+    result = await run_agent_session(
+        prompt,
+        tools=[TOOL_BY_NAME[tool_name]],
+        skill_dir=_SKILL_ROOT / skill,
+        skill_label=skill,
+        workflow_id=payload.get("workflow_id"),
+        instance_id=payload.get("instance_id"),
+        phase=phase_name,
+    )
+    calls = (
+        result.get("_raw_tool_calls")
+        if isinstance(result, dict)
+        else None
+    )
+    if calls is not None:
+        if not isinstance(calls, list):
+            raise ValueError("Fashion agent tool evidence must be a list")
+        business_calls = [
+            call
+            for call in calls
+            if call.get("name") in TOOL_BY_NAME
+        ]
+        if any(
+            call.get("name") != tool_name or call.get("success") is False
+            for call in business_calls
+        ):
+            raise ValueError(
+                f"Fashion agent emitted an invalid {tool_name!r} tool call"
+            )
+    return result
+
+
+def _validate_decision_output(
+    payload: dict[str, Any],
+    result: Any,
+) -> dict[str, Any]:
+    business_result = (
+        {key: value for key, value in result.items() if key != "_raw_tool_calls"}
+        if isinstance(result, dict)
+        else result
+    )
+    if (
+        not isinstance(business_result, dict)
+        or set(business_result) != _DECISION_OUTPUT_KEYS
+    ):
+        keys = (
+            sorted(business_result)
+            if isinstance(business_result, dict)
+            else type(business_result).__name__
+        )
+        raise ValueError(
+            "Fashion agent response must contain exactly "
+            f"{sorted(_DECISION_OUTPUT_KEYS)}, got {keys}"
+        )
+    workflow_type = str(payload["type"])
+    phase_name = str(payload["phase"])
+    skill = _phase_skill(workflow_type, phase_name)
+    profile = FASHION_PROCESS_PROFILES[workflow_type]
+    observation = _require_observation(payload)
+    actor_ids = [str(value) for value in observation.get("actor_ids") or []]
+    event_ids = [str(value) for value in observation.get("event_ids") or []]
+    if business_result["skill"] != skill or business_result["phase"] != phase_name:
+        raise ValueError("Fashion agent changed its declared skill or phase")
+    if business_result["recommendation"] != profile.command_type:
+        raise ValueError("Fashion agent recommendation is outside the process contract")
+    if (
+        business_result["actor_ids"] != actor_ids
+        or business_result["event_ids"] != event_ids
+    ):
+        raise ValueError("Fashion agent changed supplied actor or event evidence")
+    if not isinstance(business_result["constraints"], dict):
+        raise ValueError("Fashion agent constraints must be an object")
+    if not str(business_result["reasoning"]).strip():
+        raise ValueError("Fashion agent reasoning must be non-empty")
+    return business_result
+
+
+def fashion_decision_activity(payload: dict[str, Any]) -> dict[str, Any]:
+    workflow_type = str(payload["type"])
+    result = (
+        asyncio.run(_live_decision(payload))
+        if _uses_live_agent(payload, workflow_type)
+        else _deterministic_decision(payload)
+    )
+    return _validate_decision_output(payload, result)
 
 
 def _approval_reference(approval: dict[str, Any]) -> str | None:

@@ -472,7 +472,12 @@ function ProcessCards({
           sensor,
           storyStatus,
         }) => (
-          <article key={workflowId} className="rounded border border-slate-200 p-2 dark:border-slate-700">
+          <Link
+            key={workflowId}
+            to={`/workflows/${encodeURIComponent(workflowId)}`}
+            data-testid={`workflow-card-${workflowId}`}
+            className="block rounded border border-slate-200 p-2 transition-colors hover:border-blue-400 hover:bg-blue-50/60 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:hover:border-blue-500 dark:hover:bg-blue-950/30"
+          >
             <div className="text-xs font-semibold text-slate-800 dark:text-slate-100">
               {workflowType}
             </div>
@@ -485,13 +490,10 @@ function ProcessCards({
                 ? `latest evidence ${event.type} · ${event.event_id}`
                 : `story stage ${storyStatus || "active"}`}
             </div>
-            <Link
-              to={`/workflows/${encodeURIComponent(workflowId)}`}
-              className="mt-2 inline-flex text-[10px] font-medium text-blue-700 hover:underline dark:text-blue-300"
-            >
+            <span className="mt-2 inline-flex text-[10px] font-medium text-blue-700 dark:text-blue-300">
               Inspect workflow {workflowId}
-            </Link>
-          </article>
+            </span>
+          </Link>
         ))}
       </div>
     </section>

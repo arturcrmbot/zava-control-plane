@@ -79,3 +79,19 @@ def fashion_prepare_seller_suppression(params: RetailEvidence) -> ToolResult:
 )
 def fashion_prepare_return_disposition(params: RetailEvidence) -> ToolResult:
     return evidence_result(params, operation="prepare_return_disposition")
+
+
+TOOL_BY_NAME = {
+    "fashion_read_inventory": fashion_read_inventory,
+    "fashion_prepare_inventory_transfer": fashion_prepare_inventory_transfer,
+    "fashion_assess_promotion": fashion_assess_promotion,
+    "fashion_prepare_markdown_recommendation": (
+        fashion_prepare_markdown_recommendation
+    ),
+    "fashion_prepare_supplier_recovery": fashion_prepare_supplier_recovery,
+    "fashion_prepare_fulfilment_resolution": (
+        fashion_prepare_fulfilment_resolution
+    ),
+    "fashion_prepare_seller_suppression": fashion_prepare_seller_suppression,
+    "fashion_prepare_return_disposition": fashion_prepare_return_disposition,
+}

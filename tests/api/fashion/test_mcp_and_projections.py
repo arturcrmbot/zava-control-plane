@@ -119,6 +119,10 @@ async def test_mcp_pack_exposes_exact_tools_with_simulated_provenance() -> None:
     assert payload["trace_id"] == "trace-42"
 
 
+def test_fashion_tool_registry_matches_declared_tool_names() -> None:
+    assert set(retail.TOOL_BY_NAME) == retail.TOOL_NAMES
+
+
 def test_hero_projection_keeps_world_workflow_and_stock_ids_connected(
     tmp_path,
 ) -> None:

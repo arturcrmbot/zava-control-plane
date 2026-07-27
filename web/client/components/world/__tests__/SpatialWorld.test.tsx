@@ -317,6 +317,13 @@ describe("SpatialWorld", () => {
     expect(link.getAttribute("href")).toBe(
       "/workflows/rebalance-evt-00000142",
     );
+    const card = screen.getByTestId(
+      "workflow-card-rebalance-evt-00000142",
+    );
+    expect(card.tagName).toBe("A");
+    expect(card.getAttribute("href")).toBe(
+      "/workflows/rebalance-evt-00000142",
+    );
   });
 
   it("keeps automatic workflow cards after their journal events expire", () => {

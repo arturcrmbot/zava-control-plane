@@ -416,9 +416,7 @@ async function runLive() {
       fullPage: true,
     });
 
-    const processLink = page.getByRole("link", {
-      name: `Inspect workflow ${hero.id}`,
-    });
+    const processLink = page.getByTestId(`workflow-card-${hero.id}`);
     await processLink.waitFor({ state: "visible", timeout: UI_DEADLINE_MS });
     need(
       await processLink.getAttribute("href")
