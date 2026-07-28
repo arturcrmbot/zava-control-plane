@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
 from typing import Any
 
-from api.server.world.model import SimulationEvent
+from api.server.world.model import SimulationCommand, SimulationEvent
 from api.server.world.runtime import SimulationRuntime
 from verticals.airline.process_profiles import (
     SCENARIO_ID,
@@ -16,6 +17,8 @@ from verticals.airline.worlds.model import (
     Aircraft,
     CrewDuty,
     PassengerCohort,
+    RecoveryCommand,
+    RecoveryEvaluation,
     Rotation,
     Sector,
     Slot,
@@ -60,8 +63,15 @@ class AirlineWorld:
         self.slots: dict[str, Slot] = {}
         self.stands: dict[str, Stand] = {}
         self.connection_cohorts: dict[str, PassengerCohort] = {}
+        self.recovery_commands: dict[str, RecoveryCommand] = {}
+        self.recovery_evaluations: dict[str, RecoveryEvaluation] = {}
+        self.disruption_status: dict[str, str] = {}
         self._installed = False
         self._scenario_events: dict[str, SimulationEvent] = {}
+        self._processed_commands: dict[
+            str, tuple[SimulationCommand, SimulationEvent]
+        ] = {}
+        self._command_conflicts: dict[str, SimulationEvent] = {}
 
     def install(self) -> None:
         if self._installed:
@@ -189,6 +199,7 @@ class AirlineWorld:
             },
         )
         self._scenario_events[scenario_id] = source
+        self.disruption_status[STORY_ID] = "active"
         return source
 
     def build_observation(
@@ -221,6 +232,31 @@ class AirlineWorld:
             ),
             key=lambda item: item.id,
         )
+        outbound_sector = self.sectors[rotation.sector_ids[-1]]
+        outbound_aircraft = self.aircraft[outbound_sector.aircraft_id]
+        outbound_crew = self.crew_duties[outbound_sector.crew_duty_id]
+        outbound_slot = self.slots[outbound_sector.slot_id]
+        candidate_aircraft = self.aircraft["SYN-TAIL-005"]
+        candidate_crew = self.crew_duties["SYN-DUTY-006"]
+        candidate_stand = self.stands["SYN-STAND-05"]
+        evidence_records = {
+            record.id: record
+            for record in (
+                sector,
+                stand,
+                rotation,
+                self.aircraft[sector.aircraft_id],
+                self.crew_duties[sector.crew_duty_id],
+                self.slots[sector.slot_id],
+                outbound_sector,
+                outbound_aircraft,
+                outbound_crew,
+                outbound_slot,
+                candidate_aircraft,
+                candidate_crew,
+                candidate_stand,
+            )
+        }
         return {
             "workflow_type": WORKFLOW_TYPE,
             "story_id": STORY_ID,
@@ -236,11 +272,86 @@ class AirlineWorld:
             "crew_duty": _record_view(self.crew_duties[sector.crew_duty_id]),
             "slot": _record_view(self.slots[sector.slot_id]),
             "connection_cohorts": [_record_view(item) for item in cohorts],
+            "outbound_sector": _record_view(outbound_sector),
+            "outbound_aircraft": _record_view(outbound_aircraft),
+            "outbound_crew_duty": _record_view(outbound_crew),
+            "outbound_slot": _record_view(outbound_slot),
+            "candidate_aircraft": _record_view(candidate_aircraft),
+            "candidate_crew_duty": _record_view(candidate_crew),
+            "candidate_stand": _record_view(candidate_stand),
+            "sectors": [
+                _record_view(item)
+                for item in sorted(self.sectors.values(), key=lambda item: item.id)
+            ],
+            "evidence_versions": {
+                record_id: evidence_records[record_id].version
+                for record_id in sorted(evidence_records)
+            },
+            "maximum_value_gbp": 150_000.0,
             "evidence_event_ids": [
                 sensor_event.get("cause_event_id"),
                 sensor_event.get("event_id"),
             ],
         }
+
+    def _current_recovery_observation(self) -> dict[str, Any]:
+        if self.disruption_status.get(STORY_ID) != "active":
+            raise RuntimeError("integrated hub disruption is not active")
+        sensor = next(
+            (
+                event
+                for event in reversed(self.runtime.journal)
+                if event.type == "sensor.tripped"
+                and event.actor_id == SENSOR_ID
+                and event.payload.get("story_id") == STORY_ID
+            ),
+            None,
+        )
+        if sensor is None:
+            raise RuntimeError("integrated hub disruption sensor evidence is missing")
+        return self.build_observation(sensor.to_dict())
+
+    def command_for_option(
+        self,
+        *,
+        option_id: str,
+        workflow_id: str,
+        decision_id: str,
+        persona: str,
+    ) -> SimulationCommand:
+        from verticals.airline.actions.commands import command_for_option
+
+        return command_for_option(
+            self,
+            option_id=option_id,
+            workflow_id=workflow_id,
+            decision_id=decision_id,
+            persona=persona,
+        )
+
+    def apply_command(self, command: SimulationCommand) -> SimulationEvent:
+        cached = self._processed_commands.get(command.command_id)
+        if cached is not None:
+            prior_command, prior_event = cached
+            if prior_command == command:
+                return prior_event
+            conflict = self._command_conflicts.get(command.command_id)
+            if conflict is not None:
+                return conflict
+            from verticals.airline.actions.commands import reject
+
+            conflict = reject(
+                self,
+                command,
+                "idempotency key was reused with a different command payload",
+            )
+            self._command_conflicts[command.command_id] = conflict
+            return conflict
+        from verticals.airline.actions.commands import apply_recovery_command
+
+        result = apply_recovery_command(self, command)
+        self._processed_commands[command.command_id] = (copy.deepcopy(command), result)
+        return result
 
     def render_state(self) -> dict[str, list[dict[str, Any]]]:
         def rows(records: dict[str, Any]) -> list[dict[str, Any]]:
@@ -260,4 +371,6 @@ class AirlineWorld:
             "slots": rows(self.slots),
             "stands": rows(self.stands),
             "connection_cohorts": cohort_rows,
+            "recovery_commands": rows(self.recovery_commands),
+            "recovery_evaluations": rows(self.recovery_evaluations),
         }

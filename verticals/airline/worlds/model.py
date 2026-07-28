@@ -88,3 +88,29 @@ class PassengerCohort:
     status: str
     version: int = 1
     last_event_id: str | None = None
+
+
+@dataclass
+class RecoveryCommand:
+    id: str
+    workflow_id: str
+    decision_id: str
+    option_id: str
+    persona: str
+    value_gbp: float
+    action_types: tuple[str, ...]
+    evidence_versions: tuple[tuple[str, int], ...]
+    version: int = 1
+    last_event_id: str | None = None
+
+
+@dataclass
+class RecoveryEvaluation:
+    id: str
+    workflow_id: str
+    command_id: str
+    option_id: str
+    status: str
+    invariant_results: tuple[str, ...]
+    version: int = 1
+    last_event_id: str | None = None

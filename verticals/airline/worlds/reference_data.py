@@ -25,7 +25,7 @@ def build_aircraft() -> list[Aircraft]:
         Aircraft("SYN-AIRCRAFT-02", "A320", "operational", "SYN-OUT-02"),
         Aircraft("SYN-AIRCRAFT-03", "A321", "operational", "SYN-OUT-03"),
         Aircraft("SYN-AIRCRAFT-04", "A320", "operational", "SYN-OUT-04"),
-        Aircraft("SYN-AIRCRAFT-05", "A320", "reserve", HUB_ID),
+        Aircraft("SYN-TAIL-005", "A320", "reserve", HUB_ID),
     ]
 
 
@@ -195,7 +195,7 @@ def build_crew_duties() -> list[CrewDuty]:
             "active",
         ),
         CrewDuty(
-            "SYN-CREW-DUTY-06",
+            "SYN-DUTY-006",
             "A320",
             (),
             60.0,
