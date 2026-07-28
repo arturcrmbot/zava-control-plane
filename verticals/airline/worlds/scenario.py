@@ -173,7 +173,7 @@ class AirlineWorld:
         sector.last_event_id = source.event_id
         stand.last_event_id = source.event_id
 
-        sensor = self.runtime.emit(
+        self.runtime.emit(
             "sensor.tripped",
             actor_id=SENSOR_ID,
             target_id=sector.id,
@@ -188,7 +188,6 @@ class AirlineWorld:
                 "stand_id": stand.id,
             },
         )
-        sensor.payload["source_sensor_event_id"] = sensor.event_id
         self._scenario_events[scenario_id] = source
         return source
 

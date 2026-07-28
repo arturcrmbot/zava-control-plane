@@ -162,6 +162,30 @@ def test_diagnostic_uses_the_real_scenario_sensor_and_observation() -> None:
     assert observation["stand"]["id"] == "SYN-STAND-01"
 
 
+def test_diagnostic_enriches_a_copy_without_mutating_the_journal_sensor() -> None:
+    runtime, world = _world()
+    source = world.activate_scenario("synthetic-hub-cascade")
+    live_sensor = next(
+        event
+        for event in runtime.journal
+        if event.type == "sensor.tripped"
+        and event.actor_id == "sensor:integrated_hub_disruption"
+    )
+    live_payload = dict(live_sensor.payload)
+
+    diagnostic_sensor, _ = build_diagnostic_input(WORKFLOW_TYPE)
+
+    assert live_sensor.cause_event_id == source.event_id
+    assert live_sensor.trace_id == source.trace_id
+    assert "source_sensor_event_id" not in live_sensor.payload
+    assert (
+        diagnostic_sensor["payload"]["source_sensor_event_id"]
+        == live_sensor.event_id
+    )
+    assert diagnostic_sensor["payload"] is not live_sensor.payload
+    assert live_sensor.payload == live_payload
+
+
 def test_registered_scene_is_bounded_and_matches_rendered_collections() -> None:
     _, world = _world()
     scene = AIRLINE_WORLD.scene

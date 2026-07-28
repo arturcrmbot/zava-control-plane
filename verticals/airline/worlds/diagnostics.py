@@ -24,6 +24,13 @@ def build_diagnostic_input(
         for event in runtime.journal
         if event.type == "sensor.tripped" and event.actor_id == SENSOR_ID
     )
-    sensor_event = sensor.to_dict()
-    observation = world.build_observation(sensor_event, now=runtime.now)
-    return sensor_event, observation
+    source_sensor_event = sensor.to_dict()
+    observation = world.build_observation(source_sensor_event, now=runtime.now)
+    diagnostic_sensor_event = {
+        **source_sensor_event,
+        "payload": {
+            **(source_sensor_event.get("payload") or {}),
+            "source_sensor_event_id": source_sensor_event["event_id"],
+        },
+    }
+    return diagnostic_sensor_event, observation
