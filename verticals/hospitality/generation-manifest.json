@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "vertical": "hospitality",
+  "display_name": "Hospitality",
+  "design_spec": "docs/superpowers/specs/2026-07-28-anonymous-hospitality-operations-vertical-design.md",
+  "records": [
+    {
+      "path": "verticals/hospitality/__init__.py",
+      "ownership": "bespoke",
+      "note": "Pack docstring"
+    },
+    {
+      "path": "verticals/hospitality/org-brief.yaml",
+      "ownership": "bespoke",
+      "note": "Anonymous approved assumptions — no target identity"
+    },
+    {
+      "path": "verticals/hospitality/generation-manifest.json",
+      "ownership": "bespoke",
+      "note": "Ledger of bespoke hand-authored business files and future proof launchers"
+    },
+    {
+      "path": "verticals/hospitality/domains.py",
+      "ownership": "bespoke",
+      "note": "Eight executable hospitality domains"
+    },
+    {
+      "path": "verticals/hospitality/functions.py",
+      "ownership": "bespoke",
+      "note": "Organisation functions and KPI ownership"
+    },
+    {
+      "path": "verticals/hospitality/authority.py",
+      "ownership": "bespoke",
+      "note": "Exact action and spend authority rows (synthetic demo values)"
+    },
+    {
+      "path": "verticals/hospitality/personas.py",
+      "ownership": "bespoke",
+      "note": "Runtime persona registry"
+    },
+    {
+      "path": "verticals/hospitality/agents.py",
+      "ownership": "bespoke",
+      "note": "Machine-agent registry — one per workflow"
+    },
+    {
+      "path": "verticals/hospitality/ui.json",
+      "ownership": "bespoke",
+      "note": "Runtime UI manifest"
+    },
+    {
+      "path": "verticals/hospitality/actors.py",
+      "ownership": "bespoke",
+      "note": "Task 3: frozen/slotted (frozen=True, slots=True) entity dataclasses — Hotel, Room, Booking, GuestParty, CriticalAsset, WorkOrder (+ contractor_available: bool), TeamMember, Shift, FoodServicePlan, EnergyMeter"
+    },
+    {
+      "path": "verticals/hospitality/dynamics.py",
+      "ownership": "bespoke",
+      "note": "Task 3: deterministic virtual-time tick primitives and threshold helpers"
+    },
+    {
+      "path": "verticals/hospitality/sensors.py",
+      "ownership": "bespoke",
+      "note": "Task 3: pure operational-risk sensor — evaluate_operations_risk; rejects malformed snapshots explicitly; payload includes sister_travel_times_minutes (int minutes per sister hotel from _SISTER_TRAVEL_MINUTES topology) and contractor_available (bool from WorkOrder.contractor_available)"
+    },
+    {
+      "path": "verticals/hospitality/recovery.py",
+      "ownership": "bespoke",
+      "note": "Task 3: pure deterministic recovery planner — plan_recovery; RecoveryResult, RecoveryPlan, Relocation, ShiftReallocation"
+    },
+    {
+      "path": "verticals/hospitality/reference_cases.py",
+      "ownership": "bespoke",
+      "note": "Task 3: HospitalityReferenceCase and HOSPITALITY_REFERENCE_CASES — exactly 8 workflow IDs"
+    },
+    {
+      "path": "verticals/hospitality/world.py",
+      "ownership": "bespoke",
+      "note": "Task 3: HospitalityWorld — demo(seed), reset(seed), trigger_scenario, poll_sensor_events, WorldEvent"
+    },
+    {
+      "path": "tests/api/hospitality/__init__.py",
+      "ownership": "bespoke",
+      "note": "Test package marker"
+    },
+    {
+      "path": "tests/api/hospitality/test_pack_inventory.py",
+      "ownership": "bespoke",
+      "note": "Static pack inventory assertions"
+    },
+    {
+      "path": "tests/api/hospitality/test_customer_boundary.py",
+      "ownership": "bespoke",
+      "note": "Customer identity boundary scanner"
+    },
+    {
+      "path": "tests/api/hospitality/test_static_contracts.py",
+      "ownership": "bespoke",
+      "note": "Static domain/function/persona/authority/agent contract assertions"
+    },
+    {
+      "path": "tests/api/hospitality/test_world_seed.py",
+      "ownership": "bespoke",
+      "note": "Task 3: entity counts, hotel labels, same-seed equality, reset, ordering, reference cases"
+    },
+    {
+      "path": "tests/api/hospitality/test_hotel_recovery_sensor.py",
+      "ownership": "bespoke",
+      "note": "Task 3: golden scenario — 18 unavailable/7 not-ready/96% occupancy/44 arrivals, sensor event, dedupe, payload"
+    },
+    {
+      "path": "tests/api/hospitality/test_recovery_planner.py",
+      "ownership": "bespoke",
+      "note": "Task 3: recovery planner — 8 restore/10 relocation/2 shifts/HITL/no-action/protected-requirement tests"
+    },
+    {
+      "path": "tools/hospitality_proof_manifest.py",
+      "ownership": "bespoke-external",
+      "note": "Future proof manifest launcher — not yet created"
+    },
+    {
+      "path": "tools/hospitality_zava_e2e_proof.mjs",
+      "ownership": "bespoke-external",
+      "note": "Future browser proof launcher — not yet created"
+    },
+    {
+      "path": "tools/hospitality_zava_e2e_proof.sh",
+      "ownership": "bespoke-external",
+      "note": "Future shell proof launcher — not yet created"
+    }
+  ]
+}

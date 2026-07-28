@@ -1,0 +1,75 @@
+version: 1
+status: approved
+slug: hospitality
+target: Hospitality
+world: Multi-country hotel-led hospitality operator (anonymous)
+
+research:
+  classification: approved synthetic operating assumptions
+  sources:
+    - docs/superpowers/specs/2026-07-28-anonymous-hospitality-operations-vertical-design.md
+  note: >
+    No record represents a real operator, hotel brand, or customer.
+    All scale figures, thresholds, SLAs, and policy values are synthetic
+    demo assumptions and are not derived from any customer or operator
+    proprietary data.
+
+anonymity_boundary:
+  committed_as: anonymous
+  display_name: Hospitality
+  forbidden_identifiers:
+    - case: insensitive
+      note: enforced by tests/api/hospitality/test_customer_boundary.py
+
+operating_model:
+  structure: hotel-led business with integrated on-site food and beverage
+  estate: directly operated hotels across two countries (UK/Ireland and Germany)
+  property_mix: mixed owned and leased
+  scale:
+    hotels: 6 (fictional demo properties)
+    rooms: 240 (fictional synthetic rooms across standard, family, accessible, premium)
+    bookings: 180 active synthetic bookings
+    team_members: 36 across operational skill groups
+    assets: 18 critical assets, 12 open or planned work orders, 6 suppliers
+  strategic_themes:
+    - operational consistency and guest experience
+    - cost discipline and room growth
+    - digital hotel operations
+  systems:
+    - booking platform (generic)
+    - property management system (generic)
+    - maintenance management system (generic)
+    - workforce planning system (generic)
+    - finance and utilities systems (generic)
+
+golden_story: >
+  At a near-capacity property, a critical building asset fails shortly before
+  a large arrival wave. The hero workflow coordinates maintenance expediting,
+  room recovery, cross-property capacity, guest protection, workforce
+  reallocation, and governed recovery spend. It ends with typed world
+  mutations and measured operational and commercial outcomes.
+
+assumptions:
+  - all thresholds, SLAs, approval bands, and limits are synthetic demo values
+  - exact estate scale figures are rounded and fictional
+  - system roles represent generic capabilities not undocumented vendor APIs
+  - relocation policy, compensation bands, and workforce rules are illustrative
+
+uncertainties:
+  - actual maintenance SLAs and first-time-fix rates
+  - real room-out-of-order impact thresholds per operator type
+  - guest relocation and compensation bands in practice
+  - engineering workforce skill categorisation specifics
+  - energy management integration depth in real properties
+
+workflow_inventory:
+  - hotel-operations-recovery
+  - room-readiness-coordination
+  - asset-maintenance-response
+  - guest-service-recovery
+  - occupancy-pressure-response
+  - workforce-demand-balancing
+  - food-and-beverage-readiness
+  - energy-anomaly-response
+
+seller_review: PENDING

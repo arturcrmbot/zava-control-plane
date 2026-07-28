@@ -1,0 +1,12 @@
+{
+  "capabilities": ["blueprint", "world", "memory", "knowledge"],
+  "lenses": ["process-library", "customer-impact", "field-operations", "control"],
+  "theme": {
+    "accent": "#0369a1",
+    "label": "Hospitality"
+  },
+  "phase_aliases": {},
+  "supplemental_domains": [],
+  "aspirational_domains": [],
+  "include_meta_skills": false
+}
