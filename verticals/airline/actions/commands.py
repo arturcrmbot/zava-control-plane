@@ -252,13 +252,17 @@ def _evaluation_results(
                 world.disruption_status.get(STORY_ID) == "resolved",
             ),
         )
-    else:
+    elif option.option_id == _CANCEL_OPTION_ID:
         checks = (
             ("sector_cancelled", sector.status == "cancelled"),
             (
                 "disruption_resolved",
                 world.disruption_status.get(STORY_ID) == "resolved",
             ),
+        )
+    else:
+        raise ValueError(
+            f"recovery option {option.option_id!r} has no registered evaluator"
         )
     results = tuple(
         f"{name}:{'pass' if passed else 'fail'}" for name, passed in checks
@@ -272,7 +276,16 @@ def _accept(
     option: RecoveryOption,
     observation: dict[str, Any],
 ) -> SimulationEvent:
-    mutated = _mutate_tail_plan(world) if option.option_id == _TAIL_OPTION_ID else _mutate_cancel_plan(world)
+    if option.option_id == _TAIL_OPTION_ID:
+        mutated = _mutate_tail_plan(world)
+    elif option.option_id == _CANCEL_OPTION_ID:
+        mutated = _mutate_cancel_plan(world)
+    else:
+        return reject(
+            world,
+            command,
+            f"recovery option {option.option_id!r} has no registered mutator/evaluator",
+        )
     for record in mutated:
         record.version += 1
     world.disruption_status[STORY_ID] = "resolved"

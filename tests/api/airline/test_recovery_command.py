@@ -8,6 +8,7 @@ import pytest
 
 from api.server.world.model import SimulationCommand
 from api.server.world.runtime import SimulationRuntime
+from verticals.airline.actions import commands as recovery_commands
 from verticals.airline.constraints import (
     FeasibilityResult,
     RecoveryAction,
@@ -207,6 +208,87 @@ def test_accepted_command_applies_coherent_versioned_mutation_and_evidence() -> 
     assert len(world.render_state()["recovery_evaluations"]) == 1
 
 
+def test_accepted_cancel_is_coherent_causal_and_idempotent_end_to_end() -> None:
+    runtime, world = _active_world()
+    sector = world.sectors["SYN-SECTOR-OUT-001"]
+    rotation = world.rotations["SYN-ROTATION-01"]
+    crew = world.crew_duties[sector.crew_duty_id]
+    records = (sector, rotation, crew)
+    versions = {record.id: record.version for record in records}
+    original_crew_sectors = crew.sector_ids
+    command = world.command_for_option(
+        option_id="SYN-OPTION-CANCEL",
+        workflow_id="AIRHUB-0001",
+        decision_id="SYN-DECISION-001",
+        persona="duty_operations_manager",
+    )
+
+    accepted = world.apply_command(command)
+
+    business_event = next(
+        event
+        for event in runtime.journal
+        if event.type == "airline.recovery.applied"
+        and event.payload["command_id"] == command.command_id
+    )
+    sensor_event = next(
+        event
+        for event in runtime.journal
+        if event.type == "sensor.tripped"
+        and event.actor_id == "sensor:integrated_hub_disruption"
+    )
+    assert accepted.type == "command.accepted"
+    assert sector.status == "cancelled"
+    assert rotation.status == "recovered"
+    assert crew.sector_ids == tuple(
+        sector_id for sector_id in original_crew_sectors if sector_id != sector.id
+    )
+    assert world.disruption_status["SYN-STORY-HUB-001"] == "resolved"
+    for record in records:
+        assert record.version == versions[record.id] + 1
+        assert record.last_event_id == business_event.event_id
+
+    assert list(world.recovery_commands) == [command.command_id]
+    assert list(world.recovery_evaluations) == ["AIRHUB-0001"]
+    recovery_command = world.recovery_commands[command.command_id]
+    evaluation = world.recovery_evaluations["AIRHUB-0001"]
+    assert isinstance(recovery_command, RecoveryCommand)
+    assert isinstance(evaluation, RecoveryEvaluation)
+    assert recovery_command.option_id == "SYN-OPTION-CANCEL"
+    assert recovery_command.version == 1
+    assert recovery_command.last_event_id == business_event.event_id
+    assert evaluation.option_id == "SYN-OPTION-CANCEL"
+    assert evaluation.status == "pass"
+    assert evaluation.version == 1
+    assert evaluation.last_event_id == business_event.event_id
+
+    assert business_event.cause_event_id == sensor_event.event_id
+    assert business_event.trace_id == sensor_event.trace_id
+    assert business_event.payload["affected_actor_ids"] == [
+        sector.id,
+        rotation.id,
+        crew.id,
+    ]
+    assert business_event.payload["measurements"]["evaluation_status"] == "pass"
+    assert accepted.cause_event_id == business_event.event_id
+    assert accepted.trace_id == business_event.trace_id
+    assert accepted.payload == {
+        "command": command.to_dict(),
+        "business_event_id": business_event.event_id,
+        "evaluation_id": evaluation.id,
+    }
+
+    state_after_acceptance = world.render_state()
+    journal_size = len(runtime.journal)
+    replayed = world.apply_command(command)
+
+    assert replayed.event_id == accepted.event_id
+    assert world.render_state() == state_after_acceptance
+    assert len(runtime.journal) == journal_size
+    assert list(world.recovery_commands) == [command.command_id]
+    assert list(world.recovery_evaluations) == ["AIRHUB-0001"]
+
+
 def test_infeasible_action_rejects_without_partial_mutation() -> None:
     runtime = SimulationRuntime(seed=42)
     world = AirlineWorld(seed=42, runtime=runtime)
@@ -229,6 +311,40 @@ def test_infeasible_action_rejects_without_partial_mutation() -> None:
     result = world.apply_command(command)
     assert result.type == "command.rejected"
     assert world.render_state() == before
+
+
+def test_feasible_option_without_registered_handler_rejects_before_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime, world = _active_world()
+    admitted = tuple(
+        dataclasses.replace(result, feasible=True, reasons=())
+        if result.option.option_id == "SYN-OPTION-RETIME-ONLY"
+        else result
+        for result in admit_recovery_options(_observation(world))
+    )
+    monkeypatch.setattr(
+        recovery_commands,
+        "admit_recovery_options",
+        lambda _observation: admitted,
+    )
+    command = world.command_for_option(
+        option_id="SYN-OPTION-RETIME-ONLY",
+        workflow_id="AIRHUB-0001",
+        decision_id="SYN-DECISION-001",
+        persona="duty_operations_manager",
+    )
+    before = world.render_state()
+    disruption_status = dict(world.disruption_status)
+    journal_size = len(runtime.journal)
+
+    result = world.apply_command(command)
+
+    assert result.type == "command.rejected"
+    assert "no registered mutator/evaluator" in result.payload["reason"]
+    assert world.render_state() == before
+    assert world.disruption_status == disruption_status
+    assert len(runtime.journal) == journal_size + 1
 
 
 @pytest.mark.parametrize(
