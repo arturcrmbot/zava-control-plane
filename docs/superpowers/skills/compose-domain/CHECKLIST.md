@@ -33,8 +33,8 @@ in the sandbox — that hides the procedure bug.
 - [ ] §2.2  Every phase listed in the orchestrator appears in the brief in the same order.
 - [ ] §2.3  Every persona referenced by a HITL phase appears in `personae` (or already lives under `api/server/personae/`).
 - [ ] §2.4  Every `external_systems[]` id referenced by any phase is defined.
-- [ ] §2.5  Every persona has both `decision_policy` (prose paragraph) AND `decision_code` (Python source) in the brief. (NEW v3.)
-- [ ] §2.6  `domain.prefix` matches `^[a-z][a-z0-9_]*$` (used for orchestrator/activities file names; almost always `fleet`). (NEW v4.)
+- [ ] §2.5  Every persona has both `decision_policy` (prose paragraph) AND `decision_code` (Python source) in the brief.
+- [ ] §2.6  `domain.prefix` matches `^[a-z][a-z0-9_]*$` (used for orchestrator/activities file names; almost always `fleet`).
 
 ## §3 — Cross-references
 
@@ -61,8 +61,8 @@ in the sandbox — that hides the procedure bug.
 - [ ] §5.2  Every SKILL.md body has the required sections for its mode (`## Inputs / ## Procedure / ## Output` for phase agents; `## Decision policy / ## Procedure` for personae).
 - [ ] §5.3  No file in the sandbox contains a `TODO`, `FIXME`, `XXX`, `<placeholder>`, or `…` left over from a template slot.
 - [ ] §5.4  No file contains the words "AI-powered", "leverage", "synergy", or any equivalent marketing register.
-- [ ] §5.5  Every persona SKILL.md frontmatter contains `decision_policy` (executable Python), `external_event`, `workflow_label`. (NEW v3.)
-- [ ] §5.6  Persona `decision_policy` source uses only safe builtins per `api/server/services/persona_responder.py:_DECISION_BUILTINS` — no `import`, `open`, `os`, `subprocess`, `eval`, `__import__`. Verified by grep. (NEW v3.)
+- [ ] §5.5  Every persona SKILL.md frontmatter contains `decision_policy` (executable Python), `external_event`, `workflow_label`.
+- [ ] §5.6  Persona `decision_policy` source uses only safe builtins per `api/server/services/persona_responder.py:_DECISION_BUILTINS` — no `import`, `open`, `os`, `subprocess`, `eval`, `__import__`. Verified by grep.
 
 ## §6 — Determinism
 
@@ -83,13 +83,13 @@ in the sandbox — that hides the procedure bug.
   `grep -E 'wait_for_external_event' <run-id>/api/functions/workflows/*.py`
   and `grep -E '^external_event:' <run-id>/api/server/personae/*/SKILL.md`.
 
-- [ ] §6.3  v3 substrate-fix contract: orchestrator stamps `workflow_type`
+- [ ] §6.3  Checkpoint contract: orchestrator stamps `workflow_type`
   on EVERY checkpoint payload (workflow.started, every suspended, every
   resumed, workflow.completed). Verified by
   `grep -c '"workflow_type":' <run-id>/api/functions/workflows/<domain>.py`
   — must be at least `(2 * num_hitl_phases) + 2`.
 
-- [ ] §6.4  v3 persona contract: every HITL `suspended` payload stamps
+- [ ] §6.4  Persona contract: every HITL `suspended` payload stamps
   `persona`, `external_event`, `context`. Verified by
   `grep -A 6 '"kind": "suspended"' <run-id>/api/functions/workflows/<domain>.py`
   showing all three fields.
@@ -123,7 +123,7 @@ The script applies all six pack-scoped steps idempotently:
    includes the new workflow_type.
 6. Collect evidence required by `docs/VERTICAL-PROOF.md`; commit recorded walks.
 
-## §8 — Entity projection (v4)
+## §8 — Entity projection
 
 - [ ] §8.1  `<run-id>/api/server/services/entity_projections/<workflow_type_snake>.py` exists.
 - [ ] §8.2  Module imports compile (no SyntaxError).
@@ -132,21 +132,21 @@ The script applies all six pack-scoped steps idempotently:
 - [ ] §8.5  Every entity `kind` is in `_VALID_KINDS` (Phase 1 schema source-of-truth).
 - [ ] §8.6  Every relation `kind` is in `_VALID_RELS`.
 
-## §9 — Decision mapping (v4)
+## §9 — Decision mapping
 
 - [ ] §9.1  One `<run-id>/api/server/services/precedent_queries/<workflow_type>_<phase>.cypher` per HITL phase listed under `decisions:`.
 - [ ] §9.2  Each Cypher MATCHes on the dedupe triple via persona_role + workflow_type, ORDERed by `decided_at DESC`, LIMITed by `$limit`.
 - [ ] §9.3  Persona names referenced under `decisions[].persona` resolve to a folder in `api/server/personae/`.
 - [ ] §9.4  No two decisions name the same phase (one decision per HITL phase).
 
-## §10 — Function membership (v4)
+## §10 — Function membership
 
 - [ ] §10.1 `brief.function` is one of the 10 canonical keys (`finance`, `hr`, `revenue`, `ops`, `legal`, `marketing`, `tech`, `data`, `customer-success`, `legacy`).
 - [ ] §10.2 graduate.sh step 5 registers the `workflow_type` in the selected pack's `verticals/<vertical>/functions.py`, appending to `FUNCTIONS["<fn>"].owns_domains`. The registration block is wrapped in sentinel comments `# === BEGIN compose-domain <workflow_type> ===` and `# === END compose-domain <workflow_type> ===`, guarded by grep `BEGIN compose-domain $MARKER` (idempotent re-runs). The global `api/shared/functions.py` is a read-only active-pack adapter and is never modified.
 - [ ] §10.3 Sentinel comments in `verticals/<vertical>/functions.py` follow the exact format `# === BEGIN compose-domain <workflow_type> ===` and matching END. These guard against duplicate registration on re-runs.
 - [ ] §10.4 The workflow_type is not also claimed by a *different* function in the registry (orphan/dup check by author-function-membership validator).
 
-## §11 — Ambient trigger (v4, optional)
+## §11 — Ambient trigger (optional)
 
 - [ ] §11.1 If `ambient:` block is present, `<run-id>/api/server/services/ambient_agents/<function>.py` is appended (or created) with the rendered `AmbientAgent(...)` constructor.
 - [ ] §11.2 The constructor block is wrapped in sentinel comments `# compose-domain:ambient:<workflow_type> BEGIN/END` so re-runs are idempotent.

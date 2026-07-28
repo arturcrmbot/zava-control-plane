@@ -15,14 +15,22 @@ owned by that pack and never shared across packs or global legacy roots.
 
 | Resource | Path |
 |---|---|
+| **Vertical build contract (primary authority)** | [docs/superpowers/contracts/VERTICAL-BUILD-CONTRACT.md](../../../docs/superpowers/contracts/VERTICAL-BUILD-CONTRACT.md) |
 | **Meta-skill (primary authority)** | [docs/superpowers/skills/compose-domain/SKILL.md](../../../docs/superpowers/skills/compose-domain/SKILL.md) |
 | Brief schema (v4) | [docs/superpowers/skills/compose-domain/brief.schema.yaml](../../../docs/superpowers/skills/compose-domain/brief.schema.yaml) |
 | Checklist | [docs/superpowers/skills/compose-domain/CHECKLIST.md](../../../docs/superpowers/skills/compose-domain/CHECKLIST.md) |
 | 19 worked-example briefs | [docs/superpowers/specs/archive/](../../../docs/superpowers/specs/archive/) |
-| v3 generators | [author-durable-domain](../../../docs/superpowers/skills/author-durable-domain/SKILL.md), [author-runtime-skill](../../../docs/superpowers/skills/author-runtime-skill/SKILL.md), [author-persona](../../../docs/superpowers/skills/author-persona/SKILL.md), [author-mcp-tool](../../../docs/superpowers/skills/author-mcp-tool/SKILL.md) |
+| Authoring sub-skills | [author-durable-domain](../../../docs/superpowers/skills/author-durable-domain/SKILL.md), [author-runtime-skill](../../../docs/superpowers/skills/author-runtime-skill/SKILL.md), [author-persona](../../../docs/superpowers/skills/author-persona/SKILL.md), [author-mcp-tool](../../../docs/superpowers/skills/author-mcp-tool/SKILL.md) |
 | Persona meta-skill | [docs/superpowers/skills/compose-persona/SKILL.md](../../../docs/superpowers/skills/compose-persona/SKILL.md) |
 | Vertical proof requirements | [docs/VERTICAL-PROOF.md](../../../docs/VERTICAL-PROOF.md) |
 | Architecture | [docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md) §2, §4, §8, §11 |
+
+## Authority
+
+Follow the code-first
+[Vertical Build Contract](../../../docs/superpowers/contracts/VERTICAL-BUILD-CONTRACT.md).
+This entry point adds one process to an installed pack; it does not define a
+second ownership, readiness, or proof contract.
 
 ## Procedure
 

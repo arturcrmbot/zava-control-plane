@@ -22,6 +22,14 @@
 > with its own sandboxing, validators, identity scope, and CI gate. See the
 > microsite section 6 for the design.
 
+## Canonical build authority
+
+All skills in this tree implement the
+[code-first vertical contract](../contracts/VERTICAL-BUILD-CONTRACT.md).
+`docs/VERTICAL-PROOF.md` is the proof authority. Sub-skills reference these
+contracts rather than defining incompatible ownership, readiness, or
+graduation procedures.
+
 ## What's here
 
 | Skill | Role |

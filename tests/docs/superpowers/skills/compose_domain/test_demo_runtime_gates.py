@@ -10,6 +10,12 @@ COMPOSE_CHECKLIST = (
 )
 COMPOSE_LIVE = ROOT / ".github" / "skills" / "compose-domain-live" / "SKILL.md"
 VERTICAL_PROOF = ROOT / "docs" / "VERTICAL-PROOF.md"
+BUILD_CONTRACT = (
+    ROOT / "docs" / "superpowers" / "contracts" / "VERTICAL-BUILD-CONTRACT.md"
+)
+AUTHOR_DURABLE = (
+    ROOT / "docs" / "superpowers" / "skills" / "author-durable-domain" / "SKILL.md"
+)
 
 
 def test_new_vertical_process_requires_hitl_authority_and_recovery_proof():
@@ -62,3 +68,42 @@ def test_execution_visibility_proof_has_executable_api_checks():
             assert command_shape in text, (path, command_shape)
         assert "$detail" not in text, path
         assert "replay_detail=" not in text, path
+
+
+def test_builder_skills_share_one_current_contract():
+    assert BUILD_CONTRACT.exists()
+    build_contract = BUILD_CONTRACT.read_text(encoding="utf-8")
+    assert "**Contract version:** `1.0.0`" in build_contract
+    assert "code-first" in build_contract
+    assert all(
+        term in build_contract
+        for term in ("Reuse", "Extend", "Bespoke", "build ready", "demo ready")
+    )
+
+    for path in (ADD_DOMAIN, COMPOSE_SKILL, COMPOSE_LIVE, AUTHOR_DURABLE):
+        assert "VERTICAL-BUILD-CONTRACT.md" in path.read_text(encoding="utf-8"), path
+
+    compose = COMPOSE_SKILL.read_text(encoding="utf-8")
+    assert "Design-time meta-skill (v3)" not in compose
+    assert "## How v4 works" not in compose
+    assert "## The five steps" not in compose
+
+    live = COMPOSE_LIVE.read_text(encoding="utf-8")
+    assert "hand-stitches" not in live
+    assert "add-domain Phase 4d" not in live
+    assert "Phase-4b/4c" not in live
+
+    durable = AUTHOR_DURABLE.read_text(encoding="utf-8")
+    for stale in (
+        "by hand to `function_app.py`",
+        "**Patch `function_app.py`.**",
+        "**Patch `api/server/services/simulator_orchestrator.py`.**",
+        "**Patch `api/server/services/blueprint_inventory.py`.**",
+    ):
+        assert stale not in durable
+    assert "pack-scoped graduation fragments" in durable
+
+    proof = VERTICAL_PROOF.read_text(encoding="utf-8")
+    assert "**Contract version:** `1.0.0`" in proof
+    assert "Build ready" in proof
+    assert "Demo ready" in proof

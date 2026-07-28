@@ -1,5 +1,7 @@
 # Vertical Proof
 
+**Contract version:** `1.0.0`
+
 This document defines the permanent evidence requirements that must be
 satisfied before a vertical is considered shippable. Every requirement is
 deterministic and repeatable: the same commands, on a clean checkout, must
@@ -202,6 +204,23 @@ A vertical proof is **complete** when:
    workflow type.
 
 **Do not claim a vertical is shipped until all nine criteria are met.**
+
+---
+
+## 6a. Readiness vocabulary
+
+- **Build ready** means all applicable machine completion criteria above pass.
+- **Demo ready** means build-ready evidence plus a human seller review of reset,
+  pacing, visual quality, and story coherence.
+- **Deployed** is a separate state reached only through an approved deployment
+  mode and its preflight and post-deploy checks.
+
+Machine proof reports the machine result and leaves seller review pending until
+a human completes it.
+
+This contract version does not change `proof/manifest.json`. Manifest schema,
+repeatability-ledger, and deployment-preflight changes require a later
+versioned contract.
 
 ---
 

@@ -1,13 +1,13 @@
 ---
 name: compose-domain
 description: |
-  Design-time meta-skill (v3). Given a domain brief (YAML) or a free-text
+  Current design-time meta-skill. Given a domain brief (YAML) or a free-text
   idea, produce a complete Durable-fidelity domain sandbox: orchestrator,
   per-phase graphs, validators, agent skills, MCP tool stubs, persona(e),
   + a graduate.sh script that mechanically wires everything into the live
   trees.
 
-  v3 encodes the substrate-fix v2 contract: durable.* event vocabulary,
+  The current contract encodes: durable.* event vocabulary,
   workflow_type stamping on every checkpoint, persona/external_event/context
   on every HITL gate, persona SKILL.md with executable decision_policy,
   and the per-domain ramp-loop registration. Every generated domain inherits
@@ -21,6 +21,14 @@ forbidden-runtime: true
 ---
 
 # compose-domain
+
+## Authority
+
+This skill implements the code-first
+[Vertical Build Contract](../../contracts/VERTICAL-BUILD-CONTRACT.md).
+The brief and generators own repeatable workflow scaffolding; they do not
+replace bespoke pack code when a novel capability does not fit the current
+artifact plan.
 
 You are the orchestrator for a five-step procedure that turns a domain brief
 into a complete sandboxed Durable-fidelity domain. You do not improvise. You
@@ -73,7 +81,7 @@ demand**:
 1. **Read upfront (must) — ~700 lines total:**
    - this SKILL.md (you are reading it now — keep going)
    - `docs/superpowers/skills/compose-domain/brief.schema.yaml` (232 lines)
-   - `docs/superpowers/skills/compose-domain/CHECKLIST.md` (161 lines)
+   - `docs/superpowers/skills/compose-domain/CHECKLIST.md`
    - the input brief itself
 2. **Read just-in-time (read only when about to invoke that sub-skill):**
    - each sub-skill `SKILL.md` under `sub-skills/<name>/` (60–120 lines each)
@@ -161,7 +169,7 @@ pull prior-phase outputs.
 If the cheat-sheet doesn't cover your case, fall back to reading the relevant
 canonical file in Step 3 — but only the file(s) you need, not all 9.
 
-## How v4 works (sequential enrichment pipeline)
+## Current sequential enrichment pipeline
 
 v4 reshapes the meta-skill into a **sequential enrichment pipeline**:
 a shared YAML brief grows through five new authoring sub-skills, each
@@ -195,7 +203,7 @@ The brief schema is authoritative at
 sandbox layout is documented at
 `docs/superpowers/skills/compose-domain/SANDBOX.md`.
 
-## The five steps
+## The seven-step procedure
 
 ### Step 1 — Brief intake (only if no YAML brief was supplied)
 
@@ -616,6 +624,8 @@ canonical_example_path: api/server/mcp_tools/claim_lookup.py
 
 ```
 output_root: <RUN_ROOT>
+vertical: <selected vertical>
+artifact_plan: <the approved Step 2 artifact list>
 brief: <the entire brief>
 canonical_paths:
   orchestrator: api/functions/workflows/expense_claim.py
@@ -905,8 +915,9 @@ intent, not a regenerable source for those modules.
 - Skipping the validator on agent phases ("it's a stub, the validator is
   trivial"). Validators are the bounded-probabilism edge; the harness
   expects them.
-- Writing the orchestrator before reading the 8 canonical examples in
-  step 3 once in this session.
+- Ignoring the read-on-demand policy by reading every canonical example
+  upfront, or generating a byte-shape without reading the specific fallback
+  example when the cheat-sheet is insufficient.
 - Directly editing live-tree pack files (`durable.py`, `domains.py`,
   `spawners.py`, `functions.py`) "just to make the smoke test work". That's
   graduation. It happens by hand. By an engineer. After this skill ends.
