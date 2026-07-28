@@ -1,0 +1,1 @@
+"""Airline action package scaffolding."""
