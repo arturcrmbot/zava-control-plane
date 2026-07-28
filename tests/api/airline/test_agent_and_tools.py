@@ -82,6 +82,10 @@ async def test_tools_return_only_versioned_simulated_evidence() -> None:
 
 
 def test_pack_declares_exact_agent_tools() -> None:
+    assert {
+        operations.airline_read_disruption_evidence.name,
+        operations.airline_rank_feasible_recovery_options.name,
+    } == operations.TOOL_NAMES
     assert operations.TOOL_NAMES == {
         "airline_read_disruption_evidence",
         "airline_rank_feasible_recovery_options",
@@ -316,6 +320,8 @@ def test_agent_skills_declare_exact_pack_local_tools_and_truth_boundaries() -> N
         frontmatter, body = _skill_frontmatter(root / skill_name / "SKILL.md")
         assert set(frontmatter) == {"name", "description", "allowed-tools"}
         assert frontmatter["name"] == skill_name
+        allowed_tools = {frontmatter["allowed-tools"]}
+        assert allowed_tools <= operations.TOOL_NAMES
         assert frontmatter["allowed-tools"] == expected["tool"]
         lowered_body = " ".join(body.lower().split())
         assert all(term in lowered_body for term in expected["required_terms"])
