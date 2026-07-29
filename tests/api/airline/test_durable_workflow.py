@@ -12,8 +12,11 @@ import pytest
 import yaml
 from copilot.tools import ToolInvocation
 
+import verticals.airline.constraints as airline_constraints
 import verticals.airline.durable as durable
+from api.server.services.governance.kernel import _reset_for_tests
 from api.server.world.runtime import SimulationRuntime
+from api.shared.vertical_loader import active_runtime
 from verticals.airline.mcp_tools import operations
 from verticals.airline.lifecycle import shutdown_airline_worker_world
 from verticals.airline.worlds.active import (
@@ -117,6 +120,20 @@ class _AllowedKernel:
 @pytest.fixture(autouse=True)
 def _allow_airline_authority(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(durable, "kernel", lambda: _AllowedKernel())
+
+
+@pytest.fixture
+def _use_real_airline_kernel(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("ZAVA_VERTICAL", "airline")
+    monkeypatch.delenv("ZAVA_WORLD", raising=False)
+    active_runtime.cache_clear()
+    _reset_for_tests()
+    monkeypatch.setattr(durable, "kernel", _REAL_KERNEL)
+    try:
+        yield
+    finally:
+        _reset_for_tests()
+        active_runtime.cache_clear()
 
 
 def drive_airline_orchestrator(context: AirlineContext) -> dict[str, Any]:
@@ -827,20 +844,69 @@ def test_governance_denial_fails_closed_before_suspension(
     _assert_terminal_denial(context, result)
 
 
-def test_real_governance_kernel_denies_before_suspension_without_world_mutation(
+def test_real_airline_kernel_allows_selected_option_and_suspends_without_world_mutation(
     monkeypatch: pytest.MonkeyPatch,
+    _use_real_airline_kernel,
 ) -> None:
-    context = AirlineContext()
+    context = AirlineContext(timeout=True)
     before_state = context.world.render_state()
     before_journal = context.world.runtime.canonical_journal()
-    monkeypatch.setattr(durable, "kernel", _REAL_KERNEL)
     monkeypatch.setattr(durable, "run_agent_session", _valid_agent(context))
 
     result = drive_airline_orchestrator(context)
 
+    suspended = [
+        payload["payload"]
+        for name, payload in context.calls
+        if name == "checkpoint_activity_trigger" and payload["kind"] == "suspended"
+    ]
+    assert len(suspended) == 1
+    assert suspended[0]["external_event"] == "duty_operations_manager_decision"
+    assert suspended[0]["hitl_context"]["selected_option"]["value_gbp"] == 75_000.0
+    assert suspended[0]["hitl_context"]["authority"] == {
+        "allowed": True,
+        "reason": (
+            "role 'duty_operations_manager' is the matched approver per rule "
+            "AUTH-duty_operations_manager-airline.commit_recovery_plan"
+        ),
+        "governing_rule_id": "AUTH-duty_operations_manager-airline.commit_recovery_plan",
+    }
+    assert context.external_event == "duty_operations_manager_decision"
     assert result["status"] == "denied"
     assert result["command"] is None
+    assert "timed out" in result["reason"]
+    assert not _command_activity_calls(context)
+    assert context.world.render_state() == before_state
+    assert context.world.runtime.canonical_journal() == before_journal
+
+
+def test_real_airline_kernel_denies_over_limit_before_suspension_without_world_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+    _use_real_airline_kernel,
+) -> None:
+    monkeypatch.setattr(airline_constraints, "_TAIL_VALUE_GBP", 150_000.01)
+    context = AirlineContext()
+    context.observation["maximum_value_gbp"] = 200_000.0
+    context._input["observation"]["maximum_value_gbp"] = 200_000.0
+    before_state = context.world.render_state()
+    before_journal = context.world.runtime.canonical_journal()
+    monkeypatch.setattr(durable, "run_agent_session", _valid_agent(context))
+
+    result = drive_airline_orchestrator(context)
+
+    governance_payload = next(
+        payload for name, payload in context.calls if name == "airline_governance_activity_trigger"
+    )
+    assert governance_payload["selected_option"]["value_gbp"] == 150_000.01
+    assert result["status"] == "denied"
+    assert "no rule matched" in result["reason"]
+    assert "value=150000.01" in result["reason"]
+    assert result["command"] is None
     assert context.external_event is None
+    assert not any(
+        name == "checkpoint_activity_trigger" and payload["kind"] == "suspended"
+        for name, payload in context.calls
+    )
     assert not _command_activity_calls(context)
     assert context.world.render_state() == before_state
     assert context.world.runtime.canonical_journal() == before_journal
