@@ -20,7 +20,7 @@ import { useWorldScene } from "@client/hooks/useWorldScene";
 import TelcoWorld from "@client/routes/TelcoWorld";
 import RegisteredSpatialWorld from "@client/components/world/SpatialWorld";
 import EmbeddedSpatialWorld from "@client/routes/SpatialWorld";
-import type { WorldSceneMetadata } from "@shared/runtime";
+import type { RuntimeDomain, WorldSceneMetadata } from "@shared/runtime";
 
 const WAITING_CAP = 40;
 const IN_SERVICE_CAP = 40;
@@ -77,6 +77,7 @@ export default function World() {
       telco={manifest.ui.lenses.includes("telco-network")}
       embeddedScene={typeof scene === "object" ? scene : undefined}
       spatial={scene === true}
+      domains={manifest.domains ?? []}
     />
   );
 }
@@ -85,10 +86,12 @@ function ActiveWorld({
   telco,
   embeddedScene,
   spatial,
+  domains,
 }: {
   telco: boolean;
   embeddedScene?: WorldSceneMetadata;
   spatial: boolean;
+  domains: RuntimeDomain[];
 }) {
   const {
     state,
@@ -227,6 +230,8 @@ function ActiveWorld({
         events={events}
         error={error}
         onReset={resetWorld}
+        domains={domains}
+        onRunProcess={runReferenceProcess}
       />
     );
   }

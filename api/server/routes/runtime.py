@@ -27,6 +27,14 @@ def runtime_payload(
     if runtime.pack.ui.world_scene is not None:
         ui["world_scene"] = runtime.pack.ui.world_scene.to_metadata()
 
+    domains = [
+        {
+            "workflow_type": domain.workflow_type,
+            "display_name": domain.display_name,
+        }
+        for _, domain in sorted(runtime.pack.domains.items())
+    ]
+
     return {
         "vertical": {
             "name": runtime.pack.name,
@@ -37,6 +45,7 @@ def runtime_payload(
         "world": runtime.world_name,
         "world_scale": runtime.world_scale_name,
         "capabilities": sorted(capabilities),
+        "domains": domains,
         "ui": ui,
     }
 

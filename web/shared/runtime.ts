@@ -37,6 +37,11 @@ export interface WorldSceneMetadata {
   event_mappings: WorldSceneEventMapping[];
 }
 
+export interface RuntimeDomain {
+  workflow_type: string;
+  display_name: string;
+}
+
 export interface RuntimeManifest {
   vertical: {
     name: string;
@@ -47,6 +52,7 @@ export interface RuntimeManifest {
   world: string | null;
   world_scale: string | null;
   capabilities: string[];
+  domains?: RuntimeDomain[];
   ui: {
     lenses: string[];
     theme: Record<string, string>;
