@@ -414,7 +414,7 @@ def project(
                     "decided_at": datetime.fromtimestamp(
                         workflow.created_at,
                         tz=timezone.utc,
-                    ).isoformat(),
+                    ),
                     "source_event": ("duty_operations_manager_decision"),
                     "attributes": _json(
                         {
@@ -437,7 +437,7 @@ def project(
                     "decided_at": datetime.fromtimestamp(
                         workflow.created_at,
                         tz=timezone.utc,
-                    ).isoformat(),
+                    ),
                     "source_event": str(
                         (evidence.get("gateway_event") or {}).get(
                             "event_id",
@@ -466,7 +466,7 @@ def project(
                     "decided_at": datetime.fromtimestamp(
                         workflow.created_at,
                         tz=timezone.utc,
-                    ).isoformat(),
+                    ),
                     "source_event": "airline.recovery.evaluation",
                     "attributes": _json(
                         {

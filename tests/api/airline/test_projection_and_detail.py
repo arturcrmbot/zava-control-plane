@@ -5,9 +5,18 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from api.server.services.entity_graph import DecisionWrite, EntityWrite, RelWrite
+from api.server.services.entity_graph import (
+    DecisionWrite,
+    EntityGraph,
+    EntityWrite,
+    RelWrite,
+)
+from api.server.services.entity_reflector import EntityReflector
+from api.server.services.event_bus import EventBus
 from api.server.services.governance.manifest import load_tools_yaml
+from api.server.services.state_store import StateStore
 from api.server.world.runtime import SimulationRuntime
+from api.shared.events import FleetEvent
 from api.shared.types import Workflow
 from api.shared.vertical_loader import build_runtime
 from verticals.airline.constraints import admit_recovery_options
@@ -188,6 +197,68 @@ def test_projection_writes_complete_canonical_recovery_graph(
     )
     assert any(item.src_id == "SYN-DECISION-001" and item.rel == "ISSUED_COMMAND" for item in relationships)
     assert any(item.rel == "EVALUATED_BY" and item.dst_id == "SYN-EVAL-AIRHUB-0001" for item in relationships)
+
+
+def test_projection_persists_complete_canonical_recovery_graph(
+    tmp_path: Path,
+) -> None:
+    pack = build_runtime({"ZAVA_VERTICAL": "airline"}, data_root=tmp_path).pack
+    workflow, _world = _completed_workflow(tmp_path)
+    command_id = workflow.payload["evidence"]["command"]["command_id"]
+    option_id = workflow.payload["evidence"]["approval"]["selected_option_id"]
+    bus = EventBus()
+    store = StateStore()
+    audit_entries: list[tuple[str, dict[str, Any]]] = []
+
+    class _RecordingAudit:
+        def log(self, action: str, details: dict[str, Any]) -> None:
+            audit_entries.append((action, details))
+
+    store.upsert_workflow(workflow)
+    with EntityGraph(tmp_path / "airline-projection.kuzu") as graph:
+        reflector = EntityReflector(
+            bus,
+            store,
+            graph,
+            audit=_RecordingAudit(),
+            projections=pack.projections,
+        )
+        reflector.start()
+        try:
+            bus.emit(
+                FleetEvent(
+                    type="workflow.completed",
+                    workflow_id=workflow.id,
+                )
+            )
+        finally:
+            reflector.aclose()
+
+        persistence_errors = [
+            details
+            for action, details in audit_entries
+            if action in {"entity.write.failed", "reflector.error"}
+        ]
+        assert persistence_errors == []
+
+        for entity_id in (
+            workflow.id,
+            "SYN-DECISION-001",
+            command_id,
+            "SYN-EVAL-AIRHUB-0001",
+        ):
+            assert graph.get(entity_id) is not None, entity_id
+
+        expected_relationships = (
+            ("SYN-DECISION-001", "DECIDED_ASSET", option_id),
+            ("SYN-DECISION-001", "ISSUED_COMMAND", command_id),
+            (command_id, "APPROVED_BY", "SYN-DECISION-001"),
+            (command_id, "EVALUATED_BY", "SYN-EVAL-AIRHUB-0001"),
+            ("SYN-EVAL-AIRHUB-0001", "RESOLVED_OBJECTIVE", workflow.id),
+        )
+        for src_id, rel, dst_id in expected_relationships:
+            linked_ids = {item["node"]["id"] for item in graph.linked(src_id, rel=rel)}
+            assert dst_id in linked_ids, (src_id, rel, dst_id)
 
 
 def test_detail_exposes_only_real_golden_slice_evidence(tmp_path: Path) -> None:
