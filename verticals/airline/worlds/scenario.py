@@ -409,6 +409,15 @@ class AirlineWorld:
 
     reference_process_types = (WORKFLOW_TYPE,)
 
+    def run_scenario(self, scenario_id: str) -> dict[str, Any]:
+        source = self.activate_scenario(scenario_id)
+        return {
+            "scenario_id": scenario_id,
+            "root_event_id": source.event_id,
+            "workflow_id": GOLDEN_WORKFLOW_ID,
+            "story_id": STORY_ID,
+        }
+
     def run_reference_process(
         self,
         workflow_type: str,

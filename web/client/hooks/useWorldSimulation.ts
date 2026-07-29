@@ -313,7 +313,7 @@ export interface UseWorldSimulationResult {
   error: string | null;
   injectSurge: () => Promise<void>;
   injectSiteFailure: () => Promise<void>;
-  runScenario: (name: TelcoScenarioName) => Promise<void>;
+  runScenario: (name: string) => Promise<void>;
   runReferenceProcess: (workflowType: string) => Promise<void>;
   resetWorld: () => Promise<void>;
 }
@@ -457,7 +457,7 @@ export function useWorldSimulation(): UseWorldSimulationResult {
   );
 
   const runScenario = useCallback(
-    async (name: TelcoScenarioName): Promise<void> => {
+    async (name: string): Promise<void> => {
       try {
         const response = await fetch(`/api/world/scenarios/${name}`, {
           method: "POST",

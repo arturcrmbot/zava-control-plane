@@ -19,6 +19,12 @@
     {"event_type": "airline.hub_disruption.detected", "layer": "sectors", "animation": "alert"},
     {"event_type": "sensor.tripped", "layer": "sectors", "animation": "pulse"}
   ],
+  "scenarios": [
+    {
+      "name": "synthetic-hub-cascade",
+      "label": "Integrated Hub Disruption"
+    }
+  ],
   "process_event_types": ["airline.hub_disruption.detected", "sensor.tripped"],
   "knowledge_relationship_label": "Synthetic inbound delay constrains the morning hub bank",
   "knowledge_actor_ids": ["SYN-SECTOR-IN-001", "SYN-STAND-01", "SYN-COHORT-001"]

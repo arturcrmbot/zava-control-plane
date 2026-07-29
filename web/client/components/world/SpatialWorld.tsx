@@ -35,6 +35,11 @@ export interface SceneEventMapping {
   animation: "move" | "pulse" | "appear" | "status" | string;
 }
 
+export interface SceneScenario {
+  name: string;
+  label: string;
+}
+
 export interface WorldSceneContract {
   enabled: true;
   schema_version: 1;
@@ -43,6 +48,7 @@ export interface WorldSceneContract {
   locations: SceneLocation[];
   layers: SceneLayer[];
   event_mappings: SceneEventMapping[];
+  scenarios?: SceneScenario[];
   process_event_types?: string[];
   knowledge_relationship_label?: string;
   knowledge_actor_ids?: string[];
@@ -54,6 +60,7 @@ interface SpatialWorldProps {
   events: WorldEvent[];
   error: string | null;
   onReset: () => Promise<void>;
+  onRunScenario: (name: string) => Promise<void>;
 }
 
 type ActorRecord = Record<string, unknown>;
@@ -206,9 +213,11 @@ export default function SpatialWorld({
   events,
   error,
   onReset,
+  onRunScenario,
 }: SpatialWorldProps) {
   const [selectedActor, setSelectedActor] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
+  const [runningScenario, setRunningScenario] = useState<string | null>(null);
   const latestByActor = useMemo(() => recentEventByActor(events), [events]);
   const processes = useMemo(
     () => processEvents(events, scene.process_event_types ?? [], state),
@@ -239,6 +248,15 @@ export default function SpatialWorld({
       setSelectedActor(null);
     } finally {
       setResetting(false);
+    }
+  }
+
+  async function runScenario(name: string) {
+    setRunningScenario(name);
+    try {
+      await onRunScenario(name);
+    } finally {
+      setRunningScenario(null);
     }
   }
 
@@ -284,6 +302,30 @@ export default function SpatialWorld({
           <div role="alert" className="rounded border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-800">
             {error}
           </div>
+        )}
+
+        {scene.scenarios && scene.scenarios.length > 0 && (
+          <section
+            aria-label="Deterministic stories"
+            className="flex flex-wrap items-center gap-2"
+          >
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Stories
+            </span>
+            {scene.scenarios.map((scenario) => (
+              <button
+                key={scenario.name}
+                type="button"
+                disabled={runningScenario !== null}
+                onClick={() => void runScenario(scenario.name)}
+                className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-700 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              >
+                {runningScenario === scenario.name
+                  ? "Running…"
+                  : scenario.label}
+              </button>
+            ))}
+          </section>
         )}
 
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">

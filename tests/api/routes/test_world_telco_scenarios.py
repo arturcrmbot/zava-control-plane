@@ -29,12 +29,31 @@ class _Service:
         self.calls: list[str] = []
 
     def run_scenario(self, name: str) -> dict:
+        if name not in SCENARIOS:
+            raise ValueError(f"unknown Telco scenario: {name!r}")
         self.calls.append(name)
         return {
             "scenario_id": f"{name}-42",
             "root_event_id": "evt-00000001",
             "seed": self.seed,
             "expected_first_sensor": SCENARIOS[name],
+        }
+
+
+class _AirlineService:
+    runtime = _Runtime()
+
+    def __init__(self):
+        self.calls: list[str] = []
+
+    def run_scenario(self, name: str) -> dict:
+        self.calls.append(name)
+        if name != "synthetic-hub-cascade":
+            raise ValueError(f"unsupported Airline scenario: {name!r}")
+        return {
+            "scenario_id": name,
+            "root_event_id": "evt-00000040",
+            "workflow_id": "AIRHUB-0001",
         }
 
 
@@ -86,3 +105,22 @@ def test_telco_scenario_endpoint_requires_live_telco_world(client):
 
     assert response.status_code == 200
     assert response.json()["ok"] is False
+
+
+def test_scenario_endpoint_delegates_pack_owned_airline_story(
+    client,
+    monkeypatch,
+):
+    service = _AirlineService()
+    monkeypatch.setattr(app_state, "world_service", service, raising=False)
+
+    response = client.post("/api/world/scenarios/synthetic-hub-cascade")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ok": True,
+        "scenario_id": "synthetic-hub-cascade",
+        "root_event_id": "evt-00000040",
+        "workflow_id": "AIRHUB-0001",
+    }
+    assert service.calls == ["synthetic-hub-cascade"]

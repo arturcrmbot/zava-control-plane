@@ -137,16 +137,6 @@ class WorldResetRequest(BaseModel):
     seed: int | None = None
 
 
-TELCO_SCENARIOS = frozenset(
-    {
-        "storm-cascade",
-        "maintenance-save",
-        "capacity-revenue",
-        "vulnerable-retention",
-    }
-)
-
-
 @router.get("/state")
 async def world_state(compact: bool = False) -> dict:
     service = getattr(app_state, "world_service", None)
@@ -406,15 +396,13 @@ async def inject_technician_unavailable(body: TechnicianUnavailableRequest) -> d
 
 
 @router.post("/scenarios/{name}")
-async def run_telco_scenario(name: str) -> dict:
-    if name not in TELCO_SCENARIOS:
-        return {"ok": False, "error": f"unknown Telco scenario: {name!r}"}
+async def run_world_scenario(name: str) -> dict:
     service = getattr(app_state, "world_service", None)
     run = getattr(service, "run_scenario", None) if service is not None else None
     if run is None:
         return {
             "ok": False,
-            "error": "telco world not enabled (set ZAVA_WORLD=telco)",
+            "error": "actor world does not expose deterministic scenarios",
         }
     try:
         result = run(name)

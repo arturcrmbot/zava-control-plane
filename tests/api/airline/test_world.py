@@ -69,6 +69,20 @@ def test_second_scenario_activation_reuses_source_without_duplicate_sensor() -> 
     )
 
 
+def test_run_scenario_exposes_the_golden_story_to_operator_surfaces() -> None:
+    runtime, world = _world()
+
+    result = world.run_scenario("synthetic-hub-cascade")
+
+    assert result == {
+        "scenario_id": "synthetic-hub-cascade",
+        "root_event_id": "evt-00000040",
+        "workflow_id": "AIRHUB-0001",
+        "story_id": "SYN-STORY-HUB-001",
+    }
+    assert runtime.journal[-1].type == "sensor.tripped"
+
+
 def test_unknown_scenario_is_rejected_without_mutation() -> None:
     runtime, world = _world()
     before = world.render_state()
@@ -208,3 +222,9 @@ def test_registered_scene_is_bounded_and_matches_rendered_collections() -> None:
     assert all(location["id"].startswith("SYN-") for location in scene["locations"])
     assert all("Synthetic" in location["label"] for location in scene["locations"])
     assert {layer["state_key"] for layer in scene["layers"]} <= world.render_state().keys()
+    assert scene["scenarios"] == [
+        {
+            "name": "synthetic-hub-cascade",
+            "label": "Integrated Hub Disruption",
+        }
+    ]

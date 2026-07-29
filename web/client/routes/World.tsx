@@ -227,6 +227,7 @@ function ActiveWorld({
         events={events}
         error={error}
         onReset={resetWorld}
+        onRunScenario={runScenario}
       />
     );
   }
