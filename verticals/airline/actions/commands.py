@@ -34,6 +34,15 @@ _KNOWN_OPTION_IDS = {
 }
 
 
+def recovery_command_id(
+    *,
+    workflow_id: str,
+    decision_id: str,
+    option_id: str,
+) -> str:
+    return f"SYN-CMD-{workflow_id}-{decision_id}-{option_id}"
+
+
 def _result_for(
     observation: dict[str, Any],
     option_id: str,
@@ -52,7 +61,7 @@ def command_for_option(
     decision_id: str,
     persona: str,
 ) -> SimulationCommand:
-    observation = world._current_recovery_observation()
+    observation = world.current_recovery_observation()
     result = _result_for(observation, option_id)
     if result is None:
         raise ValueError(f"unknown recovery option: {option_id!r}")
@@ -61,7 +70,11 @@ def command_for_option(
         raise ValueError(f"recovery option {option_id!r} is not admitted: {reasons}")
     option = result.option
     return SimulationCommand(
-        command_id=f"SYN-CMD-{workflow_id}-{decision_id}-{option_id}",
+        command_id=recovery_command_id(
+            workflow_id=workflow_id,
+            decision_id=decision_id,
+            option_id=option_id,
+        ),
         trace_id=str(observation["trace_id"]),
         issued_by=_ISSUER,
         type=COMMAND_TYPE,
@@ -113,7 +126,7 @@ def _validated_option(
     if world.disruption_status.get(STORY_ID) != "active":
         return None, None, f"disruption {STORY_ID!r} is not active"
 
-    observation = world._current_recovery_observation()
+    observation = world.current_recovery_observation()
     result = _result_for(observation, str(option_id))
     if result is None:
         return None, observation, f"unknown recovery option {option_id!r}"
@@ -226,8 +239,7 @@ def _evaluation_results(
                 sector.aircraft_id == tail.id
                 and tail.status == "assigned"
                 and sum(
-                    item.aircraft_id == tail.id
-                    and item.status not in {"cancelled", "completed"}
+                    item.aircraft_id == tail.id and item.status not in {"cancelled", "completed"}
                     for item in world.sectors.values()
                 )
                 == 1,
@@ -244,8 +256,7 @@ def _evaluation_results(
             ),
             (
                 "slot_preserved",
-                sector.slot_id == "SYN-SLOT-05"
-                and world.slots[sector.slot_id].status == "allocated",
+                sector.slot_id == "SYN-SLOT-05" and world.slots[sector.slot_id].status == "allocated",
             ),
             (
                 "disruption_resolved",
@@ -261,12 +272,8 @@ def _evaluation_results(
             ),
         )
     else:
-        raise ValueError(
-            f"recovery option {option.option_id!r} has no registered evaluator"
-        )
-    results = tuple(
-        f"{name}:{'pass' if passed else 'fail'}" for name, passed in checks
-    )
+        raise ValueError(f"recovery option {option.option_id!r} has no registered evaluator")
+    results = tuple(f"{name}:{'pass' if passed else 'fail'}" for name, passed in checks)
     return ("pass" if all(passed for _, passed in checks) else "fail"), results
 
 

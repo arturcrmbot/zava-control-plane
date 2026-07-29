@@ -31,6 +31,10 @@ _CONSTRAINED_STAND_ID = "SYN-STAND-01"
 _INBOUND_DELAY_MINUTES = 45
 
 
+class RecoveryObservationUnavailableError(RuntimeError):
+    pass
+
+
 def _json_value(value: Any) -> Any:
     if isinstance(value, tuple):
         return [_json_value(item) for item in value]
@@ -68,9 +72,7 @@ class AirlineWorld:
         self.disruption_status: dict[str, str] = {}
         self._installed = False
         self._scenario_events: dict[str, SimulationEvent] = {}
-        self._processed_commands: dict[
-            str, tuple[SimulationCommand, SimulationEvent]
-        ] = {}
+        self._processed_commands: dict[str, tuple[SimulationCommand, SimulationEvent]] = {}
         self._command_conflicts: dict[str, SimulationEvent] = {}
 
     def install(self) -> None:
@@ -146,14 +148,8 @@ class AirlineWorld:
 
         sector = self.sectors[_INBOUND_SECTOR_ID]
         stand = self.stands[_CONSTRAINED_STAND_ID]
-        rotation = next(
-            item for item in self.rotations.values() if sector.id in item.sector_ids
-        )
-        cohorts = [
-            item
-            for item in self.connection_cohorts.values()
-            if item.inbound_sector_id == sector.id
-        ]
+        rotation = next(item for item in self.rotations.values() if sector.id in item.sector_ids)
+        cohorts = [item for item in self.connection_cohorts.values() if item.inbound_sector_id == sector.id]
 
         sector.delay_minutes = _INBOUND_DELAY_MINUTES
         sector.status = "delayed"
@@ -208,10 +204,7 @@ class AirlineWorld:
         *,
         now: float | None = None,
     ) -> dict[str, Any]:
-        if (
-            sensor_event.get("type") != "sensor.tripped"
-            or sensor_event.get("actor_id") != SENSOR_ID
-        ):
+        if sensor_event.get("type") != "sensor.tripped" or sensor_event.get("actor_id") != SENSOR_ID:
             raise ValueError("observation requires the integrated hub sensor event")
         payload = sensor_event.get("payload") or {}
         sector_id = payload.get("inbound_sector_id")
@@ -221,15 +214,9 @@ class AirlineWorld:
 
         sector = self.sectors[sector_id]
         stand = self.stands[stand_id]
-        rotation = next(
-            item for item in self.rotations.values() if sector.id in item.sector_ids
-        )
+        rotation = next(item for item in self.rotations.values() if sector.id in item.sector_ids)
         cohorts = sorted(
-            (
-                item
-                for item in self.connection_cohorts.values()
-                if item.inbound_sector_id == sector.id
-            ),
+            (item for item in self.connection_cohorts.values() if item.inbound_sector_id == sector.id),
             key=lambda item: item.id,
         )
         outbound_sector = self.sectors[rotation.sector_ids[-1]]
@@ -280,12 +267,10 @@ class AirlineWorld:
             "candidate_crew_duty": _record_view(candidate_crew),
             "candidate_stand": _record_view(candidate_stand),
             "sectors": [
-                _record_view(item)
-                for item in sorted(self.sectors.values(), key=lambda item: item.id)
+                _record_view(item) for item in sorted(self.sectors.values(), key=lambda item: item.id)
             ],
             "evidence_versions": {
-                record_id: evidence_records[record_id].version
-                for record_id in sorted(evidence_records)
+                record_id: evidence_records[record_id].version for record_id in sorted(evidence_records)
             },
             "maximum_value_gbp": 150_000.0,
             "evidence_event_ids": [
@@ -294,9 +279,9 @@ class AirlineWorld:
             ],
         }
 
-    def _current_recovery_observation(self) -> dict[str, Any]:
+    def current_recovery_observation(self) -> dict[str, Any]:
         if self.disruption_status.get(STORY_ID) != "active":
-            raise RuntimeError("integrated hub disruption is not active")
+            raise RecoveryObservationUnavailableError("integrated hub disruption is not active")
         sensor = next(
             (
                 event
@@ -308,7 +293,7 @@ class AirlineWorld:
             None,
         )
         if sensor is None:
-            raise RuntimeError("integrated hub disruption sensor evidence is missing")
+            raise RecoveryObservationUnavailableError("integrated hub disruption sensor evidence is missing")
         return self.build_observation(sensor.to_dict())
 
     def command_for_option(
@@ -319,8 +304,29 @@ class AirlineWorld:
         decision_id: str,
         persona: str,
     ) -> SimulationCommand:
-        from verticals.airline.actions.commands import command_for_option
+        from verticals.airline.actions.commands import (
+            command_for_option,
+            recovery_command_id,
+        )
 
+        command_id = recovery_command_id(
+            workflow_id=workflow_id,
+            decision_id=decision_id,
+            option_id=option_id,
+        )
+        cached = self._processed_commands.get(command_id)
+        if cached is not None:
+            prior_command, _ = cached
+            prior_identity = (
+                prior_command.payload.get("workflow_id"),
+                prior_command.payload.get("decision_id"),
+                prior_command.payload.get("option_id"),
+                prior_command.payload.get("persona"),
+            )
+            requested_identity = (workflow_id, decision_id, option_id, persona)
+            if prior_identity != requested_identity:
+                raise ValueError("recovery command identity does not match the processed command")
+            return copy.deepcopy(prior_command)
         return command_for_option(
             self,
             option_id=option_id,
@@ -328,6 +334,9 @@ class AirlineWorld:
             decision_id=decision_id,
             persona=persona,
         )
+
+    def command_was_processed(self, command_id: str) -> bool:
+        return command_id in self._processed_commands
 
     def apply_command(self, command: SimulationCommand) -> SimulationEvent:
         cached = self._processed_commands.get(command.command_id)
@@ -355,10 +364,7 @@ class AirlineWorld:
 
     def render_state(self) -> dict[str, list[dict[str, Any]]]:
         def rows(records: dict[str, Any]) -> list[dict[str, Any]]:
-            return [
-                _record_view(record)
-                for record in sorted(records.values(), key=lambda item: item.id)
-            ]
+            return [_record_view(record) for record in sorted(records.values(), key=lambda item: item.id)]
 
         cohort_rows = rows(self.connection_cohorts)
         for row in cohort_rows:

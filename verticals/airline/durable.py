@@ -13,7 +13,7 @@ import azure.durable_functions as df
 
 from api.functions.kernel_registration import create_app
 from api.server.services.governance import kernel
-from api.server.world.runtime import SimulationRuntime
+from verticals.airline.actions.commands import recovery_command_id
 from verticals.airline.constraints import FeasibilityResult, admit_recovery_options
 from verticals.airline.mcp_tools import operations
 from verticals.airline.process_profiles import (
@@ -21,12 +21,15 @@ from verticals.airline.process_profiles import (
     HITL_EVENT,
     HITL_PERSONA,
     ORCHESTRATOR as _ORCHESTRATOR,
-    SCENARIO_ID,
     STORY_ID,
     SUCCESS_EVENT,
     WORKFLOW_TYPE,
 )
-from verticals.airline.worlds.scenario import AirlineWorld
+from verticals.airline.worlds.active import resolve_active_airline_world
+from verticals.airline.worlds.scenario import (
+    AirlineWorld,
+    RecoveryObservationUnavailableError,
+)
 
 
 app = create_app()
@@ -36,6 +39,15 @@ _RANKING_PHASE = "Synthesize Recovery Options"
 _HITL_PHASE = "Approve Recovery Plan"
 _IMPACT_KEYS = {"phase", "actor_ids", "event_ids", "impact_summary"}
 _RANKING_KEYS = {"phase", "ranked_option_ids", "reasoning"}
+_CANONICAL_TOOL_CALL_KEYS = {
+    "tool_call_id",
+    "name",
+    "tool",
+    "args",
+    "result",
+    "success",
+    "latency_ms",
+}
 ORCHESTRATOR = _ORCHESTRATOR
 _PHASE_CONTRACTS = {
     _IMPACT_PHASE: (
@@ -186,15 +198,33 @@ def _business_agent_output(
     if not set(result) <= allowed_keys or not expected_keys <= set(result):
         raise ValueError(f"Airline agent response must contain exactly {sorted(expected_keys)} business keys")
     calls = result.get("_raw_tool_calls")
-    if calls is not None:
-        if not isinstance(calls, list):
-            raise ValueError("Airline agent tool evidence must be a list")
-        business_calls = [
-            call for call in calls if isinstance(call, dict) and call.get("name") in operations.TOOL_NAMES
-        ]
-        if any(
-            call.get("name") != expected_tool_name or call.get("success") is not True
-            for call in business_calls
+    if not isinstance(calls, list) or not calls:
+        raise ValueError("Airline agent requires a successful declared business tool call")
+    if len(calls) != 1:
+        raise ValueError("Airline agent requires exactly one declared business tool call")
+    for call in calls:
+        if (
+            not isinstance(call, dict)
+            or set(call) != _CANONICAL_TOOL_CALL_KEYS
+            or not isinstance(call.get("tool_call_id"), str)
+            or not call["tool_call_id"].strip()
+            or not isinstance(call.get("name"), str)
+            or not call["name"].strip()
+            or call.get("tool") != call["name"]
+            or not isinstance(call.get("args"), str)
+            or not call["args"].strip()
+            or not isinstance(call.get("result"), str)
+            or not call["result"].strip()
+            or not isinstance(call.get("success"), bool)
+            or isinstance(call.get("latency_ms"), bool)
+            or not isinstance(call.get("latency_ms"), int)
+            or call["latency_ms"] < 0
+        ):
+            raise ValueError("Airline agent tool evidence is malformed")
+        if (
+            call["name"] != expected_tool_name
+            or call["name"] not in operations.TOOL_NAMES
+            or call["success"] is not True
         ):
             raise ValueError("Airline agent used an undeclared or unsuccessful tool")
     return {key: result[key] for key in expected_keys}
@@ -368,11 +398,7 @@ def _approval_reason(
 
 
 def _active_world() -> AirlineWorld:
-    runtime = SimulationRuntime(seed=42)
-    world = AirlineWorld(seed=42, runtime=runtime)
-    world.install()
-    world.activate_scenario(SCENARIO_ID)
-    return world
+    return resolve_active_airline_world()
 
 
 def airline_command_activity(
@@ -391,12 +417,6 @@ def airline_command_activity(
         name="hitl_context.evidence_versions",
     )
     target_world = world if world is not None else _active_world()
-    current_versions = _evidence_versions(
-        target_world._current_recovery_observation().get("evidence_versions"),
-        name="current_world.evidence_versions",
-    )
-    if current_versions != expected_versions:
-        return _denied("world evidence is stale relative to the HITL checkpoint")
     option_id = _required_string(
         approval.get("selected_option_id"),
         name="approval.selected_option_id",
@@ -405,12 +425,50 @@ def airline_command_activity(
         approval.get("decision_id"),
         name="approval.decision_id",
     )
-    command = target_world.command_for_option(
-        option_id=option_id,
+    command_id = recovery_command_id(
         workflow_id=workflow_id,
         decision_id=decision_id,
-        persona=HITL_PERSONA,
+        option_id=option_id,
     )
+    is_retry = target_world.command_was_processed(command_id)
+    if is_retry:
+        try:
+            command = target_world.command_for_option(
+                option_id=option_id,
+                workflow_id=workflow_id,
+                decision_id=decision_id,
+                persona=HITL_PERSONA,
+            )
+        except ValueError as exc:
+            return _denied(f"command retry identity is invalid: {exc}")
+        version_source = command.payload
+    else:
+        try:
+            version_source = target_world.current_recovery_observation()
+        except RecoveryObservationUnavailableError as exc:
+            return _denied(f"selected recovery option is stale or infeasible: {exc}")
+    current_versions = _evidence_versions(
+        version_source.get("evidence_versions"),
+        name="current_world.evidence_versions",
+    )
+    if current_versions != expected_versions:
+        return _denied("world evidence is stale relative to the HITL checkpoint")
+    if not is_retry:
+        try:
+            command = target_world.command_for_option(
+                option_id=option_id,
+                workflow_id=workflow_id,
+                decision_id=decision_id,
+                persona=HITL_PERSONA,
+            )
+        except (RecoveryObservationUnavailableError, ValueError) as exc:
+            return _denied(f"selected recovery option is stale or infeasible: {exc}")
+        command_versions = _evidence_versions(
+            command.payload.get("evidence_versions"),
+            name="command.evidence_versions",
+        )
+        if command_versions != expected_versions:
+            return _denied("world evidence became stale while constructing the recovery command")
     gateway_event = target_world.apply_command(command)
     if gateway_event.type != "command.accepted":
         reason = str(gateway_event.payload.get("reason") or "world command gateway denied")
@@ -450,6 +508,15 @@ def airline_orchestration(
                     **event_payload,
                     "workflow_type": WORKFLOW_TYPE,
                 },
+            },
+        )
+
+    def terminal_checkpoint(result: dict[str, Any]) -> Any:
+        return checkpoint(
+            "workflow.completed",
+            {
+                "status": result["status"],
+                "reason": result["reason"],
             },
         )
 
@@ -507,7 +574,9 @@ def airline_orchestration(
         },
     )
     if not authority.get("allowed"):
-        return _denied(str(authority.get("reason") or "governance denied"))
+        denial = _denied(str(authority.get("reason") or "governance denied"))
+        yield terminal_checkpoint(denial)
+        return denial
 
     hitl_context = {
         "workflow_id": workflow_id,
@@ -540,7 +609,9 @@ def airline_orchestration(
     timer = context.create_timer(context.current_utc_datetime + timedelta(minutes=5))
     winner = yield context.task_any([decision_event, timer])
     if winner == timer:
-        return _denied(f"{_HITL_PHASE} timed out")
+        denial = _denied(f"{_HITL_PHASE} timed out")
+        yield terminal_checkpoint(denial)
+        return denial
     timer.cancel()
     approval = decision_event.result
     yield checkpoint("resumed", {"phase": _HITL_PHASE})
@@ -552,7 +623,9 @@ def airline_orchestration(
         evidence_versions=evidence["evidence_versions"],
     )
     if denial_reason is not None:
-        return _denied(denial_reason)
+        denial = _denied(denial_reason)
+        yield terminal_checkpoint(denial)
+        return denial
 
     yield checkpoint("step.started", {"step": "Commit Recovery Actions"})
     decision = yield context.call_activity(
@@ -565,6 +638,7 @@ def airline_orchestration(
         },
     )
     if decision.get("status") != "decision_ready":
+        yield terminal_checkpoint(decision)
         return decision
     yield checkpoint(
         "step.completed",

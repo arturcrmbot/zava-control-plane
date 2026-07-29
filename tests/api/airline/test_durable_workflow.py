@@ -13,7 +13,14 @@ import yaml
 import verticals.airline.durable as durable
 from api.server.world.runtime import SimulationRuntime
 from verticals.airline.mcp_tools import operations
+from verticals.airline.worlds.active import (
+    register_active_airline_world,
+    unregister_active_airline_world,
+)
 from verticals.airline.worlds.scenario import AirlineWorld
+
+_REAL_KERNEL = durable.kernel
+_MISSING = object()
 
 
 class _Task:
@@ -133,6 +140,7 @@ def _valid_agent(
                 "actor_ids": context.observation["actor_ids"],
                 "event_ids": context.observation["event_ids"],
                 "impact_summary": "Rotation, crew, stand and connection impact.",
+                "_raw_tool_calls": [_tool_call(operations.airline_read_disruption_evidence.name)],
             }
         return {
             "phase": phase,
@@ -141,13 +149,56 @@ def _valid_agent(
                 "SYN-OPTION-CANCEL",
             ],
             "reasoning": "Ranks only admitted options.",
+            "_raw_tool_calls": [_tool_call(operations.airline_rank_feasible_recovery_options.name)],
         }
 
     return fake_run_agent_session
 
 
+def _tool_call(name: str, *, success: bool = True) -> dict[str, Any]:
+    return {
+        "tool_call_id": f"call-{name}",
+        "name": name,
+        "tool": name,
+        "args": "{}",
+        "result": "{}",
+        "success": success,
+        "latency_ms": 0,
+    }
+
+
 def _command_activity_calls(context: AirlineContext) -> list[dict[str, Any]]:
     return [payload for name, payload in context.calls if name == "airline_command_activity_trigger"]
+
+
+def _terminal_checkpoints(context: AirlineContext) -> list[dict[str, Any]]:
+    return [
+        {"kind": payload["kind"], **payload["payload"]}
+        for name, payload in context.calls
+        if name == "checkpoint_activity_trigger" and payload["kind"] == "workflow.completed"
+    ]
+
+
+def _assert_terminal_denial(
+    context: AirlineContext,
+    result: dict[str, Any],
+) -> None:
+    assert _terminal_checkpoints(context) == [
+        {
+            "kind": "workflow.completed",
+            "status": result["status"],
+            "reason": result["reason"],
+            "workflow_type": "integrated-hub-disruption-recovery",
+        }
+    ]
+
+
+def _command_payload(context: AirlineContext) -> dict[str, Any]:
+    return {
+        "workflow_id": "AIRHUB-0001",
+        "approval": context.approval.result,
+        "hitl_context": {"evidence_versions": copy.deepcopy(context.observation["evidence_versions"])},
+    }
 
 
 def test_golden_orchestrator_uses_real_agent_identity_and_exact_hitl_event(
@@ -163,28 +214,9 @@ def test_golden_orchestrator_uses_real_agent_identity_and_exact_hitl_event(
     )
     captured = []
 
-    async def fake_run_agent_session(prompt: str, **kwargs):
-        captured.append(kwargs)
-        phase = kwargs["phase"]
-        if phase == "Assess Network Impact":
-            return {
-                "phase": phase,
-                "actor_ids": context.observation["actor_ids"],
-                "event_ids": context.observation["event_ids"],
-                "impact_summary": "Rotation, crew, stand and connection impact.",
-            }
-        return {
-            "phase": phase,
-            "ranked_option_ids": [
-                "SYN-OPTION-TAIL-CREW-STAND",
-                "SYN-OPTION-CANCEL",
-            ],
-            "reasoning": "Ranks only admitted options.",
-        }
-
     monkeypatch.setattr(
         "verticals.airline.durable.run_agent_session",
-        fake_run_agent_session,
+        _valid_agent(context, captured),
     )
     result = drive_airline_orchestrator(context)
     assert context.external_event == "duty_operations_manager_decision"
@@ -196,6 +228,7 @@ def test_golden_orchestrator_uses_real_agent_identity_and_exact_hitl_event(
     assert all(item["instance_id"] == context.instance_id for item in captured)
     assert result["status"] == "decision_ready"
     assert result["command"]["type"] == "airline.commit_recovery_plan"
+    assert _terminal_checkpoints(context) == []
 
 
 def test_rejection_decision_returns_denied_without_command(monkeypatch) -> None:
@@ -215,6 +248,7 @@ def test_rejection_decision_returns_denied_without_command(monkeypatch) -> None:
     assert "approve" in result["reason"]
     assert result["command"] is None
     assert not _command_activity_calls(context)
+    _assert_terminal_denial(context, result)
 
 
 def test_wrong_persona_returns_denied_without_command(monkeypatch) -> None:
@@ -234,6 +268,7 @@ def test_wrong_persona_returns_denied_without_command(monkeypatch) -> None:
     assert "persona" in result["reason"]
     assert result["command"] is None
     assert not _command_activity_calls(context)
+    _assert_terminal_denial(context, result)
 
 
 @pytest.mark.parametrize(
@@ -260,6 +295,7 @@ def test_wrong_or_non_admitted_option_returns_denied(
     assert "option" in result["reason"]
     assert result["command"] is None
     assert not _command_activity_calls(context)
+    _assert_terminal_denial(context, result)
 
 
 def test_stale_approval_evidence_returns_denied_without_command(monkeypatch) -> None:
@@ -280,6 +316,7 @@ def test_stale_approval_evidence_returns_denied_without_command(monkeypatch) -> 
     assert "stale" in result["reason"]
     assert result["command"] is None
     assert not _command_activity_calls(context)
+    _assert_terminal_denial(context, result)
 
 
 def test_world_evidence_changed_after_checkpoint_returns_denied(monkeypatch) -> None:
@@ -299,6 +336,68 @@ def test_world_evidence_changed_after_checkpoint_returns_denied(monkeypatch) -> 
     assert result["status"] == "denied"
     assert "stale" in result["reason"]
     assert result["command"] is None
+    _assert_terminal_denial(context, result)
+
+
+@pytest.mark.parametrize(
+    ("increment_version", "expected_reason"),
+    [(True, "stale"), (False, "infeasible")],
+)
+def test_world_drift_making_selected_option_infeasible_returns_terminal_denial(
+    monkeypatch: pytest.MonkeyPatch,
+    increment_version: bool,
+    expected_reason: str,
+) -> None:
+    context = AirlineContext(
+        approval={
+            "decision": "approve",
+            "persona": "duty_operations_manager",
+            "decision_id": "SYN-DECISION-001",
+            "selected_option_id": "SYN-OPTION-TAIL-CREW-STAND",
+        }
+    )
+    reserve_aircraft = context.world.aircraft["SYN-TAIL-005"]
+    reserve_aircraft.status = "unavailable"
+    if increment_version:
+        reserve_aircraft.version += 1
+    before_state = context.world.render_state()
+    before_journal = context.world.runtime.canonical_journal()
+    monkeypatch.setattr(durable, "run_agent_session", _valid_agent(context))
+
+    result = drive_airline_orchestrator(context)
+
+    assert result["status"] == "denied"
+    assert expected_reason in result["reason"]
+    assert result["command"] is None
+    assert context.world.render_state() == before_state
+    assert context.world.runtime.canonical_journal() == before_journal
+    _assert_terminal_denial(context, result)
+
+
+def test_world_drift_closing_disruption_returns_terminal_denial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = AirlineContext(
+        approval={
+            "decision": "approve",
+            "persona": "duty_operations_manager",
+            "decision_id": "SYN-DECISION-001",
+            "selected_option_id": "SYN-OPTION-TAIL-CREW-STAND",
+        }
+    )
+    context.world.disruption_status["SYN-STORY-HUB-001"] = "resolved"
+    before_state = context.world.render_state()
+    before_journal = context.world.runtime.canonical_journal()
+    monkeypatch.setattr(durable, "run_agent_session", _valid_agent(context))
+
+    result = drive_airline_orchestrator(context)
+
+    assert result["status"] == "denied"
+    assert "stale or infeasible" in result["reason"]
+    assert result["command"] is None
+    assert context.world.render_state() == before_state
+    assert context.world.runtime.canonical_journal() == before_journal
+    _assert_terminal_denial(context, result)
 
 
 def test_timeout_returns_denied_without_command(monkeypatch) -> None:
@@ -311,6 +410,7 @@ def test_timeout_returns_denied_without_command(monkeypatch) -> None:
     assert "timed out" in result["reason"]
     assert result["command"] is None
     assert not _command_activity_calls(context)
+    _assert_terminal_denial(context, result)
 
 
 def test_suspended_checkpoint_persists_complete_hitl_context(monkeypatch) -> None:
@@ -375,6 +475,7 @@ def test_agent_outputs_are_strictly_validated(
                 "actor_ids": context.observation["actor_ids"],
                 "event_ids": context.observation["event_ids"],
                 "impact_summary": "Versioned synthetic impact.",
+                "_raw_tool_calls": [_tool_call(operations.airline_read_disruption_evidence.name)],
             }
             if invalid_case == "impact_extra_key":
                 result["recommendation"] = "invented"
@@ -394,6 +495,7 @@ def test_agent_outputs_are_strictly_validated(
                 "SYN-OPTION-CANCEL",
             ],
             "reasoning": "Ranks all admitted options once.",
+            "_raw_tool_calls": [_tool_call(operations.airline_rank_feasible_recovery_options.name)],
         }
         if invalid_case == "ranking_wrong_phase":
             result["phase"] = "Different phase"
@@ -417,6 +519,147 @@ def test_agent_outputs_are_strictly_validated(
 
     with pytest.raises(ValueError, match="Airline agent"):
         drive_airline_orchestrator(context)
+
+
+@pytest.mark.parametrize(
+    ("raw_calls", "expected_message"),
+    [
+        (_MISSING, "requires a successful declared business tool call"),
+        ([], "requires a successful declared business tool call"),
+        (
+            [
+                _tool_call(operations.airline_read_disruption_evidence.name),
+                {
+                    **_tool_call(operations.airline_read_disruption_evidence.name),
+                    "tool_call_id": "call-duplicate",
+                },
+            ],
+            "exactly one",
+        ),
+        (
+            [_tool_call(operations.airline_rank_feasible_recovery_options.name)],
+            "undeclared or unsuccessful",
+        ),
+        (
+            [_tool_call("vendor_registry_lookup")],
+            "undeclared or unsuccessful",
+        ),
+        (
+            [
+                _tool_call(
+                    operations.airline_read_disruption_evidence.name,
+                    success=False,
+                )
+            ],
+            "undeclared or unsuccessful",
+        ),
+        (
+            [{"name": operations.airline_read_disruption_evidence.name}],
+            "malformed",
+        ),
+        (
+            [
+                {
+                    key: value
+                    for key, value in _tool_call(operations.airline_read_disruption_evidence.name).items()
+                    if key != "tool_call_id"
+                }
+            ],
+            "malformed",
+        ),
+        (
+            [
+                {
+                    **_tool_call(operations.airline_read_disruption_evidence.name),
+                    "unexpected": True,
+                }
+            ],
+            "malformed",
+        ),
+        (
+            [
+                {
+                    **_tool_call(operations.airline_read_disruption_evidence.name),
+                    "args": "",
+                }
+            ],
+            "malformed",
+        ),
+        (
+            [
+                {
+                    **_tool_call(operations.airline_read_disruption_evidence.name),
+                    "result": "",
+                }
+            ],
+            "malformed",
+        ),
+        (
+            [_tool_call("skill.metadata")],
+            "undeclared or unsuccessful",
+        ),
+        (
+            [_tool_call("vendor_registry_lookup", success=False)],
+            "undeclared or unsuccessful",
+        ),
+        (
+            [
+                _tool_call(operations.airline_read_disruption_evidence.name),
+                _tool_call(operations.airline_rank_feasible_recovery_options.name),
+            ],
+            "exactly one",
+        ),
+    ],
+)
+def test_agent_phase_requires_canonical_declared_successful_business_tool_call(
+    raw_calls: object,
+    expected_message: str,
+) -> None:
+    context = AirlineContext(timeout=True)
+    result = {
+        "phase": "Assess Network Impact",
+        "actor_ids": context.observation["actor_ids"],
+        "event_ids": context.observation["event_ids"],
+        "impact_summary": "Versioned synthetic impact.",
+    }
+    if raw_calls is not _MISSING:
+        result["_raw_tool_calls"] = raw_calls
+
+    with pytest.raises(ValueError, match=expected_message):
+        durable._validate_impact_output(
+            {
+                "evidence": {
+                    "actor_ids": context.observation["actor_ids"],
+                    "event_ids": context.observation["event_ids"],
+                }
+            },
+            result,
+        )
+
+
+def test_canonical_internal_tool_metadata_is_rejected_alongside_business_call() -> None:
+    context = AirlineContext(timeout=True)
+    result = {
+        "phase": "Assess Network Impact",
+        "actor_ids": context.observation["actor_ids"],
+        "event_ids": context.observation["event_ids"],
+        "impact_summary": "Versioned synthetic impact.",
+        "_raw_tool_calls": [
+            _tool_call("skill.metadata"),
+            _tool_call(operations.airline_read_disruption_evidence.name),
+        ],
+    }
+
+    with pytest.raises(ValueError, match="exactly one"):
+        durable._validate_impact_output(
+            {
+                "evidence": {
+                    "actor_ids": context.observation["actor_ids"],
+                    "event_ids": context.observation["event_ids"],
+                }
+            },
+            result,
+        )
 
 
 def test_live_agent_failure_propagates_without_deterministic_fallback(
@@ -534,6 +777,154 @@ def test_governance_denial_fails_closed_before_suspension(
     assert result["reason"] == "outside delegated authority"
     assert result["command"] is None
     assert context.external_event is None
+    _assert_terminal_denial(context, result)
+
+
+def test_real_governance_kernel_denies_before_suspension_without_world_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = AirlineContext()
+    before_state = context.world.render_state()
+    before_journal = context.world.runtime.canonical_journal()
+    monkeypatch.setattr(durable, "kernel", _REAL_KERNEL)
+    monkeypatch.setattr(durable, "run_agent_session", _valid_agent(context))
+
+    result = drive_airline_orchestrator(context)
+
+    assert result["status"] == "denied"
+    assert result["command"] is None
+    assert context.external_event is None
+    assert not _command_activity_calls(context)
+    assert context.world.render_state() == before_state
+    assert context.world.runtime.canonical_journal() == before_journal
+    _assert_terminal_denial(context, result)
+
+
+def test_registered_command_world_is_mutated_and_journal_remains_observable() -> None:
+    context = AirlineContext(
+        approval={
+            "decision": "approve",
+            "persona": "duty_operations_manager",
+            "decision_id": "SYN-DECISION-001",
+            "selected_option_id": "SYN-OPTION-TAIL-CREW-STAND",
+        }
+    )
+    journal_size = len(context.world.runtime.journal)
+    register_active_airline_world(context.world)
+    try:
+        result = durable.airline_command_activity(_command_payload(context))
+    finally:
+        unregister_active_airline_world(context.world)
+
+    assert result["status"] == "decision_ready"
+    assert context.world.sectors["SYN-SECTOR-OUT-001"].aircraft_id == "SYN-TAIL-005"
+    assert len(context.world.runtime.journal) > journal_size
+    assert any(
+        event.type == "airline.recovery.applied"
+        and event.payload["command_id"] == result["command"]["command_id"]
+        for event in context.world.runtime.journal
+    )
+
+
+def test_command_activity_without_active_world_fails_explicitly() -> None:
+    context = AirlineContext(
+        approval={
+            "decision": "approve",
+            "persona": "duty_operations_manager",
+            "decision_id": "SYN-DECISION-001",
+            "selected_option_id": "SYN-OPTION-TAIL-CREW-STAND",
+        }
+    )
+
+    with pytest.raises(RuntimeError, match="no active Airline world is registered"):
+        durable.airline_command_activity(_command_payload(context))
+
+
+def test_registered_command_activity_retry_replays_same_gateway_result() -> None:
+    context = AirlineContext(
+        approval={
+            "decision": "approve",
+            "persona": "duty_operations_manager",
+            "decision_id": "SYN-DECISION-001",
+            "selected_option_id": "SYN-OPTION-TAIL-CREW-STAND",
+        }
+    )
+    register_active_airline_world(context.world)
+    try:
+        first = durable.airline_command_activity(_command_payload(context))
+        journal_size = len(context.world.runtime.journal)
+
+        second = durable.airline_command_activity(_command_payload(context))
+    finally:
+        unregister_active_airline_world(context.world)
+
+    assert second == first
+    assert len(context.world.runtime.journal) == journal_size
+
+
+def test_colliding_retry_identity_does_not_replay_another_workflow_command() -> None:
+    context = AirlineContext(
+        approval={
+            "decision": "approve",
+            "persona": "duty_operations_manager",
+            "decision_id": "SYN-DECISION-B-SYN-DECISION-C",
+            "selected_option_id": "SYN-OPTION-TAIL-CREW-STAND",
+        }
+    )
+    first_payload = {
+        **_command_payload(context),
+        "workflow_id": "AIRHUB-A",
+    }
+    second_payload = {
+        **first_payload,
+        "workflow_id": "AIRHUB-A-SYN-DECISION-B",
+        "approval": {
+            **context.approval.result,
+            "decision_id": "SYN-DECISION-C",
+        },
+    }
+    first = durable.airline_command_activity(first_payload, world=context.world)
+    journal_size = len(context.world.runtime.journal)
+
+    second = durable.airline_command_activity(second_payload, world=context.world)
+
+    assert first["status"] == "decision_ready"
+    assert second["status"] == "denied"
+    assert "identity" in second["reason"]
+    assert len(context.world.runtime.journal) == journal_size
+
+
+def test_drift_during_command_construction_returns_terminal_stale_denial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = AirlineContext(
+        approval={
+            "decision": "approve",
+            "persona": "duty_operations_manager",
+            "decision_id": "SYN-DECISION-001",
+            "selected_option_id": "SYN-OPTION-TAIL-CREW-STAND",
+        }
+    )
+    original_command_for_option = context.world.command_for_option
+
+    def drift_then_construct(**kwargs: Any):
+        context.world.sectors["SYN-SECTOR-OUT-001"].version += 1
+        return original_command_for_option(**kwargs)
+
+    monkeypatch.setattr(context.world, "command_for_option", drift_then_construct)
+    monkeypatch.setattr(durable, "run_agent_session", _valid_agent(context))
+    before_journal = context.world.runtime.canonical_journal()
+    before_aircraft_id = context.world.sectors["SYN-SECTOR-OUT-001"].aircraft_id
+
+    result = drive_airline_orchestrator(context)
+
+    assert result["status"] == "denied"
+    assert "stale" in result["reason"]
+    assert result["command"] is None
+    assert context.world.sectors["SYN-SECTOR-OUT-001"].aircraft_id == before_aircraft_id
+    assert context.world.disruption_status["SYN-STORY-HUB-001"] == "active"
+    assert context.world.runtime.canonical_journal() == before_journal
+    _assert_terminal_denial(context, result)
 
 
 def test_command_activity_uses_world_gateway_without_terminal_claim(
@@ -564,6 +955,7 @@ def test_command_activity_uses_world_gateway_without_terminal_claim(
         payload["kind"] for name, payload in context.calls if name == "checkpoint_activity_trigger"
     ]
     assert "workflow.completed" not in checkpoint_kinds
+    assert _terminal_checkpoints(context) == []
     assert result["status"] not in {"completed", "success", "succeeded"}
 
 
