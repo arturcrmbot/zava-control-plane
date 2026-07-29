@@ -138,6 +138,7 @@ class WorldEvent:
     tick: int
     source: str
     trace_id: str
+    cause_event_id: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +169,19 @@ _SISTER_MAP: dict[str, tuple[str, ...]] = {
 # (standard%, family%, accessible%, premium%) — must sum to 1
 _ROOM_TYPE_RATIOS = (0.50, 0.21, 0.15, 0.14)
 _ROOM_TYPES = ("standard", "family", "accessible", "premium")
+
+# Trace-ID prefix per workflow, matching the process-profile prefixes so a
+# cascade is greppable end to end.
+_TRACE_PREFIX_BY_WORKFLOW: dict[str, str] = {
+    "hotel-operations-recovery": "hosp-ops",
+    "room-readiness-coordination": "hosp-rooms",
+    "asset-maintenance-response": "hosp-maint",
+    "guest-service-recovery": "hosp-grec",
+    "occupancy-pressure-response": "hosp-occ",
+    "workforce-demand-balancing": "hosp-wrkfrc",
+    "food-and-beverage-readiness": "hosp-fnbrd",
+    "energy-anomaly-response": "hosp-energy",
+}
 
 # Short slugs used in IDs
 _HOTEL_SLUG: dict[str, str] = {
@@ -372,44 +386,104 @@ class HospitalityWorld:
     # -----------------------------------------------------------------------
 
     def poll_sensor_events(self) -> list[WorldEvent]:
-        """Evaluate sensor thresholds and return any new events.
+        """Evaluate every registered sensor and return any new events.
 
-        Dedupe key is ``(source_event_id, workflow_type)``; each unique
-        combination fires at most once regardless of how many times this
-        method is called.
+        Each sensor is a pure function of the snapshot, so a command handler
+        that mutates state can cause a *different* domain's sensor to cross
+        on a later poll. That is the cascade: nothing calls a downstream
+        workflow, it detects its own trigger.
+
+        Dedupe key is ``(workflow_type, subject_id)``; each unique condition
+        fires at most once regardless of how many times this method is called.
         """
+        from verticals.hospitality.sensors import SENSOR_REGISTRY
+
         snap = self.snapshot()
-        measurement = evaluate_operations_risk(snap)
-        if measurement is None:
-            return []
+        emitted: list[WorldEvent] = []
+        cause_event_id = self._events[-1].event_id if self._events else None
 
-        source_event_id = f"SRC-{self._seed}-{self._scenario_applied}"
-        workflow_type = "hotel-operations-recovery"
-        dedupe_key = (source_event_id, workflow_type)
-        if dedupe_key in self._seen_sensor_keys:
-            return []
+        for sensor_id, workflow_type, event_type, evaluate in SENSOR_REGISTRY:
+            measurement = evaluate(snap)
+            if measurement is None:
+                continue
 
-        self._seen_sensor_keys.add(dedupe_key)
+            subject_id = self._sensor_subject_id(workflow_type, measurement)
+            dedupe_key = (workflow_type, subject_id)
+            if dedupe_key in self._seen_sensor_keys:
+                continue
+            self._seen_sensor_keys.add(dedupe_key)
+
+            event = self._emit_sensor_event(
+                workflow_type=workflow_type,
+                event_type=event_type,
+                sensor_id=sensor_id,
+                measurement=measurement,
+                cause_event_id=cause_event_id,
+            )
+            emitted.append(event)
+            # Later sensors in this same sweep descend from the event just
+            # emitted, which keeps the causal chain contiguous.
+            cause_event_id = event.event_id
+
+        return emitted
+
+    @staticmethod
+    def _sensor_subject_id(workflow_type: str, measurement: dict[str, Any]) -> str:
+        """Stable identity for the condition a measurement describes."""
+        for key in ("asset_id", "meter_id", "plan_id", "hotel_id"):
+            value = measurement.get(key)
+            if value:
+                return str(value)
+        return workflow_type
+
+    def _emit_sensor_event(
+        self,
+        *,
+        workflow_type: str,
+        event_type: str,
+        sensor_id: str,
+        measurement: dict[str, Any],
+        cause_event_id: str | None,
+    ) -> WorldEvent:
         self._event_counter += 1
         event_id = (
             f"EVT-HOSP-{self.tick:06d}-{self._event_counter:06d}"
             f"-{self._seed}"
         )
-        hotel_id = measurement["hotel_id"]
-        asset_id = measurement["asset_id"]
+        payload = dict(measurement)
+        actor_ids: tuple[str, ...]
+        source = sensor_id
+        if workflow_type == "hotel-operations-recovery":
+            # Preserve the hero contract byte-for-byte.
+            source = "hospitality-operations-sensor"
+            source_event_id = f"SRC-{self._seed}-{self._scenario_applied}"
+            payload["source_event_id"] = source_event_id
+            actor_ids = (measurement["hotel_id"], measurement["asset_id"])
+            trace_id = f"hosp-ops-{self._seed}-{self._scenario_applied}"
+        else:
+            subject = self._sensor_subject_id(workflow_type, measurement)
+            payload["source_event_id"] = f"SRC-{self._seed}-{subject}"
+            actor_ids = tuple(
+                str(measurement[key])
+                for key in ("hotel_id", "asset_id", "meter_id", "plan_id")
+                if measurement.get(key)
+            )
+            prefix = _TRACE_PREFIX_BY_WORKFLOW.get(workflow_type, "hosp")
+            trace_id = f"{prefix}-{self._seed}-{subject}"
 
         event = WorldEvent(
             event_id=event_id,
-            type="hotel.operations-risk.detected",
+            type=event_type,
             workflow_type=workflow_type,
-            actor_ids=(hotel_id, asset_id),
-            payload=dict(measurement, source_event_id=source_event_id),
+            actor_ids=actor_ids,
+            payload=payload,
             tick=self.tick,
-            source="hospitality-operations-sensor",
-            trace_id=f"hosp-ops-{self._seed}-{self._scenario_applied}",
+            source=source,
+            trace_id=trace_id,
+            cause_event_id=cause_event_id,
         )
         self._events.append(event)
-        return [event]
+        return event
 
     # -----------------------------------------------------------------------
     # Internal seeding
@@ -830,10 +904,35 @@ class HospitalityWorld:
                 priority="critical",
                 status="open",
                 assigned_team_member_id=None,
-                estimated_hours=6.0,
+                estimated_hours=12.0,
                 cost_estimate_gbp=2_400.0,  # SYNTHETIC ASSUMPTION
                 version=wo.version + 1,
                 contractor_available=True,
+            )
+
+        # --- Plant failure shifts the energy profile ----------------------
+        # Boiler offline: gas draw collapses while electric backup heating
+        # spikes. This is what makes the energy sensor a *consequence* of the
+        # asset fault rather than an independent event.
+        for meter_id, meter in list(self.energy_meters.items()):
+            if meter.hotel_id != hotel_id:
+                continue
+            if meter.meter_type == "electricity":
+                reading = round(meter.baseline_kwh * 1.24, 1)
+                status = "anomalous"
+            elif meter.meter_type == "gas":
+                reading = round(meter.baseline_kwh * 0.58, 1)
+                status = "anomalous"
+            else:
+                continue
+            self.energy_meters[meter_id] = EnergyMeter(
+                id=meter.id,
+                hotel_id=meter.hotel_id,
+                meter_type=meter.meter_type,
+                reading_kwh=reading,
+                baseline_kwh=meter.baseline_kwh,
+                status=status,
+                version=meter.version + 1,
             )
 
         # --- Ensure sister hotels have capacity for 10 relocations ------
@@ -841,6 +940,23 @@ class HospitalityWorld:
         # City Gate: 5 compatible standard rooms
         self._ensure_sister_capacity("HOTEL-AIRPORT-NORTH", standard=5)
         self._ensure_sister_capacity("HOTEL-CITY-GATE", standard=5)
+
+        # --- Relocations surge food service at the receiving hotels -------
+        # Five relocated rooms of guests eat where they sleep. The sister
+        # kitchens forecast the extra covers but have not prepared them, so
+        # the F&B gap appears downstream of the Riverside fault.
+        relocation_covers = 5 * 2 * 2  # rooms x guests x services
+        for plan_id, plan in list(self.food_service_plans.items()):
+            if plan.hotel_id not in ("HOTEL-AIRPORT-NORTH", "HOTEL-CITY-GATE"):
+                continue
+            self.food_service_plans[plan_id] = FoodServicePlan(
+                id=plan.id,
+                hotel_id=plan.hotel_id,
+                covers_forecast=plan.covers_forecast + relocation_covers,
+                covers_prepared=plan.covers_prepared,
+                status="at_risk",
+                version=plan.version + 1,
+            )
 
         # --- Ensure engineering shifts exist at sister hotels for realloc -
         self._ensure_engineering_shifts_at_sisters()

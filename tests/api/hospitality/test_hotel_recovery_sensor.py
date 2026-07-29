@@ -126,10 +126,43 @@ def test_protected_family_booking_exists():
 
 
 def test_sensor_emits_one_event_after_scenario():
+    """One shock cascades: every domain detects its own trigger condition.
+
+    The hero operations-risk event is still emitted exactly once; the other
+    seven sensors fire because the fault genuinely crosses their thresholds.
+    """
     world = HospitalityWorld.demo(seed=DEMO_SEED)
     world.trigger_scenario("riverside-hot-water-outage")
     events = world.poll_sensor_events()
-    assert len(events) == 1
+
+    hero = [e for e in events if e.workflow_type == "hotel-operations-recovery"]
+    assert len(hero) == 1
+
+    workflow_types = [e.workflow_type for e in events]
+    assert len(workflow_types) == len(set(workflow_types)), "one event per domain"
+    assert len(events) == 8
+
+
+def test_baseline_world_is_quiet():
+    """A seeded, un-shocked world raises nothing.
+
+    Busy-but-coping is normal; only lost capacity is an incident.
+    """
+    world = HospitalityWorld.demo(seed=DEMO_SEED)
+    assert world.poll_sensor_events() == []
+
+
+def test_cascade_events_form_a_causal_chain():
+    """Every cascaded event descends from the one before it."""
+    world = HospitalityWorld.demo(seed=DEMO_SEED)
+    world.trigger_scenario("riverside-hot-water-outage")
+    events = world.poll_sensor_events()
+
+    assert events[0].cause_event_id is None
+    seen = [events[0].event_id]
+    for event in events[1:]:
+        assert event.cause_event_id in seen
+        seen.append(event.event_id)
 
 
 def test_sensor_event_type():
@@ -181,17 +214,18 @@ def test_second_poll_emits_no_events():
 
 
 def test_dedupe_is_by_event_and_workflow_type_not_timestamp():
-    """Dedupe key is (source_event_id, workflow_type); a second trigger of the
-    *same* scenario after reset should produce a new event."""
+    """Dedupe key is (workflow_type, subject_id); a second trigger of the
+    *same* scenario after reset should produce new events."""
     world = HospitalityWorld.demo(seed=DEMO_SEED)
     world.trigger_scenario("riverside-hot-water-outage")
     first = world.poll_sensor_events()
-    assert len(first) == 1
+    assert len(first) == 8
+    assert world.poll_sensor_events() == [], "same conditions must not re-fire"
 
     world.reset(seed=DEMO_SEED)
     world.trigger_scenario("riverside-hot-water-outage")
     second = world.poll_sensor_events()
-    assert len(second) == 1  # new event after reset
+    assert len(second) == 8  # new events after reset
 
 
 # ---------------------------------------------------------------------------

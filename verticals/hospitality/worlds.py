@@ -124,6 +124,64 @@ class HospitalityScenario:
                     "arrivals_in_4h": hotel.arrivals_in_4h,
                 },
             )
+            # Re-evaluate every sensor against current state. A command that
+            # mutated the world on a previous tick can push a *different*
+            # domain over its threshold here, so cascades keep unfolding
+            # while the world runs rather than only at scenario time.
+            for world_event in self.world.poll_sensor_events():
+                self._emit_detection(world_event)
+
+    def _emit_detection(self, world_event) -> dict[str, Any] | None:
+        """Publish a world sensor event into the runtime as a tripped sensor.
+
+        Shared by the scenario entry point and the heartbeat so a cascaded
+        detection is indistinguishable from the original one.
+        """
+        profile = HOSPITALITY_PROCESS_PROFILES.get(world_event.workflow_type)
+        if profile is None:
+            return None
+        case = HOSPITALITY_REFERENCE_CASES.get(world_event.workflow_type)
+        measurement = dict(world_event.payload)
+        hotel_id = measurement.get("hotel_id")
+
+        detected = self.runtime.emit(
+            world_event.type,
+            actor_id=world_event.source,
+            target_id=hotel_id,
+            trace_id=world_event.trace_id,
+            payload={
+                "location_id": hotel_id,
+                "world_event_id": world_event.event_id,
+                "actor_ids": list(world_event.actor_ids),
+                "cause_world_event_id": world_event.cause_event_id,
+                "measurements": measurement,
+            },
+        )
+        tripped = self.runtime.emit(
+            "sensor.tripped",
+            actor_id=profile.sensor_id,
+            target_id=hotel_id,
+            cause_event_id=detected.event_id,
+            trace_id=world_event.trace_id,
+            payload={
+                "workflow_type": world_event.workflow_type,
+                "case_id": case.id if case else None,
+                "location_id": hotel_id,
+                "world_event_id": world_event.event_id,
+                "world_event_type": world_event.type,
+                "actor_ids": list(world_event.actor_ids),
+                "cause_world_event_id": world_event.cause_event_id,
+                "measurements": measurement,
+                "threshold": {"crossed": True},
+            },
+        )
+        return {
+            "event_id": tripped.event_id,
+            "trace_id": tripped.trace_id,
+            "case_id": case.id if case else None,
+            "world_event_id": world_event.event_id,
+            "workflow_type": world_event.workflow_type,
+        }
 
     # -- process entry points ---------------------------------------------
 
@@ -140,7 +198,15 @@ class HospitalityScenario:
                 f"scenario {name!r} did not produce a hotel operations risk "
                 "measurement"
             )
-        world_event = world_events[0]
+        world_event = next(
+            (e for e in world_events if e.workflow_type == HERO_WORKFLOW),
+            None,
+        )
+        if world_event is None:
+            raise ValueError(
+                f"scenario {name!r} did not produce a hotel operations risk "
+                "measurement"
+            )
         profile = HOSPITALITY_PROCESS_PROFILES[HERO_WORKFLOW]
         case = HOSPITALITY_REFERENCE_CASES[HERO_WORKFLOW]
         measurement = dict(world_event.payload)
@@ -186,6 +252,17 @@ class HospitalityScenario:
             "case_id": case.id,
             "world_event_id": world_event.event_id,
         }
+        # The same fault also crossed other domains' thresholds. Publish them
+        # so the cascade is visible immediately rather than only on the next
+        # heartbeat.
+        cascaded = [
+            self._emit_detection(event)
+            for event in world_events
+            if event is not world_event
+        ]
+        self._hero_result["cascaded_workflow_types"] = [
+            entry["workflow_type"] for entry in cascaded if entry
+        ]
         return dict(self._hero_result)
 
     def run_reference_process(self, workflow_type: str) -> dict[str, Any]:
