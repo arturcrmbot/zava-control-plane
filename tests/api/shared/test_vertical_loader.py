@@ -117,6 +117,12 @@ def test_discover_pack_modules_includes_fashion() -> None:
     assert result["fashion"] == "verticals.fashion.manifest"
 
 
+def test_discover_pack_modules_includes_electronics() -> None:
+    loader = _loader()
+    result = loader.discover_pack_modules()
+    assert result["electronics"] == "verticals.electronics.manifest"
+
+
 def test_discover_pack_modules_filters_underscored_and_missing_manifest(
     tmp_path,
 ) -> None:

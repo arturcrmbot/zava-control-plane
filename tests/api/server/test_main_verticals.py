@@ -107,6 +107,7 @@ def _patch_live_lifespan_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
         ("telco", "", "telco"),
         ("telco", "   ", "telco"),
         ("fashion", None, "fashion"),
+        ("electronics", None, "electronics"),
     ],
 )
 async def test_lifespan_selects_expected_world_for_vertical(

@@ -125,6 +125,31 @@ class StateStore:
             out.append(w)
         return out
 
+    def clear_workflows(self, workflow_types: set[str]) -> set[str]:
+        """Remove runtime records owned by the selected workflow types."""
+        removed = {
+            workflow_id
+            for workflow_id, workflow in self._workflows.items()
+            if workflow.type in workflow_types
+        }
+        if not removed:
+            return set()
+
+        for workflow_id in removed:
+            self._workflows.pop(workflow_id, None)
+            self._phases.pop(workflow_id, None)
+            self._spans.pop(workflow_id, None)
+            self._amplifications.pop(workflow_id, None)
+            self._mcp_calls.pop(workflow_id, None)
+            self._agent_output_recorded_at.pop(workflow_id, None)
+        for exception_id, exception in tuple(self._exceptions.items()):
+            if exception.workflow_id in removed:
+                self._exceptions.pop(exception_id, None)
+        for role_id, workflow_id in tuple(self._role_index.items()):
+            if workflow_id in removed:
+                self._role_index.pop(role_id, None)
+        return removed
+
     def append_phase(self, workflow_id: str, p: Phase) -> None:
         self._phases.setdefault(workflow_id, []).append(p)
         self._emit_phases(workflow_id)

@@ -265,6 +265,12 @@ async def reset_world(body: WorldResetRequest = WorldResetRequest()) -> dict:
     bridge = getattr(app_state, "world_bridge", None)
     if bridge is not None:
         bridge.stop()
+    workflow_types = set(app_state.runtime.pack.domains)
+    removed_workflows = app_state.store.clear_workflows(workflow_types)
+    for workflow_id in removed_workflows:
+        app_state.orchestration_history.pop(workflow_id, None)
+    from api.server.services import pending_gates
+    pending_gates.reset()
     reset(seed)
     world_task = app_state.world_task
     if world_task is None or world_task.done():

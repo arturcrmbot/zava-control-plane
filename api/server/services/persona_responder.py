@@ -300,10 +300,12 @@ def _sandbox_authority_check(
                 "governing_rule_id": result.governing_rule_id,
             }
 
-        # Default in-process path — TASK-023.
-        from api.server.services.governance import kernel
+        # Vertical packs own their business authority matrix. The static
+        # governance bundle remains the Agency/default compatibility path,
+        # while persona decisions resolve against the active pack contract.
+        from api.shared.authority import authority_check
 
-        result = kernel().check_authority(
+        return authority_check(
             role=role,
             action=action,
             value=value,
@@ -312,11 +314,6 @@ def _sandbox_authority_check(
             geography=geography,
             requester_role=requester_role,
         )
-        return {
-            "allowed": result.allowed,
-            "reason": result.reason,
-            "governing_rule_id": result.governing_rule_id,
-        }
     except Exception as ex:  # pragma: no cover — defensive only
         return {
             "allowed": False,
@@ -1159,6 +1156,14 @@ async def _handle_hitl(event: FleetEvent) -> None:
 
     event_name = external_event_override or persona.external_event
     decision_str = decision_payload.get("decision")
+    decision_payload = {
+        **decision_payload,
+        "persona": decision_payload.get("persona") or persona_role,
+        "decision_id": (
+            decision_payload.get("decision_id")
+            or f"persona:{workflow_id}:{gate_phase}:{persona_role}"
+        ),
+    }
 
     # Pitch-c6: override roll won — invert the persona's policy decision
     # to demo human defiance. approve→reject, reject→approve,

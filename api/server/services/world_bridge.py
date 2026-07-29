@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from types import SimpleNamespace
 
 import httpx
@@ -121,6 +122,9 @@ class WorldBridge:
         self._decision_ready: set[str] = set()
         self._pending_evaluations: dict[str, dict] = {}
         self._tasks: set[asyncio.Task] = set()
+        self._capacity = asyncio.Semaphore(
+            max(1, int(os.getenv("WORLD_MAX_IN_FLIGHT", "2")))
+        )
         self._off: list = []
         # Canonical Workflow lifecycle owner: mints the one StateStore Workflow
         # only after Durable accepts the deterministic sensor-event id, then routes
@@ -248,7 +252,11 @@ class WorldBridge:
         self._pending_evaluations.clear()
 
     def _spawn(self, coroutine) -> None:
-        task = asyncio.create_task(coroutine)
+        async def bounded() -> None:
+            async with self._capacity:
+                await coroutine
+
+        task = asyncio.create_task(bounded())
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import os
 from pathlib import Path
 from typing import Any
 
@@ -194,13 +195,20 @@ class ActorWorldService:
         instead of starving the event loop.
         """
         self._stop_requested = False
+        max_steps_per_second = _require_finite_positive(
+            float(os.getenv("WORLD_MAX_STEPS_PER_SECOND", "100")),
+            label="WORLD_MAX_STEPS_PER_SECOND",
+        )
+        min_step_delay = 1.0 / max_steps_per_second
         while not self._stop_requested:
             if self.runtime.status == "completed":
                 break
             before = self.runtime.now
             self._step_once()
             delta = self.runtime.now - before
-            await asyncio.sleep(max(0, delta / self.minutes_per_second))
+            await asyncio.sleep(
+                max(min_step_delay, delta / self.minutes_per_second)
+            )
 
     def _step_once(self) -> None:
         """Execute exactly one SimPy env event and publish anything new."""

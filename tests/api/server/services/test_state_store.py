@@ -9,7 +9,8 @@ from __future__ import annotations
 import time
 
 from api.server.services.state_store import StateStore
-from api.shared.types import Workflow
+from api.shared.types import Exception_ as WorkflowException
+from api.shared.types import Phase, Workflow
 
 
 def _make_workflow(workflow_id: str = "HIRE-1") -> Workflow:
@@ -89,6 +90,39 @@ def test_get_agent_outputs_returns_copy():
     w = store.get_workflow("HIRE-3")
     assert w is not None
     assert "bogus" not in w.agent_outputs
+
+
+def test_clear_workflows_removes_only_selected_domain_runtime_state():
+    store = StateStore()
+    electronics = _make_workflow("REBAL-1")
+    electronics.type = "inventory-rebalancing"
+    agency = _make_workflow("HIRE-KEEP")
+    store.upsert_workflow(electronics)
+    store.upsert_workflow(agency)
+    store.append_phase(
+        "REBAL-1",
+        Phase(workflow_id="REBAL-1", name="Detect Imbalance"),
+    )
+    store.upsert_exception(
+        WorkflowException(
+            id="EXC-REBAL",
+            workflow_id="REBAL-1",
+            composed_by="deterministic",
+            severity="medium",
+            category="threshold-exceeded",
+            summary="Approval required",
+            recommendation="Review",
+            created_at=time.time(),
+        )
+    )
+
+    removed = store.clear_workflows({"inventory-rebalancing"})
+
+    assert removed == {"REBAL-1"}
+    assert store.get_workflow("REBAL-1") is None
+    assert store.get_phases("REBAL-1") == []
+    assert store.get_exception("EXC-REBAL") is None
+    assert store.get_workflow("HIRE-KEEP") is agency
 
 
 def test_agent_output_timestamp_is_parallel_to_the_domain_output_shape():

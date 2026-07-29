@@ -97,6 +97,48 @@ def test_persona_decided_event_carries_personality(monkeypatch):
     assert data.get("verdict") in {"approve", "reject", "escalate"}
 
 
+def test_persona_approval_payload_identifies_the_deciding_role(monkeypatch):
+    raised: list[dict] = []
+
+    async def _fake_raise(instance_id, event_name, payload):
+        raised.append(payload)
+        return True
+
+    monkeypatch.setattr(persona_responder, "raise_orchestration_event", _fake_raise)
+    from api.shared.authority import AUTHORITY
+    if "finance_bp" in AUTHORITY:
+        from dataclasses import replace as _replace
+        monkeypatch.setitem(
+            AUTHORITY,
+            "finance_bp",
+            _replace(AUTHORITY["finance_bp"], ooo_today=False),
+        )
+
+    asyncio.run(persona_responder._handle_hitl(FleetEvent(
+        type="workflow.hitl.requested",
+        workflow_id="HIRE-PERSONA-PAYLOAD",
+        persona="finance_bp",
+        external_event="budget_approval",
+        instance_id="INST-HIRE-PERSONA-PAYLOAD",
+        phase="budget",
+        context={
+            "budget": {
+                "verdict": "within_envelope",
+                "requires_finance_bp": True,
+                "delta_vs_midpoint_gbp": 4_000,
+                "envelope_remaining_gbp": 50_000,
+            },
+        },
+    )))
+
+    assert raised
+    assert raised[0]["decision"] in {"approve", "reject"}
+    assert raised[0]["persona"] == "finance_bp"
+    assert raised[0]["decision_id"].startswith(
+        "persona:HIRE-PERSONA-PAYLOAD:budget:finance_bp"
+    )
+
+
 def test_default_persona_event_carries_default_personality(monkeypatch):
     """A persona without an override block still gets a fully-shaped
     personality dict on its events (the {balanced, medium, standard}

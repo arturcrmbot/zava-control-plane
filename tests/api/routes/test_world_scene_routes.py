@@ -97,6 +97,59 @@ async def test_reset_route_reinstalls_seeded_world(
 
 
 @pytest.mark.asyncio
+async def test_reset_route_clears_active_pack_workflows_before_reseeding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    routes = import_module("api.server.routes.world")
+    lifecycle: list[str] = []
+    service = SimpleNamespace(
+        seed=42,
+        runtime=SimpleNamespace(now=0),
+        reset=lambda seed: lifecycle.append(f"reset:{seed}"),
+    )
+    bridge = SimpleNamespace(
+        stop=lambda: lifecycle.append("bridge:stop"),
+        start=lambda: lifecycle.append("bridge:start"),
+    )
+    store = SimpleNamespace(
+        clear_workflows=lambda workflow_types: (
+            lifecycle.append(
+                "store:clear:" + ",".join(sorted(workflow_types))
+            )
+            or {"REBAL-1"}
+        )
+    )
+    runtime = SimpleNamespace(
+        pack=SimpleNamespace(
+            domains={
+                "inventory-rebalancing": object(),
+                "demand-spike-response": object(),
+            }
+        )
+    )
+    monkeypatch.setattr(app_state, "world_service", service, raising=False)
+    monkeypatch.setattr(app_state, "world_bridge", bridge, raising=False)
+    monkeypatch.setattr(app_state, "world_task", asyncio.current_task(), raising=False)
+    monkeypatch.setattr(app_state, "store", store, raising=False)
+    monkeypatch.setattr(app_state, "runtime", runtime, raising=False)
+    monkeypatch.setattr(
+        app_state,
+        "orchestration_history",
+        {"REBAL-1": [{"kind": "workflow.completed"}]},
+        raising=False,
+    )
+
+    result = await routes.reset_world(routes.WorldResetRequest(seed=42))
+
+    assert lifecycle == [
+        "bridge:stop",
+        "store:clear:demand-spike-response,inventory-rebalancing",
+        "reset:42",
+        "bridge:start",
+    ]
+    assert app_state.orchestration_history == {}
+    assert result["ok"] is True
+@pytest.mark.asyncio
 async def test_reset_route_starts_one_runner_when_task_is_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
