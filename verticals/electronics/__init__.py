@@ -1,0 +1,2 @@
+"""Electronics Retail vertical pack."""
+

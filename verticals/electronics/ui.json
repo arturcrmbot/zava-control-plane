@@ -1,0 +1,13 @@
+{
+  "capabilities": ["blueprint", "world", "memory", "knowledge"],
+  "lenses": ["process-library", "customer-impact", "order", "control"],
+  "theme": {
+    "accent": "#0891b2",
+    "label": "Electronics Retail"
+  },
+  "phase_aliases": {},
+  "supplemental_domains": [],
+  "aspirational_domains": [],
+  "include_meta_skills": false
+}
+

@@ -1,0 +1,78 @@
+tools:
+  - id: electronics_read_inventory
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: merchandising-planning
+    description: Read versioned device inventory and demand evidence.
+  - id: electronics_prepare_inventory_transfer
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: merchandising-planning
+    description: Prepare a device inventory transfer for world validation.
+  - id: electronics_assess_promotion
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: merchandising-planning
+    description: Assess device launch readiness stock and channel readiness.
+  - id: electronics_prepare_markdown_recommendation
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: merchandising-planning
+    description: Prepare a markdown recommendation without changing device price.
+  - id: electronics_prepare_supplier_recovery
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: supply-chain-fulfilment
+    description: Prepare a supplier allocation recovery proposal.
+  - id: electronics_prepare_fulfilment_resolution
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: supply-chain-fulfilment
+    description: Prepare an omnichannel fulfilment resolution proposal.
+  - id: electronics_prepare_seller_suppression
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: marketplace-operations
+    description: Prepare a seller offer suppression for authority review.
+  - id: electronics_prepare_return_disposition
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: customer-returns
+    description: Prepare a device return/repair disposition proposal.
+
+version: 1
+vertical: electronics
+policies:
+  inventory.transfer:
+    auto_execute_when:
+      max_retail_value_gbp: 10000
+      max_quantity: 50
+      owned_stock_only: true
+      cross_border: false
+      source_safety_stock_preserved: true
+      expected_margin_exceeds_transfer_cost: true
+      fairness_guardrail_passed: true
+    approval_event: merchandising_director_decision
+  markdown.recommend:
+    approval_required: true
+    mutates_price: false
+  seller.offer.suppress:
+    approval_required: true
+  return.disposition:
+    high_value_approval_required: true
