@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import re
 from datetime import datetime
 from pathlib import Path
@@ -9,6 +10,7 @@ from typing import Any
 
 import pytest
 import yaml
+from copilot.tools import ToolInvocation
 
 import verticals.airline.durable as durable
 from api.server.world.runtime import SimulationRuntime
@@ -167,6 +169,45 @@ def _tool_call(name: str, *, success: bool = True) -> dict[str, Any]:
         "success": success,
         "latency_ms": 0,
     }
+
+
+@pytest.mark.asyncio
+async def test_ranking_prompt_tool_input_matches_pack_tool_contract() -> None:
+    context = AirlineContext()
+    evidence = durable.airline_evidence_activity(context.get_input())
+    impact = {
+        "phase": "Assess Network Impact",
+        "actor_ids": evidence["actor_ids"],
+        "event_ids": evidence["event_ids"],
+        "impact_summary": "Synthetic hub disruption impact.",
+    }
+    admission = durable.airline_admission_activity(
+        {"evidence": evidence, "impact": impact},
+    )
+    payload = {
+        **context.get_input(),
+        "phase": "Synthesize Recovery Options",
+        "evidence": evidence,
+        "impact": impact,
+        "admitted_options": admission["admitted_options"],
+    }
+    prompt = durable._agent_prompt(
+        payload,
+        payload["phase"],
+        "recovery-option-ranker",
+    )
+    tool_input = json.loads(prompt.rsplit("tool_input=", maxsplit=1)[1])
+
+    result = await operations.airline_rank_feasible_recovery_options.handler(
+        ToolInvocation(
+            session_id="airline-test",
+            tool_call_id="tool-ranking",
+            tool_name=operations.airline_rank_feasible_recovery_options.name,
+            arguments=tool_input,
+        ),
+    )
+
+    assert result.result_type == "success"
 
 
 def _command_activity_calls(context: AirlineContext) -> list[dict[str, Any]]:

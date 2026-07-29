@@ -168,7 +168,6 @@ def _agent_prompt(payload: dict[str, Any], phase: str, skill_label: str) -> str:
                 "story_id": evidence["story_id"],
                 "impact_summary": impact["impact_summary"],
                 "evidence_versions": evidence["evidence_versions"],
-                "source_mode": "simulated",
             },
         }
         output_keys = sorted(_RANKING_KEYS)
