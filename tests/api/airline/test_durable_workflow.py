@@ -13,8 +13,10 @@ import yaml
 import verticals.airline.durable as durable
 from api.server.world.runtime import SimulationRuntime
 from verticals.airline.mcp_tools import operations
+from verticals.airline.lifecycle import shutdown_airline_worker_world
 from verticals.airline.worlds.active import (
     register_active_airline_world,
+    resolve_active_airline_world,
     unregister_active_airline_world,
 )
 from verticals.airline.worlds.scenario import AirlineWorld
@@ -428,6 +430,7 @@ def test_suspended_checkpoint_persists_complete_hitl_context(monkeypatch) -> Non
     assert suspended["external_event"] == "duty_operations_manager_decision"
     assert suspended["phase"] == "Approve Recovery Plan"
     hitl_context = suspended["hitl_context"]
+    assert suspended["context"] == hitl_context
     assert hitl_context["workflow_id"] == "AIRHUB-0001"
     assert hitl_context["instance_id"] == context.instance_id
     assert hitl_context["story_id"] == "SYN-STORY-HUB-001"
@@ -443,6 +446,9 @@ def test_suspended_checkpoint_persists_complete_hitl_context(monkeypatch) -> Non
         "SYN-OPTION-CANCEL",
     ]
     assert hitl_context["selected_option"]["option_id"] == ("SYN-OPTION-TAIL-CREW-STAND")
+    assert hitl_context["selected_option_id"] == "SYN-OPTION-TAIL-CREW-STAND"
+    assert hitl_context["decision_id"] == "SYN-DECISION-001"
+    assert [item["option_id"] for item in hitl_context["rejected_options"]] == ["SYN-OPTION-RETIME-ONLY"]
     assert hitl_context["evidence_versions"] == context.observation["evidence_versions"]
 
 
@@ -838,6 +844,32 @@ def test_command_activity_without_active_world_fails_explicitly() -> None:
 
     with pytest.raises(RuntimeError, match="no active Airline world is registered"):
         durable.airline_command_activity(_command_payload(context))
+
+
+def test_functions_worker_uses_one_persistent_airline_world(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = AirlineContext(
+        approval={
+            "decision": "approve",
+            "persona": "duty_operations_manager",
+            "decision_id": "SYN-DECISION-001",
+            "selected_option_id": "SYN-OPTION-TAIL-CREW-STAND",
+        }
+    )
+    monkeypatch.setenv("FUNCTIONS_WORKER_RUNTIME", "python")
+    monkeypatch.setenv("WORLD_SEED", "42")
+
+    result = durable.airline_command_activity(_command_payload(context))
+    worker_world = resolve_active_airline_world()
+    try:
+        retry = durable.airline_command_activity(_command_payload(context))
+    finally:
+        shutdown_airline_worker_world()
+
+    assert result["status"] == "decision_ready"
+    assert retry == result
+    assert worker_world.recovery_evaluations["AIRHUB-0001"].workflow_id == ("AIRHUB-0001")
 
 
 def test_registered_command_activity_retry_replays_same_gateway_result() -> None:

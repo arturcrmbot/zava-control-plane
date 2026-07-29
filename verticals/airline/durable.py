@@ -4,6 +4,7 @@ import asyncio
 import copy
 import json
 import math
+import os
 from collections.abc import Generator
 from datetime import timedelta
 from pathlib import Path
@@ -18,6 +19,7 @@ from verticals.airline.constraints import FeasibilityResult, admit_recovery_opti
 from verticals.airline.mcp_tools import operations
 from verticals.airline.process_profiles import (
     COMMAND_TYPE,
+    GOLDEN_DECISION_ID,
     HITL_EVENT,
     HITL_PERSONA,
     ORCHESTRATOR as _ORCHESTRATOR,
@@ -398,7 +400,16 @@ def _approval_reason(
 
 
 def _active_world() -> AirlineWorld:
-    return resolve_active_airline_world()
+    try:
+        return resolve_active_airline_world()
+    except RuntimeError:
+        if os.getenv("FUNCTIONS_WORKER_RUNTIME") != "python":
+            raise
+        from verticals.airline.lifecycle import (
+            ensure_airline_worker_world,
+        )
+
+        return ensure_airline_worker_world()
 
 
 def airline_command_activity(
@@ -592,6 +603,9 @@ def airline_orchestration(
         "admitted_options": admitted_options,
         "ranking": ranking,
         "selected_option": selected_option,
+        "selected_option_id": selected_option_id,
+        "decision_id": GOLDEN_DECISION_ID,
+        "rejected_options": admission["rejected_options"],
         "evidence_versions": evidence["evidence_versions"],
         "authority": authority,
     }
@@ -602,6 +616,7 @@ def airline_orchestration(
             "phase": _HITL_PHASE,
             "persona": HITL_PERSONA,
             "external_event": HITL_EVENT,
+            "context": hitl_context,
             "hitl_context": hitl_context,
         },
     )

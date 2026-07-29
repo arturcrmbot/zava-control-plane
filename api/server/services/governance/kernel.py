@@ -118,6 +118,48 @@ def _load_matrix(path: Path | None = None) -> list[dict[str, Any]]:
     return raw
 
 
+def _active_pack_authority_rules(
+    matrix: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    from api.shared.vertical_loader import active_runtime
+
+    existing_actions = {
+        str(rule.get("action"))
+        for rule in matrix
+        if rule.get("action")
+    }
+    pack = active_runtime().pack
+    rules: list[dict[str, Any]] = []
+    for role, row in pack.authority.items():
+        for action in row.approval_actions:
+            if action in existing_actions:
+                continue
+            rules.append(
+                {
+                    "rule_id": f"AUTH-{role}-{action}",
+                    "action": action,
+                    "category": "*",
+                    "business_unit": "*",
+                    "geography": "*",
+                    "requester_role": "*",
+                    "value_band_gbp": {
+                        "min": 0.0,
+                        "max": row.spend_limit_gbp,
+                    },
+                    "approver_role": role,
+                    "escalation_chain": (
+                        [row.delegate_to]
+                        if row.delegate_to is not None
+                        else []
+                    ),
+                    "basis": (
+                        f"active vertical {pack.name} authority declaration"
+                    ),
+                }
+            )
+    return rules
+
+
 # ---------------------------------------------------------------------------
 # JWS Compact (EdDSA) — Phase 5 TASK-038 / TASK-040
 # ---------------------------------------------------------------------------
@@ -217,6 +259,7 @@ class GovernanceKernel:
 
         tools = load_tools_yaml(tools_path) if tools_path else load_active_tools()
         matrix = _load_matrix(matrix_path)
+        matrix = [*_active_pack_authority_rules(matrix), *matrix]
         bundle: CompiledBundle = compile_bundle(matrix=matrix, tools=tools)
 
         self._tools: Mapping[str, ToolManifestEntry] = tools

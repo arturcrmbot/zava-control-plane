@@ -112,5 +112,13 @@ class RecoveryEvaluation:
     option_id: str
     status: str
     invariant_results: tuple[str, ...]
+    cancellations_avoided: int
+    departure_zero_recovered: int
+    departure_within_fifteen_recovered: int
+    minimum_remaining_crew_duty_minutes: int
+    resolved_slot_stand_conflicts: int
+    protected_connection_cohorts: int
+    passengers_requiring_rerouting: int
+    synthetic_recovery_cost_gbp: float
     version: int = 1
     last_event_id: str | None = None

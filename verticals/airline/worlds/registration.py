@@ -26,7 +26,9 @@ PACK_ROOT = Path(__file__).resolve().parents[1]
 
 
 def build_airline_demo(runtime: object) -> AirlineWorld:
-    return AirlineWorld(seed=runtime.seed, runtime=runtime)
+    world = AirlineWorld(seed=runtime.seed, runtime=runtime)
+    world.install()
+    return world
 
 
 _SCENE = validate_world_scene(

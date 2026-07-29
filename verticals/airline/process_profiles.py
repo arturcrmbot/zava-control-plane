@@ -14,6 +14,8 @@ HITL_PERSONA = "duty_operations_manager"
 HITL_EVENT = "duty_operations_manager_decision"
 SCENARIO_ID = "synthetic-hub-cascade"
 STORY_ID = "SYN-STORY-HUB-001"
+GOLDEN_WORKFLOW_ID = "AIRHUB-0001"
+GOLDEN_DECISION_ID = "SYN-DECISION-001"
 
 
 @dataclass(frozen=True, slots=True)

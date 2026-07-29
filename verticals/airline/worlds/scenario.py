@@ -7,6 +7,7 @@ from typing import Any
 from api.server.world.model import SimulationCommand, SimulationEvent
 from api.server.world.runtime import SimulationRuntime
 from verticals.airline.process_profiles import (
+    GOLDEN_WORKFLOW_ID,
     SCENARIO_ID,
     SENSOR_ID,
     STORY_ID,
@@ -120,6 +121,20 @@ class AirlineWorld:
         )
         self._installed = True
 
+    def on_service_activate(self) -> None:
+        from verticals.airline.worlds.active import (
+            register_active_airline_world,
+        )
+
+        register_active_airline_world(self)
+
+    def on_service_deactivate(self) -> None:
+        from verticals.airline.worlds.active import (
+            unregister_active_airline_world,
+        )
+
+        unregister_active_airline_world(self)
+
     def _seed_collection(
         self,
         destination: dict[str, Any],
@@ -156,6 +171,31 @@ class AirlineWorld:
         sector.version += 1
         stand.status = "unavailable"
         stand.version += 1
+        at_risk_cohorts = [
+            cohort
+            for cohort in cohorts
+            if (
+                cohort.connection_margin_minutes
+                - sector.delay_minutes
+            )
+            < cohort.minimum_connection_minutes
+        ]
+        no_action_baseline = {
+            "cancellations": int(
+                sector.delay_minutes
+                > rotation.minimum_turnaround_minutes
+                and stand.status == "unavailable"
+            ),
+            "departure_zero_recovered": 0,
+            "departure_within_fifteen_recovered": 0,
+            "protected_connection_cohorts": (
+                len(cohorts) - len(at_risk_cohorts)
+            ),
+            "passengers_requiring_rerouting": sum(
+                cohort.passenger_count
+                for cohort in at_risk_cohorts
+            ),
+        }
 
         source = self.runtime.emit(
             _SOURCE_EVENT_TYPE,
@@ -164,12 +204,14 @@ class AirlineWorld:
             payload={
                 "scenario_id": SCENARIO_ID,
                 "story_id": STORY_ID,
+                "workflow_id": GOLDEN_WORKFLOW_ID,
                 "inbound_sector_id": sector.id,
                 "delay_minutes": sector.delay_minutes,
                 "rotation_id": rotation.id,
                 "stand_id": stand.id,
                 "stand_status": stand.status,
                 "connection_cohort_ids": [item.id for item in cohorts],
+                "no_action_baseline": no_action_baseline,
                 "evidence_versions": {
                     sector.id: sector.version,
                     stand.id: stand.version,
@@ -187,6 +229,7 @@ class AirlineWorld:
             trace_id=source.trace_id,
             payload={
                 "workflow_type": WORKFLOW_TYPE,
+                "workflow_id": GOLDEN_WORKFLOW_ID,
                 "story_id": STORY_ID,
                 "scenario_id": SCENARIO_ID,
                 "source_event_id": source.event_id,
@@ -204,6 +247,21 @@ class AirlineWorld:
         *,
         now: float | None = None,
     ) -> dict[str, Any]:
+        if sensor_event.get("type") == _SOURCE_EVENT_TYPE:
+            source_event_id = sensor_event.get("event_id")
+            sensor = next(
+                (
+                    event
+                    for event in self.runtime.journal
+                    if event.type == "sensor.tripped"
+                    and event.actor_id == SENSOR_ID
+                    and event.cause_event_id == source_event_id
+                ),
+                None,
+            )
+            if sensor is None:
+                raise ValueError("source disruption has no integrated hub sensor event")
+            sensor_event = sensor.to_dict()
         if sensor_event.get("type") != "sensor.tripped" or sensor_event.get("actor_id") != SENSOR_ID:
             raise ValueError("observation requires the integrated hub sensor event")
         payload = sensor_event.get("payload") or {}
@@ -244,8 +302,17 @@ class AirlineWorld:
                 candidate_stand,
             )
         }
+        source_event = next(
+            (
+                event
+                for event in self.runtime.journal
+                if event.event_id == sensor_event.get("cause_event_id")
+            ),
+            None,
+        )
         return {
             "workflow_type": WORKFLOW_TYPE,
+            "workflow_id": GOLDEN_WORKFLOW_ID,
             "story_id": STORY_ID,
             "scenario_id": SCENARIO_ID,
             "trace_id": sensor_event.get("trace_id"),
@@ -277,6 +344,11 @@ class AirlineWorld:
                 sensor_event.get("cause_event_id"),
                 sensor_event.get("event_id"),
             ],
+            "no_action_baseline": dict(
+                source_event.payload.get("no_action_baseline") or {}
+            )
+            if source_event is not None
+            else {},
         }
 
     def current_recovery_observation(self) -> dict[str, Any]:
@@ -334,6 +406,31 @@ class AirlineWorld:
             decision_id=decision_id,
             persona=persona,
         )
+
+    reference_process_types = (WORKFLOW_TYPE,)
+
+    def run_reference_process(
+        self,
+        workflow_type: str,
+    ) -> dict[str, Any]:
+        if workflow_type != WORKFLOW_TYPE:
+            raise ValueError(f"unsupported Airline reference process: {workflow_type!r}")
+        source = self.activate_scenario(SCENARIO_ID)
+        sensor = next(
+            event
+            for event in self.runtime.journal
+            if event.type == "sensor.tripped"
+            and event.actor_id == SENSOR_ID
+            and event.cause_event_id == source.event_id
+        )
+        return {
+            "workflow_type": WORKFLOW_TYPE,
+            "workflow_id": GOLDEN_WORKFLOW_ID,
+            "scenario_id": SCENARIO_ID,
+            "story_id": STORY_ID,
+            "source_event_id": source.event_id,
+            "sensor_event_id": sensor.event_id,
+        }
 
     def command_was_processed(self, command_id: str) -> bool:
         return command_id in self._processed_commands

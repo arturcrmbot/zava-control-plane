@@ -115,6 +115,21 @@ async def _resolve_one(exception_id: str, resolution: Resolution, resolved_by: s
         if authority_gate is not None:
             payload["persona"] = authority_gate.persona
             payload["decision_id"] = exception_id
+    hitl_context = (
+        w.payload.get("hitl_context")
+        if isinstance(w.payload, dict)
+        else None
+    )
+    if isinstance(hitl_context, dict):
+        for key in (
+            "workflow_id",
+            "story_id",
+            "selected_option_id",
+            "decision_id",
+            "evidence_versions",
+        ):
+            if key in hitl_context:
+                payload[key] = hitl_context[key]
     if event_name is None:
         # Legacy POC1 expense fallbacks for `Notify` / `Arbitrate` —
         # registry covers these but the Notify gate still needs a `text`

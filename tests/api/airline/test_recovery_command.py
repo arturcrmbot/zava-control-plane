@@ -276,6 +276,9 @@ def test_accepted_cancel_is_coherent_causal_and_idempotent_end_to_end() -> None:
         "command": command.to_dict(),
         "business_event_id": business_event.event_id,
         "evaluation_id": evaluation.id,
+        "workflow_id": "AIRHUB-0001",
+        "decision_id": "SYN-DECISION-001",
+        "option_id": "SYN-OPTION-CANCEL",
     }
 
     state_after_acceptance = world.render_state()

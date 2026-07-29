@@ -310,6 +310,18 @@ def _accept(
         evidence_versions=option.evidence_versions,
     )
     evaluation_status, invariant_results = _evaluation_results(world, option)
+    protected_cohorts = sum(
+        cohort.inbound_sector_id == "SYN-SECTOR-IN-001" and cohort.status == "protected"
+        for cohort in world.connection_cohorts.values()
+    )
+    outbound_sector = world.sectors[_TARGET_SECTOR_ID]
+    assigned_crew = world.crew_duties[outbound_sector.crew_duty_id]
+    baseline = observation.get("no_action_baseline") or {}
+    avoided_cancellations = max(
+        0,
+        int(baseline.get("cancellations") or 0)
+        - int(outbound_sector.status == "cancelled"),
+    )
     evaluation = RecoveryEvaluation(
         id=f"SYN-EVAL-{workflow_id}",
         workflow_id=workflow_id,
@@ -317,6 +329,24 @@ def _accept(
         option_id=option.option_id,
         status=evaluation_status,
         invariant_results=invariant_results,
+        cancellations_avoided=avoided_cancellations,
+        departure_zero_recovered=int(
+            outbound_sector.status != "cancelled" and outbound_sector.delay_minutes == 0
+        ),
+        departure_within_fifteen_recovered=int(
+            outbound_sector.status != "cancelled" and outbound_sector.delay_minutes <= 15
+        ),
+        minimum_remaining_crew_duty_minutes=(assigned_crew.remaining_duty_minutes),
+        resolved_slot_stand_conflicts=int(option.option_id == _TAIL_OPTION_ID) * 2,
+        protected_connection_cohorts=protected_cohorts,
+        passengers_requiring_rerouting=(
+            0
+            if option.option_id == _TAIL_OPTION_ID
+            else int(
+                baseline.get("passengers_requiring_rerouting") or 0
+            )
+        ),
+        synthetic_recovery_cost_gbp=option.value_gbp,
     )
     business = world.runtime.emit(
         SUCCESS_EVENT,
@@ -352,6 +382,9 @@ def _accept(
         cause_event_id=business.event_id,
         trace_id=command.trace_id,
         payload={
+            "workflow_id": workflow_id,
+            "decision_id": payload["decision_id"],
+            "option_id": option.option_id,
             "command": command.to_dict(),
             "business_event_id": business.event_id,
             "evaluation_id": evaluation.id,

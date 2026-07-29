@@ -167,6 +167,9 @@ class ActorWorldService:
         runtime = SimulationRuntime(seed)
         scenario = self._build_scenario(runtime)
         scenario.install()
+        activate = getattr(scenario, "on_service_activate", None)
+        if activate is not None:
+            activate()
         self._published_seq = len(runtime.journal)
         self.objectives = ObjectiveManager(runtime)
         self.evaluator = OutcomeEvaluator(runtime, self.objectives)
@@ -212,7 +215,26 @@ class ActorWorldService:
 
     def reset(self, seed: int | None = None) -> None:
         self.seed = self.seed if seed is None else seed
-        self.runtime, self.scenario = self._install(self.seed)
+        previous = self.scenario
+        deactivate = getattr(
+            previous,
+            "on_service_deactivate",
+            None,
+        )
+        if deactivate is not None:
+            deactivate()
+        try:
+            runtime, scenario = self._install(self.seed)
+        except Exception:
+            reactivate = getattr(
+                previous,
+                "on_service_activate",
+                None,
+            )
+            if reactivate is not None:
+                reactivate()
+            raise
+        self.runtime, self.scenario = runtime, scenario
         self._stop_requested = False
 
     def inject_demand_surge(self, multiplier: float, duration_minutes: float) -> None:

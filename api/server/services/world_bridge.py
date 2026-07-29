@@ -142,7 +142,13 @@ class WorldBridge:
     ) -> str:
         """Start a real Durable diagnostic without a live actor-world service."""
         sensor_event_id = sensor_event["event_id"]
-        workflow_id = workflow_id_for(responder.prefix, sensor_event_id)
+        workflow_id = workflow_id_for(
+            responder.prefix,
+            sensor_event_id,
+            declared_workflow_id=(
+                (sensor_event.get("payload") or {}).get("workflow_id")
+            ),
+        )
         existing = self._app.store.get_workflow(workflow_id)
         if existing is not None:
             return workflow_id
@@ -344,7 +350,15 @@ class WorldBridge:
             # id), since `objective.id` still equals `objective_id(event_id)`
             # in either case.
             sensor_event_id = simulation_event.get("event_id")
-            prospective_workflow_id = workflow_id_for(responder.prefix, sensor_event_id)
+            prospective_workflow_id = workflow_id_for(
+                responder.prefix,
+                sensor_event_id,
+                declared_workflow_id=(
+                    (simulation_event.get("payload") or {}).get(
+                        "workflow_id"
+                    )
+                ),
+            )
             already_scheduled = self._app.store.get_workflow(prospective_workflow_id)
             if already_scheduled is not None and already_scheduled.orchestration_instance_id:
                 log.info(
