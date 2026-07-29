@@ -458,4 +458,243 @@ describe("SpatialWorld", () => {
       screen.getByTestId("location-STORE-EU-PAR-01").className,
     ).toContain("overflow-hidden");
   });
+
+  it("does not render a story panel when state.story is absent", () => {
+    renderWorld(baseline, []);
+
+    expect(screen.queryByTestId("story-control")).toBeNull();
+  });
+
+  it("renders a dense story operations strip with progress, ordered stages, autonomy, dependencies, links and a failure reason", () => {
+    const storyState: WorldState = {
+      ...baseline,
+      story: {
+        id: "launch-shock:99",
+        type: "launch-shock",
+        title: "The flagship gaming launch",
+        status: "failed",
+        trace_id: "trace-launch-99",
+        cause_event_id: "evt-cause-1",
+        started_at_sim_time: 10,
+        stages: [
+          {
+            workflow_type: "demand-spike-response",
+            dependency_ids: [],
+            status: "completed",
+            sensor_event_id: "evt-1",
+            workflow_id: "wf-demand-1",
+            autonomy: "policy-safe",
+            reason: null,
+          },
+          {
+            workflow_type: "inventory-rebalancing",
+            dependency_ids: [],
+            status: "completed",
+            sensor_event_id: "evt-2",
+            workflow_id: "wf-inventory-1",
+            autonomy: "policy-safe",
+            reason: null,
+          },
+          {
+            workflow_type: "promotion-readiness",
+            dependency_ids: ["demand-spike-response", "inventory-rebalancing"],
+            status: "active",
+            sensor_event_id: "evt-3",
+            workflow_id: "wf-promotion-1",
+            autonomy: "human-approved",
+            reason: null,
+          },
+          {
+            workflow_type: "supplier-delay-recovery",
+            dependency_ids: ["demand-spike-response"],
+            status: "waiting",
+            sensor_event_id: null,
+            workflow_id: null,
+            autonomy: "human-approved",
+            reason: null,
+          },
+          {
+            workflow_type: "marketplace-seller-exception",
+            dependency_ids: ["demand-spike-response"],
+            status: "waiting",
+            sensor_event_id: null,
+            workflow_id: null,
+            autonomy: "human-approved",
+            reason: null,
+          },
+          {
+            workflow_type: "fulfilment-exception-resolution",
+            dependency_ids: [
+              "inventory-rebalancing",
+              "supplier-delay-recovery",
+              "marketplace-seller-exception",
+            ],
+            status: "failed",
+            sensor_event_id: "evt-6",
+            workflow_id: "wf-fulfilment-1",
+            autonomy: "human-approved",
+            reason: "Supplier delay exceeded SLA before fulfilment could proceed.",
+          },
+          {
+            workflow_type: "markdown-governance",
+            dependency_ids: ["inventory-rebalancing"],
+            status: "waiting",
+            sensor_event_id: null,
+            workflow_id: null,
+            autonomy: "human-approved",
+            reason: null,
+          },
+          {
+            workflow_type: "returns-disposition",
+            dependency_ids: ["promotion-readiness", "fulfilment-exception-resolution"],
+            status: "waiting",
+            sensor_event_id: null,
+            workflow_id: null,
+            autonomy: "human-approved",
+            reason: null,
+          },
+        ],
+        kpis: {
+          units_sold: { before: 120, after: 340 },
+        },
+        failure: {
+          workflow_type: "fulfilment-exception-resolution",
+          reason: "Supplier delay exceeded SLA before fulfilment could proceed.",
+          sensor_event_id: "evt-6",
+          workflow_id: "wf-fulfilment-1",
+          status: "failed",
+        },
+      },
+    };
+
+    renderWorld(storyState, []);
+
+    const story = screen.getByTestId("story-control");
+    expect(within(story).getByText("The flagship gaming launch")).toBeTruthy();
+    expect(screen.getByTestId("story-status").textContent).toBe("failed");
+    expect(within(story).getByText("2 of 8 processes complete")).toBeTruthy();
+
+    const stageOrder = [
+      "demand-spike-response",
+      "inventory-rebalancing",
+      "promotion-readiness",
+      "supplier-delay-recovery",
+      "marketplace-seller-exception",
+      "fulfilment-exception-resolution",
+      "markdown-governance",
+      "returns-disposition",
+    ];
+    const renderedStageIds = within(story)
+      .getAllByTestId(/^story-stage-(?!link-)/)
+      .map((node) => node.dataset.testid);
+    expect(renderedStageIds).toEqual(
+      stageOrder.map((type) => `story-stage-${type}`),
+    );
+
+    const demandStage = screen.getByTestId("story-stage-demand-spike-response");
+    expect(within(demandStage).getByText(/policy-safe/i)).toBeTruthy();
+    expect(within(demandStage).getByText(/no dependencies/i)).toBeTruthy();
+
+    const promotionStage = screen.getByTestId("story-stage-promotion-readiness");
+    expect(within(promotionStage).getByText(/human-approved/i)).toBeTruthy();
+    expect(within(promotionStage).getByText(/2 dependencies/i)).toBeTruthy();
+    expect(within(promotionStage).getByText(/Demand spike response/)).toBeTruthy();
+    expect(within(promotionStage).getByText(/Inventory rebalancing/)).toBeTruthy();
+    const promotionLink = within(promotionStage).getByTestId(
+      "story-stage-link-promotion-readiness",
+    );
+    expect(promotionLink.tagName).toBe("A");
+    expect(promotionLink.getAttribute("href")).toBe("/workflows/wf-promotion-1");
+
+    const waitingStage = screen.getByTestId("story-stage-supplier-delay-recovery");
+    expect(within(waitingStage).getByText(/1 dependency/i)).toBeTruthy();
+    expect(waitingStage.tagName).not.toBe("A");
+    expect(
+      within(waitingStage).queryByTestId(
+        "story-stage-link-supplier-delay-recovery",
+      ),
+    ).toBeNull();
+
+    expect(
+      screen.getByTestId("story-failure").textContent,
+    ).toContain(
+      "Supplier delay exceeded SLA before fulfilment could proceed.",
+    );
+  });
+
+  it("renders story KPI cards with concrete before/after evidence and an explicit pending state", () => {
+    const storyState: WorldState = {
+      ...baseline,
+      story: {
+        title: "The flagship gaming launch",
+        status: "running",
+        stages: [],
+        kpis: {
+          units_sold: { before: 120, after: 340 },
+          average_wait_minutes: { before: 8, after: null },
+        },
+        failure: null,
+      },
+    };
+
+    renderWorld(storyState, []);
+
+    const unitsCard = screen.getByTestId("story-kpi-units_sold");
+    expect(within(unitsCard).getByText("Units sold")).toBeTruthy();
+    expect(unitsCard.textContent).toContain("120");
+    expect(unitsCard.textContent).toContain("340");
+
+    const waitCard = screen.getByTestId("story-kpi-average_wait_minutes");
+    expect(within(waitCard).getByText("Average wait minutes")).toBeTruthy();
+    expect(waitCard.textContent).toContain("8");
+    expect(waitCard.textContent).toMatch(/pending/i);
+    expect(waitCard.textContent).not.toContain("null");
+  });
+
+  it("shows real per-layer actor counts on location cards, including a custom scene layer not in the fashion actor label map", () => {
+    const sceneWithCustomLayer: WorldSceneContract = {
+      ...scene,
+      layers: [
+        ...scene.layers,
+        {
+          state_key: "beacon_pings",
+          kind: "beacon",
+          label: "Beacons",
+          id_field: "id",
+          location_field: "location_id",
+          status_field: "status",
+          colour: "#eab308",
+        },
+      ],
+    };
+    const stateWithCustomLayer: WorldState = {
+      ...baseline,
+      beacon_pings: [
+        { id: "BEACON-001", location_id: "STORE-EU-PAR-01", status: "sent" },
+        { id: "BEACON-002", location_id: "STORE-EU-PAR-01", status: "sent" },
+        { id: "BEACON-003", location_id: "STORE-EU-PAR-01", status: "queued" },
+      ],
+    };
+
+    renderWorld(stateWithCustomLayer, [], sceneWithCustomLayer);
+
+    const location = screen.getByTestId("location-STORE-EU-PAR-01");
+    expect(
+      within(location).getByTestId("location-counts-STORE-EU-PAR-01")
+        .textContent,
+    ).toContain("Beacons 3");
+
+    const visibleBeacon = screen.getByTestId("actor-BEACON-003");
+    expect(visibleBeacon.textContent).toContain("Beacon");
+    expect(screen.queryByTestId("actor-BEACON-001")).toBeNull();
+  });
+
+  it("summarises real location, actor and process counts in the header instead of ordinary-orders wording", () => {
+    renderWorld();
+
+    expect(screen.queryByText(/ordinary orders/i)).toBeNull();
+    expect(screen.getByText("2 locations")).toBeTruthy();
+    expect(screen.getByText(/actors/)).toBeTruthy();
+    expect(screen.getByText(/processes/)).toBeTruthy();
+  });
 });

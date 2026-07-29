@@ -72,16 +72,9 @@ const ACTORS_PER_LOCATION: Record<string, number> = {
   deliveries: 1,
   returns: 1,
 };
-const ACTOR_LABELS: Record<string, string> = {
-  customers: "Customer",
-  staff: "Colleague",
-  orders: "Order",
-  inventory_tokens: "Stock",
-  deliveries: "Delivery",
-  returns: "Return",
-};
 const JOURNAL_LIMIT = 40;
 const PROCESS_LIMIT = 8;
+const KPI_LIMIT = 6;
 
 const ANIMATION_CSS = `
 @keyframes scenePulse {
@@ -98,6 +91,22 @@ function text(value: unknown): string {
 }
 
 
+/** Capitalises a scene layer's `kind` (e.g. "customer" -> "Customer"). */
+function capitalize(value: string): string {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+}
+
+
+/** Turns a hyphen/underscore identifier into a readable label, e.g.
+ * "demand-spike-response" -> "Demand spike response",
+ * "average_wait_minutes" -> "Average wait minutes". Pack-neutral: it only
+ * reformats whatever identifier the scene/story payload provides. */
+function readableLabel(value: string): string {
+  const spaced = value.replace(/[-_]/g, " ").trim();
+  return spaced ? spaced.charAt(0).toUpperCase() + spaced.slice(1) : spaced;
+}
+
+
 function actorRecords(state: WorldState, layer: SceneLayer): ActorRecord[] {
   const records = state[layer.state_key];
   return Array.isArray(records)
@@ -108,6 +117,31 @@ function actorRecords(state: WorldState, layer: SceneLayer): ActorRecord[] {
         .localeCompare(text(left.last_event_id ?? left[layer.id_field]))
     ))
     : [];
+}
+
+
+interface LocationLayerCount {
+  layer: SceneLayer;
+  count: number;
+}
+
+
+/** Full (uncapped) per-layer actor counts at a location, derived from the
+ * real snapshot arrays — distinct from the capped sample of tokens rendered
+ * on the map, so a dense world reads at a glance. */
+function locationLayerCounts(
+  state: WorldState,
+  layers: SceneLayer[],
+  locationId: string,
+): LocationLayerCount[] {
+  return layers
+    .map((layer) => ({
+      layer,
+      count: actorRecords(state, layer).filter((actor) => (
+        text(actor[layer.location_field]) === locationId
+      )).length,
+    }))
+    .filter((entry) => entry.count > 0);
 }
 
 
@@ -127,6 +161,101 @@ interface ProcessItem {
   event?: WorldEvent;
   sensor?: WorldEvent;
   storyStatus?: string;
+}
+
+
+interface StoryStageView {
+  workflowType: string;
+  displayName: string;
+  functionId: string;
+  commandType: string;
+  successEvent: string;
+  skills: string[];
+  phases: Array<{ name: string; kind: string }>;
+  hitlPersona: string;
+  dependencyIds: string[];
+  status: string;
+  workflowId: string | null;
+  autonomy: string;
+  reason: string | null;
+}
+
+
+interface StoryView {
+  title: string;
+  status: string;
+  traceId: string;
+  stages: StoryStageView[];
+  kpis: Record<string, { before: unknown; after: unknown }>;
+  failure: { reason: string; workflowType: string } | null;
+}
+
+
+/** Reads only the existing pack-neutral story shape produced by
+ * world/packs/*_shock.py's TradingShockState.view(): title, status,
+ * trace_id, stages[] and kpis{}. No pack-specific fields are assumed. */
+function parseStory(state: WorldState): StoryView | null {
+  if (typeof state.story !== "object" || state.story === null) return null;
+  const story = state.story as Record<string, unknown>;
+  const rawStages = Array.isArray(story.stages)
+    ? story.stages.filter((stage): stage is Record<string, unknown> => (
+      typeof stage === "object" && stage !== null
+    ))
+    : [];
+  const stages: StoryStageView[] = rawStages.map((stage) => ({
+    workflowType: text(stage.workflow_type),
+    displayName: text(stage.display_name) || readableLabel(text(stage.workflow_type)),
+    functionId: text(stage.function),
+    commandType: text(stage.command_type),
+    successEvent: text(stage.success_event),
+    skills: Array.isArray(stage.skills)
+      ? stage.skills.map((skill) => text(skill))
+      : [],
+    phases: Array.isArray(stage.phases)
+      ? stage.phases.flatMap((phase) => {
+        if (typeof phase !== "object" || phase === null) return [];
+        const value = phase as Record<string, unknown>;
+        return [{ name: text(value.name), kind: text(value.kind) }];
+      })
+      : [],
+    hitlPersona: text(stage.hitl_persona),
+    dependencyIds: Array.isArray(stage.dependency_ids)
+      ? stage.dependency_ids.map((id) => text(id))
+      : [],
+    status: text(stage.status) || "waiting",
+    workflowId: stage.workflow_id != null ? text(stage.workflow_id) : null,
+    autonomy: text(stage.autonomy),
+    reason: stage.reason != null ? text(stage.reason) : null,
+  }));
+  const rawKpis = (
+    typeof story.kpis === "object" && story.kpis !== null
+      ? story.kpis as Record<string, unknown>
+      : {}
+  );
+  const kpis: Record<string, { before: unknown; after: unknown }> = {};
+  for (const [metric, value] of Object.entries(rawKpis)) {
+    if (typeof value !== "object" || value === null) continue;
+    const entry = value as Record<string, unknown>;
+    kpis[metric] = { before: entry.before, after: entry.after };
+  }
+  const rawFailure = (
+    typeof story.failure === "object" && story.failure !== null
+      ? story.failure as Record<string, unknown>
+      : null
+  );
+  return {
+    title: text(story.title),
+    status: text(story.status) || "unknown",
+    traceId: text(story.trace_id),
+    stages,
+    kpis,
+    failure: rawFailure
+      ? {
+        reason: text(rawFailure.reason),
+        workflowType: text(rawFailure.workflow_type),
+      }
+      : null,
+  };
 }
 
 
@@ -214,6 +343,14 @@ export default function SpatialWorld({
     () => processEvents(events, scene.process_event_types ?? [], state),
     [events, scene.process_event_types, state],
   );
+  const story = useMemo(() => parseStory(state), [state]);
+  const totalActorCount = useMemo(
+    () => scene.layers.reduce(
+      (sum, layer) => sum + actorRecords(state, layer).length,
+      0,
+    ),
+    [scene.layers, state],
+  );
   const relationships = (
     Array.isArray(state.knowledge_relationships)
       ? state.knowledge_relationships
@@ -265,7 +402,9 @@ export default function SpatialWorld({
                 <span>simulation {Math.round(Number(state.sim_time ?? 0))}m</span>
                 <span>seed {text(state.seed) || "—"}</span>
                 <span>{text(state.status) || "unknown"}</span>
-                <span>{Number(state.ordinary_activity_count ?? 0)} ordinary orders</span>
+                <span>{scene.locations.length} locations</span>
+                <span>{totalActorCount} actors</span>
+                <span>{story?.stages.length ?? processes.length} processes</span>
               </div>
             </div>
           </div>
@@ -285,6 +424,8 @@ export default function SpatialWorld({
             {error}
           </div>
         )}
+
+        {story && <StoryControl story={story} />}
 
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div
@@ -332,6 +473,19 @@ export default function SpatialWorld({
                       {location.kind}
                     </span>
                   </div>
+                  {(() => {
+                    const counts = locationLayerCounts(state, scene.layers, location.id);
+                    return counts.length > 0 ? (
+                      <div
+                        data-testid={`location-counts-${location.id}`}
+                        className="pointer-events-none mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[8px] text-slate-500 dark:text-slate-400"
+                      >
+                        {counts.map(({ layer, count }) => (
+                          <span key={layer.state_key}>{layer.label} {count}</span>
+                        ))}
+                      </div>
+                    ) : null;
+                  })()}
                   <div className="mt-3 grid grid-cols-2 gap-1">
                     {visibleActors.map(({ actor, layer }) => {
                       const actorId = text(actor[layer.id_field]);
@@ -364,7 +518,7 @@ export default function SpatialWorld({
                           />
                           <span className="sr-only">{actorId} · </span>
                           <span className="truncate">
-                            {ACTOR_LABELS[layer.state_key] ?? layer.kind} · {status || "active"}
+                            {capitalize(layer.kind) || layer.label} · {status || "active"}
                           </span>
                         </button>
                       );
@@ -416,6 +570,187 @@ export default function SpatialWorld({
           </ul>
         </section>
       </div>
+    </div>
+  );
+}
+
+
+/** Tailwind-only status color coding, shared by the story badge and stage
+ * badges — no new dependency, just semantic color grouping of whatever
+ * status string the pack's story/stage view provides. */
+function statusBadgeClasses(status: string): string {
+  switch (status) {
+    case "completed":
+      return "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200";
+    case "failed":
+      return "border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200";
+    case "active":
+    case "triggered":
+      return "border-blue-300 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200";
+    default:
+      return "border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300";
+  }
+}
+
+
+/** Pack-neutral operations strip: reads only the existing story shape
+ * (title, status, stages, kpis, failure, trace_id) so it works for any
+ * pack's *_shock.py story without a new schema version or framework. */
+function StoryControl({ story }: { story: StoryView }) {
+  const total = story.stages.length;
+  const completed = story.stages.filter((stage) => stage.status === "completed").length;
+  const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  return (
+    <section
+      data-testid="story-control"
+      className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+          {story.title || "Live operations story"}
+        </h2>
+        <span
+          data-testid="story-status"
+          className={`rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${statusBadgeClasses(story.status)}`}
+        >
+          {story.status}
+        </span>
+      </div>
+
+      {story.failure && (
+        <div
+          role="alert"
+          data-testid="story-failure"
+          className="mt-2 rounded border border-rose-300 bg-rose-50 px-2 py-1.5 text-[11px] text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200"
+        >
+          {readableLabel(story.failure.workflowType)} failed: {story.failure.reason}
+        </div>
+      )}
+
+      {total > 0 && (
+        <div className="mt-2">
+          <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+            <span>{completed} of {total} processes complete</span>
+            <span>{progressPct}%</span>
+          </div>
+          <div
+            role="progressbar"
+            aria-valuenow={completed}
+            aria-valuemin={0}
+            aria-valuemax={total}
+            className="mt-1 h-1.5 w-full overflow-hidden rounded bg-slate-200 dark:bg-slate-800"
+          >
+            <div
+              className="h-1.5 rounded bg-emerald-500 transition-all"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {total > 0 && (
+        <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
+          {story.stages.map((stage) => (
+            <StoryStageCard key={stage.workflowType} stage={stage} />
+          ))}
+        </div>
+      )}
+
+      <StoryKpis kpis={story.kpis} />
+    </section>
+  );
+}
+
+
+function StoryStageCard({
+  stage,
+}: {
+  stage: StoryStageView;
+}) {
+  const dependencyLabels = stage.dependencyIds.map((id) => readableLabel(id));
+  const dependencyText = dependencyLabels.length === 0
+    ? "No dependencies"
+    : `${dependencyLabels.length} ${dependencyLabels.length === 1 ? "dependency" : "dependencies"}: ${dependencyLabels.join(", ")}`;
+
+  const body = (
+    <>
+      <div className="flex items-center justify-between gap-1">
+        <span className="text-[11px] font-semibold text-slate-800 dark:text-slate-100">
+          {stage.displayName}
+        </span>
+        <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${statusBadgeClasses(stage.status)}`}>
+          {stage.status}
+        </span>
+      </div>
+      <div className="mt-1 text-[9px] text-slate-500 dark:text-slate-400">
+        autonomy: {stage.autonomy || "unknown"}
+      </div>
+      <div className="mt-1 text-[9px] text-slate-500 dark:text-slate-400">
+        {dependencyText}
+      </div>
+      {stage.status === "failed" && stage.reason && (
+        <div className="mt-1 text-[9px] text-rose-700 dark:text-rose-300">
+          {stage.reason}
+        </div>
+      )}
+      <div className="mt-2 border-t border-slate-100 pt-1.5 text-[9px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
+        <div>{stage.phases.length} phases · {stage.skills.length} AI skill{stage.skills.length === 1 ? "" : "s"}</div>
+        {stage.commandType && <div className="mt-0.5 font-mono">{stage.commandType} → {stage.successEvent}</div>}
+        {stage.hitlPersona && <div className="mt-0.5">HITL · {readableLabel(stage.hitlPersona)}</div>}
+      </div>
+      <div className="mt-2 text-[10px] font-medium text-blue-700 dark:text-blue-300">
+        {stage.workflowId ? "Open workflow →" : "Waiting for trigger"}
+      </div>
+    </>
+  );
+
+  return (
+    <div
+      data-testid={`story-stage-${stage.workflowType}`}
+      className="rounded border border-slate-200 p-2 dark:border-slate-700"
+    >
+      {stage.workflowId ? (
+        <Link
+          data-testid={`story-stage-link-${stage.workflowType}`}
+          to={`/workflows/${encodeURIComponent(stage.workflowId)}`}
+          className="block transition-colors hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:hover:text-blue-300"
+        >
+          {body}
+        </Link>
+      ) : body}
+    </div>
+  );
+}
+
+
+function StoryKpis({
+  kpis,
+}: {
+  kpis: Record<string, { before: unknown; after: unknown }>;
+}) {
+  const entries = Object.entries(kpis).slice(0, KPI_LIMIT);
+  if (entries.length === 0) return null;
+
+  return (
+    <div
+      data-testid="story-kpis"
+      className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-3"
+    >
+      {entries.map(([metric, { before, after }]) => (
+        <div
+          key={metric}
+          data-testid={`story-kpi-${metric}`}
+          className="rounded border border-slate-200 bg-slate-50 p-2 text-[10px] dark:border-slate-700 dark:bg-slate-800/60"
+        >
+          <div className="text-[9px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            {readableLabel(metric)}
+          </div>
+          <div className="mt-0.5 font-mono text-slate-700 dark:text-slate-200">
+            {before == null ? "—" : text(before)} → {after == null ? "Pending" : text(after)}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
