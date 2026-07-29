@@ -5,94 +5,34 @@
   "design_spec": "docs/superpowers/specs/2026-07-28-anonymous-hospitality-operations-vertical-design.md",
   "records": [
     {
-      "path": "verticals/hospitality/__init__.py",
-      "ownership": "bespoke",
-      "note": "Pack docstring"
-    },
-    {
-      "path": "verticals/hospitality/org-brief.yaml",
-      "ownership": "bespoke",
-      "note": "Anonymous approved assumptions \u2014 no target identity"
-    },
-    {
-      "path": "verticals/hospitality/generation-manifest.json",
-      "ownership": "bespoke",
-      "note": "Ledger of bespoke hand-authored business files and future proof launchers"
-    },
-    {
-      "path": "verticals/hospitality/domains.py",
-      "ownership": "bespoke",
-      "note": "Eight executable hospitality domains"
-    },
-    {
-      "path": "verticals/hospitality/functions.py",
-      "ownership": "bespoke",
-      "note": "Organisation functions and KPI ownership"
-    },
-    {
-      "path": "verticals/hospitality/authority.py",
-      "ownership": "bespoke",
-      "note": "Exact action and spend authority rows (synthetic demo values)"
-    },
-    {
-      "path": "verticals/hospitality/personas.py",
-      "ownership": "bespoke",
-      "note": "Runtime persona registry"
-    },
-    {
-      "path": "verticals/hospitality/agents.py",
-      "ownership": "bespoke",
-      "note": "Machine-agent registry \u2014 one per workflow"
-    },
-    {
-      "path": "verticals/hospitality/ui.json",
-      "ownership": "bespoke",
-      "note": "Runtime UI manifest"
-    },
-    {
-      "path": "verticals/hospitality/actors.py",
-      "ownership": "bespoke",
-      "note": "Task 3: frozen/slotted (frozen=True, slots=True) entity dataclasses \u2014 Hotel, Room, Booking, GuestParty, CriticalAsset, WorkOrder (+ contractor_available: bool), TeamMember, Shift, FoodServicePlan, EnergyMeter"
-    },
-    {
-      "path": "verticals/hospitality/dynamics.py",
-      "ownership": "bespoke",
-      "note": "Task 3: deterministic virtual-time tick primitives and threshold helpers"
-    },
-    {
-      "path": "verticals/hospitality/sensors.py",
-      "ownership": "bespoke",
-      "note": "Task 3: pure operational-risk sensor \u2014 evaluate_operations_risk; rejects malformed snapshots explicitly; payload includes sister_travel_times_minutes (int minutes per sister hotel from _SISTER_TRAVEL_MINUTES topology) and contractor_available (bool from WorkOrder.contractor_available)"
-    },
-    {
-      "path": "verticals/hospitality/recovery.py",
-      "ownership": "bespoke",
-      "note": "Task 3: pure deterministic recovery planner \u2014 plan_recovery; RecoveryResult, RecoveryPlan, Relocation, ShiftReallocation"
-    },
-    {
-      "path": "verticals/hospitality/reference_cases.py",
-      "ownership": "bespoke",
-      "note": "Task 3: HospitalityReferenceCase and HOSPITALITY_REFERENCE_CASES \u2014 exactly 8 workflow IDs"
-    },
-    {
-      "path": "verticals/hospitality/world.py",
-      "ownership": "bespoke",
-      "note": "Task 3: HospitalityWorld \u2014 demo(seed), reset(seed), trigger_scenario, poll_sensor_events, WorldEvent. Task 4: apply_command(...) \u2014 parses/dispatches all eight typed commands, optimistic-concurrency version checks, authority-boundary approval gate (hero/value-limit/cross-property/protected-requirement triggers, including room-readiness and maintenance-dispatch cross-property assignment), per-command atomic mutation handlers (_apply_hotel_recovery, _apply_room_readiness_plan, _apply_maintenance_work_order_dispatch, _apply_guest_recovery_action, _apply_booking_inventory_plan, _apply_workforce_shift_plan, _apply_food_beverage_service_plan, _apply_energy_control_plan), command-id idempotency log, typed rejection/acceptance WorldEvents with workflow_id preserved whenever known. Hero relocations require a declared sister-hotel destination (incompatible_property) and emit protected_requirement_breach ahead of the generic incompatible_room reason for protected bookings; hero shift moves and maintenance dispatch resolve the real TeamMember and require engineering skill (skill_mismatch) rather than trusting a denormalized skill field; guest-recovery-action value_gbp must match estimated_value_gbp (value_mismatch) so a mismatched estimate can never bypass the role-limit gate; duplicate entity IDs within a payload collection (rooms_to_restore, relocation booking IDs, shift-move shift IDs, room_ids) are rejected before any mutation. Payload-type guards use explicit checks (never bare assert), safe under python -O Blocking-invariant sync: Hotel.available_<type>_rooms always equals the count of Room entities of that hotel/type with status==\"available\". select_available_room/select_occupied_room/hotel_available_room_counts/_apply_hotel_availability_deltas are the single source of truth for physical-room selection and per-hotel counter batching (hotel version increments exactly once per command even when multiple relocations/restores/releases touch it). _check_target_versions validates a base/declared target set (no unexpected-key rule); _check_expected_versions additionally rejects any expected_versions key outside the exact final target set as unexpected_expected_version. Hero relocations and booking.inventory-plan.apply now consume a deterministic destination Room (reject insufficient_capacity if none physically exists) and release a deterministic compatible occupied source Room when one exists, before mutating; the 8 hero rooms_to_restore events remain distinct from the new hotel-recovery.room.consumed/released and booking-inventory-plan.room.consumed/released events. room.readiness-plan.apply now explicitly no-ops identical current==target transitions, rejects occupied-room transitions (invalid_room_status), and synchronizes the owning hotel counters/version on every real available<->not_ready transition."
-    },
-    {
-      "path": "verticals/hospitality/commands.py",
-      "ownership": "bespoke",
-      "note": "Task 4: pure typed command schemas \u2014 COMMAND_TYPES (exactly 8), one payload dataclass + parser per command type (COMMAND_PAYLOAD_TYPES / COMMAND_PAYLOAD_PARSERS expose the production command_type -> type/parser mappings), CommandEnvelope, RejectedCommand, CommandResult, parse_command(...), canonical_signature(...) for idempotency comparison. parse_command validates an already-typed CommandEnvelope with the exact same field-level rules as a raw mapping (non-empty identifiers, non-negative int-not-bool versions, finite non-negative estimated value, exact payload-type match) rather than passing it through unchecked. _validate_typed_envelope additionally re-runs the payload's own field *values* through the exact same registered COMMAND_PAYLOAD_PARSERS[command_type] parser used for mapping input (by serializing the frozen payload dataclass back to a plain mapping via _to_jsonable) \u2014 exact-type matching alone cannot catch a hand-built payload dataclass holding an out-of-enum or out-of-bounds field value (e.g. target_status=\"TOTALLY-BOGUS\"), so this closes that gap and propagates the parser's own RejectedCommand, returning a normalized CommandEnvelope carrying the freshly validated payload (identity-preserved when unchanged, for idempotent re-parsing). ENVELOPE_KEYS and a per-command allowed-payload-key set reject any unrecognized top-level or payload key (including nested relocation/shift-move items); duplicate IDs within a payload's ID collections are rejected before a typed envelope is ever produced. Never mutates input; never raises for business rejections"
-    },
-    {
-      "path": "verticals/hospitality/reference_actions.py",
-      "ownership": "bespoke",
-      "note": "Task 4: HOSPITALITY_REFERENCE_ACTIONS \u2014 one executable command-builder per workflow (exactly 8). The hero builder derives its payload from plan_recovery(world.snapshot()) after the golden scenario; supporting builders read real seeded IDs/current versions from a fresh HospitalityWorld.demo(seed). Deterministic test inputs only \u2014 not proof of workflow execution (Task 6 scope) Every builder now supplies expected_versions for every dynamically selected physical room/hotel the handler will mutate (mirroring world.select_available_room/select_occupied_room exactly, same processing order). The occupancy-pressure-response builder now performs a genuine cross-property relocation from the CASE-OCC hotel (Messe Central) to a declared sister with real compatible physical capacity and always supplies a commercial_director_decision approval_ref."
-    },
-    {
       "path": "tests/api/hospitality/__init__.py",
       "ownership": "bespoke",
       "note": "Test package marker"
+    },
+    {
+      "path": "tests/api/hospitality/test_commands.py",
+      "ownership": "bespoke",
+      "note": "Task 4: eight typed command validators/reference actions, malformed-payload rejections (bool-as-number, non-finite, negative, empty, unknown command, unknown top-level/payload keys, duplicate IDs in payload collections), typed-CommandEnvelope validation (malformed direct construction, cross-command payload-type mismatch returning a result rather than raising), version-conflict rejections (stale/missing/unknown), idempotent exact replay vs command_id_conflict (workflow_id preserved), hero exact mutation counts + atomic rollback + sister-property relocation enforcement (incompatible_property) + protected_requirement_breach ordering + TeamMember-backed engineering-skill shift validation, guest-recovery-action value_gbp/estimated_value_gbp equality gate (value_mismatch, incl. zero-estimate/large-value bypass), room-readiness and maintenance-dispatch cross-property approval + maintenance engineering-skill requirement, authority triggers (value-exceeds-role-limit, protected-requirement), every supporting command's success + a workflow-specific rejection, event identity (workflow_id/command_id preserved, no duplicates on replay), cross-shape payload rejection, apply_command non-mutation of input, production command_type->payload-type/parser distinctness Plus: reusable available-room-count invariant assertion exercised after all eight reference actions; hero/booking-inventory physical destination-consume + source-release room/version/hotel-counter coverage; hero destination-hotel version-increments-exactly-once despite multiple relocations; atomic rollback when a dynamically selected physical room is stale; room-readiness no-op and occupied-room-rejection coverage; unexpected_expected_version coverage (simple command and post-dynamic-target hero command); occupancy reference action cross-property + commercial_director approval coverage."
+    },
+    {
+      "path": "tests/api/hospitality/test_customer_boundary.py",
+      "ownership": "bespoke",
+      "note": "Customer identity boundary scanner"
+    },
+    {
+      "path": "tests/api/hospitality/test_hotel_recovery_sensor.py",
+      "ownership": "bespoke",
+      "note": "Task 3: golden scenario — 18 unavailable/7 not-ready/96% occupancy/44 arrivals, sensor event, dedupe, payload"
+    },
+    {
+      "path": "tests/api/hospitality/test_mcp_and_runtime_skills.py",
+      "ownership": "bespoke",
+      "note": "MCP tool, runtime skill and Durable module tests"
+    },
+    {
+      "path": "tests/api/hospitality/test_pack_contract.py",
+      "ownership": "bespoke",
+      "note": "Pack discovery, validation and structural inventory tests"
     },
     {
       "path": "tests/api/hospitality/test_pack_inventory.py",
@@ -100,9 +40,14 @@
       "note": "Static pack inventory assertions"
     },
     {
-      "path": "tests/api/hospitality/test_customer_boundary.py",
+      "path": "tests/api/hospitality/test_recovery_planner.py",
       "ownership": "bespoke",
-      "note": "Customer identity boundary scanner"
+      "note": "Task 3: recovery planner — 8 restore/10 relocation/2 shifts/HITL/no-action/protected-requirement tests"
+    },
+    {
+      "path": "tests/api/hospitality/test_runtime_golden_slice.py",
+      "ownership": "bespoke",
+      "note": "Bootable golden-slice runtime tests"
     },
     {
       "path": "tests/api/hospitality/test_static_contracts.py",
@@ -115,34 +60,259 @@
       "note": "Task 3: entity counts, hotel labels, same-seed equality, reset, ordering, reference cases"
     },
     {
-      "path": "tests/api/hospitality/test_hotel_recovery_sensor.py",
+      "path": "verticals/hospitality/__init__.py",
       "ownership": "bespoke",
-      "note": "Task 3: golden scenario \u2014 18 unavailable/7 not-ready/96% occupancy/44 arrivals, sensor event, dedupe, payload"
+      "note": "Pack docstring"
     },
     {
-      "path": "tests/api/hospitality/test_recovery_planner.py",
+      "path": "verticals/hospitality/actors.py",
       "ownership": "bespoke",
-      "note": "Task 3: recovery planner \u2014 8 restore/10 relocation/2 shifts/HITL/no-action/protected-requirement tests"
+      "note": "Task 3: frozen/slotted (frozen=True, slots=True) entity dataclasses — Hotel, Room, Booking, GuestParty, CriticalAsset, WorkOrder (+ contractor_available: bool), TeamMember, Shift, FoodServicePlan, EnergyMeter"
     },
     {
-      "path": "tests/api/hospitality/test_commands.py",
+      "path": "verticals/hospitality/agents.py",
       "ownership": "bespoke",
-      "note": "Task 4: eight typed command validators/reference actions, malformed-payload rejections (bool-as-number, non-finite, negative, empty, unknown command, unknown top-level/payload keys, duplicate IDs in payload collections), typed-CommandEnvelope validation (malformed direct construction, cross-command payload-type mismatch returning a result rather than raising), version-conflict rejections (stale/missing/unknown), idempotent exact replay vs command_id_conflict (workflow_id preserved), hero exact mutation counts + atomic rollback + sister-property relocation enforcement (incompatible_property) + protected_requirement_breach ordering + TeamMember-backed engineering-skill shift validation, guest-recovery-action value_gbp/estimated_value_gbp equality gate (value_mismatch, incl. zero-estimate/large-value bypass), room-readiness and maintenance-dispatch cross-property approval + maintenance engineering-skill requirement, authority triggers (value-exceeds-role-limit, protected-requirement), every supporting command's success + a workflow-specific rejection, event identity (workflow_id/command_id preserved, no duplicates on replay), cross-shape payload rejection, apply_command non-mutation of input, production command_type->payload-type/parser distinctness Plus: reusable available-room-count invariant assertion exercised after all eight reference actions; hero/booking-inventory physical destination-consume + source-release room/version/hotel-counter coverage; hero destination-hotel version-increments-exactly-once despite multiple relocations; atomic rollback when a dynamically selected physical room is stale; room-readiness no-op and occupied-room-rejection coverage; unexpected_expected_version coverage (simple command and post-dynamic-target hero command); occupancy reference action cross-property + commercial_director approval coverage."
+      "note": "Machine-agent registry — one per workflow"
     },
     {
-      "path": "tools/hospitality_proof_manifest.py",
-      "ownership": "bespoke-external",
-      "note": "Future proof manifest launcher \u2014 not yet created"
+      "path": "verticals/hospitality/authority.py",
+      "ownership": "bespoke",
+      "note": "Exact action and spend authority rows (synthetic demo values)"
     },
     {
-      "path": "tools/hospitality_zava_e2e_proof.mjs",
-      "ownership": "bespoke-external",
-      "note": "Future browser proof launcher \u2014 not yet created"
+      "path": "verticals/hospitality/commands.py",
+      "ownership": "bespoke",
+      "note": "Task 4: pure typed command schemas — COMMAND_TYPES (exactly 8), one payload dataclass + parser per command type (COMMAND_PAYLOAD_TYPES / COMMAND_PAYLOAD_PARSERS expose the production command_type -> type/parser mappings), CommandEnvelope, RejectedCommand, CommandResult, parse_command(...), canonical_signature(...) for idempotency comparison. parse_command validates an already-typed CommandEnvelope with the exact same field-level rules as a raw mapping (non-empty identifiers, non-negative int-not-bool versions, finite non-negative estimated value, exact payload-type match) rather than passing it through unchecked. _validate_typed_envelope additionally re-runs the payload's own field *values* through the exact same registered COMMAND_PAYLOAD_PARSERS[command_type] parser used for mapping input (by serializing the frozen payload dataclass back to a plain mapping via _to_jsonable) — exact-type matching alone cannot catch a hand-built payload dataclass holding an out-of-enum or out-of-bounds field value (e.g. target_status=\"TOTALLY-BOGUS\"), so this closes that gap and propagates the parser's own RejectedCommand, returning a normalized CommandEnvelope carrying the freshly validated payload (identity-preserved when unchanged, for idempotent re-parsing). ENVELOPE_KEYS and a per-command allowed-payload-key set reject any unrecognized top-level or payload key (including nested relocation/shift-move items); duplicate IDs within a payload's ID collections are rejected before a typed envelope is ever produced. Never mutates input; never raises for business rejections"
     },
     {
-      "path": "tools/hospitality_zava_e2e_proof.sh",
-      "ownership": "bespoke-external",
-      "note": "Future shell proof launcher \u2014 not yet created"
+      "path": "verticals/hospitality/domains.py",
+      "ownership": "bespoke",
+      "note": "Eight executable hospitality domains"
+    },
+    {
+      "path": "verticals/hospitality/durable.py",
+      "ownership": "bespoke",
+      "note": "Eight orchestrators plus evidence/decision/command activities"
+    },
+    {
+      "path": "verticals/hospitality/dynamics.py",
+      "ownership": "bespoke",
+      "note": "Task 3: deterministic virtual-time tick primitives and threshold helpers"
+    },
+    {
+      "path": "verticals/hospitality/entity_projections/__init__.py",
+      "ownership": "bespoke",
+      "note": "Entity projection package marker"
+    },
+    {
+      "path": "verticals/hospitality/entity_projections/operations.py",
+      "ownership": "bespoke",
+      "note": "Minimal evidence-only entity projection"
+    },
+    {
+      "path": "verticals/hospitality/functions.py",
+      "ownership": "bespoke",
+      "note": "Organisation functions and KPI ownership"
+    },
+    {
+      "path": "verticals/hospitality/generation-manifest.json",
+      "ownership": "bespoke",
+      "note": "Ledger of bespoke hand-authored business files and future proof launchers"
+    },
+    {
+      "path": "verticals/hospitality/lifecycle.py",
+      "ownership": "bespoke",
+      "note": "Anonymous entity bootstrap and no-op start"
+    },
+    {
+      "path": "verticals/hospitality/manifest.py",
+      "ownership": "bespoke",
+      "note": "Sole composition root for the vertical pack"
+    },
+    {
+      "path": "verticals/hospitality/mcp_tools/__init__.py",
+      "ownership": "bespoke",
+      "note": "MCP tool package marker"
+    },
+    {
+      "path": "verticals/hospitality/mcp_tools/common.py",
+      "ownership": "bespoke",
+      "note": "Shared read-only evidence model and ToolResult helper"
+    },
+    {
+      "path": "verticals/hospitality/mcp_tools/operations.py",
+      "ownership": "bespoke",
+      "note": "Eight registered read-only hospitality tools"
+    },
+    {
+      "path": "verticals/hospitality/org-brief.yaml",
+      "ownership": "bespoke",
+      "note": "Anonymous approved assumptions — no target identity"
+    },
+    {
+      "path": "verticals/hospitality/personae/commercial_director/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime persona: commercial_director"
+    },
+    {
+      "path": "verticals/hospitality/personae/estates_director/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime persona: estates_director"
+    },
+    {
+      "path": "verticals/hospitality/personae/food_beverage_operations_manager/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime persona: food_beverage_operations_manager"
+    },
+    {
+      "path": "verticals/hospitality/personae/guest_recovery_manager/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime persona: guest_recovery_manager"
+    },
+    {
+      "path": "verticals/hospitality/personae/hotel_general_manager/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime persona: hotel_general_manager"
+    },
+    {
+      "path": "verticals/hospitality/personae/hotel_operations_director/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime persona: hotel_operations_director"
+    },
+    {
+      "path": "verticals/hospitality/personae/maintenance_manager/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime persona: maintenance_manager"
+    },
+    {
+      "path": "verticals/hospitality/personae/people_operations_director/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime persona: people_operations_director"
+    },
+    {
+      "path": "verticals/hospitality/personae/regional_operations_manager/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime persona: regional_operations_manager"
+    },
+    {
+      "path": "verticals/hospitality/personae/sustainability_director/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime persona: sustainability_director"
+    },
+    {
+      "path": "verticals/hospitality/personae/sustainability_operations_manager/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime persona: sustainability_operations_manager"
+    },
+    {
+      "path": "verticals/hospitality/personae/workforce_planning_manager/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime persona: workforce_planning_manager"
+    },
+    {
+      "path": "verticals/hospitality/personas.py",
+      "ownership": "bespoke",
+      "note": "Runtime persona registry"
+    },
+    {
+      "path": "verticals/hospitality/policies/tools.yaml",
+      "ownership": "bespoke",
+      "note": "Tool scope and approval policy declarations"
+    },
+    {
+      "path": "verticals/hospitality/process_profiles.py",
+      "ownership": "bespoke",
+      "note": "Immutable process profiles joining domains to world/durable contracts"
+    },
+    {
+      "path": "verticals/hospitality/projections.py",
+      "ownership": "bespoke",
+      "note": "Projection registry for all eight workflows"
+    },
+    {
+      "path": "verticals/hospitality/recovery.py",
+      "ownership": "bespoke",
+      "note": "Task 3: pure deterministic recovery planner — plan_recovery; RecoveryResult, RecoveryPlan, Relocation, ShiftReallocation"
+    },
+    {
+      "path": "verticals/hospitality/reference_actions.py",
+      "ownership": "bespoke",
+      "note": "Task 4: HOSPITALITY_REFERENCE_ACTIONS — one executable command-builder per workflow (exactly 8). The hero builder derives its payload from plan_recovery(world.snapshot()) after the golden scenario; supporting builders read real seeded IDs/current versions from a fresh HospitalityWorld.demo(seed). Deterministic test inputs only — not proof of workflow execution (Task 6 scope) Every builder now supplies expected_versions for every dynamically selected physical room/hotel the handler will mutate (mirroring world.select_available_room/select_occupied_room exactly, same processing order). The occupancy-pressure-response builder now performs a genuine cross-property relocation from the CASE-OCC hotel (Messe Central) to a declared sister with real compatible physical capacity and always supplies a commercial_director_decision approval_ref."
+    },
+    {
+      "path": "verticals/hospitality/reference_cases.py",
+      "ownership": "bespoke",
+      "note": "Task 3: HospitalityReferenceCase and HOSPITALITY_REFERENCE_CASES — exactly 8 workflow IDs"
+    },
+    {
+      "path": "verticals/hospitality/sensors.py",
+      "ownership": "bespoke",
+      "note": "Task 3: pure operational-risk sensor — evaluate_operations_risk; rejects malformed snapshots explicitly; payload includes sister_travel_times_minutes (int minutes per sister hotel from _SISTER_TRAVEL_MINUTES topology) and contractor_available (bool from WorkOrder.contractor_available)"
+    },
+    {
+      "path": "verticals/hospitality/skills/energy-anomaly-advisor/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime skill: energy-anomaly-advisor"
+    },
+    {
+      "path": "verticals/hospitality/skills/food-service-readiness-advisor/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime skill: food-service-readiness-advisor"
+    },
+    {
+      "path": "verticals/hospitality/skills/guest-recovery-advisor/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime skill: guest-recovery-advisor"
+    },
+    {
+      "path": "verticals/hospitality/skills/hotel-impact-assessor/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime skill: hotel-impact-assessor"
+    },
+    {
+      "path": "verticals/hospitality/skills/hotel-network-recovery-planner/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime skill: hotel-network-recovery-planner"
+    },
+    {
+      "path": "verticals/hospitality/skills/maintenance-response-planner/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime skill: maintenance-response-planner"
+    },
+    {
+      "path": "verticals/hospitality/skills/occupancy-pressure-advisor/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime skill: occupancy-pressure-advisor"
+    },
+    {
+      "path": "verticals/hospitality/skills/room-readiness-coordinator/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime skill: room-readiness-coordinator"
+    },
+    {
+      "path": "verticals/hospitality/skills/workforce-balancing-advisor/SKILL.md",
+      "ownership": "bespoke",
+      "note": "Runtime skill: workforce-balancing-advisor"
+    },
+    {
+      "path": "verticals/hospitality/ui.json",
+      "ownership": "bespoke",
+      "note": "Runtime UI manifest"
+    },
+    {
+      "path": "verticals/hospitality/ui/world-scene.json",
+      "ownership": "bespoke",
+      "note": "Bounded six-property spatial scene"
+    },
+    {
+      "path": "verticals/hospitality/world.py",
+      "ownership": "bespoke",
+      "note": "Task 3: HospitalityWorld — demo(seed), reset(seed), trigger_scenario, poll_sensor_events, WorldEvent. Task 4: apply_command(...) — parses/dispatches all eight typed commands, optimistic-concurrency version checks, authority-boundary approval gate (hero/value-limit/cross-property/protected-requirement triggers, including room-readiness and maintenance-dispatch cross-property assignment), per-command atomic mutation handlers (_apply_hotel_recovery, _apply_room_readiness_plan, _apply_maintenance_work_order_dispatch, _apply_guest_recovery_action, _apply_booking_inventory_plan, _apply_workforce_shift_plan, _apply_food_beverage_service_plan, _apply_energy_control_plan), command-id idempotency log, typed rejection/acceptance WorldEvents with workflow_id preserved whenever known. Hero relocations require a declared sister-hotel destination (incompatible_property) and emit protected_requirement_breach ahead of the generic incompatible_room reason for protected bookings; hero shift moves and maintenance dispatch resolve the real TeamMember and require engineering skill (skill_mismatch) rather than trusting a denormalized skill field; guest-recovery-action value_gbp must match estimated_value_gbp (value_mismatch) so a mismatched estimate can never bypass the role-limit gate; duplicate entity IDs within a payload collection (rooms_to_restore, relocation booking IDs, shift-move shift IDs, room_ids) are rejected before any mutation. Payload-type guards use explicit checks (never bare assert), safe under python -O Blocking-invariant sync: Hotel.available_<type>_rooms always equals the count of Room entities of that hotel/type with status==\"available\". select_available_room/select_occupied_room/hotel_available_room_counts/_apply_hotel_availability_deltas are the single source of truth for physical-room selection and per-hotel counter batching (hotel version increments exactly once per command even when multiple relocations/restores/releases touch it). _check_target_versions validates a base/declared target set (no unexpected-key rule); _check_expected_versions additionally rejects any expected_versions key outside the exact final target set as unexpected_expected_version. Hero relocations and booking.inventory-plan.apply now consume a deterministic destination Room (reject insufficient_capacity if none physically exists) and release a deterministic compatible occupied source Room when one exists, before mutating; the 8 hero rooms_to_restore events remain distinct from the new hotel-recovery.room.consumed/released and booking-inventory-plan.room.consumed/released events. room.readiness-plan.apply now explicitly no-ops identical current==target transitions, rejects occupied-room transitions (invalid_room_status), and synchronizes the owning hotel counters/version on every real available<->not_ready transition."
+    },
+    {
+      "path": "verticals/hospitality/worlds.py",
+      "ownership": "bespoke",
+      "note": "HospitalityScenario adapter and world pack registration"
     }
   ]
 }

@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "title": "Hospitality Live Operations",
+  "subtitle": "Six anonymous properties: room blocks, critical assets, work orders, coverage and arrivals",
+  "locations": [
+    {"id": "HOTEL-RIVERSIDE-CENTRAL", "label": "Riverside Central", "kind": "city hotel", "country": "GB", "x": 3, "y": 6, "width": 30, "height": 41},
+    {"id": "HOTEL-AIRPORT-NORTH", "label": "Airport North", "kind": "airport hotel", "country": "GB", "x": 35, "y": 6, "width": 30, "height": 41},
+    {"id": "HOTEL-CITY-GATE", "label": "City Gate", "kind": "city hotel", "country": "GB", "x": 67, "y": 6, "width": 30, "height": 41},
+    {"id": "HOTEL-HARBOUR-VIEW", "label": "Harbour View", "kind": "coastal hotel", "country": "GB", "x": 3, "y": 53, "width": 30, "height": 41},
+    {"id": "HOTEL-MESSE-CENTRAL", "label": "Messe Central", "kind": "conference hotel", "country": "DE", "x": 35, "y": 53, "width": 30, "height": 41},
+    {"id": "HOTEL-RHINE-PARK", "label": "Rhine Park", "kind": "city hotel", "country": "DE", "x": 67, "y": 53, "width": 30, "height": 41}
+  ],
+  "layers": [
+    {"state_key": "room_blocks", "kind": "room-block", "label": "Room blocks", "id_field": "id", "location_field": "location_id", "status_field": "status", "colour": "#0ea5e9"},
+    {"state_key": "critical_assets", "kind": "asset", "label": "Critical assets", "id_field": "id", "location_field": "location_id", "status_field": "status", "colour": "#f59e0b"},
+    {"state_key": "work_orders", "kind": "work-order", "label": "Work orders", "id_field": "id", "location_field": "location_id", "status_field": "status", "colour": "#b45309"},
+    {"state_key": "coverage", "kind": "coverage", "label": "Team coverage", "id_field": "id", "location_field": "location_id", "status_field": "status", "colour": "#6d28d9"},
+    {"state_key": "arrivals", "kind": "arrivals", "label": "Arrivals", "id_field": "id", "location_field": "location_id", "status_field": "status", "colour": "#be123c"}
+  ],
+  "event_mappings": [
+    {"event_type": "hotel.readiness.observed", "layer": "room_blocks", "animation": "status"},
+    {"event_type": "hotel.operations-risk.detected", "layer": "critical_assets", "animation": "pulse"},
+    {"event_type": "sensor.tripped", "layer": "critical_assets", "animation": "pulse"},
+    {"event_type": "hotel-recovery.work-order.expedited", "layer": "work_orders", "animation": "status"},
+    {"event_type": "maintenance.work-order.dispatched", "layer": "work_orders", "animation": "status"},
+    {"event_type": "hotel-recovery.room.restored", "layer": "room_blocks", "animation": "status"},
+    {"event_type": "room.readiness-plan.applied", "layer": "room_blocks", "animation": "status"},
+    {"event_type": "hotel-recovery.booking.relocated", "layer": "arrivals", "animation": "move"},
+    {"event_type": "booking.inventory-plan.applied", "layer": "arrivals", "animation": "move"},
+    {"event_type": "hotel-recovery.shift.reallocated", "layer": "coverage", "animation": "move"},
+    {"event_type": "workforce.shift-plan.applied", "layer": "coverage", "animation": "move"},
+    {"event_type": "guest.recovery-action.issued", "layer": "arrivals", "animation": "status"},
+    {"event_type": "food-beverage.service-plan.applied", "layer": "coverage", "animation": "status"},
+    {"event_type": "energy.control-plan.applied", "layer": "critical_assets", "animation": "status"},
+    {"event_type": "hotel.recovery.executed", "layer": "room_blocks", "animation": "status"},
+    {"event_type": "evaluation.resolved", "layer": "room_blocks", "animation": "status"}
+  ],
+  "process_event_types": ["sensor.tripped", "responder.requested", "responder.decided", "hotel.recovery.executed", "evaluation.resolved"],
+  "knowledge_relationship_label": "Guests relocated from Riverside Central to sister properties",
+  "knowledge_actor_ids": ["HOTEL-RIVERSIDE-CENTRAL", "ASSET-RIVC-HW-01", "WO-RIVC-001"]
+}

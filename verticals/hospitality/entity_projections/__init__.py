@@ -1,0 +1,1 @@
+"""Hospitality entity projections."""

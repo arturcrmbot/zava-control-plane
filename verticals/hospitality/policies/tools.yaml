@@ -1,0 +1,79 @@
+tools:
+  - id: hospitality_read_hotel_operations
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: hotel-operations
+    description: Read hotel operations risk, capacity and arrival evidence.
+  - id: hospitality_read_room_readiness
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: hotel-operations
+    description: Read room readiness and housekeeping capacity evidence.
+  - id: hospitality_read_asset_maintenance
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: engineering-and-estates
+    description: Read critical asset and work order evidence.
+  - id: hospitality_read_guest_recovery
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: guest-and-commercial
+    description: Read guest service failure and booking evidence.
+  - id: hospitality_read_occupancy_pressure
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: guest-and-commercial
+    description: Read sellable inventory and protected arrival evidence.
+  - id: hospitality_read_workforce_demand
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: people-and-workforce
+    description: Read shift coverage and demand forecast evidence.
+  - id: hospitality_read_food_beverage_readiness
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: food-and-beverage
+    description: Read covers forecast and service capacity evidence.
+  - id: hospitality_read_energy_anomaly
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: sustainability-and-utilities
+    description: Read energy meter reading and baseline evidence.
+
+version: 1
+vertical: hospitality
+policies:
+  hotel.recovery.execute:
+    approval_required: true
+    approval_event: regional_operations_manager_decision
+  room.readiness-plan.apply:
+    approval_event: hotel_general_manager_decision
+  maintenance.work-order.dispatch:
+    approval_event: maintenance_manager_decision
+  guest.recovery-action.issue:
+    approval_event: guest_recovery_manager_decision
+  booking.inventory-plan.apply:
+    approval_required: true
+    approval_event: commercial_director_decision
+  workforce.shift-plan.apply:
+    approval_event: workforce_planning_manager_decision
+  food-beverage.service-plan.apply:
+    approval_event: food_beverage_operations_manager_decision
+  energy.control-plan.apply:
+    approval_event: sustainability_operations_manager_decision

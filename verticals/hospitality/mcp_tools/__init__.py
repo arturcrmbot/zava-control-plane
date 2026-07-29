@@ -1,0 +1,1 @@
+"""Hospitality MCP tool package."""
