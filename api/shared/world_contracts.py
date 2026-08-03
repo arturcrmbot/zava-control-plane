@@ -115,4 +115,23 @@ def validate_world_scene(scene: Mapping[str, Any]) -> Mapping[str, Any]:
                 f"{mapping['layer']!r}"
             )
 
+    scenarios = scene.get("scenarios", [])
+    if not isinstance(scenarios, list):
+        raise ValueError("world scene scenarios must be a list")
+    scenario_names: set[str] = set()
+    for scenario in scenarios:
+        if not isinstance(scenario, Mapping):
+            raise ValueError("world scene scenarios must contain objects")
+        missing = {"name", "label"} - set(scenario)
+        if missing:
+            raise ValueError(
+                f"world scene scenario missing fields: {sorted(missing)}"
+            )
+        name = str(scenario["name"])
+        if not name or name in scenario_names:
+            raise ValueError(
+                f"world scene duplicate or empty scenario name {name!r}"
+            )
+        scenario_names.add(name)
+
     return scene

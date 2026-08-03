@@ -26,6 +26,21 @@ beforeEach(() => {
       },
       narrative: null,
       timeline: [],
+      packDetail: {
+        workflow_id: "AIRHUB-0001",
+        timeline: [
+          { phase: "Detect Hub Disruption", kind: "deterministic" },
+          { phase: "Assess Network Impact", kind: "agent" },
+          { phase: "Approve Recovery Plan", kind: "hitl" },
+        ],
+        mutations: {
+          command_type: "airline.commit_recovery_plan",
+        },
+        evaluation: {
+          cancellations_avoided: 1,
+          protected_connection_cohorts: 1,
+        },
+      },
     }),
   } as Response);
 });
@@ -95,5 +110,34 @@ describe("Drawer", () => {
     await waitFor(() => screen.getByText(/Decision/i));
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("shows pack-owned golden-slice evidence in the drawer", async () => {
+    render(
+      <MemoryRouter>
+        <ResolutionProvider>
+          <Drawer
+            workflowId="AIRHUB-0001"
+            role={getRolePreset("ops-reviewer")}
+            onClose={() => {}}
+          />
+        </ResolutionProvider>
+      </MemoryRouter>,
+    );
+
+    const evidence = await screen.findByRole("region", {
+      name: "Pack evidence",
+    });
+    expect(evidence.textContent).toContain("AIRHUB-0001");
+    expect(evidence.textContent).toContain("deterministic");
+    expect(evidence.textContent).toContain("agent");
+    expect(evidence.textContent).toContain("hitl");
+    expect(evidence.textContent).toContain(
+      "airline.commit_recovery_plan",
+    );
+    expect(evidence.textContent).toContain("cancellations_avoided");
+    expect(evidence.textContent).toContain(
+      "protected_connection_cohorts",
+    );
   });
 });

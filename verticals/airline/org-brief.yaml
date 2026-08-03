@@ -1,0 +1,26 @@
+version: 1
+status: signed
+target: Synthetic Network Airline
+slug: airline
+world: synthetic network-airline operating company
+research:
+  classification: approved public-source operating context
+  sources:
+    - docs/superpowers/specs/2026-07-28-airline-vertical-design.md
+  note: No record or threshold represents a real airline or customer.
+synthetic_data:
+  operating_records:
+    classification: synthetic
+    identifier_prefix: SYN-
+    note: Every operating record and scenario is synthetic and visibly labelled.
+  thresholds:
+    classification: synthetic-demo-assumption
+    note: Every authority, policy, automation, cost, and KPI threshold is synthetic.
+  authority:
+    duty_operations_manager:
+      classification: synthetic-demo-assumption
+      spend_limit_gbp: 150000.0
+vision:
+  audience: enterprise seller/customer demo
+  golden_story: synthetic-hub-cascade
+  seller_review: PENDING

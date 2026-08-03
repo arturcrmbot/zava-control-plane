@@ -232,6 +232,7 @@ function ActiveWorld({
         onReset={resetWorld}
         domains={domains}
         onRunProcess={runReferenceProcess}
+        onRunScenario={runScenario}
       />
     );
   }

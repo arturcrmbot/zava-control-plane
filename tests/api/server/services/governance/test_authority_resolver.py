@@ -7,6 +7,7 @@ handling, value-band edges, and the unmatched / unauthorised paths.
 Live parity against the Node mock is in
 ``test_authority_parity.py`` (skipped unless ``AUTHORITY_MCP_LIVE=1``).
 """
+
 from __future__ import annotations
 
 import os
@@ -16,9 +17,10 @@ os.environ.setdefault("AZURE_STORAGE_CONNECTION_STRING", "")
 
 import pytest
 
-from api.server.services.governance import kernel
+from api.server.services.governance import GovernanceKernel, kernel
 from api.server.services.governance.authority import check, resolve
 from api.server.services.governance.kernel import _reset_for_tests
+from api.shared.vertical_loader import active_runtime
 
 
 @pytest.fixture(autouse=True)
@@ -36,9 +38,7 @@ def _fresh_kernel():
 def test_resolve_picks_first_matching_band() -> None:
     """A meals claim at £180 hits EXP-002 (band 100..500), not EXP-001."""
     k = kernel()
-    r = k.resolve_approver(
-        action="expense_claim_approval", category="meals", value=180.0
-    )
+    r = k.resolve_approver(action="expense_claim_approval", category="meals", value=180.0)
     assert r.matched is True
     assert r.rule_id == "EXP-002"
     assert r.approver_role == "line_manager"
@@ -52,9 +52,7 @@ def test_resolve_band_inclusive_on_min() -> None:
     resolves to EXP-001, not EXP-002. This is the correct first-match
     semantics from mocks/authority-mcp/resolver.ts."""
     k = kernel()
-    r = k.resolve_approver(
-        action="expense_claim_approval", category="meals", value=100.0
-    )
+    r = k.resolve_approver(action="expense_claim_approval", category="meals", value=100.0)
     assert r.matched is True
     assert r.rule_id == "EXP-001"
     assert r.threshold_gbp == 100
@@ -65,9 +63,7 @@ def test_resolve_band_inclusive_on_min_when_first_band_excludes() -> None:
     so EXP-002's [100, 500] picks it up — proving band inclusivity on
     EXP-002's min."""
     k = kernel()
-    r = k.resolve_approver(
-        action="expense_claim_approval", category="meals", value=101.0
-    )
+    r = k.resolve_approver(action="expense_claim_approval", category="meals", value=101.0)
     assert r.matched is True
     assert r.rule_id == "EXP-002"
 
@@ -75,9 +71,7 @@ def test_resolve_band_inclusive_on_min_when_first_band_excludes() -> None:
 def test_resolve_band_inclusive_on_max() -> None:
     """Band [100, 500] must include exactly 500."""
     k = kernel()
-    r = k.resolve_approver(
-        action="expense_claim_approval", category="meals", value=500.0
-    )
+    r = k.resolve_approver(action="expense_claim_approval", category="meals", value=500.0)
     assert r.matched is True
     assert r.rule_id == "EXP-002"
 
@@ -85,9 +79,7 @@ def test_resolve_band_inclusive_on_max() -> None:
 def test_resolve_unbounded_max_falls_through_to_high_band() -> None:
     """Meals at £10k matches EXP-004 (min=2500, max=null)."""
     k = kernel()
-    r = k.resolve_approver(
-        action="expense_claim_approval", category="meals", value=10_000.0
-    )
+    r = k.resolve_approver(action="expense_claim_approval", category="meals", value=10_000.0)
     assert r.matched is True
     assert r.rule_id == "EXP-004"
     assert r.approver_role == "finance_controller"
@@ -101,6 +93,71 @@ def test_resolve_unmatched_returns_reason() -> None:
     assert r.matched is False
     assert r.reason
     assert "not_a_real_action" in r.reason
+
+
+def test_travel_pack_authority_preserves_global_rules_without_airline_leakage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ZAVA_VERTICAL", "travel")
+    monkeypatch.delenv("ZAVA_WORLD", raising=False)
+    active_runtime.cache_clear()
+    try:
+        governance = GovernanceKernel()
+        travel = governance.resolve_approver(
+            action="reaccommodate_travellers",
+            value=700.0,
+        )
+        expense = governance.resolve_approver(
+            action="expense_claim_approval",
+            category="meals",
+            value=180.0,
+        )
+        airline = governance.resolve_approver(
+            action="airline.commit_recovery_plan",
+            value=700.0,
+        )
+    finally:
+        active_runtime.cache_clear()
+
+    assert travel.matched is True
+    assert travel.rule_id == ("AUTH-operations_controller-reaccommodate_travellers")
+    assert expense.matched is True
+    assert expense.rule_id == "EXP-002"
+    assert airline.matched is False
+    assert airline.rule_id is None
+
+
+def test_airline_pack_synthesizes_only_recovery_command_authority(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ZAVA_VERTICAL", "airline")
+    monkeypatch.delenv("ZAVA_WORLD", raising=False)
+    active_runtime.cache_clear()
+    try:
+        governance = GovernanceKernel()
+        recovery = governance.check_authority(
+            role="duty_operations_manager",
+            action="airline.commit_recovery_plan",
+            category="synthetic-operational-recovery",
+            value=75_000.0,
+        )
+        hitl_event = governance.resolve_approver(
+            action="duty_operations_manager_decision",
+            value=75_000.0,
+        )
+        travel = governance.resolve_approver(
+            action="reaccommodate_travellers",
+            value=700.0,
+        )
+    finally:
+        active_runtime.cache_clear()
+
+    assert recovery.allowed is True
+    assert recovery.governing_rule_id == ("AUTH-duty_operations_manager-airline.commit_recovery_plan")
+    assert hitl_event.matched is False
+    assert hitl_event.rule_id is None
+    assert travel.matched is False
+    assert travel.rule_id is None
 
 
 def test_customer_care_credit_escalates_to_cs_manager() -> None:

@@ -1,0 +1,13 @@
+{
+  "capabilities": ["blueprint", "world", "memory", "knowledge"],
+  "lenses": ["process-library", "control"],
+  "theme": {
+    "accent": "#2563eb",
+    "label": "Synthetic Airline Operations",
+    "world": "airline"
+  },
+  "phase_aliases": {},
+  "supplemental_domains": [],
+  "aspirational_domains": [],
+  "include_meta_skills": false
+}

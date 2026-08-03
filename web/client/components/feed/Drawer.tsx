@@ -134,6 +134,19 @@ export default function Drawer({
         {role.drawerSectionOrder.map((s) => (
           <div key={s}>{sections[s]}</div>
         ))}
+        {d.packDetail && (
+          <section
+            aria-label="Pack evidence"
+            className="space-y-2 rounded border border-blue-200 bg-blue-50/60 p-3 dark:border-blue-900 dark:bg-blue-950/30"
+          >
+            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+              Pack evidence
+            </h2>
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[10px] text-slate-700 dark:text-slate-200">
+              {JSON.stringify(d.packDetail, null, 2)}
+            </pre>
+          </section>
+        )}
       </div>
     </aside>
   );

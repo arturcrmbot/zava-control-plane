@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "generator_version": "bespoke-ownership-ledger-1",
+  "vertical": "airline",
+  "records": [
+    {
+      "path": "verticals/airline/__init__.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/actions/__init__.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/actions/commands.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/agents.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/authority.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/constraints.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/detail.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/domains.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/durable.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/entity_projections/__init__.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/entity_projections/operations.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/functions.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/generation-manifest.json",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/lifecycle.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/manifest.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/mcp_tools/__init__.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/mcp_tools/operations.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/org-brief.yaml",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/personae/duty_operations_manager/SKILL.md",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/personas.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/policies/tools.yaml",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/process_profiles.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/projections.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/skills/network-impact-assessor/SKILL.md",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/skills/recovery-option-ranker/SKILL.md",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/ui.json",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/ui/world-scene.json",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/worlds/__init__.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/worlds/active.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/worlds/diagnostics.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/worlds/model.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/worlds/reference_data.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/worlds/registration.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/worlds/scenario.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    }
+  ]
+}

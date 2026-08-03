@@ -18,6 +18,7 @@ Phase 2 status (TASK-014 / TASK-015)
   ``policy_version`` short hash. Mode is ``log_only`` until Phase 6;
   ``allowed=False`` does not raise yet (TASK-047 wires the raise).
 """
+
 from __future__ import annotations
 
 import json
@@ -118,6 +119,45 @@ def _load_matrix(path: Path | None = None) -> list[dict[str, Any]]:
     return raw
 
 
+def _active_pack_authority_rules(
+    matrix: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    from api.shared.vertical_loader import active_runtime
+
+    existing_actions = {str(rule.get("action")) for rule in matrix if rule.get("action")}
+    pack = active_runtime().pack
+    hitl_events = {gate.external_event for domain in pack.domains.values() for gate in domain.hitl_gates}
+    hitl_events.update(
+        gate.external_event
+        for domain in pack.domains.values()
+        for overlay in domain.region_overlays.values()
+        for gate in overlay.extra_hitl_gates
+    )
+    rules: list[dict[str, Any]] = []
+    for role, row in pack.authority.items():
+        for action in row.approval_actions:
+            if action in existing_actions or action in hitl_events:
+                continue
+            rules.append(
+                {
+                    "rule_id": f"AUTH-{role}-{action}",
+                    "action": action,
+                    "category": "*",
+                    "business_unit": "*",
+                    "geography": "*",
+                    "requester_role": "*",
+                    "value_band_gbp": {
+                        "min": 0.0,
+                        "max": row.spend_limit_gbp,
+                    },
+                    "approver_role": role,
+                    "escalation_chain": ([row.delegate_to] if row.delegate_to is not None else []),
+                    "basis": (f"active vertical {pack.name} authority declaration"),
+                }
+            )
+    return rules
+
+
 # ---------------------------------------------------------------------------
 # JWS Compact (EdDSA) — Phase 5 TASK-038 / TASK-040
 # ---------------------------------------------------------------------------
@@ -126,11 +166,13 @@ def _load_matrix(path: Path | None = None) -> list[dict[str, Any]]:
 def _b64url(data: bytes) -> str:
     """Base64url-encode without padding (RFC 7515 §2)."""
     import base64
+
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
 
 
 def _b64url_decode(text: str) -> bytes:
     import base64
+
     pad = "=" * (-len(text) % 4)
     return base64.urlsafe_b64decode(text + pad)
 
@@ -139,13 +181,12 @@ def _payload_hash(payload: Mapping[str, Any]) -> str:
     """sha256 hex of ``payload`` canonicalised the same way as the audit
     chain (sort_keys=True, default=str). SEC-001 of the plan."""
     import hashlib
+
     text = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def _jws_sign(
-    identity: AgentIdentityStore, agent_id: str, body: Mapping[str, Any]
-) -> str:
+def _jws_sign(identity: AgentIdentityStore, agent_id: str, body: Mapping[str, Any]) -> str:
     """Produce a JWS Compact-Serialization string (RFC 7515) with EdDSA.
 
     Format: ``b64url(header) . b64url(body) . b64url(signature)``.
@@ -159,9 +200,7 @@ def _jws_sign(
     return f"{h}.{p}.{_b64url(signature)}"
 
 
-def _jws_verify(
-    identity: AgentIdentityStore, jws: str
-) -> tuple[bool, dict[str, Any] | None]:
+def _jws_verify(identity: AgentIdentityStore, jws: str) -> tuple[bool, dict[str, Any] | None]:
     """Verify a JWS Compact string. Returns (ok, decoded_body_or_None).
 
     Returns ``(False, None)`` on any malformation, unknown ``kid``, or
@@ -217,6 +256,7 @@ class GovernanceKernel:
 
         tools = load_tools_yaml(tools_path) if tools_path else load_active_tools()
         matrix = _load_matrix(matrix_path)
+        matrix = [*_active_pack_authority_rules(matrix), *matrix]
         bundle: CompiledBundle = compile_bundle(matrix=matrix, tools=tools)
 
         self._tools: Mapping[str, ToolManifestEntry] = tools
@@ -230,6 +270,7 @@ class GovernanceKernel:
         # ``data/governance/agent-pubkeys/`` (prod). Lazy import of
         # AGENTS to avoid pulling api.shared.agents at module-load time.
         from api.shared.agents import all_agent_ids
+
         self._identity = AgentIdentityStore(all_agent_ids())
 
         # Phase 7 TASK-053: in-process decision registry. Every Decision
@@ -307,18 +348,12 @@ class GovernanceKernel:
             "tool": tool,
             "workflow_id": workflow_id,
             "args": request_args,
-            "reversible": (
-                manifest_entry.reversible if manifest_entry is not None else None
-            ),
-            "scope_function": (
-                manifest_entry.scope_function if manifest_entry is not None else None
-            ),
+            "reversible": (manifest_entry.reversible if manifest_entry is not None else None),
+            "scope_function": (manifest_entry.scope_function if manifest_entry is not None else None),
         }
 
         if manifest_entry is not None and manifest_entry.value_field:
-            context["value"] = _extract_dotted(
-                request_args, manifest_entry.value_field
-            )
+            context["value"] = _extract_dotted(request_args, manifest_entry.value_field)
         else:
             context["value"] = None
 
@@ -327,7 +362,8 @@ class GovernanceKernel:
         except Exception:  # pragma: no cover — surface eval failure
             log.exception(
                 "governance: PolicyEvaluator raised on tool=%s actor=%s",
-                tool, actor,
+                tool,
+                actor,
             )
             raise
 
@@ -340,6 +376,7 @@ class GovernanceKernel:
         # with a kill:<kill_id> rule_id; lazy expiry happens inside
         # is_killed() so a kill that just timed out doesn't fire.
         from .kill_switch import kill_switch_store
+
         kill = kill_switch_store.is_killed(actor or "unknown", tool)
         if kill is not None:
             decision = Decision(
@@ -514,10 +551,7 @@ class GovernanceKernel:
                 ),
             )
 
-        if (
-            agent_entry.max_value_gbp is not None
-            and value is not None
-        ):
+        if agent_entry.max_value_gbp is not None and value is not None:
             try:
                 v = float(value)
             except (TypeError, ValueError):
@@ -525,10 +559,7 @@ class GovernanceKernel:
             if v is not None and v > agent_entry.max_value_gbp:
                 return (
                     f"deny:value_ceiling:{actor}:{tool}",
-                    (
-                        f"value GBP {v} exceeds {actor!r}'s max_value_gbp "
-                        f"of {agent_entry.max_value_gbp}"
-                    ),
+                    (f"value GBP {v} exceeds {actor!r}'s max_value_gbp of {agent_entry.max_value_gbp}"),
                 )
 
         return None

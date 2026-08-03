@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -145,6 +145,7 @@ function renderWorld(
   state: WorldState = baseline,
   events: WorldEvent[] = [],
   sceneOverride: WorldSceneContract = scene,
+  onRunScenario: (name: string) => Promise<void> = async () => {},
 ) {
   return render(
     <MemoryRouter>
@@ -154,6 +155,7 @@ function renderWorld(
         events={events}
         error={null}
         onReset={async () => {}}
+        onRunScenario={onRunScenario}
       />
     </MemoryRouter>,
   );
@@ -174,6 +176,30 @@ describe("SpatialWorld", () => {
       ),
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: /run process/i })).toBeNull();
+  });
+
+  it("runs a pack-owned deterministic story from the spatial world", () => {
+    const onRunScenario = vi.fn(async () => {});
+    renderWorld(
+      baseline,
+      [],
+      {
+        ...scene,
+        scenarios: [
+          {
+            name: "synthetic-hub-cascade",
+            label: "Integrated Hub Disruption",
+          },
+        ],
+      },
+      onRunScenario,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Integrated Hub Disruption" }),
+    );
+
+    expect(onRunScenario).toHaveBeenCalledWith("synthetic-hub-cascade");
   });
 
   it("moves a real actor only when snapshot and journal evidence change", () => {
@@ -212,6 +238,7 @@ describe("SpatialWorld", () => {
           events={[movement]}
           error={null}
           onReset={async () => {}}
+          onRunScenario={async () => {}}
         />
       </MemoryRouter>,
     );
@@ -255,6 +282,7 @@ describe("SpatialWorld", () => {
           events={[event]}
           error={null}
           onReset={async () => {}}
+          onRunScenario={async () => {}}
         />
       </MemoryRouter>,
     );

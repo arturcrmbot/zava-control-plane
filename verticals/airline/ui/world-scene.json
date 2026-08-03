@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "title": "Synthetic Airline Hub Operations",
+  "subtitle": "A bounded morning bank of synthetic aircraft, sectors, stands and connections",
+  "locations": [
+    {"id": "SYN-HUB-01", "label": "Synthetic Central Hub", "kind": "hub", "x": 36, "y": 27, "width": 28, "height": 38},
+    {"id": "SYN-OUT-01", "label": "Synthetic North Station", "kind": "outstation", "x": 6, "y": 7, "width": 20, "height": 22},
+    {"id": "SYN-OUT-02", "label": "Synthetic East Station", "kind": "outstation", "x": 74, "y": 7, "width": 20, "height": 22},
+    {"id": "SYN-OUT-03", "label": "Synthetic South Station", "kind": "outstation", "x": 74, "y": 70, "width": 20, "height": 22},
+    {"id": "SYN-OUT-04", "label": "Synthetic West Station", "kind": "outstation", "x": 6, "y": 70, "width": 20, "height": 22}
+  ],
+  "layers": [
+    {"state_key": "aircraft", "kind": "aircraft", "label": "Aircraft", "id_field": "id", "location_field": "current_station_id", "status_field": "status", "colour": "#2563eb"},
+    {"state_key": "sectors", "kind": "sector", "label": "Sectors", "id_field": "id", "location_field": "origin_id", "status_field": "status", "colour": "#8b5cf6"},
+    {"state_key": "stands", "kind": "stand", "label": "Stands", "id_field": "id", "location_field": "station_id", "status_field": "status", "colour": "#f59e0b"},
+    {"state_key": "connection_cohorts", "kind": "connection cohort", "label": "Connections", "id_field": "id", "location_field": "location_id", "status_field": "status", "colour": "#10b981"}
+  ],
+  "event_mappings": [
+    {"event_type": "airline.hub_disruption.detected", "layer": "sectors", "animation": "alert"},
+    {"event_type": "sensor.tripped", "layer": "sectors", "animation": "pulse"}
+  ],
+  "scenarios": [
+    {
+      "name": "synthetic-hub-cascade",
+      "label": "Integrated Hub Disruption"
+    }
+  ],
+  "process_event_types": ["airline.hub_disruption.detected", "sensor.tripped"],
+  "knowledge_relationship_label": "Synthetic inbound delay constrains the morning hub bank",
+  "knowledge_actor_ids": ["SYN-SECTOR-IN-001", "SYN-STAND-01", "SYN-COHORT-001"]
+}

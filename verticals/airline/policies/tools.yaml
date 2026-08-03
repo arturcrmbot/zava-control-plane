@@ -1,0 +1,15 @@
+tools:
+  - id: airline_read_disruption_evidence
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: operations-control
+    description: Read supplied versioned synthetic airline disruption evidence.
+  - id: airline_rank_feasible_recovery_options
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: operations-control
+    description: Rank only deterministically admitted synthetic recovery options.

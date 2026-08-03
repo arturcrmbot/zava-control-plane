@@ -80,7 +80,12 @@ def _json_compact(value: Any) -> str:
 
 
 
-def workflow_id_for(responder_prefix: str, sensor_event_id: str) -> str:
+def workflow_id_for(
+    responder_prefix: str,
+    sensor_event_id: str,
+    *,
+    declared_workflow_id: str | None = None,
+) -> str:
     """Deterministic canonical Workflow id for one sensor event.
 
     The ONE formula behind :meth:`WorldWorkflowAdapter.start`'s idempotent
@@ -90,6 +95,10 @@ def workflow_id_for(responder_prefix: str, sensor_event_id: str) -> str:
     state — there is still no independent prefix-id reconstruction anywhere
     else.
     """
+    if isinstance(declared_workflow_id, str):
+        declared_workflow_id = declared_workflow_id.strip()
+        if declared_workflow_id:
+            return declared_workflow_id
     return f"{responder_prefix}-{sensor_event_id}"
 
 
@@ -115,7 +124,13 @@ class WorldWorkflowAdapter:
         mints a second Workflow. Returns the canonical workflow id.
         """
         sensor_event_id = sensor_event["event_id"]
-        workflow_id = workflow_id_for(responder.prefix, sensor_event_id)
+        workflow_id = workflow_id_for(
+            responder.prefix,
+            sensor_event_id,
+            declared_workflow_id=(
+                (sensor_event.get("payload") or {}).get("workflow_id")
+            ),
+        )
 
         existing = self._app.store.get_workflow(workflow_id)
         if existing is not None:

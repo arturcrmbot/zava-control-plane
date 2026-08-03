@@ -343,6 +343,7 @@ export interface WorkflowDetailResponse {
   narrative: Narrative | null;
   timeline: ExecutionTimelineRow[];
   auditBlobUrl?: string | null;
+  packDetail?: Record<string, unknown> | null;
 }
 
 export interface FleetEconomics {
