@@ -1,7 +1,9 @@
 """TASK-036 — CI guarantees on the agent registry.
 
 (a) Every agent_id appearing in a test fixture's ``agent_label`` MUST
-    be registered in :data:`api.shared.agents.AGENTS`.
+    resolve to a real identity — a registered entry in
+    :data:`api.shared.agents.AGENTS` (governance actors) or a declared
+    skill directory (the telemetry labels the agent wrapper emits).
 (b) Every tool in any agent's ``allowed_tools`` MUST exist in
     ``data/policies/tools.yaml``.
 (c) Each agent's ``max_value_gbp`` (if set) is non-negative; ``agent_id``
@@ -63,6 +65,34 @@ def _grep_agent_labels() -> set[str]:
     return seen
 
 
+def _declared_skill_labels() -> set[str]:
+    """Every skill declared anywhere in the repo, by directory name.
+
+    ``agent_label`` carries two distinct populations. The governance
+    *actor* namespace is :data:`AGENTS`. The telemetry namespace is the
+    skill set: the agent wrapper stamps the skill onto the event with
+    ``"agent_label": skill_label or "unknown"`` (see
+    ``api/functions/graphs/executors/agents/_wrapper.py``, "Each skill is
+    its own agent"), so a skill name in an ``agent_label`` fixture is
+    faithful to runtime, not a registry bug.
+
+    Skills are never governance actors: ``call_mcp`` resolves the actor
+    from ``AGT_DEFAULT_ACTOR`` (default ``unknown-agent``), which
+    ``GovernanceKernel._registry_gate`` soft-escapes, so a skill label
+    can't reach the registry gate.
+    """
+    skills: set[str] = set()
+    roots = [_REPO_ROOT / "api" / "server" / "skills"]
+    roots.extend((_REPO_ROOT / "verticals").glob("*/skills"))
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for path in root.iterdir():
+            if path.is_dir() and (path / "SKILL.md").is_file():
+                skills.add(path.name)
+    return skills
+
+
 # --------------------------------------------------------------------------
 # (a) every fixture agent_label has a registry entry
 # --------------------------------------------------------------------------
@@ -70,19 +100,23 @@ def _grep_agent_labels() -> set[str]:
 
 def test_every_fixture_agent_label_is_registered() -> None:
     """Auto-discovered: any agent_label string in any test fixture MUST
-    have a matching :class:`AgentRegistryEntry`. Adding a new label
-    without registering it here fails CI immediately."""
+    resolve to a real identity — either a registered
+    :class:`AgentRegistryEntry` (the governance actor namespace) or a
+    declared skill (the telemetry namespace the agent wrapper stamps onto
+    events). A label that is neither is a typo or an invented name, and
+    fails CI immediately."""
     fixture_labels = _grep_agent_labels()
     assert fixture_labels, (
         "expected to discover at least one agent_label in tests/; "
         "the grep regex may have drifted"
     )
-    registered = set(all_agent_ids())
-    missing = fixture_labels - registered
+    known = set(all_agent_ids()) | _declared_skill_labels()
+    missing = fixture_labels - known
     assert not missing, (
-        f"agent_label values appear in test fixtures but are not in "
-        f"api.shared.agents.AGENTS: {sorted(missing)!r}. Either add "
-        f"them to AGENTS or remove the fixture."
+        f"agent_label values appear in test fixtures but match neither a "
+        f"registered agent in api.shared.agents.AGENTS nor a declared "
+        f"skill directory: {sorted(missing)!r}. Register the agent, add "
+        f"the skill, or fix the fixture to use a real identity."
     )
 
 

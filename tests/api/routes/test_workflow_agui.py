@@ -1010,14 +1010,14 @@ def test_overlap_key_keeps_session_runs_distinct_within_one_executor():
     first = FleetEvent(
         type="agent.completed",
         workflow_id="hiring-42",
-        agent_label="risk-reviewer",
+        agent_label="interview-recommender",
         agent_run_id="session-run-1",
         invocation_id="executor-parent-7",
     )
     second = FleetEvent(
         type="agent.completed",
         workflow_id="hiring-42",
-        agent_label="risk-reviewer",
+        agent_label="interview-recommender",
         agent_run_id="session-run-2",
         invocation_id="executor-parent-7",
     )
