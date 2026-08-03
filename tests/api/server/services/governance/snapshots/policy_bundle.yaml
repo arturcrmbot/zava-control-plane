@@ -1287,6 +1287,33 @@ policy:
     condition:
       field: action
       operator: eq
+      value: cs_manager_decision
+    message: matrix:TELCO-CS-001 action=cs_manager_decision approver=cs_manager band=(0,10000) basis='Customer Success Manager approves Telco care and retention actions within the registered authority limit.'
+    name: matrix:TELCO-CS-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: delivery_lead_decision
+    message: matrix:TELCO-DELIVERY-001 action=delivery_lead_decision approver=delivery_lead band=(0,10000) basis='Delivery Lead approves Telco delivery exceptions within the registered authority limit.'
+    name: matrix:TELCO-DELIVERY-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
+      value: network_ops_director_decision
+    message: matrix:TELCO-NETOPS-001 action=network_ops_director_decision approver=network_ops_director band=(0,1000000) basis='Network Operations Director approves exceptional Telco network actions within the registered authority limit.'
+    name: matrix:TELCO-NETOPS-001
+    override: false
+    priority: 20
+  - action: audit
+    condition:
+      field: action
+      operator: eq
       value: treasury_fx_hedge
     message: matrix:TREASURY-FX-001 action=treasury_fx_hedge approver=treasurer band=(0,1000000) basis='Standard FX hedge; treasurer sign-off.'
     name: matrix:TREASURY-FX-001
