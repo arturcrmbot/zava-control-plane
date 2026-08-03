@@ -72,7 +72,13 @@ def test_record_external_publishes_to_event_bus():
 
 
 @pytest.mark.asyncio
-async def test_run_advances_authoritative_runtime_and_stop_ends_task():
+async def test_run_advances_authoritative_runtime_and_stop_ends_task(monkeypatch):
+    # The step throttle (WORLD_MAX_STEPS_PER_SECOND, default 100) floors every
+    # loop iteration at 10ms, which is coarser than this test's 20ms budget and
+    # would leave the SimPy clock parked on the events queued at t=0. Lift the
+    # ceiling so this asserts clock advance rather than the throttle; the
+    # throttle itself is covered by tests/api/server/services/test_world_load_limits.py.
+    monkeypatch.setenv("WORLD_MAX_STEPS_PER_SECOND", "100000")
     world = service()
     before = world.runtime.now
     task = asyncio.create_task(world.run())
