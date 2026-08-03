@@ -351,3 +351,102 @@ def test_all_reference_case_subject_ids_resolve():
             if subject_id not in all_ids:
                 dangling.append(f"[{case_key}] {subject_id!r}")
     assert not dangling, f"Dangling subject IDs:\n" + "\n".join(dangling)
+
+
+# ---------------------------------------------------------------------------
+# Seeded variance
+# ---------------------------------------------------------------------------
+
+
+def _engineering_shift_ticks(world: HospitalityWorld, hotel_id: str) -> int:
+    return sum(
+        shift.end_tick - shift.start_tick
+        for shift in world.shifts.values()
+        if shift.hotel_id == hotel_id and shift.skill == "engineering"
+    )
+
+
+def test_same_seed_rebuilds_an_identical_world():
+    """Variance must be reproducible, not random."""
+    assert (
+        HospitalityWorld.demo(seed=4242).snapshot()
+        == HospitalityWorld.demo(seed=4242).snapshot()
+    )
+
+
+def test_different_seeds_produce_different_labour_supply():
+    """Rota depth varies by seed, so the same fault poses a different problem."""
+    hotel_id = "HOTEL-RIVERSIDE-CENTRAL"
+    supplies = {
+        seed: _engineering_shift_ticks(HospitalityWorld.demo(seed=seed), hotel_id)
+        for seed in (20260728, 42, 7, 99, 1234, 555, 8081)
+    }
+    assert len(set(supplies.values())) > 1, (
+        f"every seed produced identical labour supply: {supplies}"
+    )
+
+
+def test_every_seed_still_cascades_across_all_domains():
+    """Variance changes severity, never the integrity of the cascade."""
+    for seed in (20260728, 42, 7, 99, 1234, 555, 8081):
+        world = HospitalityWorld.demo(seed=seed)
+        world.trigger_scenario("riverside-hot-water-outage")
+        events = world.poll_sensor_events()
+        workflow_types = {event.workflow_type for event in events}
+        assert len(workflow_types) == 8, (
+            f"seed {seed} cascaded into {sorted(workflow_types)}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Degradation while a fault stands
+# ---------------------------------------------------------------------------
+
+
+def _availability_invariant_holds(world: HospitalityWorld, hotel_id: str) -> bool:
+    hotel = world.hotels[hotel_id]
+    counters = sum(
+        getattr(hotel, f"available_{room_type}_rooms")
+        for room_type in ("standard", "family", "accessible", "premium")
+    )
+    actual = sum(
+        1 for room in world.rooms.values()
+        if room.hotel_id == hotel_id and room.status == "available"
+    )
+    return counters == actual
+
+
+def test_healthy_world_does_not_degrade():
+    """Nothing decays while no critical asset is faulted."""
+    world = HospitalityWorld.demo(seed=DEMO_SEED)
+    assert world.degrade_unresolved_faults() == []
+
+
+def test_unrepaired_fault_keeps_taking_rooms_out():
+    """An open fault grows the housekeeping burden tick by tick."""
+    world = HospitalityWorld.demo(seed=DEMO_SEED)
+    world.trigger_scenario("riverside-hot-water-outage")
+    hotel_id = "HOTEL-RIVERSIDE-CENTRAL"
+
+    def not_ready() -> int:
+        return sum(
+            1 for room in world.rooms.values()
+            if room.hotel_id == hotel_id and room.status == "not_ready"
+        )
+
+    before = not_ready()
+    world.degrade_unresolved_faults()
+    assert not_ready() > before
+    assert _availability_invariant_holds(world, hotel_id)
+
+
+def test_degradation_is_deterministic_for_a_seed():
+    """Two identically seeded worlds decay identically."""
+    def decayed() -> dict:
+        world = HospitalityWorld.demo(seed=DEMO_SEED)
+        world.trigger_scenario("riverside-hot-water-outage")
+        for _ in range(3):
+            world.degrade_unresolved_faults()
+        return world.snapshot()
+
+    assert decayed() == decayed()

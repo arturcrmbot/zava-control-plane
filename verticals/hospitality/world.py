@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import random
 from dataclasses import asdict, dataclass, replace as dc_replace
 from typing import Any, Callable, Mapping
 
@@ -54,6 +55,7 @@ from verticals.hospitality.commands import (
 from verticals.hospitality.domains import HOSPITALITY_DOMAINS
 from verticals.hospitality.dynamics import (
     ARRIVAL_HORIZON_TICKS,
+    DEGRADATION_ROOMS_PER_TICK,
 )
 from verticals.hospitality.sensors import evaluate_operations_risk
 
@@ -427,6 +429,54 @@ class HospitalityWorld:
 
         return emitted
 
+    def degrade_unresolved_faults(self) -> list[str]:
+        """Let an unrepaired fault keep eating the property, one tick at a time.
+
+        While a critical asset is still in ``fault``, rooms at that hotel keep
+        falling out of service. They land in ``not_ready`` rather than
+        ``unavailable``, so the damage accrues directly against the
+        housekeeping pool: the longer an approval sits unanswered, the larger
+        the labour deficit the responder has to solve.
+
+        Deterministic — rooms are taken in sorted ID order. Returns the room
+        IDs degraded so a caller can report them.
+        """
+        faulted_hotels = sorted(
+            {
+                asset.hotel_id
+                for asset in self.critical_assets.values()
+                if asset.status == "fault"
+            }
+        )
+        if not faulted_hotels:
+            return []
+
+        degraded: list[str] = []
+        hotel_deltas: dict[str, dict[str, int]] = {}
+        for hotel_id in faulted_hotels:
+            available = sorted(
+                (
+                    room for room in self.rooms.values()
+                    if room.hotel_id == hotel_id and room.status == "available"
+                ),
+                key=lambda room: room.id,
+            )
+            for room in available[:DEGRADATION_ROOMS_PER_TICK]:
+                self.rooms[room.id] = Room(
+                    id=room.id,
+                    hotel_id=room.hotel_id,
+                    room_type=room.room_type,
+                    floor=room.floor,
+                    status="not_ready",
+                    version=room.version + 1,
+                )
+                deltas = hotel_deltas.setdefault(hotel_id, {})
+                deltas[room.room_type] = deltas.get(room.room_type, 0) - 1
+                degraded.append(room.id)
+
+        self._apply_hotel_availability_deltas(hotel_deltas)
+        return degraded
+
     @staticmethod
     def _sensor_subject_id(workflow_type: str, measurement: dict[str, Any]) -> str:
         """Stable identity for the condition a measurement describes."""
@@ -648,16 +698,31 @@ class HospitalityWorld:
     def _seed_shifts(self) -> None:
         for member_id, member in self.team_members.items():
             shift_id = f"SHIFT-{member_id}"
+            start_tick, end_tick = self._shift_span(member_id)
             self.shifts[shift_id] = Shift(
                 id=shift_id,
                 team_member_id=member_id,
                 hotel_id=member.hotel_id,
                 skill=member.skill,
-                start_tick=1,
-                end_tick=9,
+                start_tick=start_tick,
+                end_tick=end_tick,
                 status="scheduled",
                 version=1,
             )
+
+    def _shift_span(self, member_id: str) -> tuple[int, int]:
+        """Deterministic per-seed rota for one team member.
+
+        Rota depth is the supply side of the labour pool, so varying it is
+        what makes two seeds tell different stories: the same fault produces
+        different deficits, and therefore different agent decisions.
+
+        Derived from ``(seed, member_id)`` alone, so a given seed always
+        rebuilds the identical rota — reproducible, not random.
+        """
+        rng = random.Random(f"hospitality-rota:{self._seed}:{member_id}")
+        start_tick = rng.choice((1, 1, 2))
+        return start_tick, start_tick + rng.choice((6, 7, 8, 8))
 
     def _seed_bookings(self) -> None:
         for hi, (hotel_id, *_rest) in enumerate(_HOTEL_SEED):

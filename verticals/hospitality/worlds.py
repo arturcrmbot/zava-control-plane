@@ -124,6 +124,23 @@ class HospitalityScenario:
                     "arrivals_in_4h": hotel.arrivals_in_4h,
                 },
             )
+            # An unrepaired fault keeps eating the property. Degrading before
+            # the sensor sweep means the deficit the responders see grows for
+            # as long as the fault is left standing.
+            degraded = self.world.degrade_unresolved_faults()
+            if degraded:
+                self.runtime.emit(
+                    "hotel.condition.degraded",
+                    actor_id=hotel_id,
+                    target_id=hotel_id,
+                    trace_id=f"hosp-degrade-{self.runtime.seed}",
+                    payload={
+                        "location_id": hotel_id,
+                        "rooms_degraded": len(degraded),
+                        "room_ids": degraded,
+                        "reason": "unrepaired_critical_asset_fault",
+                    },
+                )
             # Re-evaluate every sensor against current state. A command that
             # mutated the world on a previous tick can push a *different*
             # domain over its threshold here, so cascades keep unfolding

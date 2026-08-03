@@ -228,6 +228,99 @@ def test_fallback_decision_activity_produces_typed_output(
     assert planner["skill"] == "hotel-network-recovery-planner"
 
 
+def _bad_live_decision(recommendation: str):
+    """Build a live-agent stub whose output breaks the process contract."""
+    async def _decide(payload):
+        observation = payload["observation"]
+        return {
+            "skill": "hotel-impact-assessor",
+            "phase": payload["phase"],
+            "recommendation": recommendation,
+            "actor_ids": list(observation["actor_ids"]),
+            "event_ids": list(observation["event_ids"]),
+            "constraints": {},
+            "reasoning": "paraphrased the action instead of copying it",
+        }
+    return _decide
+
+
+def test_live_decision_retries_then_falls_back_on_contract_violation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A non-compliant live agent degrades the phase, it never stalls it.
+
+    The contract is still enforced — the bad response is rejected every
+    time — but the deterministic planner completes the phase so one flaky
+    model cannot break the cascade.
+    """
+    monkeypatch.setenv("ZAVA_HOSPITALITY_AGENT_MODE", "live")
+    durable = _durable()
+    observation = _observation("hotel-operations-recovery")
+
+    attempts = {"count": 0}
+    bad = _bad_live_decision("please dispatch someone to fix the boiler")
+
+    async def _counting(payload):
+        attempts["count"] += 1
+        return await bad(payload)
+
+    monkeypatch.setattr(durable, "_live_decision", _counting)
+
+    result = durable.hospitality_decision_activity(
+        {
+            "workflow_id": "HOPREC-1",
+            "trace_id": observation["trace_id"],
+            "type": "hotel-operations-recovery",
+            "phase": "Assess Guest and Operational Impact",
+            "observation": observation,
+        }
+    )
+
+    assert attempts["count"] == durable._LIVE_DECISION_ATTEMPTS
+    assert result["execution_mode"] == "deterministic-fallback"
+    assert result["recommendation"] == "hotel.recovery.execute"
+    assert result["actor_ids"] == observation["actor_ids"]
+
+
+def test_compliant_live_decision_is_used_without_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A compliant live response is returned as-is on the first attempt."""
+    monkeypatch.setenv("ZAVA_HOSPITALITY_AGENT_MODE", "live")
+    durable = _durable()
+    observation = _observation("hotel-operations-recovery")
+
+    attempts = {"count": 0}
+
+    async def _good(payload):
+        attempts["count"] += 1
+        return {
+            "skill": "hotel-impact-assessor",
+            "phase": payload["phase"],
+            "recommendation": "hotel.recovery.execute",
+            "actor_ids": list(observation["actor_ids"]),
+            "event_ids": list(observation["event_ids"]),
+            "constraints": {},
+            "reasoning": "copied the allowed recommendation verbatim",
+        }
+
+    monkeypatch.setattr(durable, "_live_decision", _good)
+
+    result = durable.hospitality_decision_activity(
+        {
+            "workflow_id": "HOPREC-1",
+            "trace_id": observation["trace_id"],
+            "type": "hotel-operations-recovery",
+            "phase": "Assess Guest and Operational Impact",
+            "observation": observation,
+        }
+    )
+
+    assert attempts["count"] == 1
+    assert result["execution_mode"] == "live"
+    assert result["reasoning"] == "copied the allowed recommendation verbatim"
+
+
 def test_command_activity_requires_approved_persona(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import os
 from collections.abc import Generator
 from datetime import timedelta
@@ -38,6 +39,11 @@ app = create_app()
 _SKILL_ROOT = Path(__file__).resolve().parent / "skills"
 DEFAULT_AGENT_MODE = "live"
 FALLBACK_AGENT_MODE = "deterministic-fallback"
+
+# How many times a live agent may answer before the deterministic planner
+# takes the phase. One retry covers transient model noise without stalling
+# the cascade behind a persistently non-compliant response.
+_LIVE_DECISION_ATTEMPTS = 2
 HITL_TIMEOUT_MINUTES = 5.0
 HERO_WORKFLOW = "hotel-operations-recovery"
 
@@ -188,6 +194,11 @@ async def _live_decision(payload: dict[str, Any]) -> dict[str, Any]:
         "Return one JSON object only; no markdown and no extra keys. "
         f"The exact keys are {sorted(_DECISION_OUTPUT_KEYS)}. "
         "Do not invent hotel, room, booking, asset, shift, actor or event IDs.\n"
+        "Set `recommendation` to the allowed_recommendation value below, "
+        "copied verbatim as an exact string. Do not paraphrase it, do not "
+        "describe the action in prose, and do not substitute a synonym.\n"
+        "Copy `actor_ids` and `event_ids` verbatim from the required lists, "
+        "in the same order.\n"
         f"workflow_type={workflow_type}\n"
         f"phase={phase_name}\n"
         f"skill={skill}\n"
@@ -276,13 +287,43 @@ def _validate_decision_output(
 
 def hospitality_decision_activity(payload: dict[str, Any]) -> dict[str, Any]:
     mode = _agent_mode(payload)
-    result = (
-        _fallback_decision(payload)
-        if mode == FALLBACK_AGENT_MODE
-        else asyncio.run(_live_decision(payload))
+    if mode == FALLBACK_AGENT_MODE:
+        validated = _validate_decision_output(payload, _fallback_decision(payload))
+        return {**validated, "execution_mode": mode}
+
+    # A live agent occasionally returns output outside the process contract.
+    # The contract is not relaxed to accommodate that: the response is
+    # rejected, retried once, and only then does the deterministic planner
+    # take over. A flaky model degrades this phase, it never breaks the
+    # cascade, and the recorded execution_mode always says which path ran.
+    last_error: Exception | None = None
+    for attempt in range(_LIVE_DECISION_ATTEMPTS):
+        try:
+            result = asyncio.run(_live_decision(payload))
+            validated = _validate_decision_output(payload, result)
+            return {**validated, "execution_mode": mode}
+        except ValueError as error:
+            last_error = error
+            logging.warning(
+                "hospitality decision attempt %d/%d violated the process "
+                "contract for %s/%s: %s",
+                attempt + 1,
+                _LIVE_DECISION_ATTEMPTS,
+                payload.get("type"),
+                payload.get("phase"),
+                error,
+            )
+
+    logging.warning(
+        "hospitality decision falling back to the deterministic planner for "
+        "%s/%s after %d contract violations (last: %s)",
+        payload.get("type"),
+        payload.get("phase"),
+        _LIVE_DECISION_ATTEMPTS,
+        last_error,
     )
-    validated = _validate_decision_output(payload, result)
-    return {**validated, "execution_mode": mode}
+    validated = _validate_decision_output(payload, _fallback_decision(payload))
+    return {**validated, "execution_mode": FALLBACK_AGENT_MODE}
 
 
 # ---------------------------------------------------------------------------
