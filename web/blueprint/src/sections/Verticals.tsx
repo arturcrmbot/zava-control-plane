@@ -62,9 +62,9 @@ export function Verticals() {
             A vertical is not a reskin. It owns functions, domains, authority,
             actor world, durable workflows, commands/projections and
             presentation. The shared substrate supplies identity, audit,
-            execution, event and proof contracts. Pack presence in the repo is
-            not readiness: each pack passes its own gates. Only Telco is named
-            canonical proof reference here.
+            execution, event and proof contracts. A directory in the repo
+            proves only that the pack exists, not that it is ready. Each pack
+            has its own gates. Only Telco is the canonical proof reference.
           </p>
         </header>
 
@@ -84,11 +84,6 @@ export function Verticals() {
           ))}
         </ol>
 
-        <p className="body">
-          The Telco vertical is the current canonical proof reference. No other
-          pack carries that designation. Presence in the repository confirms the
-          pack exists; it is not readiness.
-        </p>
       </div>
     </section>
   );

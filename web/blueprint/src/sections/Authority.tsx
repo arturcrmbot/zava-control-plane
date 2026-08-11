@@ -36,7 +36,7 @@ export function Authority() {
             pack&apos;s authority module, gets back the matched rule, and
             proceeds. The resolver interface is shared; the rows inside are
             pack-owned. Each vertical owns its authority, defined in its own
-            module — for Agency, that is{" "}
+            module. For Agency, that is{" "}
             <a
               className="footer__link"
               href="https://github.com/arturcrmbot/zava-control-plane/blob/main/verticals/agency/authority.py"
@@ -66,7 +66,7 @@ export function Authority() {
 
           <p className="body">
             Thresholds live on the rule, not on the persona, which means
-            the agent path and the human path resolve approvals through the
+            agent and human paths resolve approvals through the
             same logic. Local authority source changes are versioned and
             deployed with the pack; the runtime uses the active pack&apos;s
             authority on every call.

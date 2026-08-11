@@ -32,20 +32,21 @@ export function MetaSkill() {
           </h2>
           <p className="body">
             <strong>compose-org</strong> is a guided pipeline that walks{" "}
-            {COMPOSITION_STEPS.join(" → ")}. Research is source-backed —
-            drawn from the org&apos;s public footprint. Design produces a
+            {COMPOSITION_STEPS.join(" → ")}. Research uses the
+            organisation&apos;s public footprint. Design produces a
             pack-specific actor world, process map and authority model. Build
             assembles the pack-specific agents, capabilities and durable
             workflows. Prove runs machine gates against the assembled pack.
           </p>
           <p className="body">
-            Shared runtime contracts stay across packs: durable execution,
-            identity, audit, governance and proof contracts. Business
-            behaviour remains pack-owned and bespoke where it needs to be.
+            Packs share runtime contracts for durable execution, identity,
+            audit, governance and proof. Business behaviour stays with the
+            pack.
           </p>
           <p className="body">
-            Existing investments connect at the same boundaries. Edges are
-            synthetic only where a real connection has not yet been made.
+            Existing investments connect at the same boundaries. A reference
+            edge remains synthetic until a customer connects the corresponding
+            system, policy, data source or person.
           </p>
         </header>
 

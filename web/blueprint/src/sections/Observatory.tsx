@@ -29,19 +29,17 @@ export function Observatory() {
         </header>
 
         <p className="body">
-          Constellation shows the organisation-wide pattern in one view:
-          events, skills, tools, policy, people and durable workflows as
-          they execute. The public page is recorded execution — it is
-          not live — so every event maps to real evidence, not decoration.
-          The full replay shows the recording date and selected vertical
-          carried by the tape metadata.
+          Constellation puts events, skills, tools, policy, people and durable
+          workflows in one view. The public page shows recorded execution. It is
+          not live, and its events come from the replay tape rather than a
+          decorative animation. The full replay reads the recording date and
+          selected vertical from the tape metadata.
         </p>
 
         <p className="body">
-          Each workflow lights up the map. The active domain sits at the
-          centre, phases around it, skills picked up by agents as they go,
-          calls travelling out to the MCP tools on the rim. A validator
-          block shows red.
+          As a workflow runs, the map places its active domain at the centre and
+          its phases around it. Agent skill use and MCP calls appear along the
+          route. A validator block appears in red.
         </p>
 
         <div className="observatory__counters">
@@ -72,10 +70,9 @@ export function Observatory() {
         </div>
 
         <p className="body">
-          The visualisation above is one panel from the full Constellation
-          interface. The link below opens that interface, where the same
-          recording plays through a workflow detail page and a side drawer
-          showing each agent&apos;s reasoning as it ran.
+          The visualisation above is one panel from Constellation. The full
+          interface plays the same recording through a workflow detail page,
+          with a side drawer for the agent reasoning captured during the run.
         </p>
 
         <p className="body">

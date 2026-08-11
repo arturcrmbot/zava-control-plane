@@ -14,17 +14,16 @@ export function Composition() {
           </h2>
           <p className="body">
             The {data.vertical.display_name} pack is the worked example used
-            throughout this article. It composes specialised skills, pack-scoped
-            MCP adapters, durable workflows, personae, governance and
-            observability through one control plane. The code is executable:
-            organisational records and external systems are synthetic so the
-            reference runs without a customer estate behind it.
+            throughout this article. Its specialised skills, pack-scoped MCP
+            adapters, durable workflows, personae and governance run through
+            one control plane. The code is executable. Organisational records
+            and external systems are synthetic so the reference can run
+            without a customer estate behind it.
           </p>
           <p className="body">
-            The map below uses a curated static Agency snapshot bundled with
-            this article. It is not live inventory and does not represent proof
-            status. It shows how skills, tools and domains compose inside that
-            pack.
+            The map below is a curated static Agency snapshot bundled with
+            the article. It is not live inventory or evidence of proof status.
+            It shows how that pack combines skills, tools and domains.
           </p>
           <p className="body">
             Tap or hover any tile to see what each workflow composes.

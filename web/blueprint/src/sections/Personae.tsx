@@ -36,25 +36,24 @@ export function Personae() {
             Agent and human authority share the same boundary.
           </h2>
           <p className="body">
-            Synthetic personae keep the public demonstrator moving.
-            When you connect your own organisation, the same boundary
-            resolves to a real person, a delegated agent, or an
-            escalation chain — without changing the durable workflow
-            underneath.
+            The public demonstrator uses synthetic personae. In a customer
+            organisation, the same boundary can resolve to a person, a
+            delegated agent or an escalation chain without changing the
+            durable workflow underneath.
           </p>
           <p className="body">
             A persona records role, function, workflow scope and authority
             context. The substrate has {data.total} of them today.
-            The AP controller is an Agency example — not every pack uses the same set of roles:
+            The AP controller is an Agency example. Other packs define the
+            roles they need:
           </p>
 
           <pre className="snippet">{curatedJson(example, SHOWN_FIELDS)}</pre>
 
           <p className="body">
-            Every persona boundary is a connection point. Synthetic makes
-            the reference portable. When you connect real people, delegation
-            rules and approval channels, the durable workflow does not
-            change — only what sits behind each boundary.
+            A persona boundary is another connection point. Connect the
+            organisation&apos;s people, delegation rules and approval channels;
+            the durable workflow does not need to absorb those details.
           </p>
         </header>
       </div>

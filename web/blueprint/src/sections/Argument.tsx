@@ -36,11 +36,10 @@ export function Argument() {
             One workforce needs shared operating machinery.
           </h2>
           <p className="body">
-            A substrate is the ground layer every agent runs on: who an agent
-            is, what it&apos;s allowed to do, where its actions get recorded,
-            which policies apply. Build it once and every domain you put on
-            top inherits all of it. That&apos;s what makes the cost of the
-            next domain drop.
+            The substrate is the shared layer beneath every agent. It resolves
+            identity and permissions, records actions and applies policy.
+            Build that machinery once and each new domain can reuse it instead
+            of starting another isolated stack.
           </p>
         </header>
 
@@ -71,9 +70,9 @@ export function Argument() {
         </p>
 
         <p className="body">
-          Each new domain is composed from existing parts: a new orchestrator
-          plus a small number of new skills, against the same identity and
-          governance the first one used.
+          A new domain combines a domain orchestrator with the skills it
+          needs, while reusing the identity and governance contracts already
+          in place.
         </p>
       </div>
     </section>

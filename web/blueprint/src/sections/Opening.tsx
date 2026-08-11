@@ -13,27 +13,27 @@ export function Opening() {
 
         <div className="stack-lg">
           <p className="lede">
-            Most demos show one assistant handling one task. They don&apos;t
-            show specialised agents and people working across functions,
-            sharing systems, waiting on decisions, recovering from failures,
-            and governed as one workforce. That gap is where agentic
-            strategies stall.
+            Most demos stop at one assistant handling one task. They rarely
+            show what happens when specialised agents and people work across
+            functions, share systems, wait for decisions and recover from
+            failures under one set of controls. That is where an agent demo
+            has to become an operating model.
           </p>
 
           <p className="lede">
-            Initiatives restart because each pilot rebuilds orchestration,
-            prompts, evaluation, integrations, policy and observability from
-            scratch. By the time the second one lands, the first is already
-            diverging. Nothing accumulates across the organisation.
+            Too many pilots rebuild orchestration, prompts, evaluation,
+            integrations, policy and observability from scratch. By the time
+            the second lands, the first has already diverged. The organisation
+            pays for the same foundations again.
           </p>
 
           <p className="lede">
             Zava is a working reference implementation of an agentic
             organisation. A complete synthetic organisation makes the
-            pattern portable: the same boundaries connect systems, skills,
-            MCPs, policies, data and people. The public organisation is
-            synthetic; customers replace one boundary at a time with their
-            existing systems, data, policies and people.
+            reference portable without pretending that mock records are a
+            customer estate. Its runtime boundaries are executable. Customers
+            can replace those boundaries one at a time with their systems,
+            data, policies and people.
           </p>
         </div>
 

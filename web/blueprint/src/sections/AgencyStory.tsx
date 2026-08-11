@@ -55,12 +55,11 @@ export function AgencyStory() {
             Watch one signal travel across the organisation.
           </h2>
           <p className="body">
-            The Aurora flow shows how a single spend signal moves from
-            detection through CFO decision, active policy, AP invoice
-            escalation and CEO synthesis — all in one connected durable
-            execution. The operating data are synthetic; the Durable
-            checkpoints, agent and tool calls, authority decision, audit
-            and visible evidence are real runtime boundaries.
+            Aurora follows one spend signal through a CFO decision, an active
+            policy, AP invoice escalation and CEO synthesis in one durable
+            execution. The operating data are synthetic. The Durable
+            checkpoints, agent and tool calls, authority decision, audit and
+            visible evidence are real runtime boundaries.
           </p>
         </header>
 
@@ -77,10 +76,9 @@ export function AgencyStory() {
         </ol>
 
         <p className="body">
-          Each boundary in this flow is a connection point. Replace synthetic
-          Aurora data with your real spend feed, connect your real CFO approval
-          channel, bring in your existing AP system — and the durable workflow
-          stays the same.
+          Those boundaries are the connection points. Replace Aurora&apos;s
+          records with a spend feed, route approval to the CFO&apos;s channel
+          and connect the AP system. The durable workflow can stay in place.
         </p>
       </div>
     </section>
