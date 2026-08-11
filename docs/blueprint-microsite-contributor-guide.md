@@ -1,5 +1,11 @@
 # Blueprint microsite — contributor guide
 
+> **Narrative contract.** The canonical Zava/Constellation product narrative, shared language,
+> truth boundaries, and claim-to-evidence requirements are owned by:
+> [superpowers/specs/2026-08-10-zava-constellation-story-design.md](superpowers/specs/2026-08-10-zava-constellation-story-design.md).
+> Contributors must not reposition Zava as a simulation product or add claims not supported
+> by that spec.
+
 The blueprint microsite (`web/blueprint/`, served on `:5275`) renders the
 case of type as you build it. New domains, skills and MCPs feed into the
 visualisation automatically — provided you use the contract this guide
@@ -396,167 +402,33 @@ If the page doesn't pick up your change:
 
 ## Deploying to Azure
 
-The microsite ships as a single container to Azure Container Apps. One
-script does everything.
+`scripts/deploy-blueprint.sh` is the proof-gated wrapper around the canonical
+`azure.yaml` deployment via `azd up`. It requires `ZAVA_MODE=replay`, tenant
+verification, `proof/manifest.json`, `proof/seller-review.json`, and
+`proof/public-replay.json`; it deploys the full read-only replay application,
+not an nginx-only microsite.
 
 ```bash
-./scripts/deploy-blueprint.sh
+ZAVA_MODE=replay EXPECTED_TENANT_ID=<your-tenant-id> ./scripts/deploy-blueprint.sh
 ```
 
-First run takes ~7 minutes (provisions ACR, Container Apps environment,
-builds and pushes the image, creates the app). Subsequent runs take ~2
-minutes (rebuilds the image with caches, updates the running container).
+The script will:
 
-### Where it lives
+1. Verify all required commands (`az`, `azd`, `git`, `jq`, `uv`, `curl`).
+2. Require `ZAVA_MODE=replay` — deployment refuses silently-wrong modes.
+3. Require `EXPECTED_TENANT_ID` — tenant isolation enforced before any mutation.
+4. Verify `tapes/demo.tar.gz`, `proof/manifest.json`, `proof/seller-review.json`,
+   and `proof/public-replay.json` are all present.
+5. Run `tools/public_replay_manifest.py verify` to confirm the tape, proof, and
+   seller-review all match the current HEAD commit.
+6. Compare `az account show` tenant to `EXPECTED_TENANT_ID` — abort if mismatched.
+7. Run `azd up` (canonical deploy path from `azure.yaml`).
+8. Smoke-test `/healthz`, `/api/replay/meta` (mode=replay), and
+   `/api/blueprint/composition` (domains non-empty).
+9. Print the deployed HTTPS URL.
 
-- **Subscription**: `MCAPS-Hybrid-REQ-67826-2023-arzielinski`
-- **Resource group**: `project-apex-demo`
-- **Region**: `swedencentral`
-- **ACR**: `blueprintacrapexdemo`
-- **Container Apps env**: `blueprint-env`
-- **Container app**: `blueprint`
-- **URL**: <https://blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io>
-
-The auto-generated URL won't change between deploys (it's tied to the
-container app name + env, not the image).
-
-### What runs in the deployed container
-
-- The lean FastAPI entry point at
-  [`api/server/blueprint_app.py`](../api/server/blueprint_app.py).
-  Only the blueprint route + recorder + static mount. Does NOT import
-  the fleet manager, GHCP SDK, MAF, or any of the heavy domain code —
-  the deployed image stays small and fast to start.
-- The built React bundle from `web/blueprint/dist/`, served by FastAPI
-  at `/` via [`api/server/static_blueprint.py`](../api/server/static_blueprint.py).
-- The always-on demo trickle, started automatically because the
-  container's env carries `BLUEPRINT_AUTOSTART_STREAM=1`. The page is
-  alive the moment the container is up, no need to click anything.
-- Whatever JSONL files are in `data/blueprint-recordings/` at build
-  time. Empty directory = trickle falls back to synthetic templates.
-  Recorded walks committed to git = trickle replays them.
-
-### What does NOT run in the deployed container
-
-The deploy is intentionally Scope A — the page only. None of these:
-
-- Functions host (no real workflows)
-- Azurite (no Durable state)
-- The candidate portal or admin client
-- GHCP-backed real agents (no auth token in the container)
-- The persona responder (no real workflows to respond to)
-
-If a real bus event ever arrived in the deployed container, the SSE
-plumbing would forward it just like local — but nothing is firing them
-there. All "live" activity comes from the trickle.
-
-### Resources the script creates
-
-On first run the script provisions:
-
-1. ACR `blueprintacrapexdemo` (Basic tier) — image registry
-2. Container Apps environment `blueprint-env`
-3. Container app `blueprint` with public ingress, scale-to-zero
-   (`min-replicas 0`, `max-replicas 1`)
-4. A Log Analytics workspace (auto-named) for container logs
-
-Cost at scale-to-zero: ~£3-5/month with light traffic.
-Cold start after idle: ~3-5 seconds on first request.
-
-### To redeploy after a code change
-
-```bash
-./scripts/deploy-blueprint.sh
-```
-
-Idempotent. Each run produces a new image tagged with a timestamp plus
-`latest`, then updates the container app to pull the timestamped tag.
-The previous revision deprovisions automatically.
-
-### To redeploy after recording new walks
-
-Same command. The recordings are baked into the image at build time, so
-a new build picks them up:
-
-```bash
-# After capturing real events into data/blueprint-recordings/
-git add data/blueprint-recordings/*.jsonl
-git commit -m "record: <domain> walks for blueprint trickle"
-./scripts/deploy-blueprint.sh
-```
-
-### To check what's running in production
-
-```bash
-# Health
-curl https://blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io/api/health
-
-# Composition tree (sanity check the manifest)
-curl https://blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io/api/blueprint/composition
-
-# Stream status (should be {"running":true} after autostart)
-curl https://blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io/api/blueprint/_demo_stream/status
-
-# Container revisions
-az containerapp revision list -n blueprint -g project-apex-demo \
-  --query "[].{rev:name, active:properties.active, runningState:properties.runningState}" -o table
-
-# Container console logs (live tail)
-az containerapp logs show -n blueprint -g project-apex-demo --type console --tail 50
-```
-
-### To stop the demo trickle in production
-
-```bash
-curl -X POST https://blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io/api/blueprint/_demo_stream/stop
-```
-
-The page goes calm. Real bus events would still appear if any arrived
-(none do — see above). To restart:
-
-```bash
-curl -X POST https://blueprint.jollygrass-c41bb8b9.swedencentral.azurecontainerapps.io/api/blueprint/_demo_stream/start
-```
-
-### To tear it all down
-
-```bash
-# Delete the container app
-az containerapp delete -n blueprint -g project-apex-demo --yes
-
-# Delete the environment
-az containerapp env delete -n blueprint-env -g project-apex-demo --yes
-
-# Delete the ACR (this is the one with a standing monthly charge)
-az acr delete -n blueprintacrapexdemo -g project-apex-demo --yes
-```
-
-The other resources in `project-apex-demo` (Document Intelligence,
-Speech, Storage, ACS, Email) are unrelated and remain untouched.
-
-### Customising the deploy
-
-Override any default via env var:
-
-```bash
-RG=other-group LOCATION=westeurope APP_NAME=demo ./scripts/deploy-blueprint.sh
-```
-
-Available knobs:
-
-- `RG` (default `project-apex-demo`)
-- `LOCATION` (default `swedencentral`)
-- `APP_NAME` (default `blueprint`)
-- `ENV_NAME` (default `blueprint-env`)
-- `ACR_NAME` (default `blueprintacrapexdemo`)
-
-For an always-warm container (no cold starts, ~£15-25/month), edit
-`scripts/deploy-blueprint.sh` and change `--min-replicas 0` to
-`--min-replicas 1`.
-
-For a custom domain (e.g. `blueprint.crmbot.co.uk`), follow Microsoft's
-[Container Apps custom domain](https://learn.microsoft.com/azure/container-apps/custom-domains-certificates)
-docs — adds a CNAME and a managed cert. No redeploy needed.
+See [`docs/superpowers/skills/zava-workspace-deploy/`] and `azure.yaml` for
+full infrastructure details.
 
 ---
 
@@ -570,5 +442,5 @@ docs — adds a CNAME and a managed cert. No redeploy needed.
 - **Static mount**: [`api/server/static_blueprint.py`](../api/server/static_blueprint.py)
 - **Recordings**: [`data/blueprint-recordings/README.md`](../data/blueprint-recordings/README.md)
 - **Frontend types**: [`web/blueprint/src/lib/types.ts`](../web/blueprint/src/lib/types.ts)
-- **Dockerfile**: [`web/blueprint/Dockerfile`](../web/blueprint/Dockerfile)
 - **Deploy script**: [`scripts/deploy-blueprint.sh`](../scripts/deploy-blueprint.sh)
+- **ACA infra**: [`azure.yaml`](../azure.yaml) + [`deploy/Dockerfile`](../deploy/Dockerfile)

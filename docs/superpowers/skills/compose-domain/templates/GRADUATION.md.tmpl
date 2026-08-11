@@ -81,8 +81,8 @@ find data/blueprint-recordings -name '*.jsonl' -size -200c -delete
 git add data/blueprint-recordings/{{WORKFLOW_TYPE}}-*.jsonl
 git commit -m 'record(blueprint): real walks for {{DOMAIN_DISPLAY_NAME}}'
 
-# Redeploy.
-./scripts/deploy-blueprint.sh
+# Redeploy (proof-gated wrapper around `azd up`; requires ZAVA_MODE=replay and proof artefacts).
+ZAVA_MODE=replay EXPECTED_TENANT_ID=<your-tenant-id> ./scripts/deploy-blueprint.sh
 ```
 
 ## Rollback (if smoke fails)

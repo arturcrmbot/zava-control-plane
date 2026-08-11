@@ -30,13 +30,22 @@ export function MetaSkill() {
               <strong>compose-org</strong> is a guided pipeline that walks{" "}
               {COMPOSITION_STEPS.join(" → ")}. Research is source-backed —
               drawn from the org&apos;s public footprint — but the actor world
-              it produces is fully synthetic and causal: every entity, sensor,
-              and objective is generated, not scraped. <strong>zava-workspace-deploy</strong>{" "}
-              takes that proven output and requires an explicit choice:
-              private-live (a live simulation running against real Azure infra)
-              or public-replay (a deterministic tape anyone can watch without
-              touching live systems). The two modes share one codebase; the
-              choice is a deploy-time flag. See{" "}
+              it produces is fully synthetic and causal. <strong>zava-workspace-deploy</strong>{" "}
+              takes that proven output and requires an explicit choice:{" "}
+              private-live (the reference implementation running on live Azure
+              infrastructure with synthetic organisational activity) or
+              public-replay (recorded telemetry inspectable without writable
+              systems). The two modes share one codebase; the choice is a
+              deploy-time flag.
+            </p>
+            <p className="body">
+              Existing investments connect at the same boundaries. Edges are
+              synthetic only where a real connection has not yet been made.
+              The Telco vertical is the current proven reference; other
+              verticals are proven after their own compose-org gate.
+            </p>
+            <p className="body">
+              See{" "}
               <a
                 className="footer__link"
                 href="https://aiappsgbb.github.io/zava-constellation/"

@@ -1,5 +1,14 @@
 import { getDemoUrl } from "../lib/useDemoUrl";
+import { buildConstellationUrl } from "../lib/constellationUrl";
 import { BOOKING_URL, ZAVA_CONSTELLATION_URL } from "../lib/links";
+
+function getClosingConstellationUrl(): string {
+  const href =
+    typeof window !== "undefined"
+      ? window.location.href
+      : "https://placeholder.invalid/";
+  return buildConstellationUrl(href, getDemoUrl("closing"));
+}
 
 export function Closing() {
   return (
@@ -8,36 +17,29 @@ export function Closing() {
         <p className="subtitle">In closing</p>
 
         <p className="body">
-          What we hand over is a working organisation: the decision-makers
-          are mapped, approvals route through one matrix, and nine
-          workflows are already wired into the substrate with more being
-          composed.
+          What is running today is a reference implementation: governance,
+          durable workflows, agent and human boundaries, skills, MCP
+          interfaces, memory, audit — operating as one control plane.
         </p>
 
         <p className="body">
-          The workflows currently run against synthetic data and stubbed
-          MCPs, so they&apos;re effectively placeholders. The substrate
-          around them is real: identity, audit, the policy file, the
-          validators, the agent harness, the design-time skills that build
-          the next skill. That part stays in place when you swap the stubs
-          for your real Workday, SAP, Salesforce and Mediaocean.
+          The public organisation uses synthetic records, personae and
+          external systems. The connection points are not a separate
+          simulation phase. Keep your existing agent and workflow
+          investments. Connect your existing systems, data and MCP
+          boundaries. Bring in your real people. Then make its edges real one
+          valuable journey at a time.
         </p>
 
         <p className="body">
-          We hand it over as it stands today. Then a week with you, working
-          out your real ambition (one workflow or fifty), and getting one
-          of those workflows running against your real systems before we
-          leave.
+          Start from the reference, connect one cross-functional journey,
+          then expand without rebuilding the shared foundation.
         </p>
 
         <p className="closing__final">
-          The interesting question is no longer which AI project to fund
-          next, but what an organisation looks like once it&apos;s wired
-          into something like this and allowed to extend itself.
-        </p>
-
-        <p className="body" style={{ color: "var(--ink-mute)" }}>
-          That is what I&apos;d like you to consider backing.
+          The interesting question is no longer which isolated agent to
+          fund, but which parts of your organisation should operate as one
+          agentic workforce.
         </p>
 
         <ul className="closing__cta-list">
@@ -51,14 +53,14 @@ export function Closing() {
               Let&apos;s talk →
             </a>
             <span className="closing__cta-note">
-              Half an hour, no slides. I&apos;ll walk through your
-              ambition and what it would take to stand a substrate of
-              your own up.
+              Half an hour, no slides. We&apos;ll walk through your
+              ambition and what it would take to stand a reference of your
+              own up.
             </span>
           </li>
           <li>
             <a
-              href={getDemoUrl("closing")}
+              href={getClosingConstellationUrl()}
               className="closing__cta"
               rel="noopener noreferrer"
               target="_blank"
@@ -68,7 +70,7 @@ export function Closing() {
             <span className="closing__cta-note">
               The control plane is deployed at a public URL, replaying
               workflows that previously executed against the substrate
-              with synthetic data and stubbed external systems.
+              with synthetic data and external systems.
             </span>
           </li>
           <li>
@@ -81,8 +83,10 @@ export function Closing() {
               Build this for your own organisation →
             </a>
             <span className="closing__cta-note">
+              Use the executable blueprint, then connect your existing
+              systems, skills, MCPs, policies, data and people.{" "}
               <code className="mono">compose-org</code> researches, designs,
-              builds and proves an executable vertical for your workflow.{" "}
+              builds and proves an executable vertical.{" "}
               <code className="mono">zava-workspace-deploy</code> publishes
               it as private-live or public-replay.
             </span>

@@ -10,6 +10,24 @@ This is the canonical code-first contract for building a Zava vertical.
 skills reference these contracts rather than defining competing ownership,
 readiness, or graduation procedures.
 
+## Narrative boundary
+
+Each vertical is an industry expression of Zava's **working reference implementation** of an agentic organisation at scale. The actor world,
+synthetic records, personae, and **synthetic MCP adapters** are
+**demonstration scaffolding** — they let the substrate run end-to-end without
+a customer estate. They are not product deliverables and they are not a
+mandatory validation phase.
+
+**Existing systems**, skills, MCPs, policies, data, and people connect
+incrementally at the edges those adapters expose. The synthetic adapter is
+replaced by a real customer adapter at the same tool boundary — nothing in the
+workflow, governance, or evidence contracts changes.
+
+This boundary does not weaken code-first ownership, phase truth, proof,
+seller review, or deployment gates. See the canonical story spec for
+the full design rationale:
+[`docs/superpowers/specs/2026-08-10-zava-constellation-story-design.md`](../specs/2026-08-10-zava-constellation-story-design.md).
+
 ## Code-first boundary
 
 A vertical is executable Python and TypeScript: pack composition, actor-world

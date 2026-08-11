@@ -16,7 +16,7 @@
     "simulatorRampDomains": { "value": "${SIMULATOR_RAMP_DOMAINS=expense-claim}" },
     "personaAutoClose": { "value": "${PERSONA_AUTO_CLOSE=}" },
     "llmRuntime": { "value": "${LLM_RUNTIME=fake}" },
-    "zavaMode": { "value": "${ZAVA_MODE=live}" },
+    "zavaMode": { "value": "${ZAVA_MODE}" },
     "durableEventSecret": { "value": "${DURABLE_EVENT_SECRET=}" },
     "persistData": { "value": "${PERSIST_DATA=false}" }
   }
