@@ -164,8 +164,8 @@ def replay_snapshot(at: float = Query(..., description="Unix timestamp")) -> dic
 @router.get("/meta")
 def replay_meta() -> dict[str, Any]:
     """Tell the front-end whether this process is serving live data or a
-    replay tape. In replay mode, also expose tape_id / recorded_at /
-    duration_s / current_t for the badge + restart banner.
+    replay tape. In replay mode, expose the recording provenance needed
+    to distinguish the tape's vertical from the active runtime pack.
     """
     if not is_replay():
         return {"mode": "live"}
@@ -174,10 +174,19 @@ def replay_meta() -> dict[str, Any]:
         # Replay mode but no player active (boot race / teardown)
         return {"mode": "replay"}
     meta = player.meta
+    selected_vertical = getattr(meta, "selected_vertical", None)
+    active_vertical = app_state.runtime.pack.name
     return {
         "mode": "replay",
         "tape_id": meta.tape_id,
         "recorded_at": meta.recorded_at,
         "duration_s": meta.duration_s,
         "current_t": player.current_t(),
+        "selected_vertical": selected_vertical,
+        "active_vertical": active_vertical,
+        "pack_matches_tape": (
+            selected_vertical == active_vertical
+            if selected_vertical is not None
+            else None
+        ),
     }

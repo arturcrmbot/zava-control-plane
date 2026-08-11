@@ -22,6 +22,7 @@ class TapeMeta(BaseModel):
     duration_s: float
     version: int = TAPE_FORMAT_VERSION
     app_sha: str | None = None
+    selected_vertical: str | None = None
 
 
 class EventRecord(BaseModel):

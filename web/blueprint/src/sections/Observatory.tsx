@@ -33,8 +33,8 @@ export function Observatory() {
           events, skills, tools, policy, people and durable workflows as
           they execute. The public page is recorded execution — it is
           not live — so every event maps to real evidence, not decoration.
-          The full replay exposes the recording date and selected vertical;
-          a later provenance implementation will enforce this in the UI.
+          The full replay shows the recording date and selected vertical
+          carried by the tape metadata.
         </p>
 
         <p className="body">
@@ -92,4 +92,3 @@ export function Observatory() {
     </section>
   );
 }
-
