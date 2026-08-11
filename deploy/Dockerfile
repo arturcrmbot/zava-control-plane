@@ -33,8 +33,10 @@ RUN npm --prefix web/portal install --no-audit --no-fund \
     && BASE_PATH=/portal/ npm --prefix web/portal run build
 
 # Build blueprint → /src/web/blueprint/dist
+# VITE_DEMO_URL=/ tells the blueprint to use same-origin ACA routing;
+# BASE_PATH=/blueprint/ aligns emitted asset URLs with the /blueprint mount.
 RUN npm --prefix web/blueprint install --no-audit --no-fund \
-    && BASE_PATH=/blueprint/ npm --prefix web/blueprint run build
+    && BASE_PATH=/blueprint/ VITE_DEMO_URL=/ npm --prefix web/blueprint run build
 
 
 ############################

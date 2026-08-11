@@ -1,6 +1,8 @@
 import { Opening } from "./sections/Opening";
 import { Analogy } from "./sections/Analogy";
 import { Argument } from "./sections/Argument";
+import { AgencyStory } from "./sections/AgencyStory";
+import { Verticals } from "./sections/Verticals";
 import { Composition } from "./sections/Composition";
 import { Personae } from "./sections/Personae";
 import { Authority } from "./sections/Authority";
@@ -15,6 +17,7 @@ import { AccountsPage } from "./pages/AccountsPage";
 import { FunctionsPage } from "./pages/FunctionsPage";
 import { OrgClonePage } from "./pages/OrgClonePage";
 import { WorkflowRunPage } from "./pages/WorkflowRunPage";
+import { isRuntimeViewAllowed } from "./lib/runtimeViews";
 
 export default function App() {
   // Standalone full-screen page views, addressable via ?view=...
@@ -22,23 +25,20 @@ export default function App() {
   // AccountsPage + extended EntitiesPage; main's 71f48b96 had removed
   // the routing primitive). Replace with React Router when convenient.
   //
-  // Gated to localhost only: every ?view=... page fetches from the
-  // FastAPI control plane (/api/...), which doesn't exist in the
-  // statically-hosted GitHub Pages bundle. In production we silently
-  // fall through to the essay so a curious LinkedIn reader poking at
-  // ?view=constellation doesn't land on a perpetually-loading shell.
-  // We gate by hostname (not DEV) so the production-built bundle
-  // served via `vite preview` on localhost still routes correctly —
-  // that's the path boot-demo.sh uses for live operator demos.
+  // Routing is gated via isRuntimeViewAllowed: enabled for localhost,
+  // *.azurecontainerapps.io, DEV, and any custom domain whose
+  // VITE_DEMO_URL resolves to the same origin (covers the ACA Docker
+  // bundle with VITE_DEMO_URL=/). Disabled for GitHub Pages where
+  // VITE_DEMO_URL points at a different-origin ACA URL and the FastAPI
+  // control plane (/api/...) is not reachable.
   if (typeof window !== "undefined") {
-    const host = window.location.hostname;
-    const isLocal = host === "localhost" || host === "127.0.0.1" || host.endsWith(".local");
-    // Azure Container Apps replay deploy also serves the operator
-    // surface (NOT the essay). Allow ?view=* routes through there so
-    // visitors can reach the Constellation, Entities, Workflow detail
-    // pages on the public replay FQDN.
-    const isContainerApps = host.endsWith(".azurecontainerapps.io");
-    if (isLocal || isContainerApps || import.meta.env.DEV) {
+    if (
+      isRuntimeViewAllowed(
+        window.location.origin,
+        import.meta.env.VITE_DEMO_URL,
+        import.meta.env.DEV,
+      )
+    ) {
       const params = new URLSearchParams(window.location.search);
       const view = params.get("view");
       if (view === "constellation") return <ConstellationPage />;
@@ -58,6 +58,10 @@ export default function App() {
       <Analogy />
       <hr className="rule" />
       <Argument />
+      <hr className="rule" />
+      <AgencyStory />
+      <hr className="rule" />
+      <Verticals />
       <hr className="rule" />
       <Composition />
       <hr className="rule" />
@@ -91,7 +95,7 @@ export default function App() {
         >
           GitHub Copilot SDK
         </a>
-        {" · May 2026"}
+        {" · August 2026"}
       </footer>
     </div>
   );

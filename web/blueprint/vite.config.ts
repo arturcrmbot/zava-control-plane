@@ -16,6 +16,17 @@ export default defineConfig(({ mode }) => {
   // and serve from `/`. Trailing slash is required by Vite. Read from
   // process.env directly — loadEnv only sees .env* files, not shell vars.
   const base = process.env.BASE_PATH || "/";
+  // Derive demoUrl: shell env takes priority over .env files.
+  const demoUrl = process.env.VITE_DEMO_URL || env.VITE_DEMO_URL;
+  // When building at a path prefix (e.g. GitHub Pages) the blueprint will be
+  // served from a different origin than the ACA backend, so an explicit URL is
+  // required. Fail fast to prevent a broken asset being deployed.
+  if (base !== "/" && !demoUrl) {
+    throw new Error(
+      "VITE_DEMO_URL is required when building the blueprint below a path prefix " +
+        `(BASE_PATH=${base}). Set it to the ACA replay URL or '/' for same-origin.`,
+    );
+  }
   return {
     base,
     plugins: [react()],

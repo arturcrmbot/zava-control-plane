@@ -23,6 +23,7 @@ on:
     paths:
       - "web/blueprint/**"
       - ".github/workflows/deploy-blueprint-pages.yml"
+      - "docs/superpowers/specs/2026-08-10-zava-constellation-story-design.md"
   workflow_dispatch:
 
 # Pages requires id-token (OIDC) to deploy and pages: write to publish.
@@ -59,6 +60,10 @@ jobs:
         env:
           # Project Pages live at /<repo>/. Trailing slash required.
           BASE_PATH: /${{ github.event.repository.name }}/
+          # ACA replay URL injected at build time so the article CTA links to
+          # the deployed replay surface. Fail if the repo variable is unset —
+          # the vite.config.ts guard will also catch this.
+          VITE_DEMO_URL: ${{ vars.ACA_REPLAY_URL }}
         run: npm run build
 
       - name: Upload Pages artifact
@@ -73,6 +78,31 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  verify:
+    name: verify public story
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      - name: Verify article and ACA replay
+        env:
+          PUBLIC_STORY_URL: ${{ needs.deploy.outputs.page_url }}
+          ACA_REPLAY_URL: ${{ vars.ACA_REPLAY_URL }}
+        run: npx playwright test tests/e2e/public-story.spec.ts

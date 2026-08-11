@@ -1,124 +1,102 @@
 #!/usr/bin/env bash
-# Deploy the blueprint microsite to Azure Container Apps.
+# Deploy the public Zava experience as a proof-gated ACA replay.
 #
-# Idempotent. First run provisions ACR + Container Apps environment.
-# Subsequent runs build a fresh image and update the running container.
+# This is the proof-gated wrapper around the canonical `azure.yaml` deployment
+# via `azd up`. It requires ZAVA_MODE=replay, tenant verification,
+# proof/manifest.json, proof/seller-review.json, and proof/public-replay.json.
+# It deploys the full read-only replay application, not an nginx-only microsite.
 #
 # Usage:
-#   scripts/deploy-blueprint.sh
-#
-# Override defaults via env vars:
-#   RG=...           override resource group  (default: zava-control-plane-demo)
-#   LOCATION=...     override region          (default: swedencentral)
-#   APP_NAME=...     override container app   (default: blueprint)
-#   ENV_NAME=...     override environment     (default: blueprint-env)
-#   ACR_NAME=...     override ACR name        (default: blueprintacrzavademo)
-
+#   ZAVA_MODE=replay EXPECTED_TENANT_ID=<tenant-id> scripts/deploy-blueprint.sh
 set -euo pipefail
-
-RG="${RG:-zava-control-plane-demo}"
-LOCATION="${LOCATION:-swedencentral}"
-APP_NAME="${APP_NAME:-blueprint}"
-ENV_NAME="${ENV_NAME:-blueprint-env}"
-# ACR names: 5-50 lowercase alphanumeric chars. Use a short deterministic
-# name so re-runs find the same registry.
-ACR_NAME="${ACR_NAME:-blueprintacrzavademo}"
-IMAGE_TAG="$(date +%Y%m%d-%H%M%S)"
 
 cd "$(dirname "$0")/.."
 
-echo "==> Subscription: $(az account show --query name -o tsv)"
-echo "==> Target:       $APP_NAME in $RG ($LOCATION)"
-echo "==> ACR:          $ACR_NAME"
-echo "==> Image tag:    $IMAGE_TAG"
-echo ""
+# --------------------------------------------------------------------------
+# 1. Verify required commands.
+# --------------------------------------------------------------------------
+for cmd in az azd git jq uv curl; do
+  command -v "$cmd" >/dev/null || {
+    echo "ERROR: Missing required command: $cmd" >&2
+    exit 2
+  }
+done
 
 # --------------------------------------------------------------------------
-# 1. Ensure ACR exists.
+# 2. Require explicit replay mode.
 # --------------------------------------------------------------------------
-if ! az acr show --name "$ACR_NAME" --resource-group "$RG" >/dev/null 2>&1; then
-    echo "==> Creating ACR $ACR_NAME ..."
-    az acr create \
-        --resource-group "$RG" \
-        --name "$ACR_NAME" \
-        --sku Basic \
-        --location "$LOCATION" \
-        --admin-enabled true \
-        >/dev/null
-fi
-
-LOGIN_SERVER=$(az acr show --name "$ACR_NAME" --query loginServer -o tsv)
-echo "==> Login server: $LOGIN_SERVER"
+[[ "${ZAVA_MODE:-}" == "replay" ]] || {
+  echo "ERROR: Set ZAVA_MODE=replay for the public deployment." >&2
+  exit 2
+}
 
 # --------------------------------------------------------------------------
-# 2. Build the image in ACR (no local Docker required).
+# 3. Require tenant isolation env var (set by tenant-isolation process).
 # --------------------------------------------------------------------------
-echo ""
-echo "==> Building image in ACR (this is the slow step) ..."
-az acr build \
-    --registry "$ACR_NAME" \
-    --resource-group "$RG" \
-    --image "blueprint:${IMAGE_TAG}" \
-    --image "blueprint:latest" \
-    --file web/blueprint/Dockerfile \
-    .
+[[ -n "${EXPECTED_TENANT_ID:-}" ]] || {
+  echo "ERROR: EXPECTED_TENANT_ID is required for tenant isolation." >&2
+  exit 2
+}
 
 # --------------------------------------------------------------------------
-# 3. Ensure Container Apps environment exists.
+# 4. Require proof artefacts.
 # --------------------------------------------------------------------------
-if ! az containerapp env show --name "$ENV_NAME" --resource-group "$RG" >/dev/null 2>&1; then
-    echo ""
-    echo "==> Creating Container Apps environment $ENV_NAME ..."
-    az containerapp env create \
-        --name "$ENV_NAME" \
-        --resource-group "$RG" \
-        --location "$LOCATION" \
-        >/dev/null
+for artefact in tapes/demo.tar.gz proof/manifest.json proof/seller-review.json proof/public-replay.json; do
+  [[ -f "$artefact" ]] || {
+    echo "ERROR: Required proof artefact missing: $artefact" >&2
+    exit 2
+  }
+done
+
+# --------------------------------------------------------------------------
+# 5. Optionally enforce clean source via require_clean_source.sh.
+# --------------------------------------------------------------------------
+if [[ -f tools/lib/require_clean_source.sh ]]; then
+  # shellcheck source=/dev/null
+  source tools/lib/require_clean_source.sh
+  require_clean_source "."
 fi
 
 # --------------------------------------------------------------------------
-# 4. Create or update the container app.
+# 6. Verify replay provenance manifest (tape + proof + seller-review + HEAD).
 # --------------------------------------------------------------------------
-ACR_USERNAME=$(az acr credential show --name "$ACR_NAME" --query username -o tsv)
-ACR_PASSWORD=$(az acr credential show --name "$ACR_NAME" --query "passwords[0].value" -o tsv)
-IMAGE="${LOGIN_SERVER}/blueprint:${IMAGE_TAG}"
+HEAD_SHA="$(git rev-parse HEAD)"
+uv run python tools/public_replay_manifest.py verify \
+  --source-commit "$HEAD_SHA" \
+  --tape tapes/demo.tar.gz \
+  --proof proof/manifest.json \
+  --seller-review proof/seller-review.json \
+  --manifest proof/public-replay.json
 
-if az containerapp show --name "$APP_NAME" --resource-group "$RG" >/dev/null 2>&1; then
-    echo ""
-    echo "==> Updating existing container app $APP_NAME with image $IMAGE ..."
-    az containerapp update \
-        --name "$APP_NAME" \
-        --resource-group "$RG" \
-        --image "$IMAGE" \
-        --set-env-vars BLUEPRINT_AUTOSTART_STREAM=1 \
-        >/dev/null
-else
-    echo ""
-    echo "==> Creating container app $APP_NAME ..."
-    az containerapp create \
-        --name "$APP_NAME" \
-        --resource-group "$RG" \
-        --environment "$ENV_NAME" \
-        --image "$IMAGE" \
-        --target-port 80 \
-        --ingress external \
-        --registry-server "$LOGIN_SERVER" \
-        --registry-username "$ACR_USERNAME" \
-        --registry-password "$ACR_PASSWORD" \
-        --cpu 0.5 --memory 1Gi \
-        --min-replicas 0 --max-replicas 1 \
-        --env-vars BLUEPRINT_AUTOSTART_STREAM=1 \
-        >/dev/null
-fi
+# --------------------------------------------------------------------------
+# 7. Verify Azure tenant identity before any mutation.
+# --------------------------------------------------------------------------
+ACTUAL_TENANT_ID="$(az account show --query tenantId -o tsv)"
+[[ "$ACTUAL_TENANT_ID" == "$EXPECTED_TENANT_ID" ]] || {
+  echo "ERROR: Tenant mismatch: expected $EXPECTED_TENANT_ID, got $ACTUAL_TENANT_ID" >&2
+  exit 2
+}
 
-echo ""
-echo "==> Done. Resolving FQDN ..."
-FQDN=$(az containerapp show --name "$APP_NAME" --resource-group "$RG" \
-    --query properties.configuration.ingress.fqdn -o tsv)
+# --------------------------------------------------------------------------
+# 8. Full ACA deployment via azd.
+# --------------------------------------------------------------------------
+azd up
 
-echo ""
-echo "  https://$FQDN"
-echo ""
-echo "Smoke-test:"
-echo "  curl -s https://$FQDN/api/health"
-echo "  curl -s https://$FQDN/api/blueprint/composition | python3 -m json.tool | head -20"
+# --------------------------------------------------------------------------
+# 9. Read the deployed FQDN and smoke-test the live surface.
+# --------------------------------------------------------------------------
+FQDN="$(azd env get-value AZURE_CONTAINER_APP_FQDN | sed -E 's|^https?://||; s|/$||')"
+[[ -n "$FQDN" ]] || {
+  echo "ERROR: AZURE_CONTAINER_APP_FQDN is empty after azd env get-value — deployment may have failed." >&2
+  exit 2
+}
+
+curl -fsS "https://${FQDN}/healthz" >/dev/null
+
+curl -fsS "https://${FQDN}/api/replay/meta" \
+  | jq -e '.mode == "replay" and (.recorded_at | type == "string")' >/dev/null
+
+curl -fsS "https://${FQDN}/api/blueprint/composition" \
+  | jq -e '.domains | length > 0' >/dev/null
+
+printf '\nPublic replay deployed and verified: https://%s/\n' "$FQDN"

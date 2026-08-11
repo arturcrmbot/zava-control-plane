@@ -1,5 +1,12 @@
 # Visualisation reference
 
+> **Constellation is Zava's visual command surface.** Its narrative job is to orient the
+> viewer, show concurrent work across the organisation, let a viewer follow one decision
+> from trigger to outcome, expose shared capabilities (skills, tools, policies), name
+> governance outcomes, and identify where customer systems connect. See the canonical
+> story spec for the full product narrative and claim boundaries:
+> [superpowers/specs/2026-08-10-zava-constellation-story-design.md](superpowers/specs/2026-08-10-zava-constellation-story-design.md).
+
 The single canonical home for "how the substrate is visualised". Other
 docs link here; this page owns the surface inventory, the visual
 vocabulary, and the SSE-event → visual mapping. When the visualisation
@@ -42,7 +49,7 @@ editorial blueprint page is the default.
 | Surface | URL | Component | What it shows | Data source | Role |
 |---|---|---|---|---|---|
 | Editorial blueprint | `/` | [`App.tsx`](../web/blueprint/src/App.tsx) sections | Composition tree, personae, authority, mind-map, observatory ribbon | `GET /api/blueprint/composition` + `GET /api/blueprint/stream` | Pitch — the printed-on-the-page argument |
-| 3D Constellation | `/?view=constellation` | [`Constellation.tsx`](../web/blueprint/src/components/Constellation.tsx) (1,270 LOC) | Substrate sphere at centre + sunflower-distributed domain clusters; photon arcs (orange skill / blue tool / red validator); pulses on workflow start/end | `useObservatory()` SSE on `/api/blueprint/stream` | Pitch — full-bleed projection / recording |
+| 3D Constellation | `/?view=constellation` | [`Constellation.tsx`](../web/blueprint/src/components/Constellation.tsx) (1,270 LOC) | Substrate sphere at centre + sunflower-distributed domain clusters; photon arcs (orange skill / blue tool / red validator); pulses on workflow start/end | `useObservatory()` SSE on `/api/blueprint/stream` | Organisation-wide orientation, guided decision evidence, and technical drill-down; also used for full-bleed pitch and recording |
 | Entities | `/?view=entities` | [`EntitiesPage.tsx`](../web/blueprint/src/pages/EntitiesPage.tsx) | 7 kind tiles (Person / Organisation / Asset / Money / Decision / Place / Period), kind-filtered entity table, recent-links pulse | `GET /api/entities/_stats` (5 s poll) | Day-to-day — entity inspector |
 | Functions | `/?view=functions` | [`FunctionsPage.tsx`](../web/blueprint/src/pages/FunctionsPage.tsx) | 9-tile grid of function FMs; tile expands inline to show owned domains + persona-hierarchy tree | `GET /api/functions` (5 s poll) | Drill — per-function detail |
 | Org-clone | `/?view=org-clone` | [`OrgClonePage.tsx`](../web/blueprint/src/pages/OrgClonePage.tsx) | Fan-out across entities, in-flight meta-workflows, ambient agents, function FMs, cadence schedule | 5 endpoints (entities/_stats, workflows, functions, functions/{n}/ambient, cadences); 8 s poll | Admin — single-page operator view |

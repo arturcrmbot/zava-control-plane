@@ -3,7 +3,7 @@ name: compose-domain
 description: |
   Current design-time meta-skill. Given a domain brief (YAML) or a free-text
   idea, produce a complete Durable-fidelity domain sandbox: orchestrator,
-  per-phase graphs, validators, agent skills, MCP tool stubs, persona(e),
+  per-phase graphs, validators, agent skills, synthetic MCP adapters, persona(e),
   + a graduate.sh script that mechanically wires everything into the live
   trees.
 
@@ -388,7 +388,7 @@ that exist only under the legacy `kind: graph` path.
 | **segment validator activity** | `validate_<wt_snake>_segment_<letter>_output_activity_trigger` registered in the pack's `durable.py` | `kind: agent` (default) |
 | phase agent runtime SKILL.md | `api/server/skills/<wt>-<skill_name>/SKILL.md` | per-skill (both paths) |
 | persona SKILL.md | `api/server/personae/<role>/SKILL.md` | per HITL role |
-| MCP tool stub | `api/server/mcp_tools/<mcp_tool>.py` | per `external_systems[]` |
+| synthetic MCP adapter | `api/server/mcp_tools/<mcp_tool>.py` | per `external_systems[]` |
 | entity projection | `api/server/services/entity_projections/<wt_snake>.py` | always (v4) |
 | Cypher precedent | `api/server/services/precedent_queries/<wt>_<phase>.cypher` | per HITL phase (v4) |
 | ambient block | append to `api/server/services/ambient_agents/<function>.py` | if brief carries `ambient:` |
@@ -410,14 +410,14 @@ Template references (under `docs/superpowers/skills/compose-domain/templates/`):
 | `validator.py.tmpl` | in-graph validator returning `{ok: bool}` | **deterministic + legacy `kind: graph` only** |
 | `agent_executor.py.tmpl` | per-phase agent executor calling `run_agent_session` | **legacy / `kind: graph` only** |
 | `orchestrator.py.tmpl` | the orchestrator | always |
-| `mcp_tool.py.tmpl` | MCP tool stub | per `external_systems[]` |
+| `mcp_tool.py.tmpl` | synthetic MCP adapter | per `external_systems[]` |
 | `persona_SKILL.md.tmpl` | persona runtime SKILL.md | per HITL role |
 | `SKILL.md.tmpl` | phase-agent runtime SKILL.md | per skill (both paths) |
 | `GRADUATION.md.tmpl` / `graduate.sh.tmpl` | graduation artefacts | always |
 
 For each `external_systems[]` entry whose `mcp_tool` does not already
 exist in `api/server/mcp_tools/` (check this against the live filesystem):
-- 1 MCP tool stub at `api/server/mcp_tools/<mcp_tool>.py`.
+- 1 synthetic MCP adapter at `api/server/mcp_tools/<mcp_tool>.py`.
 
 #### When to use `kind: graph`
 
@@ -742,8 +742,8 @@ git add data/blueprint-recordings/<domain.name>-*.jsonl
 git commit -m "record(blueprint): real walks for <domain.display_name>"
 
 # 6. Redeploy the container app so the deployed page picks up the
-#    new recordings.
-./scripts/deploy-blueprint.sh
+#    new recordings (proof-gated — requires ZAVA_MODE=replay and proof artefacts).
+ZAVA_MODE=replay EXPECTED_TENANT_ID=<your-tenant-id> ./scripts/deploy-blueprint.sh
 ```
 
 With this step, the new domain becomes visible on the deployed page

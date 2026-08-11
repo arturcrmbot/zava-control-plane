@@ -16,6 +16,8 @@ import { DemoHUD } from "../components/cosmicLens/HUD/DemoHUD";
 import { DecisionTicker } from "../components/cosmicLens/HUD/DecisionTicker";
 import { PolicyRipple } from "../components/cosmicLens/HUD/PolicyRipple";
 import { Narrator } from "../components/cosmicLens/HUD/Narrator";
+import { StoryGuide } from "../components/cosmicLens/HUD/StoryGuide";
+import { useReplayMode } from "../lib/useReplayMode";
 
 // Operator console (web/client) lives on port 5273 in dev/preview. When the
 // constellation is opened from the operator console (?from=fleet), the back
@@ -35,6 +37,8 @@ export function ConstellationPage() {
   const fromFleet = params.get("from") === "fleet";
   const demoEnabled = params.get("demo") === "1";
 
+  const { isReplay, recordedAt } = useReplayMode();
+
   useEffect(() => {
     document.body.classList.add("constellation-page-body");
     return () => {
@@ -45,8 +49,9 @@ export function ConstellationPage() {
   return (
     <div className="constellation-page">
       <CosmicLens embed={embed} />
+      <StoryGuide isReplay={isReplay} recordedAt={recordedAt} />
       <DemoHUD enabled={demoEnabled} />
-      <DecisionTicker enabled={true} />
+      <DecisionTicker enabled={true} isReplay={isReplay} />
       <PolicyRipple enabled={true} />
       <Narrator />
       {!embed && (

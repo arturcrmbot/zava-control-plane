@@ -31,32 +31,29 @@ export function Personae() {
     <section className="section personae">
       <div className="column--wide stack-lg">
         <header className="stack">
-          <p className="subtitle">The cast that operates the press</p>
+          <p className="subtitle">The people who operate the reference organisation</p>
           <h2 className="section-title">
-            The people in the simulated organisation.
+            Agent and human authority share the same boundary.
           </h2>
           <p className="body">
-            The substrate runs as a simulated organisation. Workflows need
-            approvers, reviewers and delegates. Sometimes the actor is a
-            real person pulling a message into their inbox; sometimes
-            it&apos;s an agent acting on someone&apos;s behalf. The
-            orchestrator works the same way either way.
+            The public demonstrator uses synthetic personae. In a customer
+            organisation, the same boundary can resolve to a person, a
+            delegated agent or an escalation chain without changing the
+            durable workflow underneath.
           </p>
           <p className="body">
-            A persona is the abstraction that makes that work. It says who
-            the actor is, what function they belong to, what they&apos;re
-            authorised to approve. The substrate has {data.total} of them
-            today. One, the AP controller, looks like this:
+            A persona records role, function, workflow scope and authority
+            context. The substrate has {data.total} of them today.
+            The AP controller is an Agency example. Other packs define the
+            roles they need:
           </p>
 
           <pre className="snippet">{curatedJson(example, SHOWN_FIELDS)}</pre>
 
           <p className="body">
-            Every persona is a simulated agent today. When you replace one
-            with a real person, the workflows behave the same way: the same
-            routing, the same authority resolution, the same MCP calls. The
-            persona is the boundary between the simulated organisation and
-            a real one.
+            A persona boundary is another connection point. Connect the
+            organisation&apos;s people, delegation rules and approval channels;
+            the durable workflow does not need to absorb those details.
           </p>
         </header>
       </div>

@@ -19,7 +19,7 @@ function curatedJson<T extends object>(obj: T, keys: readonly (keyof T)[]): stri
 export function Authority() {
   const { data } = useAuthority();
   // AP-003 — material AP invoice routes to controller. Pairs directly with
-  // the controller persona shown in the section above.
+  // the controller persona shown in the section above. This is an Agency example.
   const example = data.rules.find((r) => r.rule_id === "AP-003") ?? data.rules[0];
 
   return (
@@ -28,10 +28,28 @@ export function Authority() {
         <header className="stack">
           <p className="subtitle">Who is allowed to approve what</p>
           <h2 className="section-title">
-            The delegated-authority matrix.
+            One authority contract, owned by each vertical.
           </h2>
           <p className="body">
-            The substrate&apos;s agent governance toolkit sits in{" "}
+            The substrate provides a shared authority resolver contract: any
+            workflow that needs to route a decision consults the active
+            pack&apos;s authority module, gets back the matched rule, and
+            proceeds. The resolver interface is shared; the rows inside are
+            pack-owned. Each vertical owns its authority, defined in its own
+            module. For Agency, that is{" "}
+            <a
+              className="footer__link"
+              href="https://github.com/arturcrmbot/zava-control-plane/blob/main/verticals/agency/authority.py"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <code className="mono">verticals/agency/authority.py</code>
+            </a>
+            . Another vertical supplies its own roles, actions and thresholds.
+          </p>
+
+          <p className="body">
+            The governance toolkit sits in{" "}
             <a
               className="footer__link"
               href="https://github.com/arturcrmbot/zava-control-plane/tree/main/api/server/services/governance"
@@ -40,31 +58,18 @@ export function Authority() {
             >
               <code className="mono">api/server/services/governance/</code>
             </a>
-            . One piece of that is the delegated-authority matrix, which
-            decides who can approve what at what threshold. It&apos;s a
-            single JSON file (
-            <a
-              className="footer__link"
-              href="https://github.com/arturcrmbot/zava-control-plane/blob/main/data/synthetic/authority/matrix.json"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <code className="mono">data/synthetic/authority/matrix.json</code>
-            </a>
-            ), {data.rule_count} rules covering every approval action in the
-            organisation. Here&apos;s what one rule looks like:
+            . Here is AP-003, an Agency example: a material AP invoice that
+            routes to the controller.
           </p>
 
           <pre className="snippet">{curatedJson(example, SHOWN_FIELDS)}</pre>
 
           <p className="body">
-            Compliance edits the file directly, and the substrate picks the
-            change up on the next workflow without a redeploy. Any skill
-            that needs to route a decision (human-driven or agent-driven)
-            consults the matrix, gets back the matched rule, and proceeds.
             Thresholds live on the rule, not on the persona, which means
-            the agent path and the human path resolve approvals through the
-            same logic.
+            agent and human paths resolve approvals through the
+            same logic. Local authority source changes are versioned and
+            deployed with the pack; the runtime uses the active pack&apos;s
+            authority on every call.
           </p>
         </header>
       </div>

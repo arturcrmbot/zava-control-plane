@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from api.server.routes import replay as replay_routes
 from api.server.services.replay import player as player_module
+from api.server.state import app_state
 
 
 @pytest.fixture
@@ -39,6 +40,7 @@ def test_meta_returns_replay_shape_when_player_active(monkeypatch, client):
         duration_s=42.0,
         version=1,
         app_sha="abc1234",
+        selected_vertical=app_state.runtime.pack.name,
     )
     fake_player = SimpleNamespace(meta=fake_meta, current_t=lambda: 7.5)
 
@@ -53,7 +55,11 @@ def test_meta_returns_replay_shape_when_player_active(monkeypatch, client):
             "recorded_at": "2026-05-22T11:00:00+00:00",
             "duration_s": 42.0,
             "current_t": 7.5,
+            "selected_vertical": app_state.runtime.pack.name,
+            "active_vertical": app_state.runtime.pack.name,
+            "pack_matches_tape": True,
         }
+        assert "app_sha" not in body
     finally:
         player_module.set_active_player(None)
 
@@ -66,3 +72,27 @@ def test_meta_returns_replay_without_player_fields_when_player_missing(monkeypat
     r = client.get("/api/replay/meta")
     assert r.status_code == 200
     assert r.json() == {"mode": "replay"}
+
+
+def test_meta_marks_pack_tape_mismatch(monkeypatch, client):
+    """A tape recorded for another pack must not look current for the runtime pack."""
+    monkeypatch.setenv("ZAVA_MODE", "replay")
+    from types import SimpleNamespace
+
+    tape_vertical = "telco" if app_state.runtime.pack.name != "telco" else "agency"
+    fake_meta = SimpleNamespace(
+        tape_id="tape_other_pack",
+        recorded_at="2026-08-10T09:00:00+00:00",
+        duration_s=60.0,
+        selected_vertical=tape_vertical,
+    )
+    fake_player = SimpleNamespace(meta=fake_meta, current_t=lambda: 5.0)
+
+    player_module.set_active_player(fake_player)
+    try:
+        body = client.get("/api/replay/meta").json()
+        assert body["selected_vertical"] == tape_vertical
+        assert body["active_vertical"] == app_state.runtime.pack.name
+        assert body["pack_matches_tape"] is False
+    finally:
+        player_module.set_active_player(None)

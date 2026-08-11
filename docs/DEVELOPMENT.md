@@ -311,7 +311,7 @@ In `scripts/`:
 | `run-fastapi-blueprint.sh` | Backgrounded uvicorn on `:3101` with no access log; pairs with `npm run dev:blueprint` when iterating on the microsite |
 | `blueprint-ticker.sh` | Drives synthetic blueprint events for visual smoke-testing |
 | `build-blueprint-image.sh` | `az acr build` of the blueprint container into `blueprintacrapexdemo` |
-| `deploy-blueprint.sh` | Single-command deploy of the microsite to Azure Container Apps (resource group `project-apex-demo`, container `blueprint`). See [blueprint-microsite-contributor-guide.md §Deploying to Azure](blueprint-microsite-contributor-guide.md#deploying-to-azure) |
+| `deploy-blueprint.sh` | Proof-gated wrapper around `azd up` — requires `ZAVA_MODE=replay`, tenant verification, and all proof artefacts. Deploys the full read-only replay ACA application, not an nginx-only microsite. See [blueprint-microsite-contributor-guide.md §Deploying to Azure](blueprint-microsite-contributor-guide.md#deploying-to-azure) |
 | `profile-autonomous.sh`, `profile-friday.sh` | Profiling helpers for the autonomous demo loop |
 | `preclassify_corpus.py` | One-shot preclassification of the 300-claim accuracy corpus |
 | `generate_blueprint_image.py` | Renders the social/preview image for the blueprint page |
