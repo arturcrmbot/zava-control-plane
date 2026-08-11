@@ -1,5 +1,10 @@
 # Architecture
 
+> **Scope note:** This document is the implementation reference for the codebase.
+> Product positioning, shared language, truth boundaries, and claim-to-evidence
+> requirements are owned by the canonical story spec:
+> [superpowers/specs/2026-08-10-zava-constellation-story-design.md](superpowers/specs/2026-08-10-zava-constellation-story-design.md).
+
 Canonical reference for how the codebase hangs together as of `HEAD` on
 `main`. Counts and file paths in this document were verified against the
 source tree at write time; if you change a registry, refresh this doc.

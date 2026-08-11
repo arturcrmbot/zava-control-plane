@@ -135,10 +135,14 @@ function Divider() {
 function StatusPill({ status, replay, recordedAt }: { status: string; replay?: boolean; recordedAt?: string }) {
   let color: string;
   let label: string;
+  let titleAttr: string | undefined;
   if (replay) {
     color = "#a78bfa";
     const stamp = recordedAt ? new Date(recordedAt).toLocaleDateString() : "";
     label = stamp ? `Replay · ${stamp}` : "Replay";
+    titleAttr = recordedAt
+      ? `Recorded telemetry from ${recordedAt}; not live`
+      : "Recorded telemetry; not live";
   } else {
     color =
       status === "watching" ? "#4ade80" : status === "connecting" ? "#fb923c" : "#ef4444";
@@ -147,6 +151,7 @@ function StatusPill({ status, replay, recordedAt }: { status: string; replay?: b
   }
   return (
     <div
+      title={titleAttr}
       style={{
         display: "flex",
         alignItems: "center",

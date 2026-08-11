@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { DecisionTicker } from "../DecisionTicker";
 
 describe("DecisionTicker", () => {
+  afterEach(() => { cleanup(); });
   beforeEach(() => {
     vi.stubGlobal(
       "fetch",
@@ -59,6 +60,20 @@ describe("DecisionTicker", () => {
     await waitFor(() => {
       expect(screen.getByText(/froze aurora/i)).toBeTruthy();
       expect(screen.getByText(/Org snapshot — 3 domain\(s\)/i)).toBeTruthy();
+    });
+  });
+
+  it("shows 'Recorded' header when isReplay=true", async () => {
+    render(<DecisionTicker enabled={true} isReplay={true} />);
+    await waitFor(() => {
+      expect(screen.getByText(/Recorded · org decisions and insights/i)).toBeTruthy();
+    });
+  });
+
+  it("shows 'Live' header by default", async () => {
+    render(<DecisionTicker enabled={true} />);
+    await waitFor(() => {
+      expect(screen.getByText(/Live · org decisions and insights/i)).toBeTruthy();
     });
   });
 

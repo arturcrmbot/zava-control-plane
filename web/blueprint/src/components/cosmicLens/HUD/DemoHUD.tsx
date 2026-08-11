@@ -164,7 +164,7 @@ export function DemoHUD({ enabled }: { enabled: boolean }) {
         onClick={() => setOpen(true)}
         style={{
           position: "absolute",
-          top: 16,
+          top: 72,
           left: 16,
           zIndex: 35,
           background: PANEL_BG,
@@ -210,7 +210,7 @@ export function DemoHUD({ enabled }: { enabled: boolean }) {
     <div
       style={{
         position: "absolute",
-        top: 16,
+        top: 72,
         left: 16,
         zIndex: 35,
         width: 360,

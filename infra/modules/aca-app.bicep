@@ -33,7 +33,7 @@ param llmRuntime string = 'fake'
 
 @description('Set to "replay" to boot the container against a baked tape (no live workers, no Functions host, no LLM calls). Anything else boots live mode.')
 @allowed(['live', 'replay'])
-param zavaMode string = 'live'
+param zavaMode string
 
 @description('Path inside the container to the baked tape archive. Only used when zavaMode=replay.')
 param zavaTapePath string = '/app/tape/tape.tar.gz'

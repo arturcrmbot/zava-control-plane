@@ -52,8 +52,8 @@ in the sandbox — that hides the procedure bug.
 - [ ] §4.3  Per-phase graphs build `WorkflowBuilder(start_executor=n1).add_edge(...)…build()` exactly like `classify.py`.
 - [ ] §4.4  Agent executors mirror `agent_rag_classifier.py`: `from ._wrapper import SKILLS_DIR, run_agent_session`, `_SKILL_DIR = SKILLS_DIR / "<skill-name>"`, `await run_agent_session(...)`. Segment and legacy graph-agent templates forward both canonical `workflow_id=input.get("workflow_id")` and real orchestration `instance_id=input.get("instance_id")`.
 - [ ] §4.5  Validators return `{"ok": bool, ...}` — never raise on shape errors at the in-graph layer.
-- [ ] §4.6  MCP tool stubs use `@traced_tool(...)` and `@define_tool(...)` decorators; Pydantic params class is `_<Op>Params(BaseModel)`.
-- [ ] §4.7  MCP tool stubs are pure (no `time`, no `random`, no `os.environ`, no network). Same input → byte-identical output.
+- [ ] §4.6  Synthetic MCP adapters use `@traced_tool(...)` and `@define_tool(...)` decorators; Pydantic params class is `_<Op>Params(BaseModel)`.
+- [ ] §4.7  Synthetic MCP adapters are pure (no `time`, no `random`, no `os.environ`, no network). Same input → byte-identical output.
 
 ## §5 — Frontmatter and content quality
 

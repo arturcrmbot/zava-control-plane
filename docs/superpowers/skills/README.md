@@ -37,7 +37,7 @@ graduation procedures.
 | `compose-domain/` | Orchestrator. Reads a brief, plans the artefact set, calls sub-skills, writes a sandbox snapshot + executable `graduate.sh`. Entry point. |
 | `author-runtime-skill/` | Sub-skill. Writes ONE phase-agent SKILL.md to a sandbox path. Shape-isomorphic to existing skills under `api/server/skills/`. |
 | `author-persona/` | Sub-skill (NEW v3). Writes ONE persona SKILL.md to a sandbox path. Frontmatter contains executable `decision_policy` Python the persona_responder compiles. |
-| `author-mcp-tool/` | Sub-skill. Writes one in-process Python MCP tool stub. Shape-isomorphic to existing tools under `api/server/mcp_tools/`. |
+| `author-mcp-tool/` | Sub-skill. Writes one in-process Python synthetic MCP adapter. Shape-isomorphic to existing tools under `api/server/mcp_tools/`. |
 | `author-durable-domain/` | Sub-skill. Writes the Durable orchestrator file (with v3 substrate-fix contract — workflow_type stamping + persona contract on suspended), activity functions, per-phase MAF graphs, validators, GRADUATION.md and `graduate.sh`. |
 
 ## How to invoke

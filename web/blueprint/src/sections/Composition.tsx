@@ -3,31 +3,29 @@ import { CompositionMap } from "../components/CompositionMap";
 
 export function Composition() {
   const { data } = useComposition();
-  const liveDomainCount = data.domains.filter((d) => d.status === "live").length;
 
   return (
     <section className="section composition">
       <div className="column--wide stack-lg">
         <header className="stack">
-          <p className="subtitle">What I built, and what it&apos;s for</p>
+          <p className="subtitle">A working reference implementation</p>
           <h2 className="section-title">
-            A working model of the {data.vertical.display_name} organisation.
+            An agentic organisation you can inspect while it runs.
           </h2>
           <p className="body">
-            I built a reference organisation on top of this substrate so
-            the argument above has something concrete underneath it. The
-            substrate today contains around {data.counts.skills} small
-            specialised skills, {data.counts.mcps} MCP adapters into
-            outside systems like Workday HR, Concur travel, a document
-            intelligence service and the policy and identity stack, and{" "}
-            {liveDomainCount} workflows wired up end-to-end.
+            The {data.vertical.display_name} organisation is the current
+            proven reference. Each active vertical composes specialised
+            skills, shared MCP adapters, durable workflows, personae,
+            governance and observability through one control plane. The
+            code is executable: organisational records and external systems
+            are synthetic so the reference runs without a customer estate
+            behind it.
           </p>
           <p className="body">
-            This is not a proposal that every routine decision in your
-            organisation should be made by an agent. The point of the
-            model is to prove that the substrate holds at this scope
-            and across this many domains. You&apos;ll keep the parts
-            that matter to you and leave the rest.
+            The point is not that every decision should be delegated. It is
+            that bounded capabilities working together — agents, humans,
+            approvals, policy, memory — can be proven at this scope before
+            you connect them to your own systems.
           </p>
           <p className="body">
             Tap or hover any tile to see what each workflow composes.

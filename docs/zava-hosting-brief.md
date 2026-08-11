@@ -11,7 +11,7 @@ The MS GBB skills catalogue ships a two-step pipeline. Overview & visuals: <http
 | Order | Skill | Purpose | Wall clock |
 |---|---|---|---|
 | 1 (optional) | `compose-org` | Internally runs Research → Design → Build → Prove: profiles the org from its public footprint, designs and builds an executable vertical (domains, actor world, personas), and runs the proof chain before the pipeline exits. Output is a proven vertical pack, not a stub. | 45–90 min |
-| 2 (required) | **`zava-workspace-deploy`** | Requires proven `compose-org` output. Demands an explicit mode choice: **private-live** (live simulation on Azure infra) or **public-replay** (deterministic tape, no live systems). `azd up` deploys accordingly. | ~10 min |
+| 2 (required) | **`zava-workspace-deploy`** | Requires proven `compose-org` output. Demands an explicit mode choice: **private-live** (the reference implementation running on live Azure infrastructure with synthetic organisational activity) or **public-replay** (deterministic tape, no live systems). `azd up` deploys accordingly. Synthetic activity is demonstration scaffolding, not a mandatory customer adoption phase; customer systems, skills, MCPs, policies, data, and people replace synthetic edges incrementally. | ~10 min |
 
 Skip step 1 if a generic-looking demo is fine. Run it if you want the workspace to reflect the customer's org with a proven executable vertical.
 

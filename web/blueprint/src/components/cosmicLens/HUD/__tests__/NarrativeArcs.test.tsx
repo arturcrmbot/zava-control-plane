@@ -29,8 +29,8 @@ describe("NarrativeArcs", () => {
   afterEach(() => cleanup());
 
   function renderExpanded() {
+    // Cast is visible by default (no defaultCollapsed); no click needed.
     render(<NarrativeArcs initialArcs={SAMPLE} />);
-    fireEvent.click(screen.getByTitle("Expand"));
   }
 
   it("renders one card per arc with name, role, and one-liner", () => {
@@ -49,6 +49,11 @@ describe("NarrativeArcs", () => {
     renderExpanded();
     expect(screen.getByText("AK")).toBeTruthy();
     expect(screen.getByText("MH")).toBeTruthy();
+  });
+
+  it("cast is visible by default without any interaction", () => {
+    render(<NarrativeArcs initialArcs={SAMPLE} />);
+    expect(screen.getAllByText("Aisha Khan").length).toBeGreaterThan(0);
   });
 
   it("toggles the card list from the collapsible header", () => {

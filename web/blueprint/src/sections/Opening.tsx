@@ -4,35 +4,35 @@ export function Opening() {
       <div className="column--wide">
         <div className="opening__headline-block">
           <h1 className="headline">
-            <em>Why your agentic strategy</em>
+            <em>See what an agentic organisation</em>
             <br />
-            isn&apos;t moving the needle.
+            actually looks like.
           </h1>
-          <p className="subhead">And what I think actually does.</p>
+          <p className="subhead">And use the blueprint to build yours.</p>
         </div>
 
         <div className="stack-lg">
           <p className="lede">
-            You&apos;ve sponsored the work, the demos went fine, contracts
-            were signed, things shipped. Then the next initiative arrives and
-            effectively starts over with new tech, new prompts, new
-            evaluation, new integrations, a fresh six-week clock, often a
-            different vendor. By the time the next initiative starts, very
-            little of what the previous one built is still doing useful work.
+            Most demos show one assistant handling one task. They don&apos;t
+            show specialised agents and people working across functions,
+            sharing systems, waiting on decisions, recovering from failures,
+            and governed as one workforce. That gap is where agentic
+            strategies stall.
           </p>
 
           <p className="lede">
-            Two reasons. The first is that humans cannot realistically build,
-            train and govern AI initiatives one-by-one fast enough to keep up.
-            By the time the first one lands, the rest of the organisation
-            has adopted three other tools.
+            Initiatives restart because each pilot rebuilds orchestration,
+            prompts, evaluation, integrations, policy and observability from
+            scratch. By the time the second one lands, the first is already
+            diverging. Nothing accumulates across the organisation.
           </p>
 
           <p className="lede">
-            The second reason is less commonly named. Most organisations are
-            running several different frameworks for building agents at the
-            same time. None of them strengthen each other. Nothing
-            accumulates.
+            Zava is a working reference implementation of an agentic
+            organisation. A complete synthetic organisation makes the
+            pattern portable: the same boundaries connect systems, skills,
+            MCPs, policies, data and people — whether the organisation is
+            synthetic today or real tomorrow.
           </p>
         </div>
 

@@ -24,6 +24,7 @@ owned by that pack and never shared across packs or global legacy roots.
 | Persona meta-skill | [docs/superpowers/skills/compose-persona/SKILL.md](../../../docs/superpowers/skills/compose-persona/SKILL.md) |
 | Vertical proof requirements | [docs/VERTICAL-PROOF.md](../../../docs/VERTICAL-PROOF.md) |
 | Architecture | [docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md) §2, §4, §8, §11 |
+| Constellation story spec | [docs/superpowers/specs/2026-08-10-zava-constellation-story-design.md](../../../docs/superpowers/specs/2026-08-10-zava-constellation-story-design.md) |
 
 ## Authority
 
@@ -31,6 +32,13 @@ Follow the code-first
 [Vertical Build Contract](../../../docs/superpowers/contracts/VERTICAL-BUILD-CONTRACT.md).
 This entry point adds one process to an installed pack; it does not define a
 second ownership, readiness, or proof contract.
+
+Generated business behavior must preserve the build-contract narrative
+boundary: synthetic assets (actor world, personae, synthetic MCP adapters)
+are functional demonstration scaffolding. Customer systems connect at those
+edges — the synthetic adapter is replaced by a real one at the same tool
+boundary without changing workflow, governance, or evidence contracts.
+All proof, authority, pack rules, and deploy gates remain in force.
 
 ## Procedure
 

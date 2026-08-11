@@ -1,27 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 
+/** Fields shared by all ticker item kinds. */
+type TickerBase = {
+  id: string;
+  decided_at?: string;
+};
+
 type TickerItem =
-  | {
+  | (TickerBase & {
       kind: "Decision";
-      id: string;
       persona_role?: string;
       verdict?: string;
       reason?: string;
-      decided_at?: string;
       workflow_id?: string;
       phase?: string;
       decided_on?: string[];
-      attributes?: any;
-    }
-  | {
+      attributes?: Record<string, unknown>;
+    })
+  | (TickerBase & {
       kind: "Insight";
-      id: string;
       role?: string;
       scope?: string;
-      decided_at?: string;
       headline?: string;
       fingerprint?: string;
-    };
+    });
 
 const VERDICT_LABEL: Record<string, string> = {
   approve: "approved",
@@ -130,9 +132,11 @@ function relAge(iso: string | undefined, now: number): string {
 export function DecisionTicker({
   enabled = true,
   max = 8,
+  isReplay = false,
 }: {
   enabled?: boolean;
   max?: number;
+  isReplay?: boolean;
 }) {
   const [items, setItems] = useState<TickerItem[]>([]);
   const [now, setNow] = useState(Date.now());
@@ -195,14 +199,14 @@ export function DecisionTicker({
       }}
     >
       <div style={{ opacity: 0.6, marginBottom: 4 }}>
-        Live · org decisions and insights
+        {isReplay ? "Recorded" : "Live"} · org decisions and insights
       </div>
       {items.length === 0 && (
         <div style={{ opacity: 0.5 }}>(no recent activity)</div>
       )}
       {items.map((it, idx) => (
         <div
-          key={(it as any).id || idx}
+          key={it.id || idx}
           style={{
             display: "flex",
             justifyContent: "space-between",
@@ -211,7 +215,7 @@ export function DecisionTicker({
         >
           <span>{renderItemNodes(it, personaColors)}</span>
           <span style={{ opacity: 0.5, marginLeft: 12 }}>
-            {relAge((it as any).decided_at, now)}
+            {relAge(it.decided_at, now)}
           </span>
         </div>
       ))}

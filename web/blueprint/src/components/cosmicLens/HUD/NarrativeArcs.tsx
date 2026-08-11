@@ -76,7 +76,6 @@ export function NarrativeArcs({ initialArcs, fetchUrl }: NarrativeArcsProps = {}
       badge={`${arcs.length}`}
       anchor="top-right"
       width={300}
-      defaultCollapsed
     >
       <div data-testid="narrative-arcs">
         {error && (

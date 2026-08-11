@@ -1,4 +1,15 @@
-# Zava Control Plane — Apex Substrate
+# Zava Control Plane
+
+> **See what an agentic organisation actually looks like — and use the blueprint to build yours.**
+>
+> Zava is a working reference implementation of an agentic organisation at scale. The demonstrated
+> organisation is demonstration scaffolding so the pattern runs anywhere. Customers connect or replace
+> its edges incrementally — existing systems, skills, MCPs, data, policies, and people at the same boundaries.
+>
+> The canonical product narrative, shared language, truth boundaries, and claim-to-evidence
+> requirements are owned by the **[Zava and Constellation Story Design](docs/superpowers/specs/2026-08-10-zava-constellation-story-design.md)**.
+> Shorter summaries — README, docs, contributor guides, talk tracks — may not introduce claims
+> absent from that spec.
 
 [![OWASP Agentic AI Top 10 — 10/10 covered](https://img.shields.io/badge/OWASP%20Agentic%20Top%2010-10%2F10%20covered-brightgreen)](plan/archive/feature-agent-governance-toolkit-1.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -84,8 +95,10 @@ The complete OSS/BSS implementation map lives in:
 > [`api/server/services/governance/permission_handler.py`](api/server/services/governance/permission_handler.py)
 > for the AGT pre-tool hook that gates every tool call inside a segment.
 
-The pitch behind this is captured in [docs/archive/blueprint.md](docs/archive/blueprint.md);
-the live editorial microsite that visualises the substrate is
+The current product narrative is owned by the
+**[Zava and Constellation Story Design](docs/superpowers/specs/2026-08-10-zava-constellation-story-design.md)**.
+[docs/archive/blueprint.md](docs/archive/blueprint.md) is retained as historical context only.
+The live editorial microsite that visualises the substrate is
 [`web/blueprint/`](web/blueprint/), shipped two ways:
 
 - **Editorial essay** (static, fixture-driven) — auto-published to
@@ -240,7 +253,7 @@ serve the whole repo.
 - [docs/ADD-A-DOMAIN.md](docs/ADD-A-DOMAIN.md) — how to extend it (manual → compose-domain meta-skill)
 - [docs/visualisation.md](docs/visualisation.md) — what you'll see (`?view=constellation` / `entities` / `functions` / `org-clone`), the visual vocabulary, plus contributor guide
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — local dev, terminals, debugging
-- [docs/blueprint-microsite-contributor-guide.md](docs/blueprint-microsite-contributor-guide.md) — making new domains light up on the page + the Azure Container Apps deploy
+- [docs/blueprint-microsite-contributor-guide.md](docs/blueprint-microsite-contributor-guide.md) — making new domains light up on the page + proof-gated ACA deploy via `scripts/deploy-blueprint.sh` (proof-gated wrapper around `azd up`)
 - [docs/superpowers/skills/compose-domain/SKILL.md](docs/superpowers/skills/compose-domain/SKILL.md) — meta-skill that graduates new domains
 
 ## Stop

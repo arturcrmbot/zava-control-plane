@@ -49,7 +49,7 @@ describe("Narrator", () => {
       triggerNarrator(SAMPLE_ARC);
     });
     await waitFor(() => {
-      expect(screen.getByText(/Brand spend just spiked\./i)).toBeTruthy();
+      expect(screen.getByText(/A budget overrun arrived on Aurora\./i)).toBeTruthy();
     });
     expect(screen.getByText(/1 \/ 6/i)).toBeTruthy();
   });
@@ -63,7 +63,7 @@ describe("Narrator", () => {
       });
     });
     await waitFor(() => {
-      expect(screen.getByText(/CFO observes — autonomously\./i)).toBeTruthy();
+      expect(screen.getByText(/CFO agent observes within delegated authority\./i)).toBeTruthy();
     });
     expect(
       screen.getByText(/Aurora at 123% of FY budget — recommend freeze/i),

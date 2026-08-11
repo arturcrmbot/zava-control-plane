@@ -30,12 +30,12 @@ const PHASE_LINES: Record<
   (p: Phase) => { primary: string; secondary?: string }
 > = {
   overrun: () => ({
-    primary: "Brand spend just spiked.",
+    primary: "A budget overrun arrived on Aurora.",
     secondary:
-      "We injected a fresh budget overrun on Aurora to simulate the kind of pressure that triggers an autonomous reaction.",
+      "The overrun landed on Aurora and begins a response across finance, operations, and executive oversight.",
   }),
   cfo_observe: (p) => ({
-    primary: "CFO observes — autonomously.",
+    primary: "CFO agent observes within delegated authority.",
     secondary: p.headline || "",
   }),
   approve: () => ({

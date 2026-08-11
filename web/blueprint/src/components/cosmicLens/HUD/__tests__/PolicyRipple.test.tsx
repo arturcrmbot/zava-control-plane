@@ -68,6 +68,7 @@ describe("PolicyRipple", () => {
       persona_role: "cfo",
       phase: "policy_set",
       verdict: "approve",
+      decided_on: ["BRAND-aurora"],
       decided_at: new Date().toISOString(),
     });
 
@@ -79,6 +80,27 @@ describe("PolicyRipple", () => {
     // animation still running 100ms in
     await new Promise((r) => setTimeout(r, 100));
     expect(screen.getAllByTestId("policy-ripple-ring").length).toBeGreaterThan(0);
+  });
+
+  it("renders a label badge for policy_set event", async () => {
+    render(<PolicyRipple enabled={true} />);
+    await waitFor(() => expect(fakeSources.length).toBe(1));
+
+    emit({
+      kind: "Decision",
+      id: "DEC-10",
+      persona_role: "cfo",
+      phase: "policy_set",
+      verdict: "approve",
+      decided_on: ["BRAND-aurora"],
+      decided_at: new Date().toISOString(),
+    });
+
+    await waitFor(() => {
+      const labels = screen.getAllByTestId("policy-ripple-label");
+      expect(labels.length).toBeGreaterThan(0);
+      expect(labels[0].textContent).toMatch(/CFO approved policy for aurora/i);
+    });
   });
 
   it("ignores non-matching events (Insight, non-policy_set Decision)", async () => {
@@ -140,6 +162,47 @@ describe("PolicyRipple", () => {
         ring.style.borderColor.includes("rgb(79, 155, 255)") ||
         ring.outerHTML.includes("#4f9bff");
       expect(matches).toBe(true);
+    });
+  });
+
+  it("label falls back to 'Policy update' when policy_set event has no verdict or target", async () => {
+    render(<PolicyRipple enabled={true} />);
+    await waitFor(() => expect(fakeSources.length).toBe(1));
+
+    emit({
+      kind: "Decision",
+      id: "DEC-99",
+      phase: "policy_set",
+      // no persona_role, no verdict, no decided_on
+    });
+
+    await waitFor(() => {
+      const labels = screen.getAllByTestId("policy-ripple-label");
+      expect(labels.length).toBeGreaterThan(0);
+      expect(labels[0].textContent).toBe("Policy update");
+    });
+  });
+
+  it("label uses zavaPolicyLabel animation, not zavaPolicyRipple", async () => {
+    render(<PolicyRipple enabled={true} />);
+    await waitFor(() => expect(fakeSources.length).toBe(1));
+
+    emit({
+      kind: "Decision",
+      id: "DEC-LABEL-TEST",
+      persona_role: "cfo",
+      phase: "policy_set",
+      verdict: "approve",
+      decided_on: ["BRAND-test"],
+      decided_at: new Date().toISOString(),
+    });
+
+    await waitFor(() => {
+      const label = screen.getAllByTestId("policy-ripple-label")[0] as HTMLElement;
+      expect(label).toBeTruthy();
+      const animation = label.style.animation;
+      expect(animation).toContain("zavaPolicyLabel");
+      expect(animation).not.toContain("zavaPolicyRipple");
     });
   });
 });
