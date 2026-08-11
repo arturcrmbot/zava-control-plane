@@ -31,8 +31,10 @@ export function Observatory() {
         <p className="body">
           Constellation shows the organisation-wide pattern in one view:
           events, skills, tools, policy, people and durable workflows as
-          they execute. The public page replays recorded telemetry — it is
+          they execute. The public page is recorded execution — it is
           not live — so every event maps to real evidence, not decoration.
+          The full replay exposes the recording date and selected vertical;
+          a later provenance implementation will enforce this in the UI.
         </p>
 
         <p className="body">

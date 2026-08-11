@@ -44,8 +44,8 @@ export function Personae() {
           </p>
           <p className="body">
             A persona records role, function, workflow scope and authority
-            context. The substrate has {data.total} of them today. The AP
-            controller looks like this:
+            context. The substrate has {data.total} of them today.
+            The AP controller is an Agency example — not every pack uses the same set of roles:
           </p>
 
           <pre className="snippet">{curatedJson(example, SHOWN_FIELDS)}</pre>

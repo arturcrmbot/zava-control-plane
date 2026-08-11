@@ -27,7 +27,7 @@ export function Memory() {
         <header className="stack">
           <p className="subtitle">How the substrate gets better at its job</p>
           <h2 className="section-title">
-            The institution that remembers itself.
+            Context can carry between runs, where enabled.
           </h2>
         </header>
 

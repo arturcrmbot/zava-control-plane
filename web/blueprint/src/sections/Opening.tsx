@@ -31,8 +31,9 @@ export function Opening() {
             Zava is a working reference implementation of an agentic
             organisation. A complete synthetic organisation makes the
             pattern portable: the same boundaries connect systems, skills,
-            MCPs, policies, data and people — whether the organisation is
-            synthetic today or real tomorrow.
+            MCPs, policies, data and people. The public organisation is
+            synthetic; customers replace one boundary at a time with their
+            existing systems, data, policies and people.
           </p>
         </div>
 
