@@ -27,10 +27,11 @@ _DISRUPTION_ID = "SYN-DISRUPTION-HUB-001"
 _TARGET_SECTOR_ID = "SYN-SECTOR-OUT-001"
 _TAIL_OPTION_ID = "SYN-OPTION-TAIL-CREW-STAND"
 _CANCEL_OPTION_ID = "SYN-OPTION-CANCEL"
+_RETIME_OPTION_ID = "SYN-OPTION-RETIME-ONLY"
 _KNOWN_OPTION_IDS = {
     _TAIL_OPTION_ID,
     _CANCEL_OPTION_ID,
-    "SYN-OPTION-RETIME-ONLY",
+    _RETIME_OPTION_ID,
 }
 
 
@@ -224,6 +225,38 @@ def _mutate_cancel_plan(world: AirlineWorld) -> list[Any]:
     return [sector, rotation, crew]
 
 
+def _mutate_retime_plan(world: AirlineWorld, option: RecoveryOption) -> list[Any]:
+    action = next(a for a in option.actions if a.action_type == "retime_sector")
+    if not isinstance(action.resource_id, str) or not action.resource_id:
+        raise ValueError(
+            f"retime action resource_id must be a non-empty string, got {action.resource_id!r}"
+        )
+    if isinstance(action.minutes, bool) or not isinstance(action.minutes, int) or action.minutes <= 0:
+        raise ValueError(
+            f"retime action minutes must be a positive int (not bool), got {action.minutes!r}"
+        )
+
+    # Validate slot exists and belongs to target sector before any mutation (atomicity)
+    slot_id = str(action.resource_id)
+    if slot_id not in world.slots:
+        raise ValueError(
+            f"slot {slot_id!r} not found in world.slots"
+        )
+    slot = world.slots[slot_id]
+    sector = world.sectors[_TARGET_SECTOR_ID]
+    if slot.sector_id != sector.id:
+        raise ValueError(
+            f"slot {slot_id!r} is not allocated to sector {sector.id!r}, "
+            f"it is allocated to {slot.sector_id!r}"
+        )
+
+    # Move sector departure forward by action.minutes and clear delay_minutes
+    sector.scheduled_departure += action.minutes
+    sector.delay_minutes = 0
+    # Only sector is mutated; slot is already allocated from preconditions
+    return [sector]
+
+
 def _evaluation_results(
     world: AirlineWorld,
     option: RecoveryOption,
@@ -271,6 +304,27 @@ def _evaluation_results(
                 world.disruption_status.get(STORY_ID) == "resolved",
             ),
         )
+    elif option.option_id == _RETIME_OPTION_ID:
+        action = next(a for a in option.actions if a.action_type == "retime_sector")
+        slot = world.slots[str(action.resource_id)]
+        checks = (
+            (
+                "sector_scheduled_departure_matches_slot",
+                abs(sector.scheduled_departure - slot.scheduled_time) <= slot.tolerance_minutes,
+            ),
+            (
+                "sector_delay_cleared",
+                sector.delay_minutes == 0,
+            ),
+            (
+                "slot_allocated_to_sector",
+                slot.sector_id == sector.id and slot.status == "allocated",
+            ),
+            (
+                "disruption_resolved",
+                world.disruption_status.get(STORY_ID) == "resolved",
+            ),
+        )
     else:
         raise ValueError(f"recovery option {option.option_id!r} has no registered evaluator")
     results = tuple(f"{name}:{'pass' if passed else 'fail'}" for name, passed in checks)
@@ -287,6 +341,8 @@ def _accept(
         mutated = _mutate_tail_plan(world)
     elif option.option_id == _CANCEL_OPTION_ID:
         mutated = _mutate_cancel_plan(world)
+    elif option.option_id == _RETIME_OPTION_ID:
+        mutated = _mutate_retime_plan(world, option)
     else:
         return reject(
             world,
@@ -341,7 +397,7 @@ def _accept(
         protected_connection_cohorts=protected_cohorts,
         passengers_requiring_rerouting=(
             0
-            if option.option_id == _TAIL_OPTION_ID
+            if option.option_id in {_TAIL_OPTION_ID, _RETIME_OPTION_ID}
             else int(
                 baseline.get("passengers_requiring_rerouting") or 0
             )

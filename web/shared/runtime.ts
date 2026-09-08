@@ -40,6 +40,9 @@ export interface WorldSceneMetadata {
 export interface RuntimeDomain {
   workflow_type: string;
   display_name: string;
+  /** Whether the active world can start this workflow on demand. Domains that
+   *  are not runnable must not be offered as "Run scenario" buttons. */
+  runnable?: boolean;
 }
 
 export interface RuntimeManifest {

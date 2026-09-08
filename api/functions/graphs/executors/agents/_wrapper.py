@@ -463,6 +463,7 @@ async def run_agent_session(
     prompt: str,
     *,
     tools: list[Tool] | None = None,
+    required_tool_names: list[str] | None = None,
     skill_dir: Path | None = None,
     skill_directories: list[Path] | None = None,
     skill_label: str | None = None,
@@ -478,6 +479,8 @@ async def run_agent_session(
     Args:
         prompt: The user prompt — per-call context.
         tools: SDK-native tools registered on the session via `tools=[...]`.
+        required_tool_names: Tool names the provider must execute successfully
+            before it may return its final response.
         skill_dir: Path to the skill's directory (containing SKILL.md).
         skill_label: Optional OTEL span tag. Also drives evaluator selection
             in the online subscriber.
@@ -599,6 +602,7 @@ async def run_agent_session(
                 system_message=skill_text,
                 skill_directories=all_skill_dirs or None,
                 tools=tools,
+                required_tool_names=required_tool_names,
                 permission_handler=permission_handler,
                 attachments=attachments,
                 model=model,

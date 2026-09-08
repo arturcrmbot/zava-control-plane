@@ -168,6 +168,7 @@ class WorldBridge:
             "trace_id": trace_id,
             "objective_id": objective.id,
             "observation": observation,
+            "diagnostic": True,
         }
         response = await schedule_new_orchestration(payload, responder.orchestrator)
         instance_id = response.get("id")

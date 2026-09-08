@@ -76,7 +76,7 @@ def test_run_scenario_exposes_the_golden_story_to_operator_surfaces() -> None:
 
     assert result == {
         "scenario_id": "synthetic-hub-cascade",
-        "root_event_id": "evt-00000040",
+        "root_event_id": "evt-00000050",
         "workflow_id": "AIRHUB-0001",
         "story_id": "SYN-STORY-HUB-001",
     }
@@ -147,11 +147,12 @@ def test_registration_has_one_route_responder_and_demo_scale() -> None:
     assert AIRLINE_WORLD.name == "airline"
     assert AIRLINE_WORLD.default_scale == "demo"
     assert tuple(AIRLINE_WORLD.scales) == ("demo",)
-    assert len(AIRLINE_WORLD.objective_routes) == 1
-    assert len(AIRLINE_WORLD.responders) == 1
+    # Three routes: Hero1 hub disruption + Hero2 AOG engineering recovery + Hero3 schedule resilience
+    assert len(AIRLINE_WORLD.objective_routes) == 3
+    assert len(AIRLINE_WORLD.responders) == 3
 
-    route = AIRLINE_WORLD.objective_routes[0]
-    responder = next(iter(AIRLINE_WORLD.responders.values()))
+    route = next(r for r in AIRLINE_WORLD.objective_routes if r.sensor_id == "sensor:integrated_hub_disruption")
+    responder = AIRLINE_WORLD.responders["recover_hub_disruption"]
     assert route.sensor_id == "sensor:integrated_hub_disruption"
     assert route.objective_type == responder.objective_type
     assert responder.workflow_type == WORKFLOW_TYPE
@@ -222,9 +223,8 @@ def test_registered_scene_is_bounded_and_matches_rendered_collections() -> None:
     assert all(location["id"].startswith("SYN-") for location in scene["locations"])
     assert all("Synthetic" in location["label"] for location in scene["locations"])
     assert {layer["state_key"] for layer in scene["layers"]} <= world.render_state().keys()
-    assert scene["scenarios"] == [
-        {
-            "name": "synthetic-hub-cascade",
-            "label": "Integrated Hub Disruption",
-        }
-    ]
+    assert {s["name"] for s in scene["scenarios"]} == {
+        "synthetic-hub-cascade",
+        "synthetic-aog-defect",
+        "synthetic-schedule-restriction",
+    }

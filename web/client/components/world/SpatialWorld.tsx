@@ -57,6 +57,7 @@ export interface WorldSceneContract {
 interface SpatialWorldDomain {
   workflow_type: string;
   display_name: string;
+  runnable?: boolean;
 }
 
 interface SpatialWorldProps {
@@ -363,6 +364,14 @@ export default function SpatialWorld({
     [events, scene.process_event_types, state],
   );
   const story = useMemo(() => parseStory(state), [state]);
+  // Only offer buttons the world will actually accept. A domain with
+  // `runnable === false` is rejected by /api/world/processes/{type}/run with
+  // "unknown reference process", so rendering it is a dead end. `undefined`
+  // is treated as runnable so an older manifest keeps today's behaviour.
+  const runnableDomains = useMemo(
+    () => (domains ?? []).filter((domain) => domain.runnable !== false),
+    [domains],
+  );
   const totalActorCount = useMemo(
     () => scene.layers.reduce(
       (sum, layer) => sum + actorRecords(state, layer).length,
@@ -457,7 +466,7 @@ export default function SpatialWorld({
           </button>
         </header>
 
-        {onRunProcess && domains && domains.length > 0 && (
+        {onRunProcess && runnableDomains.length > 0 && (
           <section
             aria-label="Story scenarios"
             data-testid="spatial-story-bar"
@@ -466,7 +475,7 @@ export default function SpatialWorld({
             <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
               Run scenario
             </span>
-            {domains.map((domain) => (
+            {runnableDomains.map((domain) => (
               <button
                 key={domain.workflow_type}
                 type="button"

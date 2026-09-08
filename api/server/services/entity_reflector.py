@@ -189,7 +189,7 @@ class EntityReflector:
                     )
                     return
 
-            ops = projection(workflow)
+            ops = list(projection(workflow))
         except Exception as exc:
             # Projection itself raised — nothing to dispatch. Make it visible.
             log.exception("entity_reflector: projection raised")

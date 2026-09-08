@@ -1,0 +1,318 @@
+# Preemptive Schedule Resilience — Airline Hero 3 compose-domain brief.
+#
+# Story: A forecast ATC slot restriction will compress the synthetic hub
+# departure window, cascading into missed crew duty periods and tail
+# shortfalls across SYN-SECTOR-OUT-003 and SYN-SECTOR-OUT-004.
+# A live actor-world sensor (sensor:schedule_resilience) trips when
+# AirlineWorld activates the synthetic-schedule-restriction scenario,
+# exposing the risk signal, slot forecast, ground delay forecast, affected
+# sectors, rotations, slots, crew duties, and aircraft registrations.
+# An agent (schedule-resilience-ranker) reads the versioned observation
+# via airline_read_schedule_risk_evidence, then ranks admitted options via
+# airline_rank_admitted_resilience_options — only options passing all
+# slot-integrity, crew-legality, and safety invariants are admitted.
+# monitor_risk is a permanently admitted option and must appear in the
+# ranked list with its own trade-off analysis.
+# The Network Operations Director HITL gate approves within GBP 300,000
+# authority (category: synthetic-schedule-resilience) or escalates.
+# On approval the orchestrator emits a typed airline.commit_schedule_adjustment
+# command; the live ActorWorldService applies slot/crew/aircraft mutations
+# atomically and idempotently.
+# The schedule is NOT finalised by AI: any further slot coordination is an
+# external event ingested as evidence only.
+#
+# AGENT-CHOICE: single HITL gate (network_operations_director) with a hard
+# GBP 300,000 spend cap enforced by the authority matrix.  No second gate.
+# AGENT-CHOICE: six phases; phases 1 + 3 are deterministic; phases 2 + 3 are
+# agent (assess then synthesize); phase 4 is hitl; phases 5–6 deterministic.
+# AGENT-CHOICE: monitor_risk is a real governed decision — authority_check
+# must be called even for the no-action option.
+# Brief schema version: compose-domain v5 (manually authored, Level-0).
+# Authored: 2026-08-11. Status: live — production code already reviewed.
+
+domain:
+  workflow_type: preemptive-schedule-resilience
+  prefix: airline
+  display_name: Preemptive Schedule Resilience
+  owner_role: network_operations_director
+  operator_surface: network-planning
+  objective_type: manage_schedule_risk
+  hitl_gates:
+    - phase: Approve Schedule Adjustment
+      event: network_operations_director_decision
+      persona: network_operations_director
+      spend_limit_gbp: 300000
+      category: synthetic-schedule-resilience
+  personas:
+    - network_operations_director
+  realistic_interval_seconds: 900
+  description: |
+    A forecast ATC slot restriction will cascade across SYN-SECTOR-OUT-003
+    and SYN-SECTOR-OUT-004 (slots SYN-SLOT-07, SYN-SLOT-08; crew duties
+    SYN-CREW-DUTY-04, SYN-CREW-DUTY-05; aircraft SYN-TAIL-003, SYN-TAIL-004).
+    The orchestrator reads versioned synthetic evidence (risk signal,
+    slot-forecast SYN-FCAST-SLOT-001, ground-delay forecast
+    SYN-FCAST-GROUND-001, affected rotations, crew duties) via two
+    deterministic MCP tools, ranks admitted options through the
+    schedule-resilience-ranker agent — including the always-admitted
+    monitor_risk option — and presents the set to the Network Operations
+    Director for approval within GBP 300,000 authority.
+    On approval, a typed airline.commit_schedule_adjustment command triggers
+    atomic slot/crew/aircraft mutations in the live actor world.
+    The schedule is not finalised by AI — further slot coordination is
+    external evidence only.
+
+# Causal truth source.
+sensor:
+  id: sensor:schedule_resilience
+  scenario: synthetic-schedule-restriction
+  story_id: SYN-STORY-SCHED-001
+  world_class: AirlineWorld
+
+# Synthetic entities exposed by the sensor.
+entities:
+  risk_signal: SYN-RISK-SCHED-001
+  slot_forecast: SYN-FCAST-SLOT-001
+  ground_delay_forecast: SYN-FCAST-GROUND-001
+  affected_sectors:
+    - SYN-SECTOR-OUT-003
+    - SYN-SECTOR-OUT-004
+  affected_rotations:
+    - SYN-ROTATION-03
+    - SYN-ROTATION-04
+  affected_slots:
+    - SYN-SLOT-07
+    - SYN-SLOT-08
+  affected_crew_duties:
+    - SYN-CREW-DUTY-04
+    - SYN-CREW-DUTY-05
+  affected_aircraft:
+    - SYN-TAIL-003
+    - SYN-TAIL-004
+  reserve_aircraft: SYN-TAIL-005
+  reserve_crew: SYN-DUTY-006
+
+phases:
+  - name: Detect Schedule Risk Signal
+    intent: |
+      Deterministic. Observe the sensor:schedule_resilience trip, gather
+      the risk signal (SYN-RISK-SCHED-001), slot forecast
+      (SYN-FCAST-SLOT-001), ground delay forecast (SYN-FCAST-GROUND-001),
+      affected sectors (SYN-SECTOR-OUT-003, SYN-SECTOR-OUT-004), rotations
+      (SYN-ROTATION-03, SYN-ROTATION-04), slots (SYN-SLOT-07, SYN-SLOT-08),
+      crew duties (SYN-CREW-DUTY-04, SYN-CREW-DUTY-05), and aircraft
+      (SYN-TAIL-003, SYN-TAIL-004) from the live actor world. Emit a
+      versioned SchedObservation with story_id SYN-STORY-SCHED-001 and
+      evidence_versions keyed by actor ID.
+    kind: deterministic
+    external_systems: []
+
+  - name: Assess Network Ripple Effects
+    intent: |
+      Agent (schedule-resilience-ranker). Call
+      airline_read_schedule_risk_evidence to obtain the versioned
+      observation and impact summary. Identify affected sectors, rotations,
+      crew duties, and aircraft; quantify downstream slot congestion and
+      crew-duty pressure. Surface uncertainty prominently; do not certify
+      slot availability or crew legality. Use source_mode: simulated only.
+      Return actor_ids, event_ids, impact_summary, uncertainty keyed by
+      phase: Assess Network Ripple Effects.
+    kind: agent
+    external_systems: []
+
+  - name: Synthesize Resilience Options
+    intent: |
+      Agent (schedule-resilience-ranker). Call
+      airline_rank_admitted_resilience_options with the admitted options
+      set from phase 1 constraint admission. Return a ranked list of
+      admitted option IDs including monitor_risk with per-option trade-offs,
+      uncertainty, and an explicit no-action comparison. Rank every admitted
+      option exactly once; do not omit monitor_risk. Preserve actor, event,
+      and evidence identity exactly as returned by tools. Do not mutate
+      state; source_mode: simulated.
+    kind: agent
+    external_systems: []
+
+  - name: Approve Schedule Adjustment
+    intent: |
+      HITL (network_operations_director). Wait for the external event
+      network_operations_director_decision. Approve only a deterministically
+      admitted option — including monitor_risk — for the correct story and
+      workflow with complete versioned evidence current and value ≤ GBP 300,000
+      per the authority matrix (category: synthetic-schedule-resilience).
+      Reject unresolved feasibility/legality/slot/crew concerns, stale
+      evidence, mismatched story/workflow/persona, or any value above
+      GBP 300,000. Decision must include: decision, persona, decision_id,
+      workflow_id, story_id, selected_option_id, evidence_versions, rationale.
+    kind: hitl
+    external_systems: []
+
+  - name: Commit Schedule Adjustment
+    intent: |
+      Deterministic. Emit typed command airline.commit_schedule_adjustment
+      carrying workflow_id, story_id, selected_option_id, approved_option,
+      evidence_versions, and persona. The ActorWorldService applies
+      slot/crew/aircraft mutations atomically and idempotently via the
+      orchestrator. Idempotency key: workflow_id. No further schedule
+      coordination by AI.
+    kind: deterministic
+    external_systems: []
+
+  - name: Verify Network Stability
+    intent: |
+      Deterministic. Verify the airline.schedule_adjustment.applied success
+      event appears in the world journal with the correct workflow_id and
+      story_id. Check that mutated slot, crew, and aircraft records carry the
+      correct workflow_id provenance. Any verification failure emits
+      command.rejected.  No AI makes further schedule changes; any
+      follow-on slot coordination is external evidence ingestion only.
+    kind: deterministic
+    external_systems: []
+
+# HITL gate — Network Operations Director.
+decisions:
+  - phase: Approve Schedule Adjustment
+    persona: network_operations_director
+    authority_action: network_operations_director_decision
+    category: synthetic-schedule-resilience
+    spend_limit_gbp: 300000
+    matrix_rule: synthetic-up-to-GBP-300000
+    source_event: network_operations_director_decision
+    required_fields:
+      - decision
+      - persona
+      - decision_id
+      - workflow_id
+      - story_id
+      - selected_option_id
+      - evidence_versions
+      - rationale
+
+# Typed command.
+command:
+  type: airline.commit_schedule_adjustment
+  payload_fields:
+    - workflow_id
+    - story_id
+    - selected_option_id
+    - approved_option
+    - evidence_versions
+    - persona
+  idempotency_key: workflow_id
+  handler: AirlineScheduleResilienceOrchestrator
+
+# World mutations contract.
+world_mutation:
+  applied_event: airline.schedule_adjustment.applied
+  mutations:
+    - SlotReassignment (workflow_id, sector_id, old_slot_id, new_slot_id)
+    - CrewReschedule (workflow_id, crew_duty_id, action, freed_duty_minutes)
+    - AircraftSubstitution (workflow_id, replaced_tail_id, reserve_tail_id)
+    - ScheduleResilienceEvaluation (option_id, invariant_results, schedule_finalised_by_ai=False)
+  no_finalisation_invariant: |
+    schedule_finalised_by_ai MUST be False in ScheduleResilienceEvaluation.
+    No airline.schedule.finalised event may be emitted by AI.
+    Further slot coordination is external evidence ingestion only and is
+    entirely outside AI authority.
+
+# Projection (entity graph, schema-additive).
+projection:
+  module: verticals.airline.entity_projections.schedule
+  workflow_node: Workflow (kind=preemptive-schedule-resilience)
+  asset_nodes:
+    - ScheduleRiskSignal (kind=ScheduleRiskSignal, from observation.risk_signal_id)
+    - SlotForecast (kind=SlotForecast, from observation slot_forecasts SYN-FCAST-SLOT-001)
+    - GroundDelayForecast (kind=GroundDelayForecast, from observation SYN-FCAST-GROUND-001)
+    - Sector (kind=Sector, from observation affected_sectors)
+    - CrewDuty (kind=CrewDuty, from observation affected_crew_duty_ids)
+    - Aircraft (kind=Aircraft, from observation affected_aircraft_ids)
+    - SlotReassignment (kind=SlotReassignment, from world scenario)
+    - CrewReschedule (kind=CrewReschedule, from world scenario)
+    - AircraftSubstitution (kind=AircraftSubstitution, from world scenario)
+    - ScheduleResilienceEvaluation (kind=ScheduleResilienceEvaluation, from world scenario)
+  decision_node: DecisionWrite (phase=Approve Schedule Adjustment)
+  relations:
+    - Workflow INVOLVES ScheduleRiskSignal
+    - Workflow INVOLVES SlotForecast
+    - Workflow INVOLVES GroundDelayForecast
+    - Workflow INVOLVES Sector
+    - Sector REQUIRES CrewDuty
+    - Sector ASSIGNED_TO Aircraft
+    - Workflow INVOLVES SlotReassignment
+    - Workflow INVOLVES CrewReschedule
+    - Workflow INVOLVES AircraftSubstitution
+    - Workflow EVALUATED_BY ScheduleResilienceEvaluation
+
+# Evaluation criteria.
+evaluation:
+  deterministic: true
+  measures:
+    - synthetic_adjustment_cost_gbp
+    - sectors_protected
+    - projected_delay_minutes
+    - crew_duty_slack_minutes
+    - slot_congestion_score
+  invariants:
+    - schedule_finalised_by_ai == False
+    - all invariant_results passed
+    - SlotReassignment.workflow_id == workflow_id
+    - CrewReschedule.workflow_id == workflow_id
+    - monitor_risk is always admitted
+  terminal_success: airline.schedule_adjustment.applied recorded in world journal
+  terminal_failure: command.rejected or invariant violation
+
+# Tools and skills.
+tools:
+  mcp:
+    - name: airline_read_schedule_risk_evidence
+      module: verticals.airline.mcp_tools.schedule
+      description: Read supplied versioned synthetic schedule risk observation.
+      read_only: true
+      source_mode: simulated
+    - name: airline_rank_admitted_resilience_options
+      module: verticals.airline.mcp_tools.schedule
+      description: Return deterministically admitted resilience options with ranking context.
+      read_only: true
+      source_mode: simulated
+
+skills:
+  - id: schedule-resilience-ranker
+    root: verticals/airline/skills/schedule-resilience-ranker
+    description: Ranks deterministically admitted synthetic schedule resilience options.
+    allowed_tools:
+      - airline_read_schedule_risk_evidence
+      - airline_rank_admitted_resilience_options
+    reversible_only: true
+    max_value_gbp: 300000
+    scope_function: network-planning
+
+# Function ownership.
+function: network-planning
+
+# Orchestrator.
+orchestrator:
+  name: AirlineScheduleResilienceOrchestrator
+  module: verticals.airline.schedule_durable
+  workflow_id_prefix: AIRSCHED
+  activities:
+    - sched_evidence_activity_trigger
+    - sched_assess_agent_activity_trigger
+    - sched_admission_activity_trigger
+    - sched_synthesize_agent_activity_trigger
+    - sched_governance_activity_trigger
+    - sched_command_activity_trigger
+
+# Proof expectations (live/replay — portfolio proof work, not claimed here).
+proof:
+  live_proof_command: |
+    ZAVA_VERTICAL=airline python -m uvicorn api.server.app:create_app --factory &
+    # activate synthetic-schedule-restriction scenario
+    # observe: GET /api/world/airline/journal  (expect airline.schedule_adjustment.applied)
+  replay_proof_command: |
+    ZAVA_VERTICAL=airline python -m pytest tests/api/airline/ -q
+  vertical_proof_doc: docs/VERTICAL-PROOF.md
+  note: |
+    Full browser/live Functions proof and VERTICAL-PROOF.md recording remain
+    portfolio-proof work outside the scope of this graduation. This brief
+    backfills compose-domain provenance for the reviewed live production code.
+    Run the replay command above for deterministic offline verification.

@@ -1,8 +1,13 @@
 from __future__ import annotations
+import copy
 import datetime as dt
+import json
 import logging
 import math
+import os
 import time
+from functools import lru_cache
+from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from api.server.state import app_state
 from api.server.services import economics, exception_narrative
@@ -14,6 +19,37 @@ log = logging.getLogger(__name__)
 
 _TERMINAL_PHASE_STATUSES = {"completed", "failed"}
 _MIN_PLAUSIBLE_UNIX_SECONDS = 946684800.0  # 2000-01-01T00:00:00Z
+
+
+@lru_cache(maxsize=8)
+def _load_replay_workflow_details(path_value: str) -> dict[str, dict]:
+    path = Path(path_value).expanduser()
+    if not path.is_file():
+        raise RuntimeError(f"replay workflow snapshot does not exist: {path}")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"invalid replay workflow snapshot: {path}") from exc
+    records = payload.get("workflows") if isinstance(payload, dict) else None
+    if not isinstance(records, list) or not records:
+        raise RuntimeError("replay workflow snapshot must contain workflows")
+    details: dict[str, dict] = {}
+    for detail in records:
+        workflow = detail.get("workflow") if isinstance(detail, dict) else None
+        workflow_id = workflow.get("id") if isinstance(workflow, dict) else None
+        if not isinstance(workflow_id, str) or not workflow_id:
+            raise RuntimeError("replay workflow snapshot contains an invalid workflow")
+        if workflow_id in details:
+            raise RuntimeError(
+                f"replay workflow snapshot contains duplicate id {workflow_id!r}"
+            )
+        details[workflow_id] = detail
+    return details
+
+
+def _configured_replay_workflow_details() -> dict[str, dict]:
+    path_value = os.getenv("ZAVA_REPLAY_WORKFLOW_DETAILS", "").strip()
+    return _load_replay_workflow_details(path_value) if path_value else {}
 
 
 def _timestamp(value, fallback: float) -> float:
@@ -995,12 +1031,38 @@ def _synthesize_workflow(workflow_id: str) -> Workflow | None:
 @router.get("/", include_in_schema=False)
 async def list_workflows(status: str | None = None, phase: str | None = None,
                          agency: str | None = None, has_exception: bool | None = None):
+    replay_details = _configured_replay_workflow_details()
+    if replay_details:
+        workflows = []
+        for detail in replay_details.values():
+            workflow = detail["workflow"]
+            current_phase = (
+                workflow.get("currentPhase")
+                or workflow.get("current_phase")
+            )
+            active_exception = detail.get("activeException")
+            if status is not None and workflow.get("status") != status:
+                continue
+            if phase is not None and current_phase != phase:
+                continue
+            if agency is not None and workflow.get("agency") != agency:
+                continue
+            if (
+                has_exception is not None
+                and (active_exception is not None) is not has_exception
+            ):
+                continue
+            workflows.append(copy.deepcopy(workflow))
+        return workflows
     items = app_state.store.list_workflows(status=status, phase=phase, agency=agency, has_exception=has_exception)
     return [w.model_dump(by_alias=True) for w in items]  # camelCase for UI
 
 
 @router.get("/{id}")
 async def get_workflow(id: str):
+    replay_detail = _configured_replay_workflow_details().get(id)
+    if replay_detail is not None:
+        return copy.deepcopy(replay_detail)
     w = app_state.store.get_workflow(id)
     if not w:
         w = _synthesize_workflow(id)
@@ -1030,7 +1092,8 @@ async def get_workflow(id: str):
     # success-shaped `packDetail: null` response a legitimate absence would
     # produce.
     pack_detail = None
-    hook = getattr(getattr(app_state.runtime, "pack", None), "workflow_detail_hook", None)
+    runtime = getattr(app_state, "runtime", None)
+    hook = getattr(getattr(runtime, "pack", None), "workflow_detail_hook", None)
     if hook is not None:
         pack_detail = hook(w, app_state)
     return {

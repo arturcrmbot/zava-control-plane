@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import copy
 import json
 import re
@@ -227,6 +228,22 @@ async def test_ranking_prompt_tool_input_matches_pack_tool_contract() -> None:
     assert result.result_type == "success"
 
 
+def test_impact_prompt_requires_non_empty_summary() -> None:
+    context = AirlineContext()
+    evidence = durable.airline_evidence_activity(context.get_input())
+    prompt = durable._agent_prompt(
+        {
+            **context.get_input(),
+            "phase": durable._IMPACT_PHASE,
+            "evidence": evidence,
+        },
+        durable._IMPACT_PHASE,
+        "network-impact-assessor",
+    )
+
+    assert "impact_summary MUST be a non-empty string" in prompt
+
+
 def _command_activity_calls(context: AirlineContext) -> list[dict[str, Any]]:
     return [payload for name, payload in context.calls if name == "airline_command_activity_trigger"]
 
@@ -236,6 +253,36 @@ def _terminal_checkpoints(context: AirlineContext) -> list[dict[str, Any]]:
         {"kind": payload["kind"], **payload["payload"]}
         for name, payload in context.calls
         if name == "checkpoint_activity_trigger" and payload["kind"] == "workflow.completed"
+    ]
+
+
+def _step_checkpoints(context: AirlineContext) -> list[tuple[str, str]]:
+    """Return (kind, step) pairs for all step.started / step.completed checkpoints in emission order."""
+    return [
+        (payload["kind"], payload["payload"]["step"])
+        for name, payload in context.calls
+        if name == "checkpoint_activity_trigger"
+        and payload["kind"] in {"step.started", "step.completed"}
+    ]
+
+
+def test_detect_hub_disruption_checkpoint_timeline_matches_declared_phases(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """step.started + step.completed for every deterministic/agent phase executed,
+    in declared domain order. Detect Hub Disruption must appear before Assess Network Impact."""
+    context = AirlineContext(timeout=True)
+    monkeypatch.setattr(durable, "run_agent_session", _valid_agent(context))
+
+    drive_airline_orchestrator(context)
+
+    assert _step_checkpoints(context) == [
+        ("step.started", "Detect Hub Disruption"),
+        ("step.completed", "Detect Hub Disruption"),
+        ("step.started", "Assess Network Impact"),
+        ("step.completed", "Assess Network Impact"),
+        ("step.started", "Synthesize Recovery Options"),
+        ("step.completed", "Synthesize Recovery Options"),
     ]
 
 
@@ -287,6 +334,7 @@ def test_golden_orchestrator_uses_real_agent_identity_and_exact_hitl_event(
     assert all(item["workflow_id"] == "AIRHUB-0001" for item in captured)
     assert all(item["instance_id"] == context.instance_id for item in captured)
     assert result["status"] == "decision_ready"
+    assert result["workflow_id"] == "AIRHUB-0001"
     assert result["command"]["type"] == "airline.commit_recovery_plan"
     assert _terminal_checkpoints(context) == []
 
@@ -1097,6 +1145,310 @@ def test_command_activity_uses_world_gateway_without_terminal_claim(
     assert _terminal_checkpoints(context) == []
     assert result["status"] not in {"completed", "success", "succeeded"}
 
+
+# ── Bounded retry: _raw_tool_calls absent or empty ────────────────────────────
+
+
+def _impact_payload(context: AirlineContext) -> dict[str, Any]:
+    evidence = durable.airline_evidence_activity(context.get_input())
+    return {
+        "workflow_id": "AIRHUB-0001",
+        "instance_id": context.instance_id,
+        "phase": durable._IMPACT_PHASE,
+        "evidence": evidence,
+    }
+
+
+def _ranking_payload(context: AirlineContext) -> dict[str, Any]:
+    evidence = durable.airline_evidence_activity(context.get_input())
+    impact = {
+        "phase": durable._IMPACT_PHASE,
+        "actor_ids": evidence["actor_ids"],
+        "event_ids": evidence["event_ids"],
+        "impact_summary": "Synthetic hub disruption impact.",
+    }
+    admission = durable.airline_admission_activity({"evidence": evidence, "impact": impact})
+    return {
+        "workflow_id": "AIRHUB-0001",
+        "instance_id": context.instance_id,
+        "phase": durable._RANKING_PHASE,
+        "evidence": evidence,
+        "impact": impact,
+        "admitted_options": admission["admitted_options"],
+    }
+
+
+def _valid_impact_result(context: AirlineContext) -> dict[str, Any]:
+    return {
+        "phase": durable._IMPACT_PHASE,
+        "actor_ids": context.observation["actor_ids"],
+        "event_ids": context.observation["event_ids"],
+        "impact_summary": "Rotation, crew, stand and connection impact.",
+        "_raw_tool_calls": [_tool_call(operations.airline_read_disruption_evidence.name)],
+    }
+
+
+def _valid_ranking_result() -> dict[str, Any]:
+    return {
+        "phase": durable._RANKING_PHASE,
+        "ranked_option_ids": ["SYN-OPTION-TAIL-CREW-STAND", "SYN-OPTION-CANCEL"],
+        "reasoning": "Ranks only admitted options.",
+        "_raw_tool_calls": [_tool_call(operations.airline_rank_feasible_recovery_options.name)],
+    }
+
+
+def test_retry_on_missing_tool_calls_succeeds_impact_phase(monkeypatch: pytest.MonkeyPatch) -> None:
+    context = AirlineContext()
+    payload = _impact_payload(context)
+    calls: list[str] = []
+
+    async def agent(prompt: str, **kwargs: Any) -> dict[str, Any]:
+        calls.append(prompt)
+        if len(calls) == 1:
+            return {
+                "phase": durable._IMPACT_PHASE,
+                "actor_ids": context.observation["actor_ids"],
+                "event_ids": context.observation["event_ids"],
+                "impact_summary": "Impact without tool evidence.",
+            }
+        return _valid_impact_result(context)
+
+    monkeypatch.setattr(durable, "run_agent_session", agent)
+
+    result = durable.airline_agent_activity(payload)
+
+    assert len(calls) == 2
+    assert result["phase"] == durable._IMPACT_PHASE
+    assert f"required_tool={operations.airline_read_disruption_evidence.name}" in calls[1]
+    assert "no tool evidence" in calls[1].lower()
+
+
+def test_retry_on_missing_tool_calls_succeeds_ranking_phase(monkeypatch: pytest.MonkeyPatch) -> None:
+    context = AirlineContext()
+    payload = _ranking_payload(context)
+    calls: list[str] = []
+
+    async def agent(prompt: str, **kwargs: Any) -> dict[str, Any]:
+        calls.append(prompt)
+        if len(calls) == 1:
+            return {
+                "phase": durable._RANKING_PHASE,
+                "ranked_option_ids": ["SYN-OPTION-TAIL-CREW-STAND", "SYN-OPTION-CANCEL"],
+                "reasoning": "Without tool evidence.",
+            }
+        return _valid_ranking_result()
+
+    monkeypatch.setattr(durable, "run_agent_session", agent)
+
+    result = durable.airline_agent_activity(payload)
+
+    assert len(calls) == 2
+    assert result["phase"] == durable._RANKING_PHASE
+    assert f"required_tool={operations.airline_rank_feasible_recovery_options.name}" in calls[1]
+    assert "no tool evidence" in calls[1].lower()
+
+
+def test_retry_on_empty_tool_calls_list_triggers_retry(monkeypatch: pytest.MonkeyPatch) -> None:
+    context = AirlineContext()
+    payload = _impact_payload(context)
+    calls: list[str] = []
+
+    async def agent(prompt: str, **kwargs: Any) -> dict[str, Any]:
+        calls.append(prompt)
+        if len(calls) == 1:
+            return {
+                "phase": durable._IMPACT_PHASE,
+                "actor_ids": context.observation["actor_ids"],
+                "event_ids": context.observation["event_ids"],
+                "impact_summary": "Impact.",
+                "_raw_tool_calls": [],
+            }
+        return _valid_impact_result(context)
+
+    monkeypatch.setattr(durable, "run_agent_session", agent)
+
+    result = durable.airline_agent_activity(payload)
+
+    assert len(calls) == 2
+    assert result["phase"] == durable._IMPACT_PHASE
+
+
+def test_wrong_tool_does_not_retry_and_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    context = AirlineContext()
+    payload = _impact_payload(context)
+    calls: list[str] = []
+
+    async def agent(prompt: str, **kwargs: Any) -> dict[str, Any]:
+        calls.append(prompt)
+        return {
+            "phase": durable._IMPACT_PHASE,
+            "actor_ids": context.observation["actor_ids"],
+            "event_ids": context.observation["event_ids"],
+            "impact_summary": "Impact.",
+            "_raw_tool_calls": [_tool_call(operations.airline_rank_feasible_recovery_options.name)],
+        }
+
+    monkeypatch.setattr(durable, "run_agent_session", agent)
+
+    with pytest.raises(ValueError, match="undeclared or unsuccessful"):
+        durable.airline_agent_activity(payload)
+
+    assert len(calls) == 1
+
+
+def test_failed_tool_does_not_retry_and_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    context = AirlineContext()
+    payload = _impact_payload(context)
+    calls: list[str] = []
+
+    async def agent(prompt: str, **kwargs: Any) -> dict[str, Any]:
+        calls.append(prompt)
+        return {
+            "phase": durable._IMPACT_PHASE,
+            "actor_ids": context.observation["actor_ids"],
+            "event_ids": context.observation["event_ids"],
+            "impact_summary": "Impact.",
+            "_raw_tool_calls": [
+                _tool_call(operations.airline_read_disruption_evidence.name, success=False)
+            ],
+        }
+
+    monkeypatch.setattr(durable, "run_agent_session", agent)
+
+    with pytest.raises(ValueError, match="undeclared or unsuccessful"):
+        durable.airline_agent_activity(payload)
+
+    assert len(calls) == 1
+
+
+def test_multiple_tool_calls_does_not_retry_and_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    context = AirlineContext()
+    payload = _impact_payload(context)
+    calls: list[str] = []
+
+    async def agent(prompt: str, **kwargs: Any) -> dict[str, Any]:
+        calls.append(prompt)
+        return {
+            "phase": durable._IMPACT_PHASE,
+            "actor_ids": context.observation["actor_ids"],
+            "event_ids": context.observation["event_ids"],
+            "impact_summary": "Impact.",
+            "_raw_tool_calls": [
+                _tool_call(operations.airline_read_disruption_evidence.name),
+                {
+                    **_tool_call(operations.airline_read_disruption_evidence.name),
+                    "tool_call_id": "call-dup",
+                },
+            ],
+        }
+
+    monkeypatch.setattr(durable, "run_agent_session", agent)
+
+    with pytest.raises(ValueError, match="exactly one"):
+        durable.airline_agent_activity(payload)
+
+    assert len(calls) == 1
+
+
+def test_two_missing_attempts_fails_after_exactly_two_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    context = AirlineContext()
+    payload = _impact_payload(context)
+    calls: list[str] = []
+
+    async def agent(prompt: str, **kwargs: Any) -> dict[str, Any]:
+        calls.append(prompt)
+        return {
+            "phase": durable._IMPACT_PHASE,
+            "actor_ids": context.observation["actor_ids"],
+            "event_ids": context.observation["event_ids"],
+            "impact_summary": "Impact.",
+        }
+
+    monkeypatch.setattr(durable, "run_agent_session", agent)
+
+    with pytest.raises(ValueError, match="requires a successful declared business tool call"):
+        durable.airline_agent_activity(payload)
+
+    assert len(calls) == 2
+
+
+def test_agent_timeout_retries_once_then_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = AirlineContext()
+    payload = _impact_payload(context)
+    calls: list[str] = []
+
+    async def agent(prompt: str, **kwargs: Any) -> dict[str, Any]:
+        calls.append(prompt)
+        if len(calls) == 1:
+            raise asyncio.TimeoutError
+        return _valid_impact_result(context)
+
+    monkeypatch.setattr(durable, "run_agent_session", agent)
+
+    result = durable.airline_agent_activity(payload)
+
+    assert result["phase"] == durable._IMPACT_PHASE
+    assert len(calls) == 2
+    assert "timed out before producing tool evidence" in calls[1]
+    assert f"required_tool={operations.airline_read_disruption_evidence.name}" in calls[1]
+
+
+def test_agent_timeout_fails_after_exactly_two_attempts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = AirlineContext()
+    payload = _impact_payload(context)
+    calls: list[str] = []
+
+    async def agent(prompt: str, **kwargs: Any) -> dict[str, Any]:
+        calls.append(prompt)
+        raise asyncio.TimeoutError
+
+    monkeypatch.setattr(durable, "run_agent_session", agent)
+
+    with pytest.raises(
+        asyncio.TimeoutError,
+        match="Assess Network Impact timed out after 2 attempts",
+    ):
+        durable.airline_agent_activity(payload)
+
+    assert len(calls) == 2
+
+
+def test_retry_preserves_session_kwargs_and_uses_exact_phase_tool_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = AirlineContext()
+    payload = _impact_payload(context)
+    captured: list[dict[str, Any]] = []
+
+    async def agent(prompt: str, **kwargs: Any) -> dict[str, Any]:
+        captured.append({"prompt": prompt, **kwargs})
+        if len(captured) == 1:
+            return {
+                "phase": durable._IMPACT_PHASE,
+                "actor_ids": context.observation["actor_ids"],
+                "event_ids": context.observation["event_ids"],
+                "impact_summary": "Impact.",
+            }
+        return _valid_impact_result(context)
+
+    monkeypatch.setattr(durable, "run_agent_session", agent)
+
+    durable.airline_agent_activity(payload)
+
+    assert len(captured) == 2
+    first, second = captured
+    assert second["workflow_id"] == first["workflow_id"]
+    assert second["instance_id"] == first["instance_id"]
+    assert second["phase"] == first["phase"]
+    assert second["skill_dir"] == first["skill_dir"]
+    assert second["skill_label"] == first["skill_label"]
+    assert second["tools"] == first["tools"]
+    assert f"required_tool={operations.airline_read_disruption_evidence.name}" in second["prompt"]
+    assert "no tool evidence" in second["prompt"].lower()
 
 def test_exports_exactly_one_named_orchestrator() -> None:
     assert durable.ORCHESTRATOR == "AirlineIntegratedHubRecoveryOrchestrator"

@@ -12,6 +12,7 @@ a temporal store.
 """
 from __future__ import annotations
 
+import os
 import time as _time
 from typing import Any
 
@@ -167,7 +168,10 @@ def replay_meta() -> dict[str, Any]:
     replay tape. In replay mode, also expose tape_id / recorded_at /
     duration_s / current_t for the badge + restart banner.
     """
-    if not is_replay():
+    if (
+        not is_replay()
+        and os.getenv("ZAVA_BLUEPRINT_REPLAY_ONLY") != "1"
+    ):
         return {"mode": "live"}
     player = current_player()
     if player is None:

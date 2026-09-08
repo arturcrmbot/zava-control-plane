@@ -417,18 +417,26 @@ async def run_world_scenario(name: str) -> dict:
     return {"ok": True, **result}
 
 
-def _runnable_reference_processes(service: object) -> frozenset[str]:
+def runnable_reference_processes(service: object) -> frozenset[str]:
     """Reference-process types the *active* world can run.
 
     A world scenario may declare its own ``reference_process_types``. Scenarios
     that don't declare them keep the historical telco standard-profile set, so
     this route's contract for those worlds is unchanged.
+
+    Public because ``/api/runtime`` publishes the same set as a per-domain
+    ``runnable`` flag: the /world "Run scenario" row must not offer a button
+    the world would reject with "unknown reference process".
     """
     scenario = getattr(service, "scenario", None)
     declared = getattr(scenario, "reference_process_types", None)
     if declared:
         return frozenset(declared)
     return frozenset(STANDARD_PROCESS_PROFILES)
+
+
+# Back-compat alias for existing call sites/tests.
+_runnable_reference_processes = runnable_reference_processes
 
 
 @router.post("/processes/{workflow_type}/run")

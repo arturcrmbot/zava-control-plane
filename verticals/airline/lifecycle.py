@@ -61,4 +61,9 @@ def shutdown_airline_worker_world() -> None:
     _worker_world = None
 
 
+def reset_airline_worker_world() -> AirlineWorld:
+    shutdown_airline_worker_world()
+    return ensure_airline_worker_world()
+
+
 atexit.register(shutdown_airline_worker_world)

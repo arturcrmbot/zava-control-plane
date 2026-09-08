@@ -36,6 +36,7 @@ from verticals.airline.worlds.scenario import (
 
 app = create_app()
 _SKILL_ROOT = Path(__file__).resolve().parent / "skills"
+_DETECT_PHASE = "Detect Hub Disruption"
 _IMPACT_PHASE = "Assess Network Impact"
 _RANKING_PHASE = "Synthesize Recovery Options"
 _HITL_PHASE = "Approve Recovery Plan"
@@ -100,6 +101,13 @@ def _evidence_versions(value: Any, *, name: str) -> dict[str, int]:
 
 
 def airline_evidence_activity(payload: dict[str, Any]) -> dict[str, Any]:
+    if (
+        payload.get("diagnostic") is True
+        and os.getenv("FUNCTIONS_WORKER_RUNTIME") == "python"
+    ):
+        from verticals.airline.lifecycle import reset_airline_worker_world
+
+        reset_airline_worker_world()
     workflow_id = _required_string(payload.get("workflow_id"), name="workflow_id")
     if payload.get("type") != WORKFLOW_TYPE:
         raise ValueError("Airline evidence has the wrong workflow type")
@@ -156,7 +164,12 @@ def _agent_prompt(payload: dict[str, Any], phase: str, skill_label: str) -> str:
             }
         }
         output_keys = sorted(_IMPACT_KEYS)
-        constraints = "Preserve the supplied actor_ids and event_ids exactly. Do not recommend an action."
+        constraints = (
+            "Preserve the supplied actor_ids and event_ids exactly. "
+            "impact_summary MUST be a non-empty string that explains the "
+            "observed rotation, crew, slot, stand, and passenger impact. "
+            "Do not recommend an action."
+        )
     else:
         admitted_options = payload.get("admitted_options")
         if not isinstance(admitted_options, list) or not admitted_options:
@@ -281,22 +294,68 @@ def _validate_ranking_output(
     return output
 
 
+_AGENT_MAX_ATTEMPTS = 2
+_AGENT_ATTEMPT_TIMEOUT_SECONDS = 90.0
+
+
+def _no_tool_evidence(result: Any) -> bool:
+    if not isinstance(result, dict):
+        return False
+    return "_raw_tool_calls" not in result or result.get("_raw_tool_calls") == []
+
+
+def _corrective_prompt(
+    original_prompt: str,
+    required_tool: str,
+    *,
+    reason: str = "The prior attempt produced no tool evidence.",
+) -> str:
+    return (
+        f"{original_prompt}\n"
+        f"CORRECTION: {reason} "
+        f"You MUST call required_tool={required_tool} before responding."
+    )
+
+
 async def _run_airline_agent(payload: dict[str, Any]) -> dict[str, Any]:
     phase = _required_string(payload.get("phase"), name="phase")
     contract = _PHASE_CONTRACTS.get(phase)
     if contract is None:
         raise ValueError(f"unsupported Airline agent phase: {phase!r}")
     skill_label, tool = contract
-    prompt = _agent_prompt(payload, phase, skill_label)
-    result = await run_agent_session(
-        prompt,
+    session_kwargs: dict[str, Any] = dict(
         tools=[tool],
+        required_tool_names=[tool.name],
         skill_dir=_SKILL_ROOT / skill_label,
         skill_label=skill_label,
         workflow_id=payload.get("workflow_id"),
         instance_id=payload.get("instance_id"),
         phase=phase,
     )
+    original_prompt = _agent_prompt(payload, phase, skill_label)
+    prompt = original_prompt
+    result: Any = None
+    for attempt in range(_AGENT_MAX_ATTEMPTS):
+        try:
+            result = await asyncio.wait_for(
+                run_agent_session(prompt, **session_kwargs),
+                timeout=_AGENT_ATTEMPT_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            if attempt + 1 == _AGENT_MAX_ATTEMPTS:
+                raise asyncio.TimeoutError(
+                    f"{phase} timed out after {_AGENT_MAX_ATTEMPTS} attempts",
+                ) from None
+            prompt = _corrective_prompt(
+                original_prompt,
+                tool.name,
+                reason="The prior attempt timed out before producing tool evidence.",
+            )
+            continue
+        if _no_tool_evidence(result) and attempt + 1 < _AGENT_MAX_ATTEMPTS:
+            prompt = _corrective_prompt(original_prompt, tool.name)
+            continue
+        break
     if phase == _IMPACT_PHASE:
         return _validate_impact_output(payload, result)
     return _validate_ranking_output(payload, result)
@@ -531,10 +590,12 @@ def airline_orchestration(
         )
 
     yield checkpoint("workflow.started", {})
+    yield checkpoint("step.started", {"step": _DETECT_PHASE})
     evidence = yield context.call_activity(
         "airline_evidence_activity_trigger",
         {**input_dict, "instance_id": instance_id},
     )
+    yield checkpoint("step.completed", {"step": _DETECT_PHASE})
 
     yield checkpoint("step.started", {"step": _IMPACT_PHASE})
     impact = yield context.call_activity(
@@ -596,6 +657,11 @@ def airline_orchestration(
         "persona": HITL_PERSONA,
         "external_event": HITL_EVENT,
         "phase": _HITL_PHASE,
+        "action": COMMAND_TYPE,
+        "request": {
+            "amount_gbp": selected_option["value_gbp"],
+            "category": "synthetic-operational-recovery",
+        },
         "observation": evidence["observation"],
         "evidence": evidence,
         "impact": impact,
@@ -667,6 +733,7 @@ def airline_orchestration(
     )
     return {
         **decision,
+        "workflow_id": workflow_id,
         "approval": approval,
         "workflow_evidence": evidence,
         "reasoning": {
@@ -709,3 +776,14 @@ def AirlineIntegratedHubRecoveryOrchestrator(
     context: df.DurableOrchestrationContext,
 ):
     return airline_orchestration(context)
+
+
+# Register AOG Engineering Recovery triggers on the same DFApp – no duplicate app.
+from verticals.airline import aog_durable  # noqa: E402
+
+aog_durable.register(app)
+
+# Register Schedule Resilience triggers on the same DFApp – no duplicate app.
+from verticals.airline import schedule_durable  # noqa: E402
+
+schedule_durable.register(app)

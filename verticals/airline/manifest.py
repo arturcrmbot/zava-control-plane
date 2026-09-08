@@ -22,6 +22,8 @@ from verticals.airline.process_profiles import (
     AIRLINE_PROCESS_PROFILES,
     WORKFLOW_TYPE,
 )
+from verticals.airline.aog_constants import AOG_WORKFLOW_TYPE
+from verticals.airline.schedule_constants import SCHED_WORKFLOW_TYPE
 from verticals.airline.projections import AIRLINE_PROJECTIONS
 from verticals.airline.worlds.registration import AIRLINE_WORLDS
 
@@ -59,20 +61,31 @@ def build_pack() -> VerticalPack:
                     "airline_admission_activity_trigger",
                     "airline_governance_activity_trigger",
                     "airline_command_activity_trigger",
+                    "aog_evidence_activity_trigger",
+                    "aog_airworthiness_activity_trigger",
+                    "aog_agent_activity_trigger",
+                    "aog_governance_activity_trigger",
+                    "aog_command_activity_trigger",
+                    "sched_evidence_activity_trigger",
+                    "sched_assess_agent_activity_trigger",
+                    "sched_admission_activity_trigger",
+                    "sched_synthesize_agent_activity_trigger",
+                    "sched_governance_activity_trigger",
+                    "sched_command_activity_trigger",
                 }
             ),
         ),
         personae_roots=(PACK_ROOT / "personae",),
         skill_roots=(PACK_ROOT / "skills",),
-        mcp_modules=("verticals.airline.mcp_tools.operations",),
+        mcp_modules=("verticals.airline.mcp_tools.operations", "verticals.airline.mcp_tools.aog", "verticals.airline.mcp_tools.schedule"),
         external_capabilities=frozenset(),
         worlds=dict(AIRLINE_WORLDS),
         default_world="airline",
         seed=SeedRegistration(bootstrap=bootstrap),
         projections=dict(AIRLINE_PROJECTIONS),
-        memory_workflow_types=(WORKFLOW_TYPE,),
+        memory_workflow_types=(WORKFLOW_TYPE, AOG_WORKFLOW_TYPE, SCHED_WORKFLOW_TYPE),
         lifecycle=LifecycleRegistration(start=start),
-        recordings=RecordingSources(curated_dirs=()),
+        recordings=RecordingSources(curated_dirs=(PACK_ROOT / "recordings",)),
         ui=load_ui_manifest(PACK_ROOT / "ui.json"),
         ramp_workflow_types=(),
         workflow_detail_hook=workflow_detail,

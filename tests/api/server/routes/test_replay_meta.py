@@ -20,6 +20,7 @@ def client():
 def test_meta_returns_live_when_not_in_replay_mode(monkeypatch, client):
     """In live mode, /api/replay/meta returns {mode: "live"}."""
     monkeypatch.delenv("ZAVA_MODE", raising=False)
+    monkeypatch.delenv("ZAVA_BLUEPRINT_REPLAY_ONLY", raising=False)
     r = client.get("/api/replay/meta")
     assert r.status_code == 200
     assert r.json() == {"mode": "live"}
@@ -64,5 +65,16 @@ def test_meta_returns_replay_without_player_fields_when_player_missing(monkeypat
     # Make sure no active player
     player_module.set_active_player(None)
     r = client.get("/api/replay/meta")
+    assert r.status_code == 200
+    assert r.json() == {"mode": "replay"}
+
+
+def test_meta_returns_replay_for_blueprint_recording_mode(monkeypatch, client):
+    monkeypatch.delenv("ZAVA_MODE", raising=False)
+    monkeypatch.setenv("ZAVA_BLUEPRINT_REPLAY_ONLY", "1")
+    player_module.set_active_player(None)
+
+    r = client.get("/api/replay/meta")
+
     assert r.status_code == 200
     assert r.json() == {"mode": "replay"}

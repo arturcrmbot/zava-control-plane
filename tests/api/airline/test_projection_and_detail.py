@@ -333,8 +333,12 @@ def test_tool_policy_allows_only_the_two_matching_airline_tools() -> None:
     assert set(tools) == {
         "airline_read_disruption_evidence",
         "airline_rank_feasible_recovery_options",
+        "airline_read_aog_evidence",
+        "airline_rank_admitted_aog_options",
+        "airline_read_schedule_risk_evidence",
+        "airline_rank_admitted_resilience_options",
     }
-    assert {tool.scope_function for tool in tools.values()} == {"operations-control"}
+    assert {tool.scope_function for tool in tools.values()} <= {"operations-control", "engineering-maintenance", "network-planning"}
     assert all(tool.reversible for tool in tools.values())
     assert all(not tool.requires_authority for tool in tools.values())
 

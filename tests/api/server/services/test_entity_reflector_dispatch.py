@@ -96,6 +96,37 @@ def test_reflector_dispatches_entity_write_to_upsert(
         del PROJECTIONS["test-domain"]
 
 
+def test_reflector_dispatches_generator_projection_once(
+    bus: EventBus,
+    store: StateStore,
+    graph: EntityGraph,
+    reflector: EntityReflector,
+) -> None:
+    def fake_projection(_wf: Workflow):
+        yield EntityWrite(
+            kind="Person",
+            id="PERSON-GENERATOR",
+            attrs={"name": "Generator projection"},
+            source_workflows=("WF-GENERATOR",),
+        )
+
+    PROJECTIONS["test-generator-domain"] = fake_projection
+    try:
+        store.upsert_workflow(
+            _make_workflow("WF-GENERATOR", "test-generator-domain")
+        )
+        bus.emit(
+            FleetEvent(
+                type="workflow.completed",
+                workflow_id="WF-GENERATOR",
+            )
+        )
+
+        assert graph.get("PERSON-GENERATOR") is not None
+    finally:
+        del PROJECTIONS["test-generator-domain"]
+
+
 def test_reflector_dispatches_rel_write_to_link(
     bus: EventBus,
     store: StateStore,

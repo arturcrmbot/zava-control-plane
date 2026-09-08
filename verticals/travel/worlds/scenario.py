@@ -533,6 +533,13 @@ class TravelWorld:
         self._processed_commands[command.command_id] = result
         return result
 
+    # Every reference case is a real, in-process sensor -> objective -> command
+    # -> evaluation pass (see run_reference_process below), so all of them are
+    # legitimately runnable from the /world "Run scenario" row. Without this the
+    # route falls back to the *telco* standard-profile set and rejects every
+    # Travel workflow type with "unknown reference process".
+    reference_process_types = tuple(sorted(processes.REFERENCE_CASES))
+
     def run_reference_process(self, workflow_type: str) -> dict[str, Any]:
         """Run one real sensor -> objective -> command -> evaluation pass.
 

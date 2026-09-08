@@ -4,12 +4,18 @@ from pathlib import Path
 
 from api.server.services.blueprint_recorder import (
     BlueprintRecorder,
+    RECORDED_TYPES,
     load_recorded_templates,
     runtime_recordings_dir,
 )
 from api.shared.events import FleetEvent
 from api.shared.vertical_loader import build_runtime
 from api.shared.vertical_pack import RecordingSources
+
+
+def test_recorded_types_preserve_hitl_decision_and_resume() -> None:
+    assert "persona.decided" in RECORDED_TYPES
+    assert "durable.resumed" in RECORDED_TYPES
 
 
 def test_workflow_failed_closes_recording_without_completion(

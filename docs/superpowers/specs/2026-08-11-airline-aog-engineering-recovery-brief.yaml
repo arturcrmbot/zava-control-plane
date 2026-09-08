@@ -1,0 +1,316 @@
+# AOG Engineering and Spares Recovery — Airline Hero 2 compose-domain brief.
+#
+# Story: A maintenance defect grounds an aircraft (AOG status) at the hub.
+# A live actor-world sensor (sensor:aog_engineering) trips when the
+# AirlineWorld activates the synthetic-aog-defect scenario, exposing the
+# affected tail, its technical-status record, the maintenance task, and the
+# set of approved MRO providers with their spare inventories.
+# An aog-recovery-ranker agent reads the versioned observation (read-only,
+# two deterministic MCP tools) and ranks admitted options — only options
+# passing all airworthiness invariants are admitted.
+# The Engineering Duty Manager HITL gate approves within GBP 200,000
+# authority or escalates.  On approval the orchestrator emits a typed
+# airline.commit_aog_recovery command; the live ActorWorldService applies
+# work-order + spare-movement mutations atomically and idempotently.
+# The aircraft is NOT released to service by AI: return-to-service is an
+# external event ingested as evidence only.
+#
+# AGENT-CHOICE: single HITL gate (engineering_duty_manager) with a hard
+# GBP 200,000 spend cap enforced by the authority matrix.  No second gate.
+# AGENT-CHOICE: six phases; phases 1–2 + 5–6 are deterministic; phase 3 is
+# agent; phase 4 is hitl.
+# AGENT-CHOICE: no-release invariant is structural — aircraft_released_by_ai
+# must be False in AogRecoveryEvaluation; violating options are rejected.
+# Brief schema version: compose-domain v4 (manually authored, Level-0).
+# Authored: 2026-08-11. Status: live — production code already reviewed.
+
+domain:
+  workflow_type: aog-engineering-recovery
+  prefix: airline
+  display_name: AOG Engineering and Spares Recovery
+  owner_role: engineering_duty_manager
+  operator_surface: engineering-maintenance
+  hitl_gates:
+    - phase: Approve Engineering Recovery
+      event: engineering_duty_manager_decision
+      persona: engineering_duty_manager
+      spend_limit_gbp: 200000
+  personas:
+    - engineering_duty_manager
+  realistic_interval_seconds: 1200
+  description: |
+    A maintenance defect grounds tail SYN-TAIL-003 (AOG status). The
+    orchestrator reads versioned synthetic evidence (technical-status,
+    maintenance task, approved providers, spare inventories) via two
+    deterministic MCP tools, ranks admitted options through the
+    aog-recovery-ranker agent, and presents the ranked set to the
+    Engineering Duty Manager for approval within GBP 200,000 authority.
+    On approval, a typed airline.commit_aog_recovery command triggers
+    atomic spare-movement + work-order mutations in the live actor world.
+    The aircraft is not released by AI — return-to-service is external.
+
+phases:
+  - name: Detect AOG Event
+    intent: |
+      Deterministic. Observe the sensor:aog_engineering trip, gather the
+      affected tail ID (SYN-TAIL-003), technical-status record
+      (SYN-TECH-003), maintenance task (SYN-TASK-001), approved providers
+      (SYN-PROV-001), and spare inventory (SYN-SPARE-LOCAL-001,
+      SYN-SPARE-REPO-001) from the live actor world. Emit a versioned
+      AogObservation with story_id SYN-STORY-AOG-001 and evidence_versions
+      keyed by actor ID.
+    kind: deterministic
+    external_systems: []
+
+  - name: Check Airworthiness Constraints
+    intent: |
+      Deterministic. Admit only the recovery options that satisfy all
+      airworthiness invariants: (a) spare is traceable, (b) provider is
+      approved, (c) lead time does not exceed 480 minutes, (d)
+      aircraft_released_by_ai must be False. Reject any option that fails.
+      Return the admitted set with per-option feasibility flags and
+      evidence_versions. This is pure constraint evaluation — no reasoning
+      model is used.
+    kind: deterministic
+    external_systems: []
+
+  - name: Synthesize Engineering Recovery Options
+    intent: |
+      Agent (aog-recovery-ranker). Call airline_read_aog_evidence first
+      (supplies the versioned observation), then airline_rank_admitted_aog_options
+      (ranks the admitted set). Both tools must be called in order. Return
+      a ranked list of admitted option IDs with trade-offs, uncertainty, and
+      an explicit no-action comparison for each. Surface uncertainty
+      prominently; do not certify engineering work or airworthiness. Do not
+      mutate state or claim live data (source_mode: simulated).
+    kind: agent
+    external_systems: []
+
+  - name: Approve Engineering Recovery
+    intent: |
+      HITL (engineering_duty_manager). Wait for the external event
+      engineering_duty_manager_decision. Approve only a deterministically
+      admitted option for the correct story and workflow with complete
+      versioned evidence current and value ≤ GBP 200,000 per the authority
+      matrix. Reject unresolved feasibility/safety, stale evidence,
+      mismatched story/workflow/persona, or any value above GBP 200,000.
+      Decision must include: decision, persona, workflow_id, story_id,
+      selected_option_id, evidence_versions, rationale.
+    kind: hitl
+    external_systems: []
+
+  - name: Commit Engineering and Operational Actions
+    intent: |
+      Deterministic. Emit a typed airline.commit_aog_recovery command whose
+      payload includes workflow_id, story_id, selected_option_id,
+      approved_option, evidence_versions, and persona=engineering_duty_manager.
+      The live ActorWorldService validates and applies atomically+idempotently:
+      creates EngineeringWorkOrder, moves the spare (SpareMovement), and
+      emits airline.aog_recovery.applied. The command is rejected if it
+      duplicates a previously accepted command (idempotency key = workflow_id).
+      Aircraft status remains AOG — no release event is emitted by AI.
+    kind: deterministic
+    external_systems: []
+
+  - name: Verify Recovery State
+    intent: |
+      Deterministic. Assert airline.aog_recovery.applied was recorded in the
+      world journal, EngineeringWorkOrder and SpareMovement actors exist with
+      the correct workflow_id, AogRecoveryEvaluation records aircraft_released_by_ai=False,
+      and the evaluation invariant_results all pass. Confirm that no
+      airline.aircraft.released event was emitted by AI. The evaluation
+      measures synthetic_recovery_cost_gbp, sectors_protected, and
+      projected_aog_duration_minutes. Failure on any assertion terminates
+      the workflow with command.rejected.
+    kind: deterministic
+    external_systems: []
+
+# Synthetic entities and evidence references.
+entities:
+  - kind: Workflow
+    source: aog_engineering_recovery
+    ref_field: workflow.id
+  - kind: Asset
+    source: affected_tail
+    ref_field: payload.observation.affected_tail_id
+    synthetic_id: SYN-TAIL-003
+    attributes:
+      status: aog
+  - kind: Asset
+    source: technical_status
+    ref_field: payload.observation.technical_status.id
+    synthetic_id: SYN-TECH-003
+  - kind: Asset
+    source: maintenance_task
+    ref_field: payload.observation.maintenance_task.id
+    synthetic_id: SYN-TASK-001
+  - kind: Asset
+    source: approved_provider
+    ref_field: payload.observation.approved_providers[].id
+    synthetic_id: SYN-PROV-001
+  - kind: Asset
+    source: spare_local
+    synthetic_id: SYN-SPARE-LOCAL-001
+    attributes:
+      traceable: true
+      station_id: LHR
+  - kind: Asset
+    source: spare_repo
+    synthetic_id: SYN-SPARE-REPO-001
+    attributes:
+      traceable: true
+      station_id: AMS
+
+# Sensor and objective identity.
+sensor:
+  id: sensor:aog_engineering
+  event_type: airline.aog.detected
+  scenario_id: synthetic-aog-defect
+  story_id: SYN-STORY-AOG-001
+
+objective:
+  type: recover_aog_engineering
+  command_type: airline.commit_aog_recovery
+  success_event: airline.aog_recovery.applied
+  failure_event: command.rejected
+
+# HITL gate — Engineering Duty Manager.
+decisions:
+  - phase: Approve Engineering Recovery
+    persona: engineering_duty_manager
+    authority_action: engineering_duty_manager_decision
+    category: synthetic-engineering-recovery
+    spend_limit_gbp: 200000
+    matrix_rule: synthetic-up-to-GBP-200000
+    source_event: engineering_duty_manager_decision
+    required_fields:
+      - decision
+      - persona
+      - workflow_id
+      - story_id
+      - selected_option_id
+      - evidence_versions
+      - rationale
+
+# Typed command.
+command:
+  type: airline.commit_aog_recovery
+  payload_fields:
+    - workflow_id
+    - story_id
+    - selected_option_id
+    - approved_option
+    - evidence_versions
+    - persona
+  idempotency_key: workflow_id
+  handler: AirlineAogEngineeringRecoveryOrchestrator
+
+# World mutation contract.
+world_mutation:
+  applied_event: airline.aog_recovery.applied
+  creates:
+    - EngineeringWorkOrder (workflow_id, provider_id, maintenance_task_id, spare_id)
+    - SpareMovement (spare_id, from_station_id, to_station_id, workflow_id)
+    - AogRecoveryEvaluation (option_id, invariant_results, aircraft_released_by_ai=False)
+  no_release_invariant: |
+    aircraft_released_by_ai MUST be False in AogRecoveryEvaluation.
+    No airline.aircraft.released event may be emitted by AI.
+    Return-to-service is external evidence ingestion only and is entirely
+    outside AI authority.
+
+# Projection (entity graph, schema-additive).
+projection:
+  module: verticals.airline.entity_projections.aog
+  workflow_node: Workflow (kind=aog-engineering-recovery)
+  asset_nodes:
+    - Aircraft (kind=Aircraft, status=aog, from observation.affected_tail_id)
+    - TechnicalStatus (kind=TechnicalStatus, from observation.technical_status)
+    - MaintenanceTask (kind=MaintenanceTask, from observation.maintenance_task)
+    - ApprovedProvider (kind=ApprovedProvider, from observation.approved_providers)
+    - EngineeringWorkOrder (kind=EngineeringWorkOrder, from world scenario)
+    - Spare (kind=Spare, from world scenario work-order spare_id)
+    - SpareMovement (kind=SpareMovement, from world scenario)
+    - AogRecoveryEvaluation (kind=AogRecoveryEvaluation, from world scenario)
+  decision_node: DecisionWrite (phase=Approve Engineering Recovery)
+  relations:
+    - Workflow INVOLVES Aircraft
+    - Aircraft HAS_STATUS TechnicalStatus
+    - Aircraft REQUIRES MaintenanceTask
+    - Workflow INVOLVES EngineeringWorkOrder
+    - Spare FULFILS EngineeringWorkOrder
+    - Spare HAS_SPARE_FOR MaintenanceTask
+    - Workflow INVOLVES SpareMovement
+    - SpareMovement MOVES_SPARE Spare
+    - Workflow EVALUATED_BY AogRecoveryEvaluation
+    - AogRecoveryEvaluation EVALUATES_COMMAND command_id
+
+# Evaluation criteria.
+evaluation:
+  deterministic: true
+  measures:
+    - synthetic_recovery_cost_gbp
+    - sectors_protected
+    - projected_aog_duration_minutes
+    - spare_lead_time_minutes
+    - approved_provider_coverage
+  invariants:
+    - aircraft_released_by_ai == False
+    - all invariant_results passed
+    - EngineeringWorkOrder.workflow_id == workflow_id
+    - SpareMovement.workflow_id == workflow_id
+  terminal_success: airline.aog_recovery.applied recorded in world journal
+  terminal_failure: command.rejected or invariant violation
+
+# Tools and skills.
+tools:
+  mcp:
+    - name: airline_read_aog_evidence
+      module: verticals.airline.mcp_tools.aog
+      description: Read supplied versioned synthetic AOG engineering observation.
+      read_only: true
+      source_mode: simulated
+    - name: airline_rank_admitted_aog_options
+      module: verticals.airline.mcp_tools.aog
+      description: Return deterministically admitted AOG recovery options with ranking context.
+      read_only: true
+      source_mode: simulated
+
+skills:
+  - id: aog-recovery-ranker
+    root: verticals/airline/skills/aog-recovery-ranker
+    description: Ranks deterministically admitted synthetic AOG engineering recovery options.
+    allowed_tools:
+      - airline_read_aog_evidence
+      - airline_rank_admitted_aog_options
+    reversible_only: true
+    max_value_gbp: 200000
+    scope_function: engineering-maintenance
+
+# Function ownership.
+function: engineering-maintenance
+
+# Orchestrator.
+orchestrator:
+  name: AirlineAogEngineeringRecoveryOrchestrator
+  module: verticals.airline.aog_durable
+  workflow_id_prefix: AOGA
+  activities:
+    - aog_evidence_activity_trigger
+    - aog_airworthiness_activity_trigger
+    - aog_agent_activity_trigger
+    - aog_governance_activity_trigger
+    - aog_command_activity_trigger
+
+# Proof expectations (live/replay — portfolio proof work, not claimed here).
+proof:
+  live_proof_command: |
+    ZAVA_VERTICAL=airline python -m uvicorn api.server.app:create_app --factory &
+    # activate synthetic-aog-defect scenario, wait for airline.aog_recovery.applied
+  replay_proof_command: |
+    ZAVA_VERTICAL=airline python -m pytest tests/api/airline/ -q
+  vertical_proof_doc: docs/VERTICAL-PROOF.md
+  note: |
+    Full browser/live Functions proof and VERTICAL-PROOF.md recording remain
+    portfolio-proof work. This brief backfills compose-domain provenance for
+    the reviewed live production code. Run the replay command above for
+    deterministic offline verification.

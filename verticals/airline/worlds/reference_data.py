@@ -2,12 +2,18 @@ from __future__ import annotations
 
 from verticals.airline.worlds.model import (
     Aircraft,
+    ApprovedProvider,
     CrewDuty,
+    ForecastConstraint,
+    MaintenanceTask,
     PassengerCohort,
     Rotation,
     Sector,
+    ScheduleRiskSignal,
     Slot,
+    Spare,
     Stand,
+    TechnicalStatus,
 )
 
 HUB_ID = "SYN-HUB-01"
@@ -257,5 +263,141 @@ def build_connection_cohorts() -> list[PassengerCohort]:
             65,
             True,
             "protected",
+        ),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# AOG Engineering Recovery – Hero 2 reference data
+# ---------------------------------------------------------------------------
+
+AOG_DEFECT_CODE = "DEF-HYD-ACTUATOR"
+AOG_CAPABILITY = "hydraulic-actuator-replacement"
+AOG_PART_NUMBER = "SYN-PART-HYD-001"
+
+
+def build_technical_statuses() -> list[TechnicalStatus]:
+    return [
+        TechnicalStatus(
+            id="SYN-TECH-003",
+            aircraft_id="SYN-TAIL-003",
+            defect_code=AOG_DEFECT_CODE,
+            description="Hydraulic actuator fault – aircraft grounded pending engineering assessment",
+            status="serviceable",  # will be set to 'grounded' on scenario activation
+        ),
+    ]
+
+
+def build_maintenance_tasks() -> list[MaintenanceTask]:
+    return [
+        MaintenanceTask(
+            id="SYN-TASK-001",
+            technical_status_id="SYN-TECH-003",
+            aircraft_id="SYN-TAIL-003",
+            task_type="component-replacement",
+            required_capability=AOG_CAPABILITY,
+            spare_part_number=AOG_PART_NUMBER,
+            provider_id=None,
+            status="open",
+        ),
+    ]
+
+
+def build_approved_providers() -> list[ApprovedProvider]:
+    return [
+        # Approved MRO at SYN-OUT-03 with correct capability
+        ApprovedProvider(
+            id="SYN-PROV-001",
+            name="Synthetic MRO Services OUT-03",
+            station_id="SYN-OUT-03",
+            capabilities=(AOG_CAPABILITY, "general-inspection"),
+            approved=True,
+        ),
+        # Deliberately unapproved provider – infeasible option
+        ApprovedProvider(
+            id="SYN-PROV-UNAP-001",
+            name="Synthetic Non-Approved Engineering Ltd",
+            station_id="SYN-OUT-03",
+            capabilities=(AOG_CAPABILITY,),
+            approved=False,
+        ),
+    ]
+
+
+def build_spares() -> list[Spare]:
+    return [
+        # Local traceable spare at SYN-OUT-03 (immediate lead time)
+        Spare(
+            id="SYN-SPARE-LOCAL-001",
+            part_number=AOG_PART_NUMBER,
+            traceable=True,
+            station_id="SYN-OUT-03",
+            status="available",
+            lead_time_minutes=60,
+        ),
+        # Repositionable traceable spare at hub (longer lead time)
+        Spare(
+            id="SYN-SPARE-REPO-001",
+            part_number=AOG_PART_NUMBER,
+            traceable=True,
+            station_id=HUB_ID,
+            status="available",
+            lead_time_minutes=180,
+        ),
+        # Untraceable spare – deliberately infeasible
+        Spare(
+            id="SYN-SPARE-UNTRACED-001",
+            part_number=AOG_PART_NUMBER,
+            traceable=False,
+            station_id="SYN-OUT-03",
+            status="available",
+            lead_time_minutes=30,
+        ),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Hero 3 – Preemptive Schedule Resilience seed data
+# ---------------------------------------------------------------------------
+
+
+def build_schedule_risk_signal() -> ScheduleRiskSignal:
+    """One forecast risk signal for the synthetic-schedule-restriction scenario."""
+    return ScheduleRiskSignal(
+        id="SYN-RISK-SCHED-001",
+        scenario_id="synthetic-schedule-restriction",
+        story_id="SYN-STORY-SCHED-001",
+        source="eurocontrol_forecast",
+        horizon_minutes=120,
+        window_start_minutes=120,
+        window_end_minutes=240,
+        confidence=0.82,
+        max_cancellations_permitted=1,
+        status="detected",
+    )
+
+
+def build_forecast_constraints() -> list[ForecastConstraint]:
+    """Two deterministic forecast constraints covering the 120-240 min window."""
+    return [
+        ForecastConstraint(
+            id="SYN-FCAST-SLOT-001",
+            constraint_type="reduced_slot_capacity",
+            station_id=HUB_ID,
+            affected_sector_ids=("SYN-SECTOR-OUT-003", "SYN-SECTOR-OUT-004"),
+            window_start_minutes=120,
+            window_end_minutes=240,
+            capacity_reduction_pct=40,
+            status="forecast",
+        ),
+        ForecastConstraint(
+            id="SYN-FCAST-GROUND-001",
+            constraint_type="reduced_ground_capacity",
+            station_id=HUB_ID,
+            affected_sector_ids=("SYN-SECTOR-OUT-003", "SYN-SECTOR-OUT-004"),
+            window_start_minutes=120,
+            window_end_minutes=240,
+            capacity_reduction_pct=25,
+            status="forecast",
         ),
     ]

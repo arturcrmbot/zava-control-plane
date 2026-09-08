@@ -13,3 +13,31 @@ tools:
     value_field: null
     scope_function: operations-control
     description: Rank only deterministically admitted synthetic recovery options.
+  - id: airline_read_aog_evidence
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: engineering-maintenance
+    description: Read supplied versioned synthetic AOG engineering observation.
+  - id: airline_rank_admitted_aog_options
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: engineering-maintenance
+    description: Rank only deterministically admitted synthetic AOG recovery options.
+  - id: airline_read_schedule_risk_evidence
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: network-planning
+    description: Read supplied versioned synthetic schedule-risk observation.
+  - id: airline_rank_admitted_resilience_options
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: network-planning
+    description: Rank only deterministically admitted synthetic schedule resilience options.

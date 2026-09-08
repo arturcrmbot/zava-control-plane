@@ -27,6 +27,14 @@ def test_runtime_payload_defaults_to_agency(tmp_path) -> None:
             "knowledge",
             "memory",
         ],
+        "domains": [
+            {
+                "workflow_type": domain.workflow_type,
+                "display_name": domain.display_name,
+                "runnable": False,
+            }
+            for _, domain in sorted(runtime.pack.domains.items())
+        ],
         "ui": {
             "lenses": ["agency-operations"],
             "theme": {"accent": "#2563eb", "label": "Agency"},

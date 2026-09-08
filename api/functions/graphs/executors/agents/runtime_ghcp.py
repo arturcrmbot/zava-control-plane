@@ -39,6 +39,7 @@ class GHCPRuntime:
         system_message: str | None = None,
         skill_directories: list[Path] | None = None,
         tools: list | None = None,
+        required_tool_names: list[str] | None = None,  # noqa: ARG002
         permission_handler: Callable | None = None,
         attachments: list[dict] | None = None,
         model: str = "gpt-4.1",

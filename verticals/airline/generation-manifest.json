@@ -14,12 +14,27 @@
       "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
     },
     {
+      "path": "verticals/airline/actions/aog_commands.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
       "path": "verticals/airline/actions/commands.py",
       "ownership": "bespoke",
       "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
     },
     {
       "path": "verticals/airline/agents.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/aog_constants.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/aog_constraints.py",
       "ownership": "bespoke",
       "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
     },
@@ -170,6 +185,106 @@
     },
     {
       "path": "verticals/airline/worlds/scenario.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/aog_durable.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/schedule_durable.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/mcp_tools/aog.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/personae/engineering_duty_manager/SKILL.md",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/skills/aog-recovery-ranker/SKILL.md",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/aog_detail.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/entity_projections/aog.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/schedule_constants.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/schedule_constraints.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/actions/schedule_commands.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/mcp_tools/schedule.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/personae/network_operations_director/SKILL.md",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/skills/schedule-resilience-ranker/SKILL.md",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/entity_projections/schedule.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/schedule_detail.py",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/recordings/README.md",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/recordings/integrated-hub-disruption-recovery-20260811T181355-AIRHUB-0001.jsonl",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/recordings/aog-engineering-recovery-20260811T181424-AOGA-0001.jsonl",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/recordings/preemptive-schedule-resilience-20260811T181448-AIRSCHED-0001.jsonl",
+      "ownership": "bespoke",
+      "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
+    },
+    {
+      "path": "verticals/airline/SELLER-REVIEW.md",
       "ownership": "bespoke",
       "source": "b50713ed2b6324ac917402a41fc6e9c08c5c5262"
     }

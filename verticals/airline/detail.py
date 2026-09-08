@@ -4,6 +4,7 @@ import dataclasses
 from typing import Any, Mapping
 
 from api.shared.types import Workflow
+from verticals.airline.aog_constants import AOG_WORKFLOW_TYPE
 from verticals.airline.process_profiles import (
     COMMAND_TYPE,
     HITL_PERSONA,
@@ -248,6 +249,12 @@ def workflow_detail(
     workflow: Workflow,
     app_state: Any,
 ) -> Mapping[str, Any] | None:
+    if workflow.type == AOG_WORKFLOW_TYPE:
+        from verticals.airline.aog_detail import aog_workflow_detail  # noqa: PLC0415
+        return aog_workflow_detail(workflow, app_state)
+    if workflow.type == "preemptive-schedule-resilience":
+        from verticals.airline.schedule_detail import schedule_workflow_detail  # noqa: PLC0415
+        return schedule_workflow_detail(workflow, app_state)
     if workflow.type != WORKFLOW_TYPE:
         return None
     payload = workflow.payload if isinstance(workflow.payload, dict) else {}

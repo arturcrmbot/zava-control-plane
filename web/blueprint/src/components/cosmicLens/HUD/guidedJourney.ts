@@ -48,6 +48,10 @@ const REPLAY_ARC: ArcResult = {
  *
  * - Replay: returns the checked-in explanatory arc; no HTTP call.
  * - Live: POSTs the demo trigger and returns the parsed ArcResult.
+ *
+ * The Aurora arc is agency-only (it needs `BRAND-aurora`). Under any other
+ * vertical the trigger 404s, so fall back to the active actor world's own
+ * hero scenario rather than surfacing a dead-end error to the viewer.
  */
 export async function loadGuidedJourney(isReplay: boolean): Promise<ArcResult> {
   if (isReplay) {
@@ -58,8 +62,89 @@ export async function loadGuidedJourney(isReplay: boolean): Promise<ArcResult> {
     "/api/demo/trigger/full-aurora-arc?delay_seconds=2.0&count=3",
     { method: "POST" },
   );
-  if (!res.ok) {
-    throw new Error(`Could not start the Aurora journey (${res.status})`);
+  if (res.ok) {
+    return res.json() as Promise<ArcResult>;
   }
-  return res.json() as Promise<ArcResult>;
+  if (res.status === 404) {
+    return loadActiveWorldJourney();
+  }
+  throw new Error(`Could not start the Aurora journey (${res.status})`);
+}
+
+interface SceneScenario {
+  name: string;
+  label?: string;
+}
+
+interface WorldScene {
+  title?: string;
+  scenarios?: SceneScenario[];
+}
+
+interface ScenarioRunResult {
+  ok?: boolean;
+  error?: string;
+  workflow_id?: string;
+  story_id?: string;
+}
+
+/**
+ * Vertical-aware guided journey: trigger the active world's first hero
+ * scenario and narrate the real ids it returns.
+ */
+async function loadActiveWorldJourney(): Promise<ArcResult> {
+  const sceneRes = await fetch("/api/world/scene");
+  if (!sceneRes.ok) {
+    throw new Error(
+      `No guided journey is available for this vertical (world scene ${sceneRes.status})`,
+    );
+  }
+  const scene = (await sceneRes.json()) as WorldScene;
+  const scenario = scene.scenarios?.[0];
+  if (!scenario) {
+    throw new Error("No guided journey is available for this vertical");
+  }
+
+  const started = Date.now();
+  const runRes = await fetch(
+    `/api/world/scenarios/${encodeURIComponent(scenario.name)}`,
+    { method: "POST" },
+  );
+  if (!runRes.ok) {
+    throw new Error(
+      `Could not start ${scenario.label || scenario.name} (${runRes.status})`,
+    );
+  }
+  const result = (await runRes.json()) as ScenarioRunResult;
+  if (!result.ok) {
+    throw new Error(result.error || "scenario rejected");
+  }
+
+  const label = scenario.label || scenario.name;
+  return {
+    phases: [
+      {
+        phase: "world_detected",
+        elapsed_ms: Date.now() - started,
+        headline: `${label} detected in ${scene.title || "the live world"}`,
+      },
+      {
+        phase: "world_workflow",
+        elapsed_ms: 0,
+        headline: result.workflow_id
+          ? `${result.workflow_id} opened — durable workflow now running`
+          : "Durable workflow opened",
+      },
+      {
+        phase: "world_decision",
+        elapsed_ms: 0,
+        headline:
+          "Agents assemble the evidence; the accountable human still decides.",
+      },
+    ],
+    total_elapsed_ms: Date.now() - started,
+    narrative: `${label}: detected → durable workflow ${
+      result.workflow_id || ""
+    } → governed human decision`.trim(),
+  };
 }

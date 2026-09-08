@@ -10,6 +10,7 @@ import pytest
 import yaml
 from copilot.tools import ToolInvocation
 
+from verticals.airline.agents import AIRLINE_AGENTS
 from verticals.airline.mcp_tools import operations
 
 
@@ -325,3 +326,34 @@ def test_agent_skills_declare_exact_pack_local_tools_and_truth_boundaries() -> N
         assert frontmatter["allowed-tools"] == expected["tool"]
         lowered_body = " ".join(body.lower().split())
         assert all(term in lowered_body for term in expected["required_terms"])
+
+
+def test_airline_agents_registry_allowed_tools_match_skill_frontmatter() -> None:
+    """Each AIRLINE_AGENTS entry must declare exactly the tool named in its SKILL.md.
+
+    With AGT_ENFORCE=1, governance denies any tool absent from allowed_tools,
+    causing _business_agent_output to raise before HITL.  The registry must be
+    the single source of truth; skill frontmatter is read here to verify alignment.
+    """
+    root = Path(__file__).resolve().parents[3] / "verticals" / "airline" / "skills"
+    expected_tools = {
+        "network-impact-assessor": "airline_read_disruption_evidence",
+        "recovery-option-ranker": "airline_rank_feasible_recovery_options",
+    }
+    for agent_id, tool_name in expected_tools.items():
+        entry = AIRLINE_AGENTS[agent_id]
+        # Exact single-tool tuple — no wildcards, no extras, no empty default
+        assert entry.allowed_tools == (tool_name,), (
+            f"AIRLINE_AGENTS[{agent_id!r}].allowed_tools must be exactly "
+            f"({tool_name!r},) but got {entry.allowed_tools!r}"
+        )
+        # Confirm tool name is in the MCP registry (pack-local resolution)
+        assert tool_name in operations.TOOL_NAMES, (
+            f"{tool_name!r} is not registered in the pack MCP registry"
+        )
+        # Confirm alignment with SKILL.md frontmatter declaration
+        frontmatter, _ = _skill_frontmatter(root / agent_id / "SKILL.md")
+        assert frontmatter["allowed-tools"] == tool_name, (
+            f"SKILL.md for {agent_id!r} declares {frontmatter['allowed-tools']!r}, "
+            f"but registry has {tool_name!r}"
+        )

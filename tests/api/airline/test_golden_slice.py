@@ -33,8 +33,16 @@ def test_completed_golden_pack_is_discovered_and_valid(tmp_path) -> None:
     validate_pack(runtime.pack)
     assert runtime.pack.display_name == "Synthetic Airline Operations"
     assert runtime.world_name == "airline"
-    assert tuple(runtime.pack.domains) == ("integrated-hub-disruption-recovery",)
-    assert runtime.pack.memory_workflow_types == ("integrated-hub-disruption-recovery",)
+    assert set(runtime.pack.domains) == {
+        "integrated-hub-disruption-recovery",
+        "aog-engineering-recovery",
+        "preemptive-schedule-resilience",
+    }
+    assert set(runtime.pack.memory_workflow_types) == {
+        "integrated-hub-disruption-recovery",
+        "aog-engineering-recovery",
+        "preemptive-schedule-resilience",
+    }
 
 
 def test_golden_slice_mutates_real_world_and_preserves_identity(tmp_path) -> None:

@@ -59,6 +59,18 @@ const PHASE_LINES: Record<
     primary: "CEO synthesises across the org.",
     secondary: p.headline || "",
   }),
+  world_detected: (p) => ({
+    primary: "A real event arrived in the live world.",
+    secondary: p.headline || "",
+  }),
+  world_workflow: (p) => ({
+    primary: "A durable workflow opens automatically.",
+    secondary: p.headline || "",
+  }),
+  world_decision: (p) => ({
+    primary: "Governance holds the line.",
+    secondary: p.headline || "",
+  }),
 };
 
 const PER_BUBBLE_MS = 2500;
