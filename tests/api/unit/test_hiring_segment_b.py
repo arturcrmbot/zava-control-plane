@@ -211,6 +211,31 @@ def test_orchestrator_segment_b_yields_segment_activities(monkeypatch):
     assert "validate_segment_b_output_activity_trigger" in activities
 
 
+@pytest.mark.parametrize("decision", ["reject", "rejected", "deny", "denied"])
+def test_budget_rejection_does_not_start_candidate_discovery(monkeypatch, decision):
+    ctx = _SegmentBStubContext()
+    original_wait = ctx.wait_for_external_event
+
+    def wait(name):
+        if name == "budget_approval":
+            return _StubExternalEvent(name, {"decision": decision, "reason": "budget refused"})
+        return original_wait(name)
+
+    monkeypatch.setattr(ctx, "wait_for_external_event", wait)
+    result = _drive_until_done_or_error(ctx)
+
+    assert result["status"] == "rejected"
+    assert result["phase"] == "Budget"
+    assert "hiring_segment_b_activity_trigger" not in [name for name, _ in ctx.calls]
+    checkpoints = [
+        payload["kind"]
+        for name, payload in ctx.calls
+        if name == "checkpoint_activity_trigger"
+    ]
+    assert "workflow.rejected" in checkpoints
+    assert "workflow.completed" not in checkpoints
+
+
 def test_hiring_segments_preserve_workflow_instance_and_phase_provenance():
     ctx = _SegmentBStubContext()
     _drive_until_done_or_error(ctx)

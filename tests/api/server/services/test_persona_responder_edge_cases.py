@@ -15,14 +15,19 @@ from __future__ import annotations
 
 import asyncio
 import random
+from types import SimpleNamespace
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from api.server.services import persona_responder
 from api.server.services.event_bus import EventBus
+from api.server.services.state_store import StateStore
+from api.server.services.workflow_event_ingestor import WorkflowEventIngestor
 from api.shared.domains import HitlGate
 from api.shared.events import FleetEvent
+from api.shared.types import Workflow
 
 
 @pytest.fixture(autouse=True)
@@ -96,6 +101,50 @@ def _record_cascades(monkeypatch):
 
     monkeypatch.setattr(persona_responder, "_cascade_to_delegate", _fake_cascade)
     return calls
+
+
+def test_missing_durable_instance_fails_instead_of_completing(monkeypatch):
+    _stub_gate(monkeypatch)
+    monkeypatch.setattr(persona_responder, "_wait_probability_for", lambda *args: 0.0)
+    monkeypatch.setenv("DEMO_LOUD", "0")
+    monkeypatch.setattr("api.shared.authority.is_ooo", lambda role: False)
+    monkeypatch.setitem(
+        persona_responder.PERSONA_DEFINITIONS,
+        "vendor_kyc_finance_bp",
+        SimpleNamespace(
+            decide=lambda context: {"decision": "approve", "reason": "within authority"},
+            external_event="finance_signoff_decision",
+            personality={},
+        ),
+    )
+    monkeypatch.setattr(
+        persona_responder, "raise_orchestration_event", AsyncMock(return_value=False)
+    )
+    state = _current_app_state()
+    for name, value in {
+        "store": StateStore(), "bus": EventBus(), "audit": MagicMock(),
+        "hub": MagicMock(), "orchestration_history": {},
+    }.items():
+        monkeypatch.setattr(state, name, value)
+    monkeypatch.setattr(state, "workflow_event_ingestor", WorkflowEventIngestor(state))
+    workflow = Workflow(
+        id="VKY-ORPHAN", type="vendor-kyc", current_phase="finance_signoff",
+        status="awaiting_hitl", created_at=1, sla_due_at=100,
+        jurisdiction="GB", agency="Zava-Test", orchestration_instance_id="missing-instance",
+    )
+    state.store.upsert_workflow(workflow)
+    captured = []
+    state.bus.on_any(captured.append)
+
+    asyncio.run(persona_responder._handle_hitl(
+        _build_event(workflow.id, "missing-instance")
+    ))
+
+    assert workflow.status == "failed"
+    assert workflow.metadata["outcome"] == "orphaned"
+    assert "404" in workflow.metadata["failure_reason"]
+    assert any(event.type == "workflow.failed" for event in captured)
+    assert not any(event.type == "durable.workflow.completed" for event in captured)
 
 
 def test_sick_roll_cascades_to_delegate(monkeypatch):

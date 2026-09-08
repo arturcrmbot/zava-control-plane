@@ -30,6 +30,9 @@ EXPECTED_NODE_TABLES = {
     "Account",
     "CostCentre",
     "Insight",
+    "Lesson",
+    "DreamPass",
+    "Experiment",
 }
 
 EXPECTED_REL_TABLES = {
@@ -71,6 +74,22 @@ EXPECTED_REL_TABLES = {
     "BOOKED_AGAINST_CC",
     "COSTED_TO",
     "COSTED_TO_BRAND",
+    "HOLDS_ACCOUNT",
+    "SUBSCRIBED_TO",
+    "HOSTED_ON",
+    "PLACED_ORDER",
+    "DECIDED_ACCOUNT",
+    "ASSET_AT_SITE",
+    "WORK_FOR_ASSET",
+    "ASSIGNED_TO",
+    "REQUIRES_SPARE",
+    "TICKET_FOR_SERVICE",
+    "OFFER_FOR_ACCOUNT",
+    "LESSON_FROM_RUN",
+    "LESSON_ABOUT_PERSONA",
+    "LESSON_SUPERSEDES",
+    "EXPERIMENT_FOR_LESSON",
+    "EXPERIMENT_USED_PERSONA",
     # Task 7: generic workflow-recovery topology (industry-neutral)
     "TRIGGERED_BY",
     "AFFECTS_ASSET",
@@ -111,6 +130,15 @@ def test_constructor_creates_database_file(tmp_path: Path) -> None:
     tables = _list_tables(graph)
     assert tables["NODE"] == EXPECTED_NODE_TABLES
     assert tables["REL"] == EXPECTED_REL_TABLES
+
+
+def test_bounded_database_materialises_the_real_schema(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("ENTITY_GRAPH_BUFFER_POOL_MB", "64")
+    monkeypatch.setenv("ENTITY_GRAPH_MAX_DB_SIZE_MB", "4096")
+    with EntityGraph(tmp_path / "bounded.kuzu") as graph:
+        tables = _list_tables(graph)
+        assert tables["NODE"] == EXPECTED_NODE_TABLES
+        assert tables["REL"] == EXPECTED_REL_TABLES
 
 
 def test_reconstructing_on_same_path_is_idempotent(tmp_path: Path) -> None:

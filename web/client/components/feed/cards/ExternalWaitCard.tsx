@@ -23,22 +23,21 @@ export default function ExternalWaitCard({
 
   const nudge = async () => {
     setBusy("nudge");
-    store.record(item.id, { verb: "Nudged", actor: "you", actedAt: Math.floor(Date.now() / 1000) });
     try {
-      const r = await fetch("/internal/durable-event", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workflow_id: item.workflowId, kind: "log.action",
-          payload: { by: "operator", action: "nudge-external" },
-        }),
-      });
-      if (!r.ok) {
-        store.revert(item.id);
-        toast.show("Couldn't nudge — try again");
-      }
+      await store.schedule(item.id, {
+        verb: "Nudged", actor: "you", actedAt: Math.floor(Date.now() / 1000),
+      }, async () => {
+        const r = await fetch("/internal/durable-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workflow_id: item.workflowId, kind: "log.action",
+            payload: { by: "operator", action: "nudge-external" },
+          }),
+        });
+        if (!r.ok) throw new Error(`Nudge failed (${r.status})`);
+      }, 0);
     } catch {
-      store.revert(item.id);
       toast.show("Couldn't nudge — try again");
     } finally {
       setBusy(null);

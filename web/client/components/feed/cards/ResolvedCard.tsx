@@ -2,10 +2,9 @@
 //
 // Collapsed in-place replacement for a HITL/Exception/ExternalWait card
 // the user has acted on. Per spec §3.5: "✓ <Verb> by you · <relative time>
-// · undo · audit ↗". Undo is live for 30s (managed by useResolutionStore);
-// after TTL the undo button hides.
+// · undo · audit ↗". Server-action Undo exists only before dispatch.
 import { useState } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Hourglass } from "lucide-react";
 import type { ResolvedItem } from "@shared/feedItems";
 import CardShell from "../CardShell";
 import { useResolutionStore } from "@client/hooks/useResolutionStore";
@@ -28,11 +27,15 @@ export default function ResolvedCard({
   const originKey = item.origin?.id ?? item.originId ?? "";
   const r = originKey ? store.get(originKey) : undefined;
   const undoable = !didUndo && (r?.undoable ?? false);
+  const pending = r?.pending === true;
+  const StatusIcon = pending ? Hourglass : CheckCircle2;
+  const iconColor = pending ? "text-amber-600" : "text-emerald-600";
 
   const body = (
     <div className="text-sm text-slate-600 dark:text-slate-300 truncate">
-      <CheckCircle2 size={14} className="inline-block text-emerald-600 mr-1.5 align-text-bottom" />
+      <StatusIcon size={14} className={`inline-block ${iconColor} mr-1.5 align-text-bottom`} />
       <span className="font-medium text-slate-800 dark:text-slate-100">{item.verb} by {item.actor}</span>
+      {pending && <span className="ml-1 text-amber-600">pending</span>}
       <span className="text-slate-400 dark:text-slate-500"> · {relativeTime(item.actedAt)}</span>
     </div>
   );
@@ -40,7 +43,7 @@ export default function ResolvedCard({
   const actions = undoable ? (
     <button
       type="button"
-      onClick={(e) => { e.stopPropagation(); setDidUndo(true); store.revert(originKey); }}
+      onClick={(e) => { e.stopPropagation(); if (store.undo(originKey)) setDidUndo(true); }}
       className="text-xs px-3 py-1 rounded font-medium bg-white dark:bg-slate-900 text-amber-700 ring-1 ring-amber-300 hover:bg-amber-50"
     >Undo</button>
   ) : null;
@@ -48,8 +51,8 @@ export default function ResolvedCard({
   return (
     <CardShell
       severity={null}
-      icon={<CheckCircle2 size={12} className="text-emerald-600" />}
-      typeLabel="Resolved"
+      icon={<StatusIcon size={12} className={iconColor} />}
+      typeLabel={pending ? "Pending action" : "Resolved"}
       workflowId={item.workflowId ?? "—"}
       timestampSec={item.actedAt}
       body={body}

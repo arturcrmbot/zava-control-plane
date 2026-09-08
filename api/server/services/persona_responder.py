@@ -1404,39 +1404,27 @@ async def _handle_hitl(event: FleetEvent) -> None:
         return
 
     if delivered is False:
-        # Orchestration is gone (404) — typically a zombie left from an
-        # Azurite wipe across boots. The persona has decided but no live
-        # orchestration is listening. Mark the workflow completed in the
-        # store directly so it stops sitting in awaiting_hitl forever and
-        # so the demo keeps moving. The decision payload is preserved on
-        # workflow.payload['decisions'] above.
-        try:
-            from api.server.state import app_state
-            wf = app_state.store.get_workflow(workflow_id) if workflow_id else None
-            if wf is not None and wf.status == "awaiting_hitl":
-                wf.status = "completed"
-                wf.active_exception_id = None
-                payload = dict(wf.payload or {})
-                orphans = payload.get("orphan_resolutions") or []
-                orphans.append({
-                    "event_name": event_name,
-                    "verdict": str(decision_payload.get("verdict")) if isinstance(decision_payload, dict) else None,
-                    "persona": persona_role,
-                    "reason": "orchestration_404_zombie",
-                })
-                payload["orphan_resolutions"] = orphans
-                wf.payload = payload
-                app_state.store.upsert_workflow(wf)
-                print(
-                    f"[persona_responder] orchestration {instance_id} not "
-                    f"found (404) — auto-completed zombie workflow "
-                    f"{workflow_id} after {persona_role}'s {decision_payload.get('verdict') if isinstance(decision_payload, dict) else '?'} verdict"
-                )
-        except Exception as ex:
-            print(
-                f"[persona_responder] failed to auto-complete orphan "
-                f"workflow {workflow_id}: {ex}"
+        from api.server.state import app_state
+
+        reason = f"Durable instance {instance_id} not found (404); approval was not delivered"
+        wf = app_state.store.get_workflow(workflow_id) if workflow_id else None
+        if wf is not None and wf.status == "awaiting_hitl":
+            payload = dict(wf.payload or {})
+            orphans = list(payload.get("orphan_resolutions") or [])
+            orphans.append({
+                "event_name": event_name,
+                "verdict": decision_str,
+                "persona": persona_role,
+                "reason": "orchestration_404_zombie",
+            })
+            payload["orphan_resolutions"] = orphans
+            wf.payload = payload
+            app_state.store.upsert_workflow(wf)
+            await app_state.workflow_event_ingestor.ingest(
+                workflow_id, instance_id, "workflow.failed",
+                {"by": "persona_responder", "reason": reason, "outcome": "orphaned"},
             )
+        print(f"[persona_responder] failed {workflow_id}: {reason}")
 
 
 async def _handle_summary_request(event: FleetEvent) -> None:

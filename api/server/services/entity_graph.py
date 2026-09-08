@@ -714,6 +714,19 @@ KNOWN_DECISION_COLUMN_KEYS: tuple[str, ...] = (
 )
 
 
+def _configured_size_bytes(name: str) -> int:
+    raw = os.getenv(name)
+    if raw is None or raw == "":
+        return 0
+    try:
+        megabytes = int(raw)
+    except ValueError:
+        raise ValueError(f"{name} must be a non-negative integer") from None
+    if megabytes < 0:
+        raise ValueError(f"{name} must be a non-negative integer")
+    return megabytes * 1024 * 1024
+
+
 class EntityGraph:
     """Embedded KuzuDB graph for the org's entities + relationships.
 
@@ -739,26 +752,18 @@ class EntityGraph:
 
     def __init__(self, db_path: str | os.PathLike[str]) -> None:
         self._path = str(db_path)
-        raw_buffer_pool_mb = os.getenv("ENTITY_GRAPH_BUFFER_POOL_MB")
-        if raw_buffer_pool_mb is None or raw_buffer_pool_mb == "":
-            buffer_pool_mb = 0
-        else:
-            try:
-                buffer_pool_mb = int(raw_buffer_pool_mb)
-            except ValueError:
-                raise ValueError(
-                    "ENTITY_GRAPH_BUFFER_POOL_MB must be a non-negative integer"
-                ) from None
-            if buffer_pool_mb < 0:
-                raise ValueError(
-                    "ENTITY_GRAPH_BUFFER_POOL_MB must be a non-negative integer"
-                )
         # Local demos should set 256; production can omit this cap or size it explicitly.
-        buffer_pool_size = buffer_pool_mb * 1024 * 1024
+        buffer_pool_size = _configured_size_bytes("ENTITY_GRAPH_BUFFER_POOL_MB")
+        max_db_size = _configured_size_bytes("ENTITY_GRAPH_MAX_DB_SIZE_MB")
         # Kuzu creates a directory at ``db_path`` (the "database file" is
         # actually a small directory tree). Make sure the parent exists.
         Path(self._path).parent.mkdir(parents=True, exist_ok=True)
-        self.db = kuzu.Database(self._path, buffer_pool_size=buffer_pool_size)
+        database_options = {"buffer_pool_size": buffer_pool_size}
+        # The default 8-TiB address reservation can exhaust an emulated process.
+        # Only override it when configured; existing native deployments keep their default.
+        if max_db_size:
+            database_options["max_db_size"] = max_db_size
+        self.db = kuzu.Database(self._path, **database_options)
         self.conn = kuzu.Connection(self.db)
         self._conn_lock = threading.Lock()
         self.bus: Any | None = None

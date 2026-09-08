@@ -100,8 +100,8 @@ def select_vertical(environment: Mapping[str, str]) -> tuple[str, str | None]:
 
 def resolve_data_root(environment: Mapping[str, str]) -> Path:
     raw = (
-        _normalise(environment.get("ZAVA_DATA_DIR"))
-        or _normalise(environment.get("PORTAL_DATA_DIR"))
+        (environment.get("ZAVA_DATA_DIR") or "").strip()
+        or (environment.get("PORTAL_DATA_DIR") or "").strip()
         or "data/runtime"
     )
     return Path(raw).expanduser()

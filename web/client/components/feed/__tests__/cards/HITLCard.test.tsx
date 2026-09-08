@@ -28,6 +28,7 @@ const baseItem: HITLItem = {
 };
 
 beforeEach(() => {
+  localStorage.clear();
   vi.useFakeTimers();
   globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) } as Response);
 });
@@ -50,6 +51,22 @@ function renderWithProviders(item: HITLItem, opts: { hideActions?: boolean } = {
 }
 
 describe("HITLCard", () => {
+  it("does not invent a local approval when there is no backend exception", () => {
+    function Probe() {
+      const store = useResolutionStore();
+      return <span data-testid="probe">{store.get(baseItem.id)?.verb ?? "none"}</span>;
+    }
+    render(
+      <MemoryRouter><ToastProvider><ResolutionProvider>
+        <HITLCard item={baseItem} /><Probe />
+      </ResolutionProvider></ToastProvider></MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    expect(screen.getByTestId("probe").textContent).toBe("none");
+    expect(screen.getByText(/no active exception/i)).toBeTruthy();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it("renders the four inline action buttons by default", () => {
     renderWithProviders(baseItem);
     expect(screen.getByRole("button", { name: /Approve/i })).toBeTruthy();

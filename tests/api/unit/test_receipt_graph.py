@@ -53,10 +53,8 @@ async def test_receipt_graph_blocks_parse_error():
         AsyncMock(return_value={"receipt_validation": bad}),
     ):
         wf = build_receipt_workflow()
-        events = await wf.run({"workflow_id": "CLM-broken", "claim_id": "CLM-broken"})
-    out = events.get_outputs()[0]
-    assert out["ok"] is False
-    assert "parse_error" in out["blocked_reason"]
+        with pytest.raises(ValueError, match="parse_error"):
+            await wf.run({"workflow_id": "CLM-broken", "claim_id": "CLM-broken"})
 
 
 @pytest.mark.asyncio
@@ -71,10 +69,8 @@ async def test_receipt_graph_blocks_verdict_flavour_disagreement():
         AsyncMock(return_value={"receipt_validation": bad}),
     ):
         wf = build_receipt_workflow()
-        events = await wf.run({"workflow_id": "CLM-bad", "claim_id": "CLM-bad"})
-    out = events.get_outputs()[0]
-    assert out["ok"] is False
-    assert "verdict/flavour" in out["blocked_reason"]
+        with pytest.raises(ValueError, match="verdict/flavour"):
+            await wf.run({"workflow_id": "CLM-bad", "claim_id": "CLM-bad"})
 
 
 @pytest.mark.asyncio
@@ -88,7 +84,5 @@ async def test_receipt_graph_blocks_unknown_flavour():
         AsyncMock(return_value={"receipt_validation": bad}),
     ):
         wf = build_receipt_workflow()
-        events = await wf.run({"workflow_id": "CLM-y", "claim_id": "CLM-y"})
-    out = events.get_outputs()[0]
-    assert out["ok"] is False
-    assert "flavour" in out["blocked_reason"]
+        with pytest.raises(ValueError, match="flavour"):
+            await wf.run({"workflow_id": "CLM-y", "claim_id": "CLM-y"})

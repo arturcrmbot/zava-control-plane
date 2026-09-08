@@ -39,10 +39,8 @@ async def test_invalid_recommendation_blocks():
         AsyncMock(return_value={"arbitration": bad}),
     ):
         wf = build_arbitrate_workflow()
-        events = await wf.run({"workflow_id": "CLM-X", "claim_id": "CLM-X"})
-    out = events.get_outputs()[0]
-    assert out["ok"] is False
-    assert "recommendation" in (out["blocked_reason"] or "")
+        with pytest.raises(ValueError, match="recommendation"):
+            await wf.run({"workflow_id": "CLM-X", "claim_id": "CLM-X"})
 
 
 @pytest.mark.asyncio
@@ -53,7 +51,5 @@ async def test_parse_error_blocks():
         AsyncMock(return_value={"arbitration": bad}),
     ):
         wf = build_arbitrate_workflow()
-        events = await wf.run({"workflow_id": "CLM-Y", "claim_id": "CLM-Y"})
-    out = events.get_outputs()[0]
-    assert out["ok"] is False
-    assert "parse_error" in (out["blocked_reason"] or "")
+        with pytest.raises(ValueError, match="parse_error"):
+            await wf.run({"workflow_id": "CLM-Y", "claim_id": "CLM-Y"})

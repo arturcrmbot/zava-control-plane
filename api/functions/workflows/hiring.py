@@ -146,6 +146,23 @@ def hiring_orchestration(context: df.DurableOrchestrationContext) -> Generator[A
     timeout_event.cancel()
 
     budget_decision = approval_event.result
+    budget_verdict = (
+        str(budget_decision.get("decision") or "").strip().lower()
+        if isinstance(budget_decision, dict) else ""
+    )
+    if budget_verdict in DECISION_REJECTED:
+        yield context.call_activity("checkpoint_activity_trigger", {
+            "workflow_id": workflow_id,
+            "instance_id": context.instance_id,
+            "kind": "workflow.rejected",
+            "payload": {
+                "phase": "Budget",
+                "workflow_type": workflow_type,
+                "by": budget_decision.get("resolved_by"),
+                "reason": budget_decision.get("reason") or "budget rejected",
+            },
+        })
+        return {"status": "rejected", "phase": "Budget", "decision": budget_decision}
     enriched["budget_approval"] = budget_decision
 
     yield context.call_activity("checkpoint_activity_trigger", {

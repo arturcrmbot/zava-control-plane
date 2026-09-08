@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import tarfile
 from pathlib import Path
 from typing import Any
@@ -67,6 +68,8 @@ def _tape_meta(path: Path) -> dict[str, Any]:
 
 
 def _validate_proof(path: Path, source_commit: str) -> dict[str, Any]:
+    if re.fullmatch(r"[0-9a-f]{40}", source_commit) is None:
+        raise ValueError("source_commit must be a full 40-character Git commit SHA")
     proof = json.loads(path.read_text(encoding="utf-8"))
     sc = proof.get("source_commit")
     if not isinstance(sc, str) or not sc:
@@ -76,6 +79,16 @@ def _validate_proof(path: Path, source_commit: str) -> dict[str, Any]:
             f"proof source_commit does not match HEAD: "
             f"expected {source_commit!r}, got {sc!r}"
         )
+    for field in ("vertical", "fingerprint"):
+        value = proof.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"proof {field} is missing or empty")
+    if (
+        ("source_dirty" in proof and proof["source_dirty"] is not False)
+        or proof.get("source_mode") == "dirty-development"
+        or proof.get("source_attribution") == "DIRTY_DEVELOPMENT"
+    ):
+        raise ValueError("dirty development proof cannot authorize publication")
     if proof.get("live_result") != "PASS":
         raise ValueError("live_result must be PASS")
     if proof.get("replay_result") != "PASS":
@@ -114,12 +127,25 @@ def build_manifest(
     source_commit: str,
 ) -> dict[str, Any]:
     """Validate all inputs and return the provenance manifest dict."""
-    _validate_proof(proof_path, source_commit)
+    proof = _validate_proof(proof_path, source_commit)
     _validate_seller_review(seller_review_path)
     meta = _tape_meta(tape_path)
+    expected_metadata = {
+        "app_sha": source_commit,
+        "selected_vertical": proof["vertical"],
+        "pack_fingerprint": proof["fingerprint"],
+    }
+    for field, expected in expected_metadata.items():
+        if meta.get(field) != expected:
+            raise ValueError(
+                f"tape {field} does not match current proof: "
+                f"expected {expected!r}, got {meta.get(field)!r}"
+            )
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "source_commit": source_commit,
+        "vertical": proof["vertical"],
+        "fingerprint": proof["fingerprint"],
         "story_contract": STORY_CONTRACT,
         "tape_id": meta["tape_id"],
         "recorded_at": meta["recorded_at"],
@@ -150,6 +176,12 @@ def verify_manifest(
             f"schema_version mismatch: stored {stored.get('schema_version')!r}, "
             f"current {actual['schema_version']!r}"
         )
+    for field in ("vertical", "fingerprint"):
+        if stored.get(field) != actual[field]:
+            raise ValueError(
+                f"{field} mismatch: stored {stored.get(field)!r}, "
+                f"current {actual[field]!r}"
+            )
     if stored.get("tape_id") != actual["tape_id"]:
         raise ValueError(
             f"tape_id mismatch: stored {stored.get('tape_id')!r}, "

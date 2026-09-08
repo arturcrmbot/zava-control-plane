@@ -11,9 +11,10 @@ from typing import Any, Callable
 
 from copilot import CopilotClient
 from copilot.client import SubprocessConfig
+from copilot.generated.session_events import SessionEventType
 from copilot.session import PermissionHandler
 
-from api.functions.graphs.executors.agents.runtime import LLMRuntimeResult
+from api.functions.graphs.executors.agents.runtime import LLMRuntimeResult, validate_required_tool_names
 
 
 _gh_token_cache: str | None = None
@@ -39,20 +40,41 @@ class GHCPRuntime:
         system_message: str | None = None,
         skill_directories: list[Path] | None = None,
         tools: list | None = None,
-        required_tool_names: list[str] | None = None,  # noqa: ARG002
+        required_tool_names: list[str] | None = None,
         permission_handler: Callable | None = None,
         attachments: list[dict] | None = None,
         model: str = "gpt-4.1",
         timeout_s: float = 240.0,
         event_subscriber: Callable[[Any], None] | None = None,
     ) -> LLMRuntimeResult:
+        registered_tools = tools or []
+        required_names = validate_required_tool_names(
+            required_tool_names, (tool.name for tool in registered_tools),
+        )
+        pending_tools: dict[str, str] = {}
+        successful_tools: set[str] = set()
+
+        def on_event(event: Any) -> None:
+            data = event.data
+            call_id = getattr(data, "tool_call_id", None) or getattr(data, "call_id", None)
+            if event.type == SessionEventType.TOOL_EXECUTION_START:
+                name = getattr(data, "tool_name", None)
+                if call_id and name:
+                    pending_tools[str(call_id)] = str(name)
+            elif event.type == SessionEventType.TOOL_EXECUTION_COMPLETE:
+                name = pending_tools.pop(str(call_id), None) or getattr(data, "tool_name", None)
+                if name and getattr(data, "success", None) is True:
+                    successful_tools.add(str(name))
+            if event_subscriber is not None:
+                event_subscriber(event)
+
         config = SubprocessConfig(github_token=_gh_token(), log_level="warning")
         client = CopilotClient(config)
         async with client:
             session_kwargs: dict = {
                 "on_permission_request": permission_handler or PermissionHandler.approve_all,
                 "model": model,
-                "tools": tools or [],
+                "tools": registered_tools,
             }
             if system_message:
                 session_kwargs["system_message"] = {"mode": "append", "content": system_message}
@@ -60,8 +82,8 @@ class GHCPRuntime:
                 session_kwargs["skill_directories"] = [str(p) for p in skill_directories]
             session = await client.create_session(**session_kwargs)
             unsub = None
-            if event_subscriber is not None:
-                unsub = session.on(event_subscriber)
+            if required_names or event_subscriber is not None:
+                unsub = session.on(on_event)
             try:
                 if attachments:
                     response_event = await session.send_and_wait(
@@ -79,6 +101,13 @@ class GHCPRuntime:
                     await session.disconnect()
                 except Exception:
                     pass
+
+        missing_required = [name for name in required_names if name not in successful_tools]
+        if missing_required:
+            raise RuntimeError(
+                "GHCP returned a final response before required tools succeeded: "
+                f"{missing_required}"
+            )
 
         text = ""
         in_tok = out_tok = None

@@ -3,9 +3,9 @@
 `api/functions/graphs/executors/agents/runtime.py` defines a
 provider-neutral Protocol (`LLMRuntime`) that
 `_wrapper.py:run_agent_session` consumes via `_get_runtime()`. The
-intent of the seam is to let us swap in additional providers
-(Anthropic, Azure OpenAI, …) without touching the orchestrators or the
-segments.
+intent of the seam is to select providers without touching the orchestrators or
+segments. `LLM_RUNTIME=ghcp` selects GitHub Copilot; `LLM_RUNTIME=aoai` selects
+Azure OpenAI. `fake` is a canned test double, not evidence of live tool execution.
 
 In practice the Protocol still leaks a few shapes from its first
 implementation (`runtime_ghcp.GHCPRuntime`, the GitHub Copilot Python
@@ -13,8 +13,7 @@ SDK). This file documents those leaks so a future runtime author can
 either match them or extend the Protocol explicitly rather than
 guessing.
 
-We are 100% GHCP today. None of the items below are bugs to fix; they
-are contracts to honour.
+Both real providers must honour the contracts below.
 
 ## 1. `LLMRuntimeResult.raw_event` is provider-specific
 
@@ -88,11 +87,23 @@ AGT-off path keeps working. If your SDK has a different default
 `permission_handler is None`, install an "approve all" shim before
 opening the session.
 
-The signature is `Callable | None` rather than a Protocol because the
-GHCP `PermissionHandler` is a class with two methods (`pre_tool_use`,
-`post_tool_use`). A future neutralisation pass would type this as a
-small Protocol; for now, runtime authors should accept the GHCP class
-shape and only construct shims when they cannot pass it through.
+The handler is called with the SDK's `(request, invocation)` arguments and
+returns a permission result. A provider that cannot pass those objects through
+must adapt them at its boundary.
+
+## 4. Required tools must actually succeed
+
+`required_tool_names` names tools explicitly registered on the session. Both
+real providers reject unknown names before starting a session or model call.
+A final answer is accepted only after every required tool has a successful
+execution; mentioning a tool in the answer is not sufficient. Denied, rejected,
+failed, timed-out, or unknown results do not satisfy this requirement.
+
+AOAI forces outstanding required tools through its tool loop. GHCP tracks SDK
+tool-start/completion events while preserving the caller's event subscriber.
+Missing registration raises `ValueError`; missing successful execution raises
+`RuntimeError`. Neither guarantee proves that a business outcome was achieved
+or that a write is safe to retry.
 
 ## Adding a new provider
 
@@ -100,7 +111,7 @@ shape and only construct shims when they cannot pass it through.
    implementing the `LLMRuntime` Protocol.
 2. Add a branch in `runtime.py:_get_runtime()` matching
    `LLM_RUNTIME=<name>`.
-3. Honour the three contracts above (or document the deviation in
+3. Honour the four contracts above (or document the deviation in
    this file).
 4. Add a smoke test in `tests/api/functions/agents/` that drives the
    new runtime through `_wrapper.py:run_agent_session` with

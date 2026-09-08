@@ -60,14 +60,12 @@ async def test_intake_graph_blocks_on_missing_fields():
         AsyncMock(return_value={"extracted": bad}),
     ):
         wf = build_intake_expense_workflow()
-        events = await wf.run({
-            "workflow_id": "CLM-bad",
-            "claim": {"claim_id": "CLM-bad", "ems_source": "workday"},
-        })
-    out = events.get_outputs()[0]
-    assert out.get("ok") is False
-    missing = set(out.get("missing") or [])
-    assert {"category", "market", "vendor"} <= missing
+        with pytest.raises(ValueError, match="validate_required_fields") as blocked:
+            await wf.run({
+                "workflow_id": "CLM-bad",
+                "claim": {"claim_id": "CLM-bad", "ems_source": "workday"},
+            })
+    assert all(field in str(blocked.value) for field in ("category", "market", "vendor"))
 
 
 @pytest.mark.asyncio

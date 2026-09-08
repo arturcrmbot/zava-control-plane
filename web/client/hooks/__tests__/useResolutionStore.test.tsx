@@ -9,10 +9,95 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   <ResolutionProvider undoTtlMs={30_000}>{children}</ResolutionProvider>
 );
 
-beforeEach(() => vi.useFakeTimers());
+beforeEach(() => { localStorage.clear(); vi.useFakeTimers(); });
 afterEach(() => vi.useRealTimers());
 
+function persistedHistory() {
+  const key = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+    .find((value) => value?.startsWith("fleetctl.resolutions."));
+  return JSON.parse(key ? localStorage.getItem(key) ?? "{}" : "{}");
+}
+
 describe("useResolutionStore", () => {
+  it("retained toast callbacks can undo a newly recorded local action", () => {
+    const { result } = renderHook(() => useResolutionStore(), { wrapper });
+    const undo = result.current.undo;
+    act(() => result.current.record("local:one", { verb: "Snoozed", actor: "you", actedAt: 100 }));
+    act(() => { expect(undo("local:one")).toBe(true); });
+    expect(result.current.get("local:one")).toBeUndefined();
+  });
+
+  it("Undo cancels the pending operation, not just its display record", async () => {
+    const operation = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useResolutionStore(), { wrapper });
+    let pending: Promise<boolean> | undefined;
+    act(() => {
+      pending = result.current.schedule(
+        "exception:E-1", { verb: "Approved", actor: "you", actedAt: 100 }, operation,
+      );
+    });
+    expect(result.current.get("exception:E-1")?.pending).toBe(true);
+    expect(persistedHistory()).not.toHaveProperty("exception:E-1");
+    act(() => { expect(result.current.undo("exception:E-1")).toBe(true); });
+    await expect(pending).resolves.toBe(false);
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_001); });
+    expect(operation).not.toHaveBeenCalled();
+    expect(result.current.get("exception:E-1")).toBeUndefined();
+  });
+
+  it("disables Undo at dispatch and persists only an acknowledged action", async () => {
+    let finish: (() => void) | undefined;
+    const operation = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
+    const { result } = renderHook(() => useResolutionStore(), { wrapper });
+    let pending: Promise<boolean> | undefined;
+    act(() => {
+      pending = result.current.schedule(
+        "exception:E-1", { verb: "Approved", actor: "you", actedAt: 100 }, operation,
+      );
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+    expect(operation).toHaveBeenCalledOnce();
+    act(() => { expect(result.current.undo("exception:E-1")).toBe(false); });
+    expect(result.current.get("exception:E-1")?.undoable).toBe(false);
+    expect(persistedHistory()).not.toHaveProperty("exception:E-1");
+    expect(finish).toBeTypeOf("function");
+    await act(async () => { finish?.(); await pending; });
+    expect(result.current.get("exception:E-1")).toMatchObject({ pending: false, undoable: false });
+    expect(persistedHistory()["exception:E-1"].verb).toBe("Approved");
+  });
+
+  it("removes failed actions instead of persisting successful-looking history", async () => {
+    const operation = vi.fn().mockRejectedValue(new Error("request failed"));
+    const { result } = renderHook(() => useResolutionStore(), { wrapper });
+    await act(async () => {
+      const pending = result.current.schedule(
+        "exception:E-1", { verb: "Approved", actor: "you", actedAt: 100 }, operation, 0,
+      );
+      await expect(pending).rejects.toThrow("request failed");
+    });
+    expect(result.current.get("exception:E-1")).toBeUndefined();
+    expect(persistedHistory()).not.toHaveProperty("exception:E-1");
+  });
+
+  it("reload preserves history but not pending actions or expired Undo", async () => {
+    const operation = vi.fn().mockResolvedValue(undefined);
+    const first = renderHook(() => useResolutionStore(), { wrapper });
+    let pending: Promise<boolean> | undefined;
+    act(() => {
+      first.result.current.record("local:done", { verb: "Snoozed", actor: "you", actedAt: 100 });
+      pending = first.result.current.schedule(
+        "exception:pending", { verb: "Approved", actor: "you", actedAt: 100 }, operation,
+      );
+    });
+    first.unmount();
+    await expect(pending).resolves.toBe(false);
+    const second = renderHook(() => useResolutionStore(), { wrapper });
+    expect(second.result.current.get("local:done")).toMatchObject({ verb: "Snoozed", undoable: false });
+    expect(second.result.current.get("exception:pending")).toBeUndefined();
+    await act(async () => { await vi.advanceTimersByTimeAsync(5_001); });
+    expect(operation).not.toHaveBeenCalled();
+  });
+
   it("records a resolution and reads it back", () => {
     const { result } = renderHook(() => useResolutionStore(), { wrapper });
     act(() => result.current.record("hitl:WF-1", { verb: "Approved", actor: "you", actedAt: 100 }));
@@ -87,6 +172,7 @@ describe("useResolutionStore", () => {
     const { result, unmount } = renderHook(() => useResolutionStore(), { wrapper });
     act(() => result.current.record("hitl:WF-1", { verb: "Approved", actor: "you", actedAt: 100 }));
     unmount();
+    expect(result.current.undo("hitl:WF-1")).toBe(false);
     // Advance past TTL — without the mountedRef guard, this would attempt to
     // setMap on an unmounted tree and React would log a warning.
     act(() => { vi.advanceTimersByTime(60_000); });

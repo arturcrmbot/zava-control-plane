@@ -284,6 +284,23 @@ class WorkflowEventIngestor:
         now = at if at is not None else time.time()
         payload = payload or {}
 
+        # Legacy orchestrators use workflow.completed for every terminal outcome.
+        # Normalise before publishing history or events so a timeout cannot look
+        # successful to one consumer and failed to another.
+        if kind == "workflow.completed" and payload.get("status") is not None:
+            outcome = str(payload["status"]).strip().lower()
+            if outcome and outcome not in {"completed", "success", "succeeded"}:
+                rejected = (
+                    outcome in {"rejected", "denied", "auto_dropped"}
+                    or outcome.startswith("rejected_at_")
+                )
+                kind = "workflow.rejected" if rejected else "workflow.failed"
+                payload = {
+                    **payload,
+                    "outcome": outcome,
+                    "reason": payload.get("reason") or f"Workflow ended with status {outcome}",
+                }
+
         # First-sight cache: if this event carries workflow_type, remember it for
         # all subsequent events on this workflow_id. Generated-domain orchestrators
         # stamp it on every checkpoint payload; the cache means we only need it
@@ -1046,6 +1063,8 @@ class WorkflowEventIngestor:
                 w.metadata = dict(w.metadata or {})
                 w.metadata["failure_reason"] = reason
                 w.metadata["failed_by"] = failed_by
+                if payload.get("outcome") is not None:
+                    w.metadata["outcome"] = payload["outcome"]
             self._auto_resolve_open(wid, "auto-resolved:failed")
             self._ledger(
                 wid,
@@ -1062,7 +1081,8 @@ class WorkflowEventIngestor:
 
         elif kind == "workflow.rejected":
             reason = str(payload.get("reason") or "operator rejected")
-            rejected_by = str(payload.get("by") or "operator")
+            automatic = payload.get("outcome") == "auto_dropped"
+            rejected_by = str(payload.get("by") or ("orchestrator" if automatic else "operator"))
             w = app_state.store.get_workflow(wid)
             rejection_phase = payload.get("phase")
             if w:
@@ -1086,6 +1106,8 @@ class WorkflowEventIngestor:
                 w.metadata["rejection_reason"] = reason
                 w.metadata["rejected_at_phase"] = rejection_phase
                 w.metadata["rejected_by"] = rejected_by
+                if payload.get("outcome") is not None:
+                    w.metadata["outcome"] = payload["outcome"]
             if rejection_phase is not None:
                 self._record_phase(
                     wid,
@@ -1097,7 +1119,7 @@ class WorkflowEventIngestor:
             self._auto_resolve_open(wid, "auto-resolved:rejected")
             self._ledger(
                 wid,
-                kind="human",
+                kind="agent" if automatic else "human",
                 actor_id=rejected_by,
                 action="workflow.rejected",
                 details={"phase": rejection_phase, "reason": reason},

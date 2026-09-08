@@ -25,18 +25,16 @@ top of it. Production-shaped — [Microsoft Agent Framework](https://learn.micro
 durable workflows for orchestration, GHCP SDK Python for agent identities,
 a long-lived Fleet Manager session supervising exceptions in real time.
 
-**39 live domains** (+ the generic `policy_set` shim = 40 total in
-[`api/shared/domains.py`](api/shared/domains.py)) — all spawnable at
-runtime (the previously-stubbed CEO meta-workflows were filled in by
-the v1.x wave; `employee-transfer` and `training-request` arrived via
-the `compose-domain` meta-skill, and `network-incident` — the telco
-actor-world process (§15.4) — is the most recent addition).
-Two were hand-built (POC1 finance expense-claim, POC2 hiring); the rest
-were graduated end-to-end by the
-[`compose-domain`](docs/superpowers/skills/compose-domain/SKILL.md) v4
-meta-skill. Authoritative count + per-function breakdown lives in
-[`docs/ARCHITECTURE.md` §2](docs/ARCHITECTURE.md#2-domain-registry); the
-table below is a curated subset of headline domains. Every per-domain integration fact
+**The selected vertical pack defines the running organisation.**
+Agency is the default; `GET /api/runtime` reports the active pack,
+fingerprint, domain handles, and whether each handle is runnable in the
+current mode. Replay exposes recorded activity, not spawnable live workflows.
+The original hand-built flows (POC1 finance expense-claim and POC2 hiring)
+sit alongside domains graduated through the
+[`compose-domain`](docs/superpowers/skills/compose-domain/SKILL.md) meta-skill.
+See [`docs/ARCHITECTURE.md` §2](docs/ARCHITECTURE.md#2-domain-registry)
+for the registry and pack boundary; the table below is a curated subset
+of Agency domains. Every per-domain integration fact
 (workflow_type, prefix, orchestrator, persona gates, persona, operator surface,
 wake hints, spawner, realistic cadence) lives in a single registry —
 [`api/shared/domains.py`](api/shared/domains.py) — so the substrate's
@@ -108,8 +106,13 @@ The live editorial microsite that visualises the substrate is
   whole substrate in one Azure Container App, serving the operator UI
   at `/`, the essay at `/blueprint/`, the candidate portal at
   `/portal/`, and a read-only `/api/*` whose state advances against a
-  2-hour tape that loops every ~15 minutes:
+  looping recording:
   https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/
+
+The existing public instance serves a **historical May 28, 2026 recording**
+(about 15 minutes). It is not evidence for the current checkout. A new public
+release requires a fresh, source-bound tape and operator-owned seller review;
+see the [release gates](docs/DEVELOPMENT.md#container-verification-before-publishing).
 
 See [`docs/blueprint-microsite-contributor-guide.md`](docs/blueprint-microsite-contributor-guide.md)
 for the editorial deploy and §14 of [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#14-replay-mode--recorder-player-public-deploy)
@@ -129,7 +132,7 @@ for the replay deploy.
 ## 🟢 Safe to clone & run locally — gated for public deploy
 
 This is a **proof of concept** designed to run on a single laptop. It
-is safe to clone, read, and run on `localhost`. It must NOT be bound
+is safe to clone, read, and run on `localhost`. Its writable live mode must NOT be bound
 to a public network interface (no public Azure App Service ingress, no
 Container App with external ingress enabled, no exposing port `3101`
 outside `localhost`) without first walking the [deployment gate](#deployment-gate)
@@ -137,6 +140,10 @@ below. A `POC_UNSAFE_FOR_PUBLIC_DEPLOY=1` marker lives at
 [`.poc-safety`](.poc-safety) so any future CI guard can fail a
 deployment manifest that wires a public ingress while that marker is
 still present.
+
+Public read-only replay uses the separate
+[proof-gated publishing path](docs/DEVELOPMENT.md#container-verification-before-publishing);
+it is not permission to expose the live API.
 
 ### Surface inventory
 
@@ -163,7 +170,7 @@ formally hardened. Status:
 
 ### Deployment gate
 
-Any public binding (Azure App Service public ingress, Container App
+Any public binding of writable live mode (Azure App Service public ingress, Container App
 with public ingress, exposing port `3101` outside `localhost`)
 requires **all** of the following:
 
@@ -195,6 +202,11 @@ requires **all** of the following:
 
 ## Quickstart
 
+Before publishing changes, complete the
+[container verification and release gates](docs/DEVELOPMENT.md#container-verification-before-publishing).
+`make test-harness` is an offline regression check, not evidence that the
+deployment image starts or that a public release is approved.
+
 Prerequisites: Python 3.11 + 3.13, Node 20+, [`uv`](https://astral.sh/uv),
 Azure Functions Core Tools v4.9+, Docker (for Azurite — or `npm i -g azurite`),
 GitHub Copilot license (`gh auth login`).
@@ -209,9 +221,9 @@ make up                                        # boots azurite + POC1 mocks + Fa
 ```
 
 UI at http://localhost:5273, candidate portal at http://localhost:5274.
-The simulator's domain-aware ramp loop trickles real workflows from
-all 39 live domains into the dashboard automatically when the substrate
-is up, each at its own realistic cadence (AP-invoice ~every 30s of demo,
+The simulator's domain-aware ramp loop starts eligible workflows from the
+active pack when the live substrate is up and the ramp is enabled.
+Each uses its own configured cadence (AP-invoice ~every 30s of demo,
 hiring ~every 24min, perf-review effectively dormant — see
 [`api/shared/domains.py`](api/shared/domains.py); tune via
 `DEMO_TIME_WARP_FACTOR`). The

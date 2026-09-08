@@ -12,7 +12,7 @@ import type { HITLItem } from "@shared/feedItems";
 import CardShell from "../CardShell";
 import ReceiptThumb from "./ReceiptThumb";
 import { summariseWorkflow } from "./workflowSummary";
-import { useResolutionStore } from "@client/hooks/useResolutionStore";
+import { RESOLUTION_GRACE_MS, useResolutionStore } from "@client/hooks/useResolutionStore";
 import { apiFetch } from "@client/lib/api";
 import { useToast } from "../Toast";
 
@@ -36,49 +36,35 @@ export default function HITLCard({
   const [busy, setBusy] = useState<string | null>(null);
 
   const onAction = async (id: string, verb: string) => {
-    setBusy(id);
-    store.record(item.id, { verb, actor: "you", actedAt: Math.floor(Date.now() / 1000) });
     const exceptionId = w.activeExceptionId;
-    const ctrl = new AbortController();
-    let undone = false;
-    toast.showWithAction({
-      msg: `${verb} ${w.id}`,
-      ttlMs: 5_000,
-      action: {
-        label: "Undo",
-        onAction: () => {
-          undone = true;
-          ctrl.abort();
-          store.revert(item.id);
-        },
-      },
-    });
-    await new Promise((res) => setTimeout(res, 5_000));
-    if (undone) {
-      setBusy(null);
-      return;
-    }
-    // No backend exception to resolve (HITL view without an activeException):
-    // the optimistic local resolution is the only state we need to preserve.
     if (!exceptionId) {
-      setBusy(null);
+      toast.show("This approval has no active exception to resolve.");
       return;
     }
-    try {
+    setBusy(id);
+    let replayBlocked = false;
+    const pending = store.schedule(item.id, {
+      verb, actor: "you", actedAt: Math.floor(Date.now() / 1000),
+    }, async () => {
       const r = await apiFetch(`/api/exceptions/${exceptionId}/resolve`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ resolution: id, resolvedBy: "reviewer@zava" }),
-        signal: ctrl.signal,
       });
+      replayBlocked = r.status === 403;
       if (!r.ok) {
-        store.revert(item.id);
-        if (r.status !== 403) toast.show("Couldn't resolve — try again");
+        throw new Error(`Resolution failed (${r.status})`);
       }
-    } catch (err) {
-      if ((err as Error).name === "AbortError") return;
-      store.revert(item.id);
-      toast.show("Couldn't resolve — try again");
+    });
+    toast.showWithAction({
+      msg: `${verb} ${w.id} (pending)`,
+      ttlMs: RESOLUTION_GRACE_MS,
+      action: { label: "Undo", onAction: () => { store.undo(item.id); } },
+    });
+    try {
+      await pending;
+    } catch {
+      if (!replayBlocked) toast.show("Couldn't resolve — try again");
     } finally {
       setBusy(null);
     }

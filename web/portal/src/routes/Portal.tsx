@@ -4,6 +4,7 @@ import OfferPanel from "../components/OfferPanel";
 import OnboardingPanel from "../components/OnboardingPanel";
 import TranscriptList from "../components/TranscriptList";
 import { resolvePhase, type Phase } from "../lib/phases";
+import { portalPath } from "../lib/paths";
 
 export type StatusResponse = {
   candidate: { id: string; name: string; email: string; role_id?: string };
@@ -61,7 +62,7 @@ function BookCallButton({ screenToken }: { screenToken: string | null }) {
           <li>Microphone access required (we'll prompt you)</li>
           <li>Take the call whenever it suits you, link is good for 24h</li>
         </ul>
-        <a href={`/screen?token=${encodeURIComponent(screenToken)}`} className="btn-primary btn-large">
+        <a href={portalPath(`/screen?token=${encodeURIComponent(screenToken)}`)} className="btn-primary btn-large">
           Start screening call →
         </a>
       </div>

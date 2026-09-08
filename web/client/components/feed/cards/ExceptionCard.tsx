@@ -8,7 +8,7 @@ import { ShieldAlert } from "lucide-react";
 import type { ExceptionItem } from "@shared/feedItems";
 import CardShell from "../CardShell";
 import { summariseWorkflow } from "./workflowSummary";
-import { useResolutionStore } from "@client/hooks/useResolutionStore";
+import { RESOLUTION_GRACE_MS, useResolutionStore } from "@client/hooks/useResolutionStore";
 import { apiFetch } from "@client/lib/api";
 import { useToast } from "../Toast";
 
@@ -34,55 +34,37 @@ export default function ExceptionCard({
 
   const onAction = async (id: string, verb: string) => {
     setBusy(id);
-    store.record(item.id, { verb, actor: "you", actedAt: Math.floor(Date.now() / 1000) });
+    const resolution = { verb, actor: "you", actedAt: Math.floor(Date.now() / 1000) };
     if (id === "snooze") {
+      store.record(item.id, resolution);
       setBusy(null);
       toast.showWithAction({
         msg: `${verb} ${e.workflowId}`,
-        action: { label: "Undo", onAction: () => store.revert(item.id) },
+        action: { label: "Undo", onAction: () => { store.undo(item.id); } },
       });
       return;
     }
-    // Defer the actual network call by 5s, giving the user a window to
-    // click Undo (which aborts the in-flight request before it leaves the
-    // browser). Pattern: setTimeout + AbortController.
-    const ctrl = new AbortController();
-    let undone = false;
-    toast.showWithAction({
-      msg: `${verb} ${e.workflowId}`,
-      ttlMs: 5_000,
-      action: {
-        label: "Undo",
-        onAction: () => {
-          undone = true;
-          ctrl.abort();
-          store.revert(item.id);
-        },
-      },
-    });
-    // Hold the optimistic state for ~5s, then fire. The store.record
-    // already flipped the card to ResolvedCard via the overlay so the
-    // user sees instant feedback either way.
-    await new Promise((res) => setTimeout(res, 5_000));
-    if (undone) {
-      setBusy(null);
-      return;
-    }
-    try {
+    let replayBlocked = false;
+    const pending = store.schedule(item.id, resolution, async () => {
       const r = await apiFetch(`/api/exceptions/${e.id}/resolve`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ resolution: id, resolvedBy: "reviewer@zava" }),
-        signal: ctrl.signal,
       });
+      replayBlocked = r.status === 403;
       if (!r.ok) {
-        store.revert(item.id);
-        if (r.status !== 403) toast.show("Couldn't resolve — try again");
+        throw new Error(`Resolution failed (${r.status})`);
       }
-    } catch (err) {
-      if ((err as Error).name === "AbortError") return;
-      store.revert(item.id);
-      toast.show("Couldn't resolve — try again");
+    });
+    toast.showWithAction({
+      msg: `${verb} ${e.workflowId} (pending)`,
+      ttlMs: RESOLUTION_GRACE_MS,
+      action: { label: "Undo", onAction: () => { store.undo(item.id); } },
+    });
+    try {
+      await pending;
+    } catch {
+      if (!replayBlocked) toast.show("Couldn't resolve — try again");
     } finally {
       setBusy(null);
     }

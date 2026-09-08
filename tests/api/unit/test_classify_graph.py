@@ -36,10 +36,8 @@ async def test_classify_graph_blocks_malformed_payload():
         AsyncMock(return_value={"classification": bad}),
     ):
         wf = build_classify_workflow()
-        events = await wf.run({"workflow_id": "CLM-broken", "claim_id": "CLM-broken"})
-    out = events.get_outputs()[0]
-    assert out["ok"] is False
-    assert "parse_error" in (out.get("blocked_reason") or "")
+        with pytest.raises(ValueError, match="parse_error"):
+            await wf.run({"workflow_id": "CLM-broken", "claim_id": "CLM-broken"})
 
 
 @pytest.mark.asyncio
@@ -56,10 +54,8 @@ async def test_classify_graph_blocks_missing_required_field():
         AsyncMock(return_value={"classification": bad}),
     ):
         wf = build_classify_workflow()
-        events = await wf.run({"workflow_id": "CLM-x", "claim_id": "CLM-x"})
-    out = events.get_outputs()[0]
-    assert out["ok"] is False
-    assert "policy_clause" in (out.get("blocked_reason") or "")
+        with pytest.raises(ValueError, match="policy_clause"):
+            await wf.run({"workflow_id": "CLM-x", "claim_id": "CLM-x"})
 
 
 @pytest.mark.asyncio
@@ -76,7 +72,5 @@ async def test_classify_graph_blocks_invalid_verdict_value():
         AsyncMock(return_value={"classification": bad}),
     ):
         wf = build_classify_workflow()
-        events = await wf.run({"workflow_id": "CLM-y", "claim_id": "CLM-y"})
-    out = events.get_outputs()[0]
-    assert out["ok"] is False
-    assert "verdict" in (out.get("blocked_reason") or "")
+        with pytest.raises(ValueError, match="verdict"):
+            await wf.run({"workflow_id": "CLM-y", "claim_id": "CLM-y"})

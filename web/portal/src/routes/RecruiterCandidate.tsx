@@ -25,6 +25,7 @@ import {
 import PhaseProgress from "../components/PhaseProgress";
 import AgentReasoningTimeline from "../components/AgentReasoningTimeline";
 import CommunicationsPanel from "../components/CommunicationsPanel";
+import { portalPath } from "../lib/paths";
 
 const ROLE_LABELS: Record<string, string> = {
   "REQ-SDE-USA-DEMO": "Senior Data Engineer · USA",
@@ -170,7 +171,7 @@ export default function RecruiterCandidate() {
               <>
                 {statusTok && (
                   <a
-                    href={`${window.location.origin}/portal?token=${statusTok.token}`}
+                    href={portalPath(`/portal?token=${encodeURIComponent(statusTok.token)}`)}
                     target="_blank"
                     rel="noreferrer"
                     className="bg-blue-500/30 hover:bg-blue-500/50 backdrop-blur rounded-full px-3 py-1.5 border border-blue-300/40 transition"
@@ -181,7 +182,7 @@ export default function RecruiterCandidate() {
                 )}
                 {screenTok && (
                   <a
-                    href={`${window.location.origin}/screen?token=${screenTok.token}`}
+                    href={portalPath(`/screen?token=${encodeURIComponent(screenTok.token)}`)}
                     target="_blank"
                     rel="noreferrer"
                     className="bg-emerald-500/30 hover:bg-emerald-500/50 backdrop-blur rounded-full px-3 py-1.5 border border-emerald-300/40 transition"
@@ -192,7 +193,7 @@ export default function RecruiterCandidate() {
                 )}
                 {offerTok && statusTok && (
                   <a
-                    href={`${window.location.origin}/portal?token=${statusTok.token}`}
+                    href={portalPath(`/portal?token=${encodeURIComponent(statusTok.token)}`)}
                     target="_blank"
                     rel="noreferrer"
                     className="bg-amber-500/30 hover:bg-amber-500/50 backdrop-blur rounded-full px-3 py-1.5 border border-amber-300/40 transition"
@@ -232,7 +233,9 @@ export default function RecruiterCandidate() {
           bookingTokenUrl={
             (() => {
               const tok = data.active_tokens.find((t) => t.scope === "book_interview");
-              return tok ? `${window.location.origin}/book?token=${tok.token}` : null;
+              return tok
+                ? `${window.location.origin}${portalPath(`/book?token=${encodeURIComponent(tok.token)}`)}`
+                : null;
             })()
           }
         />

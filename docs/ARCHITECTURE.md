@@ -127,12 +127,11 @@ wake_hints, spawn_fn, realistic_interval_seconds, function)`. The
 `get`, `by_prefix`, `resolve_external_event`, `all_wake_hints`,
 `all_personae`, and `live_domains()` (filter on `phases != ()`).
 
-**As of June 2026: 39 registered domains, 38 live** (`phases != ()`;
-the 39th is the generic `policy_set` shim with empty phases — see
-below). Verified via `from api.shared.functions import _; from
-api.shared.domains import DOMAINS, live_domains`. The two newest
-domains since the v1.x wave are `employee-transfer` (HR) and
-`training-request` (HR), both graduated via `compose-domain` v4.
+The table below describes the Agency registry, not a cross-pack inventory.
+The active pack is selected by the vertical loader; `GET /api/runtime`
+reports its fingerprint, domain handles, and mode-specific `runnable` flags.
+Use that endpoint rather than a historical headline count. In replay,
+registered handles describe the recording surface and are not runnable.
 
 | Function | Live domains |
 |---|---|
@@ -1040,7 +1039,7 @@ Gzipped tar produced by the recorder:
 
 ```
 tape.tar.gz
-├── meta.json                 # tape_id, recorded_at, duration_s, version, app_sha
+├── meta.json                 # identity, recording time, source SHA, vertical, pack fingerprint
 ├── snapshot_t0/              # full REST-shaped initial state
 │   ├── workflows.json
 │   ├── phases.json
@@ -1058,9 +1057,11 @@ tape.tar.gz
 
 The schema lives in
 [`api/server/services/replay/tape_format.py`](../api/server/services/replay/tape_format.py).
-Tapes shipped today: `tapes/landing-2h-20260522-1710.tar.gz` (the 4MB
-2-hour landing tape baked into the verify image) plus rolling
-`demo.tar.gz` and shorter `smoke-*.tar.gz` test tapes.
+`app_sha`, `selected_vertical`, and `pack_fingerprint` are optional for reading
+historical format-v1 tapes, but required and cross-checked before a new public
+release. The existing verify site serves `tape_fbe458bc`, recorded on May 28,
+2026, with a duration of about 15 minutes; it is not current-source proof.
+Historical local recordings are preserved under `tapes/archive/`.
 
 ### 14.3 Recorder
 
@@ -1112,7 +1113,7 @@ existing toast layer surfaces the message.
 
 | Mount | Module | Purpose |
 |---|---|---|
-| `GET /api/replay/meta` | [`routes/replay.py`](../api/server/routes/replay.py) | Returns `{ mode, tape_id, recorded_at, duration_s, current_t }`. Drives the `ReplayBadge` + `RestartBanner` in `web/client`. Always present, so live-mode clients can ask "am I in replay?". |
+| `GET /api/replay/meta` | [`routes/replay.py`](../api/server/routes/replay.py) | Returns mode, tape identity/date/duration, playback position, recorded/active vertical, and vertical-match status. Drives the `ReplayBadge` + `RestartBanner`. Missing legacy provenance remains unknown rather than inferred. |
 | `GET /api/replay/snapshot?at=<unix>` | same | Reconstructs a point-in-time view of the org by replaying audit entries up to `at` (last-write-wins). The cosmic lens HUD's time-scrub uses it. |
 | `GET /healthz` | inline in `main.py` | Liveness probe for ACA (added by PR #22). |
 
@@ -1120,41 +1121,49 @@ existing toast layer surfaces the message.
 
 One Azure Container App, one image
 ([`deploy/Dockerfile`](../deploy/Dockerfile)), three SPA bundles served
-under one nginx. Multi-stage build: Node 20 builds `web/client/dist`
-+ `web/portal/dist` + `web/blueprint/dist`; Python 3.11-slim runtime
-copies the venv, the SPA bundles, the baked-in tape
-(`/app/tape/tape.tar.gz`), and starts uvicorn alongside nginx via
-[`entrypoint.sh`](../deploy/entrypoint.sh). nginx routes `/` → client,
-`/blueprint/` → essay, `/portal/` → portal, `/api/*` + `/internal/*` →
-uvicorn on `127.0.0.1:80`. Env defaults set in the image:
-`ZAVA_MODE=replay`, `ZAVA_TAPE_PATH=/app/tape/tape.tar.gz`,
-`LLM_RUNTIME=fake`, `PERSIST_DATA=false`.
+by FastAPI through
+[`static_production.py`](../api/server/static_production.py), **not nginx**.
+The Node stage builds the client, portal, and blueprint bundles using their
+lockfiles. The Python stage includes the application, skills, synthetic
+assets, and `verticals/`. The final stage adds the baked tape at
+`/app/tape/tape.tar.gz`.
+
+[`entrypoint.sh`](../deploy/entrypoint.sh) runs Uvicorn on port 80.
+`ZAVA_MODE=replay` skips the Functions host; writable live mode also requires
+Functions and its storage. FastAPI serves `/` → operator, `/blueprint/` →
+essay, and `/portal/` → portal, alongside `/api/*` and `/internal/*`.
+Prefixed HTML deep links use their own SPA shell, while missing API routes
+and assets remain real errors. `ZAVA_MODE` is required explicitly by the
+deployment parameters.
 
 Infra: [`infra/main.bicep`](../infra/main.bicep) + modules; deployed
-with `azd up` against the `zava-verify-fruocco` environment. The bicep
+through the proof-gated `scripts/deploy-blueprint.sh` wrapper around
+`azd up`. The bicep
 supports two RBAC paths — the standard `AcrPull` assignment via UAMI,
 and a Contributor-only fallback that uses ACR admin credentials when
 the deploying principal can't grant role assignments.
 
 ### 14.8 Why this layout
 
-A read-only replay sidesteps everything the
-[deployment gate in README](../README.md#-safe-to-clone--run-locally--gated-for-public-deploy)
-lists — there's no policy `exec()` to harden because the persona
-responder is disabled, no `find_entities` Cypher injection vector
-because KuzuDB isn't loaded, no webhook auth to enforce because no
-writes are accepted at all. The substrate stays single-tenant and
-single-process (no horizontal scaling needed because there's no shared
-write state), and the deployment footprint stays at one image instead
-of nginx + FastAPI + Functions + Azurite + KuzuDB.
+Read-only replay disables live orchestration, personas, world advancement,
+and write routes; this avoids paying for live model execution during a public
+walkthrough. It is not evidence of live authentication, recovery, or scale.
+The shared application still imports graph infrastructure at startup, so
+memory and Kuzu address-space sizing still matter, especially under AMD64
+emulation. The substrate remains single-tenant and single-process.
 
 ### 14.9 Provenance
 
 Spec: [`docs/superpowers/specs/2026-05-22-public-replay-landing-design.md`](superpowers/specs/2026-05-22-public-replay-landing-design.md).
 Plans: [`docs/superpowers/plans/2026-05-22-replay-recorder-and-player.md`](superpowers/plans/2026-05-22-replay-recorder-and-player.md),
 [`docs/superpowers/plans/2026-05-22-public-cloud-deploy.md`](superpowers/plans/2026-05-22-public-cloud-deploy.md).
-Branches: replay code lives on `main`; the long-lived `demo-deploy`
-branch off `main` carries the Azure deploy artefacts (`infra/`, `deploy/Dockerfile`, baked tape) that build the verify container.
+The canonical deployment files live on `main`; generated tapes and `proof/`
+are local ignored artefacts. `tools/public_replay_manifest.py` schema 2 binds
+the full source SHA, active vertical/fingerprint, and tape/proof/review hashes.
+Source or pack drift, dirty-development recordings, and incomplete human
+review fail closed. See
+[Development: container verification before publishing](DEVELOPMENT.md#container-verification-before-publishing)
+for the current sequence, including historical-evidence handling.
 
 ---
 

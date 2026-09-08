@@ -9,11 +9,13 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
 import httpx
 
 
 WEBHOOK_URL = os.getenv("FASTAPI_WEBHOOK_URL", "http://localhost:3101/internal/durable-event")
+log = logging.getLogger(__name__)
 
 
 def _signed_headers(body: bytes) -> dict[str, str]:
@@ -36,24 +38,35 @@ def _serialise(workflow_id: str, instance_id: str | None, kind: str, payload: di
     ).encode("utf-8")
 
 
-async def emit(workflow_id: str, instance_id: str | None, kind: str, payload: dict) -> None:
-    """Best-effort webhook emit. Failures are swallowed so workflows don't break on transient
-    FastAPI hiccups."""
+async def emit(
+    workflow_id: str, instance_id: str | None, kind: str, payload: dict,
+    *, required: bool = False,
+) -> None:
+    """Emit telemetry best-effort, or require acknowledgement for a checkpoint."""
     body = _serialise(workflow_id, instance_id, kind, payload)
     try:
         async with httpx.AsyncClient() as c:
-            await c.post(WEBHOOK_URL, content=body, headers=_signed_headers(body), timeout=5)
-    except Exception:
-        pass
+            response = await c.post(WEBHOOK_URL, content=body, headers=_signed_headers(body), timeout=5)
+            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        if required:
+            raise
+        log.warning("durable-event delivery failed: workflow=%s kind=%s: %s", workflow_id, kind, exc)
 
 
-def emit_sync(workflow_id: str, instance_id: str | None, kind: str, payload: dict) -> None:
+def emit_sync(
+    workflow_id: str, instance_id: str | None, kind: str, payload: dict,
+    *, required: bool = False,
+) -> None:
     """Synchronous variant — safe to call from activity functions that run inside
     the Functions host's already-running event loop (asyncio.run() raises
     'cannot be called from a running event loop' in that context)."""
     body = _serialise(workflow_id, instance_id, kind, payload)
     try:
         with httpx.Client() as c:
-            c.post(WEBHOOK_URL, content=body, headers=_signed_headers(body), timeout=5)
-    except Exception:
-        pass
+            response = c.post(WEBHOOK_URL, content=body, headers=_signed_headers(body), timeout=5)
+            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        if required:
+            raise
+        log.warning("durable-event delivery failed: workflow=%s kind=%s: %s", workflow_id, kind, exc)

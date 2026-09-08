@@ -221,6 +221,7 @@ async def test_meta_json_shape(tmp_path: Path, isolated_app_state):
     assert meta["version"] == TAPE_FORMAT_VERSION
     assert meta["app_sha"] == "abc123"
     assert meta["selected_vertical"] == app_state.runtime.pack.name
+    assert meta["pack_fingerprint"] == app_state.runtime.fingerprint
 
 
 async def test_no_events_after_stop(tmp_path: Path, isolated_app_state):

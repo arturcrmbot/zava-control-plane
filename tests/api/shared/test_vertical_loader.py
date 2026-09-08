@@ -51,6 +51,32 @@ def test_data_directory_is_namespaced(tmp_path, pack_loader) -> None:
     assert telco.data_dir == tmp_path / "telco"
 
 
+@pytest.mark.parametrize("setting", ["ZAVA_DATA_DIR", "PORTAL_DATA_DIR"])
+def test_data_root_preserves_case_and_trims_whitespace(setting) -> None:
+    assert _loader().resolve_data_root(
+        {setting: "  Data/CustomerDemo  "}
+    ) == Path("Data/CustomerDemo")
+
+
+def test_blank_data_root_falls_back_to_portal_directory() -> None:
+    assert _loader().resolve_data_root(
+        {"ZAVA_DATA_DIR": " ", "PORTAL_DATA_DIR": " Data/PortalDemo "}
+    ) == Path("Data/PortalDemo")
+
+
+def test_data_root_expands_home_without_changing_case(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert _loader().resolve_data_root(
+        {"ZAVA_DATA_DIR": "~/CustomerDemo"}
+    ) == tmp_path / "CustomerDemo"
+
+
+def test_vertical_selection_remains_case_insensitive() -> None:
+    assert _loader().select_vertical(
+        {"ZAVA_VERTICAL": " TELCO ", "ZAVA_WORLD": " TELCO "}
+    ) == ("telco", "telco")
+
+
 def test_world_scale_requires_an_active_owned_world(tmp_path, pack_loader) -> None:
     loader = _loader()
 

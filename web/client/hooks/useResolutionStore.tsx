@@ -1,10 +1,9 @@
 // web/client/hooks/useResolutionStore.tsx
 //
 // React context for optimistic resolutions. When a card's inline action
-// fires, the caller `record()`s a resolution against the card's id; that
-// flips the card to ResolvedCard in place. The store keeps `undoable=true`
-// for `undoTtlMs` (default 30s); after that the undo button hides. revert()
-// rolls back (used on backend failure or explicit undo click).
+// fires, schedule() owns its pending operation and pre-dispatch Undo.
+// record() remains for local-only actions such as snoozing. Only confirmed
+// history is persisted; pending operations and Undo never survive reload.
 //
 // Persistence: the map is mirrored to localStorage under a day-keyed slot
 // (`fleetctl.resolutions.<YYYY-MM-DD>`) so the operator's "All my decisions
@@ -20,11 +19,22 @@ export interface Resolution {
   actor: string;
   actedAt: number;        // seconds since epoch
   undoable: boolean;
+  pending?: boolean;
+}
+
+type ResolutionDetails = Pick<Resolution, "verb" | "actor" | "actedAt">;
+export const RESOLUTION_GRACE_MS = 5_000;
+
+interface PendingAction {
+  dispatched: boolean;
+  cancel(): void;
 }
 
 interface ResolutionAPI {
   get(id: string): Resolution | undefined;
-  record(id: string, r: Omit<Resolution, "undoable">): void;
+  record(id: string, r: ResolutionDetails): void;
+  schedule(id: string, r: ResolutionDetails, operation: () => Promise<void>, delayMs?: number): Promise<boolean>;
+  undo(id: string): boolean;
   revert(id: string): void;
   all(): Record<string, Resolution>;
 }
@@ -45,7 +55,12 @@ function readPersisted(): Record<string, Resolution> {
     const raw = window.localStorage.getItem(todayKey());
     if (!raw) return {};
     const parsed = JSON.parse(raw) as Record<string, Resolution>;
-    return parsed && typeof parsed === "object" ? parsed : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .filter(([, value]) => value && typeof value === "object" && !value.pending)
+        .map(([id, value]) => [id, { ...value, undoable: false }]),
+    );
   } catch {
     return {};
   }
@@ -54,7 +69,12 @@ function readPersisted(): Record<string, Resolution> {
 function writePersisted(map: Record<string, Resolution>): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(todayKey(), JSON.stringify(map));
+    const confirmed = Object.fromEntries(
+      Object.entries(map)
+        .filter(([, value]) => !value.pending)
+        .map(([id, value]) => [id, { ...value, undoable: false }]),
+    );
+    window.localStorage.setItem(todayKey(), JSON.stringify(confirmed));
   } catch {
     // Quota or privacy-mode: in-memory state still works.
   }
@@ -65,18 +85,20 @@ export function ResolutionProvider({
 }: { children: ReactNode; undoTtlMs?: number }) {
   const [map, setMap] = useState<Record<string, Resolution>>(() => readPersisted());
   const timersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const pendingRef = useRef<Record<string, PendingAction>>({});
 
   const mountedRef = useRef(true);
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       for (const t of Object.values(timersRef.current)) clearTimeout(t);
+      timersRef.current = {};
+      for (const pending of Object.values(pendingRef.current)) pending.cancel();
     };
   }, []);
 
-  // Mirror every change to localStorage so "All my decisions today" survives
-  // a reload. Hydrated rows arrive with `undoable: true` but the undo timer
-  // is not restarted — past-the-grace-period undo would be confusing.
+  // A reload must not turn an unsent action into completed history.
   useEffect(() => {
     writePersisted(map);
   }, [map]);
@@ -85,7 +107,7 @@ export function ResolutionProvider({
   const all = useCallback(() => map, [map]);
 
   const record = useCallback(
-    (id: string, r: Omit<Resolution, "undoable">) => {
+    (id: string, r: ResolutionDetails) => {
       setMap((prev) => ({ ...prev, [id]: { ...r, undoable: true } }));
       const existing = timersRef.current[id];
       if (existing) clearTimeout(existing);
@@ -100,12 +122,14 @@ export function ResolutionProvider({
     [undoTtlMs],
   );
 
-  const revert = useCallback((id: string) => {
-    setMap((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
+  const removeRecord = useCallback((id: string) => {
+    if (mountedRef.current) {
+      setMap((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
     const t = timersRef.current[id];
     if (t) {
       clearTimeout(t);
@@ -113,9 +137,80 @@ export function ResolutionProvider({
     }
   }, []);
 
+  const revert = useCallback((id: string) => {
+    const pending = pendingRef.current[id];
+    if (pending && !pending.dispatched) {
+      pending.cancel();
+      return;
+    }
+    removeRecord(id);
+  }, [removeRecord]);
+
+  const schedule = useCallback(
+    (id: string, r: ResolutionDetails, operation: () => Promise<void>, delayMs = RESOLUTION_GRACE_MS) => {
+      if (!mountedRef.current || pendingRef.current[id]) {
+        return Promise.reject(new Error("This resolution cannot be scheduled while unavailable or pending"));
+      }
+      const oldTimer = timersRef.current[id];
+      if (oldTimer !== undefined) {
+        clearTimeout(oldTimer);
+        delete timersRef.current[id];
+      }
+      setMap((prev) => ({ ...prev, [id]: { ...r, pending: true, undoable: delayMs > 0 } }));
+      return new Promise<boolean>((resolve, reject) => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const pending: PendingAction = {
+          dispatched: false,
+          cancel() {
+            if (pending.dispatched || pendingRef.current[id] !== pending) return;
+            if (timer !== undefined) clearTimeout(timer);
+            delete pendingRef.current[id];
+            removeRecord(id);
+            resolve(false);
+          },
+        };
+        pendingRef.current[id] = pending;
+        const dispatch = async () => {
+          pending.dispatched = true;
+          setMap((prev) => prev[id] ? { ...prev, [id]: { ...prev[id], undoable: false } } : prev);
+          try {
+            await operation();
+            if (mountedRef.current) {
+              setMap((prev) => ({
+                ...prev, [id]: { ...r, pending: false, undoable: false },
+              }));
+            }
+            resolve(true);
+          } catch (error) {
+            removeRecord(id);
+            reject(error);
+          } finally {
+            delete pendingRef.current[id];
+          }
+        };
+        if (delayMs > 0) timer = setTimeout(() => { void dispatch(); }, delayMs);
+        else void dispatch();
+      });
+    },
+    [removeRecord],
+  );
+
+  const undo = useCallback((id: string): boolean => {
+    const pending = pendingRef.current[id];
+    if (pending) {
+      if (pending.dispatched) return false;
+      pending.cancel();
+      return true;
+    }
+    // Toasts retain callbacks across renders; the live timer owns local Undo.
+    if (timersRef.current[id] === undefined) return false;
+    revert(id);
+    return true;
+  }, [revert]);
+
   const api = useMemo<ResolutionAPI>(
-    () => ({ get, record, revert, all }),
-    [get, record, revert, all],
+    () => ({ get, record, schedule, undo, revert, all }),
+    [get, record, schedule, undo, revert, all],
   );
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;

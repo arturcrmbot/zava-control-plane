@@ -1,7 +1,5 @@
-# Send only what the blueprint deploy needs to the Docker build context.
-# This stays at the repo root because docker build always starts from the
-# repo root (the Dockerfile lives at web/blueprint/Dockerfile but pulls
-# files from across the tree).
+# Build context for the full application image in deploy/Dockerfile
+# and the separate editorial microsite build.
 
 # --- Heavy dev artefacts -------------------------------------------------
 # NOTE: bare names (no trailing slash) so the patterns also match in the
@@ -28,6 +26,10 @@ azurite-data/__azurite_db_blob_extent__.json
 azurite-data/__blobstorage__/
 azurite-data/__queuestorage__/
 data/portal/
+data/runtime/
+proof/
+tapes/archive/
+tapes/.pytest-portal/
 data/.eval/
 data/.avatar/
 .env

@@ -57,6 +57,7 @@ class TestTapeMeta:
             version=1,
             app_sha="abc123def456",
             selected_vertical="agency",
+            pack_fingerprint="agency:1",
         )
         dumped = original.model_dump()
         restored = TapeMeta.model_validate(dumped)
@@ -99,6 +100,7 @@ class TestTapeMeta:
             duration_s=10.0,
         )
         assert tape.selected_vertical is None
+        assert tape.pack_fingerprint is None
 
 
 class TestEventRecord:

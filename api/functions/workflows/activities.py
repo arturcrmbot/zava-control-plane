@@ -52,12 +52,16 @@ async def _run_workflow(
     t0 = _t.time()
     try:
         events = await wf.run({**payload, "phase": step_name})
+        outputs = events.get_outputs()
+        if not outputs:
+            raise RuntimeError(f"{step_name} workflow produced no output")
+        result = outputs[0]
     except Exception as ex:
         await emit(payload.get("workflow_id", "?"), payload.get("instance_id"),
                    "step.failed", {"step": step_name, "error": str(ex)})
+        await emit(payload.get("workflow_id", "?"), payload.get("instance_id"),
+                   "workflow.failed", {"by": f"phase:{step_name}", "reason": str(ex), "phase": step_name})
         raise
-    outputs = events.get_outputs()
-    result = outputs[0] if outputs else {}
     if emit_boundaries:
         await emit(payload.get("workflow_id", "?"), payload.get("instance_id"),
                    "step.completed", {"step": step_name, "duration_ms": int((_t.time() - t0) * 1000)})
@@ -178,5 +182,6 @@ def checkpoint_activity(payload: dict) -> dict:
         payload.get("instance_id"),
         payload["kind"],
         payload.get("payload", {}),
+        required=True,
     ))
     return {}

@@ -8,9 +8,8 @@ port (5273/5274/5275) and proxies ``/api`` back to FastAPI on :3101.
 
 ### Why this exists (vs ``app.mount("/", StaticFiles(html=True))``)
 
-A bare ``StaticFiles(directory=..., html=True)`` mount at ``/`` returns
-``index.html`` for **any** unmatched path — including ``/api/typo``,
-``/healthz``, ``/api/this/does/not/exist``. That makes:
+``StaticFiles(html=True)`` serves directory indexes, not client-side routes.
+SPA fallback must also avoid swallowing API and asset errors; otherwise:
 
 * ACA liveness probes pass against a broken API (HTML 200 instead of failure)
 * Frontend code see 200 + HTML when it expects 404 + JSON, often surfacing
@@ -40,6 +39,20 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.datastructures import Headers
+from starlette.exceptions import HTTPException as StaticHTTPException
+from starlette.types import Scope
+
+
+class _SPAStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        try:
+            return await super().get_response(path, scope)
+        except StaticHTTPException as exc:
+            is_navigation = "text/html" in Headers(scope=scope).get("accept", "")
+            if exc.status_code != 404 or not is_navigation or path.startswith("assets/"):
+                raise
+            return await super().get_response("index.html", scope)
 
 
 def _bundle_root() -> Path | None:
@@ -73,14 +86,14 @@ def mount_production_static(app: FastAPI) -> bool:
     if (portal_dir / "index.html").is_file():
         app.mount(
             "/portal",
-            StaticFiles(directory=str(portal_dir), html=True),
+            _SPAStaticFiles(directory=str(portal_dir), html=True),
             name="zava-portal-bundle",
         )
 
     if (blueprint_dir / "index.html").is_file():
         app.mount(
             "/blueprint",
-            StaticFiles(directory=str(blueprint_dir), html=True),
+            _SPAStaticFiles(directory=str(blueprint_dir), html=True),
             name="zava-blueprint-bundle",
         )
 

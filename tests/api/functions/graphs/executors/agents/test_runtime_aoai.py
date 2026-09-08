@@ -140,6 +140,41 @@ class TestSingleToolCall:
 
 class TestMultipleToolCalls:
     @pytest.mark.asyncio
+    async def test_unregistered_required_tool_fails_before_model_call(self):
+        rt = _runtime_with_responses(_text_response("done"))
+        with pytest.raises(ValueError, match="not registered"):
+            await rt.run_session(
+                prompt="read evidence", tools=[_make_tool("lookup")],
+                required_tool_names=["missing"],
+            )
+        rt._client.chat.completions.create.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_final_answer_without_required_tool_fails(self):
+        rt = _runtime_with_responses(_text_response("done"))
+        with pytest.raises(RuntimeError, match="required tools.*lookup"):
+            await rt.run_session(
+                prompt="read evidence", tools=[_make_tool("lookup")],
+                required_tool_names=["lookup"],
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("result_type", ["failure", "denied", "rejected", "timeout"])
+    async def test_non_success_tool_result_cannot_satisfy_required_tool(self, result_type):
+        async def handler(invocation):
+            return ToolResult(result_type=result_type, error="not completed")
+
+        rt = _runtime_with_responses(
+            _tool_response([_tool_call("c1", "lookup", "{}")]),
+            _text_response("done"),
+        )
+        with pytest.raises(RuntimeError, match="required tools.*lookup"):
+            await rt.run_session(
+                prompt="read evidence", tools=[_make_tool("lookup", handler=handler)],
+                required_tool_names=["lookup"],
+            )
+
+    @pytest.mark.asyncio
     async def test_multiple_tool_calls_in_single_response(self):
         responses = [
             _tool_response([

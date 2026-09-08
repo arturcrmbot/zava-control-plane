@@ -37,7 +37,7 @@ from copilot.generated.session_events import SessionEventType
 from copilot.session import PermissionRequest
 from copilot.tools import Tool, ToolInvocation, ToolResult
 
-from api.functions.graphs.executors.agents.runtime import LLMRuntimeResult
+from api.functions.graphs.executors.agents.runtime import LLMRuntimeResult, validate_required_tool_names
 
 log = logging.getLogger(__name__)
 
@@ -185,13 +185,7 @@ class AOAIRuntime:
         if tools_list:
             openai_tools = _tools_to_openai_schema(tools_list)
             tool_map = {t.name: t for t in tools_list}
-        required_names = list(dict.fromkeys(required_tool_names or []))
-        unknown_required = [name for name in required_names if name not in tool_map]
-        if unknown_required:
-            raise ValueError(
-                "required_tool_names contains tools that are not registered: "
-                f"{unknown_required}"
-            )
+        required_names = validate_required_tool_names(required_tool_names, tool_map)
 
         # Build initial messages
         messages: list[dict[str, Any]] = []
@@ -374,7 +368,7 @@ class AOAIRuntime:
                     result = tool_map[fn_name].handler(invocation)
                     if inspect.isawaitable(result):
                         result = await result
-                    success = result.result_type != "failure"
+                    success = result.result_type == "success"
                     error = result.error
                     content = result.text_result_for_llm or ""
                     if not success:

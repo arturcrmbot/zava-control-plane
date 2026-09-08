@@ -1,4 +1,15 @@
-.PHONY: install dev mcp mcp-authority server functions funcvenv test test-e2e prove clean azurite-up azurite-down reset up down up-with-authority-mock agt-doctor agt-verify snapshot-save snapshot-restore snapshot-list data-pack-save
+.PHONY: install dev mcp mcp-authority server functions funcvenv test test-harness test-e2e prove clean azurite-up azurite-down reset up down up-with-authority-mock agt-doctor agt-verify snapshot-save snapshot-restore snapshot-list data-pack-save
+
+HARNESS_TEST_ENV = env -u PORTAL_DATA_DIR -u ZAVA_DATA_DIR -u ZAVA_WORLD_SCALE \
+	ZAVA_VERTICAL=agency ZAVA_WORLD= ZAVA_MODE=live \
+	PYTHON_DOTENV_DISABLED=1 ANONYMIZED_TELEMETRY=False \
+	MEMORY_BACKEND=fallback LLM_RUNTIME=fake ENTITY_GRAPH_BUFFER_POOL_MB=256 \
+	ENTITY_GRAPH_MAX_DB_SIZE_MB=4096 \
+	AGT_DEV_KEYS=1 AGT_ENFORCE=0 AUTHORITY_MCP_URL= \
+	AZURE_STORAGE_CONNECTION_STRING= AZURE_STORAGE_AUDIT_ACCOUNT= \
+	APPLICATIONINSIGHTS_CONNECTION_STRING=
+HARNESS_PYTEST = $(HARNESS_TEST_ENV) uv run --no-sync python -m pytest \
+	-q --disable-warnings -o usefixtures=harness_offline
 
 install:
 	uv sync
@@ -89,6 +100,46 @@ down:
 test:
 	uv run pytest -q
 	npm test --silent
+
+# Replay collection configures a different AppState: keep it in its own process.
+test-harness:
+	$(HARNESS_PYTEST) \
+		tests/api/shared/test_vertical_loader.py \
+		tests/api/shared/test_vertical_pack_inventory.py \
+		tests/api/shared/test_vertical_pack_validation.py \
+		tests/api/shared/test_vertical_pack_contracts.py \
+		tests/tools/test_runtime_image_contract.py \
+		tests/tools/test_container_entrypoint.py \
+		tests/tools/test_public_replay_manifest.py \
+		tests/tools/test_public_story_deployment.py \
+		tests/api/server/test_static_production.py \
+		tests/api/server/services/test_entity_graph_buffer_pool.py \
+		tests/api/server/services/test_entity_graph_schema.py \
+		tests/api/unit/test_webhook_delivery.py \
+		tests/api/unit/test_tracked_executor_validation.py \
+		tests/api/server/services/test_workflow_event_ingestor.py \
+		tests/api/server/services/test_persona_responder_edge_cases.py \
+		tests/api/unit/test_hiring_segment_*.py \
+		tests/api/unit/test_expense_claim_orchestration.py \
+		tests/api/unit/test_*graph.py \
+		tests/api/functions/agents/test_runtime_protocol.py \
+		tests/api/functions/graphs/executors/agents/test_runtime_aoai.py \
+		tests/api/functions/graphs/executors/agents/test_wrapper_tool_capture.py \
+		tests/api/unit/test_fleet_manager_queue*.py \
+		tests/api/unit/test_fleet_manager_service.py
+	$(HARNESS_PYTEST) \
+		tests/api/server/services/replay/test_recorder.py \
+		tests/api/server/services/replay/test_tape_format.py \
+		tests/api/server/routes/test_replay_meta.py
+	npm exec --no -- vitest run \
+		web/client/hooks/__tests__/useResolutionStore.test.tsx \
+		web/client/hooks/__tests__/useFeedItems.test.tsx \
+		web/client/components/feed/__tests__/cards \
+		web/client/components/feed/__tests__/Feed.test.tsx \
+		web/client/components/feed/__tests__/CardList.test.tsx \
+		web/client/components/feed/__tests__/Drawer.test.tsx \
+		web/client/components/feed/__tests__/DrawerDecision.test.tsx \
+		web/portal/src/lib/__tests__/paths.test.ts
 
 # Playwright — requires the stack to already be running (`make up` in another terminal).
 test-e2e:

@@ -33,3 +33,34 @@ async def test_batches_multiple_workflows():
     await asyncio.sleep(0.2)
     assert len(calls) == 1
     assert sorted(e.workflow_id for e in calls[0]) == ["A", "B", "C"]
+
+
+@pytest.mark.asyncio
+async def test_work_arriving_during_batch_drains_without_another_wake():
+    started = asyncio.Event()
+    release = asyncio.Event()
+    batches = []
+    active = 0
+    max_active = 0
+
+    async def process(batch):
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
+        batches.append([(entry.workflow_id, entry.reason) for entry in batch])
+        if len(batches) == 1:
+            started.set()
+            await release.wait()
+        active -= 1
+
+    queue = FleetManagerQueue(process, debounce_ms=0)
+    queue.enqueue(QueueEntry(workflow_id="A", reason="first"))
+    await asyncio.wait_for(started.wait(), timeout=1)
+    queue.enqueue(QueueEntry(workflow_id="B", reason="earlier"))
+    queue.enqueue(QueueEntry(workflow_id="B", reason="latest"))
+    release.set()
+    await asyncio.wait_for(queue._task, timeout=1)
+
+    assert batches == [[("A", "first")], [("B", "latest")]]
+    assert queue.depth() == 0
+    assert max_active == 1

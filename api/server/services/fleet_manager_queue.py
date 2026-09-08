@@ -38,9 +38,9 @@ class FleetManagerQueue:
             return
         self._flushing = True
         try:
-            batch = list(self._pending.values())
-            self._pending.clear()
-            if batch:
+            while self._pending:
+                batch = list(self._pending.values())
+                self._pending.clear()
                 await self._processor(batch)
         finally:
             self._flushing = False

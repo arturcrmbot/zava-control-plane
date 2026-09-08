@@ -276,6 +276,53 @@ async def test_workflow_completed_sets_completed_status():
     assert "workflow.resolved" in types
 
 
+@pytest.mark.parametrize(
+    ("outcome", "terminal_kind"),
+    [
+        ("timeout", "workflow.failed"),
+        ("failed", "workflow.failed"),
+        ("cancelled", "workflow.failed"),
+        ("auto_dropped", "workflow.rejected"),
+        ("rejected", "workflow.rejected"),
+        ("rejected_at_final_signoff", "workflow.rejected"),
+        ("unexpected", "workflow.failed"),
+    ],
+)
+async def test_completion_preserves_unsuccessful_outcome(outcome, terminal_kind):
+    state, captured = _app_state()
+    workflow = _seed(state, "ING-OUTCOME")
+    workflow.status = "awaiting_hitl"
+    workflow.metadata = {"awaiting_reason": "approval", "wait_kind": "operator_review"}
+    ing = WorkflowEventIngestor(state)
+
+    await ing.ingest(
+        workflow.id, "I-OUTCOME", "workflow.completed",
+        {"status": outcome, "phase": "Approve"},
+    )
+
+    assert workflow.status == "failed"
+    assert workflow.metadata["outcome"] == outcome
+    assert "awaiting_reason" not in workflow.metadata
+    assert state.orchestration_history[workflow.id][-1]["kind"] == terminal_kind
+    assert "durable.workflow.completed" not in [event.type for event in captured]
+    assert not any(
+        event.type == "workflow.resolved" and event.resolution == "completed"
+        for event in captured
+    )
+
+
+async def test_automatic_drop_is_not_attributed_to_a_human_operator():
+    state, _ = _app_state()
+    workflow = _seed(state, "ING-AUTO-DROP")
+    await WorkflowEventIngestor(state).ingest(
+        workflow.id, "I-DROP", "workflow.completed", {"status": "auto_dropped"}
+    )
+    rejection = workflow.action_ledger[-1]
+    assert rejection.actor_kind == "agent"
+    assert rejection.actor_id == "orchestrator"
+    assert workflow.metadata["rejected_by"] == "orchestrator"
+
+
 async def test_workflow_rejected_sets_failed_and_emits_failed():
     state, captured = _app_state()
     _seed(state, "ING-8")

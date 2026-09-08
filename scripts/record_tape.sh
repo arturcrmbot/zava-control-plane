@@ -45,7 +45,13 @@ export SIMULATOR_RAMP_AVG_INTERVAL_SECONDS="${SIMULATOR_RAMP_AVG_INTERVAL_SECOND
 # trigger ONE explicit dream pass below to also produce lessons.
 export DREAM_PASS_TRIGGER_BACKLOG=999
 export MEMORY_DOMAINS=hiring
-export ZAVA_APP_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+ZAVA_APP_SHA="$(git rev-parse --verify HEAD)"
+SOURCE_STATUS="$(git status --porcelain --untracked-files=normal)"
+if [[ -n "$SOURCE_STATUS" ]]; then
+  ZAVA_APP_SHA="${ZAVA_APP_SHA}-dirty"
+  echo "[record_tape] uncommitted source: this development tape cannot authorize publication" >&2
+fi
+export ZAVA_APP_SHA
 export ZAVA_RECORD_TO="$OUT"
 # Default 40s warmup so the t=0 snapshot has seeded workflows AND the
 # memory seed batches + explicit dream pass complete BEFORE snapshot.

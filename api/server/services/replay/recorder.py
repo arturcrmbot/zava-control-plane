@@ -196,6 +196,7 @@ class Recorder:
                 version=TAPE_FORMAT_VERSION,
                 app_sha=self._app_sha,
                 selected_vertical=app_state.runtime.pack.name,
+                pack_fingerprint=app_state.runtime.fingerprint,
             )
 
             assert self._work_dir is not None

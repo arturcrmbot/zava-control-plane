@@ -15,6 +15,7 @@ needing to know about OpenTelemetry.
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, Callable, Protocol, runtime_checkable
 
@@ -54,6 +55,20 @@ class LLMRuntime(Protocol):
         event_subscriber: Callable[[Any], None] | None = None,
     ) -> LLMRuntimeResult:
         ...
+
+
+def validate_required_tool_names(
+    required_tool_names: list[str] | None, available_names: Iterable[str],
+) -> list[str]:
+    required = list(dict.fromkeys(required_tool_names or []))
+    available = set(available_names)
+    unknown = [name for name in required if name not in available]
+    if unknown:
+        raise ValueError(
+            "required_tool_names contains tools that are not registered: "
+            f"{unknown}"
+        )
+    return required
 
 
 def _get_runtime() -> LLMRuntime:

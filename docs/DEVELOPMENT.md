@@ -73,8 +73,145 @@ you don't want noise in the terminal).
 
 ```bash
 make test              # pytest + vitest (no live stack needed)
+make test-harness      # focused, offline presales harness contracts
 make test-e2e          # Playwright (requires `make up` in another terminal)
 ```
+
+`make test-harness` covers pack registration/packaging, checkpoint delivery,
+validation and terminal outcomes, required-tool evidence, supervisor batching,
+feed action cancellation, prefixed SPA navigation, and release provenance.
+It uses installed dependencies without syncing
+them, synthetic stores, mocked providers and callback/memory boundaries. The
+delivery cases use HTTP transport mocks rather than bypassing the client.
+Live-state and replay cohorts run in separate processes to avoid their
+import-time state configurations interfering.
+
+This is a regression gate, not proof of production failover, live-model quality,
+or complete industry modelling. Image-copy checks do not replace building and
+starting the canonical container when Docker is available.
+
+Live checkpoint callbacks require the same `DURABLE_EVENT_SECRET` in FastAPI and
+the Functions worker. Delivery/authentication failures now stop the checkpoint
+instead of being silently accepted. Optional trace delivery remains best-effort.
+Feed Undo cancels only an unsent action; once dispatch begins it is unavailable,
+and pending actions are not restored as completed history after a reload.
+
+### Container verification before publishing
+
+On macOS, a missing Docker socket can mean the existing Colima profile is
+stopped. Start it without deleting or resetting its disks:
+
+```bash
+colima start --profile default
+docker version
+docker build --platform linux/amd64 --progress=plain \
+  -f deploy/Dockerfile -t zava-control-plane:local .
+```
+
+The AMD64 build matches the deployment target. A successful unit suite or image
+build alone is not a runtime proof: the built image must start, serve the UI and
+runtime APIs, and pass browser checks for the selected live or replay mode.
+Do not proceed to publication after a failed build or startup.
+
+If package downloads fail during TLS negotiation, compare the exact URL from
+the build log on the host and inside the Linux base image. If both fail while
+the package index works, restore network/VPN access or use an approved package
+mirror. Do not disable certificate verification or relabel that build as passed.
+
+The Dockerfile accepts an alternate HTTPS index without changing `uv.lock`:
+
+```bash
+docker build --platform linux/amd64 --progress=plain \
+  --build-arg PYPI_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+  --build-arg NPM_REGISTRY=https://repo.huaweicloud.com/repository/npm/ \
+  -f deploy/Dockerfile -t zava-control-plane:local .
+```
+
+The example mirror serves the same pinned wheel bytes; the build exports frozen
+requirements and enforces their hashes during installation. The default remains
+PyPI. `NPM_REGISTRY` similarly overrides the download registry while all three
+frontends use `npm ci` and their checked-in integrity hashes. The build invokes
+the installed Vite binary rather than allowing `npx` to fetch an unlocked
+replacement. These are build-local choices, not machine-wide network settings.
+
+For a loopback-only replay preview of the tape baked into that image:
+
+```bash
+docker run --rm --name zava-replay-local -p 127.0.0.1:8080:80 \
+  -e ZAVA_MODE=replay -e ZAVA_VERTICAL=agency \
+  -e PORTAL_DATA_DIR=/tmp/zava-replay \
+  -e MEMORY_BACKEND=fallback -e LLM_RUNTIME=fake \
+  -e ENTITY_GRAPH_BUFFER_POOL_MB=256 \
+  -e ENTITY_GRAPH_MAX_DB_SIZE_MB=4096 \
+  zava-control-plane:local
+```
+
+The two graph settings are deliberately separate. The buffer pool controls
+working memory; the optional maximum DB size bounds Kuzu's address-space
+reservation. Kuzu's default 8 TiB reservation caused an actual OOM when running
+the AMD64 image through QEMU on Apple Silicon. A 4096 MiB limit permits the
+small demo graph to open there. Unset or zero retains the library default;
+do not copy this capacity limit into a larger deployment without sizing it.
+
+The container pins Azure Functions Core Tools **4.9.0-1** and pre-caches
+extension bundle **4.17.0**, verified by SHA-256, rather than depending on the
+CLI's first-boot connectivity probe. For **local AMD64/QEMU live execution
+only**, pass `-e ZAVA_FUNCTIONS_QEMU_COMPAT=1`. This disables .NET's W^X mapping
+in the Functions subprocess to avoid the observed emulation/reflection
+failure; native deployments retain the default protection. Replay does not
+start Functions and needs neither that opt-in nor Azurite.
+
+In live mode the entrypoint supervises both Functions and Uvicorn: either
+child exiting stops the container and its owned worker processes. An API
+health response alone is not a Durable proof. Also require Functions host
+state `Running` and an actual workflow completion with its instance ID and
+observable outcome. A boot-only overlay can demonstrate that boundary, but
+does not prove that a subsequent full-source image was built successfully.
+
+In another terminal, inspect the actual runtime rather than just the container
+process:
+
+```bash
+curl -fsS http://127.0.0.1:8080/healthz
+curl -fsS http://127.0.0.1:8080/api/runtime
+curl -fsS http://127.0.0.1:8080/api/replay/meta
+curl -fsS -H 'Accept: text/html' http://127.0.0.1:8080/portal/recruiter
+```
+
+Open `/`, `/blueprint/`, and `/portal/recruiter` in a browser, then reload the
+portal deep link. Packaged portal navigation stays under `/portal/`; the
+standalone Vite app still uses `/`. Set `PORTAL_PUBLIC_URL` to the externally
+reachable portal root **including `/portal`** when the backend generates
+candidate links. Unknown `/api/*` and `/assets/*` must remain errors, not
+HTML success responses. In replay, a POST to `/api/workflows` must return 403.
+
+Before a public release, commit the intended source, obtain fresh live/replay
+proof for that exact commit and selected vertical, and complete the
+operator-owned seller review. Generate and verify `proof/public-replay.json`
+with `tools/public_replay_manifest.py`; do not edit a PASS into the manifest.
+Then use the existing proof-gated `scripts/deploy-blueprint.sh` path with
+`ZAVA_MODE=replay` and the explicitly selected tenant. The wrapper refuses stale
+source, missing evidence, or incomplete review before deployment.
+
+Committing reviewed source is a checkpoint, not permission to deploy. Do not
+hold all source changes uncommitted while investigating a machine-specific
+build issue; record the remaining image/release gate explicitly.
+
+`public-replay.json` schema 2 binds the full source commit, vertical, pack
+fingerprint, and SHA-256 digests of the tape, machine proof, and seller review.
+The tape's `app_sha`, `selected_vertical`, and `pack_fingerprint` must agree
+with the proof. Missing metadata, short SHAs, different packs, and
+dirty-development proof are rejected. `scripts/record_tape.sh` now stamps the
+full commit and adds `-dirty` for uncommitted source; that recording remains
+usable locally but cannot approve a release. Legacy tapes remain readable,
+not silently upgraded into current evidence.
+
+Keep old evidence under `proof/archive/` and old recordings under
+`tapes/archive/`, outside the image build context. The pre-harness Fashion
+proof is archived at `proof/archive/2026-07-27-fashion-dirty/`; its historical
+PASS results do not approve an Agency release. The May 28 Agency tape is
+preserved under `tapes/archive/pre-harness/`. Do not fix freshness by renaming
+a tape, changing its date, or editing PASS into a JSON file.
 
 Run a single file:
 
@@ -88,8 +225,9 @@ Layout:
 
 | Path | Framework | What |
 |---|---|---|
-| [tests/api/](../tests/api/) | pytest | Python unit tests (30) |
-| [tests/web/](../tests/web/) | vitest | TS shared-types + events unit tests (12) |
+| [tests/api/](../tests/api/) | pytest | Python unit and integration tests |
+| [tests/web/](../tests/web/) | vitest | TS shared-types and events |
+| `web/**/__tests__/` | vitest | Frontend components and hooks |
 | [tests/e2e/](../tests/e2e/) | Playwright | Live-stack smoke + API contract |
 
 ## Reset between demo takes
@@ -252,54 +390,19 @@ Manager + simulator state (not persisted).
 | `azurite` refuses connections on 10000 | Docker/npm azurite not up | `make azurite-up` or `npm i -g azurite && azurite --silent --location azurite-data` |
 | UI shows empty workflows | No stack / API proxy misrouted | Check `VITE_API_BASE_URL` in `.env`; default is `http://localhost:3101` |
 
-## ⚠️ Not safe for public exposure (yet)
+## Live deployment safety
 
-This is a **proof of concept**. It must NOT be bound to a public network
-interface (no public Azure App Service ingress, no Container App with
-external ingress enabled, no exposing port `3101` outside `localhost`).
-A `POC_UNSAFE_FOR_PUBLIC_DEPLOY=1` marker lives at
-[`.poc-safety`](../.poc-safety) at the repo root so any future CI guard
-can fail a deployment manifest that wires a public ingress while that
-marker is still present.
+Writable live mode remains a localhost/private demonstration, not an approved
+unauthenticated public service. The authoritative surface inventory, hardening
+switches, and remaining live deployment gate are in
+[README.md](../README.md#deployment-gate). The old raw-Cypher and unsigned
+Durable-callback findings are not current: query templates and HMAC callback
+authentication already exist. This does not certify the rest of the live API.
 
-### Still-unsafe surfaces
-
-| Surface | Why it's unsafe | Code path | Plan |
-|---|---|---|---|
-| `find_by_pattern` raw-Cypher MCP tool | Lets a tool caller execute arbitrary Cypher fragments against the substrate graph | [`api/server/mcp_tools/find_entities.py`](../api/server/mcp_tools/find_entities.py), [`api/server/services/entity_graph.py`](../api/server/services/entity_graph.py) (`find_by_pattern`) | C2 (pending) — see [`plan/refactor-repo-coherence-remediation-1.md`](../plan/refactor-repo-coherence-remediation-1.md) |
-| `POST /api/durable-event` internal route | Mutates Durable Functions state with no HMAC / actor check | [`api/server/routes/internal_durable_event.py`](../api/server/routes/internal_durable_event.py) | C4 (pending) — see [`plan/refactor-repo-coherence-remediation-1.md`](../plan/refactor-repo-coherence-remediation-1.md) |
-| Persona `decision_policy` `exec()` / `eval()` loader | Compiles + `exec()`s YAML-loaded Python from `data/personae/*` — code-execution surface coupled to a data file | [`api/server/services/persona_responder.py`](../api/server/services/persona_responder.py) (`compile(..., "exec")` / `exec(code, ...)`) | Master-plan persona-loader review/replacement (pending) |
-
-### Hardening switches that exist today
-
-| Env flag | Gates | Default |
-|---|---|---|
-| `CORS_ALLOWED_ORIGINS` | Browser-facing CORS allowlist; no wildcard-with-credentials (C3, commit `5271fb94`) | empty / restrictive |
-| `SERVICENOW_WEBHOOK_SECRET` | HMAC-signed ServiceNow webhook ingress (C5, commit `cb5b507c`) | unset → endpoint refuses |
-| `FINANCE_BP_WEBHOOK_SECRET` | HMAC-signed Finance Business Partner webhook ingress (C5, commit `cb5b507c`) | unset → endpoint refuses |
-| `READ_ROUTE_AUTH` | Set to `enforce` to require an authenticated actor on `audit` / `evals` / `entities` / `cities` reads (C6, commit `c71f590c`) | off (local PoC) |
-
-### Deployment gate
-
-Any public binding (Azure App Service public ingress, Container App with
-public ingress, exposing port `3101` outside `localhost`) requires **all**
-of the following:
-
-1. **C2 complete** — `find_by_pattern` raw-Cypher MCP tool removed or
-   gated. See [`plan/refactor-repo-coherence-remediation-1.md`](../plan/refactor-repo-coherence-remediation-1.md).
-2. **C4 complete** — `POST /api/durable-event` requires HMAC. See
-   [`plan/refactor-repo-coherence-remediation-1.md`](../plan/refactor-repo-coherence-remediation-1.md).
-3. **All hardening switches in enforce mode** — `CORS_ALLOWED_ORIGINS`
-   set to a non-wildcard origin list, both webhook secrets set,
-   `READ_ROUTE_AUTH=enforce`.
-4. **Persona loader review/replacement complete** — the
-   `exec()`/`eval()` surface in `persona_responder.py` either removed,
-   sandboxed, or replaced with a declarative policy DSL.
-5. **`.poc-safety` marker removed** — delete the
-   `POC_UNSAFE_FOR_PUBLIC_DEPLOY=1` line in
-   [`.poc-safety`](../.poc-safety) (or delete the file). A CI guard
-   should fail any deployment manifest with public ingress while that
-   marker is present.
+Leave [`.poc-safety`](../.poc-safety) in place. Public read-only replay is a
+different mode and must pass the
+[source/tape/proof/review gates above](#container-verification-before-publishing).
+Its write rejection does not authorize exposing writable live mode.
 
 ## Helper scripts
 

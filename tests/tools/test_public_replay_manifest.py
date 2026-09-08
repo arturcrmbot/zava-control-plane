@@ -15,14 +15,21 @@ from tools.public_replay_manifest import build_manifest, verify_manifest
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _write_tape(path: Path, *, tape_id: str = "tape_test", recorded_at: str = "2026-08-10T09:00:00+00:00") -> None:
+def _write_tape(
+    path: Path, *, tape_id: str = "tape_test",
+    recorded_at: str = "2026-08-10T09:00:00+00:00",
+    meta_overrides: dict | None = None,
+) -> None:
     meta = json.dumps(
         {
             "tape_id": tape_id,
             "recorded_at": recorded_at,
             "duration_s": 60,
             "version": 1,
-            "app_sha": "abc1234",
+            "app_sha": "a" * 40,
+            "selected_vertical": "agency",
+            "pack_fingerprint": "agency:1",
+            **(meta_overrides or {}),
         },
     ).encode()
     with tarfile.open(path, "w:gz") as archive:
@@ -36,6 +43,8 @@ def _write_proof(path: Path, source_commit: str) -> None:
         json.dumps(
             {
                 "source_commit": source_commit,
+                "vertical": "agency",
+                "fingerprint": "agency:1",
                 "live_result": "PASS",
                 "replay_result": "PASS",
                 "seller_review": "PENDING",
@@ -74,7 +83,7 @@ def test_build_manifest_binds_tape_proof_and_story(tmp_path: Path) -> None:
 
     manifest = build_manifest(tape, proof, seller_review, "a" * 40)
 
-    assert manifest["schema_version"] == 1
+    assert manifest["schema_version"] == 2
     assert manifest["source_commit"] == "a" * 40
     assert len(manifest["tape_sha256"]) == 64
     assert len(manifest["proof_manifest_sha256"]) == 64
@@ -84,6 +93,79 @@ def test_build_manifest_binds_tape_proof_and_story(tmp_path: Path) -> None:
         "2026-08-10-zava-constellation-story-design.md",
     )
     assert manifest["tape_id"] == "tape_test"
+    assert manifest["vertical"] == "agency"
+    assert manifest["fingerprint"] == "agency:1"
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("app_sha", None),
+        ("app_sha", "b" * 40),
+        ("selected_vertical", None),
+        ("selected_vertical", "telco"),
+        ("pack_fingerprint", None),
+        ("pack_fingerprint", "agency:stale"),
+    ],
+)
+def test_build_manifest_rejects_stale_or_unattributed_tape(tmp_path, field, value):
+    tape = tmp_path / "demo.tar.gz"
+    proof = tmp_path / "manifest.json"
+    review = tmp_path / "seller-review.json"
+    _write_tape(tape, meta_overrides={field: value})
+    _write_proof(proof, "a" * 40)
+    _write_seller_review(review)
+    with pytest.raises(ValueError, match=field):
+        build_manifest(tape, proof, review, "a" * 40)
+
+
+@pytest.mark.parametrize("field", ["vertical", "fingerprint"])
+def test_build_manifest_requires_identified_proof_pack(tmp_path, field):
+    tape = tmp_path / "demo.tar.gz"
+    proof = tmp_path / "manifest.json"
+    review = tmp_path / "seller-review.json"
+    _write_tape(tape)
+    _write_proof(proof, "a" * 40)
+    _write_seller_review(review)
+    payload = json.loads(proof.read_text())
+    payload.pop(field)
+    proof.write_text(json.dumps(payload))
+    with pytest.raises(ValueError, match=field):
+        build_manifest(tape, proof, review, "a" * 40)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("source_mode", "dirty-development"),
+        ("source_dirty", True),
+        ("source_attribution", "DIRTY_DEVELOPMENT"),
+    ],
+)
+def test_build_manifest_refuses_dirty_development_proof(tmp_path, field, value):
+    tape = tmp_path / "demo.tar.gz"
+    proof = tmp_path / "manifest.json"
+    review = tmp_path / "seller-review.json"
+    _write_tape(tape)
+    _write_proof(proof, "a" * 40)
+    _write_seller_review(review)
+    payload = json.loads(proof.read_text())
+    payload[field] = value
+    proof.write_text(json.dumps(payload))
+    with pytest.raises(ValueError, match="dirty"):
+        build_manifest(tape, proof, review, "a" * 40)
+
+
+@pytest.mark.parametrize("source_commit", ["", "abc1234", "a" * 40 + "-dirty"])
+def test_build_manifest_requires_full_source_commit(tmp_path, source_commit):
+    tape = tmp_path / "demo.tar.gz"
+    proof = tmp_path / "manifest.json"
+    review = tmp_path / "seller-review.json"
+    _write_tape(tape, meta_overrides={"app_sha": source_commit})
+    _write_proof(proof, source_commit)
+    _write_seller_review(review)
+    with pytest.raises(ValueError, match="source_commit"):
+        build_manifest(tape, proof, review, source_commit)
 
 
 # ---------------------------------------------------------------------------
@@ -276,7 +358,13 @@ def test_build_manifest_accepts_meta_json_without_leading_dot(tmp_path: Path) ->
     tape = tmp_path / "demo.tar.gz"
     proof = tmp_path / "manifest.json"
     seller_review = tmp_path / "seller-review.json"
-    meta = json.dumps({"tape_id": "t1", "recorded_at": "2026-08-10T00:00:00Z"}).encode()
+    meta = json.dumps({
+        "tape_id": "t1",
+        "recorded_at": "2026-08-10T00:00:00Z",
+        "app_sha": "a" * 40,
+        "selected_vertical": "agency",
+        "pack_fingerprint": "agency:1",
+    }).encode()
     with tarfile.open(tape, "w:gz") as archive:
         info = tarfile.TarInfo("meta.json")  # no "./" prefix
         info.size = len(meta)
@@ -331,6 +419,22 @@ def test_tape_meta_refuses_hardlink_member(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Verify: stored schema_version / tape_id / recorded_at tampering
 # ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("field", ["vertical", "fingerprint"])
+def test_verify_manifest_detects_pack_tampering(tmp_path, field):
+    tape = tmp_path / "demo.tar.gz"
+    proof = tmp_path / "manifest.json"
+    review = tmp_path / "seller-review.json"
+    manifest_path = tmp_path / "public-replay.json"
+    _write_tape(tape)
+    _write_proof(proof, "a" * 40)
+    _write_seller_review(review)
+    stored = build_manifest(tape, proof, review, "a" * 40)
+    stored[field] = "stale"
+    manifest_path.write_text(json.dumps(stored))
+    with pytest.raises(ValueError, match=f"{field} mismatch"):
+        verify_manifest(tape, proof, review, manifest_path, "a" * 40)
+
 
 def test_verify_manifest_detects_schema_version_tampering(tmp_path: Path) -> None:
     tape = tmp_path / "demo.tar.gz"

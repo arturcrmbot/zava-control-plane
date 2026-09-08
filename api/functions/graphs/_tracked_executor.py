@@ -87,6 +87,16 @@ class TrackedExecutor(Executor):
             try:
                 try:
                     result = await self._fn(input)
+                    if self._executor_type == "validator" and result.get("ok") is False:
+                        reason = result.get("blocked_reason") or result.get("missing") or "validation failed"
+                        span.add_event("validator.blocked", {"reason": str(reason)})
+                        await emit(wid, iid, "validator.blocked", {
+                            "name": self._name,
+                            "reason": str(reason),
+                            **phase_fields,
+                            **invocation_fields,
+                        })
+                        raise ValueError(f"{self._name}: {reason}")
                 except Exception as ex:
                     span.record_exception(ex)
                     span.set_status(Status(StatusCode.ERROR, str(ex)))
@@ -104,11 +114,6 @@ class TrackedExecutor(Executor):
                 _current_invocation_id.reset(invocation_token)
                 _current_phase.reset(phase_token)
 
-            if self._executor_type == "validator" and result.get("ok") is False:
-                reason = result.get("blocked_reason") or result.get("missing") or "validation failed"
-                span.set_status(Status(StatusCode.ERROR, str(reason)))
-                span.add_event("validator.blocked", {"reason": str(reason)})
-
         await emit(wid, iid, "executor.invoked", {
             "name": self._name, "type": self._executor_type, "stage": "complete",
             "duration_ms": int((time.time() - t0) * 1000),
@@ -117,15 +122,6 @@ class TrackedExecutor(Executor):
         })
         # Merge input + result so downstream nodes have full context
         merged = {**input, **result}
-        # If a validator failed, emit dedicated event
-        if self._executor_type == "validator" and result.get("ok") is False:
-            await emit(wid, iid, "validator.blocked", {
-                "name": self._name,
-                "reason": result.get("blocked_reason") or result.get("missing") or "validation failed",
-                **phase_fields,
-                **invocation_fields,
-            })
-            # Still forward -- orchestration generator decides what to do with ok=False
         await ctx.send_message(merged)
 
 
