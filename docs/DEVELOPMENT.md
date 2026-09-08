@@ -220,11 +220,24 @@ SITE-03; terminating Functions stopped the whole live container and finalized
 the recording. Local evidence is under `proof/harness/source-3fe95702/`.
 This is shared-harness evidence, not an Agency seller-story approval.
 
-The older historical-replay container subsequently exhausted its **4 GiB
-container memory limit after about 131 minutes**. The cause has not yet been
-isolated; do not call replay soak-tested or fix this by merely increasing the
-limit. Resolve that failure and repeat a bounded-memory soak before public
-publication, alongside the fresh Agency tape and operator review gates.
+The older historical-replay container exhausted its **4 GiB memory limit after
+about 131 minutes**. Replay was still subscribed to the live entity and
+meta-workflow reflectors. Every tape cycle re-ran graph writes and minted new
+governance/audit evidence. A six-cycle reproduction grew from 335 MiB to
+2,563 MiB; a minimal Kuzu write probe reproduced native memory retention.
+
+Replay now leaves those live reflectors unsubscribed. Recorded workflow
+mutations and event delivery continue; live mode retains its projections.
+Twelve accelerated full-tape cycles stayed at about 410 MiB after warmup.
+This is a replay isolation fix, not a claim that sustained write-heavy Kuzu
+workloads are bounded. A normal-speed container soak is a separate release
+gate and must not be inferred from accelerated coverage.
+
+Format-v1 tapes restore workflow, phase, span, tool-call, memory and audit
+snapshot data. They do **not** reconstruct a historical entity graph or actor
+world. The Knowledge surface shows the selected pack's seed graph, not
+recomputed decisions attributed to the old recording. Capture any live graph
+outcome separately and keep that limitation explicit in the seller review.
 
 Run a single file:
 

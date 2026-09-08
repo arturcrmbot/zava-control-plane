@@ -153,7 +153,10 @@ class AppState:
                 self.bus, self.store, self.entities,
                 governance=self.governance, audit=self.audit,
             )
-            self.entity_reflector.start()
+            # Playback must not re-run live projections: every tape loop would
+            # write the graph again and mint fresh audit/governance evidence.
+            if not is_replay():
+                self.entity_reflector.start()
 
             # Phase 4 IP7 (TASK-033b) — meta-workflow reflector mirrors
             # workflow.sub_spawned events into the Workflow self-relation
@@ -162,7 +165,8 @@ class AppState:
             self.meta_workflow_reflector = MetaWorkflowReflector(
                 bus=self.bus, audit=self.audit, graph=self.entities,
             )
-            self.meta_workflow_reflector.start()
+            if not is_replay():
+                self.meta_workflow_reflector.start()
 
         self.hub = SSEHub()
 

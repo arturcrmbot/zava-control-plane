@@ -1100,6 +1100,13 @@ runs at startup when `is_replay()`:
 4. At EOT (`duration_s` reached): re-snapshot t=0 in-memory and reset
    the clock — the loop is hands-free.
 
+Replay does not subscribe the live entity or meta-workflow reflectors.
+Re-evaluating archived events would repeatedly write Kuzu and create new
+governance/audit evidence on each loop; that caused the observed replay
+memory exhaustion. Format-v1 tapes do not hydrate a historical graph or
+actor world, so the Knowledge view remains the active pack's seed graph,
+not a time-travel reconstruction.
+
 ### 14.5 Read-only middleware
 
 [`api/server/middleware/replay_readonly.py`](../api/server/middleware/replay_readonly.py)

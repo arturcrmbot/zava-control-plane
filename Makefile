@@ -128,7 +128,10 @@ test-harness:
 		tests/api/unit/test_fleet_manager_queue*.py \
 		tests/api/unit/test_fleet_manager_service.py
 	$(HARNESS_PYTEST) \
+		tests/api/server/services/replay/test_reflector_isolation.py \
 		tests/api/server/services/replay/test_recorder.py \
+		tests/api/server/services/replay/test_player.py \
+		tests/api/server/services/replay/test_hydrate.py \
 		tests/api/server/services/replay/test_tape_format.py \
 		tests/api/server/routes/test_replay_meta.py
 	npm exec --no -- vitest run \

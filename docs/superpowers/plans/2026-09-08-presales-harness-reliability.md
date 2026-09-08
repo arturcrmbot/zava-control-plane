@@ -180,10 +180,15 @@ a substitute Agency seller story.
   tape, actual FastAPI SPA hosting, and mode-specific release boundaries.
 - [ ] Publish only after fresh Agency live/replay evidence and the operator's
   seller review pass. Never manufacture human approval to bypass this gate.
-- [ ] Investigate and resolve the long-running replay memory failure before
-  publication. The older historical-replay container was killed at its 4 GiB
-  memory limit after 7,862 seconds; the kernel reports a container-limit OOM,
-  not VM-wide pressure. Short current-image checks are not a passed soak test.
+- [x] Isolate the long-running replay failure: live graph subscribers re-ran
+  projections on each tape loop. Six accelerated cycles grew from 335 MiB to
+  2,563 MiB; disabling live reflection left replay stable. Replay now leaves
+  both live reflectors unsubscribed while preserving recorded event delivery
+  and workflow hydration; live mode retains graph projections.
+- [x] Run twelve full accelerated tape cycles after the fix: approximately
+  410 MiB after warmup, no per-cycle graph writes or new governance decisions.
+- [ ] Complete the normal-speed container soak past the original 131-minute
+  failure window. Accelerated cycles are not a substitute for this release gate.
 
 Checkpoint the reviewed source separately from the remaining image/release
 gate. After commit, new evidence must name that exact source SHA; the earlier
