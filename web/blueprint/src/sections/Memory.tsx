@@ -27,7 +27,7 @@ export function Memory() {
         <header className="stack">
           <p className="subtitle">How the substrate gets better at its job</p>
           <h2 className="section-title">
-            The institution that remembers itself.
+            Context can carry between runs, where enabled.
           </h2>
         </header>
 
@@ -44,12 +44,11 @@ export function Memory() {
         </ol>
 
         <p className="body">
-          This is where the authority matrix stops being a static rulebook
-          and starts behaving like institutional judgement. Where memory is
-          enabled, the substrate surfaces the rule, recent comparable
-          decisions, and the lessons distilled from previous runs. Add a
-          domain and it inherits that accumulated record — in the domains
-          where inheritance is configured. That is the part that compounds.
+          Where memory is enabled, the substrate can put the rule beside recent
+          comparable decisions and lessons from earlier runs. A domain inherits
+          that record only when its memory configuration says it should. The
+          useful part is the precedent, not a claim that every workflow learns
+          automatically.
         </p>
       </div>
     </section>

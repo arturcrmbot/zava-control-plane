@@ -56,6 +56,7 @@ class TestTapeMeta:
             duration_s=123.456,
             version=1,
             app_sha="abc123def456",
+            selected_vertical="agency",
         )
         dumped = original.model_dump()
         restored = TapeMeta.model_validate(dumped)
@@ -90,6 +91,14 @@ class TestTapeMeta:
             duration_s=10.0,
         )
         assert tape.app_sha is None
+
+    def test_selected_vertical_optional_for_legacy_tapes(self):
+        tape = TapeMeta(
+            tape_id="tape-legacy",
+            recorded_at="2025-05-22T10:00:00Z",
+            duration_s=10.0,
+        )
+        assert tape.selected_vertical is None
 
 
 class TestEventRecord:

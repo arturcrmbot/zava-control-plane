@@ -1,6 +1,8 @@
 import { Opening } from "./sections/Opening";
 import { Analogy } from "./sections/Analogy";
 import { Argument } from "./sections/Argument";
+import { AgencyStory } from "./sections/AgencyStory";
+import { Verticals } from "./sections/Verticals";
 import { Composition } from "./sections/Composition";
 import { Personae } from "./sections/Personae";
 import { Authority } from "./sections/Authority";
@@ -56,6 +58,10 @@ export default function App() {
       <Analogy />
       <hr className="rule" />
       <Argument />
+      <hr className="rule" />
+      <AgencyStory />
+      <hr className="rule" />
+      <Verticals />
       <hr className="rule" />
       <Composition />
       <hr className="rule" />

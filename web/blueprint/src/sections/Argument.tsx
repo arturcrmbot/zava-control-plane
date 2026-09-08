@@ -1,28 +1,28 @@
 
 const captions: { label: string; title: string; body: string }[] = [
   {
-    label: "01 · The harness",
-    title: "Agentic segments inside deterministic workflows.",
+    label: "01 · Durable control",
+    title: "Workflow order, checkpoints, retries and human gates.",
     body:
-      "A workflow is a sequence of segments. Each segment opens a short-lived agent session, runs to a checkpoint, and closes. The model picks the next tool inside a segment; the orchestrator picks everything else.",
+      "Every domain runs inside a durable workflow: segment order is declared, checkpoints survive infrastructure failures, retries are automatic, and human approval gates pause execution until a person acts. The orchestrator owns all of that; agents own what happens inside a segment.",
   },
   {
-    label: "02 · Skills",
-    title: "Modular units of know-how, governed in one place.",
+    label: "02 · Bounded agent work",
+    title: "Short-lived sessions load approved skills and tools.",
     body:
-      "A skill is a markdown file with a system prompt, a tool allow-list, and a model choice. Adding or replacing a skill is a small change to a single file rather than a redeployment of the system.",
+      "A segment opens an agent session with an approved skill and tool list, runs to a checkpoint, and closes. Skills and tools are versioned and released like code. Changes to a skill go through the same review and deployment pipeline as any other code change.",
   },
   {
-    label: "03 · MCPs",
-    title: "One adapter per system, shared across every agent.",
+    label: "03 · Pack-scoped capabilities",
+    title: "MCP adapters and typed commands belong to the selected vertical.",
     body:
-      "The outside systems the workflows depend on — Workday, Concur, the policy and audit ledger, the delegated-authority matrix, identity, document intelligence, and external sources like contract repositories and market pricing — are all surfaced as MCP tools with a shared way of authenticating and a shared shape for their inputs and outputs. Every agent uses the same adapter for the same system.",
+      "The MCP adapters and command types available to a workflow belong to the active vertical pack. Authorised capabilities are available only to work that the pack's authority rules permit. A different pack selects different adapters and commands.",
   },
   {
-    label: "04 · The foundation",
-    title: "Identity, validation, audit and policy, built into the substrate once.",
+    label: "04 · Governance and evidence",
+    title: "Proposed calls are evaluated, recorded and configurable.",
     body:
-      "Each agent has its own identity, its own signing key, and an allow-list of tools it's permitted to call. Every tool call is checked against that allow-list before it runs, every output is structurally validated before the workflow continues, and every call gets written to a tamper-evident audit log signed by the calling skill. Policy lives in a YAML file that compliance can edit directly.",
+      "Each proposed agent call is evaluated before it runs and written to a tamper-evident audit log. Evaluation workspaces can run in log-only mode — the default in .env.example is AGT_ENFORCE=0, which records denials without blocking them. In enforced mode, denied calls block. Configured validators gate outputs before the workflow continues.",
   },
 ];
 
@@ -33,14 +33,13 @@ export function Argument() {
         <header className="argument__intro stack">
           <p className="subtitle">The architecture</p>
           <h2 className="section-title">
-            What you ought to be using instead.
+            One workforce needs shared operating machinery.
           </h2>
           <p className="body">
-            A substrate is the ground layer every agent runs on: who an agent
-            is, what it&apos;s allowed to do, where its actions get recorded,
-            which policies apply. Build it once and every domain you put on
-            top inherits all of it. That&apos;s what makes the cost of the
-            next domain drop sharply.
+            The substrate is the shared layer beneath every agent. It resolves
+            identity and permissions, records actions and applies policy.
+            Build that machinery once and each new domain can reuse it instead
+            of starting another isolated stack.
           </p>
         </header>
 
@@ -57,7 +56,7 @@ export function Argument() {
         </ol>
 
         <p className="body">
-          That identity, audit and policy layer is Microsoft&apos;s
+          The identity, audit and policy layer uses Microsoft&apos;s
           open-source{" "}
           <a
             className="footer__link"
@@ -71,9 +70,9 @@ export function Argument() {
         </p>
 
         <p className="body">
-          Each new domain is composed from existing parts: a new orchestrator
-          plus a small number of new skills, against the same MCPs, identity
-          and governance the first one used.
+          A new domain combines a domain orchestrator with the skills it
+          needs, while reusing the identity and governance contracts already
+          in place.
         </p>
       </div>
     </section>

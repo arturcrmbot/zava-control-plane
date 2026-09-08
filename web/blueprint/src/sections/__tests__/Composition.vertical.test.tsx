@@ -35,5 +35,5 @@ import { Composition } from "../Composition";
 it("names the active vertical", () => {
   render(<Composition />);
 
-  expect(screen.getByText(/Telco organisation/)).toBeTruthy();
+  expect(screen.getByText(/Telco pack/)).toBeTruthy();
 });

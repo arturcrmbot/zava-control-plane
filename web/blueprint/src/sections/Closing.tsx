@@ -17,18 +17,18 @@ export function Closing() {
         <p className="subtitle">In closing</p>
 
         <p className="body">
-          What is running today is a reference implementation: governance,
-          durable workflows, agent and human boundaries, skills, MCP
-          interfaces, memory, audit — operating as one control plane.
+          What is running today is a reference implementation. Governance,
+          durable workflows, agent and human boundaries, skills, MCP interfaces
+          and audit operate through one control plane. Memory joins that control
+          plane only in domains where it is enabled.
         </p>
 
         <p className="body">
-          The public organisation uses synthetic records, personae and
-          external systems. The connection points are not a separate
-          simulation phase. Keep your existing agent and workflow
-          investments. Connect your existing systems, data and MCP
-          boundaries. Bring in your real people. Then make its edges real one
-          valuable journey at a time.
+          The public organisation uses synthetic records, personae and external
+          systems. Those connection points are part of the reference, not a
+          separate simulation phase. Keep your existing agent and workflow
+          investments. Connect your existing systems and people, then make its edges real
+          one useful journey at a time.
         </p>
 
         <p className="body">
@@ -37,9 +37,8 @@ export function Closing() {
         </p>
 
         <p className="closing__final">
-          The interesting question is no longer which isolated agent to
-          fund, but which parts of your organisation should operate as one
-          agentic workforce.
+          The next decision is which parts of your organisation should operate
+          as one agentic workforce.
         </p>
 
         <ul className="closing__cta-list">

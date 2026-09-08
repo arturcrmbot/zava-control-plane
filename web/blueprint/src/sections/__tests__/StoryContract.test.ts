@@ -69,14 +69,6 @@ describe("blueprint article story contract", () => {
     expect(composition).toContain("the model decides which skill");
   });
 
-  // MetaSkill asserts current proven reference is Telco (intentionally hard-coded per approved story)
-  it("metaskill establishes telco as proven reference with boundary connections", () => {
-    const metaSkill = section("MetaSkill");
-    expect(metaSkill).toContain("Telco vertical");
-    expect(metaSkill).toContain("current proven reference");
-    expect(metaSkill).toContain("Existing investments connect at the same boundaries");
-  });
-
   // Observatory CTA text check (source assertion for visible copy)
   it("observatory CTA text says Open Constellation", () => {
     expect(section("Observatory")).toContain("Open Constellation");
@@ -135,6 +127,202 @@ describe("blueprint article story contract", () => {
   it("app footer includes august 2026 publication date", () => {
     const appFile = readFile("../../App.tsx");
     expect(appFile).toContain("August 2026");
+  });
+
+  // ── RED phase: new article contract ─────────────────────────────────────
+
+  // 1. Metadata and navigation
+  describe("metadata and navigation", () => {
+    it("index.html title uses new agentic-organisation proposition", () => {
+      const html = readFile("../../../../../index.html");
+      expect(html).toContain("See what an agentic organisation");
+      expect(html).not.toContain("Why your agentic strategy isn't moving the needle");
+    });
+
+    it("index.html description/OG/Twitter use new proposition", () => {
+      const html = readFile("../../../../../index.html");
+      expect(html).not.toContain("Why your agentic strategy isn't moving the needle");
+    });
+
+    it("TopBar contains new article caption", () => {
+      const topBar = readFile("../../components/TopBar.tsx");
+      expect(topBar).toContain("See what an agentic organisation actually looks like");
+      expect(topBar).not.toContain("Why your agentic strategy isn't moving the needle");
+    });
+  });
+
+  // 2. Current architecture truth
+  describe("architecture truth", () => {
+    it("Argument mentions both log-only and enforced governance modes", () => {
+      const arg = section("Argument");
+      expect(arg).toContain("log-only");
+      expect(arg).toContain("enforced");
+    });
+
+    it("Argument does not claim adding/replacing a skill avoids deployment", () => {
+      const arg = section("Argument");
+      expect(arg).not.toContain("rather than a redeployment of the system");
+      expect(arg).not.toContain("small change to a single file rather than a redeploy");
+    });
+
+    it("Argument does not say every agent uses the same adapter; uses pack-scoped/authorised capability language", () => {
+      const arg = section("Argument");
+      expect(arg).not.toContain("Every agent uses the same adapter for the same system");
+      // Must contain pack-scoped or authorised capability language instead
+      expect(arg).toMatch(/pack[\s-]scoped|authorised capability|authorised capabilities/i);
+    });
+  });
+
+  // 3. Pack-owned authority
+  describe("pack-owned authority", () => {
+    it("Authority links or names verticals/agency/authority.py", () => {
+      const auth = section("Authority");
+      expect(auth).toContain("verticals/agency/authority.py");
+    });
+
+    it("Authority contains 'Each vertical owns' its authority", () => {
+      const auth = section("Authority");
+      expect(auth).toMatch(/each vertical owns/i);
+    });
+
+    it("Authority does not reference data/synthetic/authority/matrix.json", () => {
+      const auth = section("Authority");
+      expect(auth).not.toContain("data/synthetic/authority/matrix.json");
+    });
+
+    it("Authority does not say 'without a redeploy'", () => {
+      const auth = section("Authority");
+      expect(auth).not.toContain("without a redeploy");
+    });
+  });
+
+  // 4. Proof/readiness truth
+  describe("proof and readiness truth", () => {
+    it("Composition calls Agency the worked example, not current proven reference", () => {
+      const comp = section("Composition");
+      expect(comp).toContain("worked example");
+      expect(comp).not.toMatch(/current proven reference/);
+    });
+
+    it("MetaSkill contains Build ready, Demo ready, and Deployed with correct meaning", () => {
+      const ms = section("MetaSkill");
+      expect(ms).toContain("Build ready");
+      expect(ms).toContain("Demo ready");
+      expect(ms).toContain("Deployed");
+    });
+
+    it("MetaSkill does not import or render CompoundingDiagram", () => {
+      const ms = section("MetaSkill");
+      expect(ms).not.toContain("CompoundingDiagram");
+    });
+
+    it("MetaSkill contains not a reskin or equivalent", () => {
+      const ms = section("MetaSkill");
+      expect(ms).toMatch(/not a reskin|not merely a reskin/i);
+    });
+
+    it("no article section contains current proven reference except Telco canonical proof in Verticals", () => {
+      const sections = [
+        "Opening", "Analogy", "Argument", "Composition",
+        "Personae", "Authority", "Memory", "MetaSkill",
+        "Observatory", "Closing",
+      ];
+      for (const name of sections) {
+        expect(section(name)).not.toMatch(/current proven reference/);
+      }
+      // Verticals.tsx must exist and may contain current proven reference for Telco
+      const verticals = section("Verticals");
+      expect(verticals).toContain("Telco");
+    });
+  });
+
+  // 5. Seven executable vertical packs
+  describe("seven executable vertical packs", () => {
+    it("Verticals.tsx exists and contains all manifest display names", () => {
+      const v = section("Verticals");
+      expect(v).toContain("Agency");
+      expect(v).toContain("Telco");
+      expect(v).toContain("Fashion Retail");
+      expect(v).toContain("Travel");
+      expect(v).toContain("Synthetic Airline Operations");
+      expect(v).toContain("Hospitality");
+      expect(v).toContain("Electronics Retail");
+    });
+
+    it("Verticals.tsx says pack presence is not readiness", () => {
+      const v = section("Verticals");
+      expect(v).toMatch(/presence.{0,30}not readiness|not readiness/i);
+    });
+
+    it("Verticals.tsx says only Telco is the canonical proof reference", () => {
+      const v = section("Verticals");
+      expect(v).toMatch(/telco.{0,80}canonical proof|canonical proof.{0,80}telco/i);
+    });
+  });
+
+  // 6. Concrete Agency story
+  describe("concrete Agency story", () => {
+    it("AgencyStory.tsx exists and contains Aurora, CFO, policy/freeze, AP invoices, escalation, CEO synthesis", () => {
+      const as_ = section("AgencyStory");
+      expect(as_).toContain("Aurora");
+      expect(as_).toContain("CFO");
+      expect(as_).toMatch(/policy|freeze/i);
+      expect(as_).toMatch(/AP invoice|accounts payable invoice/i);
+      expect(as_).toContain("escalation");
+      expect(as_).toMatch(/CEO synthesis|CEO/i);
+    });
+
+    it("AgencyStory says data is synthetic but runtime boundaries/evidence are real", () => {
+      const as_ = section("AgencyStory");
+      expect(as_).toMatch(/data.{0,30}synthetic/i);
+      expect(as_).toMatch(/runtime boundaries|boundaries.{0,30}real|evidence.{0,30}real/i);
+    });
+
+    it("App.tsx imports and renders AgencyStory and Verticals", () => {
+      const app = readFile("../../App.tsx");
+      expect(app).toContain("AgencyStory");
+      expect(app).toContain("Verticals");
+    });
+  });
+
+  // 7. Static fixture and replay honesty
+  describe("static fixture and replay honesty", () => {
+    it("Composition says its map is a curated static Agency snapshot, not live", () => {
+      const comp = section("Composition");
+      expect(comp).toMatch(/curated static|static.{0,30}snapshot/i);
+      expect(comp).toContain("Agency");
+    });
+
+    it("Observatory says public view is recorded execution and not live", () => {
+      const obs = section("Observatory");
+      expect(obs).toMatch(/recorded execution|not live/i);
+    });
+
+    it("Observatory mentions recording date and selected vertical in full replay", () => {
+      const obs = section("Observatory");
+      expect(obs).toMatch(/recording date|selected vertical/i);
+    });
+
+    it("Opening does not contain 'synthetic today or real tomorrow'", () => {
+      expect(section("Opening")).not.toContain("synthetic today or real tomorrow");
+    });
+  });
+
+  // 8. Existing useful claims retained
+  describe("existing useful claims retained", () => {
+    it("Opening contains approved headline", () => {
+      const opening = section("Opening");
+      expect(opening).toContain("See what an agentic organisation");
+    });
+
+    it("Personae labels AP controller as an Agency example", () => {
+      const personae = section("Personae");
+      expect(personae).toMatch(/AP controller.{0,80}Agency example|Agency.{0,80}AP controller/i);
+    });
+
+    it("Memory remains conditional with 'Where memory is enabled'", () => {
+      expect(section("Memory")).toContain("Where memory is enabled");
+    });
   });
 
   // Behavioral URL helper tests for Closing CTA — no source-token assertions

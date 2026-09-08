@@ -7,6 +7,9 @@ export type ReplayMetaReplay = {
   recorded_at?: string;
   duration_s?: number;
   current_t?: number;
+  selected_vertical?: string;
+  active_vertical?: string;
+  pack_matches_tape?: boolean | null;
 };
 export type ReplayMeta = ReplayMetaLive | ReplayMetaReplay;
 

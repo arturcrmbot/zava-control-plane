@@ -34,7 +34,7 @@ export function TopBar() {
     >
       <div className="topbar__inner">
         <span className="topbar__caption">
-          Why your agentic strategy isn&apos;t moving the needle.
+          See what an agentic organisation actually looks like.
         </span>
         <a
           className="topbar__cta"

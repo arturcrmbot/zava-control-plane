@@ -195,6 +195,7 @@ class Recorder:
                 duration_s=duration_s,
                 version=TAPE_FORMAT_VERSION,
                 app_sha=self._app_sha,
+                selected_vertical=app_state.runtime.pack.name,
             )
 
             assert self._work_dir is not None
