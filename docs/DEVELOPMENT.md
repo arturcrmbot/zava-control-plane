@@ -213,6 +213,19 @@ PASS results do not approve an Agency release. The May 28 Agency tape is
 preserved under `tapes/archive/pre-harness/`. Do not fix freshness by renaming
 a tape, changing its date, or editing PASS into a JSON file.
 
+**Container evidence from September 8, 2026:** the canonical image built from
+`3fe95702` served all three browser surfaces, including portal deep-link reload.
+A real deterministic Telco Durable run rerouted 184 sessions and recovered
+SITE-03; terminating Functions stopped the whole live container and finalized
+the recording. Local evidence is under `proof/harness/source-3fe95702/`.
+This is shared-harness evidence, not an Agency seller-story approval.
+
+The older historical-replay container subsequently exhausted its **4 GiB
+container memory limit after about 131 minutes**. The cause has not yet been
+isolated; do not call replay soak-tested or fix this by merely increasing the
+limit. Resolve that failure and repeat a bounded-memory soak before public
+publication, alongside the fresh Agency tape and operator review gates.
+
 Run a single file:
 
 ```bash

@@ -163,9 +163,15 @@ a substitute Agency seller story.
   deterministic Telco instance `d98f8795453a4578b604bb214a1896ce` completed,
   rerouted 184 sessions, and recovered SITE-03. The image was a boot-only
   overlay, not a final current-source release image.
-- [ ] Rebuild the full immutable image and exercise portal navigation/reload
-  in it. The latest full rebuild failed with `uv export` exit 139 under QEMU;
-  source-level and boot-overlay results do not erase that failure.
+- [x] Build the full immutable image from pushed source `3fe95702` and exercise
+  all three browser surfaces, including portal navigation/reload. The unchanged
+  retry passed `uv export`; the subsequent export-space failure was resolved by
+  removing only the completed boot-overlay image and its four exact cache
+  records. No dependency or source changes were needed.
+- [x] Repeat real Durable execution in that full-source image:
+  `c18a0a2c33964d7190597547bedc183b` rerouted all 184 affected sessions and
+  recovered SITE-03. Killing its Functions host stopped the container in two
+  seconds and finalized a source-attributed technical recording.
 - [x] Bind new recordings/public manifests to the full source commit, selected
   vertical, and pack fingerprint. Reject dirty or historical release inputs.
 - [x] Archive the old Fashion proof and historical tapes without deleting them;
@@ -174,6 +180,10 @@ a substitute Agency seller story.
   tape, actual FastAPI SPA hosting, and mode-specific release boundaries.
 - [ ] Publish only after fresh Agency live/replay evidence and the operator's
   seller review pass. Never manufacture human approval to bypass this gate.
+- [ ] Investigate and resolve the long-running replay memory failure before
+  publication. The older historical-replay container was killed at its 4 GiB
+  memory limit after 7,862 seconds; the kernel reports a container-limit OOM,
+  not VM-wide pressure. Short current-image checks are not a passed soak test.
 
 Checkpoint the reviewed source separately from the remaining image/release
 gate. After commit, new evidence must name that exact source SHA; the earlier
