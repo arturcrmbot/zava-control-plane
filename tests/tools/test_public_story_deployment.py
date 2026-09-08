@@ -35,6 +35,15 @@ def test_bicep_zava_mode_has_no_live_default() -> None:
         )
 
 
+def test_replay_deployment_uses_the_proven_graph_memory_budget() -> None:
+    bicep = (ROOT / "infra/modules/aca-app.bicep").read_text()
+    assert "memory: '4Gi'" in bicep
+    assert (
+        "{ name: 'ENTITY_GRAPH_BUFFER_POOL_MB', "
+        "value: zavaMode == 'replay' ? '256' : '0' }"
+    ) in bicep
+
+
 def test_public_deploy_uses_the_full_azd_path() -> None:
     script = (ROOT / "scripts/deploy-blueprint.sh").read_text()
     # Must require replay mode.

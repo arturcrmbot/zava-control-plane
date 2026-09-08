@@ -121,6 +121,8 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'DEMO_TIME_WARP_FACTOR', value: '3600' }
 
             { name: 'ENTITY_PLANE_ENABLED', value: '1' }
+            // Match the replay memory proof; live retains Kuzu's native default.
+            { name: 'ENTITY_GRAPH_BUFFER_POOL_MB', value: zavaMode == 'replay' ? '256' : '0' }
 
             // Azure Functions host (Durable orchestrator on :7071, started
             // alongside uvicorn by deploy/entrypoint.sh). Identity-based

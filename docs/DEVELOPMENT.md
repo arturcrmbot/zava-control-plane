@@ -153,6 +153,11 @@ the AMD64 image through QEMU on Apple Silicon. A 4096 MiB limit permits the
 small demo graph to open there. Unset or zero retains the library default;
 do not copy this capacity limit into a larger deployment without sizing it.
 
+The ACA template sets a **256 MiB graph buffer pool in replay mode**, matching
+the container proof rather than inheriting the host's memory-based default.
+Live mode keeps the native default. The emulation-only maximum DB-size and
+Functions compatibility settings are not enabled for native Azure deployment.
+
 The container pins Azure Functions Core Tools **4.9.0-1** and pre-caches
 extension bundle **4.17.0**, verified by SHA-256, rather than depending on the
 CLI's first-boot connectivity probe. For **local AMD64/QEMU live execution
