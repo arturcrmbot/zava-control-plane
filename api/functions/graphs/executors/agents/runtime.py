@@ -71,7 +71,7 @@ def validate_required_tool_names(
     return required
 
 
-def _get_runtime() -> LLMRuntime:
+def _get_runtime(*, azure_deployment: str | None = None) -> LLMRuntime:
     """Dispatch on `LLM_RUNTIME` env var. Defaults to GHCP."""
     name = os.environ.get("LLM_RUNTIME", "ghcp").strip().lower()
     if name == "fake":
@@ -82,7 +82,7 @@ def _get_runtime() -> LLMRuntime:
         return GHCPRuntime()
     if name in ("aoai", "azure", "azure_openai"):
         from api.functions.graphs.executors.agents.runtime_aoai import AOAIRuntime
-        return AOAIRuntime()
+        return AOAIRuntime(deployment=azure_deployment)
     raise ValueError(
         f"LLM_RUNTIME={name!r} not recognised. Supported: 'ghcp', 'aoai', 'fake'."
     )

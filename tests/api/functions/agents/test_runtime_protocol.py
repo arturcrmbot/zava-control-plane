@@ -70,6 +70,19 @@ def test_get_runtime_default_is_ghcp(monkeypatch: pytest.MonkeyPatch) -> None:
     assert isinstance(_get_runtime(), GHCPRuntime)
 
 
+def test_azure_deployment_override_does_not_change_workflow_default(monkeypatch) -> None:
+    from api.functions.graphs.executors.agents.runtime import _get_runtime
+
+    monkeypatch.setenv("LLM_RUNTIME", "azure")
+    monkeypatch.setenv("AZURE_OPENAI_DEPLOYMENT", "workflow-deployment")
+
+    supervisor = _get_runtime(azure_deployment="supervisor-deployment")
+    workflow = _get_runtime()
+
+    assert supervisor._deployment == "supervisor-deployment"
+    assert workflow._deployment == "workflow-deployment"
+
+
 @pytest.mark.asyncio
 async def test_run_agent_session_under_fake_no_subprocess(
     monkeypatch: pytest.MonkeyPatch,

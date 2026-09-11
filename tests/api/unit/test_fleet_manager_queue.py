@@ -64,3 +64,44 @@ async def test_work_arriving_during_batch_drains_without_another_wake():
     assert batches == [[("A", "first")], [("B", "latest")]]
     assert queue.depth() == 0
     assert max_active == 1
+
+
+@pytest.mark.asyncio
+async def test_stop_cancels_pending_work_and_allows_restart():
+    batches = []
+
+    async def process(batch):
+        batches.append(batch)
+
+    queue = FleetManagerQueue(process, debounce_ms=0)
+    queue.enqueue(QueueEntry(workflow_id="A", reason="cancelled"))
+    await queue.stop()
+
+    assert batches == []
+    assert queue.depth() == 0
+    queue.enqueue(QueueEntry(workflow_id="B", reason="after-restart"))
+    await asyncio.wait_for(queue._task, timeout=1)
+    assert [entry.workflow_id for entry in batches[0]] == ["B"]
+
+
+@pytest.mark.asyncio
+async def test_stop_waits_for_active_batch_cancellation():
+    started = asyncio.Event()
+    stopped = asyncio.Event()
+
+    async def process(batch):
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            stopped.set()
+
+    queue = FleetManagerQueue(process, debounce_ms=0)
+    queue.enqueue(QueueEntry(workflow_id="A", reason="active"))
+    await asyncio.wait_for(started.wait(), timeout=1)
+
+    await queue.stop()
+
+    assert stopped.is_set()
+    assert not queue._flushing
+    assert queue.depth() == 0

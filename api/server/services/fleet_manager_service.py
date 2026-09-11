@@ -1,15 +1,16 @@
 """
-Fleet Manager service — long-running GHCP SDK session that consumes triage-filtered
-events, debounces them, and reasons over batches via send_and_wait, calling tools as needed.
+Fleet Manager service — triage-filtered events, debounced into reasoning batches.
+GitHub uses a long-running SDK session; other providers use LLMRuntime per batch.
 
 API surface uses the Phase 0.2 spike's findings; see spike/MAF-DURABLE-NOTES.md §2.
 """
 from __future__ import annotations
 import asyncio
+import os
 import subprocess
 import time
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from copilot import CopilotClient
 from copilot.client import SubprocessConfig
@@ -25,6 +26,9 @@ from api.server.services.fleet_manager_queue import FleetManagerQueue, QueueEntr
 from api.server.services.triage import Triage
 from api.server.mcp_tools import build_fleet_manager_tools
 from api.shared.events import FleetEvent
+
+if TYPE_CHECKING:
+    from api.functions.graphs.executors.agents.runtime import LLMRuntime
 
 
 def _gh_token() -> str:
@@ -118,14 +122,17 @@ def _function_identity_section(function_name: str) -> str:
 class FleetManagerService:
     def __init__(self, *, bus: EventBus | None = None, store: StateStore,
                  audit: AuditLogger,
-                 model: str = "gpt-4.1", on_live: Callable[[dict], None] | None = None,
+                 model: str | None = None, on_live: Callable[[dict], None] | None = None,
                  function: str | None = None,
                  tools: list | None = None,
                  hub=None):
         self._bus = bus
         self._store = store
         self._audit = audit
-        self._model = model
+        self._model = (
+            model if model is not None
+            else os.environ.get("FLEET_MANAGER_MODEL") or "gpt-4.1"
+        )
         self._on_live = on_live or (lambda e: None)
         # Phase 3 (TASK-025) — per-function identity. ``None`` keeps the
         # existing fleet-wide singleton behaviour unchanged.
@@ -141,6 +148,9 @@ class FleetManagerService:
 
         self._client: CopilotClient | None = None
         self._session = None
+        self._runtime: LLMRuntime | None = None
+        self._tools: list = []
+        self._skill_text = ""
         self._unsub_session_events: Callable[[], None] | None = None
         self._unsub_bus: Callable[[], None] | None = None
         # Tool spans opened by TOOL_EXECUTION_START, closed by TOOL_EXECUTION_COMPLETE;
@@ -175,33 +185,34 @@ class FleetManagerService:
     async def start(self) -> None:
         if self._started:
             return
+        if self._bus is None:
+            raise ValueError("Fleet Manager requires an event bus to start")
+
         try:
-            token = _gh_token()
-        except Exception as ex:
-            print(f"[fleet-manager] gh auth token failed: {ex}; not starting")
-            return
-
-        # The CopilotClient owns a node subprocess. If anything between
-        # `client.start()` and `_started = True` raises, we must tear that
-        # subprocess down here \u2014 otherwise the lifespan's `try: stop() except`
-        # finds nothing to stop and the orphan keeps running across reloads.
-        config = SubprocessConfig(github_token=token, log_level="warning")
-        self._client = CopilotClient(config)
-        try:
-            await self._client.start()  # explicit start (alternative to async-with for long-lived)
-
-            skill_text = self._build_skill_text()
-            tools = self._tools_override if self._tools_override is not None else build_fleet_manager_tools(self._store, self._audit)
-
-            self._session = await self._client.create_session(
-                on_permission_request=PermissionHandler.approve_all,
-                model=self._model,
-                tools=tools,
-                system_message={"mode": "append", "content": skill_text},
+            self._skill_text = self._build_skill_text()
+            self._tools = (
+                self._tools_override if self._tools_override is not None
+                else build_fleet_manager_tools(self._store, self._audit)
             )
-
-            # Subscribe to session events (single catch-all; filter inside)
-            self._unsub_session_events = self._session.on(self._on_session_event)
+            if os.environ.get("LLM_RUNTIME", "ghcp").strip().lower() == "ghcp":
+                config = SubprocessConfig(github_token=_gh_token(), log_level="warning")
+                self._client = CopilotClient(config)
+                await self._client.start()
+                self._session = await self._client.create_session(
+                    on_permission_request=PermissionHandler.approve_all,
+                    model=self._model,
+                    tools=self._tools,
+                    system_message={"mode": "append", "content": self._skill_text},
+                )
+                self._unsub_session_events = self._session.on(self._on_session_event)
+            else:
+                from api.functions.graphs.executors.agents.runtime import _get_runtime
+                self._runtime = _get_runtime(
+                    azure_deployment=(
+                        os.environ.get("AZURE_OPENAI_FLEET_MANAGER_DEPLOYMENT", "").strip()
+                        or None
+                    ),
+                )
 
             # Subscribe to the bus \u2014 every event flows through triage
             self._unsub_bus = self._bus.on_any(self._observe)
@@ -255,6 +266,9 @@ class FleetManagerService:
             except Exception:
                 pass
             self._client = None
+        self._runtime = None
+        self._tools = []
+        self._skill_text = ""
 
     def _on_session_event(self, event) -> None:
         if event.type == SessionEventType.TOOL_EXECUTION_START:
@@ -308,7 +322,10 @@ class FleetManagerService:
                     "stage": "complete",
                     "tool_call_id": call_id,
                     "success": success,
-                    "result": getattr(result_obj, "content", None) if result_obj else None,
+                    "result": (
+                        result_obj if isinstance(result_obj, str)
+                        else getattr(result_obj, "content", None)
+                    ),
                 }
             })
 
@@ -375,10 +392,25 @@ class FleetManagerService:
             # Capture context so session-event tool spans attach as children.
             self._reasoning_parent_ctx = trace.set_span_in_context(span)
             try:
-                event = await self._session.send_and_wait(prompt, timeout=120.0)
-                preview = ""
-                if event and getattr(event, "data", None):
-                    preview = (getattr(event.data, "content", "") or "")[:200]
+                if self._runtime is not None:
+                    result = await asyncio.wait_for(
+                        self._runtime.run_session(
+                            prompt=prompt,
+                            system_message=self._skill_text,
+                            tools=self._tools,
+                            permission_handler=PermissionHandler.approve_all,
+                            model=self._model,
+                            timeout_s=120.0,
+                            event_subscriber=self._on_session_event,
+                        ),
+                        timeout=120.0,
+                    )
+                    preview = result.text[:200]
+                else:
+                    event = await self._session.send_and_wait(prompt, timeout=120.0)
+                    preview = ""
+                    if event and getattr(event, "data", None):
+                        preview = (getattr(event.data, "content", "") or "")[:200]
                 self._on_live({
                     "kind": "reasoning_done",
                     "timestamp": time.time(),
@@ -396,17 +428,30 @@ class FleetManagerService:
                 self._reasoning_parent_ctx = None
 
     async def stop(self) -> None:
-        if self._tick_task:
-            self._tick_task.cancel()
-        if self._unsub_session_events:
-            self._unsub_session_events()
+        self._started = False
         if self._unsub_bus:
             self._unsub_bus()
+            self._unsub_bus = None
+        await self._queue.stop()
+        if self._tick_task is not None:
+            self._tick_task.cancel()
+            try:
+                await self._tick_task
+            except asyncio.CancelledError:
+                pass
+            self._tick_task = None
+        if self._unsub_session_events:
+            self._unsub_session_events()
+            self._unsub_session_events = None
         if self._session:
             await self._session.disconnect()
+            self._session = None
         if self._client:
             await self._client.stop()
-        self._started = False
+            self._client = None
+        self._runtime = None
+        self._tools = []
+        self._skill_text = ""
 
     # ----------------------------------------------------------------------
     # Phase 4 IP2 (TASK-011) — KPI publish API

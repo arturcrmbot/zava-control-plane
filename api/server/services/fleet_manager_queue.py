@@ -32,6 +32,16 @@ class FleetManagerQueue:
     def depth(self) -> int:
         return len(self._pending)
 
+    async def stop(self) -> None:
+        self._pending.clear()
+        task, self._task = self._task, None
+        if task is not None:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
     async def _wait_and_flush(self) -> None:
         await asyncio.sleep(self._debounce)
         if self._flushing:

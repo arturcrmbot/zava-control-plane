@@ -35,7 +35,7 @@ from typing import Any, Callable
 
 from copilot.generated.session_events import SessionEventType
 from copilot.session import PermissionRequest
-from copilot.tools import Tool, ToolInvocation, ToolResult
+from copilot.tools import Tool, ToolInvocation
 
 from api.functions.graphs.executors.agents.runtime import LLMRuntimeResult, validate_required_tool_names
 
@@ -111,9 +111,9 @@ class AOAIRuntime:
     session events, and aggregates token usage across turns.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, deployment: str | None = None) -> None:
         self._client: Any | None = None
-        self._deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT") or "gpt-4"
+        self._deployment = deployment or os.environ.get("AZURE_OPENAI_DEPLOYMENT") or "gpt-4"
 
     def _client_lazy(self) -> Any:
         if self._client is None:
