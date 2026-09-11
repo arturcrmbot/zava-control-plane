@@ -104,6 +104,22 @@ Reprovisioning restores the safe internal-ingress default. Recheck authenticatio
 before deliberately reopening external access. Legacy `READ_ROUTE_AUTH=enforce`
 checks caller-supplied local headers; it is not an alternative to platform auth.
 
+## Registry-hosted image build
+
+The Dockerfile uses BuildKit cache mounts. For an ACR-hosted build, use the
+supplied task rather than plain `az acr build`, whose default builder may reject
+`RUN --mount`. Run from the approved isolated Azure profile and a clean checkout:
+
+```bash
+SOURCE_COMMIT="$(git rev-parse HEAD)"
+az acr run --registry "$AZURE_ACR_NAME" --file deploy/acr-build.yaml \
+  --set imageRepository=zava-control-plane imageTag="$SOURCE_COMMIT" \
+        sourceCommit="$SOURCE_COMMIT" \
+  --timeout 900 .
+```
+
+This builds and pushes an image; it does not deploy or approve a release.
+
 ## Public replay
 
 Prepare an approved recording and the existing proof/seller-review manifests.

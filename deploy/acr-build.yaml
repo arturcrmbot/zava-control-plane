@@ -1,0 +1,15 @@
+version: v1.1.0
+steps:
+  - id: build
+    build: >-
+      --platform linux/amd64
+      --label org.opencontainers.image.revision={{.Values.sourceCommit}}
+      -t $Registry/{{.Values.imageRepository}}:{{.Values.imageTag}}
+      -f deploy/Dockerfile .
+    env:
+      - DOCKER_BUILDKIT=1
+    timeout: 900
+  - id: push
+    push:
+      - $Registry/{{.Values.imageRepository}}:{{.Values.imageTag}}
+    timeout: 300

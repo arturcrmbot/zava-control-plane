@@ -64,3 +64,21 @@ def test_build_context_keeps_walkthrough_media_without_all_docs() -> None:
     assert all(rule in rules for rule in expected)
     positions = [rules.index(rule) for rule in expected]
     assert positions == sorted(positions)
+
+
+def test_acr_build_enables_buildkit_and_pushes_a_source_tagged_image() -> None:
+    import yaml
+
+    task_path = ROOT / "deploy/acr-build.yaml"
+    assert task_path.is_file(), "ACR needs an explicit BuildKit task for RUN --mount"
+    task = yaml.safe_load(task_path.read_text())
+    build, push = task["steps"]
+
+    assert "DOCKER_BUILDKIT=1" in build["env"]
+    assert "--platform linux/amd64" in build["build"]
+    assert "-f deploy/Dockerfile ." in build["build"]
+    assert "org.opencontainers.image.revision={{.Values.sourceCommit}}" in build["build"]
+    image = "$Registry/{{.Values.imageRepository}}:{{.Values.imageTag}}"
+    assert image in build["build"]
+    assert push["push"] == [image]
+    assert build["timeout"] <= 900
