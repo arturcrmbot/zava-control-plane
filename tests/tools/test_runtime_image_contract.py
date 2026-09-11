@@ -82,3 +82,9 @@ def test_acr_build_enables_buildkit_and_pushes_a_source_tagged_image() -> None:
     assert image in build["build"]
     assert push["push"] == [image]
     assert build["timeout"] <= 900
+
+
+def test_acr_runbook_repeats_set_for_each_task_value() -> None:
+    guide = (ROOT / "docs/zava-hosting-brief.md").read_text()
+    for name in ("imageRepository", "imageTag", "sourceCommit"):
+        assert f"--set {name}=" in guide

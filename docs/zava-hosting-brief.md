@@ -113,8 +113,8 @@ supplied task rather than plain `az acr build`, whose default builder may reject
 ```bash
 SOURCE_COMMIT="$(git rev-parse HEAD)"
 az acr run --registry "$AZURE_ACR_NAME" --file deploy/acr-build.yaml \
-  --set imageRepository=zava-control-plane imageTag="$SOURCE_COMMIT" \
-        sourceCommit="$SOURCE_COMMIT" \
+  --set imageRepository=zava-control-plane \
+  --set imageTag="$SOURCE_COMMIT" --set sourceCommit="$SOURCE_COMMIT" \
   --timeout 900 .
 ```
 
