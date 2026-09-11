@@ -1,0 +1,37 @@
+{
+  "status": "development-walkthrough",
+  "release_ready": false,
+  "captured_on": "2026-09-10",
+  "source_workflow_id": "AUR-5DF62C49051E209B",
+  "source_instance_id": "aurora-5df62c49051e209b",
+  "source_tape_id": "tape_4ceb2487",
+  "source_tape_sha256": "a4138abaf456309fdda314cb9f18c429d7273605391c4d0d1ec5addbbcb94631",
+  "source_workflow_detail_sha256": "6a02462fa83049d261277a5f8ce89071581ce50b25017720baa03c7af03cb80c",
+  "source_app_sha": "31554c66825e903725f36c3513a479448ca48965-dirty",
+  "exact_committed_runtime_revision": false,
+  "model_provider": "GitHub Copilot",
+  "requested_model": "gpt-4.1",
+  "api_supervisor_mode": "fake",
+  "functions_host": "native local Core Tools 4.10.0",
+  "business_data": "synthetic",
+  "operator_action": "automated exercise of the local CFO operator interface",
+  "human_release_approval": false,
+  "cloud_deployment_proof": false,
+  "presentation": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 25,
+    "duration_seconds": 102.48,
+    "audio": "none; captioned",
+    "edits": "Recorded UI inspection with editorial chapter cards; H.264 transcode, no retiming.",
+    "video_sha256": "cf389fa0a9c7f62382b85836f4bd61289370859eab8521ef922d0353158a3752",
+    "poster_sha256": "1a0a089352a84b959c61e95828bbde3ac45fd99a5bc4fff13e17170ee1f221e3",
+    "captions_sha256": "1fcfb189235d1be92ea0af76855cc4a15f9ea9f4244db3fdc16508ffe67d48b6"
+  },
+  "limitations": [
+    "This is working-tree development evidence, not a clean-source public release.",
+    "Only the selected Aurora model-backed workflow is demonstrated; the API supervisor was an unpaid test double.",
+    "The captured source predates the synthetic invoice due-date correction; this walkthrough does not claim invoice-date validation.",
+    "Azure deployment, normal-speed container release soak and human seller approval remain separate gates."
+  ]
+}

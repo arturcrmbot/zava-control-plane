@@ -4,7 +4,7 @@ const captions: { label: string; title: string; body: string }[] = [
     label: "01 · Durable control",
     title: "Workflow order, checkpoints, retries and human gates.",
     body:
-      "Every domain runs inside a durable workflow: segment order is declared, checkpoints survive infrastructure failures, retries are automatic, and human approval gates pause execution until a person acts. The orchestrator owns all of that; agents own what happens inside a segment.",
+      "Durable-backed workflows declare their execution order and preserve orchestration history. Activities use configured retry policies where appropriate; retries are not an unconditional guarantee. Gates may require an operator or use explicitly synthetic personae. Recovering the control plane's own state is a separate concern from Durable history.",
   },
   {
     label: "02 · Bounded agent work",

@@ -1,4 +1,16 @@
+import { buildConstellationUrl } from "../lib/constellationUrl";
+import { getDemoUrl } from "../lib/useDemoUrl";
+import { CONTROL_PLANE_REPO_URL } from "../lib/links";
+import walkthroughUrl from "../../../../docs/media/aurora-recorded-walkthrough.mp4";
+import walkthroughPoster from "../../../../docs/media/aurora-recorded-walkthrough-poster.jpg";
+import walkthroughCaptions from "../../../../docs/media/aurora-recorded-walkthrough.vtt?url";
+import walkthroughProvenance from "../../../../docs/media/aurora-recorded-walkthrough.provenance.json?url";
+
 export function Opening() {
+  const demonstration = buildConstellationUrl(
+    typeof window !== "undefined" ? window.location.href : CONTROL_PLANE_REPO_URL,
+    getDemoUrl("opening"),
+  );
   return (
     <section className="section opening">
       <div className="column--wide">
@@ -11,29 +23,48 @@ export function Opening() {
           <p className="subhead">And use the blueprint to build yours.</p>
         </div>
 
+        <div className="opening__actions">
+          <a className="opening__action opening__action--primary" href={demonstration} target="_blank" rel="noopener noreferrer">
+            Open recorded demonstration
+          </a>
+          <a className="opening__action" href={`${CONTROL_PLANE_REPO_URL}/blob/main/docs/zava-hosting-brief.md`} target="_blank" rel="noopener noreferrer">
+            Run the reference
+          </a>
+        </div>
+
+        <figure className="opening__film">
+          <video controls preload="metadata" poster={walkthroughPoster} aria-label="Recorded Aurora development walkthrough">
+            <source src={walkthroughUrl} type="video/mp4" />
+            <track kind="captions" srcLang="en" label="English" src={walkthroughCaptions} default />
+          </video>
+          <figcaption>
+            Development walkthrough · 1:42. Actual local execution, synthetic
+            business data, automated operator exercise.{" "}
+            <a href={walkthroughProvenance} target="_blank" rel="noopener noreferrer">Source and limits</a>
+          </figcaption>
+        </figure>
+
         <div className="stack-lg">
           <p className="lede">
-            Most demos stop at one assistant handling one task. They rarely
-            show what happens when specialised agents and people work across
-            functions, share systems, wait for decisions and recover from
-            failures under one set of controls. That is where an agent demo
-            has to become an operating model.
+            Most demos stop at one assistant handling one task. The harder
+            problem is connecting work across teams: one spending decision
+            changes what happens to invoices, people retain authority, and
+            everyone can see why an action was taken.
           </p>
 
           <p className="lede">
-            Too many pilots rebuild orchestration, prompts, evaluation,
-            integrations, policy and observability from scratch. By the time
-            the second lands, the first has already diverged. The organisation
-            pays for the same foundations again.
+            Follow Aurora&apos;s budget signal through an agent recommendation,
+            CFO approval, a governed policy and queued invoice reviews.
+            The point is reuse. Each new process should not need its own
+            integration stack, approval machinery and audit trail.
           </p>
 
           <p className="lede">
             Zava is a working reference implementation of an agentic
-            organisation. A complete synthetic organisation makes the
-            reference portable without pretending that mock records are a
-            customer estate. Its runtime boundaries are executable. Customers
-            can replace those boundaries one at a time with their systems,
-            data, policies and people.
+            organisation, not a packaged production platform. A complete synthetic organisation
+            makes it portable without customer data. Keep your existing agents
+            and workflows; connect your systems, policies and people at the
+            demonstrated boundaries.
           </p>
         </div>
 

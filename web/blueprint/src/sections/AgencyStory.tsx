@@ -9,39 +9,39 @@
 const steps: { label: string; title: string; body: string }[] = [
   {
     label: "01 · Signal",
-    title: "Brand spend crosses threshold.",
+    title: "A budget signal starts the response.",
     body:
-      "Aurora, the spend-monitoring workflow, detects that the brand marketing budget has crossed its configured threshold. A durable checkpoint records the signal and opens an agent session to assess exposure across in-flight commitments.",
+      "The synthetic Aurora spending record reaches its configured threshold. The parent Durable workflow captures the budget facts so its recommendation and later actions refer to the same observation.",
   },
   {
     label: "02 · Recommendation",
-    title: "CFO observer recommends a freeze.",
+    title: "An agent prepares the recommendation.",
     body:
-      "The CFO observer agent reviews current run-rate, outstanding purchase orders and committed spend. It recommends a brand spend freeze and records its reasoning in the audit log. No action is taken yet — the recommendation waits at a human authority gate.",
+      "A bounded agent skill assesses the observed budget position and explains its recommendation. Model output is recorded with the run. The agent cannot use that recommendation as permission to apply a policy.",
   },
   {
     label: "03 · Decision",
-    title: "Authority and person approve.",
+    title: "The CFO decision is explicit.",
     body:
-      "The authority resolver matches the freeze action to the CFO role at this threshold. The CFO reviews the recommendation and approves. The approval is signed and written to the tamper-evident log. The durable workflow continues.",
+      "The workflow pauses for an operator acting in the CFO role. The authority check uses the requested action and scope. Background personae cannot silently approve this gate. Approval, rejection and timeout remain different outcomes.",
   },
   {
     label: "04 · Policy",
     title: "Decision becomes active policy.",
     body:
-      "The approved freeze is registered as active policy in the pack's policy store. Downstream workflows that consult the policy store will see the freeze. The decision is attributable, timestamped and auditable.",
+      "Only an approved decision can create the governed freeze policy. Its decision ID links the operator outcome to the actual policy record. Rejection and timeout do not create a freeze.",
   },
   {
-    label: "05 · Escalation",
-    title: "In-flight AP invoices escalate.",
+    label: "05 · Invoice reviews",
+    title: "Queued AP invoices use the existing workflow.",
     body:
-      "The AP invoice workflow detects that pending brand-category invoices are now subject to the freeze policy. Invoices above threshold are escalated to the AP controller for individual review rather than processed automatically. The escalation path is set by the AP-003 authority rule.",
+      "The parent starts real AP invoice child workflows against synthetic invoice records. Lookup, matching, approval and escalation follow that existing engine. Each child has its own execution ID and outcome; these are not simulated completion messages or real payments.",
   },
   {
     label: "06 · Synthesis",
-    title: "CEO synthesis sees changed posture.",
+    title: "The executive summary reports actual outcomes.",
     body:
-      "The CEO synthesis workflow surfaces the changed spending posture: freeze active, invoices escalated, CFO decision recorded. The synthesis is grounded in the durable record — not inferred from agent output alone.",
+      "The summary for the CEO is calculated from the policy result and child workflow outcomes. It reports what happened rather than asking another model to invent a successful ending. The same records remain available for inspection.",
   },
 ];
 
@@ -50,16 +50,16 @@ export function AgencyStory() {
     <section className="section">
       <div className="column--wide stack-xl">
         <header className="argument__intro stack">
-          <p className="subtitle">A signal that travels the whole organisation</p>
+          <p className="subtitle">A worked example</p>
           <h2 className="section-title">
-            Watch one signal travel across the organisation.
+            One spending decision, shared consequences.
           </h2>
           <p className="body">
-            Aurora follows one spend signal through a CFO decision, an active
-            policy, AP invoice escalation and CEO synthesis in one durable
-            execution. The operating data are synthetic. The Durable
-            checkpoints, agent and tool calls, authority decision, audit and
-            visible evidence are real runtime boundaries.
+            Aurora connects budget oversight with accounts payable through
+            a real parent workflow and child executions. The operating data are synthetic.
+            Workflow, authority and evidence are executable runtime boundaries,
+            not a sequence of captions. The viewer distinguishes live work from
+            recorded execution and exposes the selected run&apos;s evidence.
           </p>
         </header>
 

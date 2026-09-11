@@ -55,11 +55,13 @@ export default function App() {
       <TopBar />
       <Opening />
       <hr className="rule" />
+      <AgencyStory />
+      <hr className="rule" />
+      <Observatory />
+      <hr className="rule" />
       <Analogy />
       <hr className="rule" />
       <Argument />
-      <hr className="rule" />
-      <AgencyStory />
       <hr className="rule" />
       <Verticals />
       <hr className="rule" />
@@ -72,8 +74,6 @@ export default function App() {
       <Memory />
       <hr className="rule" />
       <MetaSkill />
-      <hr className="rule" />
-      <Observatory />
       <hr className="rule" />
       <Closing />
       <footer className="footer">

@@ -1,7 +1,7 @@
 # Docs
 
-Six docs. That's it. Anything else is either generated from code, lives
-in `superpowers/`, or has been retired to `archive/`.
+Current implementation and presales references are listed below. Design and
+execution plans live in `superpowers/`; historical material belongs in `archive/`.
 
 | If you want… | Read |
 |---|---|
@@ -9,6 +9,8 @@ in `superpowers/`, or has been retired to `archive/`.
 | What the system is + why it's built this way | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | How to add a new business domain | [ADD-A-DOMAIN.md](ADD-A-DOMAIN.md) |
 | How to run / hack on this locally | [DEVELOPMENT.md](DEVELOPMENT.md) |
+| How to install the reference in Azure, including auth and limitations | [zava-hosting-brief.md](zava-hosting-brief.md) |
+| How to explain and demonstrate the reference | [presales/seller-guide.md](presales/seller-guide.md) |
 | How Constellation, the visual command surface, works (and how to extend it) | [visualisation.md](visualisation.md) |
 | How to ship the public blueprint microsite | [blueprint-microsite-contributor-guide.md](blueprint-microsite-contributor-guide.md) |
 | How replay mode works (recorder + player + public verify deploy) | [ARCHITECTURE.md §14](ARCHITECTURE.md#14-replay-mode--recorder-player-public-deploy) |

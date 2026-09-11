@@ -609,7 +609,7 @@ All routers are mounted in
 | `/api/personas`, `/api/entities`, `/api/functions`, `/api/cadences`, `/api/cities` | `routes/personas.py`, `routes/entities.py`, `routes/functions*.py`, `routes/cadences.py`, `routes/cities.py` | Read-only views consumed by the cosmic lens (functions, ambient agents, entities, persona library, cadences, city affinities). `/api/entities/{id}/precedents` walks the `PRECEDENT_OF` chain for the entity-view drawer. |
 | `/api/personas/{role}/insights/latest`, `/api/personas/insights/latest`, `/api/personas/{role}/actions/{id}/approve`, `/api/personas/labels/preview`, `/api/personas/colors` | `routes/insights.py`, `routes/personas.py` | **v1.0+** Persona Insight surface (§12). Latest-per-role + cross-role snapshot; one-click approve that spawns a `policy_set` workflow + records the Decision inline so other personae's `decision_policy` blocks see it on the next gate. `/labels/preview` returns the verdict/scope/persona-role plain-language maps. `/colors` returns the per-persona hue palette consumed by ticker, drawer chip, and planet rendering. |
 | `/api/ticker/recent`, `/api/ticker/stream` | `routes/ticker.py` | **v1.1+** Live decision + insight ticker. REST snapshot + SSE stream subscribed to bus events; powers the bottom-strip rolling feed on the constellation. |
-| `/api/demo/trigger/{aurora-overrun, brand-overrun, in-flight-invoices, fx-exposure, vendor-concentration, department-attrition, full-aurora-arc, reset}` | `routes/demo_triggers.py` | **v1.1+** Operator-driven scripted scenarios. The full-arc trigger orchestrates the whole 5-min Aurora demo synchronously (overrun → CFO observe → approve → cascade auto-escalate → CEO synthesise) with a configurable `delay_seconds` for visual pacing. The reset trigger wipes demo-added Money / Workflows / Decisions for clean re-runs. |
+| `/api/demo/trigger/{aurora-overrun, brand-overrun, in-flight-invoices, fx-exposure, vendor-concentration, department-attrition, full-aurora-arc, reset}` | `routes/demo_triggers.py` | Operator-driven scenarios. The Aurora full-arc route returns HTTP 202 with app-local tracking URLs for a real Durable parent, explicit operator gate and AP children. It does not synchronously simulate completion. The reset route is a separate destructive demo action. |
 | `/api/accounts/summary`, `/api/accounts/by-brand` | `routes/accounts.py` | Chart-of-accounts roll-up + per-brand spend tile, fed by `BOOKED_AGAINST` / `COSTED_TO_BRAND`. |
 | `/api/webhooks/servicenow`, `/api/webhooks/finance-bp`, `/api/a2a` | `routes/webhooks_*.py`, `routes/a2a.py` | External + agent-to-agent inbound. |
 
@@ -943,7 +943,7 @@ only new node kind is `Insight`; the only new generic workflow type is
 | [`api/server/services/plain_language.py`](../api/server/services/plain_language.py) | Translates technical fields (`verdict=freeze, scope=po, persona_role=cfo, decided_on=BRAND-aurora`) into buyer-comprehensible strings (`"CFO Policy: Freeze Aurora purchase orders (14 days)"`). Used by the WorkflowDrawer + ticker via `/api/personas/labels/preview`. |
 | [`api/server/routes/insights.py`](../api/server/routes/insights.py) | Read-only persona-Insight HTTP surface (per-role + cross-role + labels-preview). No POST; the v1.0 `/approve` route was removed in v1.4 since the cadence loop self-applies. |
 | [`api/server/routes/ticker.py`](../api/server/routes/ticker.py) | REST snapshot + SSE stream of recent Decisions + Insights. Bus-subscription pattern with `loop.call_soon_threadsafe`; sub-millisecond latency. |
-| [`api/server/routes/demo_triggers.py`](../api/server/routes/demo_triggers.py) | Eight scenario routes for stress-testing the loop on demand (the matrix still gates every applied policy). The `in-flight-invoices` route synchronously runs the ap_clerk → controller → cfo cascade per spawned invoice so the auto-escalation moment is visible without a real durable workflow runtime. The `full-aurora-arc` route orchestrates the whole 5-minute demo arc in 50ms (or 12s with `delay_seconds=2.0` pacing). |
+| [`api/server/routes/demo_triggers.py`](../api/server/routes/demo_triggers.py) | Scenario entry points. The legacy-named `in-flight-invoices` route queues real AP workflows and reports partially confirmed batches explicitly. `full-aurora-arc` starts the Agency-owned Aurora parent asynchronously; it never fabricates a persona cascade. |
 | [`data/synthetic/authority/matrix.json`](../data/synthetic/authority/matrix.json) | Matrix carries one `POL-*` rule per (persona, scope) pair authorised to issue policies — `POL-CFO-001` (cfo + po), `POL-CDO-001` (chief_data_officer + data), `POL-DPO-001` (dpo + data), `POL-GC-001` (gc + contracts), `POL-HRD-001` (hr_director + hiring), `POL-IT-001` (it_admin_director + access), `POL-REC-001` (recruiter + hiring), `POL-SRC-001` (sourcing_lead + vendor_po), `POL-TRS-001` (treasurer + fx). Adding a new persona policy capability = adding a row here, not a code change. |
 
 ### 13.3 Cadence
@@ -995,9 +995,16 @@ cadence tick (~15s with `INSIGHT_REFRESH_SECONDS=15`):
 - **CEO** synthesises across all of them: *"Org snapshot — 9 domain(s)
   reporting"* with a body listing each persona's headline.
 
-The `POST /api/demo/trigger/full-aurora-arc?delay_seconds=2.0&count=3`
-route fires the entire five-minute Aurora arc as a 12-second
-cinematic.
+`POST /api/demo/trigger/full-aurora-arc?count=3` accepts an `Idempotency-Key`
+and returns HTTP 202. `AuroraBudgetResponseOrchestrator` observes budget facts,
+runs the bounded recommendation skill, waits for an explicit CFO operator
+decision, applies the authorised policy and starts real AP child orchestrations.
+The final summary is computed from their outcomes. The legacy `delay_seconds`
+parameter is ignored, not used to manufacture execution timing.
+
+The guide reads workflow evidence and presents a writable decision only in live
+mode. Rejection and timeout do not apply policy. Synthetic personae cannot
+auto-close the root's operator-only gate.
 
 ### 13.6 Provenance
 
@@ -1059,9 +1066,14 @@ The schema lives in
 [`api/server/services/replay/tape_format.py`](../api/server/services/replay/tape_format.py).
 `app_sha`, `selected_vertical`, and `pack_fingerprint` are optional for reading
 historical format-v1 tapes, but required and cross-checked before a new public
-release. The existing verify site serves `tape_fbe458bc`, recorded on May 28,
-2026, with a duration of about 15 minutes; it is not current-source proof.
+release. Read `/api/replay/meta` for the actual public recording date, duration
+and selected pack rather than relying on a hand-maintained description. A
+historical recording is not current-source proof.
 Historical local recordings are preserved under `tapes/archive/`.
+
+`/api/blueprint/stream` relays the selected runtime's bus. The replay Player
+already emits its recorded events there; the route does not add template
+walks or replace recorded workflow IDs with random IDs.
 
 ### 14.3 Recorder
 

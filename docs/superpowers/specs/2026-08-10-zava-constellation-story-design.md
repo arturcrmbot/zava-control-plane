@@ -205,11 +205,18 @@ standalone cosmic visualisation.
 6. **Connect to reality:** a concise handoff identifies the synthetic edges and
    shows where customer systems, skills, MCPs, policies, and people connect.
 
-The existing Aurora budget-pressure cascade remains a useful cross-functional
-guided example because it links operational data, CFO observation, governed
-policy, in-flight work, and CEO synthesis. It is a zoom-in proof point, not the
+The Aurora budget-pressure journey remains a useful cross-functional
+guided example because it links operational data, a model-backed recommendation,
+an explicit CFO operator gate, governed policy, queued AP child workflows and a
+calculated executive summary. It is a zoom-in proof point, not the
 definition of Zava. Telco, airline, and other packs remain additional evidence
 that the same substrate supports different organisations.
+
+The current implementation uses a real Durable parent and children. Recorded
+operator-interface automation must not be described as a real customer CFO
+approval, and the calculated summary must not be described as a separate CEO
+model session. Working-tree proof footage remains development material until
+source-bound release and human seller gates are complete.
 
 ### Visual rules
 

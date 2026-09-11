@@ -1,6 +1,6 @@
 import { getDemoUrl } from "../lib/useDemoUrl";
 import { buildConstellationUrl } from "../lib/constellationUrl";
-import { BOOKING_URL, ZAVA_CONSTELLATION_URL } from "../lib/links";
+import { BOOKING_URL, CONTROL_PLANE_REPO_URL, ZAVA_CONSTELLATION_URL } from "../lib/links";
 
 function getClosingConstellationUrl(): string {
   const href =
@@ -74,20 +74,21 @@ export function Closing() {
           </li>
           <li>
             <a
-              href={ZAVA_CONSTELLATION_URL}
+              href={`${CONTROL_PLANE_REPO_URL}/blob/main/docs/zava-hosting-brief.md`}
               className="closing__cta"
               rel="noopener noreferrer"
               target="_blank"
             >
-              Build this for your own organisation →
+              Run the reference →
             </a>
             <span className="closing__cta-note">
-              Use the executable blueprint, then connect your existing
+              Start with the installation guide: required resources, identity,
+              live versus recorded modes, costs and limitations. Keep existing
               systems, skills, MCPs, policies, data and people.{" "}
-              <code className="mono">compose-org</code> researches, designs,
-              builds and proves an executable vertical.{" "}
-              <code className="mono">zava-workspace-deploy</code> publishes
-              it as private-live or public-replay.
+              <a href={ZAVA_CONSTELLATION_URL} target="_blank" rel="noopener noreferrer">
+                Optional composition skills
+              </a>{" "}
+              are available for builders who need another industry expression.
             </span>
           </li>
         </ul>

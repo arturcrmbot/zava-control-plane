@@ -61,6 +61,29 @@ describe("blueprint article story contract", () => {
     expect(opening).toContain("A complete synthetic organisation");
   });
 
+  it("puts the worked business example and visible proof before architecture detail", () => {
+    const app = readFile("../../App.tsx");
+    expect(app.indexOf("<AgencyStory")).toBeLessThan(app.indexOf("<Argument"));
+    expect(app.indexOf("<Observatory")).toBeLessThan(app.indexOf("<Argument"));
+  });
+
+  it("offers proof and deployment entry points in the opening", () => {
+    const opening = section("Opening");
+    expect(opening).toContain("Open recorded demonstration");
+    expect(opening).toContain("Run the reference");
+    expect(opening).toContain("buildConstellationUrl");
+  });
+
+  it("embeds the captioned development walkthrough without autoplay", () => {
+    const opening = section("Opening");
+    expect(opening).toContain("aurora-recorded-walkthrough.mp4");
+    expect(opening).toContain("<video");
+    expect(opening).toContain("<track");
+    expect(opening).toContain('preload="metadata"');
+    expect(opening).toContain("Development walkthrough");
+    expect(opening).not.toContain("autoPlay");
+  });
+
   // Composition retains CompositionMap and segment explanation
   it("composition preserves CompositionMap component and segment model", () => {
     const composition = section("Composition");
@@ -172,6 +195,12 @@ describe("blueprint article story contract", () => {
 
   // 2. Current architecture truth
   describe("architecture truth", () => {
+    it("does not promise automatic retries and physical human action for every domain", () => {
+      const arg = section("Argument");
+      expect(arg).not.toContain("retries are automatic");
+      expect(arg).not.toContain("until a person acts");
+      expect(arg).toMatch(/configured.{0,30}retr|retr.{0,30}configured/i);
+    });
     it("Argument mentions both log-only and enforced governance modes", () => {
       const arg = section("Argument");
       expect(arg).toContain("log-only");
@@ -281,6 +310,14 @@ describe("blueprint article story contract", () => {
 
   // 6. Concrete Agency story
   describe("concrete Agency story", () => {
+    it("describes real parent/child execution without invented in-flight timing", () => {
+      const story = section("AgencyStory");
+      expect(story).toContain("parent");
+      expect(story).toContain("child");
+      expect(story).toMatch(/queued/i);
+      expect(story).not.toContain("In-flight AP invoices escalate");
+      expect(story).not.toMatch(/in one durable\s+execution/);
+    });
     it("AgencyStory.tsx exists and contains Aurora, CFO, policy/freeze, AP invoices, escalation, CEO synthesis", () => {
       const as_ = section("AgencyStory");
       expect(as_).toContain("Aurora");

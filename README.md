@@ -11,13 +11,29 @@
 > Shorter summaries — README, docs, contributor guides, talk tracks — may not introduce claims
 > absent from that spec.
 
-[![OWASP Agentic AI Top 10 — 10/10 covered](https://img.shields.io/badge/OWASP%20Agentic%20Top%2010-10%2F10%20covered-brightgreen)](plan/archive/feature-agent-governance-toolkit-1.md)
+[![Governance reference controls](https://img.shields.io/badge/governance-reference%20controls-blue)](plan/archive/feature-agent-governance-toolkit-1.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Status: PoC — runs on a laptop](https://img.shields.io/badge/status-PoC%20%E2%80%94%20runs%20on%20a%20laptop-blue)](#-safe-to-clone--run-locally--gated-for-public-deploy)
 
-**Walkthrough video (3:42).** What the substrate is, a workflow in flight, the authority matrix, agent memory, and the knowledge graph.
+**Aurora development walkthrough (1:42, captioned).** Actual model-backed
+recommendation, operator gate, policy and AP workflow evidence from a local
+run. Business data is synthetic; the operator interface was exercised by
+automation. This is development material, not an Azure release or human seller
+sign-off. [Source and limits](docs/media/aurora-recorded-walkthrough.provenance.json).
+
+[![Aurora recorded walkthrough](docs/media/aurora-recorded-walkthrough-poster.jpg)](docs/media/aurora-recorded-walkthrough.mp4)
+
+[Seller guide](docs/presales/seller-guide.md) · [Run the reference](docs/zava-hosting-brief.md)
+
+<details>
+<summary>Historical technical walkthrough (3:42)</summary>
+
+Shows an earlier UI and narrative, including the authority matrix, memory and
+graph. It is not current release proof.
 
 [![Explainer video poster](docs/media/explainer-poster.jpg)](docs/media/agentic-blueprint-explainer.mp4)
+
+</details>
 
 A composable agentic substrate (skills + MCP tools + harness + governance)
 running on a single laptop, with multiple business domains composed on
@@ -109,8 +125,8 @@ The live editorial microsite that visualises the substrate is
   looping recording:
   https://zava-zava-verify-fruocco.thankfulsand-2576b58e.swedencentral.azurecontainerapps.io/
 
-The existing public instance serves a **historical May 28, 2026 recording**
-(about 15 minutes). It is not evidence for the current checkout. A new public
+The existing public instance serves a **historical recording**. Read
+`/api/replay/meta` for its actual date and duration; it is not evidence for the current checkout. A new public
 release requires a fresh, source-bound tape and operator-owned seller review;
 see the [release gates](docs/DEVELOPMENT.md#container-verification-before-publishing).
 
@@ -119,7 +135,7 @@ for the editorial deploy and §14 of [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.
 for the replay deploy.
 
 **Stack**
-- Python 3.11 (Functions worker) + 3.13 (FastAPI) · FastAPI · Azure Durable Functions · MAF · GHCP SDK Python
+- Python 3.11 reference worker (project supports 3.11–3.12) · FastAPI · Azure Durable Functions · MAF · GHCP SDK Python
 - React 19 · Vite 6 · TailwindCSS 4 — three frontends: control plane, candidate portal, blueprint microsite
 - 10 Node mock MCP servers (3 finance + 7 HR/comms — see `mocks/`)
 - Microsoft Agent Governance Toolkit (AGT) v3.4 — in-process policy
@@ -166,7 +182,7 @@ formally hardened. Status:
 | `SERVICENOW_WEBHOOK_SECRET` | HMAC-signed ServiceNow webhook ingress (C5, commit `cb5b507c`) | unset → endpoint refuses |
 | `FINANCE_BP_WEBHOOK_SECRET` | HMAC-signed Finance Business Partner webhook ingress (C5, commit `cb5b507c`) | unset → endpoint refuses |
 | `DURABLE_EVENT_SECRET` | HMAC-signed `POST /api/durable-event` ingress (C4, commit `07882946`) | unset → endpoint refuses |
-| `READ_ROUTE_AUTH` | Set to `enforce` to require an authenticated actor on `audit` / `evals` / `entities` / `cities` reads (C6, commit `c71f590c`) | off (local PoC) |
+| `READ_ROUTE_AUTH` | `platform` uses the trusted Entra principal injected by configured ACA auth; legacy `enforce` checks local caller headers and is not production authentication | off (local PoC) |
 
 ### Deployment gate
 
@@ -176,7 +192,8 @@ requires **all** of the following:
 
 1. **All hardening switches in enforce mode** — `CORS_ALLOWED_ORIGINS`
    set to a non-wildcard origin list, both webhook secrets set,
-   `READ_ROUTE_AUTH=enforce`, `DURABLE_EVENT_SECRET` set.
+   `READ_ROUTE_AUTH=platform` behind configured tenant-specific ACA authentication,
+   `AUTH_TENANT_ID` / `AUTH_CLIENT_ID` configured, and `DURABLE_EVENT_SECRET` set.
 2. **Persona loader hardening complete** — the AST-level attribute
    whitelist landed in `persona_responder.py` (next planned pass) so
    sandbox-escape reflection paths (`__class__`/`__mro__`/
@@ -207,7 +224,7 @@ Before publishing changes, complete the
 `make test-harness` is an offline regression check, not evidence that the
 deployment image starts or that a public release is approved.
 
-Prerequisites: Python 3.11 + 3.13, Node 20+, [`uv`](https://astral.sh/uv),
+Prerequisites: Python 3.11 (or supported 3.12), Node 20+, [`uv`](https://astral.sh/uv),
 Azure Functions Core Tools v4.9+, Docker (for Azurite — or `npm i -g azurite`),
 GitHub Copilot license (`gh auth login`).
 
