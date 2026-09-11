@@ -39,3 +39,28 @@ def test_frontend_builds_use_locked_installs_and_no_npx_download_fallback() -> N
     assert dockerfile.count("ci --include=dev") == 3
     assert "RUN ./node_modules/.bin/vite build" in dockerfile
     assert "RUN npx vite build" not in dockerfile
+
+
+def test_blueprint_build_copies_imported_walkthrough_media() -> None:
+    dockerfile = (ROOT / "deploy/Dockerfile").read_text(encoding="utf-8")
+    spa_stage = dockerfile.split("AS spa-build", 1)[1].split("AS py-build", 1)[0]
+    media_copy = "COPY docs/media/aurora-recorded-walkthrough* ./docs/media/"
+    assert media_copy in spa_stage
+    assert spa_stage.index(media_copy) < spa_stage.index("&& BASE_PATH=/blueprint/")
+
+
+def test_build_context_keeps_walkthrough_media_without_all_docs() -> None:
+    rules = [
+        line.strip()
+        for line in (ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    expected = [
+        "docs/*",
+        "!docs/media/",
+        "docs/media/*",
+        "!docs/media/aurora-recorded-walkthrough*",
+    ]
+    assert all(rule in rules for rule in expected)
+    positions = [rules.index(rule) for rule in expected]
+    assert positions == sorted(positions)

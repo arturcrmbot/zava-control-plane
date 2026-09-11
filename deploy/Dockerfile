@@ -40,6 +40,7 @@ RUN --mount=type=cache,target=/root/.npm \
 # Build blueprint → /src/web/blueprint/dist
 # VITE_DEMO_URL=/ tells the blueprint to use same-origin ACA routing;
 # BASE_PATH=/blueprint/ aligns emitted asset URLs with the /blueprint mount.
+COPY docs/media/aurora-recorded-walkthrough* ./docs/media/
 RUN --mount=type=cache,target=/root/.npm \
     npm --prefix web/blueprint ci --include=dev --registry="${NPM_REGISTRY}" --no-audit --no-fund \
     && BASE_PATH=/blueprint/ VITE_DEMO_URL=/ npm --prefix web/blueprint run build

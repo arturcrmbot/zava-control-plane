@@ -58,7 +58,10 @@ logs/
 
 # --- Tests / docs / fixtures we don't need in the image ------------------
 tests
-docs
+docs/*
+!docs/media/
+docs/media/*
+!docs/media/aurora-recorded-walkthrough*
 screenshots
 tools/scratch
 *.pptx
