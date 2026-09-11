@@ -22,6 +22,16 @@ The previous `/plan/` folder used a different (REQ/TASK spec-style) format. It i
 
 ## Current plans
 
+**Presales release readiness (2026-09-10):**
+[active master plan, version 2](2026-09-10-presales-release-readiness.md):
+repair demonstrated behaviour, finish the presentation, and make the Azure
+reference straightforward to deploy. Copilot owns execution. The six earlier
+phase files are superseded reference material, not an executable backlog.
+Status: local implementation complete; external release gates pending. The
+article, captioned development walkthrough, seller guide and installation guide
+are prepared. Azure deployment proof, a clean-source release recording, the
+container stability gate and human publication approval remain outstanding.
+
 ```
 ls docs/superpowers/plans/*.md
 ```
