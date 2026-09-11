@@ -86,7 +86,7 @@ export function WorkflowDrawer({ view, onClose, onOpenWorkflow, onOpenEntity, fl
           top: 0,
           bottom: 0,
           right: 0,
-          width: 480,
+          width: "min(480px, 100vw)",
           background: "linear-gradient(to left, rgb(2,6,23), rgb(15,23,42))",
           color: "#e2e8f0",
           fontFamily: "ui-sans-serif, system-ui",

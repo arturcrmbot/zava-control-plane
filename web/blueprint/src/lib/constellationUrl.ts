@@ -1,9 +1,8 @@
 /**
  * Shared helper for building a Constellation view URL.
  *
- * - When running locally (localhost / 127.0.0.1 / *.local) it redirects to
- *   port 5275 at the root path with ?view=constellation, matching Observatory
- *   dev-server behaviour.
+ * - Separate local UI dev servers (5273/5274) use the blueprint on 5275.
+ *   A locally hosted API or standalone preview keeps its actual origin.
  * - When deployed it builds from `demoBase` (the configured replay URL),
  *   sets pathname to /blueprint/, preserves attribution query params (e.g.
  *   `from=…`) from demoBase, and sets ?view=constellation.
@@ -17,8 +16,11 @@ export function buildConstellationUrl(currentHref: string, demoBase: string): st
   const isLocal = host === "localhost" || host === "127.0.0.1" || host.endsWith(".local");
   if (isLocal) {
     const url = new URL(current.origin);
-    url.port = "5275";
-    url.pathname = "/";
+    const separateDevServer = current.port === "5273" || current.port === "5274";
+    if (separateDevServer) url.port = "5275";
+    url.pathname = !separateDevServer && current.pathname.startsWith("/blueprint")
+      ? "/blueprint/"
+      : "/";
     url.search = "";
     url.searchParams.set("view", "constellation");
     return url.toString();

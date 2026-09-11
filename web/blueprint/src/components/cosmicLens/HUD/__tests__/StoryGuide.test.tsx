@@ -6,19 +6,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 vi.mock("../guidedJourney", () => ({
   loadGuidedJourney: vi.fn(),
 }));
-vi.mock("../Narrator", () => ({
-  triggerNarrator: vi.fn(),
-}));
-
 import { StoryGuide } from "../StoryGuide";
-import { loadGuidedJourney } from "../guidedJourney";
-import { triggerNarrator } from "../Narrator";
+import { loadGuidedJourney, type GuidedJourney } from "../guidedJourney";
 
-const SAMPLE_ARC = {
-  phases: [{ phase: "overrun", elapsed_ms: 1 }],
-  total_elapsed_ms: 1,
-  narrative: "test",
-};
+const SAMPLE_JOURNEY: GuidedJourney = { workflowId: "AUR-real", source: "live" };
+const onFollow = vi.fn();
 
 describe("StoryGuide", () => {
   beforeEach(() => {
@@ -29,8 +21,27 @@ describe("StoryGuide", () => {
     cleanup();
   });
 
+  it("does not start work while source mode is unknown", () => {
+    render(<StoryGuide source={{ mode: "loading" }} onFollow={onFollow} />);
+    const button = screen.getByTestId("story-guide-journey-btn");
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(screen.getByTestId("story-guide-status").textContent).toMatch(/checking/i);
+    fireEvent.click(button);
+    expect(loadGuidedJourney).not.toHaveBeenCalled();
+  });
+
+  it("shows source failure and offers a retry without claiming live", () => {
+    const retry = vi.fn();
+    render(<StoryGuide source={{ mode: "unavailable", error: "Offline" }} onRetry={retry} onFollow={onFollow} />);
+    expect(screen.getByRole("alert").textContent).toContain("Offline");
+    expect(screen.getByTestId("story-guide-journey-btn").hasAttribute("disabled")).toBe(true);
+    expect(screen.queryByText("Live runtime")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
   it("renders orientation substance", () => {
-    render(<StoryGuide isReplay={false} />);
+    render(<StoryGuide source={{ mode: "live" }} onFollow={onFollow} />);
     expect(
       screen.getByText(/You are watching a working agentic organisation\./i),
     ).toBeTruthy();
@@ -39,54 +50,54 @@ describe("StoryGuide", () => {
   });
 
   it("shows 'Recorded telemetry' label with date when isReplay and recordedAt provided", () => {
-    render(<StoryGuide isReplay={true} recordedAt="2026-07-01T00:00:00Z" />);
+    render(<StoryGuide source={{ mode: "replay", recordedAt: "2026-07-01T00:00:00Z" }} onFollow={onFollow} />);
     const status = screen.getByTestId("story-guide-status");
     expect(status.textContent).toMatch(/Recorded telemetry/i);
     expect(status.textContent).toMatch(/2026|Jul/i);
   });
 
   it("shows 'Recorded telemetry' without date when isReplay but no recordedAt", () => {
-    render(<StoryGuide isReplay={true} />);
+    render(<StoryGuide source={{ mode: "replay" }} onFollow={onFollow} />);
     const status = screen.getByTestId("story-guide-status");
     expect(status.textContent).toBe("Recorded telemetry");
   });
 
   it("shows 'Live runtime' label when not replay", () => {
-    render(<StoryGuide isReplay={false} />);
+    render(<StoryGuide source={{ mode: "live" }} onFollow={onFollow} />);
     const status = screen.getByTestId("story-guide-status");
     expect(status.textContent).toBe("Live runtime");
   });
 
   it("renders 'Follow one decision' button", () => {
-    render(<StoryGuide isReplay={false} />);
+    render(<StoryGuide source={{ mode: "live" }} onFollow={onFollow} />);
     expect(screen.getByTestId("story-guide-journey-btn")).toBeTruthy();
     expect(screen.getByText(/Follow one decision/i)).toBeTruthy();
   });
 
-  it("starts guided journey and triggers narrator on success", async () => {
-    vi.mocked(loadGuidedJourney).mockResolvedValueOnce(SAMPLE_ARC as any);
-    render(<StoryGuide isReplay={false} />);
+  it("opens actual workflow evidence on success", async () => {
+    vi.mocked(loadGuidedJourney).mockResolvedValueOnce(SAMPLE_JOURNEY);
+    render(<StoryGuide source={{ mode: "live" }} onFollow={onFollow} />);
 
     await act(async () => {
       fireEvent.click(screen.getByTestId("story-guide-journey-btn"));
     });
 
     await waitFor(() => {
-      expect(loadGuidedJourney).toHaveBeenCalledWith(false);
-      expect(triggerNarrator).toHaveBeenCalledWith(SAMPLE_ARC);
+      expect(loadGuidedJourney).toHaveBeenCalledWith(false, expect.any(String));
+      expect(onFollow).toHaveBeenCalledWith(SAMPLE_JOURNEY);
     });
   });
 
   it("passes isReplay=true to loadGuidedJourney when replay", async () => {
-    vi.mocked(loadGuidedJourney).mockResolvedValueOnce(SAMPLE_ARC as any);
-    render(<StoryGuide isReplay={true} />);
+    vi.mocked(loadGuidedJourney).mockResolvedValueOnce({ ...SAMPLE_JOURNEY, source: "replay" });
+    render(<StoryGuide source={{ mode: "replay" }} onFollow={onFollow} />);
 
     await act(async () => {
       fireEvent.click(screen.getByTestId("story-guide-journey-btn"));
     });
 
     await waitFor(() => {
-      expect(loadGuidedJourney).toHaveBeenCalledWith(true);
+      expect(loadGuidedJourney).toHaveBeenCalledWith(true, undefined);
     });
   });
 
@@ -94,7 +105,7 @@ describe("StoryGuide", () => {
     vi.mocked(loadGuidedJourney).mockRejectedValueOnce(
       new Error("Could not start the Aurora journey (503)"),
     );
-    render(<StoryGuide isReplay={false} />);
+    render(<StoryGuide source={{ mode: "live" }} onFollow={onFollow} />);
 
     await act(async () => {
       fireEvent.click(screen.getByTestId("story-guide-journey-btn"));
@@ -108,11 +119,11 @@ describe("StoryGuide", () => {
   });
 
   it("disables button while busy", async () => {
-    let resolve!: (v: any) => void;
+    let resolve!: (v: GuidedJourney) => void;
     vi.mocked(loadGuidedJourney).mockReturnValueOnce(
       new Promise((r) => { resolve = r; }),
     );
-    render(<StoryGuide isReplay={false} />);
+    render(<StoryGuide source={{ mode: "live" }} onFollow={onFollow} />);
 
     act(() => {
       fireEvent.click(screen.getByTestId("story-guide-journey-btn"));
@@ -126,12 +137,12 @@ describe("StoryGuide", () => {
 
     // Resolve and clean up
     await act(async () => {
-      resolve(SAMPLE_ARC);
+      resolve(SAMPLE_JOURNEY);
     });
   });
 
   it("contains details section with three connection boundaries", () => {
-    render(<StoryGuide isReplay={false} />);
+    render(<StoryGuide source={{ mode: "live" }} onFollow={onFollow} />);
     // Click to open boundaries
     fireEvent.click(screen.getByText(/Where your systems connect/i));
     const details = screen.getByTestId("story-guide-boundaries");

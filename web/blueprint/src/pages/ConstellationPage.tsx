@@ -10,7 +10,7 @@
  * the link doesn't navigate the iframe back to the editorial blueprint.
  */
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CosmicLens } from "../components/cosmicLens/CosmicLens";
 import { DemoHUD } from "../components/cosmicLens/HUD/DemoHUD";
 import { DecisionTicker } from "../components/cosmicLens/HUD/DecisionTicker";
@@ -18,6 +18,7 @@ import { PolicyRipple } from "../components/cosmicLens/HUD/PolicyRipple";
 import { Narrator } from "../components/cosmicLens/HUD/Narrator";
 import { StoryGuide } from "../components/cosmicLens/HUD/StoryGuide";
 import { useReplayMode } from "../lib/useReplayMode";
+import type { GuidedJourney } from "../components/cosmicLens/HUD/guidedJourney";
 
 // Operator console (web/client) lives on port 5273 in dev/preview. When the
 // constellation is opened from the operator console (?from=fleet), the back
@@ -37,7 +38,15 @@ export function ConstellationPage() {
   const fromFleet = params.get("from") === "fleet";
   const demoEnabled = params.get("demo") === "1";
 
-  const { isReplay, recordedAt } = useReplayMode();
+  const { source, retry } = useReplayMode();
+  const sourceKnown = source.mode === "live" || source.mode === "replay";
+  const [journey, setJourney] = useState<GuidedJourney | null>(null);
+  const [workflowToOpen, setWorkflowToOpen] = useState<string | null>(null);
+  const workflowOpened = useCallback(() => setWorkflowToOpen(null), []);
+  const inspectWorkflow = useCallback((id: string) => {
+    setWorkflowToOpen(id);
+    setJourney(null);
+  }, []);
 
   useEffect(() => {
     document.body.classList.add("constellation-page-body");
@@ -48,12 +57,19 @@ export function ConstellationPage() {
 
   return (
     <div className="constellation-page">
-      <CosmicLens embed={embed} />
-      <StoryGuide isReplay={isReplay} recordedAt={recordedAt} />
-      <DemoHUD enabled={demoEnabled} />
-      <DecisionTicker enabled={true} isReplay={isReplay} />
+      <CosmicLens embed={embed} source={source} workflowToOpen={workflowToOpen} onWorkflowOpened={workflowOpened} />
+      <StoryGuide source={source} onRetry={retry} onFollow={setJourney} />
+      <DemoHUD enabled={demoEnabled && source.mode === "live"} onFollow={setJourney} />
+      <DecisionTicker enabled={sourceKnown} isReplay={source.mode === "replay"} />
       <PolicyRipple enabled={true} />
-      <Narrator />
+      {journey && journey.source === source.mode && (
+        <Narrator
+          key={journey.workflowId}
+          journey={journey}
+          onClose={() => setJourney(null)}
+          onInspect={inspectWorkflow}
+        />
+      )}
       {!embed && (
         <div
           className="constellation-page__return"

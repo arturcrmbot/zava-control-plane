@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReplayModeInfo } from "../../lib/useReplayMode";
+import type { GuidedJourney } from "../../components/cosmicLens/HUD/guidedJourney";
 
 // Module mocks — must be hoisted before imports of the components under test.
 vi.mock("../../components/cosmicLens/CosmicLens", () => ({
-  CosmicLens: ({ embed }: { embed?: boolean }) => (
-    <div data-testid="cosmic-lens" data-embed={String(embed)} />
+  CosmicLens: ({ embed, source, workflowToOpen }: { embed?: boolean; source: ReplayModeInfo; workflowToOpen?: string }) => (
+    <div data-testid="cosmic-lens" data-embed={String(embed)} data-source={source.mode} data-workflow-request={workflowToOpen ?? ""} />
   ),
 }));
 vi.mock("../../components/cosmicLens/HUD/DemoHUD", () => ({
@@ -24,27 +26,35 @@ vi.mock("../../components/cosmicLens/HUD/PolicyRipple", () => ({
   ),
 }));
 vi.mock("../../components/cosmicLens/HUD/Narrator", () => ({
-  Narrator: () => <div data-testid="narrator" />,
-  triggerNarrator: vi.fn(),
+  Narrator: ({ journey, onInspect }: { journey: GuidedJourney; onInspect: (id: string) => void }) => (
+    <div data-testid="narrator" data-workflow={journey.workflowId}>
+      <button onClick={() => onInspect(journey.workflowId)}>Inspect fixture</button>
+    </div>
+  ),
 }));
 vi.mock("../../components/cosmicLens/HUD/StoryGuide", () => ({
-  StoryGuide: ({ isReplay, recordedAt }: { isReplay: boolean; recordedAt?: string }) => (
-    <div data-testid="story-guide" data-replay={String(isReplay)} data-recorded-at={recordedAt ?? ""} />
+  StoryGuide: ({ source, onFollow }: { source: ReplayModeInfo; onFollow: (journey: GuidedJourney) => void }) => (
+    <div
+      data-testid="story-guide"
+      data-source={source.mode}
+      data-replay={String(source.mode === "replay")}
+      data-recorded-at={source.mode === "replay" ? source.recordedAt ?? "" : ""}
+    >
+      <button onClick={() => onFollow({ workflowId: "AUR-real", source: "live" })}>Follow fixture</button>
+    </div>
   ),
 }));
 
-let mockIsReplay = false;
-let mockRecordedAt: string | undefined;
+let mockSource: ReplayModeInfo = { mode: "live" };
 vi.mock("../../lib/useReplayMode", () => ({
-  useReplayMode: () => ({ isReplay: mockIsReplay, recordedAt: mockRecordedAt }),
+  useReplayMode: () => ({ source: mockSource, retry: vi.fn() }),
 }));
 
 import { ConstellationPage } from "../ConstellationPage";
 
 describe("ConstellationPage", () => {
   beforeEach(() => {
-    mockIsReplay = false;
-    mockRecordedAt = undefined;
+    mockSource = { mode: "live" };
     // Set up window.location.search for the page
     Object.defineProperty(window, "location", {
       writable: true,
@@ -76,8 +86,7 @@ describe("ConstellationPage", () => {
   });
 
   it("passes isReplay=true to StoryGuide and DecisionTicker when replay", async () => {
-    mockIsReplay = true;
-    mockRecordedAt = "2026-07-01T00:00:00Z";
+    mockSource = { mode: "replay", recordedAt: "2026-07-01T00:00:00Z" };
     render(<ConstellationPage />);
     await waitFor(() => {
       const sg = screen.getByTestId("story-guide");
@@ -88,9 +97,31 @@ describe("ConstellationPage", () => {
     });
   });
 
-  it("renders PolicyRipple and Narrator", () => {
+  it("opens the evidence panel only for an actual selected workflow", () => {
     render(<ConstellationPage />);
     expect(screen.getByTestId("policy-ripple")).toBeTruthy();
-    expect(screen.getByTestId("narrator")).toBeTruthy();
+    expect(screen.queryByTestId("narrator")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Follow fixture" }));
+    expect(screen.getByTestId("narrator").getAttribute("data-workflow")).toBe("AUR-real");
+  });
+
+  it("clears the guide when opening the existing workflow inspector", () => {
+    render(<ConstellationPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Follow fixture" }));
+    fireEvent.click(screen.getByRole("button", { name: "Inspect fixture" }));
+    expect(screen.queryByTestId("narrator")).toBeNull();
+    expect(screen.getByTestId("cosmic-lens").getAttribute("data-workflow-request")).toBe("AUR-real");
+  });
+
+  it.each<ReplayModeInfo>([
+    { mode: "loading" },
+    { mode: "unavailable", error: "Offline" },
+  ])("shares $mode without showing a live decision ticker", (source) => {
+    mockSource = source;
+    render(<ConstellationPage />);
+    expect(screen.getByTestId("cosmic-lens").getAttribute("data-source")).toBe(source.mode);
+    expect(screen.getByTestId("story-guide").getAttribute("data-source")).toBe(source.mode);
+    expect(screen.getByTestId("decision-ticker").getAttribute("data-enabled")).toBe("false");
+    expect(screen.getByTestId("demo-hud").getAttribute("data-enabled")).toBe("false");
   });
 });

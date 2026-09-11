@@ -1,150 +1,160 @@
-import type { ArcResult } from "./Narrator";
-
-/**
- * Replay arc: six-phase explanatory Aurora journey over recorded telemetry.
- * No network mutation — this is guidance commentary, not a live trigger.
- */
-const REPLAY_ARC: ArcResult = {
-  phases: [
-    {
-      phase: "overrun",
-      elapsed_ms: 0,
-      summary: { brand: "BRAND-aurora" },
-    },
-    {
-      phase: "cfo_observe",
-      elapsed_ms: 7,
-      headline: "Aurora at 123 % of FY budget — recommend freeze",
-    },
-    {
-      phase: "approve",
-      elapsed_ms: 5,
-      policy_workflow_id: "WF-replay-001",
-    },
-    {
-      phase: "cfo_observe_post",
-      elapsed_ms: 8,
-      headline: "Aurora dropped from proposals",
-      freezes_remaining: 2,
-    },
-    {
-      phase: "spawn_invoices",
-      elapsed_ms: 26,
-      cascades: [{ id: 1 }, { id: 2 }, { id: 3 }],
-    },
-    {
-      phase: "ceo_synthesise",
-      elapsed_ms: 2,
-      headline: "Org-wide spend posture: 1 freeze active across 3 brands",
-    },
-  ],
-  total_elapsed_ms: 48,
-  narrative:
-    "Recorded Aurora journey: budget overrun → CFO observed → freeze approved → cascade → CEO synthesis",
-};
-
-/**
- * Load the guided Aurora cross-functional journey.
- *
- * - Replay: returns the checked-in explanatory arc; no HTTP call.
- * - Live: POSTs the demo trigger and returns the parsed ArcResult.
- *
- * The Aurora arc is agency-only (it needs `BRAND-aurora`). Under any other
- * vertical the trigger 404s, so fall back to the active actor world's own
- * hero scenario rather than surfacing a dead-end error to the viewer.
- */
-export async function loadGuidedJourney(isReplay: boolean): Promise<ArcResult> {
-  if (isReplay) {
-    return REPLAY_ARC;
-  }
-
-  const res = await fetch(
-    "/api/demo/trigger/full-aurora-arc?delay_seconds=2.0&count=3",
-    { method: "POST" },
-  );
-  if (res.ok) {
-    return res.json() as Promise<ArcResult>;
-  }
-  if (res.status === 404) {
-    return loadActiveWorldJourney();
-  }
-  throw new Error(`Could not start the Aurora journey (${res.status})`);
+export interface GuidedJourney {
+  workflowId: string;
+  source: "live" | "replay";
 }
 
-interface SceneScenario {
-  name: string;
-  label?: string;
+export interface JourneyDetails {
+  workflowId: string;
+  workflowType: string;
+  status: string;
+  currentPhase: string;
+  outcome?: string;
+  reason?: string;
+  phases: { name: string; status: string }[];
+  activeExceptionId?: string;
+  recommendation?: string;
+  policyDecisionId?: string;
+  children: { workflowId: string; status?: string }[];
 }
 
-interface WorldScene {
-  title?: string;
-  scenarios?: SceneScenario[];
+const AURORA_TYPE = "aurora-budget-response";
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
 }
 
-interface ScenarioRunResult {
-  ok?: boolean;
-  error?: string;
-  workflow_id?: string;
-  story_id?: string;
+function text(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
 }
 
-/**
- * Vertical-aware guided journey: trigger the active world's first hero
- * scenario and narrate the real ids it returns.
- */
-async function loadActiveWorldJourney(): Promise<ArcResult> {
-  const sceneRes = await fetch("/api/world/scene");
-  if (!sceneRes.ok) {
-    throw new Error(
-      `No guided journey is available for this vertical (world scene ${sceneRes.status})`,
-    );
-  }
-  const scene = (await sceneRes.json()) as WorldScene;
-  const scenario = scene.scenarios?.[0];
-  if (!scenario) {
-    throw new Error("No guided journey is available for this vertical");
-  }
+function requiredText(value: unknown, field: string): string {
+  const result = text(value);
+  if (!result) throw new Error(`Workflow evidence is missing ${field}`);
+  return result;
+}
 
-  const started = Date.now();
-  const runRes = await fetch(
-    `/api/world/scenarios/${encodeURIComponent(scenario.name)}`,
-    { method: "POST" },
-  );
-  if (!runRes.ok) {
-    throw new Error(
-      `Could not start ${scenario.label || scenario.name} (${runRes.status})`,
-    );
+async function responseBody(response: Response, label: string): Promise<unknown> {
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() => null);
+    const rawDetail = record(body)?.detail;
+    const detail = text(rawDetail) || text(record(rawDetail)?.message);
+    throw new Error(detail || `${label} (${response.status})`);
   }
-  const result = (await runRes.json()) as ScenarioRunResult;
-  if (!result.ok) {
-    throw new Error(result.error || "scenario rejected");
-  }
+  return response.json();
+}
 
-  const label = scenario.label || scenario.name;
+/** Follow a real existing run; create one only when live has no Aurora run. */
+export async function loadGuidedJourney(
+  isReplay: boolean, requestId?: string,
+): Promise<GuidedJourney> {
+  const body = await responseBody(await fetch("/api/workflows"), "Could not load workflows");
+  if (!Array.isArray(body)) throw new Error("Workflow index is not a list");
+  const roots = body
+    .map(record)
+    .filter((item): item is Record<string, unknown> => !!item &&
+      item.type === AURORA_TYPE && !!text(item.id) &&
+      !!text(item.orchestrationInstanceId ?? item.orchestration_instance_id))
+    .sort((a, b) => Number(a.createdAt ?? a.created_at ?? 0) - Number(b.createdAt ?? b.created_at ?? 0));
+  const latest = roots[roots.length - 1];
+  if (latest) {
+    return {
+      workflowId: requiredText(latest.id, "workflow id"),
+      source: isReplay ? "replay" : "live",
+    };
+  }
+  if (isReplay) throw new Error("No recorded Aurora execution is available in this tape.");
+  return startAuroraJourney(requestId);
+}
+
+export async function startAuroraJourney(
+  requestId: string = crypto.randomUUID(),
+): Promise<GuidedJourney> {
+  const response = await fetch("/api/demo/trigger/full-aurora-arc?count=3", {
+    method: "POST",
+    headers: { "Idempotency-Key": requestId },
+  });
+  if (response.status === 404) return startActiveWorldJourney();
+  const body = record(await responseBody(response, "Could not start Aurora"));
+  if (response.status !== 202) {
+    throw new Error("Expected a Durable workflow acceptance (202), not a caption script.");
+  }
   return {
-    phases: [
-      {
-        phase: "world_detected",
-        elapsed_ms: Date.now() - started,
-        headline: `${label} detected in ${scene.title || "the live world"}`,
-      },
-      {
-        phase: "world_workflow",
-        elapsed_ms: 0,
-        headline: result.workflow_id
-          ? `${result.workflow_id} opened — durable workflow now running`
-          : "Durable workflow opened",
-      },
-      {
-        phase: "world_decision",
-        elapsed_ms: 0,
-        headline:
-          "Agents assemble the evidence; the accountable human still decides.",
-      },
-    ],
-    total_elapsed_ms: Date.now() - started,
-    narrative: `${label}: detected → durable workflow ${
-      result.workflow_id || ""
-    } → governed human decision`.trim(),
+    workflowId: requiredText(body?.workflow_id, "accepted workflow id"),
+    source: "live",
   };
+}
+
+async function startActiveWorldJourney(): Promise<GuidedJourney> {
+  const scene = record(await responseBody(
+    await fetch("/api/world/scene"), "Could not load the active world",
+  ));
+  const scenario = Array.isArray(scene?.scenarios) ? record(scene.scenarios[0]) : undefined;
+  const name = text(scenario?.name);
+  if (!name) throw new Error("No guided journey is available for this vertical.");
+  const result = record(await responseBody(
+    await fetch(`/api/world/scenarios/${encodeURIComponent(name)}`, { method: "POST" }),
+    "Could not start the active world scenario",
+  ));
+  if (result?.ok !== true) throw new Error(text(result?.error) || "Scenario was not accepted.");
+  const workflowId = text(result.workflow_id);
+  if (!workflowId) {
+    throw new Error("Scenario accepted, but no workflow evidence ID was returned. Inspect the world view.");
+  }
+  return { workflowId, source: "live" };
+}
+
+export async function readJourneyDetails(workflowId: string): Promise<JourneyDetails | null> {
+  const response = await fetch(`/api/workflows/${encodeURIComponent(workflowId)}`);
+  if (response.status === 404) return null;
+  const body = record(await responseBody(response, "Could not load workflow evidence"));
+  const workflow = record(body?.workflow);
+  if (workflow?.id !== workflowId) throw new Error("Workflow evidence identity does not match the selected run.");
+  if (!Array.isArray(body?.phases)) throw new Error("Workflow evidence has no phase list.");
+
+  const pack = record(body.packDetail);
+  const outputs = record(pack?.outputs);
+  const recommendation = record(outputs?.recommendation);
+  const policy = record(outputs?.policy);
+  const exception = record(body.activeException);
+  const metadata = record(workflow.metadata);
+  const children = Array.isArray(pack?.children) ? pack.children : [];
+  return {
+    workflowId,
+    workflowType: requiredText(workflow.type, "workflow type"),
+    status: requiredText(workflow.status, "workflow status"),
+    currentPhase: text(workflow.currentPhase ?? workflow.current_phase) || "",
+    outcome: text(metadata?.outcome) || (metadata?.rejected === true ? "rejected" : undefined),
+    reason: text(metadata?.rejection_reason) || text(metadata?.failure_reason),
+    phases: body.phases.map((value) => {
+      const phase = record(value);
+      return {
+        name: requiredText(phase?.name, "phase name"),
+        status: requiredText(phase?.status, "phase status"),
+      };
+    }),
+    activeExceptionId: text(exception?.id),
+    recommendation: text(recommendation?.rationale),
+    policyDecisionId: text(policy?.decision_id),
+    children: children.map((value) => {
+      const child = record(value);
+      return {
+        workflowId: requiredText(child?.workflow_id ?? value, "child workflow id"),
+        status: text(record(child?.outcome)?.status),
+      };
+    }),
+  };
+}
+
+export async function resolveJourneyDecision(
+  exceptionId: string, resolution: "approve" | "reject",
+): Promise<void> {
+  const response = await fetch(`/api/exceptions/${encodeURIComponent(exceptionId)}/resolve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ resolution }),
+  });
+  const body = record(await responseBody(response, "Could not submit the decision"));
+  if (body?.resolved !== 1) throw new Error("The decision was not acknowledged.");
 }

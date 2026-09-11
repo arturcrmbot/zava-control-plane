@@ -17,6 +17,7 @@ export type PanelId =
 const RETIRED_IDS = new Set<string>(["vital-signs"]);
 
 const STORAGE_KEY = "zava.hud.hidden";
+const SMALL_SCREEN = "(max-width: 720px)";
 
 // Default-visible panels at first load. Anything added after a user hid it
 // stays hidden until they un-hide it.
@@ -34,7 +35,11 @@ function readHidden(): Set<PanelId> {
   } catch {
     /* ignore */
   }
-  return new Set(DEFAULT_HIDDEN);
+  return new Set<PanelId>(
+    window.matchMedia?.(SMALL_SCREEN).matches
+      ? ["narrative-arcs", "activity-rail"]
+      : DEFAULT_HIDDEN,
+  );
 }
 
 function writeHidden(s: Set<PanelId>) {
@@ -52,11 +57,14 @@ export function usePanelVisibility() {
 
   useEffect(() => {
     const reload = () => setHidden(readHidden());
+    const media = window.matchMedia?.(SMALL_SCREEN);
+    media?.addEventListener("change", reload);
     window.addEventListener("zava-panel-visibility", reload);
     window.addEventListener("storage", reload);
     return () => {
       window.removeEventListener("zava-panel-visibility", reload);
       window.removeEventListener("storage", reload);
+      media?.removeEventListener("change", reload);
     };
   }, []);
 

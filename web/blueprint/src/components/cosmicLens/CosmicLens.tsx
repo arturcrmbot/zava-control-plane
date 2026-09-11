@@ -27,9 +27,13 @@ import { WorkflowDrawer, type DrawerView } from "./HUD/WorkflowDrawer";
 import { KnowledgePulse } from "./HUD/KnowledgePulse";
 import { NarrativeArcs } from "./HUD/NarrativeArcs";
 import { TimeScrub, type ReplaySnapshot } from "./HUD/TimeScrub";
+import type { ReplayModeInfo } from "../../lib/useReplayMode";
 
 interface CosmicLensProps {
   embed?: boolean;
+  source: ReplayModeInfo;
+  workflowToOpen?: string | null;
+  onWorkflowOpened?: () => void;
 }
 
 /** Internal component — runs INSIDE Canvas so useThree works. Publishes
@@ -51,12 +55,17 @@ function SceneIntrospector() {
  * moons and cities on the hub. Trails fade behind rockets, building
  * operational corridors.
  */
-export function CosmicLens({ embed: _embed }: CosmicLensProps) {
+export function CosmicLens({ embed: _embed, source, workflowToOpen, onWorkflowOpened }: CosmicLensProps) {
   const live = useLiveCosmic();
   const trailRegistry = useMemo(() => new TrailRegistry(500), []);
   const exhaustRegistry = useMemo(() => new ExhaustRegistry(), []);
   const rocketRegistry = useMemo(() => new RocketRegistry(), []);
   const [drawer, setDrawer] = useState<DrawerView>({ type: null });
+  useEffect(() => {
+    if (!workflowToOpen) return;
+    setDrawer({ type: "workflow", id: workflowToOpen });
+    onWorkflowOpened?.();
+  }, [workflowToOpen, onWorkflowOpened]);
   // pick which HUD panels to render — backed by localStorage. The
   // PanelPicker chip top-right is the canonical UI for toggling these.
   const panelVisibility = usePanelVisibility();
@@ -514,6 +523,7 @@ export function CosmicLens({ embed: _embed }: CosmicLensProps) {
           which is the only way to toggle the other HUD panels. Hiding it
           would strand the user with no escape hatch. */}
       <VitalSignsBar
+        source={source}
         inFlight={live.inFlight}
         personas={live.personas}
         status={live.status}
@@ -524,7 +534,7 @@ export function CosmicLens({ embed: _embed }: CosmicLensProps) {
         throughputPerMin={throughputPerMin}
       />
 
-      {panelVisibility.visible("time-scrub") && (
+      {source.mode === "live" && panelVisibility.visible("time-scrub") && (
         <TimeScrub onSnapshot={setReplaySnap} />
       )}
       {replaySnap && (
@@ -551,6 +561,7 @@ export function CosmicLens({ embed: _embed }: CosmicLensProps) {
 
       {panelVisibility.visible("activity-rail") && (
         <ActivityRail
+          source={source}
           flashesRef={live.flashesRef}
           mode={live.mode}
           inFlight={live.inFlight}

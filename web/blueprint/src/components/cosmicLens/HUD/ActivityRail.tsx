@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import type { CosmicFlash, FunctionMeta, WorkflowMoonData } from "../lib/types";
 import { labelForCapability, labelForEntity } from "../lib/labels";
 import { HotFunctions } from "./HotFunctions";
-import { useReplayMode } from "../../../lib/useReplayMode";
+import type { ReplayModeInfo } from "../../../lib/useReplayMode";
 
 interface ActivityRailProps {
+  source: ReplayModeInfo;
   flashesRef: React.MutableRefObject<{ buffer: CosmicFlash[]; version: number }>;
   mode: "capabilities" | "entities";
   inFlight?: WorkflowMoonData[];
@@ -39,12 +40,12 @@ export function ActivityRail({
   inFlight,
   functions,
   onFunctionClick,
+  source,
 }: ActivityRailProps) {
   const [entries, setEntries] = useState<RailEntry[]>([]);
   const [enabled, setEnabled] = useState<Set<string>>(
     () => new Set(FILTERS.filter((f) => f.default).map((f) => f.key)),
   );
-  const { isReplay } = useReplayMode();
   // When user switches to Entities mode, auto-enable the entity chip so the
   // rail surfaces the right signal for that view. We still let users override.
   useEffect(() => {
@@ -181,7 +182,7 @@ export function ActivityRail({
         }}
       >
         <div style={{ color: "#94a3b8", fontSize: 10, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
-          {isReplay ? "Recorded activity" : "Live activity"}
+          {source.mode === "replay" ? "Recorded activity" : source.mode === "live" ? "Live activity" : "Activity"}
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
           {FILTERS.map((f) => {

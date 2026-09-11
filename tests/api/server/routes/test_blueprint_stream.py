@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -13,6 +14,39 @@ from api.shared.events import FleetEvent
 class _DisconnectedRequest:
     async def is_disconnected(self) -> bool:
         return True
+
+
+@pytest.mark.asyncio
+async def test_runtime_stream_does_not_mix_in_renamed_template_workflows(monkeypatch):
+    class ConnectedRequest:
+        async def is_disconnected(self):
+            return False
+
+    bus = EventBus()
+    template_reads = []
+
+    def templates(_runtime):
+        template_reads.append(True)
+        return [{
+            "workflow_type": "hiring",
+            "events": [{"type": "workflow.started", "workflow_id": "RECORDED-ORIGINAL"}],
+            "deltas_ms": [0],
+        }]
+    monkeypatch.setattr(blueprint.app_state, "bus", bus)
+    monkeypatch.setattr(blueprint, "_OBSERVATORY_CAP", SimpleNamespace(allow=lambda: True, capacity=400))
+    monkeypatch.setattr(blueprint, "_normalise_event", lambda event: event.model_dump())
+    monkeypatch.setattr(blueprint, "load_recorded_templates", templates)
+    response = await blueprint.blueprint_stream(ConnectedRequest())
+    stream = response.body_iterator
+    try:
+        assert (await anext(stream))["event"] == "hello"
+        await asyncio.sleep(0)
+        assert template_reads == []
+        bus.emit(FleetEvent(type="workflow.started", workflow_id="AUR-real"))
+        event = await asyncio.wait_for(anext(stream), timeout=1)
+        assert json.loads(event["data"])["workflow_id"] == "AUR-real"
+    finally:
+        await stream.aclose()
 
 
 @pytest.mark.asyncio

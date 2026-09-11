@@ -1,8 +1,9 @@
 import type { CosmicMode, PersonaState, WorkflowMoonData } from "../lib/types";
 import { PanelPicker } from "./PanelPicker";
-import { useReplayMode } from "../../../lib/useReplayMode";
+import type { ReplayModeInfo } from "../../../lib/useReplayMode";
 
 interface VitalSignsBarProps {
+  source: ReplayModeInfo;
   inFlight: WorkflowMoonData[];
   personas: PersonaState[];
   status: string;
@@ -25,13 +26,13 @@ export function VitalSignsBar(props: VitalSignsBarProps) {
     setMode,
     onBurst,
     recentEvents,
+    source,
   } = props;
 
   // Throughput is computed by the parent (CosmicLens) which has direct
   // access to flashesRef. Pass via prop.
   const throughput = props.throughputPerMin ?? 0;
 
-  const replay = useReplayMode();
   const pendingDecisions = personas.reduce(
     (sum, p) => sum + (p.pending_count ?? 0),
     0,
@@ -40,6 +41,7 @@ export function VitalSignsBar(props: VitalSignsBarProps) {
 
   return (
     <div
+      className="cosmic-vitals"
       style={{
         position: "absolute",
         top: 0,
@@ -47,7 +49,8 @@ export function VitalSignsBar(props: VitalSignsBarProps) {
         right: 0,
         padding: "10px 16px",
         display: "flex",
-        gap: 16,
+        flexWrap: "wrap",
+        gap: "var(--vitals-gap, 16px)",
         alignItems: "center",
         background: "linear-gradient(to bottom, rgba(2,6,23,0.92), rgba(2,6,23,0.65))",
         color: "#e2e8f0",
@@ -71,11 +74,11 @@ export function VitalSignsBar(props: VitalSignsBarProps) {
       <Divider />
       <Stat label="Events per minute" value={Math.round(recentEvents)} accent="#10b981" />
 
-      <div style={{ flex: 1 }} />
+      <div className="cosmic-vitals__spacer" style={{ flex: 1 }} />
 
-      <StatusPill status={status} replay={replay.isReplay} recordedAt={replay.recordedAt} />
+      <StatusPill status={status} source={source} />
 
-      {!replay.isReplay && (
+      {source.mode === "live" && (
         <button onClick={onBurst} style={btnStyle("primary")} title="Inject 8 varied workflows">
           ⚡ Spawn 8 cases
         </button>
@@ -102,7 +105,7 @@ function Stat({
   accent: string;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
+    <div className="cosmic-vitals__stat" style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
       <span
         style={{
           color: accent,
@@ -123,6 +126,7 @@ function Stat({
 function Divider() {
   return (
     <div
+      className="cosmic-vitals__divider"
       style={{
         width: 1,
         height: 30,
@@ -132,11 +136,16 @@ function Divider() {
   );
 }
 
-function StatusPill({ status, replay, recordedAt }: { status: string; replay?: boolean; recordedAt?: string }) {
+function StatusPill({ status, source }: { status: string; source: ReplayModeInfo }) {
   let color: string;
   let label: string;
   let titleAttr: string | undefined;
-  if (replay) {
+  if (source.mode === "loading" || source.mode === "unavailable") {
+    color = "#fbbf24";
+    label = source.mode === "loading" ? "Checking source…" : "Source unavailable";
+    titleAttr = source.mode === "unavailable" ? source.error : undefined;
+  } else if (source.mode === "replay") {
+    const { recordedAt } = source;
     color = "#a78bfa";
     const stamp = recordedAt ? new Date(recordedAt).toLocaleDateString() : "";
     label = stamp ? `Replay · ${stamp}` : "Replay";

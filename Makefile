@@ -110,6 +110,7 @@ test-harness:
 		tests/api/shared/test_vertical_pack_contracts.py \
 		tests/tools/test_runtime_image_contract.py \
 		tests/tools/test_container_entrypoint.py \
+		tests/tools/test_local_demo_configuration.py \
 		tests/tools/test_public_replay_manifest.py \
 		tests/tools/test_public_story_deployment.py \
 		tests/api/server/test_static_production.py \
@@ -119,6 +120,22 @@ test-harness:
 		tests/api/unit/test_tracked_executor_validation.py \
 		tests/api/server/services/test_workflow_event_ingestor.py \
 		tests/api/server/services/test_persona_responder_edge_cases.py \
+		tests/api/server/services/test_platform_actor.py \
+		tests/api/server/services/test_aurora_operator_guard.py \
+		tests/api/server/services/test_aurora_workflow_ingestion.py \
+		tests/api/server/routes/test_aurora_demo_trigger.py \
+		tests/api/server/routes/test_aurora_operator_decision.py \
+		tests/api/server/routes/test_internal_agency_aurora.py \
+		tests/api/server/routes/test_blueprint_stream.py \
+		tests/api/server/routes/test_blueprint_stream_backpressure.py \
+		tests/api/server/routes/test_health_and_authority_health.py \
+		tests/api/server/test_aurora_budget_response_domain.py \
+		tests/api/server/test_ap_invoice_domain.py \
+		tests/api/functions/test_kernel_registration.py \
+		tests/api/functions/test_vertical_skill_root.py \
+		tests/api/functions/workflows/test_aurora_budget_response.py \
+		tests/api/functions/workflows/test_aurora_budget_response_activities.py \
+		tests/api/functions/workflows/test_fleet_ap_invoice_decisions.py \
 		tests/api/unit/test_hiring_segment_*.py \
 		tests/api/unit/test_expense_claim_orchestration.py \
 		tests/api/unit/test_*graph.py \
@@ -142,7 +159,16 @@ test-harness:
 		web/client/components/feed/__tests__/CardList.test.tsx \
 		web/client/components/feed/__tests__/Drawer.test.tsx \
 		web/client/components/feed/__tests__/DrawerDecision.test.tsx \
-		web/portal/src/lib/__tests__/paths.test.ts
+		web/portal/src/lib/__tests__/paths.test.ts \
+		web/blueprint/src/lib/__tests__/useReplayMode.test.ts \
+		web/blueprint/src/components/cosmicLens/HUD/__tests__/guidedJourney.test.ts \
+		web/blueprint/src/components/cosmicLens/HUD/__tests__/Narrator.test.tsx \
+		web/blueprint/src/components/cosmicLens/HUD/__tests__/StoryGuide.test.tsx \
+		web/blueprint/src/components/cosmicLens/HUD/__tests__/DemoHUD.test.tsx \
+		web/blueprint/src/components/cosmicLens/HUD/__tests__/VitalSignsBar.test.tsx \
+		web/blueprint/src/components/cosmicLens/HUD/__tests__/usePanelVisibility.test.ts \
+		web/blueprint/src/pages/__tests__/ConstellationPage.test.tsx \
+		web/blueprint/src/sections/__tests__/StoryContract.test.ts
 
 # Playwright — requires the stack to already be running (`make up` in another terminal).
 test-e2e:

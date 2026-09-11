@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { loadGuidedJourney } from "./guidedJourney";
-import { triggerNarrator } from "./Narrator";
+import { useRef, useState } from "react";
+import { loadGuidedJourney, type GuidedJourney } from "./guidedJourney";
+import type { ReplayModeInfo } from "../../../lib/useReplayMode";
 
 interface StoryGuideProps {
-  isReplay: boolean;
-  recordedAt?: string;
+  source: ReplayModeInfo;
+  onRetry?: () => void;
+  onFollow: (journey: GuidedJourney) => void;
 }
 
 /**
@@ -15,18 +16,29 @@ interface StoryGuideProps {
  * cross-functional Aurora decision, names the governance layer, and explains
  * real/synthetic/customer-connection boundaries.
  */
-export function StoryGuide({ isReplay, recordedAt }: StoryGuideProps) {
+export function StoryGuide({ source, onRetry, onFollow }: StoryGuideProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const requestId = useRef<string | undefined>(undefined);
+  const isReplay = source.mode === "replay";
+  const sourceKnown = source.mode === "live" || isReplay;
+  const disabled = busy || !sourceKnown;
+  const visibleError = error || (source.mode === "unavailable" ? source.error : null);
 
   async function handleJourney() {
+    if (!sourceKnown) {
+      setError("Source mode is not confirmed");
+      return;
+    }
     if (busy) return;
     setError(null);
     setBusy(true);
     try {
-      const result = await loadGuidedJourney(isReplay);
-      triggerNarrator(result);
+      if (!isReplay) requestId.current ??= crypto.randomUUID();
+      const result = await loadGuidedJourney(isReplay, requestId.current);
+      requestId.current = undefined;
+      onFollow(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -34,18 +46,23 @@ export function StoryGuide({ isReplay, recordedAt }: StoryGuideProps) {
     }
   }
 
-  const statusLabel = isReplay
-    ? recordedAt
-      ? `Recorded telemetry · ${new Date(recordedAt).toLocaleDateString()}`
-      : "Recorded telemetry"
-    : "Live runtime";
+  const statusLabel = source.mode === "loading"
+    ? "Checking source…"
+    : source.mode === "unavailable"
+      ? "Source unavailable"
+      : source.mode === "replay"
+        ? source.recordedAt
+          ? `Recorded telemetry · ${new Date(source.recordedAt).toLocaleDateString()}`
+          : "Recorded telemetry"
+        : "Live runtime";
+  const statusColor = isReplay ? "#a78bfa" : source.mode === "live" ? "#4ade80" : "#fbbf24";
 
   return (
     <div
+      className="constellation-story-guide"
       data-testid="story-guide"
       style={{
         position: "fixed",
-        top: 72,
         left: "50%",
         transform: "translateX(-50%)",
         zIndex: 60,
@@ -76,14 +93,14 @@ export function StoryGuide({ isReplay, recordedAt }: StoryGuideProps) {
       </div>
 
       {/* Status + action row */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: error ? 8 : 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: visibleError ? 8 : 0 }}>
         <span
           data-testid="story-guide-status"
           style={{
             fontSize: 11,
-            color: isReplay ? "#a78bfa" : "#4ade80",
-            background: isReplay ? "rgba(167,139,250,0.12)" : "rgba(74,222,128,0.12)",
-            border: `1px solid ${isReplay ? "rgba(167,139,250,0.3)" : "rgba(74,222,128,0.3)"}`,
+            color: statusColor,
+            background: `${statusColor}1f`,
+            border: `1px solid ${statusColor}4d`,
             borderRadius: 999,
             padding: "2px 9px",
             fontWeight: 500,
@@ -95,16 +112,16 @@ export function StoryGuide({ isReplay, recordedAt }: StoryGuideProps) {
         <button
           data-testid="story-guide-journey-btn"
           onClick={handleJourney}
-          disabled={busy}
+          disabled={disabled}
           style={{
             padding: "5px 13px",
-            background: busy
+            background: disabled
               ? "rgba(99,102,241,0.3)"
               : "linear-gradient(135deg, #6366f1, #8b5cf6)",
-            color: busy ? "#a5b4fc" : "#fff",
+            color: disabled ? "#a5b4fc" : "#fff",
             border: "none",
             borderRadius: 6,
-            cursor: busy ? "not-allowed" : "pointer",
+            cursor: disabled ? "not-allowed" : "pointer",
             fontSize: 11,
             fontWeight: 600,
             letterSpacing: 0.3,
@@ -131,7 +148,7 @@ export function StoryGuide({ isReplay, recordedAt }: StoryGuideProps) {
       </div>
 
       {/* Error */}
-      {error && (
+      {visibleError && (
         <div
           role="alert"
           data-testid="story-guide-error"
@@ -145,7 +162,15 @@ export function StoryGuide({ isReplay, recordedAt }: StoryGuideProps) {
             padding: "4px 10px",
           }}
         >
-          {error}
+          {visibleError}
+          {source.mode === "unavailable" && onRetry && (
+            <button
+              onClick={() => { setError(null); onRetry(); }}
+              style={{ marginLeft: 10, cursor: "pointer", textDecoration: "underline" }}
+            >
+              Retry connection
+            </button>
+          )}
         </div>
       )}
 

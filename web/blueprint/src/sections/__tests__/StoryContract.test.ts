@@ -76,6 +76,25 @@ describe("blueprint article story contract", () => {
 
   // Behavioral URL helper tests — no source token assertions
   describe("buildConstellationUrl", () => {
+    it("keeps a locally hosted full API/blueprint on its actual port", () => {
+      const result = new URL(buildConstellationUrl(
+        "http://127.0.0.1:7315/blueprint/",
+        "https://replay.example/",
+      ));
+      expect(result.origin).toBe("http://127.0.0.1:7315");
+      expect(result.pathname).toBe("/blueprint/");
+      expect(result.searchParams.get("view")).toBe("constellation");
+    });
+
+    it("keeps a standalone local preview on its actual port", () => {
+      const result = new URL(buildConstellationUrl(
+        "http://localhost:5279/",
+        "https://replay.example/",
+      ));
+      expect(result.port).toBe("5279");
+      expect(result.pathname).toBe("/");
+    });
+
     it("local blueprint dev (port 5275) returns origin:5275, pathname /, view=constellation", () => {
       const result = buildConstellationUrl(
         "http://localhost:5275/",

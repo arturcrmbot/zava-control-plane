@@ -9,7 +9,7 @@
  */
 
 import { useState } from "react";
-import { triggerNarrator } from "./Narrator";
+import type { GuidedJourney } from "./guidedJourney";
 
 type Scenario = {
   id: string;
@@ -21,28 +21,28 @@ type Scenario = {
 const SCENARIOS: Scenario[] = [
   {
     id: "full-aurora-arc",
-    title: "🎬 Full Aurora Demo Arc",
+    title: "Start Aurora budget response",
     description:
-      "One-click: overrun → CFO observation → auto-approve → cascade → CEO synthesis. Watch the ticker.",
+      "Start a real Durable budget response. CFO approval is required before a policy is applied and queued invoices are reviewed.",
     trigger: () =>
       fetch(
-        "/api/demo/trigger/full-aurora-arc?delay_seconds=2.0&count=3",
-        { method: "POST" },
+        "/api/demo/trigger/full-aurora-arc?count=3",
+        { method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() } },
       ),
   },
   {
     id: "aurora-overrun",
     title: "Aurora Budget Overrun",
     description:
-      "Push BRAND-aurora spend above 95% of FY budget + spawn 3 in-flight ap-invoices on Aurora. CFO will recommend a freeze on the next cadence tick.",
+      "Raise the synthetic Aurora spending signal and queue three real AP invoice workflows.",
     trigger: () =>
       fetch("/api/demo/trigger/aurora-overrun", { method: "POST" }),
   },
   {
     id: "in-flight-only",
-    title: "Aurora In-Flight Invoices",
+    title: "Queue Aurora invoices",
     description:
-      "Spawn 3 ap-invoices on Aurora WITHOUT injecting overrun. If CFO has already proposed a freeze, watch the new invoices auto-escalate.",
+      "Queue three real AP invoice workflows without changing the budget signal. Their actual review outcomes appear in workflow evidence.",
     trigger: () =>
       fetch(
         "/api/demo/trigger/in-flight-invoices?brand_id=BRAND-aurora&count=3",
@@ -55,10 +55,11 @@ const SCENARIOS: Scenario[] = [
     description:
       "Push BRAND-solace above 95% (already over today; this tops it up) and spawn 2 invoices to drive the freeze recommendation on the alt brand.",
     trigger: async () => {
-      await fetch(
+      const overrun = await fetch(
         "/api/demo/trigger/brand-overrun?brand_id=BRAND-solace&target_pct=0.95",
         { method: "POST" },
       );
+      if (!overrun.ok) return overrun;
       return fetch(
         "/api/demo/trigger/in-flight-invoices?brand_id=BRAND-solace&count=2",
         { method: "POST" },
@@ -117,7 +118,12 @@ const PANEL_BG = "linear-gradient(to bottom, rgb(2,6,23), rgb(15,23,42))";
 const BORDER = "1px solid rgba(99,102,241,0.3)";
 const MUTED = "rgba(148,163,184,0.85)";
 
-export function DemoHUD({ enabled }: { enabled: boolean }) {
+export function DemoHUD({
+  enabled, onFollow,
+}: {
+  enabled: boolean;
+  onFollow?: (journey: GuidedJourney) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
@@ -134,20 +140,33 @@ export function DemoHUD({ enabled }: { enabled: boolean }) {
     try {
       const r = await s.trigger();
       const body = await r.json().catch(() => ({}));
-      if (
-        r.ok &&
-        s.id === "full-aurora-arc" &&
-        body &&
-        Array.isArray((body as { phases?: unknown }).phases)
-      ) {
-        triggerNarrator(body as Parameters<typeof triggerNarrator>[0]);
+      const failureDetail = typeof body.detail === "string"
+        ? body.detail
+        : typeof body.detail?.message === "string" ? body.detail.message : undefined;
+      const confirmedIds = Array.isArray(body.detail?.started_workflow_ids)
+        ? body.detail.started_workflow_ids.filter((id: unknown) => typeof id === "string")
+        : [];
+      const unconfirmedId = typeof body.detail?.unconfirmed_workflow_id === "string"
+        ? body.detail.unconfirmed_workflow_id
+        : undefined;
+      if (r.ok && s.id === "full-aurora-arc") {
+        if (r.status !== 202 || typeof body.workflow_id !== "string" || !body.workflow_id) {
+          throw new Error("Aurora did not return a real workflow acceptance.");
+        }
+        onFollow?.({ workflowId: body.workflow_id, source: "live" });
       }
       setFeedback({
         id: s.id,
         ok: r.ok,
         msg: r.ok
-          ? `Triggered. ${JSON.stringify(body).slice(0, 200)}`
-          : `Failed (${r.status})`,
+          ? s.id === "full-aurora-arc"
+            ? `Accepted ${body.workflow_id}. Follow its actual checkpoints and operator decision.`
+            : `Triggered. ${JSON.stringify(body).slice(0, 200)}`
+          : [
+              failureDetail || `Failed (${r.status})`,
+              confirmedIds.length ? `Started: ${confirmedIds.join(", ")}` : "",
+              unconfirmedId ? `Unconfirmed: ${unconfirmedId}` : "",
+            ].filter(Boolean).join(" "),
       });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
