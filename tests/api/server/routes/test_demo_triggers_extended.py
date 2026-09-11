@@ -234,12 +234,8 @@ def test_department_attrition_handles_missing_department(client):
     assert "no Persons" in (body.get("message") or "")
 
 
-def test_in_flight_invoices_cascade_records_decisions(monkeypatch):
-    """When an in-flight invoice is spawned on a frozen Brand, the
-    ap_clerk → controller → cfo cascade runs synchronously and records
-    Decision rows so the auto-escalation is visible end-to-end without
-    a real workflow runtime.
-    """
+def test_in_flight_invoices_do_not_fabricate_persona_decisions(monkeypatch):
+    """The legacy route queues real AP Durable work and never writes fake decisions."""
     from datetime import datetime
     from pathlib import Path
     import tempfile
@@ -247,15 +243,22 @@ def test_in_flight_invoices_cascade_records_decisions(monkeypatch):
     from fastapi.testclient import TestClient
 
     from api.server.main import app
-    from api.server.services import persona_responder as pr
     from api.server.services.entity_graph import EntityGraph, EntityWrite
     from api.server.state import app_state
 
     tmp = Path(tempfile.mkdtemp())
     g = EntityGraph(tmp / "ig.kuzu")
     monkeypatch.setattr(app_state, "entities", g)
-    monkeypatch.setattr(pr, "_lazy_app_graph", lambda: g, raising=False)
-    pr.PERSONA_DEFINITIONS = pr._load_personae()
+    scheduled = []
+
+    async def _schedule(payload, function_name, instance_id=None):
+        scheduled.append((payload, function_name, instance_id))
+        return {"id": instance_id, "_started": True}
+
+    monkeypatch.setattr(
+        "api.server.services.durable_client.schedule_new_orchestration",
+        _schedule,
+    )
 
     # Seed BRAND-frozen + record an active policy_set freeze on it.
     g.upsert(EntityWrite(
@@ -280,20 +283,10 @@ def test_in_flight_invoices_cascade_records_decisions(monkeypatch):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["count"] == 1
-    cascades = body.get("cascades") or []
-    assert len(cascades) == 1
-    decisions = cascades[0]["decisions"]
-    # ap_clerk should have escalated due to the active freeze.
-    assert any(
-        d["role"] == "ap_clerk" and d["verdict"] == "escalate"
-        for d in decisions
-    ), f"expected ap_clerk to escalate; got {decisions}"
-
-    # Decision rows should exist in the graph for the cascade.
+    assert body["queue_status"] == "queued"
+    assert len(scheduled) == 1
     rows = g.query(
         "MATCH (d:Decision) WHERE d.source_event = 'demo.in_flight_invoice' "
         "RETURN d.persona_role AS who, d.verdict AS v ORDER BY who"
     )
-    roles = {r["who"]: r["v"] for r in rows}
-    assert "ap_clerk" in roles, f"ap_clerk decision missing; got {roles}"
-    assert roles["ap_clerk"] == "escalate"
+    assert rows == []

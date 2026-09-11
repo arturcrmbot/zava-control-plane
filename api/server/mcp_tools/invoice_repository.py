@@ -10,6 +10,7 @@ Used by the AP-invoice fleet domain (api/functions/workflows/fleet_ap_invoice.py
 from __future__ import annotations
 import hashlib
 import json
+from datetime import date, timedelta
 
 from copilot.tools import ToolResult, define_tool
 from opentelemetry import trace
@@ -54,6 +55,7 @@ def _synth_get_invoice(invoice_id: str) -> dict:
     """Deterministic synthesis. Same invoice_id -> byte-identical record."""
     seed = int(hashlib.sha256(str(invoice_id).encode()).hexdigest()[:8], 16)
     gl = _GL_CODES[seed % len(_GL_CODES)]
+    received_date = _date_iso(seed)
     return {
         "invoice_id": invoice_id,
         "vendor": _VENDORS[seed % len(_VENDORS)],
@@ -62,15 +64,14 @@ def _synth_get_invoice(invoice_id: str) -> dict:
         "gl_code": gl[0],
         "gl_category": gl[1],
         "cost_centre": f"CC-{(seed >> 4) % 9000 + 1000:04d}",
-        "received_date": _date_iso(seed),
-        "due_date": _date_iso(seed + 2592000),  # 30 days later
+        "received_date": received_date,
+        "due_date": (date.fromisoformat(received_date) + timedelta(days=30)).isoformat(),
     }
 
 
 def _date_iso(seed: int) -> str:
     # Pick a date in 2026; deterministic on seed.
     day_of_year = (seed >> 8) % 365 + 1
-    from datetime import date, timedelta
     return (date(2026, 1, 1) + timedelta(days=day_of_year - 1)).isoformat()
 
 

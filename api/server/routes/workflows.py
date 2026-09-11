@@ -1006,7 +1006,7 @@ def _synthesize_workflow(workflow_id: str) -> Workflow | None:
     workflow_type via the domain registry by workflow_id prefix.
     """
     domain = _registry.by_prefix(workflow_id)
-    if domain is None:
+    if domain is None or not domain.seed_in_data_fabric:
         return None
     excs = [
         e for e in app_state.store.list_exceptions(include_resolved=True)

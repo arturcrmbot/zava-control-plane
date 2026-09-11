@@ -16,6 +16,15 @@ from api.functions.workflows.surge_staffing import surge_staffing_orchestration
 from api.functions.workflows.surge_staffing_activities import (
     surge_staffing_decide_activity,
 )
+from api.functions.workflows.aurora_budget_response import (
+    aurora_budget_response_orchestration,
+)
+from api.functions.workflows.aurora_budget_response_activities import (
+    aurora_apply_policy_activity,
+    aurora_observe_budget_activity,
+    aurora_recommendation_activity,
+    aurora_synthesise_activity,
+)
 from api.functions.workflows.activities import (
     intake_activity,
     classify_activity,
@@ -39,6 +48,31 @@ from api.functions.workflows.activities import (
 )
 
 app = create_app()
+
+
+@app.orchestration_trigger(context_name="context")
+def AuroraBudgetResponseOrchestrator(context: df.DurableOrchestrationContext):
+    return aurora_budget_response_orchestration(context)
+
+
+@app.activity_trigger(input_name="payload")
+def aurora_observe_budget_activity_trigger(payload: dict) -> dict:
+    return aurora_observe_budget_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+async def aurora_recommendation_activity_trigger(payload: dict) -> dict:
+    return await aurora_recommendation_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def aurora_apply_policy_activity_trigger(payload: dict) -> dict:
+    return aurora_apply_policy_activity(payload)
+
+
+@app.activity_trigger(input_name="payload")
+def aurora_synthesise_activity_trigger(payload: dict) -> dict:
+    return aurora_synthesise_activity(payload)
 
 
 # Orchestrator — 7-phase expense claim (POC1)

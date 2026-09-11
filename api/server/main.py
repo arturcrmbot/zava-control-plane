@@ -528,8 +528,10 @@ routers = [stream_router, workflows_router, exceptions_router, policy_router,
 
 if app_state.runtime.pack.name == "agency":
     from api.server.routes.functions_ambient import router as functions_ambient_router
+    from api.server.routes.internal_agency import router as internal_agency_router
 
     routers.append(functions_ambient_router)
+    routers.append(internal_agency_router)
 
 for r in routers:
     app.include_router(r)

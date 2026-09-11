@@ -36,7 +36,11 @@ _FIXTURE_ROOT = _REPO_ROOT / "data" / "synthetic"
 
 
 def _live_domains() -> list[Domain]:
-    return [d for d in DOMAINS.values() if not d.stub]
+    return [
+        domain
+        for domain in DOMAINS.values()
+        if not domain.stub and domain.seed_in_data_fabric
+    ]
 
 
 def _domain_weights(live: list[Domain]) -> list[float]:

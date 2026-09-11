@@ -40,11 +40,12 @@ from api.server.services.governance.permission_handler import AGTPermissionHandl
 from api.functions.graphs.executors.agents.runtime import _get_runtime, LLMRuntimeResult
 
 
-if len(app_state.runtime.pack.skill_roots) != 1:
+if not app_state.runtime.pack.skill_roots:
     raise RuntimeError(
-        f"vertical {app_state.runtime.pack.name!r} must declare one skill root"
+        f"vertical {app_state.runtime.pack.name!r} must declare at least one skill root"
     )
-_SKILLS_DIR = app_state.runtime.pack.skill_roots[0]
+_SKILLS_DIRS = tuple(app_state.runtime.pack.skill_roots)
+_SKILLS_DIR = _SKILLS_DIRS[0]
 SKILLS_DIR = _SKILLS_DIR
 _tracer = trace.get_tracer("zava.agents.finance")
 log = logging.getLogger(__name__)
@@ -730,12 +731,18 @@ async def run_agent_skill(
     instance_id: str | None = None,
 ) -> dict:
     """Deprecated alias — prefer `run_agent_session(skill_dir=..., tools=[...])`."""
-    candidate = _SKILLS_DIR / skill_name
-    if not candidate.is_dir():
-        candidate = _SKILLS_DIR / skill_name.replace("_", "-")
+    candidate = next(
+        (
+            path
+            for root in _SKILLS_DIRS
+            for path in (root / skill_name, root / skill_name.replace("_", "-"))
+            if path.is_dir()
+        ),
+        None,
+    )
     return await run_agent_session(
         prompt=prompt,
-        skill_dir=candidate if candidate.is_dir() else None,
+        skill_dir=candidate,
         skill_label=skill_name,
         model=model,
         attachments=attachments,

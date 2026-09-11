@@ -25,7 +25,7 @@ from api.server.services.exception_factory import (
 )
 from api.server.services import pending_gates
 from api.shared.events import FleetEvent
-from api.shared.types import Phase, OtelSpan, ActionLedgerEntry, McpCall
+from api.shared.types import Workflow, Phase, OtelSpan, ActionLedgerEntry, McpCall
 
 log = logging.getLogger(__name__)
 
@@ -343,6 +343,32 @@ class WorkflowEventIngestor:
         })
 
         if kind == "workflow.started":
+            workflow = app_state.store.get_workflow(wid)
+            workflow_init = payload.get("workflow")
+            if workflow is None and wt_in and isinstance(workflow_init, dict):
+                workflow = Workflow(
+                    id=wid,
+                    type=str(wt_in),
+                    status="in_progress",
+                    current_phase=str(
+                        workflow_init.get("current_phase") or "Intake"
+                    ),
+                    created_at=now,
+                    sla_due_at=float(
+                        workflow_init.get("sla_due_at") or now + 86400
+                    ),
+                    jurisdiction=str(
+                        workflow_init.get("jurisdiction") or "London-Zava"
+                    ),
+                    agency=str(workflow_init.get("agency") or "Zava"),
+                    payload=dict(workflow_init.get("payload") or {}),
+                    orchestration_instance_id=instance_id,
+                    metadata=dict(workflow_init.get("metadata") or {}),
+                )
+                app_state.store.upsert_workflow(workflow)
+            elif workflow is not None and instance_id:
+                workflow.orchestration_instance_id = instance_id
+                app_state.store.upsert_workflow(workflow)
             # Emit BOTH the legacy workflow.started (consumers haven't migrated
             # yet) and the rich durable.workflow.started the observatory +
             # recorder expect. The substrate-fix design names durable.* as
@@ -657,6 +683,10 @@ class WorkflowEventIngestor:
             wait_kind = payload.get("wait_kind", "operator_review")
             is_external_party = wait_kind == "external_party"
             enriched_context = dict(payload.get("context") or {})
+            if payload.get("operator_only") is not None:
+                enriched_context["operator_only"] = bool(
+                    payload.get("operator_only")
+                )
             phase = payload.get("phase")
             if phase and "phase" not in enriched_context:
                 enriched_context["phase"] = phase
@@ -694,11 +724,16 @@ class WorkflowEventIngestor:
                 w.metadata["awaiting_reason"] = reason
                 w.metadata["wait_kind"] = wait_kind
                 w.payload = dict(w.payload or {})
-                w.payload["hitl_context"] = {
+                hitl_context = {
                     **enriched_context,
                     "persona": payload.get("persona"),
                     "external_event": payload.get("external_event"),
                 }
+                if payload.get("operator_only") is not None:
+                    hitl_context["operator_only"] = bool(
+                        payload.get("operator_only")
+                    )
+                w.payload["hitl_context"] = hitl_context
             # Forward persona-responder fields onto the FleetEvent. Generated
             # domains stash `persona`, `external_event`, and `context` in the
             # suspended payload so the responder can close the gate without a
@@ -760,6 +795,18 @@ class WorkflowEventIngestor:
             # Canonical durable.resumed lights the orbit ring back up after the
             # persona responder closes the gate.
             self._emit("durable.resumed", wid, phase=payload.get("phase"))
+
+        elif kind == "workflow.output":
+            slot = str(payload.get("slot") or "")
+            data = payload.get("data")
+            workflow = app_state.store.get_workflow(wid)
+            if workflow is not None and slot:
+                workflow.payload = dict(workflow.payload or {})
+                outputs = dict(workflow.payload.get("outputs") or {})
+                outputs[slot] = data
+                workflow.payload["outputs"] = outputs
+                app_state.store.upsert_workflow(workflow)
+            self._emit("workflow.output", wid, slot=slot, data=data)
 
         elif kind == "agent_output":
             # POC2 §4.21 AG-UI: cross-process bridge for structured agent

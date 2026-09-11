@@ -11,6 +11,21 @@ Confirms:
 from __future__ import annotations
 
 import pytest
+from datetime import date, timedelta
+
+
+@pytest.mark.parametrize("invoice_id", [
+    "INV-2026-00017",
+    "INV-AUR-5DF62C4905-01",
+    "INV-AUR-5DF62C4905-02",
+])
+def test_synthetic_invoice_due_date_is_thirty_days_after_receipt(invoice_id):
+    from api.server.mcp_tools.invoice_repository import get_invoice
+
+    invoice = get_invoice(invoice_id)
+    assert date.fromisoformat(invoice["due_date"]) == (
+        date.fromisoformat(invoice["received_date"]) + timedelta(days=30)
+    )
 
 
 def test_domain_registry_has_ap_invoice():

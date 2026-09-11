@@ -110,18 +110,20 @@ def test_brand_overrun_no_op_when_already_at_target(client):
     assert body["before_pct"] == pytest.approx(0.95, rel=1e-3)
 
 
-def test_in_flight_invoices_emits_spawn_events(client, monkeypatch):
+def test_in_flight_invoices_schedules_real_durable_workflows(client, monkeypatch):
     c, g = client
     _seed_brand(g, "BRAND-test", budget=100_000.0, spend=10_000.0)
 
-    captured: list = []
-    real_emit = app_state.bus.emit
+    scheduled = []
 
-    def fake_emit(ev):
-        captured.append(ev)
-        return real_emit(ev)
+    async def _schedule(payload, function_name, instance_id=None):
+        scheduled.append((payload, function_name, instance_id))
+        return {"id": instance_id, "_started": True}
 
-    monkeypatch.setattr(app_state.bus, "emit", fake_emit)
+    monkeypatch.setattr(
+        "api.server.services.durable_client.schedule_new_orchestration",
+        _schedule,
+    )
 
     r = c.post(
         "/api/demo/trigger/in-flight-invoices?brand_id=BRAND-test&count=2",
@@ -131,28 +133,55 @@ def test_in_flight_invoices_emits_spawn_events(client, monkeypatch):
     body = r.json()
     assert body["count"] == 2
     assert len(body["spawned_workflow_ids"]) == 2
+    assert body["queue_status"] == "queued"
+    assert len(scheduled) == 2
+    assert all(call[1] == "FleetApInvoiceOrchestrator" for call in scheduled)
+    assert all(call[0]["invoice"]["brand_id"] == "BRAND-test" for call in scheduled)
+    assert all(
+        app_state.store.get_workflow(workflow_id) is not None
+        for workflow_id in body["spawned_workflow_ids"]
+    )
 
-    spawn_events = [
-        e for e in captured
-        if getattr(e, "type", None) == "workflow.spawn.requested"
-        and (getattr(e, "payload", None) or {}).get("workflow_type") == "ap-invoice"
-    ]
-    assert len(spawn_events) == 2
-    for ev in spawn_events:
-        inner = (ev.payload or {}).get("payload") or {}
-        invoice = inner.get("invoice") or {}
-        assert invoice.get("brand_id") == "BRAND-test"
+
+def test_invoice_batch_failure_reports_already_started_work(client, monkeypatch):
+    c, _graph = client
+    started = []
+
+    async def schedule(payload, function_name, instance_id=None):
+        if started:
+            raise RuntimeError("Functions stopped")
+        started.append(payload["workflow_id"])
+        return {"id": instance_id, "_started": True}
+
+    monkeypatch.setattr(
+        "api.server.services.durable_client.schedule_new_orchestration", schedule,
+    )
+    response = c.post(
+        "/api/demo/trigger/in-flight-invoices?brand_id=BRAND-test&count=3",
+        headers=HDRS,
+    )
+
+    assert response.status_code == 503
+    detail = response.json()["detail"]
+    assert detail["started_workflow_ids"] == started
+    assert detail["requested_count"] == 3
+    assert detail["failed_item"] == 2
+    assert app_state.store.get_workflow(started[0]) is not None
 
 
 def test_aurora_convenience_route_calls_both(client, monkeypatch):
     c, g = client
     _seed_brand(g, "BRAND-aurora", budget=100_000.0, spend=40_000.0)
 
-    captured: list = []
-    real_emit = app_state.bus.emit
+    scheduled = []
+
+    async def _schedule(payload, function_name, instance_id=None):
+        scheduled.append((payload, function_name, instance_id))
+        return {"id": instance_id, "_started": True}
+
     monkeypatch.setattr(
-        app_state.bus, "emit",
-        lambda ev: (captured.append(ev), real_emit(ev))[1],
+        "api.server.services.durable_client.schedule_new_orchestration",
+        _schedule,
     )
 
     r = c.post("/api/demo/trigger/aurora-overrun", headers=HDRS)
@@ -163,9 +192,4 @@ def test_aurora_convenience_route_calls_both(client, monkeypatch):
     assert len(body["spawned_workflow_ids"]) == 3
     assert body["count"] == 3
 
-    spawn_events = [
-        e for e in captured
-        if getattr(e, "type", None) == "workflow.spawn.requested"
-        and (getattr(e, "payload", None) or {}).get("workflow_type") == "ap-invoice"
-    ]
-    assert len(spawn_events) == 3
+    assert len(scheduled) == 3

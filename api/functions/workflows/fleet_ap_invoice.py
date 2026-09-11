@@ -39,7 +39,20 @@ def fleet_ap_invoice_orchestration(context: df.DurableOrchestrationContext) -> G
     yield context.call_activity("checkpoint_activity_trigger", {
         "workflow_id": workflow_id, "instance_id": context.instance_id,
         "kind": "workflow.started",
-        "payload": {"domain": "fleet-ap-invoice", "workflow_type": workflow_type},
+        "payload": {
+            "domain": "fleet-ap-invoice",
+            "workflow_type": workflow_type,
+            "workflow": {
+                "current_phase": "Invoice Lookup",
+                "jurisdiction": "London-Zava",
+                "agency": "Zava",
+                "payload": {
+                    "parent_workflow_id": input_dict.get("parent_workflow_id"),
+                    "invoice": input_dict.get("invoice") or {},
+                    "scenario": input_dict.get("scenario"),
+                },
+            },
+        },
     })
 
     # Phase 1: Invoice Lookup (deterministic)
@@ -47,6 +60,10 @@ def fleet_ap_invoice_orchestration(context: df.DurableOrchestrationContext) -> G
         "fleet_ap_invoice_invoice_lookup_activity_trigger", enriched
     )
     enriched = {**enriched, "invoice_lookup": invoice_lookup_result}
+    invoice_context = {
+        **(input_dict.get("invoice") or {}),
+        **(invoice_lookup_result or {}),
+    }
 
     # Phase 2: Three-Way Match (deterministic + validator)
     three_way_match_result = yield context.call_activity(
@@ -66,9 +83,12 @@ def fleet_ap_invoice_orchestration(context: df.DurableOrchestrationContext) -> G
             "persona": "ap_clerk",
             "external_event": "ap_invoice_processing_decision",
             "context": {
-                "invoice": enriched.get("invoice"),
+                "invoice": invoice_context,
                 "invoice_lookup": enriched.get("invoice_lookup"),
                 "three_way_match": enriched.get("three_way_match"),
+                "action": "ap_invoice_approval",
+                "escalation_chain": ["controller", "cfo"],
+                "workflow_type": workflow_type,
             },
         },
     })
@@ -80,8 +100,9 @@ def fleet_ap_invoice_orchestration(context: df.DurableOrchestrationContext) -> G
     if winner_clerk == timeout_event_clerk:
         yield context.call_activity("checkpoint_activity_trigger", {
             "workflow_id": workflow_id, "instance_id": context.instance_id,
-            "kind": "workflow.completed",
-            "payload": {"status": "timeout", "phase": "ap_clerk_signoff",
+            "kind": "workflow.failed",
+            "payload": {"outcome": "timeout", "phase": "ap_clerk_signoff",
+                        "reason": "AP clerk decision timed out",
                         "workflow_type": workflow_type},
         })
         return {"status": "timeout", "phase": "ap_clerk_signoff"}
@@ -99,16 +120,62 @@ def fleet_ap_invoice_orchestration(context: df.DurableOrchestrationContext) -> G
     # gets to see it). When ap_clerk approved, the workflow is done.
     clerk_decision = (enriched["ap_clerk_signoff"] or {}).get("decision")
     if clerk_decision == "approve":
-        yield context.call_activity("checkpoint_activity_trigger", {
-            "workflow_id": workflow_id, "instance_id": context.instance_id,
-            "kind": "workflow.completed", "payload": {"workflow_type": workflow_type},
-        })
-        return {
+        outcome = {
             "status": "completed",
+            "invoice_id": invoice_context.get("invoice_id"),
             "invoice_lookup": invoice_lookup_result,
             "three_way_match": three_way_match_result,
             "ap_clerk_signoff": enriched["ap_clerk_signoff"],
         }
+        yield context.call_activity("checkpoint_activity_trigger", {
+            "workflow_id": workflow_id, "instance_id": context.instance_id,
+            "kind": "workflow.output",
+            "payload": {"slot": "outcome", "data": outcome,
+                        "workflow_type": workflow_type},
+        })
+        yield context.call_activity("checkpoint_activity_trigger", {
+            "workflow_id": workflow_id, "instance_id": context.instance_id,
+            "kind": "workflow.completed", "payload": {"workflow_type": workflow_type},
+        })
+        return outcome
+    if clerk_decision == "reject":
+        outcome = {
+            "status": "rejected",
+            "phase": "ap_clerk_signoff",
+            "invoice_id": invoice_context.get("invoice_id"),
+            "ap_clerk_signoff": enriched["ap_clerk_signoff"],
+        }
+        yield context.call_activity("checkpoint_activity_trigger", {
+            "workflow_id": workflow_id, "instance_id": context.instance_id,
+            "kind": "workflow.output",
+            "payload": {"slot": "outcome", "data": outcome,
+                        "workflow_type": workflow_type},
+        })
+        yield context.call_activity("checkpoint_activity_trigger", {
+            "workflow_id": workflow_id, "instance_id": context.instance_id,
+            "kind": "workflow.rejected",
+            "payload": {
+                "phase": "ap_clerk_signoff",
+                "reason": (
+                    enriched["ap_clerk_signoff"].get("reason")
+                    or "AP clerk rejected invoice"
+                ),
+                "decision_id": enriched["ap_clerk_signoff"].get("decision_id"),
+                "workflow_type": workflow_type,
+            },
+        })
+        return outcome
+    if clerk_decision != "escalate":
+        yield context.call_activity("checkpoint_activity_trigger", {
+            "workflow_id": workflow_id, "instance_id": context.instance_id,
+            "kind": "workflow.failed",
+            "payload": {
+                "outcome": "invalid_ap_clerk_decision",
+                "reason": f"Unsupported AP clerk decision {clerk_decision!r}",
+                "workflow_type": workflow_type,
+            },
+        })
+        return {"status": "failed", "outcome": "invalid_ap_clerk_decision"}
 
     # Phase 4: Controller Signoff (HITL — controller persona)
     yield context.call_activity("checkpoint_activity_trigger", {
@@ -122,10 +189,13 @@ def fleet_ap_invoice_orchestration(context: df.DurableOrchestrationContext) -> G
             "persona": "controller",
             "external_event": "controller_signoff_decision",
             "context": {
-                "invoice": enriched.get("invoice"),
+                "invoice": invoice_context,
                 "invoice_lookup": enriched.get("invoice_lookup"),
                 "three_way_match": enriched.get("three_way_match"),
                 "ap_clerk_signoff": enriched.get("ap_clerk_signoff"),
+                "action": "ap_invoice_approval",
+                "escalation_chain": ["cfo"],
+                "workflow_type": workflow_type,
             },
         },
     })
@@ -137,8 +207,9 @@ def fleet_ap_invoice_orchestration(context: df.DurableOrchestrationContext) -> G
     if winner_ctrl == timeout_event_ctrl:
         yield context.call_activity("checkpoint_activity_trigger", {
             "workflow_id": workflow_id, "instance_id": context.instance_id,
-            "kind": "workflow.completed",
-            "payload": {"status": "timeout", "phase": "controller_signoff",
+            "kind": "workflow.failed",
+            "payload": {"outcome": "timeout", "phase": "controller_signoff",
+                        "reason": "Controller decision timed out",
                         "workflow_type": workflow_type},
         })
         return {"status": "timeout", "phase": "controller_signoff"}
@@ -152,15 +223,54 @@ def fleet_ap_invoice_orchestration(context: df.DurableOrchestrationContext) -> G
         "payload": {"phase": "controller_signoff", "workflow_type": workflow_type},
     })
 
-    yield context.call_activity("checkpoint_activity_trigger", {
-        "workflow_id": workflow_id, "instance_id": context.instance_id,
-        "kind": "workflow.completed", "payload": {"workflow_type": workflow_type},
-    })
-
-    return {
-        "status": "completed",
+    controller_decision = (enriched["controller_signoff"] or {}).get("decision")
+    outcome = {
+        "status": "completed" if controller_decision == "approve" else (
+            "rejected" if controller_decision == "reject" else "failed"
+        ),
+        "invoice_id": invoice_context.get("invoice_id"),
         "invoice_lookup": invoice_lookup_result,
         "three_way_match": three_way_match_result,
         "ap_clerk_signoff": enriched["ap_clerk_signoff"],
         "controller_signoff": enriched["controller_signoff"],
     }
+    if controller_decision == "escalate":
+        outcome["outcome"] = "unresolved_escalation"
+    elif controller_decision not in {"approve", "reject"}:
+        outcome["outcome"] = "invalid_controller_decision"
+    yield context.call_activity("checkpoint_activity_trigger", {
+        "workflow_id": workflow_id, "instance_id": context.instance_id,
+        "kind": "workflow.output",
+        "payload": {"slot": "outcome", "data": outcome,
+                    "workflow_type": workflow_type},
+    })
+    if controller_decision == "approve":
+        terminal_kind = "workflow.completed"
+        terminal_payload = {"workflow_type": workflow_type}
+    elif controller_decision == "reject":
+        terminal_kind = "workflow.rejected"
+        terminal_payload = {
+            "phase": "controller_signoff",
+            "reason": (
+                enriched["controller_signoff"].get("reason")
+                or "Controller rejected invoice"
+            ),
+            "decision_id": enriched["controller_signoff"].get("decision_id"),
+            "workflow_type": workflow_type,
+        }
+    else:
+        terminal_kind = "workflow.failed"
+        terminal_payload = {
+            "outcome": outcome["outcome"],
+            "reason": (
+                "Controller escalation remains unresolved"
+                if controller_decision == "escalate"
+                else f"Unsupported controller decision {controller_decision!r}"
+            ),
+            "workflow_type": workflow_type,
+        }
+    yield context.call_activity("checkpoint_activity_trigger", {
+        "workflow_id": workflow_id, "instance_id": context.instance_id,
+        "kind": terminal_kind, "payload": terminal_payload,
+    })
+    return outcome

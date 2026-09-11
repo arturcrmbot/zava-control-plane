@@ -19,6 +19,7 @@ from verticals.agency.lifecycle import bootstrap, start
 from verticals.agency.personas import AGENCY_PERSONAS
 from verticals.agency.projections import AGENCY_PROJECTIONS
 from verticals.agency.worlds import AGENCY_WORLDS
+from verticals.agency.detail import workflow_detail
 
 
 PACK_ROOT = Path(__file__).resolve().parent
@@ -93,7 +94,10 @@ def build_pack() -> VerticalPack:
             activities=frozenset(),
         ),
         personae_roots=(REPO_ROOT / "api" / "server" / "personae",),
-        skill_roots=(REPO_ROOT / "api" / "server" / "skills",),
+        skill_roots=(
+            REPO_ROOT / "api" / "server" / "skills",
+            PACK_ROOT / "skills",
+        ),
         mcp_modules=_mcp_modules(),
         external_capabilities=AGENCY_EXTERNAL_CAPABILITIES,
         worlds=AGENCY_WORLDS,
@@ -111,4 +115,5 @@ def build_pack() -> VerticalPack:
             for domain in domains.values()
             if not domain.stub and domain.spawn_fn
         ),
+        workflow_detail_hook=workflow_detail,
     )

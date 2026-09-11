@@ -27,7 +27,7 @@ AGENCY_FUNCTIONS: dict[str, Function] = {
         name="finance",
         display="Finance",
         operator_surface="finance-controller",
-        owns_domains=("ap-invoice", "contract-renewal", "purchase-order",
+        owns_domains=("aurora-budget-response", "ap-invoice", "contract-renewal", "purchase-order",
                       "treasury-fx", "vendor-kyc", "vendor-risk-to-pay",
                       "intercompany-recharge",
                       "monthly-client-pnl", "annual-budget-setting"),

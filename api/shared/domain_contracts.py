@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Literal, Mapping
 
 
-PhaseKind = Literal["deterministic", "agent", "hitl"]
+PhaseKind = Literal["deterministic", "agent", "hitl", "sub_orchestrator"]
 
 
 @dataclass(frozen=True)
@@ -23,6 +23,7 @@ class HitlGate:
     holiday_probability: float = 0.0
     timeout_probability: float = 0.0
     override_probability: float = 0.0
+    operator_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,7 @@ class Domain:
     realistic_interval_seconds: int | None = None
     region_overlays: Mapping[str, RegionOverlay] = field(default_factory=dict)
     slow_burn: bool = False
+    seed_in_data_fabric: bool = True
 
     def phases_for_region(self, region: str | None) -> tuple[Phase, ...]:
         if not region:

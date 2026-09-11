@@ -8,28 +8,29 @@ demo flow. Three endpoints, all under ``/api/demo/trigger``:
   POST /api/demo/trigger/aurora-overrun      (convenience wrapper)
 
 The first inserts ~5 fresh ``Money`` rows so a freshly-loaded graph can
-produce overrun observations on the next CFO summary tick. The second
-spawns a few ``ap-invoice`` workflows so the freeze policy has live
-work to auto-escalate (the prestige moment). The third is a one-shot
-wrapper around (a) + (b) targeting ``BRAND-aurora``.
+produce overrun observations on the next CFO summary tick. The legacy-named
+``in-flight-invoices`` route now queues real ``FleetApInvoiceOrchestrator``
+instances and reports them as queued. The Aurora flagship route starts the
+asynchronous ``AuroraBudgetResponseOrchestrator``; it does not apply policy or
+manufacture decisions inside the request.
 
 Generalised from §8.1 of the v1 spec
 ``docs/superpowers/specs/2026-05-12-autonomous-domain-insights-design.md``.
 """
 from __future__ import annotations
 
-import asyncio
-import json
+import hashlib
 import time
 import uuid
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from api.server.services.entity_graph import EntityWrite
 from api.server.services.read_route_auth import Actor, require_actor
 from api.server.state import app_state
+from api.shared.types import Workflow
 
 router = APIRouter(prefix="/api/demo/trigger")
 
@@ -190,129 +191,78 @@ def _do_brand_overrun(brand_id: str | None, target_pct: float) -> dict[str, Any]
     }
 
 
-def _spawn_ap_invoice(brand_id: str, idx: int) -> str:
-    """Emit a ``workflow.spawn.requested`` FleetEvent for an ap-invoice.
-
-    Mirrors the ``_spawn_policy_set`` helper in
-    :mod:`api.server.services.policy_application` — there is no direct
-    in-process spawner that accepts a free-form payload, so we publish on
-    the bus and let the durable-functions wiring pick it up. Tests
-    monkeypatch ``app_state.bus.emit`` to assert the call.
-    """
-    from api.shared.events import FleetEvent
-
-    workflow_id = f"WF-AP-DEMO-{uuid.uuid4().hex[:12]}"
-    invoice_id = f"INV-DEMO-{uuid.uuid4().hex[:8]}"
-    payload = {
-        "invoice": {
-            "invoice_id": invoice_id,
-            "brand_id": brand_id,
-            "amount_gbp": 5000,
-            "vendor_name": f"Demo Vendor {idx}",
-            "currency": "GBP",
-            "po_id": f"PO-DEMO-{idx}",
-            "category": "demo",
-        }
-    }
-    app_state.bus.emit(FleetEvent(
-        type="workflow.spawn.requested",
-        workflow_id=workflow_id,
-        payload={"workflow_type": "ap-invoice", "payload": payload},
-    ))
-    return workflow_id
-
-
-def _simulate_ap_invoice_decision_cascade(
-    workflow_id: str, brand_id: str, invoice_id: str, amount_gbp: float,
-) -> list[dict[str, Any]]:
-    """Run the ap_clerk → controller → cfo decision cascade synchronously.
-
-    Each level: invoke the persona's compiled decision_policy with a
-    synthesized context (mirroring what an ap-invoice gate would carry),
-    record the resulting Decision in the graph, and stop the cascade
-    when a non-escalate verdict is reached. Returns the list of recorded
-    decision summaries for the response payload.
-
-    This bridges the gap between the bus-emit shim (no in-process
-    workflow runtime) and the visible auto-escalation demo: when an
-    invoice on a frozen Brand is "spawned", the active freeze is
-    detected immediately and Decision rows show in the ticker.
-    """
-    from datetime import datetime
-
-    from api.server.services import persona_responder as pr
-
-    cascade_chain = ("ap_clerk", "controller", "cfo")
-    context = {
-        "invoice": {
-            "invoice_id": invoice_id,
-            "brand_id": brand_id,
-            "amount_gbp": amount_gbp,
-        },
-        "brand_id": brand_id,
-        "workflow_id": workflow_id,
-        "action": "ap_invoice_processing",
-    }
-    out: list[dict[str, Any]] = []
-    now = datetime.utcnow()
-    for role in cascade_chain:
-        persona = pr.PERSONA_DEFINITIONS.get(role)
-        if persona is None or not callable(persona.decide):
-            break
-        try:
-            result = persona.decide(context)
-        except Exception:  # pragma: no cover — defensive
-            break
-        decision = str(result.get("decision") or "")
-        reason = str(result.get("reason") or "")
-        phase = "ap_clerk_signoff" if role == "ap_clerk" else (
-            "controller_signoff" if role == "controller" else "cfo_signoff"
-        )
-        try:
-            app_state.entities.record_decision(
-                workflow_id=workflow_id,
-                phase=phase,
-                persona_role=role,
-                verdict=decision,
-                reason=reason,
-                decided_at=now,
-                source_event="demo.in_flight_invoice",
-                attributes={"brand_id": brand_id, "amount_gbp": amount_gbp},
-                decided_on=(brand_id,),
-            )
-        except Exception:  # pragma: no cover — defensive
-            pass
-        out.append({"role": role, "verdict": decision, "reason": reason[:80]})
-        if decision != "escalate":
-            break
-    return out
-
-
-def _do_in_flight_invoices(brand_id: str, count: int) -> dict[str, Any]:
+async def _do_in_flight_invoices(brand_id: str, count: int) -> dict[str, Any]:
     if not brand_id:
         raise HTTPException(status_code=400, detail="brand_id is required")
     if count <= 0:
         raise HTTPException(status_code=400, detail="count must be > 0")
+    from api.server.mcp_tools.invoice_repository import get_invoice
+    from api.server.services.durable_client import schedule_new_orchestration
+
     spawned = []
-    cascades = []
     for i in range(count):
-        wf_id = _spawn_ap_invoice(brand_id, i + 1)
-        spawned.append(wf_id)
-        # Demo prestige moment: synchronously run the ap_clerk → controller
-        # → cfo cascade so the policy honour Decisions land immediately and
-        # show up in the ticker (no real durable orchestrator wired).
-        invoice_id = f"INV-DEMO-{wf_id[-12:]}"
-        cascades.append({
-            "workflow_id": wf_id,
-            "decisions": _simulate_ap_invoice_decision_cascade(
-                wf_id, brand_id, invoice_id, 5000.0,
-            ),
-        })
+        token = uuid.uuid4().hex[:12].upper()
+        workflow_id = f"API-{token}"
+        instance_id = f"ap-demo-{token.lower()}"
+        invoice_id = f"INV-DEMO-{token[:8]}"
+        record = get_invoice(invoice_id)
+        invoice = {
+            **record,
+            "vendor_name": record["vendor"],
+            "brand_id": brand_id,
+            "po_id": f"PO-DEMO-{token[:8]}",
+            "category": record["gl_category"],
+            "scenario": "matched-clean",
+        }
+        payload = {
+            "workflow_id": workflow_id,
+            "type": "ap-invoice",
+            "invoice": invoice,
+            "scenario": "matched-clean",
+        }
+        try:
+            durable = await schedule_new_orchestration(
+                payload,
+                function_name="FleetApInvoiceOrchestrator",
+                instance_id=instance_id,
+            )
+        except Exception as exc:
+            raise HTTPException(
+                503,
+                {
+                    "message": (
+                        f"AP batch incomplete: {len(spawned)} of {count} starts confirmed; "
+                        f"item {i + 1} could not be confirmed. Inspect the returned IDs before retrying."
+                    ),
+                    "started_workflow_ids": list(spawned),
+                    "unconfirmed_workflow_id": workflow_id,
+                    "unconfirmed_instance_id": instance_id,
+                    "requested_count": count,
+                    "failed_item": i + 1,
+                },
+            ) from exc
+        workflow = app_state.store.get_workflow(workflow_id)
+        if workflow is None:
+            now = time.time()
+            workflow = Workflow(
+                id=workflow_id,
+                type="ap-invoice",
+                status="in_progress",
+                current_phase="Invoice Lookup",
+                created_at=now,
+                sla_due_at=now + 86400,
+                jurisdiction="London-Zava",
+                agency="Zava",
+                orchestration_instance_id=durable.get("id") or instance_id,
+                payload={"invoice": invoice, "scenario": "matched-clean"},
+            )
+            app_state.store.upsert_workflow(workflow)
+        spawned.append(workflow_id)
     return {
         "brand_id": brand_id,
         "spawned_workflow_ids": spawned,
         "count": len(spawned),
-        "cascades": cascades,
+        "queue_status": "queued",
     }
 
 
@@ -331,17 +281,17 @@ async def trigger_in_flight_invoices(
     count: int = Query(default=3, ge=1, le=50),
     actor: Actor = Depends(require_actor),
 ) -> dict[str, Any]:
-    return _do_in_flight_invoices(brand_id, count)
+    return await _do_in_flight_invoices(brand_id, count)
 
 
 @router.post("/aurora-overrun")
 async def trigger_aurora_overrun(
     actor: Actor = Depends(require_actor),
 ) -> dict[str, Any]:
-    """Convenience wrapper: brand-overrun + in-flight-invoices on Aurora."""
+    """Legacy convenience wrapper: brand overrun plus queued AP workflows."""
     brand_id = "BRAND-aurora"
     overrun = _do_brand_overrun(brand_id, 0.95)
-    invoices = _do_in_flight_invoices(brand_id, 3)
+    invoices = await _do_in_flight_invoices(brand_id, 3)
     return {
         "brand_id": brand_id,
         "brand_name": overrun.get("brand_name"),
@@ -675,176 +625,105 @@ async def trigger_department_attrition(
 # ---------------------------------------------------------------------------
 
 
-def _latest_cfo_insight() -> dict[str, Any] | None:
-    rows = app_state.entities.query(
-        "MATCH (i:Insight {role: 'cfo'}) "
-        "RETURN i.id AS id, i.role AS role, i.headline AS headline, "
-        "       i.body AS body, i.proposed_actions AS proposed_actions, "
-        "       i.kpis AS kpis "
-        "ORDER BY i.decided_at DESC LIMIT 1"
-    )
-    if not rows:
-        return None
-    row = rows[0]
-    out: dict[str, Any] = {
-        "id": row.get("id"),
-        "role": row.get("role"),
-        "headline": row.get("headline") or "",
-        "body": row.get("body") or "",
-    }
-    for col in ("proposed_actions", "kpis"):
-        raw = row.get(col)
-        if raw:
-            try:
-                out[col] = json.loads(raw)
-            except (TypeError, ValueError):
-                out[col] = [] if col == "proposed_actions" else {}
-        else:
-            out[col] = [] if col == "proposed_actions" else {}
-    return out
+def _aurora_request_ids(request_id: str) -> tuple[str, str]:
+    digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()[:16]
+    return f"AUR-{digest.upper()}", f"aurora-{digest}"
 
 
-async def _refresh_persona_summary(role: str) -> None:
-    """Force an immediate summary tick for `role` (bypass cadence loop)."""
-    from api.server.services import persona_responder as pr
-    from api.shared.events import FleetEvent
-
-    await pr._handle_summary_request(FleetEvent(
-        type="domain.summary.requested",
-        payload={"role": role},
-    ))
-
-
-@router.post("/full-aurora-arc")
+@router.post("/full-aurora-arc", status_code=202)
 async def trigger_full_aurora_arc(
     delay_seconds: float = Query(default=0.0, ge=0.0, le=30.0),
     count: int = Query(default=3, ge=1, le=20),
+    request_id: str | None = Query(default=None, min_length=1, max_length=200),
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key",
+    ),
     actor: Actor = Depends(require_actor),
 ) -> dict[str, Any]:
-    """One-click full demo arc: overrun → CFO observe → freeze → cascade → CEO.
+    """Start the real Aurora Durable workflow and return its tracking URLs."""
+    from api.server.services.durable_client import schedule_new_orchestration
 
-    Synchronous: returns the complete per-phase timeline so the caller
-    can reconstruct the narrative on screen. Pacing between phases is
-    controlled by ``delay_seconds`` so the operator's eyes (and the
-    on-screen ticker) have time to catch up.
-    """
-    from api.server.services.policy_application import (
-        apply_proposed_actions,
-        PolicyApplicationOutcome,
-    )
+    stable_request_id = (
+        idempotency_key or request_id or uuid.uuid4().hex
+    ).strip()
+    workflow_id, instance_id = _aurora_request_ids(stable_request_id)
+    existing = app_state.store.get_workflow(workflow_id)
+    payload = {
+        "workflow_id": workflow_id,
+        "type": "aurora-budget-response",
+        "request_id": stable_request_id,
+        "brand_id": "BRAND-aurora",
+        "count": count,
+        "requested_by": actor.id,
+        "requested_by_role": actor.role,
+    }
+    try:
+        durable = await schedule_new_orchestration(
+            payload,
+            function_name="AuroraBudgetResponseOrchestrator",
+            instance_id=instance_id,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            503,
+            "Aurora Durable workflow could not be started",
+        ) from exc
 
-    brand_id = "BRAND-aurora"
-    phases: list[dict[str, Any]] = []
-    arc_started = time.perf_counter()
+    workflow = app_state.store.get_workflow(workflow_id)
+    if workflow is None:
+        now = time.time()
+        runtime_status = str(durable.get("_runtime_status") or "")
+        normalised_status = runtime_status.lower().replace("_", "")
+        if durable.get("_started") is False and normalised_status in {
+            "completed",
+        }:
+            workflow_status = "completed"
+        elif durable.get("_started") is False and normalised_status in {
+            "failed",
+            "terminated",
+        }:
+            workflow_status = "failed"
+        else:
+            workflow_status = "in_progress"
+        workflow = Workflow(
+            id=workflow_id,
+            type="aurora-budget-response",
+            status=workflow_status,
+            current_phase="Observe budget signal",
+            created_at=now,
+            sla_due_at=now + 86400,
+            jurisdiction="London-Zava",
+            agency="Zava",
+            orchestration_instance_id=durable.get("id") or instance_id,
+            payload={
+                "request_id": stable_request_id,
+                "brand_id": "BRAND-aurora",
+                "count": count,
+            },
+            metadata={
+                "requested_by": actor.id,
+                "delay_seconds_ignored": delay_seconds,
+                **(
+                    {"recovered_from_durable_status": runtime_status}
+                    if durable.get("_started") is False and runtime_status
+                    else {}
+                ),
+            },
+        )
+        app_state.store.upsert_workflow(workflow)
+    elif not workflow.orchestration_instance_id:
+        workflow.orchestration_instance_id = durable.get("id") or instance_id
+        app_state.store.upsert_workflow(workflow)
 
-    async def _pause() -> None:
-        if delay_seconds > 0:
-            await asyncio.sleep(delay_seconds)
-
-    # --- Phase 1: force overrun ---------------------------------------------
-    t0 = time.perf_counter()
-    overrun = _do_brand_overrun(brand_id, target_pct=1.0)
-    phases.append({
-        "phase": "overrun",
-        "elapsed_ms": int((time.perf_counter() - t0) * 1000),
-        "summary": overrun,
-    })
-    await _pause()
-
-    # --- Phase 2: refresh CFO insight, capture observation ------------------
-    t0 = time.perf_counter()
-    await _refresh_persona_summary("cfo")
-    cfo_pre = _latest_cfo_insight() or {}
-    phases.append({
-        "phase": "cfo_observe",
-        "elapsed_ms": int((time.perf_counter() - t0) * 1000),
-        "headline": cfo_pre.get("headline", ""),
-        "proposed_action_count": len(cfo_pre.get("proposed_actions", []) or []),
-    })
-    await _pause()
-
-    # --- Phase 3: matrix-gated auto-apply -----------------------------------
-    # No operator click. The persona's proposed_action goes through the
-    # AGT kernel; if the matrix authorises, it's recorded as a Decision.
-    t0 = time.perf_counter()
-    actions = cfo_pre.get("proposed_actions") or []
-    target_action = next(
-        (a for a in actions if isinstance(a, dict) and a.get("id") == "freeze-brand-aurora"),
-        None,
-    )
-    workflow_id: str | None = None
-    if target_action is not None:
-        outcomes = apply_proposed_actions("cfo", [target_action])
-        if outcomes and outcomes[0]["outcome"] == PolicyApplicationOutcome.APPLIED:
-            workflow_id = outcomes[0]["workflow_id"]
-    phases.append({
-        "phase": "approve",
-        "elapsed_ms": int((time.perf_counter() - t0) * 1000),
-        "policy_workflow_id": workflow_id,
-        "approved_action_id": "freeze-brand-aurora" if target_action else None,
-    })
-    await _pause()
-
-    # --- Phase 4: refresh CFO again — Aurora drops from proposed_actions ----
-    t0 = time.perf_counter()
-    await _refresh_persona_summary("cfo")
-    cfo_post = _latest_cfo_insight() or {}
-    post_actions = cfo_post.get("proposed_actions") or []
-    freezes_remaining = sum(
-        1 for a in post_actions
-        if isinstance(a, dict) and str(a.get("verdict", "")) == "freeze"
-    )
-    phases.append({
-        "phase": "cfo_observe_post",
-        "elapsed_ms": int((time.perf_counter() - t0) * 1000),
-        "headline": cfo_post.get("headline", ""),
-        "freezes_remaining": freezes_remaining,
-    })
-    await _pause()
-
-    # --- Phase 5: spawn in-flight invoices → cascade auto-escalates ---------
-    t0 = time.perf_counter()
-    invoices = _do_in_flight_invoices(brand_id, count)
-    phases.append({
-        "phase": "spawn_invoices",
-        "elapsed_ms": int((time.perf_counter() - t0) * 1000),
-        "spawned_workflow_ids": invoices.get("spawned_workflow_ids", []),
-        "cascades": invoices.get("cascades", []),
-    })
-    await _pause()
-
-    # --- Phase 6: refresh CEO synthesis -------------------------------------
-    t0 = time.perf_counter()
-    await _refresh_persona_summary("ceo")
-    ceo_rows = app_state.entities.query(
-        "MATCH (i:Insight {role: 'ceo'}) "
-        "RETURN i.headline AS headline "
-        "ORDER BY i.decided_at DESC LIMIT 1"
-    )
-    ceo_headline = str(ceo_rows[0].get("headline") or "") if ceo_rows else ""
-    phases.append({
-        "phase": "ceo_synthesise",
-        "elapsed_ms": int((time.perf_counter() - t0) * 1000),
-        "headline": ceo_headline,
-    })
-
-    total_elapsed_ms = int((time.perf_counter() - arc_started) * 1000)
-    cfo_pct_int = 0
-    if cfo_pre.get("headline"):
-        try:
-            cfo_pct_int = int(round(float(overrun.get("after_pct", 0.0)) * 100))
-        except (TypeError, ValueError):
-            cfo_pct_int = 0
-    narrative = (
-        f"Aurora overrun → CFO observed at {cfo_pct_int}% → "
-        f"freeze approved → CFO updated to {freezes_remaining} freezes remaining → "
-        f"{count} invoices spawned and auto-escalated → CEO synthesis refreshed"
-    )
-
+    actual_instance_id = durable.get("id") or instance_id
     return {
-        "phases": phases,
-        "total_elapsed_ms": total_elapsed_ms,
-        "narrative": narrative,
+        "workflow_id": workflow_id,
+        "instance_id": actual_instance_id,
+        "request_id": stable_request_id,
+        "status_url": f"/api/workflows/{workflow_id}",
+        "events_url": f"/api/workflows/{workflow_id}/orchestration",
+        "duplicate": existing is not None or durable.get("_started") is False,
     }
 
 

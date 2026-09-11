@@ -41,6 +41,37 @@ from api.shared.domain_contracts import (
 # --------------------------------------------------------------------------
 
 AGENCY_DOMAINS: dict[str, Domain] = {
+    "aurora-budget-response": Domain(
+        workflow_type="aurora-budget-response",
+        display_name="Aurora budget response",
+        workflow_id_prefix="AUR",
+        orchestrator_name="AuroraBudgetResponseOrchestrator",
+        operator_surface="executive",
+        phases=(
+            Phase("Observe budget signal", "deterministic"),
+            Phase("Recommend response", "agent"),
+            Phase("Executive approval", "hitl"),
+            Phase("Apply governed policy", "deterministic"),
+            Phase("Queue AP invoice reviews", "sub_orchestrator"),
+            Phase("Synthesise outcomes", "deterministic"),
+        ),
+        hitl_gates=(
+            HitlGate(
+                "Executive approval",
+                "aurora_budget_response_decision",
+                "cfo",
+                operator_only=True,
+            ),
+        ),
+        skills=("aurora-budget-recommender",),
+        wake_hints=(
+            WakeHint(
+                "aurora.budget.threshold_exceeded",
+                "Aurora reached the configured annual budget threshold",
+            ),
+        ),
+        seed_in_data_fabric=False,
+    ),
     # ----- POC1 -----
     "expense-claim": Domain(
         workflow_type="expense-claim",

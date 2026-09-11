@@ -1,9 +1,10 @@
 from __future__ import annotations
 import time
 from typing import Literal
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from api.server.state import app_state
 from api.server.services import pending_gates
+from api.server.services.read_route_auth import Actor, require_actor
 from api.shared import domains as _registry
 from api.shared.types import ActionLedgerEntry, BaseModel  # BaseModel here = camelCase-aliased
 
@@ -68,7 +69,12 @@ async def list_exceptions(include_resolved: bool = False):
     return [e.model_dump(by_alias=True) for e in by_wid.values()]
 
 
-async def _resolve_one(exception_id: str, resolution: Resolution, resolved_by: str) -> bool:
+async def _resolve_one(
+    exception_id: str,
+    resolution: Resolution,
+    resolved_by: str,
+    actor: Actor | None = None,
+) -> bool:
     """Resolve a single exception, advancing the workflow's HITL gate when wired.
 
     Reads the per-workflow pending-gate cache (populated by
@@ -85,11 +91,18 @@ async def _resolve_one(exception_id: str, resolution: Resolution, resolved_by: s
     exc = app_state.store.get_exception(exception_id)
     if not exc:
         return False
+    if exc.resolved_at is not None:
+        w = app_state.store.get_workflow(exc.workflow_id)
+        if w is not None and w.type == "aurora-budget-response":
+            raise HTTPException(409, f"decision {exception_id} already resolved")
+        return True
     w = app_state.store.get_workflow(exc.workflow_id)
     if not w:
         app_state.store.resolve_exception(exception_id, resolved_by)
         return True
     if w.status != "awaiting_hitl":
+        if w.type == "aurora-budget-response":
+            raise HTTPException(409, f"workflow {w.id} is not awaiting a decision")
         app_state.store.resolve_exception(exception_id, resolved_by)
         return True
 
@@ -130,6 +143,40 @@ async def _resolve_one(exception_id: str, resolution: Resolution, resolved_by: s
         ):
             if key in hitl_context:
                 payload[key] = hitl_context[key]
+    if w.type == "aurora-budget-response":
+        if actor is None:
+            raise HTTPException(401, "authenticated actor required for Aurora decision")
+        if resolution not in {"approve", "reject"}:
+            raise HTTPException(
+                400,
+                "Aurora operator gate accepts only approve or reject",
+            )
+        proposed_action = (
+            hitl_context.get("proposed_action")
+            if isinstance(hitl_context, dict)
+            else None
+        )
+        proposed_action = (
+            proposed_action if isinstance(proposed_action, dict) else {}
+        )
+        attributes = dict(proposed_action.get("attributes") or {})
+        action = str(proposed_action.get("kind") or "")
+        category = str(attributes.get("scope") or "")
+        from api.server.services.governance import kernel
+
+        authority = kernel().check_authority(
+            role=actor.role,
+            action=action,
+            category=category,
+            requester_role=actor.role,
+        )
+        if not authority.allowed:
+            raise HTTPException(403, authority.reason)
+        resolved_by = actor.id
+        payload["resolved_by"] = actor.id
+        payload["actor_role"] = actor.role
+        payload["governing_rule_id"] = authority.governing_rule_id
+        payload["proposed_action"] = proposed_action
     if event_name is None:
         # Legacy POC1 expense fallbacks for `Notify` / `Arbitrate` —
         # registry covers these but the Notify gate still needs a `text`
@@ -163,6 +210,21 @@ async def _resolve_one(exception_id: str, resolution: Resolution, resolved_by: s
 
     app_state.store.resolve_exception(exception_id, resolved_by)
     w.status = "in_progress"
+    if w.type == "aurora-budget-response":
+        w.payload = dict(w.payload or {})
+        decisions = list(w.payload.get("decisions") or [])
+        decisions.append({
+            "decision_id": exception_id,
+            "phase": w.current_phase,
+            "persona_role": actor.role if actor is not None else "unknown",
+            "verdict": resolution,
+            "reason": payload.get("reason"),
+            "resolved_by": resolved_by,
+            "source_event": event_name,
+            "governing_rule_id": payload.get("governing_rule_id"),
+        })
+        w.payload["decisions"] = decisions
+        app_state.store.upsert_workflow(w)
     w.action_ledger.append(ActionLedgerEntry(
         workflow_id=w.id, timestamp=time.time(),
         actor_kind="human", actor_id=resolved_by,
@@ -173,17 +235,34 @@ async def _resolve_one(exception_id: str, resolution: Resolution, resolved_by: s
 
 
 @router.post("/{exception_id}/resolve")
-async def resolve_one(exception_id: str, body: ResolveBody):
-    ok = await _resolve_one(exception_id, body.resolution, body.resolved_by)
+async def resolve_one(
+    exception_id: str,
+    body: ResolveBody,
+    actor: Actor = Depends(require_actor),
+):
+    ok = await _resolve_one(
+        exception_id,
+        body.resolution,
+        body.resolved_by,
+        actor=actor,
+    )
     if not ok:
         raise HTTPException(404, f"exception {exception_id} not found")
     return {"resolved": 1, "exception_id": exception_id, "resolution": body.resolution}
 
 
 @router.post("/bulk-resolve")
-async def bulk_resolve(body: BulkResolveBody):
+async def bulk_resolve(
+    body: BulkResolveBody,
+    actor: Actor = Depends(require_actor),
+):
     resolved = 0
     for id in body.exception_ids:
-        if await _resolve_one(id, body.resolution, body.resolved_by):
+        if await _resolve_one(
+            id,
+            body.resolution,
+            body.resolved_by,
+            actor=actor,
+        ):
             resolved += 1
     return {"resolved": resolved}

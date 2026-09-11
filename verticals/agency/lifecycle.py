@@ -18,6 +18,8 @@ def bootstrap(state) -> None:
         vendors_path=_REPO_ROOT / "api" / "server" / "fixtures" / "vendors.json",
         agencies_path=_REPO_ROOT / "api" / "server" / "fixtures" / "agencies.json",
     )
+    from verticals.agency.aurora import bootstrap_budget_context
+    bootstrap_budget_context(state.entities)
 
 
 async def start(state) -> tuple[Callable[[], Any], ...]:

@@ -14,7 +14,11 @@ _END = datetime(2026, 5, 12, 12, 0, 0, tzinfo=timezone.utc)
 
 
 def _live_workflow_types() -> set[str]:
-    return {wt for wt, d in DOMAINS.items() if not d.stub}
+    return {
+        wt
+        for wt, domain in DOMAINS.items()
+        if not domain.stub and domain.seed_in_data_fabric
+    }
 
 
 def test_generate_timeline_counts_and_split():

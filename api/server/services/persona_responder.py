@@ -198,6 +198,34 @@ def _hitl_gate_for(workflow_id: str | None, gate_phase: str | None):
     return None
 
 
+def _requires_explicit_operator(
+    workflow_id: str | None,
+    gate_phase: str | None,
+    context: dict[str, Any] | None = None,
+) -> bool:
+    if isinstance(context, dict) and context.get("operator_only") is True:
+        return True
+    if workflow_id:
+        try:
+            from api.server.state import app_state
+
+            workflow = app_state.store.get_workflow(workflow_id)
+            hitl_context = (
+                workflow.payload.get("hitl_context")
+                if workflow is not None and isinstance(workflow.payload, dict)
+                else None
+            )
+            if (
+                isinstance(hitl_context, dict)
+                and hitl_context.get("operator_only") is True
+            ):
+                return True
+        except Exception:
+            pass
+    gate = _hitl_gate_for(workflow_id, gate_phase)
+    return bool(gate is not None and getattr(gate, "operator_only", False))
+
+
 def _workflow_type_for(workflow_id: str | None) -> str | None:
     """Resolve workflow_id → workflow.type (the I4 ``domain`` axis).
 
@@ -981,6 +1009,9 @@ async def _handle_hitl(event: FleetEvent) -> None:
     if not (persona_role and instance_id):
         return
 
+    if _requires_explicit_operator(workflow_id, gate_phase, context):
+        return
+
     auto_close = _auto_close_set()
     if not _role_auto_closes(persona_role, auto_close):
         # Real human is supposed to drive this gate. Stay out of their way.
@@ -1220,7 +1251,16 @@ async def _handle_hitl(event: FleetEvent) -> None:
                 f"{workflow_id} (started at {persona_role}); leaving gate open"
             )
             return
-        parent_role = _escalation_parent(persona_role)
+        explicit_chain = context.get("escalation_chain")
+        if (
+            isinstance(explicit_chain, (list, tuple))
+            and cascade_depth < len(explicit_chain)
+        ):
+            parent_role = str(explicit_chain[cascade_depth])
+        elif context.get("escalate_to"):
+            parent_role = str(context["escalate_to"])
+        else:
+            parent_role = _escalation_parent(persona_role)
         if not parent_role:
             print(
                 f"[persona_responder] {persona_role} has no parent in any "
@@ -1725,7 +1765,11 @@ async def sweep_pending_hitl(*, max_concurrency: int = 8) -> dict[str, int]:
                         cand = (getattr(gates[0], "persona", None)
                                 or getattr(gates[0], "persona_role", None))
                         persona_role = cand
-            if not persona_role or not _role_auto_closes(persona_role, auto):
+            if (
+                not persona_role
+                or _requires_explicit_operator(w.id, w.current_phase, ctx)
+                or not _role_auto_closes(persona_role, auto)
+            ):
                 counters["skipped"] += 1
                 return
             instance_id = getattr(w, "orchestration_instance_id", None)

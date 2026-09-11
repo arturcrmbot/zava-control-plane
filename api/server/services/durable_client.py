@@ -11,7 +11,6 @@ events later without storing the full URL in the workflow record.
 """
 from __future__ import annotations
 import os
-import re
 from typing import Any
 import httpx
 
@@ -24,14 +23,25 @@ ORCHESTRATOR_NAME = "ExpenseClaimOrchestrator"
 _send_event_uris: dict[str, str] = {}
 
 
-async def schedule_new_orchestration(payload: dict, function_name: str = ORCHESTRATOR_NAME) -> dict:
+async def schedule_new_orchestration(
+    payload: dict,
+    function_name: str = ORCHESTRATOR_NAME,
+    instance_id: str | None = None,
+) -> dict:
     """Start a new orchestration via the func host's HTTP starter.
     Returns the AF-standard response dict including 'id' (instance_id) and various URIs."""
     url = f"{FUNCTIONS_HOST}/api/orchestrators/{function_name}"
+    params = {"instance_id": instance_id} if instance_id else None
     async with httpx.AsyncClient() as c:
-        r = await c.post(url, json=payload, timeout=15)
+        r = await c.post(url, params=params, json=payload, timeout=15)
         r.raise_for_status()
         data = r.json()
+        started_header = r.headers.get("X-Zava-Orchestration-Started")
+        if started_header is not None:
+            data["_started"] = started_header.lower() == "true"
+        runtime_status = r.headers.get("X-Zava-Orchestration-Runtime-Status")
+        if runtime_status is not None:
+            data["_runtime_status"] = runtime_status
         # Cache sendEventPostUri template if present
         if "id" in data and "sendEventPostUri" in data:
             _send_event_uris[data["id"]] = data["sendEventPostUri"]

@@ -49,6 +49,22 @@ def _seed_suspended_workflow(workflow_type: str, gate) -> tuple[str, str]:
         current_phase=gate.gate_phase, created_at=now, sla_due_at=now + 86400,
         jurisdiction="London-Zava", agency="Zava",
         orchestration_instance_id=f"INST-{wid}",
+        payload=(
+            {
+                "hitl_context": {
+                    "operator_only": True,
+                    "proposed_action": {
+                        "id": "freeze-brand-aurora",
+                        "kind": "policy_set",
+                        "verdict": "freeze",
+                        "decided_on": ["BRAND-aurora"],
+                        "attributes": {"scope": "po", "expiry_days": 14},
+                    },
+                }
+            }
+            if workflow_type == "aurora-budget-response"
+            else {}
+        ),
     )
     app_state.store.upsert_workflow(w)
     pending_gates.record(wid, phase=gate.gate_phase, external_event=gate.external_event)
@@ -79,6 +95,7 @@ def test_resolve_route_raises_per_domain_event_via_cache(client, monkeypatch):
             resp = client.post(
                 f"/api/exceptions/{exc_id}/resolve",
                 json={"resolution": "approve", "resolvedBy": "test@zava"},
+                headers={"X-Actor-Id": "test@zava", "X-Actor-Role": "cfo"},
             )
             assert resp.status_code == 200, f"{wt}/{gate.gate_phase}: {resp.text}"
             assert raised, f"{wt}/{gate.gate_phase}: no event raised"
