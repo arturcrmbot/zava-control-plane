@@ -62,6 +62,14 @@ The template does not provision a model account, deployment or shared ACR.
 
 ## Private Azure live
 
+Reuse a valid Azure sign-in rather than starting repeated device-code flows.
+Set `AZURE_CONFIG_DIR` and `AZD_CONFIG_DIR` to the approved tenant's isolated
+profiles first, then verify the tenant/subscription with `az account show`.
+`azd config set auth.useAzCliAuth true` lets azd reuse that Azure CLI identity;
+`azd auth login --check-status` checks it without prompting for another login.
+Do not change the shared global subscription or weaken authentication to get
+past a failed sign-in.
+
 1. Obtain approval for the tenant, subscription, resources and expected costs.
 2. Create/select a dedicated azd environment and set `ZAVA_MODE=live`,
    `ZAVA_VERTICAL=agency`, `LLM_RUNTIME=azure` and the required inputs above.
