@@ -9,10 +9,12 @@ plugs that gap for the four read surfaces called out in
 ``c6-audit-evals-entities-authz`` (audit, evals, entities, cities)
 **without** introducing a new auth library.
 
-Two modes, switched by the ``READ_ROUTE_AUTH`` env var:
+Modes, switched by the ``READ_ROUTE_AUTH`` env var:
 
-* ``enforce`` — request MUST carry an ``X-Actor-Id`` header (and may
-  carry ``X-Actor-Role``). Missing → ``401``.
+* ``platform`` — use the Entra principal injected by configured ACA/App
+  Service authentication. Caller-supplied ``X-Actor-*`` headers are ignored.
+* ``enforce`` — legacy local-test mode requiring ``X-Actor-Id``. This is
+  not production authentication.
 * anything else (default, including unset) — local-PoC ergonomics: a
   synthetic ``local-dev`` / ``local`` actor is stamped on every
   request so handlers always have an actor to project responses for.
@@ -22,6 +24,9 @@ The projector (:func:`project_for_role`) redacts ``prompt`` /
 """
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 import os
 from dataclasses import dataclass
 from typing import Any
@@ -31,6 +36,13 @@ from fastapi import Header, HTTPException
 
 _ENV_FLAG = "READ_ROUTE_AUTH"
 _ENFORCE_VALUE = "enforce"
+_PLATFORM_ROLES = {
+    "Zava.CFO": "cfo",
+    "Zava.Executive": "executive",
+    "Zava.GC": "gc",
+    "Zava.Operator": "operator",
+    "Zava.Viewer": "viewer",
+}
 
 # Roles that may see raw prompts/responses/details in audit + entity
 # payloads. CFO and General Counsel are the substrate-wide privileged
@@ -65,12 +77,59 @@ class Actor:
 
 def _enforce_mode() -> bool:
     raw = os.environ.get(_ENV_FLAG, "").strip().lower()
-    return raw == _ENFORCE_VALUE
+    return raw in {_ENFORCE_VALUE, "platform"}
+
+
+def _platform_actor(header: str | None) -> Actor:
+    """Decode a trusted platform header, not an arbitrary bearer token.
+
+    Enable only behind configured platform authentication, which removes
+    caller-supplied principal headers before injecting its own identity.
+    """
+    tenant = os.environ.get("AUTH_TENANT_ID", "").strip().lower()
+    if not tenant:
+        raise HTTPException(503, "platform_auth_not_configured: AUTH_TENANT_ID required")
+    if not isinstance(header, str) or not header:
+        raise HTTPException(401, "missing_platform_identity")
+    try:
+        principal = json.loads(base64.b64decode(header, validate=True))
+    except (binascii.Error, ValueError, UnicodeDecodeError) as exc:
+        raise HTTPException(401, "invalid_platform_identity") from exc
+    if not isinstance(principal, dict) or principal.get("auth_typ") != "aad":
+        raise HTTPException(401, "invalid_platform_identity")
+    claims = principal.get("claims")
+    if not isinstance(claims, list) or any(
+        not isinstance(claim, dict)
+        or not isinstance(claim.get("typ"), str)
+        or not isinstance(claim.get("val"), str)
+        for claim in claims
+    ):
+        raise HTTPException(401, "invalid_platform_claims")
+    tenants = {
+        claim["val"].lower() for claim in claims
+        if claim["typ"] in {"tid", "http://schemas.microsoft.com/identity/claims/tenantid"}
+    }
+    if tenants != {tenant}:
+        raise HTTPException(403, "wrong_tenant")
+    identities = {
+        claim["val"] for claim in claims
+        if claim["typ"] in {"oid", "http://schemas.microsoft.com/identity/claims/objectidentifier"}
+        and claim["val"].strip()
+    }
+    if len(identities) != 1:
+        raise HTTPException(401, "missing_platform_object_id")
+    role_types = {"roles", "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"}
+    if isinstance(principal.get("role_typ"), str):
+        role_types.add(principal["role_typ"])
+    assigned = {claim["val"] for claim in claims if claim["typ"] in role_types}
+    role = next((mapped for name, mapped in _PLATFORM_ROLES.items() if name in assigned), "viewer")
+    return Actor(id=identities.pop(), role=role)
 
 
 async def require_actor(
     x_actor_id: str | None = Header(default=None),
     x_actor_role: str | None = Header(default=None),
+    x_ms_client_principal: str | None = Header(default=None),
 ) -> Actor:
     """FastAPI dependency: resolve the request actor.
 
@@ -80,6 +139,8 @@ async def require_actor(
     401; in default mode we stamp ``local-dev`` so downstream code can
     always assume an :class:`Actor` is present.
     """
+    if os.environ.get(_ENV_FLAG, "").strip().lower() == "platform":
+        return _platform_actor(x_ms_client_principal)
     if _enforce_mode():
         if not x_actor_id:
             raise HTTPException(

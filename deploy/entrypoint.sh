@@ -18,10 +18,11 @@ if [[ "${ZAVA_MODE:-live}" == "replay" ]]; then
 fi
 
 # Kuzu (entity graph) holds an exclusive file lock per process. uvicorn
-# opens data/portal/entity_graph.kuzu first, so the func worker — which
+# opens the selected pack's entity_graph.kuzu, so the func worker — which
 # imports the same substrate module-tree via function_app.py — would
 # crash with "Could not set lock on file". Give the func worker its own
-# isolated PORTAL_DATA_DIR; activities that need shared state call back
+# isolated data root; ZAVA_DATA_DIR takes precedence over PORTAL_DATA_DIR.
+# Activities that need shared state call back
 # into FastAPI via FASTAPI_WEBHOOK_URL (http://localhost:80).
 FUNC_PORTAL_DATA_DIR="${FUNC_PORTAL_DATA_DIR:-/app/data/functions}"
 # .NET cannot resolve LocalApplicationData when its directory is absent.
@@ -67,7 +68,8 @@ echo "[entrypoint] starting Azure Functions host on :${FUNC_PORT}"
     export DOTNET_EnableWriteXorExecute="${DOTNET_EnableWriteXorExecute:-0}"
     echo "[entrypoint] using opt-in Functions QEMU compatibility"
   fi
-  export PYTHONPATH=/app PORTAL_DATA_DIR="${FUNC_PORTAL_DATA_DIR}"
+  export PYTHONPATH=/app
+  export ZAVA_DATA_DIR="${FUNC_PORTAL_DATA_DIR}" PORTAL_DATA_DIR="${FUNC_PORTAL_DATA_DIR}"
   exec func host start --port "${FUNC_PORT}" --no-build
 ) &
 FUNC_PID=$!

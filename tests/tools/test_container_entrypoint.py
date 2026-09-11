@@ -49,6 +49,7 @@ if name == "func" and os.environ.get("SPAWN_WORKER") == "1":
 (root / (name + ".ready")).write_text(json.dumps({{
     "argv": sys.argv[1:],
     "portal_data_dir": os.environ.get("PORTAL_DATA_DIR"),
+    "zava_data_dir": os.environ.get("ZAVA_DATA_DIR"),
     "xdg_data_home": os.environ.get("XDG_DATA_HOME"),
     "pythonpath": os.environ.get("PYTHONPATH"),
     "write_xor_execute": os.environ.get("DOTNET_EnableWriteXorExecute"),
@@ -71,7 +72,7 @@ raise SystemExit(int((root / (name + ".exit")).read_text()))
     def launch(**overrides):
         env = {
             key: value for key, value in os.environ.items()
-            if not key.startswith(("DOTNET_", "COMPlus_", "ZAVA_FUNCTIONS_"))
+            if not key.startswith(("DOTNET_", "COMPlus_", "ZAVA_FUNCTIONS_", "ZAVA_DATA_DIR"))
         }
         env.update(
             PATH=f"{binary_dir}{os.pathsep}{env['PATH']}",
@@ -148,6 +149,20 @@ def test_replay_execs_only_the_api(launch_entrypoint):
     assert int((work / "uvicorn.pid").read_text()) == process.pid
     process.send_signal(signal.SIGTERM)
     assert process.wait(timeout=5) == 0
+
+
+@pytest.mark.parametrize("api_data_dir", ["/data", "/tmp/Mixed Case/API"])
+def test_functions_overrides_inherited_zava_data_directory(launch_entrypoint, api_data_dir):
+    process, work = launch_entrypoint(ZAVA_DATA_DIR=api_data_dir)
+    wait_for(lambda: (work / "func.ready").exists() and (work / "uvicorn.ready").exists())
+    func = json.loads((work / "func.ready").read_text())
+    api = json.loads((work / "uvicorn.ready").read_text())
+
+    assert func["zava_data_dir"] == str(work / "functions-data")
+    assert func["portal_data_dir"] == func["zava_data_dir"]
+    assert api["zava_data_dir"] == api_data_dir
+    process.send_signal(signal.SIGTERM)
+    wait_for(lambda: process.poll() is not None)
 
 
 def test_shutdown_is_bounded_for_an_unresponsive_worker(launch_entrypoint):

@@ -15,6 +15,28 @@ guessing.
 
 Both real providers must honour the contracts below.
 
+## Fleet Manager provider selection
+
+Fleet Manager and its function-scoped instances respect `LLM_RUNTIME`.
+GitHub keeps its persistent Copilot session and uses `FLEET_MANAGER_MODEL`
+unless the caller supplies an explicit model. Azure uses the existing
+`LLMRuntime.run_session()` tool loop per batch without GitHub authentication
+or a Copilot subprocess. Each Azure batch receives the supervisor instructions,
+current triggering events and registered state-query/action tools; it does not
+inherit GitHub's persistent conversation history.
+
+`AZURE_OPENAI_FLEET_MANAGER_DEPLOYMENT` optionally selects a separate Azure
+deployment. When empty, the supervisor uses `AZURE_OPENAI_DEPLOYMENT`, just
+like workflow agents. This does not change other agents' default deployment.
+Both settings are passed through the deployment template. `fake` remains a
+canned, no-subprocess test mode, not evidence of live tool execution.
+
+Startup failures are surfaced, provider tool-result payloads remain visible,
+and stopping a manager cancels queued/in-progress batches before disconnecting
+its session. Function-manager construction shares this implementation; the
+separate `query_function_fm` delegation stub is not made executable by selecting
+a provider.
+
 ## 1. `LLMRuntimeResult.raw_event` is provider-specific
 
 ```python

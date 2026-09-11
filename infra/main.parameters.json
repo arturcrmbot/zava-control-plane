@@ -13,10 +13,15 @@
     "azureOpenAiEmbedDeployment": { "value": "${AZURE_OPENAI_EMBED_DEPLOYMENT=text-embedding-3-large}" },
     "azureOpenAiApiVersion": { "value": "${AZURE_OPENAI_API_VERSION=2024-10-21}" },
     "fleetManagerModel": { "value": "${FLEET_MANAGER_MODEL=gpt-4.1}" },
+    "azureOpenAiFleetManagerDeployment": { "value": "${AZURE_OPENAI_FLEET_MANAGER_DEPLOYMENT=}" },
     "simulatorRampDomains": { "value": "${SIMULATOR_RAMP_DOMAINS=expense-claim}" },
     "personaAutoClose": { "value": "${PERSONA_AUTO_CLOSE=}" },
     "llmRuntime": { "value": "${LLM_RUNTIME=fake}" },
     "zavaMode": { "value": "${ZAVA_MODE}" },
+    "zavaVertical": { "value": "${ZAVA_VERTICAL=agency}" },
+    "authTenantId": { "value": "${AUTH_TENANT_ID=}" },
+    "authClientId": { "value": "${AUTH_CLIENT_ID=}" },
+    "authClientSecret": { "value": "${AUTH_CLIENT_SECRET=}" },
     "durableEventSecret": { "value": "${DURABLE_EVENT_SECRET=}" },
     "persistData": { "value": "${PERSIST_DATA=false}" }
   }

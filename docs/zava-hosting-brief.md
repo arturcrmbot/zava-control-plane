@@ -1,64 +1,132 @@
-# Hosting the Zava Agentic Substrate in Your Azure — A One-Page Brief
+# Run the Zava reference
 
-**Audience:** any delivery partner or internal platform team standing up the Zava control plane in a customer's (or their own) Azure tenant for evaluation purposes.
+Zava is a single-replica reference implementation with synthetic operating data,
+not a packaged production platform. Use an existing vertical; composing another
+one is not an installation prerequisite.
 
-**Bottom line:** don't write anything. The recipe already exists as a published skill. This brief lists the small set of prerequisites you must provision in the target tenant and points you at the canonical instructions.
+## Choose the right mode
 
-## The recipe is already written — use it
+| Mode | What runs | Access |
+|---|---|---|
+| Local live | FastAPI, Functions, synthetic adapters and the selected model runtime | Loopback only |
+| Private Azure live | One Container App containing API and Functions, using Azure model/storage identity | Internal ingress initially; Entra authentication must be configured before approved external exposure |
+| Public replay | Recorded workflow state and events; no Functions or live agents | Public, read-only, source/proof gated |
 
-The MS GBB skills catalogue ships a two-step pipeline. Overview & visuals: <https://aiappsgbb.github.io/zava-constellation/>
+Use separate azd environments for private live and public replay. Do not turn an
+existing writable environment into an anonymous demo by changing one flag.
 
-| Order | Skill | Purpose | Wall clock |
-|---|---|---|---|
-| 1 (optional) | `compose-org` | Internally runs Research → Design → Build → Prove: profiles the org from its public footprint, designs and builds an executable vertical (domains, actor world, personas), and runs the proof chain before the pipeline exits. Output is a proven vertical pack, not a stub. | 45–90 min |
-| 2 (required) | **`zava-workspace-deploy`** | Requires proven `compose-org` output. Demands an explicit mode choice: **private-live** (the reference implementation running on live Azure infrastructure with synthetic organisational activity) or **public-replay** (deterministic tape, no live systems). `azd up` deploys accordingly. Synthetic activity is demonstration scaffolding, not a mandatory customer adoption phase; customer systems, skills, MCPs, policies, data, and people replace synthetic edges incrementally. | ~10 min |
+## Local development
 
-Skip step 1 if a generic-looking demo is fine. Run it if you want the workspace to reflect the customer's org with a proven executable vertical.
+Follow the root [quickstart](../README.md#quickstart). Python 3.11 is the
+reference worker version; the project supports Python below 3.13.
 
-**Skills repo:** <https://github.com/aiappsgbb/zava-constellation>
-**Deploy skill:** `skills/zava-workspace-deploy/SKILL.md`
-**Substrate repo:** <https://github.com/arturcrmbot/zava-control-plane>
+Select `ZAVA_VERTICAL=agency` for Aurora. The Agency bootstrap supplies the
+synthetic budget context; it does not fabricate a completed Aurora workflow.
+Set a shared `DURABLE_EVENT_SECRET` for API/Functions callbacks. A live model run
+requires the selected provider's access and consumes that provider's allowance.
 
-## What the deploy skill creates (workload-scoped, one resource group)
+For a quiet Aurora walkthrough, disable unrelated generation with
+`SIMULATOR_RAMP_ENABLED=0`, `PORTAL_SEED_REQS=0`, `INSIGHT_LOOP_ENABLED=0` and
+`BLUEPRINT_AUTOSTART_STREAM=0`. The operator-only CFO gate remains open even
+when ordinary synthetic personae auto-close their own gates.
 
-User-Assigned Managed Identity · Storage Account + Azure Files share (KuzuDB persistence) · Container Apps managed environment · the Container App itself (single uvicorn process serving FastAPI + 3 React SPAs on port 80) · `AcrPull` role assignment from the UAMI onto the shared ACR.
+The local launch helpers bind the API, Functions, emulator and UI to loopback.
+Functions needs `Kestrel__Endpoints__Local__Url=http://127.0.0.1:7071`;
+Core Tools' printed `localhost` URLs alone do not prove a loopback listener.
 
-## What the skill does NOT create — you must provision these first
+## Azure resources and inputs
 
-The deploy skill assumes "shared infra" already exists in the subscription. Stand these up once per subscription before running `azd up`:
+The existing Bicep creates the workload resource group, user-assigned managed
+identity, Storage account, ACA environment/logging workspace, Container App and
+registry-pull role assignment. Azure Files is optional.
 
-| # | Component | Purpose | Skill expects |
-|---|---|---|---|
-| 1 | Azure subscription + target resource group | Where the workload lands | Owner rights on the deploy account |
-| 2 | **Azure Container Registry** (Basic SKU is fine) | Hosts the built image | `AZURE_ACR_LOGIN_SERVER`, `AZURE_ACR_NAME`, `AZURE_ACR_RESOURCE_GROUP` |
-| 3 | **Application Insights** (+ its Log Analytics workspace) | OTEL + container logs + AGT governance events | `APPLICATIONINSIGHTS_CONNECTION_STRING` |
-| 4 | **LLM endpoint** — either an APIM gateway URL or a direct Azure OpenAI / Foundry endpoint | The agents call OpenAI-shape APIs | `AZURE_OPENAI_ENDPOINT`, deployment names for `gpt-4.1` and `text-embedding-3-large` |
-| 5 | **Foundry AI Services account** (only if hosting your own models) | Model deployments | Manual RBAC: grant the workload UAMI `Cognitive Services OpenAI User` + `Foundry User` on this account |
-| 6 | Entra app registration (post-deploy) | SSO via Container Apps Easy Auth on the public ingress | Restrict to the target tenant's users |
+Supply these approved inputs; do not put credentials in source control:
 
-That's the whole list. No firewall, no private endpoints, no WAF, no managed DB, no Sentinel content — the substrate runs against embedded KuzuDB on the Azure Files share and that's good enough for evaluation.
+| Input | Purpose |
+|---|---|
+| Selected tenant/subscription and region | Workload ownership; verify the actual tenant before any mutation |
+| `AZURE_ACR_LOGIN_SERVER`, `AZURE_ACR_NAME`, `AZURE_ACR_RESOURCE_GROUP` | Existing image registry |
+| `ZAVA_MODE`, `ZAVA_VERTICAL` | Explicit boot mode and installed pack |
+| `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT` | Azure-compatible model endpoint and actual deployment name for live mode |
+| `AZURE_OPENAI_FLEET_MANAGER_DEPLOYMENT` | Optional separate supervisor deployment; empty uses the workflow deployment |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Optional supplied Application Insights resource; empty means that export is not configured |
+| `DURABLE_EVENT_SECRET` | Shared internal callback secret, required for live work |
+| `AUTH_TENANT_ID`, `AUTH_CLIENT_ID` | Approved single-tenant Entra app registration for private live |
+| `AUTH_CLIENT_SECRET` | Optional registration secret when required by the chosen sign-in configuration |
+| `PERSIST_DATA` | Explicit choice of the optional Azure Files mount |
 
-Idle cost envelope: **~€100–500 / month** (the Container App scales down; ACR Basic + App Insights + Storage are the floor).
+Grant the workload identity the model/storage permissions required by those
+resources. Direct Azure OpenAI inference uses `Cognitive Services OpenAI User`;
+an APIM gateway must support the expected API routes and identity policy.
+The template does not provision a model account, deployment or shared ACR.
 
-## Tenant isolation (mandatory)
+## Private Azure live
 
-The deploy skill mandates the **`azure-tenant-isolation`** skill (also in `awesome-gbb`), which sets per-tenant `AZURE_CONFIG_DIR` and `AZD_CONFIG_DIR` so an engineer with access to multiple Azure tenants cannot accidentally deploy into the wrong one. Configure once per workstation before any `az` / `azd` command.
+1. Obtain approval for the tenant, subscription, resources and expected costs.
+2. Create/select a dedicated azd environment and set `ZAVA_MODE=live`,
+   `ZAVA_VERTICAL=agency`, `LLM_RUNTIME=azure` and the required inputs above.
+3. Configure the Entra registration's redirect URI as
+   `https://APP_FQDN/.auth/login/aad/callback`, replacing `APP_FQDN` with the
+   actual app host. Restrict assignment to intended demo users.
+4. Define/assign app roles as required: `Zava.CFO`, `Zava.Executive`,
+   `Zava.Operator`, `Zava.Viewer`, optionally `Zava.GC`.
+   The application maps only trusted assigned roles; `X-Actor-*` headers are
+   ignored in `READ_ROUTE_AUTH=platform` mode.
+5. Run the approved `azd up`. Live ingress remains internal. The template
+   configures native ACA authentication when the registration inputs are present.
+6. Verify the actual auth configuration, tenant/audience, HTTPS, role assignment,
+   required hardening switches and the root README's public-binding gate.
+   Do not remove `.poc-safety` merely to pass a check.
+7. Only after that gate and explicit approval, enable external authenticated
+   ingress if the chosen topology needs it. Internal-only environments instead
+   need an approved network access path.
 
-## End-to-end steps
+The inspection/exposure commands use the actual values returned by azd:
 
-1. Install `az` ≥ 2.60, `azd` (Azure Developer CLI), Docker, Node 20, Python 3.11, `uv`.
-2. Install or read `skills/azure-tenant-isolation/SKILL.md` from <https://github.com/aiappsgbb/awesome-gbb> (sets `AZURE_CONFIG_DIR` and `AZD_CONFIG_DIR` once per workstation). Then clone `aiappsgbb/zava-constellation` for the compose and deploy skills.
-3. Provision shared infra (items 2–4 above) in the target subscription. Standard `az` commands or a small Bicep are fine; this is one-off and not Zava-specific.
-4. (Optional, recommended for customer-facing demos) Run `compose-org` to produce a proven vertical pack scoped to the customer's org.
-5. Clone `arturcrmbot/zava-control-plane` (or apply the proven pack from step 4).
-6. Follow `skills/zava-workspace-deploy/SKILL.md` step by step:
-   - Choose `private-live` or `public-replay` mode before proceeding.
-   - `azd init` + `azd env new zava`
-   - `azd env set …` for ACR / App Insights / LLM endpoint values (full reference in `.env.azd.example` in the repo).
-   - `azd up` → ~10 min on first run.
-7. Smoke-test via the health / workflow / SSE `curl` commands at the bottom of the skill.
-8. Turn on Entra Easy Auth on the resulting Container App and lock ingress to your tenant's users.
+```bash
+APP="$(azd env get-value AZURE_CONTAINER_APP_NAME)"
+RG="$(azd env get-value AZURE_RESOURCE_GROUP)"
+az containerapp auth show --name "$APP" --resource-group "$RG"
+# Only after the authentication/hardening gate and exposure approval:
+az containerapp ingress enable --name "$APP" --resource-group "$RG" \
+  --type external --target-port 80 --transport auto --allow-insecure false
+```
 
-## Explicitly out of scope
+Reprovisioning restores the safe internal-ingress default. Recheck authentication
+before deliberately reopening external access. Legacy `READ_ROUTE_AUTH=enforce`
+checks caller-supplied local headers; it is not an alternative to platform auth.
 
-Pen-test, threat model, DPIA, Sentinel analytics, immutable WORM audit, DR, SLOs, run-books, replacing embedded KuzuDB with a managed DB, network isolation / private endpoints / WAF, wiring real SaaS systems (Workday, Concur, Greenhouse, ServiceNow, ACS). All of that belongs in a separate productionisation effort once an evaluation passes its go/no-go — the substrate's own `POC_UNSAFE_FOR_PUBLIC_DEPLOY=1` marker and "Deployment gate" checklist (in the substrate's `README.md`) are the input list for that future scope.
+## Public replay
+
+Prepare an approved recording and the existing proof/seller-review manifests.
+Then use `scripts/deploy-blueprint.sh`, the proof-gated wrapper around `azd up`.
+It verifies source/tape identity and the expected Azure tenant before deployment.
+No live model configuration is needed for playback.
+
+Read the actual recording date, selected pack and mode from `/api/replay/meta`.
+Historical or dirty-development recordings must not be presented as evidence
+for the current release.
+
+## Operation and limits
+
+- `/healthz` reports process liveness. `/readyz` reports initialized playback or
+  the live supervisor/callback configuration and responding Functions worker.
+  It does not spend model tokens per probe or certify business correctness.
+- The Functions worker's internal readiness route is `/api/zava-ready`.
+- Memory domains come from the selected pack, not a deployment-wide allowlist.
+- With the optional mount, API data is under `/data/<vertical>`; otherwise it is
+  under ephemeral `/app/data/runtime/<vertical>`. Functions uses a separate root.
+  A mounted share is not proof of safe database recovery.
+- In-memory workflow/approval state is not a universal restart-recovery system.
+  Do not claim failover, exactly-once external effects or production readiness.
+- Current sizing is **2 vCPU, 4 GiB, min/max one replica**. There is no
+  scale-to-zero claim. Budget compute, registry, Storage, logging and model use
+  using the chosen region/SKUs and dated prices; no generic monthly quote is
+  asserted here.
+- Preserve the prior approved replay/image for rollback. Clean up only the
+  explicitly owned evaluation resources after approval.
+
+See [development and release gates](DEVELOPMENT.md) and the
+[seller guide](presales/seller-guide.md). Optional composition skills live in
+[zava-constellation](https://github.com/aiappsgbb/zava-constellation); they do not
+replace these deployment prerequisites.

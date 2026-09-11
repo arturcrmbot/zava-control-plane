@@ -11,6 +11,7 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from api.server.middleware.replay_readonly import ReplayReadOnlyMiddleware
 from api.server.services.replay.mode import is_replay
@@ -52,6 +53,10 @@ if app_state.runtime.pack.name == "agency":
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    app.state.startup_complete = False
+    if os.getenv("READ_ROUTE_AUTH", "").strip().lower() == "platform":
+        if not os.getenv("AUTH_TENANT_ID", "").strip() or not os.getenv("AUTH_CLIENT_ID", "").strip():
+            raise RuntimeError("Platform authentication requires AUTH_TENANT_ID and AUTH_CLIENT_ID")
     init_otel("control-plane-server")
     runtime = app_state.runtime
     blueprint_replay_only = os.getenv("ZAVA_BLUEPRINT_REPLAY_ONLY", "0") == "1"
@@ -87,8 +92,10 @@ async def lifespan(app: FastAPI):
                 f"duration_s={loader.meta.duration_s}"
             )
             try:
+                app.state.startup_complete = True
                 yield
             finally:
+                app.state.startup_complete = False
                 set_active_player(None)
                 await player.stop()
                 try:
@@ -314,8 +321,10 @@ async def lifespan(app: FastAPI):
 
     try:
         async with session_manager:
+            app.state.startup_complete = True
             yield
     finally:
+        app.state.startup_complete = False
         if _recorder_arm_task is not None and not _recorder_arm_task.done():
             _recorder_arm_task.cancel()
             try:
@@ -409,6 +418,39 @@ async def health():
 @app.get("/healthz")
 async def healthz():
     return {"ok": True}
+
+
+@app.get("/readyz")
+async def readyz():
+    def unavailable(reason: str):
+        return JSONResponse({"ready": False, "reason": reason}, status_code=503)
+
+    if not getattr(app.state, "startup_complete", False):
+        return unavailable("starting")
+    if is_replay():
+        from api.server.services.replay.player import current_player
+        player = current_player()
+        if player is None or player._task is None or player._task.done():
+            return unavailable("replay_unavailable")
+        return {"ready": True, "mode": "replay"}
+    if not os.getenv("DURABLE_EVENT_SECRET", "").strip():
+        return unavailable("callback_secret_missing")
+    if app_state.runtime.pack.name == "agency" and not app_state.fm._started:
+        return unavailable("supervisor_unavailable")
+    world_task = getattr(app_state, "world_task", None)
+    if world_task is not None and world_task.done():
+        return unavailable("world_unavailable")
+    import httpx
+    host = os.getenv("FUNCTIONS_HOST", "http://localhost:7071").rstrip("/")
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            response = await client.get(f"{host}/api/zava-ready")
+            response.raise_for_status()
+            if response.json() != {"state": "Running"}:
+                return unavailable("functions_unavailable")
+    except (httpx.HTTPError, ValueError):
+        return unavailable("functions_unavailable")
+    return {"ready": True, "mode": "live"}
 
 
 # Bus -> hub fan-out is wired inside the lifespan (see above) so each app

@@ -3,13 +3,13 @@
 // Notes:
 //  * `image` starts as the public `mcr` quickstart placeholder. `azd deploy`
 //    swaps in the freshly-built ACR image after `azd provision`.
-//  * Liveness and readiness probes hit `/healthz` (NOT `/`). The skill
+//  * Liveness hits `/healthz`; readiness/startup use `/readyz` (NOT `/`). The skill
 //    troubleshooting log (May 2026 cloud rollout) showed that hitting `/`
 //    returns the SPA index.html 200 even when the API is dead — that's
 //    why we have an explicit `/healthz` route registered before any
 //    StaticFiles mount in `api/server/main.py`, and why probes target it.
-//  * `corsPolicy` and ingress allow all origins by default for the demo;
-//    tighten via APIM in front of this in production.
+//  * Public ingress is enabled only for read-only replay. Live exposure is
+//    a separate approved step after tenant authentication and release gates.
 
 param name string
 param location string
@@ -26,6 +26,7 @@ param azureOpenAiDeployment string = 'gpt-4.1'
 param azureOpenAiEmbedDeployment string = 'text-embedding-3-large'
 param azureOpenAiApiVersion string = '2024-10-21'
 param fleetManagerModel string = 'gpt-4.1'
+param azureOpenAiFleetManagerDeployment string = ''
 param simulatorRampDomains string = 'expense-claim'
 param personaAutoClose string = ''
 @allowed(['fake', 'azure'])
@@ -34,6 +35,14 @@ param llmRuntime string = 'fake'
 @description('Set to "replay" to boot the container against a baked tape (no live workers, no Functions host, no LLM calls). Anything else boots live mode.')
 @allowed(['live', 'replay'])
 param zavaMode string
+
+@description('Installed vertical pack used by the runtime.')
+param zavaVertical string = 'agency'
+
+param authTenantId string = ''
+param authClientId string = ''
+@secure()
+param authClientSecret string = ''
 
 @description('Path inside the container to the baked tape archive. Only used when zavaMode=replay.')
 param zavaTapePath string = '/app/tape/tape.tar.gz'
@@ -46,6 +55,7 @@ param durableEventSecret string = ''
 param funcStorageAccountName string
 
 var placeholderImage = 'mcr.microsoft.com/k8se/quickstart:latest'
+var authEnabled = zavaMode == 'live' && !empty(authTenantId) && !empty(authClientId)
 
 resource app 'Microsoft.App/containerApps@2024-03-01' = {
   name: name
@@ -64,7 +74,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
     configuration: {
       activeRevisionsMode: 'Single'
       ingress: {
-        external: true
+        external: zavaMode == 'replay'
         targetPort: 80
         transport: 'auto'
         allowInsecure: false
@@ -80,12 +90,17 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           identity: userAssignedIdentityId
         }
       ]
-      secrets: [
+      secrets: concat([
         {
           name: 'durable-event-secret'
           value: durableEventSecret
         }
-      ]
+      ], authEnabled && !empty(authClientSecret) ? [
+        {
+          name: 'aad-client-secret'
+          value: authClientSecret
+        }
+      ] : [])
     }
     template: {
       containers: [
@@ -105,6 +120,11 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             // Player against ZAVA_TAPE_PATH, and the read-only middleware
             // 403s every write.
             { name: 'ZAVA_MODE', value: zavaMode }
+            { name: 'ZAVA_VERTICAL', value: zavaVertical }
+            { name: 'READ_ROUTE_AUTH', value: zavaMode == 'live' ? 'platform' : '' }
+            { name: 'AUTH_TENANT_ID', value: authTenantId }
+            { name: 'AUTH_CLIENT_ID', value: authClientId }
+            { name: 'ZAVA_DATA_DIR', value: persistData ? '/data' : '/app/data/runtime' }
             { name: 'ZAVA_TAPE_PATH', value: zavaTapePath }
 
             { name: 'AZURE_OPENAI_ENDPOINT', value: azureOpenAiEndpoint }
@@ -112,11 +132,11 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'AZURE_OPENAI_EMBED_DEPLOYMENT', value: azureOpenAiEmbedDeployment }
             { name: 'AZURE_OPENAI_API_VERSION', value: azureOpenAiApiVersion }
             { name: 'FLEET_MANAGER_MODEL', value: fleetManagerModel }
+            { name: 'AZURE_OPENAI_FLEET_MANAGER_DEPLOYMENT', value: azureOpenAiFleetManagerDeployment }
             { name: 'LLM_RUNTIME', value: llmRuntime }
 
             { name: 'SIMULATOR_RAMP_ENABLED', value: '1' }
             { name: 'SIMULATOR_RAMP_DOMAINS', value: simulatorRampDomains }
-            { name: 'MEMORY_DOMAINS', value: 'expense-claim,hiring,fleet-vendor-kyc,fleet-travel-preapproval,fleet-purchase-order' }
             { name: 'PERSONA_AUTO_CLOSE', value: personaAutoClose }
             { name: 'DEMO_TIME_WARP_FACTOR', value: '3600' }
 
@@ -160,7 +180,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               type: 'Readiness'
               httpGet: {
-                path: '/healthz'
+                path: '/readyz'
                 port: 80
                 scheme: 'HTTP'
               }
@@ -172,7 +192,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               type: 'Startup'
               httpGet: {
-                path: '/healthz'
+                path: '/readyz'
                 port: 80
                 scheme: 'HTTP'
               }
@@ -196,6 +216,46 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         }
       ] : []
     }
+  }
+}
+
+resource authentication 'Microsoft.App/containerApps/authConfigs@2024-03-01' = {
+  parent: app
+  name: 'current'
+  properties: {
+    platform: {
+      enabled: authEnabled
+    }
+    httpSettings: {
+      requireHttps: true
+    }
+    globalValidation: authEnabled ? {
+      unauthenticatedClientAction: 'RedirectToLoginPage'
+      redirectToProvider: 'azureactivedirectory'
+      excludedPaths: [
+        '/healthz'
+        '/readyz'
+      ]
+    } : {
+      unauthenticatedClientAction: 'AllowAnonymous'
+    }
+    identityProviders: authEnabled ? {
+      azureActiveDirectory: {
+        enabled: true
+        registration: union({
+          clientId: authClientId
+          openIdIssuer: 'https://login.microsoftonline.com/${authTenantId}/v2.0'
+        }, !empty(authClientSecret) ? {
+          clientSecretSettingName: 'aad-client-secret'
+        } : {})
+        validation: {
+          allowedAudiences: [
+            authClientId
+            'api://${authClientId}'
+          ]
+        }
+      }
+    } : {}
   }
 }
 

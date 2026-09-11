@@ -32,7 +32,7 @@ trap cleanup INT TERM EXIT
 echo "==> azurite"
 mkdir -p azurite-data
 azurite --silent --location azurite-data \
-  --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 &
+  --blobHost 127.0.0.1 --queueHost 127.0.0.1 --tableHost 127.0.0.1 &
 pids+=($!)
 
 echo "    waiting for azurite ports..."

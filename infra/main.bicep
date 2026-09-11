@@ -46,8 +46,11 @@ param azureOpenAiEmbedDeployment string = 'text-embedding-3-large'
 @description('Azure OpenAI API version')
 param azureOpenAiApiVersion string = '2024-10-21'
 
-@description('Fleet manager model deployment')
+@description('GitHub Fleet Manager model. Azure uses its separate deployment setting.')
 param fleetManagerModel string = 'gpt-4.1'
+
+@description('Optional Azure Fleet Manager deployment; empty uses the default chat deployment.')
+param azureOpenAiFleetManagerDeployment string = ''
 
 @description('Optional override: comma-separated simulator ramp domains (Profile 1 vs 2)')
 param simulatorRampDomains string = 'expense-claim'
@@ -62,6 +65,15 @@ param llmRuntime string = 'fake'
 @description('Container boot mode: "live" boots the full FastAPI + Functions stack; "replay" boots only FastAPI + Player against a baked tape (no LLM, no Functions host).')
 @allowed(['live', 'replay'])
 param zavaMode string
+
+@description('Installed vertical pack used by the runtime.')
+param zavaVertical string = 'agency'
+
+@description('Single-tenant Entra application registration used for private-live access.')
+param authTenantId string = ''
+param authClientId string = ''
+@secure()
+param authClientSecret string = ''
 
 @description('Shared secret for Functions worker → FastAPI /internal/durable-event callback. Generate with: openssl rand -hex 32')
 @secure()
@@ -134,10 +146,15 @@ module acaApp 'modules/aca-app.bicep' = {
     azureOpenAiEmbedDeployment: azureOpenAiEmbedDeployment
     azureOpenAiApiVersion: azureOpenAiApiVersion
     fleetManagerModel: fleetManagerModel
+    azureOpenAiFleetManagerDeployment: azureOpenAiFleetManagerDeployment
     simulatorRampDomains: simulatorRampDomains
     personaAutoClose: personaAutoClose
     llmRuntime: llmRuntime
     zavaMode: zavaMode
+    zavaVertical: zavaVertical
+    authTenantId: authTenantId
+    authClientId: authClientId
+    authClientSecret: authClientSecret
     durableEventSecret: durableEventSecret
     funcStorageAccountName: storage.outputs.accountName
   }
