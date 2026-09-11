@@ -6,8 +6,9 @@ import json
 import pytest
 
 
+@pytest.mark.parametrize("with_tool_evidence", [False, True])
 def test_recommendation_uses_canonical_agent_session_and_preserves_invoice_values(
-    monkeypatch,
+    monkeypatch, with_tool_evidence,
 ):
     calls = []
 
@@ -25,6 +26,7 @@ def test_recommendation_uses_canonical_agent_session_and_preserves_invoice_value
                 "reason": "Budget threshold exceeded.",
             },
             "selected_invoice_ids": ["INV-AUR-TESTMODEL-01"],
+            **({"_raw_tool_calls": [{"tool": "skill", "success": True}]} if with_tool_evidence else {}),
         }
 
     monkeypatch.setattr(
@@ -55,10 +57,18 @@ def test_recommendation_uses_canonical_agent_session_and_preserves_invoice_value
     assert selected["amount_gbp"] >= 500
     assert selected["vendor"]
     assert selected["gl_code"]
+    assert "_raw_tool_calls" not in result
 
 
-def test_recommendation_rejects_model_selected_invoice_outside_candidates(
-    monkeypatch,
+@pytest.mark.parametrize(
+    ("invoice_id", "extra_fields", "error"),
+    [
+        ("INV-NOT-SUPPLIED", {}, "outside the supplied candidates"),
+        ("INV-AUR-TESTMODEL-01", {"unexpected": True}, "extra_forbidden"),
+    ],
+)
+def test_recommendation_rejects_invalid_model_output(
+    monkeypatch, invoice_id, extra_fields, error,
 ):
     async def _run(*args, **kwargs):
         return {
@@ -71,7 +81,8 @@ def test_recommendation_rejects_model_selected_invoice_outside_candidates(
                 "decided_on": ["BRAND-aurora"],
                 "attributes": {"scope": "po", "expiry_days": 14},
             },
-            "selected_invoice_ids": ["INV-NOT-SUPPLIED"],
+            "selected_invoice_ids": [invoice_id],
+            **extra_fields,
         }
 
     monkeypatch.setattr(
@@ -82,7 +93,7 @@ def test_recommendation_rejects_model_selected_invoice_outside_candidates(
         aurora_recommendation_activity,
     )
 
-    with pytest.raises(ValueError, match="outside the supplied candidates"):
+    with pytest.raises(ValueError, match=error):
         asyncio.run(aurora_recommendation_activity({
             "workflow_id": "AUR-TESTMODEL",
             "brand_id": "BRAND-aurora",

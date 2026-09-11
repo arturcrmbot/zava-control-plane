@@ -135,7 +135,13 @@ async def aurora_recommendation_activity(payload: dict) -> dict:
         instance_id=payload.get("instance_id"),
         phase="Recommend response",
     )
-    recommendation = AuroraRecommendation.model_validate(raw)
+    # The wrapper records tool evidence separately from the model-authored schema.
+    model_output = (
+        {key: value for key, value in raw.items() if key != "_raw_tool_calls"}
+        if isinstance(raw, dict)
+        else raw
+    )
+    recommendation = AuroraRecommendation.model_validate(model_output)
     action = recommendation.proposed_action
     if (
         action.id != "freeze-brand-aurora"

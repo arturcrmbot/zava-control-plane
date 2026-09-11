@@ -47,6 +47,23 @@ def test_agency_registers_real_aurora_domain_and_pack_owned_skill():
     )
 
 
+def test_aurora_skill_omits_the_unused_tool_allowlist():
+    from pathlib import Path
+
+    import yaml
+
+    skill = (
+        Path(__file__).resolve().parents[3]
+        / "verticals/agency/skills/aurora-budget-recommender/SKILL.md"
+    )
+    metadata = yaml.safe_load(skill.read_text().split("---", 2)[1])
+
+    assert "allowed-tools" not in metadata, (
+        "Omit an unused allowlist: null breaks Copilot discovery and [] is "
+        "treated as a tool name by the pack loader"
+    )
+
+
 def test_agency_functions_app_registers_aurora_orchestrator_and_activities():
     from verticals.agency.durable import app
 

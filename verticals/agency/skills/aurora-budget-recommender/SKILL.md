@@ -1,7 +1,6 @@
 ---
 name: aurora-budget-recommender
 description: Recommends a bounded response to an observed Aurora budget overrun.
-allowed-tools:
 ---
 
 # Aurora budget response recommender
