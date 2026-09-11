@@ -117,7 +117,14 @@ export function Narrator({ journey, onClose, onInspect }: NarratorProps) {
           <p data-testid="journey-status" data-status={detail.status} aria-live="polite">
             {STATUS_LABELS[outcome] || outcome.replace(/_/g, " ")}
           </p>
-          {detail.reason && <p>{detail.reason}</p>}
+          {detail.reason && (
+            detail.status === "failed" && outcome !== "rejected"
+              ? <details className="journey-evidence__failure">
+                  <summary>Failure details</summary>
+                  <pre>{detail.reason}</pre>
+                </details>
+              : <p>{detail.reason}</p>
+          )}
           {detail.phases.length === 0 && <p>No phase checkpoint has been recorded yet.</p>}
           <ol className="journey-evidence__phases">
             {detail.phases.map((phase) => (

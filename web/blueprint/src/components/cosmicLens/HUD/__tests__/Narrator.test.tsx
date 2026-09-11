@@ -67,6 +67,33 @@ describe("Narrator execution evidence", () => {
     expect(screen.queryByText("Executive approval")).toBeNull();
   });
 
+  it("keeps full failure diagnostics collapsed so the outcome stays readable", async () => {
+    const reason = "ValidationError: malformed recommendation\n".repeat(100);
+    vi.mocked(readJourneyDetails).mockResolvedValue({
+      ...detail, status: "failed", outcome: "recommendation_failed", reason,
+      activeExceptionId: undefined,
+    });
+    render(<Narrator journey={{ workflowId: "AUR-real", source: "replay" }} onClose={vi.fn()} onInspect={vi.fn()} />);
+
+    const diagnostics = (await screen.findByText("Failure details")).closest("details");
+    expect(diagnostics?.hasAttribute("open")).toBe(false);
+    expect(diagnostics?.querySelector("pre")?.textContent).toBe(reason);
+    expect(screen.getByTestId("journey-status").textContent).toBe("recommendation failed");
+    expect(screen.getByRole("button", { name: "Inspect workflow" })).toBeTruthy();
+  });
+
+  it("keeps the operator rejection reason visible rather than treating it as a stack trace", async () => {
+    vi.mocked(readJourneyDetails).mockResolvedValue({
+      ...detail, status: "failed", outcome: "rejected", reason: "Budget exception declined",
+      activeExceptionId: undefined,
+    });
+    render(<Narrator journey={{ workflowId: "AUR-real", source: "replay" }} onClose={vi.fn()} />);
+
+    const reason = await screen.findByText("Budget exception declined");
+    expect(reason.closest("details")).toBeNull();
+    expect(screen.getByTestId("journey-status").textContent).toBe("Rejected");
+  });
+
   it("submits an operator decision but waits for actual workflow progression", async () => {
     vi.mocked(resolveJourneyDecision).mockResolvedValue();
     render(<Narrator journey={{ workflowId: "AUR-real", source: "live" }} onClose={vi.fn()} />);

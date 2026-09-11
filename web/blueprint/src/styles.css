@@ -1164,6 +1164,16 @@ body.constellation-page-body {
   color: #fca5a5;
 }
 
+.journey-evidence__failure summary {
+  cursor: pointer;
+  color: #fca5a5;
+}
+
+.journey-evidence__failure pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .journey-evidence__recommendation {
   padding-left: 12px;
   border-left: 2px solid #818cf8;
