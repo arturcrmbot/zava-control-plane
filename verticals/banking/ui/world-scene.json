@@ -1,0 +1,102 @@
+{
+  "version": "1",
+  "title": "Zava Bank — Synthetic Operations",
+  "locations": [
+    { "id": "SYN-RETAIL-NORTH", "label": "Retail North", "x": 0.10, "y": 0.22 },
+    { "id": "SYN-RETAIL-SOUTH", "label": "Retail South", "x": 0.10, "y": 0.72 },
+    { "id": "SYN-PAYMENTS-HUB", "label": "Payments Hub", "x": 0.31, "y": 0.47 },
+    { "id": "SYN-RAIL-FLOOR", "label": "Rail Floor", "x": 0.46, "y": 0.20 },
+    { "id": "SYN-EXTERNAL-PSP", "label": "Receiving Providers", "x": 0.46, "y": 0.76 },
+    { "id": "SYN-FINCRIME-UNIT", "label": "Financial Crime", "x": 0.62, "y": 0.50 },
+    { "id": "SYN-MARKETS-FLOOR", "label": "Markets Floor", "x": 0.84, "y": 0.20 },
+    { "id": "SYN-CREDIT-RISK", "label": "Credit Risk", "x": 0.84, "y": 0.50 },
+    { "id": "SYN-CLIENT-GOVERNANCE", "label": "Client Governance", "x": 0.70, "y": 0.86 },
+    { "id": "SYN-WEALTH-OFFICE", "label": "Wealth Office", "x": 0.84, "y": 0.80 }
+  ],
+  "actor_bindings": [
+    {
+      "collection": "fraud_claims",
+      "kind": "fraud claim",
+      "id_field": "id",
+      "state_field": "status",
+      "location_field": "location_id"
+    },
+    {
+      "collection": "payment_rails",
+      "kind": "payment rail",
+      "id_field": "id",
+      "state_field": "status",
+      "location_field": "location_id"
+    },
+    {
+      "collection": "payment_service_providers",
+      "kind": "provider",
+      "id_field": "id",
+      "state_field": "status",
+      "location_field": "location_id"
+    },
+    {
+      "collection": "investigations",
+      "kind": "investigation",
+      "id_field": "id",
+      "state_field": "status",
+      "location_field": "location_id"
+    },
+    {
+      "collection": "counterparties",
+      "kind": "counterparty",
+      "id_field": "id",
+      "state_field": "status",
+      "location_field": "location_id"
+    },
+    {
+      "collection": "exposures",
+      "kind": "exposure",
+      "id_field": "id",
+      "state_field": "status",
+      "location_field": "location_id"
+    }
+  ],
+  "event_mappings": [
+    {
+      "event_type": "banking.app_fraud.claim_raised",
+      "animation_type": "alert",
+      "actor_id_field": "actor_id"
+    },
+    {
+      "event_type": "sensor.tripped",
+      "animation_type": "pulse",
+      "target_id": "target_id"
+    },
+    {
+      "event_type": "banking.reimbursement.applied",
+      "animation_type": "resolve",
+      "actor_id_field": "actor_id"
+    },
+    {
+      "event_type": "banking.investigation.opened",
+      "animation_type": "alert",
+      "actor_id_field": "actor_id"
+    },
+    {
+      "event_type": "banking.exposure.revalued",
+      "animation_type": "pulse",
+      "actor_id_field": "actor_id"
+    },
+    {
+      "event_type": "banking.rail.throughput",
+      "animation_type": "flow",
+      "actor_id_field": "actor_id"
+    },
+    {
+      "event_type": "banking.payment.settled",
+      "animation_type": "flow",
+      "target_id": "target_id"
+    },
+    {
+      "event_type": "banking.fraud_claim.seeded",
+      "animation_type": "settle",
+      "actor_id_field": "actor_id"
+    }
+  ]
+}

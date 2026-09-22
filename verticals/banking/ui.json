@@ -1,0 +1,14 @@
+{
+  "capabilities": ["blueprint", "world", "memory", "knowledge"],
+  "lenses": ["process-library", "customer-impact", "control"],
+  "theme": {
+    "accent": "#1d4ed8",
+    "label": "Zava Bank",
+    "world": "banking"
+  },
+  "phase_aliases": {},
+  "supplemental_domains": [],
+  "aspirational_domains": [],
+  "include_meta_skills": false,
+  "world_scene": "ui/world-scene.json"
+}

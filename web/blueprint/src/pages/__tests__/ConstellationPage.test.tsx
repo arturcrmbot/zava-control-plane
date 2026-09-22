@@ -11,8 +11,10 @@ vi.mock("../../components/cosmicLens/CosmicLens", () => ({
   ),
 }));
 vi.mock("../../components/cosmicLens/HUD/DemoHUD", () => ({
-  DemoHUD: ({ enabled }: { enabled: boolean }) => (
-    <div data-testid="demo-hud" data-enabled={String(enabled)} />
+  DemoHUD: ({ enabled, onFollow }: { enabled: boolean; onFollow: (journey: GuidedJourney) => void }) => (
+    <div data-testid="demo-hud" data-enabled={String(enabled)}>
+      <button onClick={() => onFollow({ workflowId: "AUR-real", source: "live" })}>Follow fixture</button>
+    </div>
   ),
 }));
 vi.mock("../../components/cosmicLens/HUD/DecisionTicker", () => ({
@@ -29,18 +31,6 @@ vi.mock("../../components/cosmicLens/HUD/Narrator", () => ({
   Narrator: ({ journey, onInspect }: { journey: GuidedJourney; onInspect: (id: string) => void }) => (
     <div data-testid="narrator" data-workflow={journey.workflowId}>
       <button onClick={() => onInspect(journey.workflowId)}>Inspect fixture</button>
-    </div>
-  ),
-}));
-vi.mock("../../components/cosmicLens/HUD/StoryGuide", () => ({
-  StoryGuide: ({ source, onFollow }: { source: ReplayModeInfo; onFollow: (journey: GuidedJourney) => void }) => (
-    <div
-      data-testid="story-guide"
-      data-source={source.mode}
-      data-replay={String(source.mode === "replay")}
-      data-recorded-at={source.mode === "replay" ? source.recordedAt ?? "" : ""}
-    >
-      <button onClick={() => onFollow({ workflowId: "AUR-real", source: "live" })}>Follow fixture</button>
     </div>
   ),
 }));
@@ -79,19 +69,15 @@ describe("ConstellationPage", () => {
     expect(screen.getByTestId("cosmic-lens")).toBeTruthy();
   });
 
-  it("renders StoryGuide with isReplay=false in live mode", () => {
+  it("does not mount the orientation overlay over the scene", () => {
     render(<ConstellationPage />);
-    const sg = screen.getByTestId("story-guide");
-    expect(sg.getAttribute("data-replay")).toBe("false");
+    expect(screen.queryByTestId("story-guide")).toBeNull();
   });
 
-  it("passes isReplay=true to StoryGuide and DecisionTicker when replay", async () => {
+  it("passes isReplay=true to DecisionTicker when replay", async () => {
     mockSource = { mode: "replay", recordedAt: "2026-07-01T00:00:00Z" };
     render(<ConstellationPage />);
     await waitFor(() => {
-      const sg = screen.getByTestId("story-guide");
-      expect(sg.getAttribute("data-replay")).toBe("true");
-      expect(sg.getAttribute("data-recorded-at")).toBe("2026-07-01T00:00:00Z");
       const dt = screen.getByTestId("decision-ticker");
       expect(dt.getAttribute("data-replay")).toBe("true");
     });
@@ -120,7 +106,6 @@ describe("ConstellationPage", () => {
     mockSource = source;
     render(<ConstellationPage />);
     expect(screen.getByTestId("cosmic-lens").getAttribute("data-source")).toBe(source.mode);
-    expect(screen.getByTestId("story-guide").getAttribute("data-source")).toBe(source.mode);
     expect(screen.getByTestId("decision-ticker").getAttribute("data-enabled")).toBe("false");
     expect(screen.getByTestId("demo-hud").getAttribute("data-enabled")).toBe("false");
   });

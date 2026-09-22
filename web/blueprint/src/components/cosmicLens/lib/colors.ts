@@ -48,13 +48,41 @@ const FUNCTION_FAMILY_COLORS: Record<string, string> = {
   ops: "#06b6d4", // cyan
   engineering: "#14b8a6", // teal
   customer: "#f97316", // orange
+  // Banking families. A universal bank has several functions whose names do
+  // not contain any of the substrings above ("markets", "payments",
+  // "wealth"), and two that are actively misleading: "financial-crime" does
+  // not contain "finance", and "credit-risk" does not contain "contract".
+  // Without these, every banking planet resolves to `ops` and the whole
+  // organisation renders in one colour.
+  retail: "#60a5fa", // light blue
+  payments: "#34d399", // light emerald
+  markets: "#fbbf24", // light amber
+  credit: "#a78bfa", // light violet
+  fincrime: "#f87171", // light red
+  governance: "#e879f9", // fuchsia
+  wealth: "#fb923c", // light orange
   default: "#94a3b8",
+};
+
+/** Exact function-key families. Checked before the substring heuristics
+ *  below, which were written for the agency vertical and mis-classify
+ *  several banking function names. */
+const EXACT_FUNCTION_FAMILY: Record<string, string> = {
+  "retail-banking": "retail",
+  payments: "payments",
+  markets: "markets",
+  "credit-risk": "credit",
+  "financial-crime": "fincrime",
+  "client-governance": "governance",
+  wealth: "wealth",
 };
 
 /** Map function key → family. Conservative — extend as functions are added. */
 export function familyForFunction(fn: string | undefined): string {
   if (!fn) return "default";
   const f = fn.toLowerCase();
+  const exact = EXACT_FUNCTION_FAMILY[f];
+  if (exact) return exact;
   if (f.includes("finance") || f.includes("ap-") || f.includes("treasury") || f.includes("vendor"))
     return "finance";
   if (f.includes("hire") || f.includes("hiring") || f.includes("perf") || f.includes("hr") || f.includes("recruit"))

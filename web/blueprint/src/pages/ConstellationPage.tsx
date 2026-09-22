@@ -16,7 +16,6 @@ import { DemoHUD } from "../components/cosmicLens/HUD/DemoHUD";
 import { DecisionTicker } from "../components/cosmicLens/HUD/DecisionTicker";
 import { PolicyRipple } from "../components/cosmicLens/HUD/PolicyRipple";
 import { Narrator } from "../components/cosmicLens/HUD/Narrator";
-import { StoryGuide } from "../components/cosmicLens/HUD/StoryGuide";
 import { useReplayMode } from "../lib/useReplayMode";
 import type { GuidedJourney } from "../components/cosmicLens/HUD/guidedJourney";
 
@@ -38,7 +37,7 @@ export function ConstellationPage() {
   const fromFleet = params.get("from") === "fleet";
   const demoEnabled = params.get("demo") === "1";
 
-  const { source, retry } = useReplayMode();
+  const { source } = useReplayMode();
   const sourceKnown = source.mode === "live" || source.mode === "replay";
   const [journey, setJourney] = useState<GuidedJourney | null>(null);
   const [workflowToOpen, setWorkflowToOpen] = useState<string | null>(null);
@@ -58,7 +57,6 @@ export function ConstellationPage() {
   return (
     <div className="constellation-page">
       <CosmicLens embed={embed} source={source} workflowToOpen={workflowToOpen} onWorkflowOpened={workflowOpened} />
-      <StoryGuide source={source} onRetry={retry} onFollow={setJourney} />
       <DemoHUD enabled={demoEnabled && source.mode === "live"} onFollow={setJourney} />
       <DecisionTicker enabled={sourceKnown} isReplay={source.mode === "replay"} />
       <PolicyRipple enabled={true} />

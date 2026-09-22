@@ -1,0 +1,48 @@
+version: 1
+status: signed
+target: Zava Bank (synthetic universal bank)
+slug: banking
+world: synthetic universal bank spanning retail, payments, markets, credit and financial crime
+research:
+  classification: approved public-source operating context
+  sources:
+    - docs/superpowers/specs/2026-09-22-banking-vertical-design.md
+  note: >
+    Public sources establish operating realities only: that UK payment service
+    providers decide authorised-push-payment fraud reimbursement within a fixed
+    window, against a per-claim cap, with liability shared between sending and
+    receiving providers, and that a customer carrying a vulnerability marker
+    cannot be refused under the consumer standard of caution. No record,
+    threshold, limit or policy below represents a real institution or customer.
+synthetic_data:
+  operating_records:
+    classification: synthetic
+    identifier_prefix: SYN-
+    note: >
+      Every customer, account, payment, beneficiary, claim, corporate client,
+      counterparty, limit, exposure, position and collateral agreement is
+      synthetic and visibly labelled.
+  thresholds:
+    classification: synthetic-demo-assumption
+    note: Every authority band, cap, cost and KPI threshold is a demo assumption.
+  authority:
+    fraud_decision_manager:
+      classification: synthetic-demo-assumption
+      spend_limit_gbp: 50000.0
+      note: >
+        Deliberately set below the synthetic reimbursement cap of GBP 85,000 so
+        a capped claim above the delegation is refused by the real authority
+        matrix and escalates.
+    financial_crime_lead:
+      classification: synthetic-demo-assumption
+      spend_limit_gbp: 250000.0
+    payments_operations_lead:
+      classification: synthetic-demo-assumption
+      spend_limit_gbp: 120000.0
+vision:
+  audience: enterprise seller/customer demo
+  golden_story: synthetic-app-fraud-claim
+  supporting_stories:
+    - mule-account-investigation
+    - merchant-onboarding-risk
+  seller_review: PENDING

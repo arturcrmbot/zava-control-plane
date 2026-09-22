@@ -1,0 +1,29 @@
+tools:
+  - id: banking_read_claim_evidence
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: retail-banking
+    description: Read supplied versioned synthetic APP fraud claim evidence.
+  - id: banking_rank_admitted_claim_options
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: retail-banking
+    description: Rank only deterministically admitted synthetic reimbursement options.
+  - id: banking_read_case_evidence
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: financial-crime
+    description: Read supplied versioned synthetic supporting-case evidence.
+  - id: banking_rank_admitted_case_options
+    reversible: true
+    requires_capability: null
+    requires_authority: false
+    value_field: null
+    scope_function: financial-crime
+    description: Rank only deterministically admitted synthetic supporting-case options.
