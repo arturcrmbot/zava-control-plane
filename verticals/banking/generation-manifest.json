@@ -4,259 +4,264 @@
   "vertical": "banking",
   "records": [
     {
+      "path": "verticals/banking/SELLER-REVIEW.md",
+      "ownership": "bespoke",
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
+    },
+    {
       "path": "verticals/banking/__init__.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/actions/__init__.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/actions/fraud_commands.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/agents.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/authority.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/detail.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/domains.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/durable.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/entity_projections/__init__.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/entity_projections/fraud.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/entity_projections/supporting.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/fraud_constants.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/fraud_constraints.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/fraud_durable.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/functions.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/lifecycle.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/manifest.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/mcp_tools/__init__.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/mcp_tools/fraud.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/mcp_tools/supporting.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/org-brief.yaml",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/personae/credit_risk_officer/SKILL.md",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/personae/financial_crime_lead/SKILL.md",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/personae/fraud_decision_manager/SKILL.md",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/personae/payments_operations_lead/SKILL.md",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/personae/senior_credit_officer/SKILL.md",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/personae/vulnerable_customer_specialist/SKILL.md",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/personas.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/policies/tools.yaml",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/process_profiles.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/projections.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/recordings/README.md",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/recordings/app-fraud-reimbursement-20260922T153557-app-evt-00000351.jsonl",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/recordings/app-fraud-reimbursement-20260922T153557-app-evt-00000378.jsonl",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/recordings/merchant-onboarding-risk-20260922T153623-BMER-0003.jsonl",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/recordings/mule-account-investigation-20260922T153618-BMUL-0006.jsonl",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/skills/claim-evidence-assessor/SKILL.md",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/skills/merchant-risk-assessor/SKILL.md",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/skills/mule-network-analyst/SKILL.md",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/spawners.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/support_constants.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/supporting_durable.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/ui.json",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/ui/world-scene.json",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/worlds/__init__.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/worlds/active.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/worlds/diagnostics.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/worlds/model.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/worlds/reference_data.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/worlds/registration.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     },
     {
       "path": "verticals/banking/worlds/scenario.py",
       "ownership": "bespoke",
-      "source": "6e943cdc4d54bc4575db847dc6efc4afcb673a7a"
+      "source": "1267eb6916421f78b7f1dd26c6ae46d8a2b43e6e"
     }
   ]
 }
