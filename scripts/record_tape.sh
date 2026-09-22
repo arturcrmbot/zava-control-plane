@@ -44,7 +44,10 @@ export SIMULATOR_RAMP_AVG_INTERVAL_SECONDS="${SIMULATOR_RAMP_AVG_INTERVAL_SECOND
 # memories survive long enough to land in the t=0 snapshot — we
 # trigger ONE explicit dream pass below to also produce lessons.
 export DREAM_PASS_TRIGGER_BACKLOG=999
-export MEMORY_DOMAINS=hiring
+# Memory domains seeded into the tape. Defaults to the agency `hiring`
+# corpus; override per vertical so a tape does not carry another pack's
+# memories (e.g. MEMORY_DOMAINS=app-fraud-reimbursement for banking).
+export MEMORY_DOMAINS="${MEMORY_DOMAINS:-hiring}"
 ZAVA_APP_SHA="$(git rev-parse --verify HEAD)"
 SOURCE_STATUS="$(git status --porcelain --untracked-files=normal)"
 if [[ -n "$SOURCE_STATUS" ]]; then
