@@ -53,6 +53,21 @@ tape contains a human decision rather than an auto-close.
 
 Commit the tape.
 
+### Recorded tape
+
+`tapes/banking.tar.gz` — `tape_6bb10307`, ~30 minutes, 11,639 events,
+recorded at app SHA `56efebcb` with `pack_fingerprint
+banking:1:3885135132db92aa`. It carries 7,134 settled payments, 1,296
+exposure revaluations, 433 entity upserts, 147 entity links, 57 persona
+decisions and the seeded banking memories.
+
+`tapes/banking-v1-fallback.tar.gz` is an earlier take kept only as a
+fallback; it predates the memory-seed fix, so its Memory surface is empty.
+Prefer the current tape.
+
+Tapes are gitignored (`/tapes/`), so they live on disk and are not carried
+by a clone.
+
 ## 2. Every demo: replay
 
 ```bash

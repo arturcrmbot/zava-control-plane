@@ -107,25 +107,17 @@ def workflow_detail(workflow: Any, app_state: Any = None) -> dict[str, Any] | No
     if not detail:
         detail = _supporting_detail(payload)
 
-    # A workflow stopped by the authority matrix must say so. Otherwise the
-    # clearest governance moment in the demo reads as an unexplained failure
-    # at whatever phase happened to be current when it terminated.
-    hitl = _dict(payload.get("hitl_context"))
-    if hitl.get("governance_refusal") is True:
-        authority = _dict(hitl.get("authority"))
-        selected = _dict(hitl.get("selected_option"))
-        request = _dict(hitl.get("request"))
+    # A workflow stopped by the authority matrix must say so. The rejection
+    # handler persists the reason and phase on the workflow's metadata, not
+    # its payload, so read it from there. Without this the clearest
+    # governance moment reads as an unexplained failure.
+    metadata = getattr(workflow, "metadata", None)
+    metadata = metadata if isinstance(metadata, dict) else {}
+    if metadata.get("rejected") is True:
         detail["governanceRefusal"] = {
-            "persona": hitl.get("persona"),
-            "action": hitl.get("action"),
-            "phase": hitl.get("phase"),
-            "requestedValueGbp": request.get("amount_gbp")
-            or selected.get("value_gbp"),
-            "category": request.get("category"),
-            "allowed": authority.get("allowed"),
-            "reason": authority.get("reason"),
-            # The matrix names who *can* authorise it, which is the point.
-            "governingRuleId": authority.get("governing_rule_id"),
+            "refusedAtPhase": metadata.get("rejected_at_phase"),
+            "refusedBy": metadata.get("rejected_by"),
+            "reason": metadata.get("rejection_reason"),
         }
 
     # Every governed decision this workflow recorded, with the authority rule
