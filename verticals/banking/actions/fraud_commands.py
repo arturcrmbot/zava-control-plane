@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 from api.server.world.model import SimulationCommand, SimulationEvent
 from verticals.banking.fraud_constants import (
     FRAUD_COMMAND_TYPE,
+    FRAUD_FUNCTION,
     FRAUD_ISSUER,
     FRAUD_PSP_LIABILITY_SHARE,
     FRAUD_SUCCESS_EVENT,
@@ -190,6 +191,7 @@ def apply_reimbursement_command(
                         "holder_id": beneficiary.holder_id,
                         "holder_kind": beneficiary.holder_kind,
                         "location_id": beneficiary.location_id,
+                        "function": "financial-crime",
                     },
                 )
                 investigation.last_event_id = opened.event_id
@@ -249,6 +251,7 @@ def apply_reimbursement_command(
             "decision_id": decision_id,
             "value_gbp": option.value_gbp,
             "location_id": claim.location_id,
+            "function": FRAUD_FUNCTION,
             "mutation_records": {
                 "claim": claim.id,
                 "customer": customer.id,

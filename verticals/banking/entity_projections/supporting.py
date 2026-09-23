@@ -1,8 +1,9 @@
 """Supporting-process entity projection (mule investigation, merchant risk).
 
-Shared by both supporting workflow types. Projects only the case subject and
-the recorded decision -- these processes hold no actor-world records, so no
-world entities are claimed.
+Shared by both supporting workflow types. The store persists ``case`` from
+the spawner, ``hitl_context`` while the gate is open, and the persona
+decisions under ``decisions``. These processes hold no actor-world records,
+so no world entities are claimed.
 """
 from __future__ import annotations
 
@@ -26,6 +27,10 @@ def _json(value: Any) -> str:
 
 def _dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
+
+
+def _list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
 
 
 def project(workflow: Any) -> Generator[EntityWrite | RelWrite | DecisionWrite, None, None]:
@@ -83,30 +88,29 @@ def project(workflow: Any) -> Generator[EntityWrite | RelWrite | DecisionWrite, 
                     "type": "beneficiary",
                     "currency": "GBP",
                     "attributes": _json(
-                        {
-                            "risk_band": case.get("risk_band"),
-                            "status": "under_review",
-                        }
+                        {"risk_band": case.get("risk_band"), "status": "under_review"}
                     ),
                 },
                 source_workflows=sources,
             )
         yield RelWrite(src_id=case_id, rel="TOUCHED", dst_id=subject_id)
 
-    approval = _dict(payload.get("approval"))
-    if approval.get("decision"):
+    governing_rule = _dict(hitl.get("authority")).get("governing_rule_id")
+    decided_on = (case_id,) + ((subject_id,) if subject_id else ())
+    for entry in _list(payload.get("decisions")):
+        if not isinstance(entry, dict) or not entry.get("verdict"):
+            continue
         yield DecisionWrite(
             workflow_id=workflow_id,
-            phase=str(hitl.get("phase") or "Approve"),
-            persona_role=str(hitl.get("persona") or approval.get("persona") or ""),
-            verdict=str(approval.get("decision")),
-            reason=str(approval.get("rationale") or approval.get("reason") or ""),
-            decided_at=datetime.now(timezone.utc).isoformat(),
-            source_event=str(hitl.get("external_event") or ""),
+            phase=str(entry.get("phase") or hitl.get("phase") or "Approve"),
+            persona_role=str(entry.get("persona_role") or hitl.get("persona") or ""),
+            verdict=str(entry["verdict"]),
+            reason=str(entry.get("reason") or ""),
+            decided_at=str(entry.get("decided_at") or datetime.now(timezone.utc).isoformat()),
+            source_event=str(entry.get("source_event") or hitl.get("external_event") or ""),
             attributes={
-                "selected_option_id": approval.get("selected_option_id"),
-                "decision_id": approval.get("decision_id"),
-                "governing_rule_id": _dict(hitl.get("authority")).get("governing_rule_id"),
+                "governing_rule_id": governing_rule,
+                "decided_via": "persona",
             },
-            decided_on=(case_id,) + ((subject_id,) if subject_id else ()),
+            decided_on=decided_on,
         )

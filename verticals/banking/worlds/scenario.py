@@ -15,11 +15,17 @@ diagram:
 
 Only ``sensor.tripped`` on the fraud sensor opens an objective. Background
 loops emit ``banking.*`` events for life and never spawn work.
+
+Every world event declares the organisational ``function`` that owns the
+activity. The observatory relay forwards function-tagged world events as
+ambient activity, so the organisation visibly works even when no workflow is
+running. A world event without a function stays out of the visual stream.
 """
 from __future__ import annotations
 
 import copy
 import dataclasses
+from collections import deque
 from typing import Any
 
 from api.server.world.model import SimulationCommand, SimulationEvent
@@ -27,6 +33,7 @@ from api.server.world.runtime import SimulationRuntime
 from verticals.banking.fraud_constants import (
     FRAUD_CLAIM_BY_SCENARIO,
     FRAUD_COMMAND_TYPE,
+    FRAUD_FUNCTION,
     FRAUD_REIMBURSEMENT_CAP_GBP,
     FRAUD_SCENARIOS,
     FRAUD_SENSOR_ID,
@@ -62,6 +69,19 @@ _RAIL_TICK_MINUTES = 7
 
 _PAYMENTS_PER_TICK = 6
 _EXPOSURES_PER_TICK = 4
+_POSITIONS_PER_TICK = 3
+
+# Organisational owner of each kind of world activity.
+FUNCTION_PAYMENTS = "payments"
+FUNCTION_CREDIT = "credit-risk"
+FUNCTION_MARKETS = "markets"
+FUNCTION_FINCRIME = "financial-crime"
+
+# Bounded views keep /api/world/state small enough to poll every second. The
+# full book (2,400 customers, 3,000+ payments) stays in the world; the
+# snapshot carries counts plus the records a person can actually read.
+_RECENT_SETTLEMENTS = 24
+_TOP_POSITIONS = 12
 
 
 class ClaimObservationUnavailableError(RuntimeError):
@@ -111,6 +131,15 @@ class ZavaBankWorld:
         self.collateral_agreements: dict[str, CollateralAgreement] = {}
 
         self.claim_story_status: dict[str, str] = {}
+
+        # Running totals for the operations floor. Counters, not lists: the
+        # book is large and the snapshot is polled every second.
+        self.payments_settled_total = 0
+        self.settled_value_gbp = 0.0
+        self.positions_marked_total = 0
+        self.recent_settlements: deque[dict[str, Any]] = deque(
+            maxlen=_RECENT_SETTLEMENTS
+        )
 
         self._installed = False
         self._scenario_events: dict[str, SimulationEvent] = {}
@@ -227,9 +256,21 @@ class ZavaBankWorld:
                         "rail_id": payment.rail_id,
                         "amount_gbp": payment.amount_gbp,
                         "location_id": payment.location_id,
+                        "function": FUNCTION_PAYMENTS,
                     },
                 )
                 payment.last_event_id = event.event_id
+                self.payments_settled_total += 1
+                self.settled_value_gbp += payment.amount_gbp
+                self.recent_settlements.append(
+                    {
+                        "payment_id": payment.id,
+                        "rail_id": payment.rail_id,
+                        "amount_gbp": payment.amount_gbp,
+                        "sim_time": event.sim_time,
+                        "event_id": event.event_id,
+                    }
+                )
 
     def _rail_loop(self):
         """Publish rail throughput so the payment floor keeps breathing.
@@ -252,13 +293,19 @@ class ZavaBankWorld:
                         "in_flight_count": rail.in_flight_count,
                         "status": rail.status,
                         "location_id": rail.location_id,
+                        "function": FUNCTION_PAYMENTS,
                     },
                 )
 
     def _market_loop(self):
-        """Revalue a slice of the wholesale book on every market tick."""
+        """Revalue a slice of the wholesale book on every market tick.
+
+        Exposures revalue against their limits (Credit Risk owns that), and a
+        few trading positions are marked to market (Markets owns that).
+        """
         rng = self.runtime.rng
         exposure_ids = list(self.exposures)
+        position_ids = list(self.positions)
         while True:
             yield self.runtime.env.timeout(_MARKET_TICK_MINUTES)
             for _ in range(_EXPOSURES_PER_TICK):
@@ -283,9 +330,31 @@ class ZavaBankWorld:
                         "excess_gbp": exposure.excess_gbp,
                         "status": exposure.status,
                         "location_id": exposure.location_id,
+                        "function": FUNCTION_CREDIT,
                     },
                 )
                 exposure.last_event_id = event.event_id
+            for _ in range(_POSITIONS_PER_TICK):
+                position = self.positions[rng.choice(position_ids)]
+                move = rng.uniform(-0.04, 0.04) * position.notional_gbp
+                position.mark_to_market_gbp = round(
+                    position.mark_to_market_gbp + move, 2
+                )
+                position.version += 1
+                event = self.runtime.emit(
+                    "banking.position.marked",
+                    actor_id=position.id,
+                    target_id=position.counterparty_id,
+                    payload={
+                        "instrument": position.instrument,
+                        "notional_gbp": position.notional_gbp,
+                        "mark_to_market_gbp": position.mark_to_market_gbp,
+                        "location_id": position.location_id,
+                        "function": FUNCTION_MARKETS,
+                    },
+                )
+                position.last_event_id = event.event_id
+                self.positions_marked_total += 1
 
     # -- scenarios ---------------------------------------------------------
 
@@ -334,6 +403,7 @@ class ZavaBankWorld:
                 "location_id": claim.location_id,
                 "scenario_id": scenario_id,
                 "story_id": story_id,
+                "function": FRAUD_FUNCTION,
             },
         )
         claim.last_event_id = raised.event_id
@@ -352,6 +422,7 @@ class ZavaBankWorld:
                 "claim_id": claim.id,
                 "amount_gbp": claim.amount_gbp,
                 "source_event_id": raised.event_id,
+                "function": FRAUD_FUNCTION,
             },
         )
         self._scenario_events[scenario_id] = sensor
@@ -494,16 +565,49 @@ class ZavaBankWorld:
 
     # -- snapshot ----------------------------------------------------------
 
-    def render_state(self) -> dict[str, list[dict[str, Any]]]:
+    def render_state(self) -> dict[str, Any]:
+        """Snapshot for /api/world/state, polled every second by the floor.
+
+        The full book stays in the world. The snapshot carries counts for the
+        large collections and full records only for what a person reads:
+        the rails, the claims, the beneficiaries under review, the wholesale
+        book, the investigations. Serialising every customer and payment on
+        every poll made the snapshot 2 MB a second.
+        """
+        beneficiaries_in_play = [
+            _record_view(r)
+            for r in self.beneficiaries.values()
+            if r.status != "open"
+        ]
+        positions_by_size = sorted(
+            self.positions.values(),
+            key=lambda position: abs(position.mark_to_market_gbp),
+            reverse=True,
+        )
         return {
-            "customers": [_record_view(r) for r in self.customers.values()],
-            "accounts": [_record_view(r) for r in self.accounts.values()],
+            "bank": {
+                "customer_count": len(self.customers),
+                "vulnerable_customer_count": sum(
+                    1 for c in self.customers.values() if c.vulnerability_flag
+                ),
+                "account_count": len(self.accounts),
+                "payment_count": len(self.payments),
+                "beneficiary_count": len(self.beneficiaries),
+                "corporate_client_count": len(self.corporate_clients),
+                "position_count": len(self.positions),
+                "payments_settled_total": self.payments_settled_total,
+                "settled_value_gbp": round(self.settled_value_gbp, 2),
+                "positions_marked_total": self.positions_marked_total,
+                "positions_mtm_gbp": round(
+                    sum(p.mark_to_market_gbp for p in self.positions.values()), 2
+                ),
+            },
+            "recent_settlements": list(self.recent_settlements),
             "payment_service_providers": [
                 _record_view(r) for r in self.payment_service_providers.values()
             ],
             "payment_rails": [_record_view(r) for r in self.payment_rails.values()],
-            "payments": [_record_view(r) for r in self.payments.values()],
-            "beneficiaries": [_record_view(r) for r in self.beneficiaries.values()],
+            "beneficiaries": beneficiaries_in_play,
             "fraud_claims": [_record_view(r) for r in self.fraud_claims.values()],
             "reimbursement_commands": [
                 _record_view(r) for r in self.reimbursement_commands.values()
@@ -518,7 +622,7 @@ class ZavaBankWorld:
             "counterparties": [_record_view(r) for r in self.counterparties.values()],
             "credit_limits": [_record_view(r) for r in self.credit_limits.values()],
             "exposures": [_record_view(r) for r in self.exposures.values()],
-            "positions": [_record_view(r) for r in self.positions.values()],
+            "positions": [_record_view(r) for r in positions_by_size[:_TOP_POSITIONS]],
             "collateral_agreements": [
                 _record_view(r) for r in self.collateral_agreements.values()
             ],

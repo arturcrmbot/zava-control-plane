@@ -23,6 +23,7 @@ import asyncio
 import json
 import os
 import random
+import threading
 import time
 import time as _time
 from typing import Any
@@ -185,7 +186,77 @@ def _domain_from_workflow_type(workflow_type: str | None) -> str | None:
     return None
 
 
+def _normalise_world_activity(event: FleetEvent) -> dict[str, Any] | None:
+    """Forward a function-tagged actor-world event as ambient activity.
+
+    Actor worlds publish their journal onto the bus as ``world.<type>``.
+    Those events are organisational work that happens with no workflow
+    running — payments settling, exposures revaluing — and they are what
+    makes the organisation read as alive between cases. A world event is
+    forwarded only when its payload declares the owning ``function``; one
+    that does not stays out of the visual stream, so worlds opt in
+    explicitly and no pack vocabulary lives here.
+    """
+    data = event.model_dump()
+    simulation_event = data.get("simulation_event") or {}
+    if not isinstance(simulation_event, dict):
+        return None
+    payload = simulation_event.get("payload") or {}
+    function = payload.get("function") if isinstance(payload, dict) else None
+    if not isinstance(function, str) or not function:
+        return None
+    return {
+        "type": "world.activity",
+        "function": function,
+        "world_type": simulation_event.get("type"),
+        "actor_id": simulation_event.get("actor_id"),
+        "target_id": simulation_event.get("target_id"),
+        "count": 1,
+        "ts": time.time(),
+    }
+
+
+# World activity a viewer must see the moment it happens, uncoalesced: a
+# sensor tripping is the world raising a problem for the organisation.
+_IMMEDIATE_WORLD_TYPES: frozenset[str] = frozenset({"sensor.tripped"})
+_WORLD_ACTIVITY_WINDOW_S = 1.0
+
+
+class _WorldActivityCoalescer:
+    """Collapse routine world activity to one flash per function per window.
+
+    The observatory cap is one shared per-second bucket. A busy world emits
+    several events a second, and forwarding each would spend the budget the
+    workflow events need to move the rockets. Coalescing keeps the ambient
+    signal — which function is working, and how much — at a bounded rate,
+    with the collapsed total carried in ``count``.
+    """
+
+    def __init__(self, window_s: float = _WORLD_ACTIVITY_WINDOW_S) -> None:
+        self._window_s = window_s
+        self._last_emit: dict[str, float] = {}
+        self._pending: dict[str, int] = {}
+        self._lock = threading.Lock()
+
+    def admit(self, flash: dict[str, Any]) -> dict[str, Any] | None:
+        if flash.get("world_type") in _IMMEDIATE_WORLD_TYPES:
+            return flash
+        function = str(flash.get("function"))
+        now = _time.monotonic()
+        with self._lock:
+            pending = self._pending.get(function, 0) + 1
+            last = self._last_emit.get(function)
+            if last is not None and now - last < self._window_s:
+                self._pending[function] = pending
+                return None
+            self._last_emit[function] = now
+            self._pending[function] = 0
+        return {**flash, "count": pending}
+
+
 def _normalise_event(event: FleetEvent) -> dict[str, Any] | None:
+    if event.type.startswith("world."):
+        return _normalise_world_activity(event)
     if event.type not in _OBSERVATORY_TYPES:
         return None
 
@@ -274,11 +345,16 @@ async def blueprint_stream(request: Request) -> EventSourceResponse:
     """
     queue = _make_event_queue()
     loop = asyncio.get_running_loop()
+    coalescer = _WorldActivityCoalescer()
 
     def _push_bus_event(event: FleetEvent) -> None:
         normalised = _normalise_event(event)
         if normalised is None:
             return
+        if normalised["type"] == "world.activity":
+            normalised = coalescer.admit(normalised)
+            if normalised is None:
+                return
         if not _OBSERVATORY_CAP.allow():
             return
         try:

@@ -39,17 +39,19 @@ MCP_TOOL_PATHS = {
 PERSONAE_ROOTS = _RUNTIME.pack.personae_roots
 
 
-# Real entity-graph kinds enumerated when listing cities in entity-mode.
-# Kept in lock-step with `_NODE_TABLES` in
-# `api/server/services/entity_graph.py`. `Workflow` is included so that
-# `SUB_WORKFLOW_OF` parent-child chains surface as a first-class city in
-# the cosmic lens.
-ENTITY_KINDS: list[str] = [
+# Entity-graph kinds shown in entity-mode. The core kinds are part of every
+# vertical's organisation, so they always render. Every other node kind is
+# pack vocabulary (agency's Brand/Campaign, banking's Account, …) and renders
+# only when the active pack's graph actually holds it — otherwise a bank
+# shows an advertising agency's media plans and hides its own accounts.
+# `Workflow` is core so that `SUB_WORKFLOW_OF` parent-child chains surface as
+# a first-class city in the cosmic lens.
+CORE_ENTITY_KINDS: list[str] = [
     "Person", "Organisation", "Asset", "Money",
     "Decision", "Place", "Period", "Workflow",
-    # pitch-e1: agency-domain kinds
-    "Brand", "Campaign", "Pitch", "MediaPlan", "Subsidiary",
 ]
+# Retained name for callers that want the always-rendered set.
+ENTITY_KINDS: list[str] = CORE_ENTITY_KINDS
 
 
 router = APIRouter(prefix="/api/cities", tags=["cities"])
@@ -265,19 +267,30 @@ def _capability_meta(city_id: str) -> dict[str, Any]:
 
 
 def _gather_entity_types() -> list[dict[str, Any]]:
-    """Return cities for the 8 real entity-graph kinds with live counts."""
+    """Return entity-type cities: core kinds plus kinds present in the graph."""
     from api.server.state import app_state
     try:
         counts = app_state.entities.count_by_kind()
     except Exception:
-        counts = {k: 0 for k in ENTITY_KINDS}
-    out: list[dict[str, Any]] = []
-    for k in ENTITY_KINDS:
-        cnt = int(counts.get(k, 0))
+        counts = {k: 0 for k in CORE_ENTITY_KINDS}
+
+    def _rate(kind: str) -> float:
         try:
-            rate = float(app_state.entities.recent_activity_per_min(k))
+            return float(app_state.entities.recent_activity_per_min(kind))
         except Exception:
-            rate = 0.0
+            return 0.0
+
+    rates = {kind: _rate(kind) for kind in set(counts) | set(CORE_ENTITY_KINDS)}
+    present = sorted(
+        kind
+        for kind in counts
+        if kind not in CORE_ENTITY_KINDS
+        and (int(counts.get(kind, 0)) > 0 or rates.get(kind, 0.0) > 0.0)
+    )
+    out: list[dict[str, Any]] = []
+    for k in [*CORE_ENTITY_KINDS, *present]:
+        cnt = int(counts.get(k, 0))
+        rate = rates.get(k, 0.0)
         out.append({
             "id": k,
             "kind": "entity_type",
