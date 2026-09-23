@@ -57,7 +57,9 @@ Open both screens:
 
 Expect Payments, Credit and Markets alive with events per minute, the other
 four functions dimmed until work arrives, and the floor reading *No fraud
-claims raised*.
+claims raised*. Let the ramp open a case or two before the first story: the
+first model sessions after a cold start can fail authentication once, and
+the retry absorbs it off stage rather than on it.
 
 ## 3. The walk
 
@@ -121,9 +123,18 @@ tape holds human decisions rather than auto-closes. Check the over-delegation
 story ends in *Refused by authority*, not *Workflow failed*.
 
 Tapes are gitignored (`/tapes/`), so they live on disk and are not carried by
-a clone. `tapes/banking.tar.gz` currently holds `tape_6bb10307`; its
-over-delegation story failed on the model quota rather than reaching
-governance, so re-record before relying on it.
+a clone.
+
+### Recorded tape
+
+`tapes/banking.tar.gz` — `tape_e1752da7`, 30 minutes, 12,478 events, app SHA
+`f6028d4c`, `pack_fingerprint banking:1:3885135132db92aa`. It holds all three
+stories: the approved £18,400 claim (its first attempt, at the cold start,
+failed and was re-run after a world reset), the vulnerable claim, and the
+over-delegation refusal naming `financial_crime_lead`; 11 agent sessions, 14
+persona decisions and 10 human-gate resumes. `tapes/banking-tape2-backup.tar.gz`
+is the previous take, whose over-delegation story failed on the model quota
+before reaching governance.
 
 ## 7. What not to claim
 
@@ -134,3 +145,6 @@ governance, so re-record before relying on it.
   real institution.
 - The supporting processes hold no actor-world records, so they mutate no
   world state. Say so rather than implying they do.
+- Memory holds the seeded decision notes, but the dream pass distils no
+  lessons here: memory runs on the in-process fallback without an Azure
+  OpenAI endpoint. Do not claim learned lessons.

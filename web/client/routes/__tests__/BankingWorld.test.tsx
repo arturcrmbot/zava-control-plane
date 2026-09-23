@@ -79,6 +79,7 @@ const STATE = {
 const EVENTS = [ROUTINE, ...APPROVED_TRACE, ...APPROVED_OUTCOME, ...REFUSED_TRACE];
 
 let queue: unknown[] = [];
+let details: Record<string, unknown> = {};
 
 function renderBank(overrides: Partial<ComponentProps<typeof BankingWorld>> = {}) {
   const props = {
@@ -95,7 +96,11 @@ function renderBank(overrides: Partial<ComponentProps<typeof BankingWorld>> = {}
 
 beforeEach(() => {
   queue = [];
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(queue), { status: 200 })));
+  details = {};
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    const body = String(url).startsWith("/api/workflows/") ? details[String(url)] ?? {} : queue;
+    return new Response(JSON.stringify(body), { status: 200 });
+  }));
 });
 
 afterEach(() => {
@@ -155,7 +160,20 @@ describe("BankingWorld", () => {
   });
 
   it("counts humans in the loop from the real operator queue", async () => {
-    queue = [{ id: "exc-1", workflowId: "bapp-evt-11", summary: "Approve APP fraud reimbursement", recommendation: "Reimburse in full" }];
+    queue = [{ id: "exc-1", workflowId: "bapp-evt-11", summary: "Workflow suspended for approval: awaiting_approval", recommendation: "Awaiting Fleet Manager reasoning." }];
+    details["/api/workflows/bapp-evt-11"] = {
+      workflow: {
+        payload: {
+          hitl_context: {
+            persona: "fraud_decision_manager",
+            phase: "Decide Reimbursement",
+            selected_option: { option_id: "SYN-APP-OPTION-REIMBURSE-FULL", impact: "Reimburse the customer in full", value_gbp: 18_400 },
+            ranking: { reasoning: "The only admitted option reimburses the customer in full. It maximises recovery. A third sentence." },
+            authority: { allowed: true },
+          },
+        },
+      },
+    };
     renderBank({
       state: { ...STATE, fraud_claims: [claim("SYN-CLAIM-0031", { amount_gbp: 18_400, raised: true })], reimbursement_evaluations: [] },
       events: [ROUTINE, ...APPROVED_TRACE],
@@ -164,6 +182,14 @@ describe("BankingWorld", () => {
     expect(screen.getByTestId("decisions-waiting").textContent).toBe("1");
     expect(within(band).getByRole("link", { name: "Review & decide →" }).getAttribute("href")).toBe("/workflows/bapp-evt-11");
     expect(screen.getByTestId("claim-outcome-SYN-CLAIM-0031").textContent).toBe("Waiting for the fraud decision manager");
+    // The card says who decides and what the agents recommend, not the queue's placeholder.
+    expect(await within(band).findByText("Fraud decision manager · Decide Reimbursement")).toBeTruthy();
+    const card = within(band).getByTestId("pending-bapp-evt-11").textContent ?? "";
+    expect(card).toContain("Agents recommend: Reimburse the customer in full · £18,400");
+    expect(card).toContain("It maximises recovery.");
+    expect(card).not.toContain("A third sentence");
+    expect(card).toContain("Within delegated authority");
+    expect(card).not.toContain("Fleet Manager");
   });
 
   it("shows no decisions waiting when the queue is empty", () => {

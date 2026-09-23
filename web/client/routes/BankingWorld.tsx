@@ -295,29 +295,83 @@ function deriveClaimStory(events: WorldEvent[]): { trace: string; steps: Interve
   return { trace, steps };
 }
 
-interface PendingDecision { id: string; workflowId: string; summary?: string; recommendation?: string }
+interface DecisionContext {
+  persona?: string;
+  phase?: string;
+  impact?: string;
+  optionId?: string;
+  value?: number;
+  reasoning?: string;
+  allowed?: boolean;
+}
+interface PendingDecision { id: string; workflowId: string; summary?: string; context?: DecisionContext }
+
+function text(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+/** The gate's own context: who decides, what the agents recommend and why,
+ *  and whether it sits inside the decision-maker's delegated authority. */
+function decisionContext(detail: unknown): DecisionContext | undefined {
+  const payload = ((detail as { workflow?: { payload?: Record<string, unknown> } } | null)?.workflow?.payload ?? {}) as Record<string, unknown>;
+  const evidence = (payload.evidence ?? {}) as Record<string, unknown>;
+  const hitl = (payload.hitl_context ?? evidence.hitl_context) as Record<string, unknown> | undefined;
+  if (!hitl) return undefined;
+  const option = (hitl.selected_option ?? {}) as Record<string, unknown>;
+  const ranking = (hitl.ranking ?? {}) as Record<string, unknown>;
+  const authority = (hitl.authority ?? {}) as Record<string, unknown>;
+  const value = Number(option.value_gbp);
+  return {
+    persona: text(hitl.persona),
+    phase: text(hitl.phase),
+    impact: text(option.impact),
+    optionId: text(option.option_id),
+    value: Number.isFinite(value) ? value : undefined,
+    reasoning: text(ranking.reasoning),
+    allowed: typeof authority.allowed === "boolean" ? authority.allowed : undefined,
+  };
+}
+
+function excerpt(reasoning: string, max = 220): string {
+  const firstTwo = reasoning.split(/(?<=\.)\s+/).slice(0, 2).join(" ");
+  return firstTwo.length <= max ? firstTwo : `${firstTwo.slice(0, max - 1).replace(/\s+\S*$/, "")}…`;
+}
 
 /** The operator queue: workflows actually waiting on a human right now. */
 function usePendingDecisions(): PendingDecision[] {
   const [rows, setRows] = useState<PendingDecision[]>([]);
+  const contexts = useRef<Map<string, DecisionContext>>(new Map());
   useEffect(() => {
     let cancelled = false;
+    // Only a found context is cached: a gate whose context has not been
+    // persisted yet is looked up again on the next poll.
+    const contextFor = async (workflowId: string): Promise<DecisionContext | undefined> => {
+      const cached = contexts.current.get(workflowId);
+      if (cached) return cached;
+      try {
+        const response = await fetch(`/api/workflows/${encodeURIComponent(workflowId)}`);
+        const found = response.ok ? decisionContext(await response.json()) : undefined;
+        if (found) contexts.current.set(workflowId, found);
+        return found;
+      } catch {
+        return undefined;
+      }
+    };
     const load = async () => {
       try {
         const response = await fetch("/api/exceptions");
         if (!response.ok) return;
         const data: unknown = await response.json();
         if (cancelled || !Array.isArray(data)) return;
-        setRows(
-          data
-            .map((row: Record<string, unknown>) => ({
-              id: String(row.id ?? ""),
-              workflowId: String(row.workflowId ?? row.workflow_id ?? ""),
-              summary: typeof row.summary === "string" ? row.summary : undefined,
-              recommendation: typeof row.recommendation === "string" ? row.recommendation : undefined,
-            }))
-            .filter((row) => row.id && row.workflowId),
-        );
+        const queue = data
+          .map((row: Record<string, unknown>) => ({
+            id: String(row.id ?? ""),
+            workflowId: String(row.workflowId ?? row.workflow_id ?? ""),
+            summary: text(row.summary),
+          }))
+          .filter((row) => row.id && row.workflowId);
+        const enriched = await Promise.all(queue.map(async (row) => ({ ...row, context: await contextFor(row.workflowId) })));
+        if (!cancelled) setRows(enriched);
       } catch {
         // A transient queue failure must not blank the floor; the next poll retries.
       }
@@ -455,16 +509,32 @@ export default function BankingWorld({
           <section data-testid="pending-decisions" aria-label="Decisions waiting for a human" className="rounded-xl border border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-800 dark:bg-amber-950/30">
             <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200"><Scale size={15} className="bank-live-glow" /> Waiting for a human decision</div>
             <div className="grid gap-2 lg:grid-cols-2">
-              {pendingDecisions.map((decision) => (
-                <div key={decision.id} className="flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-white px-3 py-2 dark:border-amber-900 dark:bg-slate-900">
-                  <div className="min-w-0">
-                    <div className="font-mono text-[11px] text-slate-500">{decision.workflowId}</div>
-                    <div className="mt-0.5 text-sm font-medium text-slate-900 dark:text-white">{decision.summary ?? "Decision requested"}</div>
-                    {decision.recommendation && <div className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">Agent recommendation: {decision.recommendation}</div>}
+              {pendingDecisions.map((decision) => {
+                const context = decision.context;
+                const recommendation = context?.impact ?? (context?.optionId ? OPTION_LABELS[context.optionId] ?? context.optionId : undefined);
+                return (
+                  <div key={decision.id} data-testid={`pending-${decision.workflowId}`} className="flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-white px-3 py-2 dark:border-amber-900 dark:bg-slate-900">
+                    <div className="min-w-0">
+                      <div className="font-mono text-[11px] text-slate-500">{decision.workflowId}</div>
+                      {context?.persona ? (
+                        <>
+                          <div className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">{roleLabel(context.persona)}{context.phase ? ` · ${context.phase}` : ""}</div>
+                          {recommendation && <div className="mt-1 text-xs text-slate-700 dark:text-slate-200">Agents recommend: {recommendation}{context.value !== undefined ? ` · ${money(context.value)}` : ""}</div>}
+                          {context.reasoning && <div className="mt-1 text-xs italic text-slate-500 dark:text-slate-400">“{excerpt(context.reasoning)}”</div>}
+                          {context.allowed !== undefined && (
+                            <span className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${context.allowed ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"}`}>
+                              {context.allowed ? "Within delegated authority" : "Outside delegated authority"}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <div className="mt-0.5 text-sm font-medium text-slate-900 dark:text-white">{decision.summary ?? "Decision requested"}</div>
+                      )}
+                    </div>
+                    <a href={`/workflows/${encodeURIComponent(decision.workflowId)}`} className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">Review &amp; decide →</a>
                   </div>
-                  <a href={`/workflows/${encodeURIComponent(decision.workflowId)}`} className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">Review &amp; decide →</a>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}
