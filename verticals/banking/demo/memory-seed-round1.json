@@ -1,0 +1,12 @@
+{
+  "domain": "app-fraud-reimbursement",
+  "entries": [
+    {"role": "fraud_decision_manager", "verdict": "approve", "gate": "Decide Reimbursement", "reason": "No effective warning was shown before the payment; reimbursed in full within delegation", "signals": {"amount_gbp": 12400, "warning_shown": false, "vulnerability_flag": false}, "workflow_id": "BAPP-HIST-001"},
+    {"role": "fraud_decision_manager", "verdict": "approve", "gate": "Decide Reimbursement", "reason": "Warning shown was generic, not specific to the scam; caution does not apply, reimbursed in full", "signals": {"amount_gbp": 7900, "warning_shown": true, "specific_warning_ignored": false}, "workflow_id": "BAPP-HIST-002"},
+    {"role": "fraud_decision_manager", "verdict": "approve", "gate": "Decide Reimbursement", "reason": "Customer carries a vulnerability marker; reimbursed regardless of the ignored warning", "signals": {"amount_gbp": 3100, "vulnerability_flag": true, "specific_warning_ignored": true}, "workflow_id": "BAPP-HIST-003"},
+    {"role": "fraud_decision_manager", "verdict": "approve", "gate": "Decide Reimbursement", "reason": "Vulnerable customer; the customer-caution refusal is not available, reimbursed in full", "signals": {"amount_gbp": 5400, "vulnerability_flag": true}, "workflow_id": "BAPP-HIST-004"},
+    {"role": "fraud_decision_manager", "verdict": "reject", "gate": "Decide Reimbursement", "reason": "Customer ignored a specific scam warning twice and is not vulnerable; customer caution applies", "signals": {"amount_gbp": 2200, "specific_warning_ignored": true, "vulnerability_flag": false}, "workflow_id": "BAPP-HIST-005"},
+    {"role": "financial_crime_lead", "verdict": "approve", "gate": "Decide Reimbursement", "reason": "Above the claims manager's delegation; approved at the reimbursement cap after escalation", "signals": {"amount_gbp": 91000, "capped_gbp": 85000}, "workflow_id": "BAPP-HIST-006"},
+    {"role": "financial_crime_lead", "verdict": "approve", "gate": "Decide Reimbursement", "reason": "Escalated claim; mule network confirmed, approved at the cap", "signals": {"amount_gbp": 120000, "capped_gbp": 85000}, "workflow_id": "BAPP-HIST-007"}
+  ]
+}

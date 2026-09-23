@@ -1,0 +1,8 @@
+{
+  "domain": "app-fraud-reimbursement",
+  "entries": [
+    {"role": "fraud_decision_manager", "verdict": "approve", "gate": "Decide Reimbursement", "reason": "Receiving provider bears half of the reimbursement; recovery pursued from the beneficiary", "signals": {"amount_gbp": 16800, "recoverable_gbp": 5200}, "workflow_id": "BAPP-HIST-008"},
+    {"role": "fraud_decision_manager", "verdict": "approve", "gate": "Decide Reimbursement", "reason": "Beneficiary account is held by a corporate client; mule investigation opened alongside reimbursement", "signals": {"amount_gbp": 9800, "holder_kind": "corporate"}, "workflow_id": "BAPP-HIST-009"},
+    {"role": "financial_crime_lead", "verdict": "approve", "gate": "Decide Reimbursement", "reason": "Escalated above delegation; beneficiary frozen before approval at the cap", "signals": {"amount_gbp": 88000, "capped_gbp": 85000}, "workflow_id": "BAPP-HIST-010"}
+  ]
+}
