@@ -13,6 +13,8 @@ export interface DrawerView {
   /** function key, workflow id, city id, or entity id depending on type */
   id?: string;
   label?: string;
+  /** For a city: its kind from /api/cities ("entity_type" in entities mode). */
+  cityKind?: string;
 }
 
 interface WorkflowDrawerProps {
@@ -120,10 +122,8 @@ function DrawerContent({
   onOpenEntity?: (id: string) => void;
   flashesRef?: React.MutableRefObject<{ buffer: CosmicFlash[]; version: number }>;
 }) {
-/** Set of Kuzu entity kinds — used to decide whether a clicked city is an
- *  entity-type slot (route to EntityKindView) vs a capability node (route
- *  to the new CapabilityView). Mirrors api/server/routes/cities.py
- *  ENTITY_KINDS. */
+/** Fallback for views opened without a cityKind: the core entity kinds. A
+ *  pack's own kinds (Account, …) arrive as cityKind "entity_type". */
 const ENTITY_KIND_SET = new Set([
   "Person", "Organisation", "Asset", "Money", "Decision", "Place", "Period",
   "Workflow", "Brand", "Campaign", "Pitch", "MediaPlan", "Subsidiary",
@@ -139,7 +139,7 @@ const ENTITY_KIND_SET = new Set([
     const cityId = view.id ?? "";
     // Entity-type slot in entities mode → recent records of that kind.
     // Otherwise (capability in capabilities mode) → CapabilityView.
-    if (ENTITY_KIND_SET.has(cityId)) {
+    if (view.cityKind === "entity_type" || ENTITY_KIND_SET.has(cityId)) {
       return <CityView cityId={cityId} label={view.label} onClose={onClose}
                        onOpenEntity={onOpenEntity ?? (() => {})}
                        flashesRef={flashesRef} />;

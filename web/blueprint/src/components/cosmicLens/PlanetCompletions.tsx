@@ -16,17 +16,39 @@ interface PlanetCompletionsProps {
   functions: FunctionMeta[];
 }
 
+/** completion: a workflow finished. heartbeat: the function's world is
+ *  working (routine activity). alarm: the world raised a signal a
+ *  workflow must answer (a sensor tripped). */
+export type PulseKind = "completion" | "heartbeat" | "alarm";
+
 interface Pulse {
   id: number;
   fn: string;
+  kind: PulseKind;
   startedAt: number; // ms
   color: string;
 }
 
-const PULSE_DURATION_MS = 1600;
+const PULSE_STYLE: Record<PulseKind, { durationMs: number; growth: number; opacity: number }> = {
+  completion: { durationMs: 1600, growth: 4.0, opacity: 0.95 },
+  heartbeat: { durationMs: 1400, growth: 1.3, opacity: 0.3 },
+  alarm: { durationMs: 2600, growth: 7.0, opacity: 1.0 },
+};
 const MAX_PULSES = 24;
+/** Calm, not strobing: at most one heartbeat per planet in this window. */
+const HEARTBEAT_MIN_GAP_MS = 1800;
+const ALARM_COLOR = "#fbbf24";
+const ALARM_ECHO_DELAY_MS = 380;
 
 let _pulseCounter = 0;
+
+export function pulseKindForFlash(flash: CosmicFlash): PulseKind | null {
+  if (isCompletion(flash.type)) return "completion";
+  if (flash.type === "world.activity") {
+    return flash.world_type === "sensor.tripped" ? "alarm" : "heartbeat";
+  }
+  return null;
+}
 
 /**
  * Expanding ring on a function planet whenever one of its workflows completes.
@@ -43,6 +65,13 @@ export function PlanetCompletions({
 }: PlanetCompletionsProps) {
   const [pulses, setPulses] = useState<Pulse[]>([]);
   const lastVersion = useRef(0);
+  const lastHeartbeat = useRef<Map<string, number>>(new Map());
+  const planetKeys = useMemo(
+    () => new Set(functions.map((f) => f.name ?? f.key ?? "").filter(Boolean)),
+    [functions],
+  );
+  const planetKeysRef = useRef(planetKeys);
+  planetKeysRef.current = planetKeys;
 
   // Keep an in-memory map workflow_id → fn so completion events can resolve
   // the right planet even after the workflow has been removed from inFlight.
@@ -75,7 +104,25 @@ export function PlanetCompletions({
         const newSlice = ref.buffer.slice(Math.max(0, ref.buffer.length - delta));
         lastVersion.current = ref.version;
         for (const f of newSlice) {
-          if (!isCompletion(f.type)) continue;
+          const kind = pulseKindForFlash(f);
+          if (!kind) continue;
+          if (kind !== "completion") {
+            // World pulses land only on a planet that exists; never on the hub.
+            const fn = f.function;
+            if (!fn || !planetKeysRef.current.has(fn)) continue;
+            if (kind === "heartbeat") {
+              if (now - (lastHeartbeat.current.get(fn) ?? 0) < HEARTBEAT_MIN_GAP_MS) continue;
+              lastHeartbeat.current.set(fn, now);
+              _pulseCounter += 1;
+              added.push({ id: _pulseCounter, fn, kind, startedAt: now, color: colorForFunction(fn) });
+            } else {
+              for (const delay of [0, ALARM_ECHO_DELAY_MS]) {
+                _pulseCounter += 1;
+                added.push({ id: _pulseCounter, fn, kind, startedAt: now + delay, color: ALARM_COLOR });
+              }
+            }
+            continue;
+          }
           const wid = f.workflow_id;
           if (!wid) continue;
           const fn =
@@ -86,6 +133,7 @@ export function PlanetCompletions({
           added.push({
             id: _pulseCounter,
             fn,
+            kind,
             startedAt: now,
             color: colorForFunction(fn),
           });
@@ -93,7 +141,7 @@ export function PlanetCompletions({
       }
 
       setPulses((prev) => {
-        const live = prev.filter((p) => now - p.startedAt < PULSE_DURATION_MS);
+        const live = prev.filter((p) => now - p.startedAt < PULSE_STYLE[p.kind].durationMs);
         const next = [...live, ...added];
         if (next.length > MAX_PULSES) {
           next.splice(0, next.length - MAX_PULSES);
@@ -132,20 +180,21 @@ function PulseRing({
     const mat = matRef.current;
     if (!mesh || !mat) return;
     const now = performance.now();
-    const age = (now - pulse.startedAt) / PULSE_DURATION_MS; // 0..1
-    if (age >= 1) {
+    const style = PULSE_STYLE[pulse.kind];
+    const age = (now - pulse.startedAt) / style.durationMs; // 0..1
+    if (age < 0 || age >= 1) {
       mat.opacity = 0;
       return;
     }
     const t = state.clock.getElapsedTime();
     const planet = planetPosition(pulse.fn, functions, t);
-    const r = 0.55 + age * 4.0; // expand 0.55 → 4.55
+    const r = 0.55 + age * style.growth;
     mesh.position.set(planet[0], planet[1], planet[2]);
     mesh.scale.set(r, r, r);
     // Billboard so the ring always faces the camera as a full circle —
     // a flat horizontal torus is mostly edge-on at our oblique camera angle.
     mesh.lookAt(state.camera.position);
-    mat.opacity = 0.95 * (1 - age) ** 1.2;
+    mat.opacity = style.opacity * (1 - age) ** 1.2;
   });
 
   return (

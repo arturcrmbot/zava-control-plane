@@ -48,7 +48,13 @@ describe("ConstellationPage", () => {
     // Set up window.location.search for the page
     Object.defineProperty(window, "location", {
       writable: true,
-      value: { search: "", protocol: "http:", hostname: "localhost", port: "" },
+      value: {
+        search: "",
+        protocol: "http:",
+        hostname: "localhost",
+        port: "5275",
+        origin: "http://localhost:5275",
+      },
     });
     (global as any).EventSource = class {
       close() {}
@@ -72,6 +78,13 @@ describe("ConstellationPage", () => {
   it("does not mount the orientation overlay over the scene", () => {
     render(<ConstellationPage />);
     expect(screen.queryByTestId("story-guide")).toBeNull();
+  });
+
+  it("offers a way into the control plane without editing the URL", () => {
+    render(<ConstellationPage />);
+    const link = screen.getByTestId("open-control-plane");
+    expect(link.textContent).toContain("control plane");
+    expect(link.getAttribute("href")).toBe("http://localhost:5273/?from=constellation");
   });
 
   it("passes isReplay=true to DecisionTicker when replay", async () => {

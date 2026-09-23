@@ -12,12 +12,19 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("EntitiesPage", () => {
-  it("lists all 15 kinds in the dropdown", async () => {
+  it("lists the core kinds and every kind the graph holds", async () => {
     render(<EntitiesPage />);
     for (const k of ["Person", "Organisation", "Asset", "Money", "Decision",
                      "Place", "Period", "Workflow", "Brand", "Campaign",
-                     "Pitch", "MediaPlan", "Subsidiary", "Account", "CostCentre"]) {
+                     "Pitch", "MediaPlan", "Subsidiary"]) {
       expect(await screen.findByRole("option", { name: k })).toBeTruthy();
     }
+  });
+
+  it("hides a kind this graph holds none of", async () => {
+    render(<EntitiesPage />);
+    await screen.findByRole("option", { name: "Brand" });
+    expect(screen.queryByRole("option", { name: "Account" })).toBeNull();
+    expect(screen.queryByRole("option", { name: "CostCentre" })).toBeNull();
   });
 });

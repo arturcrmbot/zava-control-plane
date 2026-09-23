@@ -20,6 +20,7 @@ import { usePanelVisibility } from "./HUD/usePanelVisibility";
 import { planetBasePosition } from "./FunctionPlanets";
 import { RocketRegistry, TrailRegistry } from "./lib/registries";
 import { useLiveCosmic } from "./lib/useLiveCosmic";
+import { useWorldAmbience } from "./lib/worldAmbience";
 import { buildWorkflowTypeToFunction, resolveFunction, workflowTypeFromId } from "./lib/workflowFunction";
 import { VitalSignsBar } from "./HUD/VitalSignsBar";
 import { ActivityRail } from "./HUD/ActivityRail";
@@ -305,6 +306,7 @@ export function CosmicLens({ embed: _embed, source, workflowToOpen, onWorkflowOp
     }
     return counts;
   }, [live.inFlight, live.functions]);
+  const ambientByFunction = useWorldAmbience(live.flashesRef);
 
   // Throttle a "recent events / min" counter from flashesRef
   const [eventsPerMin, setEventsPerMin] = useState(0);
@@ -334,15 +336,20 @@ export function CosmicLens({ embed: _embed, source, workflowToOpen, onWorkflowOp
       const ref = live.flashesRef.current;
       const delta = ref.version - lastVersion;
       const elapsed = (Date.now() - lastSampleTs) / 1000;
-      if (elapsed > 0) {
-        setEventsPerMin((delta / elapsed) * 60);
-      }
-      // Count NEW step-completion events in the buffer. Many workflows
+      // Step-completion events are counted below. Many workflows
       // park indefinitely at HITL gates so workflow-level completions can
       // be rare; step completions are a more honest "is the system doing
       // work right now" signal.
       const buffer = ref.buffer;
       const newSlice = buffer.slice(Math.max(0, buffer.length - delta));
+      if (elapsed > 0) {
+        // A world.activity flash stands for `count` coalesced world events.
+        let events = Math.max(0, delta - newSlice.length);
+        for (const f of newSlice) {
+          events += f.type === "world.activity" ? Math.max(1, f.count ?? 1) : 1;
+        }
+        setEventsPerMin((events / elapsed) * 60);
+      }
       let completedDelta = 0;
       for (const f of newSlice) {
         if (
@@ -419,6 +426,7 @@ export function CosmicLens({ embed: _embed, source, workflowToOpen, onWorkflowOp
           <FunctionPlanets
             functions={live.functions}
             loadByFunction={loadByFunction}
+            ambientByFunction={ambientByFunction}
             onFunctionClick={(key, label) => {
               // Zoom to the planet AND open the function drawer (workflow list).
               // Drawer makes sense here since planets are the main filter axis.
@@ -441,7 +449,8 @@ export function CosmicLens({ embed: _embed, source, workflowToOpen, onWorkflowOp
               // parked there, etc.
               const [x, y, z] = cityPosition(id);
               setFocus({ target: [x, y + 0.4, z], distance: 4.0 });
-              setDrawer({ type: "city", id, label: lbl });
+              const cityKind = live.cities.find((c) => c.id === id)?.kind;
+              setDrawer({ type: "city", id, label: lbl, cityKind });
             }}
           />
           <EntityEdges cities={live.cities} visible={live.mode === "entities"} />

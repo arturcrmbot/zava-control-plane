@@ -17,16 +17,35 @@ import { DecisionTicker } from "../components/cosmicLens/HUD/DecisionTicker";
 import { PolicyRipple } from "../components/cosmicLens/HUD/PolicyRipple";
 import { Narrator } from "../components/cosmicLens/HUD/Narrator";
 import { useReplayMode } from "../lib/useReplayMode";
+import { getDemoUrl } from "../lib/useDemoUrl";
 import type { GuidedJourney } from "../components/cosmicLens/HUD/guidedJourney";
 
-// Operator console (web/client) lives on port 5273 in dev/preview. When the
-// constellation is opened from the operator console (?from=fleet), the back
-// link navigates back there instead of to the editorial blueprint page.
-function fleetUrl(): string {
-  if (typeof window === "undefined") return "/";
-  const { protocol, hostname, port } = window.location;
-  if (port === "5275") return `${protocol}//${hostname}:5273/`;
-  return "/";
+const NAV_LINK_STYLE = {
+  color: "#e2e8f0",
+  fontSize: 12,
+  fontFamily: "ui-sans-serif, system-ui",
+  textDecoration: "none",
+  padding: "6px 12px",
+  borderRadius: 999,
+  border: "1px solid rgba(148, 163, 184, 0.35)",
+  background: "rgba(15, 23, 42, 0.72)",
+} as const;
+const SECONDARY_LINK_STYLE = {
+  color: "rgba(148, 163, 184, 0.7)",
+  fontSize: 12,
+  fontFamily: "ui-sans-serif, system-ui",
+  textDecoration: "none",
+} as const;
+
+/** The operator console owns the control plane. getDemoUrl resolves it
+ *  locally (:5275 → :5273) and when deployed; a malformed configured URL
+ *  must not take the whole constellation down with it. */
+function controlPlaneHref(): string {
+  try {
+    return getDemoUrl("constellation");
+  } catch {
+    return "/";
+  }
 }
 
 export function ConstellationPage() {
@@ -69,22 +88,28 @@ export function ConstellationPage() {
         />
       )}
       {!embed && (
-        <div
+        <nav
           className="constellation-page__return"
-          style={{ position: "absolute", bottom: 16, left: 16, zIndex: 10 }}
+          aria-label="Views"
+          style={{
+            position: "absolute",
+            bottom: 16,
+            left: 16,
+            zIndex: 10,
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+          }}
         >
-          <a
-            href={fromFleet ? fleetUrl() : "/"}
-            style={{
-              color: "rgba(148, 163, 184, 0.7)",
-              fontSize: 12,
-              fontFamily: "ui-sans-serif, system-ui",
-              textDecoration: "none",
-            }}
-          >
-            {fromFleet ? "← back to fleet" : "← back to blueprint"}
+          <a href={controlPlaneHref()} data-testid="open-control-plane" style={NAV_LINK_STYLE}>
+            {fromFleet ? "← back to control plane" : "Open control plane →"}
           </a>
-        </div>
+          {!fromFleet && (
+            <a href="/" style={SECONDARY_LINK_STYLE}>
+              blueprint
+            </a>
+          )}
+        </nav>
       )}
     </div>
   );

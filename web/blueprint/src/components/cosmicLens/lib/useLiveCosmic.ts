@@ -208,6 +208,10 @@ export function useLiveCosmic(): UseLiveCosmicResult {
             skill: data.skill,
             tool: data.tool,
             executor_type: data.executor_type,
+            world_type: data.world_type,
+            count: typeof data.count === "number" ? data.count : undefined,
+            actor_id: data.actor_id,
+            target_id: data.target_id,
           };
           const ref = flashesRef.current;
           ref.buffer.push(flash);

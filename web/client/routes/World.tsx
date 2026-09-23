@@ -18,6 +18,7 @@ import { deriveCommonIntervention, type InterventionStep } from "@client/lib/wor
 import { useRuntimeManifest } from "@client/hooks/useRuntimeManifest";
 import { useWorldScene } from "@client/hooks/useWorldScene";
 import TelcoWorld from "@client/routes/TelcoWorld";
+import BankingWorld from "@client/routes/BankingWorld";
 import RegisteredSpatialWorld from "@client/components/world/SpatialWorld";
 import EmbeddedSpatialWorld from "@client/routes/SpatialWorld";
 import type { RuntimeDomain, WorldSceneMetadata } from "@shared/runtime";
@@ -75,6 +76,7 @@ export default function World() {
   return (
     <ActiveWorld
       telco={manifest.ui.lenses.includes("telco-network")}
+      banking={manifest.ui.lenses.includes("bank-operations")}
       embeddedScene={typeof scene === "object" ? scene : undefined}
       spatial={scene === true}
       domains={manifest.domains ?? []}
@@ -84,11 +86,13 @@ export default function World() {
 
 function ActiveWorld({
   telco,
+  banking,
   embeddedScene,
   spatial,
   domains,
 }: {
   telco: boolean;
+  banking: boolean;
   embeddedScene?: WorldSceneMetadata;
   spatial: boolean;
   domains: RuntimeDomain[];
@@ -204,6 +208,19 @@ function ActiveWorld({
       <div data-testid="world-loading" role="status">
         {loading ? "Loading world…" : error ?? "No world snapshot available."}
       </div>
+    );
+  }
+
+  if (banking) {
+    return (
+      <BankingWorld
+        state={state}
+        events={events}
+        loading={loading}
+        error={error}
+        onRunScenario={runScenario}
+        onRunProcess={runReferenceProcess}
+      />
     );
   }
 

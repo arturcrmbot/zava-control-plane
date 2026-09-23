@@ -113,6 +113,12 @@ export interface CosmicFlash {
   executor_type?: string; // "tool" | "skill" | "validator" | "agent" | "deterministic"
   // Used by rocketRegistry to compute target city
   target_city_id?: string;
+  // Carried by `world.activity`: the underlying world event type and how
+  // many world events the relay coalesced into this one flash.
+  world_type?: string;
+  count?: number;
+  actor_id?: string;
+  target_id?: string;
 }
 
 /** A rocket as managed by rocketRegistry — one per in-flight workflow. */

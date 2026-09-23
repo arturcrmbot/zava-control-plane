@@ -19,6 +19,9 @@ interface FunctionPlanetsProps {
   functions: FunctionMeta[];
   /** workflow_id-prefix → function key counts (for sizing planets by load). */
   loadByFunction?: Map<string, number>;
+  /** function key → world events per minute. A function running the
+   *  business with no case in flight is live, not idle. */
+  ambientByFunction?: Map<string, number>;
   onFunctionClick?: (key: string, label: string) => void;
 }
 
@@ -135,7 +138,7 @@ function Planet({
           horizontal streak is the cinematic 'lens artifact' you see on
           bright spacecraft / planets in J.J. Abrams Star Trek and Mass
           Effect. Skipped entirely on idle so the dim planets stay calm. */}
-      {!idle && (
+      {!idle && load > 0 && (
         <AnamorphicFlare
           color={color}
           intensity={Math.min(0.55, 0.18 + load / 80)}
@@ -167,7 +170,7 @@ function Planet({
  * — gives the system a 'drifting' feel without changing the API-known
  * positions used for rocket aim and moon resolution.
  */
-export function FunctionPlanets({ functions, loadByFunction, onFunctionClick }: FunctionPlanetsProps) {
+export function FunctionPlanets({ functions, loadByFunction, ambientByFunction, onFunctionClick }: FunctionPlanetsProps) {
   const visible = functions.filter((f) => fnKey(f));
   // v1.2 Spec §9 polish (e): tint each planet with its senior persona's hue
   // (Finance blue, HR rose, Procurement gold, Tech teal, Creative violet,
@@ -192,7 +195,8 @@ export function FunctionPlanets({ functions, loadByFunction, onFunctionClick }: 
         const z = Math.sin(angle) * ORBIT_RADIUS;
         const color = planetColor(fn, personaHues);
         const load = loadByFunction?.get(k) ?? 0;
-        const idle = load === 0;
+        const ambient = ambientByFunction?.get(k) ?? 0;
+        const idle = load === 0 && ambient === 0;
         const planetScale = idle ? 0.7 : 1.0;
         const labelText = (fn.display ?? fn.label ?? k).toUpperCase();
         return (
@@ -235,6 +239,14 @@ export function FunctionPlanets({ functions, loadByFunction, onFunctionClick }: 
               {load > 0 && (
                 <span style={{ color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}>
                   · {load}
+                </span>
+              )}
+              {ambient > 0 && (
+                <span
+                  data-testid={`fn-${k}-ambient`}
+                  style={{ color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}
+                >
+                  · {ambient}{load > 0 ? "/min" : " events/min"}
                 </span>
               )}
               {idle && (

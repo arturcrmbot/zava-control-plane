@@ -21,6 +21,11 @@ const KINDS = [
   "Account", "CostCentre", "Insight",
 ] as const;
 type Kind = (typeof KINDS)[number];
+// Always offered; any other kind appears only once this vertical's graph
+// holds it, so one pack's vocabulary never shows up empty in another's.
+const CORE_KINDS: ReadonlySet<string> = new Set([
+  "Person", "Organisation", "Asset", "Money", "Decision", "Place", "Period", "Workflow",
+]);
 
 // Palette per kind — saturated mid-tones that read on light + dark.
 const KIND_COLOR: Record<string, string> = {
@@ -190,6 +195,10 @@ export default function Knowledge() {
     () => Object.values(kindCounts).reduce((a, b) => a + (b ?? 0), 0),
     [kindCounts],
   );
+  const visibleKinds = useMemo(
+    () => KINDS.filter((k) => CORE_KINDS.has(k) || (kindCounts[k] ?? 0) > 0 || k === kindFilter),
+    [kindCounts, kindFilter],
+  );
   const [relationshipQuery, setRelationshipQuery] = useState("");
   const relationshipRows = useMemo(() => {
     const query = relationshipQuery.trim().toLowerCase();
@@ -237,7 +246,7 @@ export default function Knowledge() {
             <h2 className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500 px-1 mr-1">
               Kind
             </h2>
-            {KINDS.map((k) => {
+            {visibleKinds.map((k) => {
               const c = kindCounts[k] ?? 0;
               const active = k === kindFilter;
               return (

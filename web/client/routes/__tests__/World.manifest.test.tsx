@@ -21,6 +21,9 @@ vi.mock("@client/hooks/useWorldScene", () => ({
 vi.mock("@client/routes/TelcoWorld", () => ({
   default: () => <div data-testid="telco-world-route" />,
 }));
+vi.mock("@client/routes/BankingWorld", () => ({
+  default: () => <div data-testid="banking-world-route" />,
+}));
 vi.mock("@client/components/world/SpatialWorld", () => ({
   default: () => <div data-testid="spatial-world-route" />,
 }));
@@ -46,6 +49,9 @@ beforeEach(() => {
     error: null,
     injectSurge: vi.fn(),
     injectSiteFailure: vi.fn(),
+    runScenario: vi.fn(),
+    runReferenceProcess: vi.fn(),
+    resetWorld: vi.fn(),
   });
 });
 afterEach(() => {
@@ -85,6 +91,32 @@ describe("World runtime manifest routing", () => {
     render(<World />);
 
     expect(screen.getByTestId("telco-world-route")).toBeTruthy();
+  });
+
+  it("uses the bank operations lens before a declared world scene", () => {
+    mockRuntime.mockReturnValue({
+      loading: false,
+      error: null,
+      manifest: {
+        vertical: { display_name: "Banking" },
+        world: "banking",
+        ui: {
+          lenses: ["bank-operations", "process-library", "control"],
+          world_scene: {
+            version: "1",
+            title: "Banking scene",
+            locations: [{ id: "hub", label: "Hub", x: 0.5, y: 0.5 }],
+            actor_bindings: [],
+            event_mappings: [],
+          },
+        },
+      },
+    });
+
+    render(<World />);
+
+    expect(screen.getByTestId("banking-world-route")).toBeTruthy();
+    expect(screen.queryByTestId("spatial-world-route")).toBeNull();
   });
 
   it("keeps a legacy world usable when the optional scene request fails", () => {

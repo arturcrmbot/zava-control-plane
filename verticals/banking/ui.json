@@ -1,6 +1,6 @@
 {
   "capabilities": ["blueprint", "world", "memory", "knowledge"],
-  "lenses": ["process-library", "customer-impact", "control"],
+  "lenses": ["bank-operations", "process-library", "customer-impact", "control"],
   "theme": {
     "accent": "#1d4ed8",
     "label": "Zava Bank",

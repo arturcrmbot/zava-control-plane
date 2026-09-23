@@ -6,6 +6,7 @@ KNOWN_CAPABILITIES = frozenset(
 KNOWN_LENSES = frozenset(
     {
         "agency-operations",
+        "bank-operations",
         "telco-network",
         "customer-impact",
         "field-operations",

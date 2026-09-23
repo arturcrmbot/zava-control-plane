@@ -13,10 +13,8 @@
 
 import { useEffect, useState } from "react";
 
-// All 15 entity kinds. Phase 2 added Account/CostCentre; Phase 3 promoted
-// Brand/Campaign/Pitch/MediaPlan/Subsidiary to first-class. Workflow is
-// included so the operator can browse the workflow timeline alongside
-// the entity tables.
+// Every kind the graph can hold. Workflow is included so the operator can
+// browse the workflow timeline alongside the entity tables.
 const KINDS = [
   "Person","Organisation","Asset","Money","Decision","Place","Period",
   "Workflow","Brand","Campaign","Pitch","MediaPlan","Subsidiary",
@@ -24,6 +22,16 @@ const KINDS = [
 ] as const;
 
 type Kind = (typeof KINDS)[number];
+
+// Always shown; any other kind appears only once this vertical's graph holds
+// it, so one pack's vocabulary never shows up empty in another's.
+const CORE_KINDS: ReadonlySet<string> = new Set([
+  "Person","Organisation","Asset","Money","Decision","Place","Period","Workflow",
+]);
+
+export function visibleKinds(counts: Record<string, number>, selected?: string): Kind[] {
+  return KINDS.filter((k) => CORE_KINDS.has(k) || (counts[k] ?? 0) > 0 || k === selected);
+}
 
 // Entity rows come from Kuzu in snake_case (see entities.py docstring).
 type EntityRow = {
@@ -117,6 +125,7 @@ export function EntitiesPage() {
   }, [selectedKind]);
 
   const counts = stats?.counts ?? {};
+  const kinds = visibleKinds(counts, selectedKind);
   const recentLinks = (stats?.recentLinks ?? []).slice(0, 20);
 
   return (
@@ -135,7 +144,7 @@ export function EntitiesPage() {
             <div className="entities-page__error">stats unavailable: {statsError}</div>
           )}
           <div className="entities-page__tiles">
-            {KINDS.map((k) => (
+            {kinds.map((k) => (
               <div className="entities-page__tile" key={k}>
                 <div className="entities-page__tile-kind">{k}</div>
                 <div className="entities-page__tile-count">
@@ -156,7 +165,7 @@ export function EntitiesPage() {
                 value={selectedKind}
                 onChange={(e) => setSelectedKind(e.target.value as Kind)}
               >
-                {KINDS.map((k) => (
+                {kinds.map((k) => (
                   <option key={k} value={k}>
                     {k}
                   </option>
