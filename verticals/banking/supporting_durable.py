@@ -58,9 +58,11 @@ _SKILL_ROOT = Path(__file__).resolve().parent / "skills"
 _TOOLS = [banking_read_case_evidence, banking_rank_admitted_case_options]
 # A model session can fail transiently (a session-auth blip, a rate limit).
 # The agent activity only reads evidence and ranks options, so re-running it
-# is safe, and each attempt is recorded in the orchestration history.
+# is safe, and each attempt is recorded in the orchestration history. Each
+# attempt already retries a hung session internally, so two attempts keep
+# the worst case inside the world bridge's wait.
 _AGENT_RETRY = df.RetryOptions(
-    first_retry_interval_in_milliseconds=10_000, max_number_of_attempts=3
+    first_retry_interval_in_milliseconds=10_000, max_number_of_attempts=2
 )
 
 _RANKING_KEYS = frozenset({

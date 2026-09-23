@@ -75,9 +75,11 @@ _TOOLS = [banking_read_claim_evidence, banking_rank_admitted_claim_options]
 # A model session can fail transiently (a session-auth blip, a rate limit).
 # The agent activity only reads evidence and ranks options — the world is
 # mutated by the separate command activity — so re-running it is safe, and
-# each attempt is recorded in the orchestration history.
+# each attempt is recorded in the orchestration history. Each attempt already
+# retries a hung session internally (_AGENT_MAX_ATTEMPTS x 150 s), so two
+# attempts keep the worst case (~10 min) inside the world bridge's 900 s wait.
 _AGENT_RETRY = df.RetryOptions(
-    first_retry_interval_in_milliseconds=10_000, max_number_of_attempts=3
+    first_retry_interval_in_milliseconds=10_000, max_number_of_attempts=2
 )
 
 _RANKING_KEYS = frozenset({
@@ -779,11 +781,12 @@ def fraud_orchestration(
         # was refused *at the decision* by the authority matrix, rather than
         # appearing to have failed in the preceding agent phase.
         rule_id = authority.get("governing_rule_id") or "no matching rule"
+        why = authority.get("reason") or "governance denied"
         denial = _denied(
             f"{HITL_PERSONA} is not authorised to approve "
             f"GBP {float(selected_option['value_gbp']):,.2f} for "
-            f"{HITL_CATEGORY}: {authority.get('reason') or 'governance denied'} "
-            f"(matched rule {rule_id})"
+            f"{HITL_CATEGORY}: {why}"
+            + ("" if rule_id in why else f" (matched rule {rule_id})")
         )
         yield checkpoint(
             "workflow.completed",

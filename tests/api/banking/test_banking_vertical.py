@@ -190,7 +190,7 @@ class _RecordingContext:
         return name
 
 
-def _run_to_refusal() -> tuple[dict, _RecordingContext]:
+def _run_to_refusal(reason: str = "value exceeds delegated authority") -> tuple[dict, _RecordingContext]:
     from verticals.banking.fraud_durable import fraud_orchestration
 
     context = _RecordingContext({"workflow_id": "BAPP-test-refusal"})
@@ -202,7 +202,7 @@ def _run_to_refusal() -> tuple[dict, _RecordingContext]:
         "fraud_agent_activity_trigger": {"ranked_option_ids": [OPTION_REIMBURSE_CAPPED]},
         "fraud_governance_activity_trigger": {
             "allowed": False,
-            "reason": "value exceeds delegated authority",
+            "reason": reason,
             "governing_rule_id": "AUTH-financial_crime_lead-banking.commit_reimbursement_decision",
         },
     }
@@ -221,6 +221,12 @@ def test_a_refusal_reaches_the_world_bridge_with_its_reason() -> None:
     # world records responder.deferred with this text instead of a failure.
     assert output["command"] is None
     assert "AUTH-financial_crime_lead" in output["reasoning"]
+
+
+def test_the_governing_rule_is_named_once() -> None:
+    rule = "AUTH-financial_crime_lead-banking.commit_reimbursement_decision"
+    output, _ = _run_to_refusal(f"matched rule {rule} requires 'financial_crime_lead'")
+    assert output["reasoning"].count(rule) == 1
 
 
 def test_agent_work_is_retried_but_governance_is_not() -> None:

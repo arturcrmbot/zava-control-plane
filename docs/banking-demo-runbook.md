@@ -27,7 +27,8 @@ other Copilot use of that account counts against the same limit.
   start at once.
 - **Symptom of exhaustion**: a claim card reads `Workflow failed · …` and the
   Durable history says *"rate limit … try again in N minutes"*. The agent
-  activity retries three times, 10 s apart; that absorbs a blip, not a limit.
+  activity is retried once after 10 s, and each attempt already retries a hung
+  session internally; that absorbs a blip, not a limit.
   Switch the constellation to the tape (section 5).
 
 ## 2. Boot (T-30 minutes)
