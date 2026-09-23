@@ -1,0 +1,12 @@
+{
+  "domain": "app-fraud-reimbursement",
+  "entries": [
+    {"role":"fraud_decision_manager","verdict":"approve","gate":"reimbursement_decision","reason":"within delegation; traced beneficiary retained recoverable balance","signals":{"claim_value_gbp":12400,"recoverable_gbp":5100,"vulnerability":0},"workflow_id":"SYN-MEM-CLAIM-001"},
+    {"role":"fraud_decision_manager","verdict":"approve","gate":"reimbursement_decision","reason":"within delegation; no tailored warning evidence against the customer","signals":{"claim_value_gbp":8300,"recoverable_gbp":2200,"vulnerability":0},"workflow_id":"SYN-MEM-CLAIM-002"},
+    {"role":"fraud_decision_manager","verdict":"approve","gate":"reimbursement_decision","reason":"vulnerability marker present; refusal never admitted","signals":{"claim_value_gbp":4100,"recoverable_gbp":900,"vulnerability":1},"workflow_id":"SYN-MEM-CLAIM-003"},
+    {"role":"fraud_decision_manager","verdict":"escalate","gate":"reimbursement_decision","reason":"capped value above claims delegation; matrix names financial_crime_lead","signals":{"claim_value_gbp":85000,"recoverable_gbp":11400,"vulnerability":0},"workflow_id":"SYN-MEM-CLAIM-004"},
+    {"role":"fraud_decision_manager","verdict":"escalate","gate":"reimbursement_decision","reason":"capped value above claims delegation","signals":{"claim_value_gbp":85000,"recoverable_gbp":6200,"vulnerability":0},"workflow_id":"SYN-MEM-CLAIM-005"},
+    {"role":"financial_crime_lead","verdict":"approve","gate":"account_disposition","reason":"beneficiary linked to multiple claims; restrain and preserve balance","signals":{"linked_claims":4,"risk_band":3},"workflow_id":"SYN-MEM-MULE-101"},
+    {"role":"financial_crime_lead","verdict":"approve","gate":"account_disposition","reason":"single linked claim at low risk; enhanced monitoring sufficient","signals":{"linked_claims":1,"risk_band":1},"workflow_id":"SYN-MEM-MULE-102"}
+  ]
+}

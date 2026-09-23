@@ -763,11 +763,47 @@ def fraud_orchestration(
         },
     )
     if not authority.get("allowed"):
+        # Persist the refusal the same way a raised gate persists its
+        # context, so the surfaces can explain *why* the workflow stopped.
+        # Without this the single clearest governance moment renders as an
+        # unexplained failure at the preceding phase.
+        refusal_context = {
+            "workflow_id": workflow_id,
+            "instance_id": instance_id,
+            "workflow_type": WORKFLOW_TYPE,
+            "story_id": evidence["story_id"],
+            "claim_id": evidence["claim_id"],
+            "persona": HITL_PERSONA,
+            "external_event": HITL_EVENT,
+            "phase": _HITL_PHASE,
+            "action": COMMAND_TYPE,
+            "request": {
+                "amount_gbp": selected_option["value_gbp"],
+                "category": HITL_CATEGORY,
+            },
+            "observation": evidence["observation"],
+            "selected_option": selected_option,
+            "selected_option_id": selected_option_id,
+            "admitted_options": admitted_options,
+            "rejected_options": admission["rejected_options"],
+            "evidence_versions": evidence["evidence_versions"],
+            "authority": authority,
+            "governance_refusal": True,
+        }
         denial = _denied(
             f"{HITL_PERSONA} is not authorised for this value: "
             f"{authority.get('reason') or 'governance denied'}"
         )
-        yield terminal_checkpoint(denial)
+        yield checkpoint(
+            "workflow.completed",
+            {
+                "status": denial["status"],
+                "reason": denial["reason"],
+                "phase": _HITL_PHASE,
+                "context": refusal_context,
+                "hitl_context": refusal_context,
+            },
+        )
         return denial
 
     # --- Phase 4 (HITL) ---

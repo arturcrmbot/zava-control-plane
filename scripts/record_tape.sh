@@ -127,6 +127,12 @@ seed_memories() {
 
   # Round 1: seed batch (will be consumed by the explicit dream pass)
   echo "[record_tape] seeding round 1 memories (for consolidation)..."
+  if [[ -n "${MEMORY_SEED_ROUND1:-}" ]]; then
+    curl -s -X POST http://localhost:3101/api/memory/v2/seed-demo \
+      -H "content-type: application/json" \
+      --data @"${MEMORY_SEED_ROUND1}" 2>&1 | head -1
+    echo ""
+  else
   curl -s -X POST http://localhost:3101/api/memory/v2/seed-demo \
     -H "content-type: application/json" \
     -d '{
@@ -142,16 +148,23 @@ seed_memories() {
       ]
     }' 2>&1 | head -1
   echo ""
+  fi
 
   # Trigger one explicit dream pass to produce lessons
   sleep 2
   echo "[record_tape] triggering dream pass..."
-  curl -s -X POST "http://localhost:3101/api/dream-pass/run?domain=hiring" 2>&1 | head -1
+  curl -s -X POST "http://localhost:3101/api/dream-pass/run?domain=${MEMORY_DOMAINS}" 2>&1 | head -1
   echo ""
 
   # Round 2: fresh working notes that the consolidator hasn't eaten
   sleep 3
   echo "[record_tape] seeding round 2 memories (fresh working notes)..."
+  if [[ -n "${MEMORY_SEED_ROUND2:-}" ]]; then
+    curl -s -X POST http://localhost:3101/api/memory/v2/seed-demo \
+      -H "content-type: application/json" \
+      --data @"${MEMORY_SEED_ROUND2}" 2>&1 | head -1
+    echo ""
+  else
   curl -s -X POST http://localhost:3101/api/memory/v2/seed-demo \
     -H "content-type: application/json" \
     -d '{
@@ -163,6 +176,7 @@ seed_memories() {
       ]
     }' 2>&1 | head -1
   echo ""
+  fi
 }
 seed_memories &
 

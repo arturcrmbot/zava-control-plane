@@ -1,0 +1,8 @@
+{
+  "domain": "app-fraud-reimbursement",
+  "entries": [
+    {"role":"fraud_decision_manager","verdict":"approve","gate":"reimbursement_decision","reason":"live claim within delegation; receiving provider share raised","signals":{"claim_value_gbp":18400,"recoverable_gbp":6100,"vulnerability":0},"workflow_id":"SYN-MEM-CLAIM-LIVE-1"},
+    {"role":"vulnerable_customer_specialist","verdict":"approve","gate":"vulnerability_determination","reason":"marker confirmed on the evidence supplied; refusal unavailable downstream","signals":{"vulnerability":1},"workflow_id":"SYN-MEM-CLAIM-LIVE-2"},
+    {"role":"payments_operations_lead","verdict":"escalate","gate":"merchant_onboarding","reason":"high risk band with permissive terms not admitted","signals":{"risk_band":3,"monthly_volume_gbp":640000},"workflow_id":"SYN-MEM-MER-LIVE-1"}
+  ]
+}
