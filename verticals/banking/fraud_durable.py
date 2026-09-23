@@ -490,6 +490,8 @@ def _corrective_prompt(
 
 
 async def _run_claim_agent(payload: dict[str, Any]) -> dict[str, Any]:
+    from api.functions.graphs.executors.agents.runtime import RequiredToolsNotCalledError
+
     session_kwargs: dict[str, Any] = dict(
         tools=list(_TOOLS),
         required_tool_names=[tool.name for tool in _TOOLS],
@@ -516,6 +518,15 @@ async def _run_claim_agent(payload: dict[str, Any]) -> dict[str, Any]:
             prompt = _corrective_prompt(
                 original_prompt,
                 reason="The prior attempt timed out before producing tool evidence.",
+            )
+            continue
+        except RequiredToolsNotCalledError:
+            # The runtime refused an answer given before the evidence was read.
+            if attempt + 1 == _AGENT_MAX_ATTEMPTS:
+                raise
+            prompt = _corrective_prompt(
+                original_prompt,
+                reason="The prior attempt answered before calling the required tools.",
             )
             continue
         if _no_tool_evidence(result) and attempt + 1 < _AGENT_MAX_ATTEMPTS:

@@ -237,6 +237,32 @@ def test_agent_work_is_retried_but_governance_is_not() -> None:
     assert retried == {"fraud_agent_activity_trigger"}
 
 
+def test_an_answer_given_before_the_evidence_is_corrected_not_fatal(monkeypatch) -> None:
+    import asyncio
+
+    from api.functions.graphs.executors.agents.runtime import RequiredToolsNotCalledError
+    from verticals.banking import fraud_durable
+
+    assert issubclass(RequiredToolsNotCalledError, RuntimeError)
+    prompts: list[str] = []
+
+    async def session(prompt: str, **_: object) -> dict:
+        prompts.append(prompt)
+        if len(prompts) == 1:
+            raise RequiredToolsNotCalledError("answered before reading the evidence")
+        return {"ranked": True}
+
+    monkeypatch.setattr(fraud_durable, "run_agent_session", session)
+    monkeypatch.setattr(fraud_durable, "_agent_prompt", lambda payload: "Rank the admitted options.")
+    monkeypatch.setattr(fraud_durable, "_no_tool_evidence", lambda result: False)
+    monkeypatch.setattr(fraud_durable, "_has_failed_declared_tool_evidence", lambda result: False)
+    monkeypatch.setattr(fraud_durable, "_validate_agent_output", lambda payload, result: result)
+
+    assert asyncio.run(fraud_durable._run_claim_agent({"workflow_id": "BAPP-x"})) == {"ranked": True}
+    assert len(prompts) == 2
+    assert "CORRECTION" in prompts[1] and "required tools" in prompts[1]
+
+
 # --- Projections read the shape the store persists ----------------------------------
 
 

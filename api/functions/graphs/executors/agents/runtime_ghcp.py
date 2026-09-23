@@ -14,7 +14,11 @@ from copilot.client import SubprocessConfig
 from copilot.generated.session_events import SessionEventType
 from copilot.session import PermissionHandler
 
-from api.functions.graphs.executors.agents.runtime import LLMRuntimeResult, validate_required_tool_names
+from api.functions.graphs.executors.agents.runtime import (
+    LLMRuntimeResult,
+    RequiredToolsNotCalledError,
+    validate_required_tool_names,
+)
 
 
 _gh_token_cache: str | None = None
@@ -104,7 +108,7 @@ class GHCPRuntime:
 
         missing_required = [name for name in required_names if name not in successful_tools]
         if missing_required:
-            raise RuntimeError(
+            raise RequiredToolsNotCalledError(
                 "GHCP returned a final response before required tools succeeded: "
                 f"{missing_required}"
             )

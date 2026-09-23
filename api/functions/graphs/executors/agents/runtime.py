@@ -22,6 +22,14 @@ from typing import Any, Callable, Protocol, runtime_checkable
 from pydantic import BaseModel
 
 
+class RequiredToolsNotCalledError(RuntimeError):
+    """The model gave its final answer before every required tool succeeded.
+
+    Distinct from a transport or session failure: a caller can retry with a
+    corrective prompt rather than treat the run as broken.
+    """
+
+
 class LLMRuntimeResult(BaseModel):
     """Return value of `LLMRuntime.run_session`. The shape `_wrapper.py`
     already produces; lifted to its own model so multiple runtimes can
