@@ -23,12 +23,25 @@ def _repo_root() -> Path:
     raise DreamSkillLoadError('repository root not found while resolving dream skill path')
 
 
+def _active_pack_root() -> Path | None:
+    try:
+        from api.shared.vertical_loader import active_runtime
+
+        return Path(active_runtime().pack.root)
+    except Exception:
+        return None
+
+
 def dream_skill_path(domain: str) -> Path:
     root = _repo_root()
     candidates = [
         root / 'api' / 'server' / 'skills' / 'dream-passes' / domain / 'SKILL.md',
         root / 'skills' / 'dream-passes' / domain / 'SKILL.md',
     ]
+    # A pack owns the dream skill for its own domains.
+    pack_root = _active_pack_root()
+    if pack_root is not None:
+        candidates.insert(0, pack_root / 'dream-passes' / domain / 'SKILL.md')
     for candidate in candidates:
         if candidate.is_file():
             return candidate

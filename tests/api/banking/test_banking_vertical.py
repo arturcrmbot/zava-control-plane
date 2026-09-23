@@ -422,6 +422,21 @@ def test_a_sensor_trip_is_never_coalesced() -> None:
 # --- Knowledge view shows this pack's vocabulary, not another's ----------------------------
 
 
+def test_the_pack_owns_its_dream_skill(monkeypatch) -> None:
+    from api.server.services.dream_pass.skill_loader import dream_skill_path, load_dream_skill
+
+    monkeypatch.setenv("ZAVA_VERTICAL", "banking")
+    monkeypatch.delenv("ZAVA_WORLD", raising=False)
+    active_runtime.cache_clear()
+    try:
+        path = dream_skill_path("app-fraud-reimbursement")
+    finally:
+        active_runtime.cache_clear()
+    assert path.parts[-4:] == ("banking", "dream-passes", "app-fraud-reimbursement", "SKILL.md")
+    skill = load_dream_skill(path)
+    assert skill.domain == "app-fraud-reimbursement"
+
+
 def test_the_cast_is_the_banks_own_decision_makers(monkeypatch) -> None:
     import asyncio
 
