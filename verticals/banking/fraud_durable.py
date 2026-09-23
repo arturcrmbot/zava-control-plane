@@ -72,6 +72,13 @@ _VERIFY_PHASE = "Verify Reimbursement Outcome"
 _SKILL_ROOT = Path(__file__).resolve().parent / "skills"
 _SKILL_LABEL = "claim-evidence-assessor"
 _TOOLS = [banking_read_claim_evidence, banking_rank_admitted_claim_options]
+# A model session can fail transiently (a session-auth blip, a rate limit).
+# The agent activity only reads evidence and ranks options — the world is
+# mutated by the separate command activity — so re-running it is safe, and
+# each attempt is recorded in the orchestration history.
+_AGENT_RETRY = df.RetryOptions(
+    first_retry_interval_in_milliseconds=10_000, max_number_of_attempts=3
+)
 
 _RANKING_KEYS = frozenset({
     "phase",
@@ -137,7 +144,9 @@ def _identity_list(value: Any, *, name: str) -> list[str]:
 
 
 def _denied(reason: str) -> dict[str, Any]:
-    return {"status": "denied", "command": None, "reason": reason}
+    # `reasoning` is the world bridge's contract key: it records the refusal
+    # as responder.deferred carrying this text, instead of a bare failure.
+    return {"status": "denied", "command": None, "reason": reason, "reasoning": reason}
 
 
 def _active_world() -> ZavaBankWorld:
@@ -736,8 +745,9 @@ def fraud_orchestration(
 
     # --- Phase 3 ---
     yield checkpoint("step.started", {"step": _AGENT_PHASE})
-    ranking = yield context.call_activity(
+    ranking = yield context.call_activity_with_retry(
         "fraud_agent_activity_trigger",
+        _AGENT_RETRY,
         {
             **input_dict,
             "instance_id": instance_id,

@@ -608,7 +608,19 @@ class ZavaBankWorld:
             ],
             "payment_rails": [_record_view(r) for r in self.payment_rails.values()],
             "beneficiaries": beneficiaries_in_play,
-            "fraud_claims": [_record_view(r) for r in self.fraud_claims.values()],
+            # Every hero claim exists from install; `raised` says whether its
+            # story has actually started, so a surface never shows a dormant
+            # claim as open work.
+            "fraud_claims": [
+                {
+                    **_record_view(r),
+                    "raised": any(
+                        FRAUD_CLAIM_BY_SCENARIO[scenario_id] == r.id
+                        for scenario_id in self._scenario_events
+                    ),
+                }
+                for r in self.fraud_claims.values()
+            ],
             "reimbursement_commands": [
                 _record_view(r) for r in self.reimbursement_commands.values()
             ],

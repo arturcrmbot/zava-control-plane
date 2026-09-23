@@ -16,6 +16,7 @@ patterns=(
   "uvicorn api.server.main"          # FastAPI
   "func host start"                  # Azure Functions host (.NET wrapper)
   "Microsoft.Azure.Functions"        # Functions worker
+  "azure-functions-core-tools/bin/workers/python"  # Python Functions worker (orphans on host exit)
   "func\$"                            # bare func binary, edge case
   "vite preview"                     # built-bundle UI servers (5273/5274/5275)
   "azurite"                          # storage emulator

@@ -158,6 +158,79 @@ def test_snapshot_is_bounded_and_carries_counts_for_the_large_book() -> None:
     assert len(snapshot["recent_settlements"]) <= 24
 
 
+def test_a_hero_claim_is_raised_only_once_its_story_starts() -> None:
+    world = _world()
+    assert not any(c["raised"] for c in world.render_state()["fraud_claims"])
+    world.activate_scenario(FRAUD_SCENARIO_STANDARD)
+    raised = {c["id"] for c in world.render_state()["fraud_claims"] if c["raised"]}
+    assert raised == {"SYN-CLAIM-0031"}
+
+
+# --- Orchestration: resilient agent work, refusals the world can explain ------------
+
+
+class _RecordingContext:
+    """Just enough of DurableOrchestrationContext to step the generator."""
+
+    instance_id = "inst-test"
+
+    def __init__(self, input_: dict) -> None:
+        self._input = input_
+        self.calls: list[tuple[str, object]] = []
+
+    def get_input(self) -> dict:
+        return self._input
+
+    def call_activity(self, name: str, payload: dict) -> str:
+        self.calls.append((name, None))
+        return name
+
+    def call_activity_with_retry(self, name: str, retry, payload: dict) -> str:
+        self.calls.append((name, retry))
+        return name
+
+
+def _run_to_refusal() -> tuple[dict, _RecordingContext]:
+    from verticals.banking.fraud_durable import fraud_orchestration
+
+    context = _RecordingContext({"workflow_id": "BAPP-test-refusal"})
+    results = {
+        "fraud_evidence_activity_trigger": {},
+        "fraud_trace_activity_trigger": {
+            "admitted_options": [{"option_id": OPTION_REIMBURSE_CAPPED, "value_gbp": 85_000.0}]
+        },
+        "fraud_agent_activity_trigger": {"ranked_option_ids": [OPTION_REIMBURSE_CAPPED]},
+        "fraud_governance_activity_trigger": {
+            "allowed": False,
+            "reason": "value exceeds delegated authority",
+            "governing_rule_id": "AUTH-financial_crime_lead-banking.commit_reimbursement_decision",
+        },
+    }
+    orchestration = fraud_orchestration(context)
+    sent = None
+    try:
+        while True:
+            sent = results.get(orchestration.send(sent))
+    except StopIteration as stop:
+        return stop.value, context
+
+
+def test_a_refusal_reaches_the_world_bridge_with_its_reason() -> None:
+    output, _ = _run_to_refusal()
+    # command=None plus `reasoning` is the bridge's deferral contract, so the
+    # world records responder.deferred with this text instead of a failure.
+    assert output["command"] is None
+    assert "AUTH-financial_crime_lead" in output["reasoning"]
+
+
+def test_agent_work_is_retried_but_governance_is_not() -> None:
+    import azure.durable_functions as df
+
+    _, context = _run_to_refusal()
+    retried = {name for name, retry in context.calls if isinstance(retry, df.RetryOptions)}
+    assert retried == {"fraud_agent_activity_trigger"}
+
+
 # --- Projections read the shape the store persists ----------------------------------
 
 
@@ -341,6 +414,27 @@ def test_a_sensor_trip_is_never_coalesced() -> None:
 
 
 # --- Knowledge view shows this pack's vocabulary, not another's ----------------------------
+
+
+def test_the_cast_is_the_banks_own_decision_makers(monkeypatch) -> None:
+    import asyncio
+
+    from api.server.data_fabric.narrative_arcs import ARCS
+    from api.server.routes.personas import narrative_arcs
+
+    monkeypatch.setenv("ZAVA_VERTICAL", "banking")
+    monkeypatch.delenv("ZAVA_WORLD", raising=False)
+    active_runtime.cache_clear()
+    try:
+        cast = asyncio.run(narrative_arcs())
+    finally:
+        active_runtime.cache_clear()
+    by_role = {person["role"]: person for person in cast}
+    assert FRAUD_HITL_PERSONA in by_role
+    assert by_role[FRAUD_HITL_PERSONA]["name"] == "Fraud decision manager"
+    assert by_role[FRAUD_HITL_PERSONA]["function"] == "retail-banking"
+    assert all(0 < len(person["one_liner"]) <= 120 for person in cast)
+    assert not {arc.name for arc in ARCS} & {person["name"] for person in cast}
 
 
 def test_entity_cities_hide_absent_pack_kinds_and_show_present_ones(monkeypatch) -> None:

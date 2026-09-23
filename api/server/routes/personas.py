@@ -18,14 +18,50 @@ from dataclasses import asdict
 from fastapi import APIRouter, HTTPException
 
 from api.shared import personas as personas_registry
+from api.shared.vertical_loader import active_runtime
 from api.server.data_fabric.narrative_arcs import ARCS as _NARRATIVE_ARCS
 
 
 router = APIRouter(prefix="/api/personas")
 
+_ONE_LINER_MAX = 120
+
 
 def _serialise(p: personas_registry.Persona) -> dict:
     return asdict(p)
+
+
+def _one_liner(description: str) -> str:
+    sentence = description.strip().split(". ")[0].rstrip(".")
+    if len(sentence) <= _ONE_LINER_MAX:
+        return sentence
+    return sentence[: _ONE_LINER_MAX - 1].rsplit(" ", 1)[0] + "…"
+
+
+def _pack_cast(pack) -> list[dict]:
+    """A pack's own decision-makers, for packs without curated named people."""
+    owner: dict[str, str] = {}
+
+    def walk(tree, function_key: str) -> None:
+        owner.setdefault(tree.role, function_key)
+        for child in tree.manages:
+            walk(child, function_key)
+
+    for key, function in pack.organisation_functions.items():
+        if function.persona_hierarchy is not None:
+            walk(function.persona_hierarchy, key)
+    return [
+        {
+            "employee_id": role,
+            "name": role.replace("_", " ").capitalize(),
+            "role": role,
+            "photo_url": "",
+            "one_liner": _one_liner(persona.description or ""),
+            "arc": (persona.description or "").strip(),
+            "function": owner.get(role, ""),
+        }
+        for role, persona in pack.personas.items()
+    ]
 
 
 @router.get("")
@@ -91,7 +127,15 @@ async def narrative_arcs() -> list[dict]:
     stacked-deck panel of named humans (photo, name, role, one-liner)
     instead of anonymous role ids. Registered before ``/{role}`` so
     the path doesn't get swallowed by the catch-all matcher below.
+
+    Scoped to the active pack: a curated individual appears only when the
+    pack has that role, and a pack with none shows its own decision-makers,
+    so one vertical's cast never appears in another's.
     """
+    pack = active_runtime().pack
+    curated = [a for a in _NARRATIVE_ARCS if a.role in pack.personas]
+    if not curated:
+        return _pack_cast(pack)
     return [
         {
             "employee_id": a.employee_id,
@@ -102,7 +146,7 @@ async def narrative_arcs() -> list[dict]:
             "arc": a.arc,
             "function": a.function,
         }
-        for a in _NARRATIVE_ARCS
+        for a in curated
     ]
 
 

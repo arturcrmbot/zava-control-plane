@@ -56,6 +56,12 @@ from verticals.banking.support_constants import (
 
 _SKILL_ROOT = Path(__file__).resolve().parent / "skills"
 _TOOLS = [banking_read_case_evidence, banking_rank_admitted_case_options]
+# A model session can fail transiently (a session-auth blip, a rate limit).
+# The agent activity only reads evidence and ranks options, so re-running it
+# is safe, and each attempt is recorded in the orchestration history.
+_AGENT_RETRY = df.RetryOptions(
+    first_retry_interval_in_milliseconds=10_000, max_number_of_attempts=3
+)
 
 _RANKING_KEYS = frozenset({
     "phase",
@@ -165,7 +171,9 @@ def _required_string(value: Any, *, name: str) -> str:
 
 
 def _denied(reason: str) -> dict[str, Any]:
-    return {"status": "denied", "command": None, "reason": reason}
+    # `reasoning` is the orchestration-output contract key shared by every
+    # vertical; `reason` is kept for this module's own terminal checkpoints.
+    return {"status": "denied", "command": None, "reason": reason, "reasoning": reason}
 
 
 # ---------------------------------------------------------------------------
@@ -600,8 +608,9 @@ def case_orchestration(
     yield checkpoint("step.completed", {"step": profile.evidence_phase})
 
     yield checkpoint("step.started", {"step": profile.agent_phase})
-    ranking = yield context.call_activity(
+    ranking = yield context.call_activity_with_retry(
         "case_agent_activity_trigger",
+        _AGENT_RETRY,
         {
             **input_dict,
             "instance_id": instance_id,
