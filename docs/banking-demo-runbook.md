@@ -82,6 +82,12 @@ the retry absorbs it off stage rather than on it.
 
 ## 4. Reset between takes
 
+The workflow store and memory are in-process: restarting the API empties the
+feed and memory (re-seed memory afterwards). Between takes reset only the
+world, which keeps the feed's history. Show history with the feed's **All
+activity**; *All my decisions today* lists only decisions made by hand in this
+browser, and with personas deciding every gate it stays empty.
+
 A story runs once per world. Start a fresh world (claims dormant again):
 
 ```bash
