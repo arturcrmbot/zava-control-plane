@@ -596,7 +596,9 @@ async def inject_burst(n: int = 5):
     of spawned workflow_ids.
     """
     import asyncio
+    from api.shared.vertical_loader import active_runtime
     from api.server.services.simulator_orchestrator import (  # noqa: E402
+        _resolve_spawner,
         spawn_fleet_vendor_kyc_workflow,
         spawn_fleet_ap_invoice_workflow,
         spawn_fleet_perf_review_workflow,
@@ -609,6 +611,24 @@ async def inject_burst(n: int = 5):
         spawn_hiring_workflow,
     )
     n = max(1, min(int(n or 5), 20))
+    pack = active_runtime().pack
+    if pack.name != "agency":
+        # Another pack bursts its own autonomous processes; the agency
+        # spawners below have no orchestrators outside the agency pack.
+        own = [pack.domains[t] for t in pack.ramp_workflow_types if t in pack.domains]
+        if not own:
+            return {"ok": True, "count": 0, "spawned": []}
+        selected = [
+            (own[i % len(own)].workflow_type, _resolve_spawner(own[i % len(own)])())
+            for i in range(n)
+        ]
+        results = await asyncio.gather(*[coro for _, coro in selected], return_exceptions=True)
+        spawned = [
+            {"domain": domain, "error": str(result)} if isinstance(result, Exception)
+            else {"domain": domain, "workflow_id": result}
+            for (domain, _), result in zip(selected, results)
+        ]
+        return {"ok": True, "count": len(spawned), "spawned": spawned}
     spawners = [
         ("vendor-kyc", spawn_fleet_vendor_kyc_workflow()),
         ("ap-invoice", spawn_fleet_ap_invoice_workflow()),

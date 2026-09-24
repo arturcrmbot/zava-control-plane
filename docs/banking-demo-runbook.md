@@ -23,8 +23,8 @@ other Copilot use of that account counts against the same limit.
 - **Keep the ramp slow**: `DEMO_TIME_WARP_FACTOR=15` opens a mule case about
   every 6 minutes and a merchant case about every 8, so the organisation stays
   visibly busy without spending the budget the stories need.
-- **Never press "Spawn 8 cases"** on the constellation: eight agent sessions
-  start at once.
+- **"Spawn 8 cases" opens eight real mule and merchant cases at once** — eight
+  agent sessions. Press it only if the budget can take it.
 - **Symptom of exhaustion**: a claim card reads `Workflow failed · …` and the
   Durable history says *"rate limit … try again in N minutes"*. The agent
   activity is retried once after 10 s, and each attempt already retries a hung
@@ -41,12 +41,16 @@ other Copilot use of that account counts against the same limit.
 | `LLM_RUNTIME` | `ghcp` | uses the `gh` CLI token; `aoai` needs a correct Azure tenant |
 | `SIMULATOR_RAMP_ENABLED` | `1` | the autonomy switch — `0` means no supporting cases open |
 | `DEMO_TIME_WARP_FACTOR` | `15` | supporting-case cadence (section 1) |
-| `PERSONA_AUTO_CLOSE` | `financial_crime_lead,payments_operations_lead` | the bank runs itself; the hero decision waits for the presenter |
+| `PERSONA_AUTO_CLOSE` | `*` | synthetic demo: every gate is decided by its persona within delegated authority; nobody approves by hand |
+| `MEMORY_BACKEND` | `fallback` | in-process memory; the configured Azure OpenAI endpoint rejects embeddings, so `auto` loses every write |
 
 ```bash
 bash scripts/down-demo.sh && make up
 curl -s 'localhost:3101/api/world/state?compact=true' | jq '.enabled, .bank.payments_settled_total'
 curl -s localhost:3101/api/personas/narrative-arcs | jq -r '.[].name'   # the bank's six decision-makers
+# memory is in-process, so seed it on every boot (no model calls)
+for f in verticals/banking/demo/memory-seed-round1.json verticals/banking/demo/memory-seed-round2.json; do
+  curl -s -X POST localhost:3101/api/memory/v2/seed-demo -H 'content-type: application/json' --data @"$f"; done
 ```
 
 Open both screens:
@@ -70,7 +74,7 @@ the retry absorbs it off stage rather than on it.
 | 0:05 | Floor | Rails, settlements, credit, markets | The same world as an operations floor. Nothing here is a slide. |
 | 0:07 | Floor | **APP fraud claim · £18,400** | A customer reports a scam. Watch Retail banking flare on the constellation — the world raised a signal. |
 | 0:09 | Floor | Chain: claim raised → case opened → agents investigating | A real agent is reading the claim evidence and ranking the admitted options. |
-| 0:12 | Floor | *Waiting for a human decision* → **Review & decide** | The agent ranked. The human decides — within their delegation. |
+| 0:12 | Floor | Chain: decision approved | The agent ranked; the fraud decision manager persona approved within its £50,000 delegation, and the decision names the rule. |
 | 0:15 | Floor | Chain completes | £18,400 reimbursed; the mule account traced to `SYN-CORP-014`, a corporate client. |
 | 0:18 | Floor | **Vulnerable customer · £6,750** | Refusal was never admitted — the deterministic layer refused it, and no ranking can resurrect it. |
 | 0:22 | Floor | **Over-delegation · £92,000** | Capped at £85,000, still above the manager's £50,000 delegation. *Refused by authority · needs Financial crime lead* — governance refuses and names who can. |

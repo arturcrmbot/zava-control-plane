@@ -448,6 +448,32 @@ def test_a_sensor_trip_is_never_coalesced() -> None:
 # --- Knowledge view shows this pack's vocabulary, not another's ----------------------------
 
 
+def test_a_burst_spawns_the_banks_own_processes(monkeypatch) -> None:
+    import asyncio
+
+    from api.server.routes import simulator
+    from api.server.services import simulator_orchestrator
+
+    def fake_spawner(domain):
+        async def spawn() -> str:
+            return f"{domain.workflow_type}-1"
+        return spawn
+
+    monkeypatch.setattr(simulator_orchestrator, "_resolve_spawner", fake_spawner)
+    monkeypatch.setenv("ZAVA_VERTICAL", "banking")
+    monkeypatch.delenv("ZAVA_WORLD", raising=False)
+    active_runtime.cache_clear()
+    try:
+        result = asyncio.run(simulator.inject_burst(n=8))
+    finally:
+        active_runtime.cache_clear()
+    assert result["count"] == 8
+    assert {row["domain"] for row in result["spawned"]} == {
+        "mule-account-investigation",
+        "merchant-onboarding-risk",
+    }
+
+
 def test_the_pack_owns_its_dream_skill(monkeypatch) -> None:
     from api.server.services.dream_pass.skill_loader import dream_skill_path, load_dream_skill
 

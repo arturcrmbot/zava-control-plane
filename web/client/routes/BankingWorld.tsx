@@ -474,7 +474,7 @@ export default function BankingWorld({
                   <span className={`h-2 w-2 rounded-full bg-emerald-500 ${bank.enabled && bank.status === "running" ? "bank-live-glow" : ""}`} /> Autonomous · world live
                 </span>
                 <span data-testid="humans-in-the-loop" className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium ${pendingDecisions.length > 0 ? "bg-amber-100 text-amber-800 ring-1 ring-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:ring-amber-800" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
-                  <Scale size={13} className={pendingDecisions.length > 0 ? "bank-live-glow" : ""} /><span>Humans in the loop: <span data-testid="decisions-waiting" className="tabular-nums">{pendingDecisions.length}</span> {pendingDecisions.length === 1 ? "decision" : "decisions"} waiting</span>
+                  <Scale size={13} className={pendingDecisions.length > 0 ? "bank-live-glow" : ""} /><span>Decisions waiting: <span data-testid="decisions-waiting" className="tabular-nums">{pendingDecisions.length}</span></span>
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"><Clock3 size={13} /> sim <span className="tabular-nums">{simClock(bank.sim_time)}</span></span>
               </div>
@@ -506,8 +506,8 @@ export default function BankingWorld({
         {story && story.steps.length > 0 && <WorldInterventionStrip testId="banking-intervention" trace={story.trace} steps={story.steps} onTrace={toggleActor} />}
 
         {pendingDecisions.length > 0 && (
-          <section data-testid="pending-decisions" aria-label="Decisions waiting for a human" className="rounded-xl border border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-800 dark:bg-amber-950/30">
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200"><Scale size={15} className="bank-live-glow" /> Waiting for a human decision</div>
+          <section data-testid="pending-decisions" aria-label="Decisions waiting" className="rounded-xl border border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-800 dark:bg-amber-950/30">
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200"><Scale size={15} className="bank-live-glow" /> Waiting for a decision</div>
             <div className="grid gap-2 lg:grid-cols-2">
               {pendingDecisions.map((decision) => {
                 const context = decision.context;
