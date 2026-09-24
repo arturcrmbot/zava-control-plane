@@ -80,6 +80,7 @@ const EVENTS = [ROUTINE, ...APPROVED_TRACE, ...APPROVED_OUTCOME, ...REFUSED_TRAC
 
 let queue: unknown[] = [];
 let details: Record<string, unknown> = {};
+let workflows: unknown[] = [];
 
 function renderBank(overrides: Partial<ComponentProps<typeof BankingWorld>> = {}) {
   const props = {
@@ -97,8 +98,13 @@ function renderBank(overrides: Partial<ComponentProps<typeof BankingWorld>> = {}
 beforeEach(() => {
   queue = [];
   details = {};
+  workflows = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
-    const body = String(url).startsWith("/api/workflows/") ? details[String(url)] ?? {} : queue;
+    const path = String(url);
+    const body = path === "/api/workflows" ? workflows
+      : path.startsWith("/api/workflows/") ? details[path] ?? {}
+      : path.startsWith("/api/simulator/inject-burst") ? { ok: true }
+      : queue;
     return new Response(JSON.stringify(body), { status: 200 });
   }));
 });
@@ -118,11 +124,11 @@ describe("BankingWorld", () => {
     expect(screen.getByText("2 min window")).toBeTruthy();
   });
 
-  it("runs the three banking stories with their real scenario ids", () => {
+  it("raises a new claim of each kind from the world", () => {
     for (const [label, id] of [
-      ["APP fraud claim · £18,400", "synthetic-app-fraud-claim"],
-      ["Vulnerable customer · £6,750", "synthetic-app-fraud-vulnerable"],
-      ["Over-delegation · £92,000", "synthetic-app-fraud-over-delegation"],
+      ["Fraud claim reported", "new-fraud-claim"],
+      ["High-value claim", "new-fraud-claim:high-value"],
+      ["Vulnerable customer claim", "new-fraud-claim:vulnerable"],
     ] as const) {
       cleanup();
       const onRunScenario = vi.fn(async () => {});
@@ -130,6 +136,32 @@ describe("BankingWorld", () => {
       fireEvent.click(screen.getByRole("button", { name: label }));
       expect(onRunScenario).toHaveBeenCalledWith(id);
     }
+  });
+
+  it("opens a new autonomous case of the chosen process", () => {
+    renderBank();
+    fireEvent.click(screen.getByRole("button", { name: "Mule activity detected" }));
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/simulator/inject-burst?n=1&workflow_type=mule-account-investigation",
+      { method: "POST" },
+    );
+  });
+
+  it("lists recent cases newest first, each one openable", async () => {
+    workflows = [
+      { id: "BMUL-0001", type: "mule-account-investigation", status: "completed", currentPhase: "Verify Disposition", createdAt: 10, metadata: {} },
+      { id: "bapp-evt-00000200", type: "app-fraud-reimbursement", status: "failed", currentPhase: "Decide Reimbursement", createdAt: 20, metadata: { rejected: true } },
+      { id: "VKY-0001", type: "vendor-kyc", status: "in_progress", createdAt: 30, metadata: {} },
+    ];
+    renderBank();
+    const refused = await screen.findByTestId("case-bapp-evt-00000200");
+    expect(refused.getAttribute("href")).toBe("/workflows/bapp-evt-00000200");
+    expect(refused.textContent).toContain("refused by authority");
+    expect(screen.getByTestId("case-BMUL-0001").textContent).toContain("decided");
+    // Another pack's workflow never appears on the bank's floor.
+    expect(screen.queryByTestId("case-VKY-0001")).toBeNull();
+    const rows = screen.getByTestId("recent-cases").querySelectorAll("a");
+    expect(rows[0].getAttribute("data-testid")).toBe("case-bapp-evt-00000200");
   });
 
   it("never shows a dormant claim as open work", () => {

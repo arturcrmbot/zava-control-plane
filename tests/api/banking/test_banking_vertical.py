@@ -445,6 +445,64 @@ def test_a_sensor_trip_is_never_coalesced() -> None:
     assert first is not None and second is not None
 
 
+# --- Claims raised on demand ------------------------------------------------------------
+
+
+def test_each_click_raises_a_new_claim_with_its_own_facts() -> None:
+    world = _world()
+    first = world.raise_claim()
+    second = world.raise_claim()
+    assert first.payload["claim_id"] != second.payload["claim_id"]
+    raised = {c["id"] for c in world.render_state()["fraud_claims"] if c["raised"]}
+    assert {first.payload["claim_id"], second.payload["claim_id"]} <= raised
+
+
+def test_claim_kinds_shape_the_facts_not_the_outcome() -> None:
+    world = _world()
+    high = world.fraud_claims[world.raise_claim("high-value").payload["claim_id"]]
+    vulnerable = world.fraud_claims[world.raise_claim("vulnerable").payload["claim_id"]]
+    assert high.amount_gbp > 50_000
+    assert vulnerable.vulnerability_flag is True
+    with pytest.raises(ValueError):
+        world.raise_claim("scripted")
+
+
+def test_a_raised_claim_runs_end_to_end_across_two_world_replicas() -> None:
+    from verticals.banking.fraud_constraints import admit_claim_options
+
+    api_world = _world()
+    sensor = api_world.raise_claim("vulnerable")
+    observation = api_world.build_observation(sensor.to_dict())
+
+    # The Functions worker holds its own replica; it adopts the claim from the evidence.
+    worker_world = ZavaBankWorld(seed=42, runtime=SimulationRuntime(42))
+    worker_world.install()
+    worker_world.adopt_claim(observation)
+    mirrored = worker_world.observation_for_claim(observation["claim"]["id"])
+    assert mirrored["evidence_versions"] == observation["evidence_versions"]
+    assert mirrored["trace_id"] == observation["trace_id"]
+
+    admitted = [r.option.option_id for r in admit_claim_options(mirrored) if r.feasible]
+    assert admitted and OPTION_REFUSE_CAUTION not in admitted
+    command = worker_world.command_for_claim_option(
+        claim_id=observation["claim"]["id"],
+        option_id=admitted[0],
+        workflow_id="BAPP-gen-1",
+        decision_id="SYN-APP-DECISION-001",
+        persona=FRAUD_HITL_PERSONA,
+    )
+    assert worker_world.apply_command(command).type == "banking.reimbursement.applied"
+    # The bridge applies the same command to the API world.
+    assert api_world.apply_command(command).type == "banking.reimbursement.applied"
+
+
+def test_run_scenario_raises_new_claims_by_kind() -> None:
+    world = _world()
+    result = world.run_scenario("new-fraud-claim:high-value")
+    assert result["event"]["type"] == "sensor.tripped"
+    assert result["event"]["payload"]["claim_id"].startswith("SYN-CLAIM-G")
+
+
 # --- Knowledge view shows this pack's vocabulary, not another's ----------------------------
 
 
@@ -459,19 +517,33 @@ def test_a_burst_spawns_the_banks_own_processes(monkeypatch) -> None:
             return f"{domain.workflow_type}-1"
         return spawn
 
+    from api.server.state import app_state
+
+    raised: list[str] = []
+
+    class World:
+        def run_scenario(self, name: str) -> dict:
+            raised.append(name)
+            return {"event": {"trace_id": f"evt-{len(raised)}"}}
+
     monkeypatch.setattr(simulator_orchestrator, "_resolve_spawner", fake_spawner)
+    monkeypatch.setattr(app_state, "world_service", World(), raising=False)
     monkeypatch.setenv("ZAVA_VERTICAL", "banking")
     monkeypatch.delenv("ZAVA_WORLD", raising=False)
     active_runtime.cache_clear()
     try:
-        result = asyncio.run(simulator.inject_burst(n=8))
+        mixed = asyncio.run(simulator.inject_burst(n=8))
+        mule_only = asyncio.run(simulator.inject_burst(n=2, workflow_type="mule-account-investigation"))
     finally:
         active_runtime.cache_clear()
-    assert result["count"] == 8
-    assert {row["domain"] for row in result["spawned"]} == {
+    assert mixed["count"] == 8
+    assert {row["domain"] for row in mixed["spawned"]} == {
         "mule-account-investigation",
         "merchant-onboarding-risk",
+        "world-case",
     }
+    assert raised and set(raised) == {"new-fraud-claim"}
+    assert [row["domain"] for row in mule_only["spawned"]] == ["mule-account-investigation"] * 2
 
 
 def test_the_pack_owns_its_dream_skill(monkeypatch) -> None:

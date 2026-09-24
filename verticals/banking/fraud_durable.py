@@ -40,6 +40,7 @@ from verticals.banking.fraud_constants import (
     FRAUD_HITL_PERSONA,
     FRAUD_ORCHESTRATOR,
     FRAUD_SCENARIO_STANDARD,
+    FRAUD_SCENARIOS,
     FRAUD_SUCCESS_EVENT,
     FRAUD_WORKFLOW_TYPE,
 )
@@ -193,16 +194,21 @@ def fraud_evidence_activity(
     target_world = world if world is not None else _active_world()
     if world is None and isinstance(supplied_observation, dict):
         scenario_id = supplied_observation.get("scenario_id") or FRAUD_SCENARIO_STANDARD
-        story_id = supplied_observation.get("story_id")
-        if target_world.claim_story_status.get(story_id) != "active":
-            target_world.activate_scenario(scenario_id)
-        target_world.bind_scenario_trace(
-            scenario_id,
-            _required_string(
-                supplied_observation.get("trace_id"),
-                name="observation.trace_id",
-            ),
-        )
+        if scenario_id in FRAUD_SCENARIOS:
+            story_id = supplied_observation.get("story_id")
+            if target_world.claim_story_status.get(story_id) != "active":
+                target_world.activate_scenario(scenario_id)
+            target_world.bind_scenario_trace(
+                scenario_id,
+                _required_string(
+                    supplied_observation.get("trace_id"),
+                    name="observation.trace_id",
+                ),
+            )
+        else:
+            # A claim raised on demand exists only in the API's replica; this
+            # worker's world adopts it from the versioned evidence.
+            target_world.adopt_claim(supplied_observation)
         observation = copy.deepcopy(supplied_observation)
     else:
         try:
@@ -643,6 +649,8 @@ def fraud_command_activity(
     )
 
     target_world = world if world is not None else _active_world()
+    if claim_id not in target_world.fraud_claims and isinstance(hitl_context.get("observation"), dict):
+        target_world.adopt_claim(hitl_context["observation"])
     command_id = reimbursement_command_id(
         workflow_id=workflow_id, decision_id=decision_id, option_id=option_id
     )

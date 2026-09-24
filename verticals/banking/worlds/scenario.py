@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import math
 from collections import deque
 from typing import Any
 
@@ -34,6 +35,8 @@ from verticals.banking.fraud_constants import (
     FRAUD_CLAIM_BY_SCENARIO,
     FRAUD_COMMAND_TYPE,
     FRAUD_FUNCTION,
+    FRAUD_RAIL_CHAPS,
+    FRAUD_RAIL_FPS,
     FRAUD_REIMBURSEMENT_CAP_GBP,
     FRAUD_SCENARIOS,
     FRAUD_SENSOR_ID,
@@ -100,6 +103,23 @@ def _record_view(record: Any) -> dict[str, Any]:
     return _json_value(dataclasses.asdict(record))
 
 
+# Claims raised on demand. Their outcome follows from the drawn facts
+# (amount, vulnerability, warnings) through the same admission, agent,
+# governance and persona path as the seeded stories.
+GENERATED_CLAIM_KINDS = ("any", "high-value", "vulnerable")
+_CLAIM_WINDOW_MINUTES = 5 * 24 * 60.0
+
+
+def _sync_record(record: Any, view: dict[str, Any]) -> None:
+    for field in dataclasses.fields(record):
+        if field.name in view:
+            setattr(record, field.name, copy.deepcopy(view[field.name]))
+
+
+def _rebuild(cls: type, view: dict[str, Any]) -> Any:
+    return cls(**{f.name: copy.deepcopy(view[f.name]) for f in dataclasses.fields(cls) if f.name in view})
+
+
 class ZavaBankWorld:
     """A bounded, deterministic synthetic universal bank."""
 
@@ -145,6 +165,11 @@ class ZavaBankWorld:
         self._scenario_events: dict[str, SimulationEvent] = {}
         self._scenario_trace_overrides: dict[str, str] = {}
         self._active_claim_id: str | None = None
+        # claim id -> the scenario that raised it and its causal trace, for
+        # the seeded stories and for claims raised on demand alike.
+        self._claim_scenarios: dict[str, str] = {}
+        self._claim_traces: dict[str, str] = {}
+        self._generated_claims = 0
         self._processed_commands: dict[str, tuple[SimulationCommand, SimulationEvent]] = {}
 
     # -- lifecycle ---------------------------------------------------------
@@ -364,6 +389,9 @@ class ZavaBankWorld:
         if not isinstance(trace_id, str) or not trace_id.strip():
             raise ValueError("trace_id must be a non-empty string")
         self._scenario_trace_overrides[scenario_id] = trace_id
+        claim_id = FRAUD_CLAIM_BY_SCENARIO.get(scenario_id)
+        if claim_id is not None:
+            self._claim_traces[claim_id] = trace_id
 
     def activate_scenario(self, scenario_id: str) -> SimulationEvent:
         if scenario_id not in FRAUD_SCENARIOS:
@@ -376,7 +404,9 @@ class ZavaBankWorld:
 
         claim_id = FRAUD_CLAIM_BY_SCENARIO[scenario_id]
         story_id = FRAUD_STORY_BY_SCENARIO[scenario_id]
-        claim = self.fraud_claims[claim_id]
+        return self._raise(self.fraud_claims[claim_id], scenario_id, story_id)
+
+    def _raise(self, claim: FraudClaim, scenario_id: str, story_id: str) -> SimulationEvent:
         payment = self.payments[claim.payment_id]
         beneficiary = self.beneficiaries[claim.beneficiary_id]
         customer = self.customers[claim.customer_id]
@@ -428,18 +458,107 @@ class ZavaBankWorld:
         self._scenario_events[scenario_id] = sensor
         self._active_claim_id = claim.id
         self.claim_story_status[story_id] = "active"
+        self._claim_scenarios[claim.id] = scenario_id
+        self._claim_traces[claim.id] = sensor.trace_id
         return sensor
 
+    def raise_claim(self, kind: str = "any") -> SimulationEvent:
+        """Raise a new claim with drawn facts; each call is a new case."""
+        if kind not in GENERATED_CLAIM_KINDS:
+            raise ValueError(f"unsupported claim kind: {kind!r}")
+        if not self._installed:
+            raise RuntimeError("ZavaBankWorld must be installed before raising a claim")
+        rng = self.runtime.rng
+        vulnerable = kind == "vulnerable" or (kind == "any" and rng.random() < 0.25)
+        busy = {c.customer_id for c in self.fraud_claims.values() if c.id in self._claim_scenarios}
+        customers = [
+            cid for cid in sorted(self.customers)
+            if self.customers[cid].vulnerability_flag == vulnerable
+            and self.customers[cid].status == "active" and cid not in busy
+        ]
+        beneficiaries = [
+            bid for bid in sorted(self.beneficiaries)
+            if self.beneficiaries[bid].status == "open" and self.beneficiaries[bid].balance_gbp > 0
+        ]
+        if not customers or not beneficiaries:
+            raise ValueError("no free customer or receiving account to raise a claim against")
+        customer = self.customers[rng.choice(customers)]
+        beneficiary = self.beneficiaries[rng.choice(beneficiaries)]
+        if kind == "high-value":
+            amount = rng.uniform(55_000, 120_000)
+        elif vulnerable:
+            amount = math.exp(rng.uniform(math.log(500), math.log(25_000)))
+        else:
+            amount = math.exp(rng.uniform(math.log(800), math.log(120_000)))
+        amount = float(round(amount / 50) * 50)
+        warning_shown = rng.random() < 0.6
+        specific_ignored = kind == "any" and not vulnerable and warning_shown and rng.random() < 0.35
+        recoverable = float(min(beneficiary.balance_gbp, round(amount * rng.uniform(0.1, 0.45) / 10) * 10))
+        rail = FRAUD_RAIL_CHAPS if amount >= 25_000 else FRAUD_RAIL_FPS
+        self._generated_claims += 1
+        number = self._generated_claims
+        payment = Payment(
+            id=f"SYN-PAY-G{number:03d}", from_account_id=customer.account_id,
+            to_beneficiary_id=beneficiary.id, rail_id=rail, amount_gbp=amount,
+            location_id=customer.home_location_id, warning_shown=warning_shown,
+        )
+        now = float(self.runtime.env.now)
+        claim = FraudClaim(
+            id=f"SYN-CLAIM-G{number:03d}", customer_id=customer.id, payment_id=payment.id,
+            beneficiary_id=beneficiary.id, rail_id=rail, amount_gbp=amount,
+            location_id=customer.home_location_id, reported_at_minutes=now,
+            deadline_minutes=now + _CLAIM_WINDOW_MINUTES,
+            vulnerability_flag=customer.vulnerability_flag, warning_shown=warning_shown,
+            specific_warning_ignored=specific_ignored, recoverable_gbp=recoverable,
+        )
+        self.payments[payment.id] = payment
+        self.fraud_claims[claim.id] = claim
+        return self._raise(claim, f"generated:{claim.id}", f"SYN-STORY-{claim.id}")
+
+    def adopt_claim(self, observation: dict[str, Any]) -> None:
+        """Mirror a claim raised in another replica of this world.
+
+        The observation carries every record the decision reads, with its
+        version, so syncing those records makes the evidence match exactly.
+        """
+        claim_view = observation["claim"]
+        payment_view = observation["payment"]
+        if claim_view["id"] in self.fraud_claims:
+            _sync_record(self.fraud_claims[claim_view["id"]], claim_view)
+        else:
+            self.fraud_claims[claim_view["id"]] = _rebuild(FraudClaim, claim_view)
+        if payment_view["id"] in self.payments:
+            _sync_record(self.payments[payment_view["id"]], payment_view)
+        else:
+            self.payments[payment_view["id"]] = _rebuild(Payment, payment_view)
+        for key, store in (
+            ("customer", self.customers), ("beneficiary", self.beneficiaries),
+            ("rail", self.payment_rails), ("account", self.accounts),
+            ("receiving_psp", self.payment_service_providers),
+            ("corporate_holder", self.corporate_clients),
+        ):
+            view = observation.get(key)
+            if isinstance(view, dict) and view.get("id") in store:
+                _sync_record(store[view["id"]], view)
+        claim_id = claim_view["id"]
+        self._claim_scenarios[claim_id] = str(observation["scenario_id"])
+        self._claim_traces[claim_id] = str(observation["trace_id"])
+        self.claim_story_status[str(observation["story_id"])] = "active"
+        self._active_claim_id = claim_id
+
     def run_scenario(self, scenario_id: str) -> dict[str, Any]:
-        event = self.activate_scenario(scenario_id)
+        if scenario_id == "new-fraud-claim" or scenario_id.startswith("new-fraud-claim:"):
+            event = self.raise_claim(scenario_id.partition(":")[2] or "any")
+        else:
+            event = self.activate_scenario(scenario_id)
         return {"scenario": scenario_id, "event": event.to_dict()}
 
     # -- observations ------------------------------------------------------
 
     def _trace_for_claim(self, claim_id: str) -> str:
-        for scenario_id, sensor in self._scenario_events.items():
-            if FRAUD_CLAIM_BY_SCENARIO[scenario_id] == claim_id:
-                return self._scenario_trace_overrides.get(scenario_id, sensor.trace_id)
+        trace = self._claim_traces.get(claim_id)
+        if trace is not None:
+            return trace
         raise ClaimObservationUnavailableError(
             f"claim {claim_id!r} has no active scenario"
         )
@@ -472,13 +591,9 @@ class ZavaBankWorld:
         if corporate is not None:
             records.append(corporate)
 
-        scenario_id = next(
-            scenario
-            for scenario, mapped in FRAUD_CLAIM_BY_SCENARIO.items()
-            if mapped == claim_id
-        )
+        scenario_id = self._claim_scenarios[claim_id]
         observation: dict[str, Any] = {
-            "story_id": FRAUD_STORY_BY_SCENARIO[scenario_id],
+            "story_id": FRAUD_STORY_BY_SCENARIO.get(scenario_id, f"SYN-STORY-{claim_id}"),
             "scenario_id": scenario_id,
             "trace_id": trace_id,
             "reimbursement_cap_gbp": FRAUD_REIMBURSEMENT_CAP_GBP,
@@ -614,10 +729,7 @@ class ZavaBankWorld:
             "fraud_claims": [
                 {
                     **_record_view(r),
-                    "raised": any(
-                        FRAUD_CLAIM_BY_SCENARIO[scenario_id] == r.id
-                        for scenario_id in self._scenario_events
-                    ),
+                    "raised": r.id in self._claim_scenarios,
                 }
                 for r in self.fraud_claims.values()
             ],

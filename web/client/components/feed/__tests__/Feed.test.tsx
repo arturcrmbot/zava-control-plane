@@ -81,4 +81,20 @@ describe("Feed", () => {
       expect(screen.getByRole("button", { name: /All activity/i }).className).toMatch(/bg-blue-600/);
     });
   });
+
+  it("reads back the filter value the feed itself writes to the URL", async () => {
+    const role = getRolePreset("ops-reviewer"); // default filter is "needs-you"
+    render(
+      <MemoryRouter initialEntries={["/?filter=all-activity"]}>
+        <ToastProvider>
+          <ResolutionProvider>
+            <Feed role={role} onOpenDrawer={() => {}} />
+          </ResolutionProvider>
+        </ToastProvider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /All activity/i }).className).toMatch(/bg-blue-600/);
+    });
+  });
 });

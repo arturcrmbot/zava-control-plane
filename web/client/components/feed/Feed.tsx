@@ -31,6 +31,8 @@ function filterFromUrl(rawMode: string | null): Partial<FilterState> | null {
   if (rawMode === "exceptions") return { mode: "needs-you" };
   if (rawMode === "needs-you") return { mode: "needs-you" };
   if (rawMode === "all") return { mode: "all-activity" };
+  // setFilter writes the mode itself into the URL, so it must read back.
+  if (rawMode === "all-activity") return { mode: "all-activity" };
   return null;
 }
 

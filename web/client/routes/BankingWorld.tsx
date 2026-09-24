@@ -42,16 +42,72 @@ const ROUTINE_EVENTS = new Set([
 const FUNCTIONS = ["all", "payments", "retail-banking", "financial-crime", "credit-risk", "markets"] as const;
 type FunctionFilter = typeof FUNCTIONS[number];
 
-type BankingScenarioName =
-  | "synthetic-app-fraud-claim"
-  | "synthetic-app-fraud-vulnerable"
-  | "synthetic-app-fraud-over-delegation";
-
-const SCENARIOS: Array<{ id: BankingScenarioName; label: string }> = [
-  { id: "synthetic-app-fraud-claim", label: "APP fraud claim · £18,400" },
-  { id: "synthetic-app-fraud-vulnerable", label: "Vulnerable customer · £6,750" },
-  { id: "synthetic-app-fraud-over-delegation", label: "Over-delegation · £92,000" },
+// Each action opens a NEW case. A claim's outcome follows from the facts the
+// world draws for it; the kind only shapes those facts.
+interface CaseAction { id: string; label: string; hint: string; kind: "claim" | "process" }
+const CASE_ACTIONS: CaseAction[] = [
+  { id: "new-fraud-claim", label: "Fraud claim reported", hint: "A customer reports an authorised push payment scam", kind: "claim" },
+  { id: "new-fraud-claim:high-value", label: "High-value claim", hint: "A claim above the claims manager's delegated authority", kind: "claim" },
+  { id: "new-fraud-claim:vulnerable", label: "Vulnerable customer claim", hint: "A claim from a customer with a vulnerability marker", kind: "claim" },
+  { id: "mule-account-investigation", label: "Mule activity detected", hint: "A receiving account shows a mule pattern", kind: "process" },
+  { id: "merchant-onboarding-risk", label: "Merchant risk flagged", hint: "A merchant application needs a risk decision", kind: "process" },
 ];
+const CASE_LABELS: Record<string, string> = {
+  "app-fraud-reimbursement": "Fraud claim",
+  "mule-account-investigation": "Mule investigation",
+  "merchant-onboarding-risk": "Merchant review",
+};
+const RECENT_CASES_CAP = 8;
+
+interface RecentCase { id: string; type: string; status: string; phase?: string; createdAt: number; refused: boolean }
+
+/** The bank's latest cases, newest first, each one openable. */
+function useRecentCases(): RecentCase[] {
+  const [cases, setCases] = useState<RecentCase[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await fetch("/api/workflows");
+        if (!response.ok) return;
+        const data: unknown = await response.json();
+        const rows = Array.isArray(data) ? data : [];
+        if (cancelled) return;
+        setCases(
+          rows
+            .filter((w: Record<string, unknown>) => typeof w.id === "string" && String(w.type) in CASE_LABELS)
+            .map((w: Record<string, unknown>) => ({
+              id: String(w.id),
+              type: String(w.type),
+              status: String(w.status ?? ""),
+              phase: text(w.currentPhase),
+              createdAt: Number(w.createdAt ?? 0),
+              refused: Boolean((w.metadata as Record<string, unknown> | undefined)?.rejected),
+            }))
+            .sort((a, b) => b.createdAt - a.createdAt)
+            .slice(0, RECENT_CASES_CAP),
+        );
+      } catch {
+        // Keep the last list on a transient failure; the next poll retries.
+      }
+    };
+    void load();
+    const timer = window.setInterval(() => void load(), 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+  return cases;
+}
+
+function caseStatus(c: RecentCase): { label: string; tone: string } {
+  if (c.refused) return { label: "refused by authority", tone: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300" };
+  if (c.status === "completed") return { label: "decided", tone: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" };
+  if (c.status === "failed") return { label: "failed", tone: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300" };
+  if (c.status === "awaiting_hitl") return { label: "awaiting decision", tone: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" };
+  return { label: "agents working", tone: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300" };
+}
 
 interface BankSnapshot extends WorldState {
   bank?: {
@@ -402,6 +458,7 @@ export default function BankingWorld({
   const [functionFilter, setFunctionFilter] = useState<FunctionFilter>("all");
   const [showRoutine, setShowRoutine] = useState(false);
   const pendingDecisions = usePendingDecisions();
+  const recentCases = useRecentCases();
   const derived = useMemo(() => deriveClaimStory(events), [events]);
   const [persistedStory, setPersistedStory] = useState<{ trace: string; steps: InterventionStep[] } | null>(null);
   // Facts accumulate so an outcome stays visible after its events leave the
@@ -450,9 +507,17 @@ export default function BankingWorld({
     return source.slice(-JOURNAL_CAP).reverse();
   }, [events, functionFilter, selectedActor, showRoutine]);
 
-  async function runScenario(name: BankingScenarioName) {
+  async function runAction(action: CaseAction) {
     setBusy(true);
-    try { await onRunScenario(name); } finally { setBusy(false); }
+    try {
+      if (action.kind === "claim") {
+        await onRunScenario(action.id);
+      } else {
+        await fetch(`/api/simulator/inject-burst?n=1&workflow_type=${encodeURIComponent(action.id)}`, { method: "POST" });
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -491,15 +556,34 @@ export default function BankingWorld({
 
         {error && <div data-testid="banking-error" className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">{error}</div>}
 
-        <section aria-label="Banking demo stories" className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+        <section aria-label="Make something happen" className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Stories</span>
-            {SCENARIOS.map((scenario) => (
-              <button key={scenario.id} type="button" disabled={busy || !bank.enabled} onClick={() => void runScenario(scenario.id)} className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-blue-950/30">
-                {scenario.label}
+            <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Make something happen</span>
+            {CASE_ACTIONS.map((action) => (
+              <button key={action.id} type="button" title={action.hint} disabled={busy || !bank.enabled} onClick={() => void runAction(action)} className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-blue-950/30">
+                {action.label}
               </button>
             ))}
           </div>
+        </section>
+
+        <section data-testid="recent-cases" aria-label="Recent cases" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"><Activity size={15} /> Recent cases</div>
+          {recentCases.length === 0 ? (
+            <div data-testid="recent-cases-empty" className="text-xs text-slate-400">No cases yet. Make something happen above.</div>
+          ) : (
+            <div className="grid gap-1.5 md:grid-cols-2">
+              {recentCases.map((c) => {
+                const status = caseStatus(c);
+                return (
+                  <a key={c.id} data-testid={`case-${c.id}`} href={`/workflows/${encodeURIComponent(c.id)}`} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-xs transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-800 dark:bg-slate-950/50 dark:hover:bg-blue-950/30">
+                    <span className="min-w-0 truncate"><span className="font-medium text-slate-800 dark:text-slate-100">{CASE_LABELS[c.type]}</span> <span className="font-mono text-slate-500">{c.id}</span>{c.phase ? <span className="text-slate-400"> · {c.phase}</span> : null}</span>
+                    <span className="flex shrink-0 items-center gap-2"><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${status.tone}`}>{status.label}</span><span className="text-blue-600 dark:text-blue-400">Open →</span></span>
+                  </a>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         <WorldObjectiveStrip testId="banking-objective" objectives={bank.objectives} />
