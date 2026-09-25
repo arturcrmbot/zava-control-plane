@@ -96,7 +96,7 @@ What changes in the walk:
 
 | Moment | With judgement on |
 |---|---|
-| 0:12 | The fraud decision manager reads the agent's reasoning. The chain shows *Fraud decision manager approved · fast judgement*, with the concerns it found, if any. |
+| 0:12 | The fraud decision manager reads the agent's reasoning. The chain shows *Fraud decision manager approved*, marked *quick check*, with the concerns it found, if any. |
 | A contradiction | If the agent's reasoning contradicts the record (e.g. says "no vulnerability marker" for a flagged customer), the manager holds it and hands it to the financial crime lead, who decides. Both steps show on the chain. |
 | A refusal | A refusal is never waved through on its £0 value: refusals always get a second pair of eyes. |
 | At the top of the chain | The last persona can send the case back to the agent with its reasons. The agent re-assesses once and the gate is raised again; the chain shows *sent it back to the agent*, then *approved after re-assessment*. |
@@ -106,7 +106,8 @@ Fallbacks are automatic and recorded on the decision:
 - Laya down or slow (2 s timeout; after three failures it is skipped for 30 s): the rules decide.
 - Deep-review budget spent or the LLM failing: the rules decide.
 
-Every decision records who decided (fast judgement, deep review or rules), each
+Every decision records who decided (Laya, an LLM deep review or the rules; the floor
+says *quick check*, *closer review* or *standard rules*), each
 question with its probabilities, the lead over the runner-up, and the
 threshold. It shows in the drawer and in `persona.judgement` events. Laya needs
 about 3 GB of memory; stop it after the slot.
@@ -115,7 +116,7 @@ about 3 GB of memory; stop it after the slot.
 
 With `BANKING_WORLD_SCREENING=1` the bank screens the payments it sees:
 - New payments arrive with references, and Laya matches each against described
-  scam patterns. The floor's *The bank noticed* panel lists the flags.
+  scam patterns. The floor's *Payments the bank flagged* panel lists them.
 - Flagged payments from two or more customers into one account open a mule
   investigation through a world sensor, so mule cases stop arriving on a timer.
   **Mule activity detected** now makes such payments land.
@@ -136,8 +137,13 @@ what fits who they are (Laya picks, from their profile and the time of day), get
 pay rent, and sometimes something happens to them. Scam crews pick tactics from what
 worked, and each target's caution is read by Laya from who they are; the bank's
 warning and the scam's fit do the rest. Victims realise, ring the bank, and the claim
-runs through the hero path. New customers join; some leave after a refusal. The
-floor's *Life in the bank* panel shows it, with who decided each thing.
+runs through the hero path. New customers join; some leave after a refusal.
+
+The floor becomes a page a banker can follow: *Today at Zava Bank* (customers, fraud
+attempts, money lost, what the bank finds out, claims decided), *Why customers did what
+they did*, *Losses nobody has reported yet*, *What the bank hasn't been told*, *Criminal
+groups*, then *How the bank responded*. Laya is named once, in the folded *How this
+simulation works*, with its numbers.
 
 The world opens at most `BANKING_WORLD_CASES_PER_HOUR` (default 10) cases on its own,
 so the agents' Copilot quota stays predictable.
@@ -146,7 +152,7 @@ so the agents' Copilot quota stays predictable.
 
 - **A customer calls about a payment.** Pick any recent payment on the floor and type
   what the customer says. The bank raises a claim on that payment and the whole hero
-  path runs on it. Laya's reading of the words shows next to it and is advisory: the
+  path runs on it. A first impression of the words (Laya's reading) shows next to it and is advisory: the
   record decides vulnerability, and the rules decide what is permitted. The list of
   payments holds still while you choose; press ↻ for newer ones. The bank refuses a
   call while the same customer or receiving account already has a case being

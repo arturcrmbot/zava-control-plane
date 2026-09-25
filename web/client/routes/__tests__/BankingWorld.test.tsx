@@ -240,9 +240,9 @@ describe("BankingWorld", () => {
     const strip = screen.getByTestId("banking-intervention");
     expect(await within(strip).findByText("Fraud decision manager held it")).toBeTruthy();
     const chain = strip.textContent ?? "";
-    expect(chain).toContain("fast judgement · Held for a closer look");
+    expect(chain).toContain("quick check · Held for a closer look");
     expect(chain).toContain("Financial crime lead approved");
-    expect(chain).toContain("deep review · Deep review: The record is consistent.");
+    expect(chain).toContain("closer review · The record is consistent.");
     expect(chain.indexOf("held it")).toBeLessThan(chain.indexOf("Financial crime lead approved"));
     expect(chain.indexOf("Financial crime lead approved")).toBeLessThan(chain.indexOf("Decision approved"));
   });
@@ -276,46 +276,81 @@ describe("BankingWorld", () => {
       customer_reactions: { accepts: 2, chases: 1, complains: 1 },
     } } as WorldState });
     expect(screen.getByTestId("noticed-counts").textContent).toBe("3 flagged of 40 screened · 1 mule cases open · 2 decided");
-    expect(screen.getByTestId("customer-reactions").textContent).toBe("Customers: 2 accepted · 1 chased · 1 complained");
-    expect(screen.getByTestId("flag-SYN-PAY-N00007").textContent).toContain("unlock fee · read by Laya");
+    expect(screen.getByTestId("customer-reactions").textContent).toBe("After a claim decision: 2 accepted it · 1 chased us · 1 complained");
+    expect(screen.getByTestId("flag-SYN-PAY-N00007").textContent).toContain("unlock fee · £900");
+    expect(screen.getByTestId("bank-noticed").textContent).not.toContain("Laya");
   });
 
-  it("explains the living world: the loop, Laya's odds, what the bank doesn't know", () => {
+  it("tells the living world in the bank's words and names Laya only in the folded explainer", () => {
     const decision = (kind: string, title: string, steps: unknown[], outcome: string) => ({ t: 1, when: "Friday night", kind, who: "x", profile: "Liam Chen, 21, a student.", title, steps, outcome });
-    renderBank({ state: { ...STATE, screening: { payments_screened: 90, payments_flagged: 3 }, life: {
-      people: 214, payments: 945, scams_tried: 54, scams_paid: 18, scams_stopped: 18, calls: 1, joined: 14, left: 0, life_events: 5,
-      decided_by_laya: 300, decided_by_rules: 20, laya_share: 0.94, laya_avg_ms: 88, cases_opened: 2, cases_per_hour: 10,
-      decisions: [decision("spend", "Liam Chen, Friday night", [{ by: "laya", question: "What is Liam most likely to spend money on right now?", chose: "eat_out", ms: 71,
-        options: [{ id: "eat_out", label: "Eating out or ordering a takeaway", p: 0.48 }, { id: "treat", label: "A night out", p: 0.21 }] }], "paid Lucky Noodle GBP 22: \"Takeaway\"")],
-      scam_decisions: [decision("scam", "Crew Harbour tried a romance scam on Dorothy Walsh", [
-        { by: "laya", question: "Which scam would most likely work on Dorothy?", chose: "romance", options: [{ id: "romance", label: "A fake online romance asking for money", p: 0.6 }] },
-        { by: "code", question: "Combines that caution, how well the scam fits and the bank's warning", chose: "pay", options: [{ id: "pay", label: "Do what the message asks and send the money", p: 0.62 }] },
-      ], "fell for a romance scam and sent GBP 900 despite the bank's warning")],
-      unknown_to_bank: [{ name: "Gareth Rossi", circumstance: "just out of hospital after a stroke" }],
-      crews: { "Crew Harbour": { romance: { tried: 2, paid: 1 } } },
-      stories: [{ t: 2, when: "Friday night", who: "Joan Chen", text: "Joan Chen called Zava Bank before paying a tax office penalty scam", by: "laya", kind: "scam" }],
-      feed: [],
-    } } });
-    const how = screen.getByTestId("how-it-works");
-    expect(how.textContent).toContain("214people");
-    expect(how.textContent).toContain("94% of all choices · 88 ms each · no tokens");
-    expect(how.textContent).toContain("2 cases opened (limit 10/h)");
-    const decisions = screen.getByTestId("laya-decisions");
-    expect(within(decisions).getByTestId("decision-scam").textContent).toContain("Crew Harbour tried a romance scam on Dorothy Walsh");
-    const spend = within(decisions).getByTestId("decision-spend");
-    expect(spend.textContent).toContain("Laya · 71 msWhat is Liam most likely to spend money on right now?");
+    renderBank({ state: { ...STATE, sim_time: 1440 * 4 + 19 * 60 + 5, screening: { payments_screened: 90, payments_flagged: 3 },
+      reimbursement_evaluations: [{ id: "E1", claim_id: "C1", reimbursed_gbp: 900 }, { id: "E2", claim_id: "C2", reimbursed_gbp: 0 }],
+      life: {
+        people: 214, payments: 945, scams_tried: 54, scams_paid: 18, scams_stopped: 18, scams_ignored: 18, calls: 1, joined: 14, left: 0, life_events: 5,
+        lost_gbp: 23_450, unreported_count: 2, unreported_gbp: 3_100,
+        unreported: [{ name: "Nadia Shah", amount_gbp: 2_200, scam: "fake bank fraud team", hours_ago: 3.4 }, { name: "Olu Wright", amount_gbp: 900, scam: "romance", hours_ago: 0.5 }],
+        decided_by_laya: 300, decided_by_rules: 20, laya_share: 0.94, laya_avg_ms: 88, cases_opened: 2, cases_per_hour: 10,
+        decisions: [decision("spend", "Liam Chen, Friday night", [{ by: "laya", question: "What is Liam most likely to spend money on right now?", chose: "eat_out", ms: 71,
+          options: [{ id: "eat_out", label: "Eating out or ordering a takeaway", p: 0.48 }, { id: "treat", label: "A night out", p: 0.21 }] }], "paid Lucky Noodle £22: \"Takeaway\""),
+          { ...decision("spend", "Rhys Singh decides what to spend on", [{ by: "laya", question: "What is Rhys most likely to spend money on right now?", chose: "groceries",
+            options: [{ id: "eat_out", label: "Eating out", p: 0.43 }, { id: "shop_online", label: "Buying something online", p: 0.19 },
+              { id: "bills", label: "Paying a household bill", p: 0.13 }, { id: "groceries", label: "Doing the food shopping", p: 0.1 }] }], "paid Market Basket £16"), t: 2 }],
+        scam_decisions: [decision("scam", "Crew Harbour tried a romance scam on Dorothy Walsh", [
+          { by: "laya", question: "Which scam would most likely work on Dorothy?", chose: "romance", options: [{ id: "romance", label: "A fake online romance asking for money", p: 0.6 }] },
+          { by: "code", question: "What Dorothy does, after the bank's warning", chose: "pay", options: [{ id: "pay", label: "Do what the message asks and send the money", p: 0.62 }] },
+        ], "fell for a romance scam and sent £900 despite the bank's warning")],
+        unknown_to_bank: [{ name: "Gareth Rossi", circumstance: "just out of hospital after a stroke" }],
+        crews: { "Crew Harbour": { romance: { tried: 2, paid: 1 } } },
+        stories: [{ t: 2, when: "Friday night", who: "Joan Chen", text: "Joan Chen called Zava Bank before paying a tax office penalty scam", by: "laya", kind: "scam" }],
+        feed: [],
+      } } as WorldState });
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Zava Bank");
+    expect(screen.getByTestId("world-clock").textContent).toBe("Friday 19:05");
+    const today = screen.getByTestId("bank-today");
+    expect(today.textContent).toContain("214customers");
+    expect(today.textContent).toContain("£23,450lost by 18 customers");
+    expect(today.textContent).toContain("18 checked with us first · 18 ignored it");
+    expect(today.textContent).toContain("3 payments flagged by screening · 2 losses not reported yet");
+    expect(today.textContent).toContain("2claims decided");
+    expect(today.textContent).toContain("£900 refunded · 0 waiting for a manager");
+    const decisions = screen.getByTestId("customer-decisions");
+    const scam = within(decisions).getByTestId("decision-scam");
+    expect(scam.textContent).toContain("Crew Harbour tried a romance scam on Dorothy Walsh");
+    expect(scam.textContent).toContain("What Dorothy does, after the bank's warning");
+    const spend = within(decisions).getAllByTestId("decision-spend")[0];
+    expect(spend.textContent).toContain("What is Liam most likely to spend money on right now?");
     expect(spend.textContent).toContain("✓ Eating out or ordering a takeaway");
     expect(spend.textContent).toContain("48%");
-    expect(spend.textContent).toContain("→ paid Lucky Noodle GBP 22");
+    expect(spend.textContent).toContain("→ paid Lucky Noodle £22");
+    // An unlikely choice is still shown, in place of the third likeliest.
+    const unlikely = within(decisions).getAllByTestId("decision-spend")[1];
+    expect(unlikely.textContent).toContain("✓ Doing the food shopping");
+    expect(unlikely.textContent).not.toContain("Paying a household bill");
+    expect(screen.getByTestId("unreported-total").textContent).toBe("2 customers · £3,100");
+    expect(screen.getByTestId("unreported-losses").textContent).toContain("Nadia Shah · fake bank fraud team£2,200 · 3 h ago");
     expect(screen.getByTestId("unknown-to-bank").textContent).toContain("Gareth Rossi just out of hospital after a stroke");
     expect(screen.getByTestId("crew-board").textContent).toContain("romance 1/2");
     expect(screen.getByTestId("life-stories").textContent).toContain("Joan Chen called Zava Bank before paying");
     expect((screen.getByTestId("bank-infrastructure") as HTMLDetailsElement).open).toBe(false);
-    expect(screen.getByTestId("laya-chip").textContent?.trim()).toBe("Laya · 88 ms per choice · no tokens");
     expect(screen.queryByTestId("bank-stat-mtm")).toBeNull();
+    expect(screen.queryByTestId("banking-objective")).toBeNull();
+    // Laya is named once, in the folded explainer, with what it has done.
+    const about = screen.getByTestId("about-simulation") as HTMLDetailsElement;
+    expect(about.open).toBe(false);
+    expect(screen.getByTestId("about-numbers").textContent).toContain("320 customer choices, 94% by Laya (about 88 ms each)");
+    const page = screen.getByTestId("banking-world-route").textContent ?? "";
+    expect(page.replace(about.textContent ?? "", "")).not.toMatch(/Laya| ms\b|tokens/);
   });
 
-  it("shows how the persona read the agent's reasoning for the case on screen", async () => {
+  it("names the claimant on the latest claim when the world knows who they are", () => {
+    renderBank({ events: [ROUTINE, ...APPROVED_TRACE], state: { ...STATE, life: { people: 200, claimants: { "SYN-CUST-0007": "Rosa Taylor" } } } as WorldState });
+    const strip = screen.getByTestId("banking-intervention");
+    expect(strip.textContent).toContain("The latest claim, step by step");
+    expect(strip.textContent).toContain("Rosa Taylor");
+    expect(strip.textContent).not.toContain("SYN-CUST-0007");
+  });
+
+  it("shows what the manager checked in the agent's reasoning for the case on screen", async () => {
     details["/api/workflows/bapp-evt-11"] = { workflow: { payload: {
       decisions: [{ persona_role: "fraud_decision_manager", verdict: "hold", decided_by: "laya", judgement: {
         summary: "Held for a closer look.", laya_ms: 154, concerns: ["the agent's reasoning says there is no vulnerability marker, but the record shows one"],
@@ -323,10 +358,12 @@ describe("BankingWorld", () => {
     } } };
     renderBank({ events: [ROUTINE, ...APPROVED_TRACE, ...APPROVED_OUTCOME], state: { ...STATE, life: { people: 200, decisions: [], scam_decisions: [] } } });
     const panel = await screen.findByTestId("persona-readings");
-    expect(panel.textContent).toContain("How the fraud decision manager read the agent's reasoning");
+    expect(panel.textContent).toContain("What the fraud decision manager checked before deciding");
     expect(panel.textContent).toContain("Does the text say there is no vulnerability flag?");
-    expect(panel.textContent).toContain("94% yes");
-    expect(panel.textContent).toContain("Decided by fast judgement in 154 ms: Held for a closer look.");
+    expect(panel.textContent).toContain("Yes 94%");
+    expect(panel.textContent).toContain("Found: the agent's reasoning says there is no vulnerability marker");
+    expect(panel.textContent).toContain("Decision: Held for a closer look.");
+    expect(panel.textContent).not.toMatch(/Laya|154/);
   });
 
   it("hides the noticed panel when the bank does not screen", () => {
@@ -343,7 +380,7 @@ describe("BankingWorld", () => {
     fireEvent.change(within(panel).getByLabelText("What the customer says"), { target: { value: "My bank's fraud team told me to move my savings." } });
     fireEvent.click(within(panel).getByRole("button", { name: "Report the call" }));
     const result = await within(panel).findByTestId("customer-call-result");
-    expect(result.textContent).toBe("Claim SYN-CLAIM-C001 raised · Laya read: bank impersonation · noted: bereavement (advisory; the record decides)");
+    expect(result.textContent).toBe("Claim SYN-CLAIM-C001 raised · first impression: bank impersonation · noted: bereavement. The evidence decides.");
     const call = (fetch as unknown as { mock: { calls: [string, RequestInit?][] } }).mock.calls.find(([url]) => url === "/api/world/customer-calls");
     expect(JSON.parse(String(call?.[1]?.body))).toEqual({ payment_id: "SYN-PAY-0100", statement: "My bank's fraud team told me to move my savings." });
   });
@@ -446,7 +483,18 @@ describe("BankingWorld", () => {
       payload: { decisions: [{ persona_role: "financial_crime_lead", verdict: "approve", decided_by: "laya", judgement: { summary: "Approved." } }] },
     }];
     renderBank();
-    expect((await screen.findByTestId("judged-BMUL-0002")).textContent).toBe("Financial crime lead · fast judgement");
+    expect((await screen.findByTestId("judged-BMUL-0002")).textContent).toBe("Financial crime lead approved");
+  });
+
+  it("names the customer and the amount on a recent case in the living world", async () => {
+    workflows = [{
+      id: "bapp-evt-00000565", type: "app-fraud-reimbursement", status: "completed", currentPhase: "Verify Reimbursement Outcome", createdAt: 10, metadata: {},
+      payload: { observation: { claim: { id: "SYN-CLAIM-C001", customer_id: "SYN-CUST-2361", amount_gbp: 2510 } },
+        decisions: [{ persona_role: "fraud_decision_manager", verdict: "approve", decided_by: "laya", judgement: { summary: "Approved." } }] },
+    }];
+    renderBank({ state: { ...STATE, life: { people: 200, claimants: { "SYN-CUST-2361": "Priya Jones" } } } as WorldState });
+    expect((await screen.findByTestId("case-who-bapp-evt-00000565")).textContent).toBe(" · Priya Jones · £2,510");
+    expect(screen.getByTestId("judged-bapp-evt-00000565").textContent).toBe("Fraud decision manager approved");
   });
 
   it("shows no decisions waiting when the queue is empty", () => {

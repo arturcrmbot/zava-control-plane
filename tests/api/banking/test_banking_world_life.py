@@ -66,6 +66,21 @@ def test_a_victim_who_realises_calls_the_bank_and_the_claim_follows(life_on) -> 
     # A private life is world truth: the bank's evidence carries only the record and the call.
     assert person.who() not in observation and person.stage["who"] not in observation
     assert CIRCUMSTANCES.get(person.circumstance or "", ("never in evidence",))[0] not in observation
+    # The floor names the claimant from the world, not by customer number.
+    assert world.render_state()["life"]["claimants"][claim.customer_id] == person.name
+
+
+def test_the_floor_counts_what_was_lost_and_what_nobody_has_told_the_bank(life_on) -> None:
+    world = _world()
+    world.life.dial = CaseDial(0)  # one call gets through; the rest wait
+    _run(world, 48)
+    life = world.render_state()["life"]
+    silent = [p for p in world.life.people.values() if p.scam and not p.scam["called"]]
+    assert life["scams_paid"] > 0 and life["lost_gbp"] >= life["unreported_gbp"] > 0
+    assert life["unreported_count"] == len(silent)
+    assert life["unreported_gbp"] == round(sum(p.scam["amount"] for p in silent), 2)
+    assert {row["name"] for row in life["unreported"]} <= {p.name for p in silent}
+    assert all(row["amount_gbp"] > 0 and row["hours_ago"] >= 0 for row in life["unreported"])
 
 
 class _Laya:
@@ -127,3 +142,21 @@ def test_a_customer_let_down_by_the_bank_may_leave(life_on) -> None:
     assert world.customers[person.customer_id].status == "left"
     assert world.render_state()["bank"]["customer_count"] == len(world.customers) - 1
     assert any(e.type == "banking.customer.left" for e in world.runtime.journal)
+
+
+def test_leaving_follows_what_the_bank_did(life_on) -> None:
+    from types import SimpleNamespace
+
+    world = _world()
+    person = next(iter(world.life.people.values()))
+    claim_id = next(c.id for c in world.fraud_claims.values())
+    world.fraud_claims[claim_id].customer_id = person.customer_id
+    person.switch = 3  # read once per person: moves at the first real problem
+    odds = {}
+    for option, outcome in (("SYN-APP-OPTION-REIMBURSE-FULL", "fully refunded"), ("SYN-APP-OPTION-REFUSE-CAUTION", "refused")):
+        world.life.on_decision(SimpleNamespace(payload={"claim_id": claim_id, "option_id": option}))
+        trace = world.life.decisions[0]
+        assert trace["title"] == f"{person.name}, after being {outcome}"
+        odds[outcome] = next(o["p"] for o in trace["steps"][1]["options"] if o["id"] == "yes")
+    # Even the least loyal customer rarely leaves after a full refund.
+    assert odds["fully refunded"] < 0.05 and odds["refused"] > 0.5

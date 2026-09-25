@@ -5,11 +5,13 @@ export function WorldInterventionStrip({
   trace,
   steps,
   onTrace,
+  title = "Durable intervention",
 }: {
   testId: string;
   trace: string;
   steps: InterventionStep[];
   onTrace: (trace: string) => void;
+  title?: string;
 }) {
   return (
     <section
@@ -18,7 +20,7 @@ export function WorldInterventionStrip({
     >
       <div className="flex items-center justify-between pb-2">
         <h2 className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-          Durable intervention
+          {title}
         </h2>
         <button
           type="button"

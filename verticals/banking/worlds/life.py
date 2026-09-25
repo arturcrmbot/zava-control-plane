@@ -187,6 +187,16 @@ VICTIM_OPTIONS = {
     "ignore": "Ignore it, it looks like a scam",
 }
 
+# Measured: asked whether a customer would move banks after a claim, Laya says
+# yes about 0.9 of the time even after a full refund (more than after a
+# refusal). It does read how readily a person switches from who they are
+# (rarely checks their balance ~0.2, careful ~0.9, impulsive ~1.9), so it rates
+# that once per person and code weighs it against what the bank did.
+SWITCH_LEVELS = ("Never: stays with the same bank whatever happens", "Rarely: would need a lot to go wrong",
+                 "Sometimes: would think about moving", "Quickly: moves at the first real problem")
+LEAVE_AFTER = {"refused": 0.5, "partly refunded": 0.2, "fully refunded": 0.03}
+LEAVE_OPTIONS = {"yes": "Move to another bank", "no": "Stay with Zava Bank"}
+
 
 # -- Laya, with a seeded draw and a rules fallback ------------------------------------------------
 
@@ -347,6 +357,9 @@ class Person:
     caution: int | None = None
     caution_by: str = "rules"
     caution_odds: dict[str, float] | None = None
+    switch: int | None = None
+    switch_by: str = "rules"
+    switch_odds: dict[str, float] | None = None
     since: float = -1.0
     diary: deque = field(default_factory=lambda: deque(maxlen=4))
 
@@ -383,6 +396,7 @@ class Life:
         self.counts = {"payments": 0, "scams_tried": 0, "scams_paid": 0, "scams_stopped": 0,
                        "scams_ignored": 0, "calls": 0, "joined": 0, "left": 0, "life_events": 0}
         self._spent_gbp = 0.0
+        self._lost_gbp = 0.0
 
     # -- install ----------------------------------------------------------------------------
 
@@ -565,13 +579,13 @@ class Life:
         if self._pay(person, payee, reference, amount) is None:
             return
         if payee in self.payee_names:
-            text = f"{person.name} paid {self.payee_names[payee]} GBP {amount:,.0f}: \"{reference}\""
+            text = f"{person.name} paid {self.payee_names[payee]} {_gbp(amount)}: \"{reference}\""
         else:
-            text = f"{person.name} sent GBP {amount:,.0f} to family: \"{reference}\""
+            text = f"{person.name} sent {_gbp(amount)} to family: \"{reference}\""
         self._note(person, text, by, "payment")
         if decision is not None:
             first = person.name.split()[0]
-            self._trace("spend", person, f"{person.name}, {_when(float(self.world.runtime.now))}",
+            self._trace("spend", person, f"{person.name} decides what to spend on",
                         [step(f"What is {first} most likely to spend money on right now?", SPEND_OPTIONS, decision)],
                         text.replace(person.name + " ", "", 1))
 
@@ -595,7 +609,7 @@ class Life:
                 tactic = draw(odds, self.rng)
                 first = person.name.split()[0]
                 steps = [step(f"Which scam would most likely work on {first}?", FIT_OPTIONS, fit, mark=False),
-                         step(f"{crew} weighs that against what has worked for it", FIT_OPTIONS,
+                         step(f"What {crew} tries, leaning on what has worked for it before", FIT_OPTIONS,
                               Decision(tactic, "code", odds))]
                 self._approach(crew, tactic, person, fit.by, steps)
 
@@ -629,7 +643,7 @@ class Life:
             caution = Decision(str(person.caution or 0), person.caution_by, person.caution_odds or {str(person.caution or 0): 1.0})
             trail = list(steps or []) + [
                 step(f"How easily could a stranger talk {first} into sending money?", dict(enumerate(CAUTION_LEVELS)), caution),
-                step("Combines that caution, how well the scam fits and " + ("the bank's warning" if warning else "no warning shown"),
+                step(f"What {first} does" + (", after the bank's warning" if warning else ", with no warning from the bank"),
                      VICTIM_OPTIONS, Decision(choice, "code", odds)),
             ]
             self._victim(crew, tactic_id, person, amount, warning, choice, person.caution_by, trail)
@@ -661,7 +675,8 @@ class Life:
                                "at": float(self.world.runtime.now), "called": False}
                 self.counts["scams_paid"] += 1
                 record[tactic_id][1] += 1
-                text = (f"{person.name} fell for a {label} scam and sent GBP {amount:,.0f}"
+                self._lost_gbp += amount
+                text = (f"{person.name} fell for a {label} scam and sent {_gbp(amount)}"
                         + (" despite the bank's warning" if warning else ""))
                 self._note(person, text, by, "scam")
                 self._trace("scam", person, f"{crew} tried a {label} scam on {person.name}", steps or [],
@@ -698,7 +713,7 @@ class Life:
         scam = person.scam
         if not scam or scam["called"] or not self.dial.take():
             return
-        statement = TACTICS[scam["tactic"]]["call"].format(amount=f"GBP {scam['amount']:,.0f}")
+        statement = TACTICS[scam["tactic"]]["call"].format(amount=_gbp(scam["amount"]))
         if person.circumstance:
             statement += " " + CIRCUMSTANCES[person.circumstance][1]
         scam["called"] = True
@@ -764,17 +779,34 @@ class Life:
         option = str(applied.payload.get("option_id") or "")
         outcome = ("refused" if "REFUSE" in option else "partly refunded" if "CAPPED" in option or "PARTIAL" in option
                    else "fully refunded")
-        state = {"person": person.who(),
-                 "what happened": f"Zava Bank {outcome} their GBP {claim.amount_gbp:,.0f} scam claim."}
-        fallback = {"yes": 0.6 if outcome == "refused" else 0.05, "no": 1.0}
-        self.chooser.choose(state, yes_no("Would this person move their account to another bank?"),
-                            fallback, lambda d: self._leave(person, outcome, d.choice, d.by, d))
 
-    def _leave(self, person: Person, outcome: str, answer: str, by: str, decision: Decision | None = None) -> None:
-        if decision is not None:
+        def decide() -> None:
+            level = person.switch or 0
+            leave = min(0.9, LEAVE_AFTER[outcome] * (0.4 + 0.4 * level))
+            odds = {"yes": leave, "no": 1 - leave}
+            choice = draw(odds, self.rng)
             first = person.name.split()[0]
-            self._trace("leave", person, f"{person.name}, after being {outcome}",
-                        [step(f"Would {first} move their account to another bank?", {"yes": "Yes, leave", "no": "No, stay"}, decision)],
+            readiness = Decision(str(level), person.switch_by, person.switch_odds or {str(level): 1.0})
+            self._leave(person, outcome, choice, person.switch_by, [
+                step(f"How quickly would {first} move to another bank after being let down?", dict(enumerate(SWITCH_LEVELS)), readiness),
+                step(f"What {first} does, after being {outcome}", LEAVE_OPTIONS, Decision(choice, "code", odds)),
+            ])
+
+        if person.switch is not None:
+            decide()
+            return
+
+        def read(d: Decision) -> None:
+            person.switch, person.switch_by, person.switch_odds = int(d.choice), d.by, d.odds
+            decide()
+
+        self.chooser.choose({"person": person.who()},
+                            rating("How quickly would this person move to another bank after being let down?", SWITCH_LEVELS),
+                            {"0": 1.0, "1": 2.0, "2": 1.5, "3": 0.5}, read, min_lead=0.0)
+
+    def _leave(self, person: Person, outcome: str, answer: str, by: str, steps: list[dict[str, Any]] | None = None) -> None:
+        if steps:
+            self._trace("leave", person, f"{person.name}, after being {outcome}", steps,
                         "closes the account" if answer == "yes" else "stays with Zava Bank")
         if answer != "yes":
             self._note(person, f"{person.name} is staying with Zava Bank after being {outcome}", by, "stay")
@@ -799,7 +831,19 @@ class Life:
             key=lambda p: p.since, reverse=True)[:8]
         crews = {crew: {TACTICS[t]["label"]: {"tried": r[0], "paid": r[1]} for t, r in record.items() if r[0]}
                  for crew, record in sorted(self.crew_record.items())}
+        # Scammed, not yet told the bank: to the bank it is just a payment.
+        now = float(self.world.runtime.now)
+        unreported = sorted((p for p in self.people.values() if p.scam and not p.scam["called"]),
+                            key=lambda p: p.scam["at"], reverse=True)
+        claimants = {c.customer_id: self.people[c.customer_id].name
+                     for c in self.world.fraud_claims.values() if c.customer_id in self.people}
         return {"people": active, **self.counts, "spent_gbp": round(self._spent_gbp, 2),
+                "lost_gbp": round(self._lost_gbp, 2),
+                "unreported_count": len(unreported),
+                "unreported_gbp": round(sum(p.scam["amount"] for p in unreported), 2),
+                "unreported": [{"name": p.name, "amount_gbp": p.scam["amount"], "scam": TACTICS[p.scam["tactic"]]["label"],
+                                "hours_ago": round((now - p.scam["at"]) / 60, 1)} for p in unreported[:6]],
+                "claimants": claimants,
                 "decided_by_laya": decided["laya"], "decided_by_rules": decided["rules"],
                 "laya_share": round(decided["laya"] / total, 3) if total else 0.0,
                 "laya_avg_ms": self.chooser.avg_ms(),
@@ -812,6 +856,10 @@ class Life:
 _MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September",
            "October", "November", "December")
 _DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+
+
+def _gbp(amount: float) -> str:
+    return f"£{amount:,.0f}"
 
 
 def _when(now_minutes: float) -> str:

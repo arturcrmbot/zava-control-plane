@@ -23,7 +23,7 @@ import { type WorldEvent, type WorldState } from "@client/hooks/useWorldSimulati
 import { WorldInterventionStrip } from "@client/components/WorldInterventionStrip";
 import { WorldObjectiveStrip } from "@client/components/WorldObjectiveStrip";
 import { type InterventionStep } from "@client/lib/worldIntervention";
-import { CrewBoard, HowItWorks, LayaDecisions, LifeStories, PersonaReadings, UnknownToBank, type JudgedCounts, type Life, type PersonaReading } from "./LivingWorld";
+import { AboutSimulation, CrewBoard, CustomerDecisions, HOW_DECIDED, LifeStories, PersonaReadings, TodayAtZava, UnknownToBank, UnreportedLosses, type JudgedCounts, type Life, type PersonaReading } from "./LivingWorld";
 
 const RAIL_CAP = 8;
 const CLAIM_CAP = 8;
@@ -60,16 +60,23 @@ const CASE_LABELS: Record<string, string> = {
 };
 const RECENT_CASES_CAP = 8;
 
-interface RecentCase { id: string; type: string; status: string; phase?: string; createdAt: number; refused: boolean; judged?: JudgedDecision }
+interface RecentCase { id: string; type: string; status: string; phase?: string; createdAt: number; refused: boolean; judged?: JudgedDecision; customerId?: string; amount?: number }
 
 /** A persona decision reached by judgement, as the persona responder records it. */
 interface JudgedDecision {
   persona: string; verdict: string; decidedBy: string; summary?: string; round?: number;
-  readings?: PersonaReading[]; concerns?: string[]; layaMs?: number; reviewMs?: number;
+  readings?: PersonaReading[]; concerns?: string[];
 }
 
-const DECIDED_BY: Record<string, string> = { laya: "fast judgement", llm: "deep review", rules: "rules" };
+const DECIDED_BY = HOW_DECIDED;
 const VERDICT_WORDS: Record<string, string> = { approve: "approved", hold: "held it", reject: "declined", escalate: "escalated", send_back: "sent it back to the agent" };
+
+/** A closer review's summary opens with its own label; the floor names how it was decided once. */
+function reviewSummary(summary: string | undefined): string | undefined {
+  if (!summary) return summary;
+  const plain = summary.replace(/^Deep review:\s*/i, "");
+  return plain.charAt(0).toUpperCase() + plain.slice(1);
+}
 
 function judgedDecisions(decisions: unknown): JudgedDecision[] {
   if (!Array.isArray(decisions)) return [];
@@ -80,13 +87,10 @@ function judgedDecisions(decisions: unknown): JudgedDecision[] {
     if (!decidedBy || !persona) return [];
     const judgement = (row.judgement ?? {}) as Record<string, unknown>;
     const round = Number(row.round ?? 0);
-    const review = (judgement.deep_review ?? {}) as Record<string, unknown>;
     return [{
-      persona, verdict: String(row.verdict ?? ""), decidedBy, summary: text(judgement.summary) ?? text(row.reason), round: round > 0 ? round : undefined,
+      persona, verdict: String(row.verdict ?? ""), decidedBy, summary: reviewSummary(text(judgement.summary) ?? text(row.reason)), round: round > 0 ? round : undefined,
       readings: Array.isArray(judgement.readings) ? (judgement.readings as PersonaReading[]) : undefined,
       concerns: Array.isArray(judgement.concerns) ? (judgement.concerns as unknown[]).map(String) : undefined,
-      layaMs: typeof judgement.laya_ms === "number" ? judgement.laya_ms : undefined,
-      reviewMs: typeof review.latency_ms === "number" ? review.latency_ms : undefined,
     }];
   });
 }
@@ -143,6 +147,12 @@ function withJudgement(steps: InterventionStep[], trail: JudgedDecision[]): Inte
   return at < 0 ? [...steps, ...judged] : [...steps.slice(0, at), ...judged, ...steps.slice(at)];
 }
 
+/** Name the customer on the claim's story when the world knows who they are. */
+function named(steps: InterventionStep[], names: Record<string, string> | undefined): InterventionStep[] {
+  if (!names) return steps;
+  return steps.map((s) => (s.detail ? { ...s, detail: s.detail.replace(/SYN-CUST-\d+/g, (id) => names[id] ?? id) } : s));
+}
+
 interface StatementReading { scam_type?: string; scam_lead?: number; cues?: string[]; read_by?: string }
 const SCAM_LABELS: Record<string, string> = {
   bank_impersonation: "bank impersonation",
@@ -187,9 +197,9 @@ function CustomerCallPanel({ settlements }: { settlements: RecentSettlement[] })
       }
       const reading = body.reading;
       const read = reading
-        ? `${reading.read_by === "laya" ? "Laya read" : "Rules read"}: ${SCAM_LABELS[reading.scam_type ?? "unclear"] ?? reading.scam_type}${reading.cues?.length ? ` · noted: ${reading.cues.join(", ")}` : ""}`
-        : "no reading";
-      setResult({ ok: true, text: `Claim ${body.claim_id} raised · ${read} (advisory; the record decides)` });
+        ? ` · first impression: ${SCAM_LABELS[reading.scam_type ?? "unclear"] ?? reading.scam_type}${reading.cues?.length ? ` · noted: ${reading.cues.join(", ")}` : ""}. The evidence decides.`
+        : "";
+      setResult({ ok: true, text: `Claim ${body.claim_id} raised${read}` });
       setStatement("");
       setPaymentId("");
       setOptions(settlements);
@@ -296,6 +306,7 @@ function useRecentCases(): RecentCase[] {
           rows
             .filter((w: Record<string, unknown>) => typeof w.id === "string" && String(w.type) in CASE_LABELS)
             .map((w: Record<string, unknown>) => ({
+              ...claimOf(w.payload),
               id: String(w.id),
               type: String(w.type),
               status: String(w.status ?? ""),
@@ -319,6 +330,13 @@ function useRecentCases(): RecentCase[] {
     };
   }, []);
   return cases;
+}
+
+/** Who the case is about and how much, from the claim the agents were given. */
+function claimOf(payload: unknown): { customerId?: string; amount?: number } {
+  const observation = ((payload ?? {}) as Record<string, unknown>).observation as Record<string, unknown> | undefined;
+  const claim = (observation?.claim ?? {}) as Record<string, unknown>;
+  return { customerId: text(claim.customer_id), amount: typeof claim.amount_gbp === "number" ? claim.amount_gbp : undefined };
 }
 
 function caseStatus(c: RecentCase): { label: string; tone: string } {
@@ -385,9 +403,9 @@ function NoticedPanel({ screening }: { screening: Screening }) {
   return (
     <section data-testid="bank-noticed" aria-label="What the bank noticed" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-        <span className="font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">The bank noticed</span>
+        <span className="font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Payments the bank flagged</span>
         <span data-testid="noticed-counts" className="text-slate-600 dark:text-slate-300">{compactInt(screening.payments_flagged)} flagged of {compactInt(screening.payments_screened)} screened · {compactInt(screening.mule_cases_open)} mule cases open · {compactInt(screening.mule_cases_decided)} decided</span>
-        <span data-testid="customer-reactions" className="text-slate-600 dark:text-slate-300">Customers: {compactInt(reactions.accepts)} accepted · {compactInt(reactions.chases)} chased · {compactInt(reactions.complains)} complained</span>
+        <span data-testid="customer-reactions" className="text-slate-600 dark:text-slate-300">After a claim decision: {compactInt(reactions.accepts)} accepted it · {compactInt(reactions.chases)} chased us · {compactInt(reactions.complains)} complained</span>
       </div>
       {flags.length === 0 ? (
         <div className="text-xs text-slate-400">Nothing suspicious yet. New payments are screened as they arrive.</div>
@@ -395,7 +413,7 @@ function NoticedPanel({ screening }: { screening: Screening }) {
         <ul className="grid gap-1 md:grid-cols-2">
           {flags.map((flag) => (
             <li key={flag.payment_id} data-testid={`flag-${flag.payment_id}`} className="truncate rounded-lg border border-red-100 bg-red-50/60 px-2.5 py-1 text-[11px] text-slate-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-slate-200">
-              “{flag.reference}” → <span className="font-mono">{flag.beneficiary_id}</span> · {PATTERN_LABELS[flag.pattern] ?? flag.pattern} · {flag.screened_by === "laya" ? "read by Laya" : "keyword rules"}
+              “{flag.reference}” → <span className="font-mono">{flag.beneficiary_id}</span> · {PATTERN_LABELS[flag.pattern] ?? flag.pattern} · {money(flag.amount_gbp)}
             </li>
           ))}
         </ul>
@@ -489,6 +507,11 @@ function duration(minutes: number | undefined): string {
   if (m >= 1440 && m % 1440 === 0) return `${m / 1440}-day cycle`;
   if (m >= 60 && m % 60 === 0) return `${m / 60} h window`;
   return `${m} min window`;
+}
+const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+function weekClock(minutes: number | undefined): string {
+  const m = n(minutes);
+  return `${WEEKDAYS[Math.floor(m / 1440) % 7]} ${String(Math.floor((m % 1440) / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 function simClock(minutes: number | undefined): string {
   const m = n(minutes);
@@ -762,11 +785,14 @@ export default function BankingWorld({
 
   const story = derived ?? persistedStory;
   const { trail, gate } = useDecisionTrail(story?.workflowId);
-  const storySteps = useMemo(() => (story ? withJudgement(story.steps, trail) : []), [story, trail]);
+  const claimants = bank.life?.claimants;
+  const storySteps = useMemo(() => (story ? named(withJudgement(story.steps, trail), claimants) : []), [story, trail, claimants]);
   const raisedClaims = useMemo(() => (bank.fraud_claims ?? []).filter((claim) => claim.raised), [bank.fraud_claims]);
   const openClaims = raisedClaims.filter((claim) => claim.status !== "reimbursed" && claim.status !== "refused" && !claimFacts.get(claim.id)?.closed);
   const pendingWorkflowIds = useMemo(() => new Set(pendingDecisions.map((row) => row.workflowId)), [pendingDecisions]);
   const living = Boolean(bank.life);
+  const evaluations = bank.reimbursement_evaluations ?? [];
+  const refunded = evaluations.reduce((sum, e) => sum + (e.reimbursed_gbp ?? 0), 0);
   const judgedCounts = useMemo<JudgedCounts>(() => {
     const counts: JudgedCounts = { laya: 0, llm: 0, rules: 0 };
     for (const c of recentCases) if (c.judged && c.judged.decidedBy in counts) counts[c.judged.decidedBy as keyof JudgedCounts] += 1;
@@ -822,8 +848,8 @@ export default function BankingWorld({
               <div className="flex items-center gap-3">
                 <div className="rounded-xl bg-blue-600 p-2 text-white shadow-sm shadow-blue-500/30"><Landmark size={22} /></div>
                 <div>
-                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">Bank operations</h1>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{bank.life ? `Zava Bank · synthetic · ${compactInt(bank.life.people)} people living their lives through Laya, a small model on this machine` : "Zava Bank · synthetic"}</p>
+                  <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">{living ? "Zava Bank" : "Bank operations"}</h1>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{living ? "A fictional UK retail bank, running live: its customers, the fraud aimed at them, and how the bank responds." : "Zava Bank · synthetic"}</p>
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
@@ -833,8 +859,7 @@ export default function BankingWorld({
                 <span data-testid="humans-in-the-loop" className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium ${pendingDecisions.length > 0 ? "bg-amber-100 text-amber-800 ring-1 ring-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:ring-amber-800" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
                   <Scale size={13} className={pendingDecisions.length > 0 ? "bank-live-glow" : ""} /><span>Decisions waiting: <span data-testid="decisions-waiting" className="tabular-nums">{pendingDecisions.length}</span></span>
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"><Clock3 size={13} /> sim <span className="tabular-nums">{simClock(bank.sim_time)}</span></span>
-                {bank.life && <span data-testid="laya-chip" className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"><Activity size={13} /> Laya · {bank.life.laya_avg_ms ? `${Math.round(bank.life.laya_avg_ms)} ms per choice` : "starting"} · no tokens</span>}
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"><Clock3 size={13} /> {living ? <span data-testid="world-clock" className="tabular-nums">{weekClock(bank.sim_time)}</span> : <>sim <span className="tabular-nums">{simClock(bank.sim_time)}</span></>}</span>
               </div>
             </div>
             {bank.life ? null : (
@@ -853,28 +878,29 @@ export default function BankingWorld({
 
         {living && bank.life ? (
           <>
-            <HowItWorks life={bank.life} judged={judgedCounts} flagged={bank.screening?.payments_flagged ?? 0} />
+            <TodayAtZava life={bank.life} flagged={bank.screening?.payments_flagged ?? 0} decided={evaluations.length} refunded={refunded} waiting={pendingDecisions.length} />
             <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-5">
-              <div className="xl:col-span-3"><LayaDecisions life={bank.life} /></div>
+              <div className="xl:col-span-3"><CustomerDecisions life={bank.life} /></div>
               <div className="space-y-3 xl:col-span-2">
                 <LifeStories life={bank.life} />
+                <UnreportedLosses life={bank.life} />
                 <UnknownToBank people={bank.life.unknown_to_bank ?? []} />
                 <CrewBoard crews={bank.life.crews} />
               </div>
             </div>
-            <h2 className="pt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">The bank's side: cases, and how its personas decided</h2>
+            <h2 className="pt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">How the bank responded</h2>
             <section data-testid="recent-cases" aria-label="Recent cases" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"><Activity size={15} /> Recent cases</div>
               {recentCases.length === 0 ? (
-                <div data-testid="recent-cases-empty" className="text-xs text-slate-400">No cases yet. Make something happen above.</div>
+                <div data-testid="recent-cases-empty" className="text-xs text-slate-400">No cases yet. One opens when a customer rings the bank, or steer the world below.</div>
               ) : (
                 <div className="grid gap-1.5 md:grid-cols-2">
                   {recentCases.map((c) => {
                     const status = caseStatus(c);
                     return (
                       <a key={c.id} data-testid={`case-${c.id}`} href={`/workflows/${encodeURIComponent(c.id)}`} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-xs transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-800 dark:bg-slate-950/50 dark:hover:bg-blue-950/30">
-                        <span className="min-w-0 truncate"><span className="font-medium text-slate-800 dark:text-slate-100">{CASE_LABELS[c.type]}</span> <span className="font-mono text-slate-500">{c.id}</span>{c.phase ? <span className="text-slate-400"> · {c.phase}</span> : null}</span>
-                        <span className="flex shrink-0 items-center gap-2">{c.judged && <span data-testid={`judged-${c.id}`} className="text-[10px] text-slate-500 dark:text-slate-400">{roleLabel(c.judged.persona)} · {DECIDED_BY[c.judged.decidedBy] ?? c.judged.decidedBy}</span>}<span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${status.tone}`}>{status.label}</span><span className="text-blue-600 dark:text-blue-400">Open →</span></span>
+                        <span className="min-w-0 truncate"><span className="font-medium text-slate-800 dark:text-slate-100">{CASE_LABELS[c.type]}</span>{c.customerId && claimants?.[c.customerId] ? <span data-testid={`case-who-${c.id}`} className="text-slate-700 dark:text-slate-200"> · {claimants[c.customerId]}{c.amount !== undefined ? ` · ${money(c.amount)}` : ""}</span> : <span className="font-mono text-slate-500"> {c.id}</span>}{c.phase ? <span className="text-slate-400"> · {c.phase}</span> : null}</span>
+                        <span className="flex shrink-0 items-center gap-2">{c.judged && <span data-testid={`judged-${c.id}`} className="text-[10px] text-slate-500 dark:text-slate-400">{roleLabel(c.judged.persona)} {VERDICT_WORDS[c.judged.verdict] ?? c.judged.verdict}</span>}<span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${status.tone}`}>{status.label}</span><span className="text-blue-600 dark:text-blue-400">Open →</span></span>
                       </a>
                     );
                   })}
@@ -882,11 +908,10 @@ export default function BankingWorld({
               )}
             </section>
 
-            <WorldObjectiveStrip testId="banking-objective" objectives={bank.objectives} />
-            {story && storySteps.length > 0 && <WorldInterventionStrip testId="banking-intervention" trace={story.trace} steps={storySteps} onTrace={toggleActor} />}
+            {story && storySteps.length > 0 && <WorldInterventionStrip testId="banking-intervention" title="The latest claim, step by step" trace={story.trace} steps={storySteps} onTrace={toggleActor} />}
             {story?.workflowId && gate && trail.length > 0 && <AskPersonaPanel workflowId={story.workflowId} gate={gate} />}
 
-            {personaReading && <PersonaReadings persona={roleLabel(personaReading.persona)} readings={personaReading.readings ?? []} concerns={personaReading.concerns ?? []} decidedBy={personaReading.decidedBy} layaMs={personaReading.layaMs} reviewMs={personaReading.reviewMs} summary={personaReading.summary} />}
+            {personaReading && <PersonaReadings persona={roleLabel(personaReading.persona)} readings={personaReading.readings ?? []} concerns={personaReading.concerns ?? []} decidedBy={personaReading.decidedBy} summary={personaReading.summary} />}
             {pendingDecisions.length > 0 && (
               <section data-testid="pending-decisions" aria-label="Decisions waiting" className="rounded-xl border border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-800 dark:bg-amber-950/30">
                 <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200"><Scale size={15} className="bank-live-glow" /> Waiting for a decision</div>
@@ -938,7 +963,7 @@ export default function BankingWorld({
             {(bank.recent_settlements ?? []).length > 0 && <CustomerCallPanel settlements={[...(bank.recent_settlements ?? [])].reverse()} />}
 
             <details data-testid="bank-infrastructure" className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-              <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Bank infrastructure: payment rails, claims, credit, markets and the event stream</summary>
+              <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Bank systems: payment rails, the claims ledger, credit, markets and the event log</summary>
               <div className="mt-3 space-y-4">
                 <Panel title="Payment rails" icon={<Activity size={16} />}>
                   <div className="grid gap-3 md:grid-cols-3">
@@ -1010,6 +1035,7 @@ export default function BankingWorld({
                 <Journal events={journal} selectedActor={selectedActor} functionFilter={functionFilter} showRoutine={showRoutine} loading={loading} onFunctionFilter={setFunctionFilter} onRoutine={setShowRoutine} onActor={toggleActor} onClear={() => setSelectedActor(null)} />
               </div>
             </details>
+            <AboutSimulation life={bank.life} judged={judgedCounts} />
           </>
         ) : (
           <>
@@ -1035,7 +1061,7 @@ export default function BankingWorld({
                     return (
                       <a key={c.id} data-testid={`case-${c.id}`} href={`/workflows/${encodeURIComponent(c.id)}`} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-xs transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-800 dark:bg-slate-950/50 dark:hover:bg-blue-950/30">
                         <span className="min-w-0 truncate"><span className="font-medium text-slate-800 dark:text-slate-100">{CASE_LABELS[c.type]}</span> <span className="font-mono text-slate-500">{c.id}</span>{c.phase ? <span className="text-slate-400"> · {c.phase}</span> : null}</span>
-                        <span className="flex shrink-0 items-center gap-2">{c.judged && <span data-testid={`judged-${c.id}`} className="text-[10px] text-slate-500 dark:text-slate-400">{roleLabel(c.judged.persona)} · {DECIDED_BY[c.judged.decidedBy] ?? c.judged.decidedBy}</span>}<span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${status.tone}`}>{status.label}</span><span className="text-blue-600 dark:text-blue-400">Open →</span></span>
+                        <span className="flex shrink-0 items-center gap-2">{c.judged && <span data-testid={`judged-${c.id}`} className="text-[10px] text-slate-500 dark:text-slate-400">{roleLabel(c.judged.persona)} {VERDICT_WORDS[c.judged.verdict] ?? c.judged.verdict}</span>}<span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${status.tone}`}>{status.label}</span><span className="text-blue-600 dark:text-blue-400">Open →</span></span>
                       </a>
                     );
                   })}
