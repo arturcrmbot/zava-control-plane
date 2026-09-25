@@ -280,6 +280,19 @@ describe("BankingWorld", () => {
     expect(screen.getByTestId("flag-SYN-PAY-N00007").textContent).toContain("unlock fee · read by Laya");
   });
 
+  it("shows people living their lives and what happens to them", () => {
+    renderBank({ state: { ...STATE, life: {
+      people: 214, payments: 945, scams_tried: 54, scams_paid: 18, scams_stopped: 18, calls: 1, joined: 14, left: 0, laya_share: 0.83,
+      feed: [{ t: 1, when: "Tuesday morning", who: "Grace Young", text: "Grace Young paid Bella Pizza GBP 51: \"Takeaway\"", by: "laya", kind: "payment" }],
+      stories: [{ t: 2, when: "Tuesday morning", who: "Joan Chen", text: "Joan Chen fell for a tax office penalty scam and sent GBP 900", by: "laya", kind: "scam" }],
+    } } });
+    const panel = screen.getByTestId("life");
+    expect(within(panel).getByTestId("life-counts").textContent).toBe("214 people · 945 payments · scams 54 tried, 18 paid, 18 stopped · 1 called the bank · 14 joined, 0 left");
+    expect(within(panel).getByTestId("life-laya").textContent).toBe("83% of choices made by Laya");
+    expect(panel.textContent).toContain("Grace Young paid Bella Pizza GBP 51");
+    expect(panel.textContent).toContain("Joan Chen fell for a tax office penalty scam");
+  });
+
   it("hides the noticed panel when the bank does not screen", () => {
     renderBank();
     expect(screen.queryByTestId("bank-noticed")).toBeNull();

@@ -47,7 +47,7 @@ from verticals.banking.fraud_constants import (
     FRAUD_SUCCESS_EVENT,
     FRAUD_WORKFLOW_TYPE,
 )
-from verticals.banking.flags import world_screening_enabled
+from verticals.banking.flags import world_life_enabled, world_screening_enabled
 from verticals.banking.support_constants import (
     MULE_COMMAND_TYPE,
     MULE_SENSOR_ID,
@@ -161,6 +161,8 @@ class ZavaBankWorld:
         # Phase 2 (BANKING_WORLD_SCREENING=1): new payments carry references
         # the bank screens; mule accounts are hidden world truth.
         self._screening = world_screening_enabled()
+        self._life_enabled = world_life_enabled()
+        self.life: Any = None
         self._screener = screener
         self._mule_ids: set[str] = set()
         self._references: dict[str, str] = {}
@@ -267,7 +269,9 @@ class ZavaBankWorld:
                    reference_data.build_collateral_agreements(),
                    "banking.collateral.seeded", quiet=True)
 
-        self.runtime.process(self._payments_loop())
+        if not self._life_enabled:
+            # Without people living in it, the rails replay the seeded book.
+            self.runtime.process(self._payments_loop())
         self.runtime.process(self._market_loop())
         if self._screening:
             self._mule_ids = set(reference_data.mule_beneficiary_ids())
@@ -278,7 +282,13 @@ class ZavaBankWorld:
                 self._screener = default_screener()
             if self._reactor is None:
                 self._reactor = default_reactor()
-            self.runtime.process(self._new_payments_loop())
+            if self._life_enabled:
+                from verticals.banking.worlds.life import Life
+
+                self.life = Life(self)
+                self.life.install()
+            else:
+                self.runtime.process(self._new_payments_loop())
         self.runtime.process(self._rail_loop())
         self._installed = True
 
@@ -539,6 +549,8 @@ class ZavaBankWorld:
         if case is not None and case["status"] == "open":
             return None
         if self._mule_case_waits(beneficiary_id):
+            return None
+        if self.life is not None and not self.life.dial.take():
             return None
         flags = self._flags.get(beneficiary_id, [])
         fresh = flags[case["flags_at_decision"]:] if case is not None else flags
@@ -1147,6 +1159,8 @@ class ZavaBankWorld:
             self._processed_commands[command.command_id] = (command, event)
             if self._screening:
                 self._customer_reacts(event)
+            if self.life is not None:
+                self.life.on_decision(event)
         return event
 
     def _customer_reacts(self, applied: SimulationEvent) -> None:
@@ -1202,7 +1216,7 @@ class ZavaBankWorld:
         )
         return {
             "bank": {
-                "customer_count": len(self.customers),
+                "customer_count": sum(1 for c in self.customers.values() if c.status != "left"),
                 "vulnerable_customer_count": sum(
                     1 for c in self.customers.values() if c.vulnerability_flag
                 ),
@@ -1252,6 +1266,7 @@ class ZavaBankWorld:
                 _record_view(r) for r in self.collateral_agreements.values()
             ],
             **({"screening": self._screening_state()} if self._screening else {}),
+            **({"life": self.life.render()} if self.life is not None else {}),
         }
 
     def _screening_state(self) -> dict[str, Any]:

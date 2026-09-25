@@ -345,6 +345,72 @@ interface BankSnapshot extends WorldState {
   positions?: Position[];
   /** Present when the bank screens new payments (BANKING_WORLD_SCREENING=1). */
   screening?: Screening;
+  /** Present when people live in the world (BANKING_WORLD_LIFE=1). */
+  life?: Life;
+}
+
+interface LifeEntry { t: number; when: string; who?: string | null; text: string; by: string; kind: string }
+interface Life {
+  people?: number;
+  payments?: number;
+  scams_tried?: number;
+  scams_paid?: number;
+  scams_stopped?: number;
+  scams_ignored?: number;
+  calls?: number;
+  joined?: number;
+  left?: number;
+  life_events?: number;
+  laya_share?: number;
+  feed?: LifeEntry[];
+  stories?: LifeEntry[];
+}
+
+const LIFE_TONES: Record<string, string> = {
+  scam: "text-red-700 dark:text-red-300",
+  call: "text-amber-700 dark:text-amber-300",
+  life: "text-violet-700 dark:text-violet-300",
+  join: "text-sky-700 dark:text-sky-300",
+  leave: "text-sky-700 dark:text-sky-300",
+};
+
+function LifeLine({ entry }: { entry: LifeEntry }) {
+  const by = entry.by === "laya" ? "Laya" : entry.by === "rules" ? "rules" : "world";
+  return (
+    <li className="flex items-baseline gap-2 truncate text-[11px] text-slate-700 dark:text-slate-200">
+      <span className="shrink-0 text-slate-400">{entry.when}</span>
+      <span className={`truncate ${LIFE_TONES[entry.kind] ?? ""}`}>{entry.text}</span>
+      <span className={`shrink-0 rounded px-1 text-[10px] ${by === "Laya" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"}`}>{by}</span>
+    </li>
+  );
+}
+
+/** The people who live in the bank's world: what they do, and what happens to them. */
+function LifePanel({ life }: { life: Life }) {
+  const payments = (life.feed ?? []).filter((e) => e.kind === "payment" || e.kind === "money").slice(0, 8);
+  const stories = (life.stories ?? []).slice(0, 8);
+  return (
+    <section data-testid="life" aria-label="Life in the bank" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+        <span className="font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Life in the bank</span>
+        <span data-testid="life-counts" className="text-slate-600 dark:text-slate-300">
+          {compactInt(life.people)} people · {compactInt(life.payments)} payments · scams {compactInt(life.scams_tried)} tried, {compactInt(life.scams_paid)} paid, {compactInt(life.scams_stopped)} stopped · {compactInt(life.calls)} called the bank · {compactInt(life.joined)} joined, {compactInt(life.left)} left
+        </span>
+        <span data-testid="life-laya" className="text-emerald-700 dark:text-emerald-300">{Math.round((life.laya_share ?? 0) * 100)}% of choices made by Laya</span>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        <div>
+          <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-400">What people are doing</div>
+          <ul className="space-y-0.5">{payments.map((e, i) => <LifeLine key={`${e.t}-${i}`} entry={e} />)}</ul>
+        </div>
+        <div>
+          <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-400">What is happening to them</div>
+          {stories.length === 0 ? <div className="text-[11px] text-slate-400">Nothing yet.</div>
+            : <ul className="space-y-0.5">{stories.map((e, i) => <LifeLine key={`${e.t}-${i}`} entry={e} />)}</ul>}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 interface ScreeningFlag { payment_id: string; beneficiary_id: string; reference: string; pattern: string; lead: number; screened_by: string; amount_gbp: number }
@@ -856,6 +922,8 @@ export default function BankingWorld({
             </div>
           )}
         </section>
+
+        {bank.life && <LifePanel life={bank.life} />}
 
         {(bank.recent_settlements ?? []).length > 0 && <CustomerCallPanel settlements={[...(bank.recent_settlements ?? [])].reverse()} />}
 

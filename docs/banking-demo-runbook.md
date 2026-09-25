@@ -129,6 +129,19 @@ so. The cadence is set by `BANKING_NEW_PAYMENT_MINUTES` (default 30 synthetic
 minutes) and `BANKING_SCAM_SHARE` (default 0.35). At the demo speed that opens a
 mule case every few minutes.
 
+## 2b+. People live in the world (optional, needs Laya)
+
+With `BANKING_WORLD_LIFE=1` about 200 named customers live in the bank. They spend on
+what fits who they are (Laya picks, from their profile and the time of day), get paid,
+pay rent, and sometimes something happens to them. Scam crews pick tactics from what
+worked, and each target's caution is read by Laya from who they are; the bank's
+warning and the scam's fit do the rest. Victims realise, ring the bank, and the claim
+runs through the hero path. New customers join; some leave after a refusal. The
+floor's *Life in the bank* panel shows it, with who decided each thing.
+
+The world opens at most `BANKING_WORLD_CASES_PER_HOUR` (default 10) cases on its own,
+so the agents' Copilot quota stays predictable.
+
 ## 2c. Steer it live (optional)
 
 - **A customer calls about a payment.** Pick any recent payment on the floor and type
