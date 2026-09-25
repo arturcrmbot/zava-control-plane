@@ -69,6 +69,7 @@ def spawner(monkeypatch):
 def test_with_screening_on_a_merchant_application_is_read_from_its_description(spawner, monkeypatch) -> None:
     spawners, scheduled = spawner
     monkeypatch.setenv("BANKING_WORLD_SCREENING", "1")
+    monkeypatch.delenv("BANKING_WORLD_LIFE", raising=False)
 
     async def categorise(description, client=None):
         return mc.Reading("subscriptions", "medium", 0.99, "laya")
@@ -84,6 +85,7 @@ def test_with_screening_on_a_merchant_application_is_read_from_its_description(s
 def test_with_screening_off_a_merchant_application_is_as_before(spawner, monkeypatch) -> None:
     spawners, scheduled = spawner
     monkeypatch.delenv("BANKING_WORLD_SCREENING", raising=False)
+    monkeypatch.delenv("BANKING_WORLD_LIFE", raising=False)
     asyncio.run(spawners.spawn_merchant_onboarding_workflow())
     case = scheduled[-1]["case"]
     assert set(case) == {"id", "subject_id", "subject_kind", "risk_band", "sector",

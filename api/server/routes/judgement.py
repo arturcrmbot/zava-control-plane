@@ -57,7 +57,8 @@ async def what_if(body: WhatIf) -> dict:
     workflow = app_state.store.get_workflow(body.workflow_id)
     if workflow is None:
         return {"ok": False, "error": f"unknown workflow {body.workflow_id!r}"}
-    context = copy.deepcopy((workflow.payload or {}).get("hitl_context") or {})
+    payload = workflow.payload or {}
+    context = copy.deepcopy(payload.get("hitl_context") or payload.get("judged_gate_context") or {})
     if not context:
         return {"ok": False, "error": "this workflow has no decision gate to ask about"}
     role = body.persona or str(context.get("persona") or "")
