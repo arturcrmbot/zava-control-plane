@@ -64,10 +64,10 @@ judgement:
                   ask: "Does the text say the customer is vulnerable or carries a vulnerability marker?"
                 - id: says_no_marker
                   text: agent_reasoning
-                  ask: "Does the text say no vulnerability flag or marker is present?"
+                  ask: "Does the text say there is no vulnerability flag?"
                 - id: covers_no_action
                   text: agent_reasoning
-                  ask: "Does the text say what would happen if the bank did nothing?"
+                  ask: "Does the text mention what happens if nothing is done?"
             checks:
                 - concern: "the agent's reasoning says there is no vulnerability marker, but the record shows one"
                   when: {read: says_no_marker, is: yes, fact: customer_vulnerable, equals: true}
@@ -96,7 +96,7 @@ judgement:
                   ask: "Does the text discuss preserving or recovering the money still in the account?"
                 - id: covers_no_action
                   text: agent_reasoning
-                  ask: "Does the text say what would happen if the bank did nothing?"
+                  ask: "Does the text mention what happens if nothing is done?"
             checks:
                 - concern: "the agent argues for restraining the account but recommends keeping it open"
                   when: {read: argues_restraint, is: yes, fact: recommends_monitoring, equals: true}

@@ -101,18 +101,21 @@ def _check(gate: GateProfile, readings: list[Reading], facts: GateFacts) -> tupl
             continue
         if check.read is not None:
             reading = by_id[check.read]
+            guard = by_id[check.unless] if check.unless is not None else None
+            guard_says_yes = guard is not None and guard.clear and guard.yes
             if not reading.clear:
-                if check.severity == "serious":
+                # A clear partner reading that says the opposite settles it;
+                # otherwise a serious check we cannot read is unclear.
+                if not guard_says_yes and check.severity == "serious":
                     unclear.append(f"could not tell whether {check.concern}")
                 continue
             if reading.yes != (check.read_is == "yes"):
                 continue
-            if check.unless is not None:
-                guard = by_id[check.unless]
-                if not guard.clear or guard.yes:
-                    if check.severity == "serious":
-                        unclear.append(f"conflicting readings on whether {check.concern}")
-                    continue
+            if guard_says_yes:
+                # Both paired readings say yes: the reading contradicts itself.
+                if check.severity == "serious":
+                    unclear.append(f"conflicting readings on whether {check.concern}")
+                continue
         concerns.append(check.concern)
         if check.severity == "serious":
             serious.append(check.concern)

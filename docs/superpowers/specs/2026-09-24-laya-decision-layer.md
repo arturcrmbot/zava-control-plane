@@ -108,6 +108,7 @@ Laya's top answer is ahead of the runner-up (0 is a coin toss, 1 is certain).
 | "Would the customer complain?" yes/no | Flat 0.06-0.18 whatever the decision | Use the upset scale instead |
 | The approve/hold verdict weighing a list of concerns (measured while building) | Approved with a lead of 0.5-0.8 in all four phrasings even with "the agent argues for declining" listed | Serious concerns hold by rule; Laya weighs only minor ones, in character |
 | "Does the text argue for refusal?" (measured while building) | 3 of 6 confidently wrong in every wording, including a routine reimbursement read as arguing for refusal | Removed from the fraud profiles |
+| Wording of the pair and the no-action read, on 11 and 10 texts (measured while building) | "Does the text say there is no vulnerability flag?" 10/11 (was 9/11); "Does the text mention what happens if nothing is done?" 9/10 with no confident errors (was 8/10 with 2) | Measure wording on real texts; keep the variant with the fewest confident errors |
 | "Does the text argue for declining?" when the text names declining only to reject it | Unsure (about 0.46), never confidently wrong in 6 texts | Kept as serious: unsure goes to the deep review |
 
 ## 5. Principles
@@ -175,8 +176,8 @@ judgement:
   character: "Thorough: you hold a case whenever the agent's reasoning and the record disagree."
   reads:
     - {id: says_vulnerable,  text: agent_reasoning, ask: "Does the text say the customer is vulnerable or carries a vulnerability marker?"}
-    - {id: says_no_marker,   text: agent_reasoning, ask: "Does the text say no vulnerability flag or marker is present?"}
-    - {id: covers_no_action, text: agent_reasoning, ask: "Does the text say what would happen if the bank did nothing?"}
+    - {id: says_no_marker,   text: agent_reasoning, ask: "Does the text say there is no vulnerability flag?"}
+    - {id: covers_no_action, text: agent_reasoning, ask: "Does the text mention what happens if nothing is done?"}
   checks:
     - concern: "the agent's reasoning says there is no vulnerability marker, but the record shows one"
       when: {read: says_no_marker, is: yes, fact: customer_vulnerable, equals: true}

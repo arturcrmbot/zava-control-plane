@@ -67,7 +67,7 @@ judgement:
                   ask: "Does the text discuss the merchant's expected card volume?"
                 - id: covers_no_action
                   text: agent_reasoning
-                  ask: "Does the text say what would happen if the bank did nothing?"
+                  ask: "Does the text mention what happens if nothing is done?"
             checks:
                 - concern: "the agent argues for declining but recommends onboarding the merchant"
                   when: {read: argues_decline, is: yes, fact: recommends_decline, equals: false}

@@ -259,6 +259,38 @@ def test_paired_readings_that_both_say_yes_are_unclear_not_a_concern() -> None:
     assert reviewer.requests and outcome.payload["decision"] == "approve"
 
 
+def test_a_clear_partner_reading_settles_an_unsure_one() -> None:
+    # "No vulnerability flag is present" once read as 0.58 for "says vulnerable"
+    # while "says no marker" read 1.0: the partner question settles it.
+    profile = parse_profile("fraud_decision_manager", yaml.safe_load("""
+gates:
+  app-fraud-reimbursement:
+    facts: verticals.test:adapter
+    reads:
+      - {id: says_vulnerable, text: agent_reasoning, ask: "Does the text say the customer is vulnerable?"}
+      - {id: says_no_marker, text: agent_reasoning, ask: "Does the text say no vulnerability marker is present?"}
+    checks:
+      - concern: "the agent's reasoning says the customer is vulnerable, but the record shows no marker"
+        when: {read: says_vulnerable, is: yes, fact: customer_vulnerable, equals: false}
+        unless: says_no_marker
+    decide: {ask: "What should you do?", approve: "Approve it now", hold: "Hold it"}
+"""), resolver=lambda ref: _adapter)
+    outcome = _judge(laya=FakeLaya({"says_vulnerable": 0.58, "says_no_marker": 1.0}), profile=profile)
+    record = outcome.judgement
+    assert record.concerns == [] and record.unclear == [] and record.decided_by == "laya"
+    unsettled = _judge(laya=FakeLaya({"says_vulnerable": 0.58, "says_no_marker": 0.1}), profile=profile,
+                       reviewer=FakeReviewer("approve"))
+    assert unsettled.judgement.unclear and unsettled.judgement.decided_by == "llm"
+
+
+def test_a_clear_reading_stands_when_its_partner_is_only_unsure() -> None:
+    laya = FakeLaya({"says_vulnerable": 0.58, "says_no_marker": 1.0, "covers_no_action": 0.9})
+    outcome = _judge({"vulnerable": True}, laya=laya)
+    assert outcome.judgement.serious == [
+        "the agent's reasoning says there is no vulnerability marker, but the record shows one"]
+    assert outcome.hold is True
+
+
 def test_minor_checks_are_raised_only_when_clear() -> None:
     unclear_minor = _judge(laya=FakeLaya({**ROUTINE_READS, "covers_no_action": 0.55}))
     assert unclear_minor.judgement.unclear == [] and unclear_minor.judgement.decided_by == "laya"
