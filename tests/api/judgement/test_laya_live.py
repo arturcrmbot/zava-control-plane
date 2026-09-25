@@ -212,3 +212,56 @@ def test_a_merchant_recommendation_that_argues_against_itself_is_held() -> None:
     record = outcome.judgement
     assert any("argues for declining" in c for c in record.concerns) or record.unclear, record.to_dict()
     assert not (record.decided_by == "laya" and record.verdict == "approve"), record.to_dict()
+
+
+# --- Phase 2: the world notices and reacts --------------------------------------------------
+
+def test_the_screener_flags_scams_and_leaves_ordinary_payments_alone() -> None:
+    from verticals.banking.worlds import reference_data
+    from verticals.banking.worlds.screening import PATTERN_QUESTION, Screening
+
+    client = LayaClient(LAYA_URL, timeout_s=10.0)
+
+    async def read(reference: str) -> Screening:
+        answer = (await client.ask({"payment_reference": reference}, PATTERN_QUESTION)).answers["pattern"]
+        return Screening(answer.top, answer.lead, "laya")
+
+    async def run() -> tuple[list[Screening], list[Screening]]:
+        ordinary = [await read(r) for r in reference_data.ORDINARY_REFERENCES]
+        scams = [await read(r) for r in reference_data.SCAM_REFERENCES]
+        return ordinary, scams
+
+    ordinary, scams = asyncio.run(run())
+    assert sum(s.flagged for s in ordinary) == 0
+    assert sum(s.flagged for s in scams) >= 12
+
+
+def test_merchant_descriptions_are_read_into_categories() -> None:
+    from verticals.banking import merchant_categories as mc
+
+    client = LayaClient(LAYA_URL, timeout_s=10.0)
+
+    async def run() -> list[tuple[str, str]]:
+        return [((await mc.categorise(text, client=client)).category, truth) for text, truth in mc.DESCRIPTIONS]
+
+    readings = asyncio.run(run())
+    # Measured: 13 of 20 right with a clear lead; the rest read as unclear
+    # (medium band) and none is confidently put in a wrong category.
+    assert sum(got == truth for got, truth in readings) >= 12
+    assert [(got, truth) for got, truth in readings if got not in (truth, "unclear")] == []
+
+
+def test_customers_are_more_upset_the_worse_the_decision() -> None:
+    from verticals.banking.worlds.reactions import DECISION_WORDS, UPSET_QUESTION
+
+    client = LayaClient(LAYA_URL, timeout_s=10.0)
+
+    async def upset(kind: str) -> float:
+        state = {"customer": "A personal customer who lost GBP 18,400 to a scam", "decision": DECISION_WORDS[kind]}
+        return (await client.ask(state, UPSET_QUESTION)).answers["upset"].score
+
+    async def run() -> list[float]:
+        return [await upset(kind) for kind in ("full", "capped", "refused")]
+
+    full, capped, refused = asyncio.run(run())
+    assert full < capped < refused

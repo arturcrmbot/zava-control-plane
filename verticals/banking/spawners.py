@@ -15,6 +15,8 @@ from api.server.services.durable_client import schedule_new_orchestration
 from api.server.services.synthetic_data import _now_with_jitter
 from api.server.state import app_state
 from api.shared.types import Workflow
+from verticals.banking.flags import world_screening_enabled
+from verticals.banking.merchant_categories import DESCRIPTIONS, categorise
 from verticals.banking.support_constants import (
     MERCHANT_ORCHESTRATOR,
     MERCHANT_WORKFLOW_ID_PREFIX,
@@ -106,6 +108,30 @@ async def spawn_merchant_onboarding_workflow(scenario: str | None = None) -> str
     global _merchant_seq
     _merchant_seq += 1
     workflow_id = f"{MERCHANT_WORKFLOW_ID_PREFIX}-{_merchant_seq:04d}"
+    if world_screening_enabled():
+        # The application describes the business; the band comes from reading
+        # that description (Laya, or rules when it is down), not from a draw.
+        description = _rng.choice(DESCRIPTIONS)[0]
+        reading = await categorise(description)
+        case = {
+            "id": f"SYN-MER-CASE-{_merchant_seq:04d}",
+            "subject_id": f"SYN-MERCHANT-{_merchant_seq:04d}",
+            "subject_kind": "merchant",
+            "description": description,
+            "risk_band": scenario or reading.band,
+            "sector": reading.category,
+            "categorised_by": reading.by,
+            "category_lead": reading.lead,
+            "projected_monthly_volume_gbp": float(_rng.randint(8_000, 900_000)),
+            "version": 1,
+        }
+        return await _spawn(
+            workflow_id=workflow_id,
+            workflow_type=MERCHANT_WORKFLOW_TYPE,
+            orchestrator=MERCHANT_ORCHESTRATOR,
+            first_phase="Collect Merchant Application",
+            case=case,
+        )
     case = {
         "id": f"SYN-MER-CASE-{_merchant_seq:04d}",
         "subject_id": f"SYN-MERCHANT-{_merchant_seq:04d}",
