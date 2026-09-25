@@ -203,6 +203,51 @@ interface BankSnapshot extends WorldState {
   credit_limits?: CreditLimit[];
   exposures?: Exposure[];
   positions?: Position[];
+  /** Present when the bank screens new payments (BANKING_WORLD_SCREENING=1). */
+  screening?: Screening;
+}
+
+interface ScreeningFlag { payment_id: string; beneficiary_id: string; reference: string; pattern: string; lead: number; screened_by: string; amount_gbp: number }
+interface Screening {
+  payments_screened?: number;
+  payments_flagged?: number;
+  mule_cases_open?: number;
+  mule_cases_decided?: number;
+  recent_flags?: ScreeningFlag[];
+  customer_reactions?: Record<string, number>;
+}
+
+const PATTERN_LABELS: Record<string, string> = {
+  safe_account: "safe-account transfer",
+  authority_demand: "authority demand",
+  unlock_fee: "unlock fee",
+  high_returns: "guaranteed returns",
+};
+
+/** What the bank noticed in the payments it screened, and how customers reacted. */
+function NoticedPanel({ screening }: { screening: Screening }) {
+  const reactions = screening.customer_reactions ?? {};
+  const flags = [...(screening.recent_flags ?? [])].reverse();
+  return (
+    <section data-testid="bank-noticed" aria-label="What the bank noticed" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+        <span className="font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">The bank noticed</span>
+        <span data-testid="noticed-counts" className="text-slate-600 dark:text-slate-300">{compactInt(screening.payments_flagged)} flagged of {compactInt(screening.payments_screened)} screened · {compactInt(screening.mule_cases_open)} mule cases open · {compactInt(screening.mule_cases_decided)} decided</span>
+        <span data-testid="customer-reactions" className="text-slate-600 dark:text-slate-300">Customers: {compactInt(reactions.accepts)} accepted · {compactInt(reactions.chases)} chased · {compactInt(reactions.complains)} complained</span>
+      </div>
+      {flags.length === 0 ? (
+        <div className="text-xs text-slate-400">Nothing suspicious yet. New payments are screened as they arrive.</div>
+      ) : (
+        <ul className="grid gap-1 md:grid-cols-2">
+          {flags.map((flag) => (
+            <li key={flag.payment_id} data-testid={`flag-${flag.payment_id}`} className="truncate rounded-lg border border-red-100 bg-red-50/60 px-2.5 py-1 text-[11px] text-slate-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-slate-200">
+              “{flag.reference}” → <span className="font-mono">{flag.beneficiary_id}</span> · {PATTERN_LABELS[flag.pattern] ?? flag.pattern} · {flag.screened_by === "laya" ? "read by Laya" : "keyword rules"}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 interface PaymentRail {
@@ -595,6 +640,9 @@ export default function BankingWorld({
     try {
       if (action.kind === "claim") {
         await onRunScenario(action.id);
+      } else if (action.id === "mule-account-investigation" && bank.screening) {
+        // The world owns mule cases: make suspicious payments land, and the bank notices.
+        await onRunScenario("mule-activity");
       } else {
         await fetch(`/api/simulator/inject-burst?n=1&workflow_type=${encodeURIComponent(action.id)}`, { method: "POST" });
       }
@@ -668,6 +716,8 @@ export default function BankingWorld({
             </div>
           )}
         </section>
+
+        {bank.screening && <NoticedPanel screening={bank.screening} />}
 
         <WorldObjectiveStrip testId="banking-objective" objectives={bank.objectives} />
         {story && storySteps.length > 0 && <WorldInterventionStrip testId="banking-intervention" trace={story.trace} steps={storySteps} onTrace={toggleActor} />}

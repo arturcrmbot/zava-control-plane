@@ -110,6 +110,24 @@ question with its probabilities, the lead over the runner-up, and the
 threshold. It shows in the drawer and in `persona.judgement` events. Laya needs
 about 3 GB of memory; stop it after the slot.
 
+## 2b. The world notices (optional, needs Laya for the best reading)
+
+With `BANKING_WORLD_SCREENING=1` the bank screens the payments it sees:
+- New payments arrive with references, and Laya matches each against described
+  scam patterns. The floor's *The bank noticed* panel lists the flags.
+- Flagged payments from two or more customers into one account open a mule
+  investigation through a world sensor, so mule cases stop arriving on a timer.
+  **Mule activity detected** now makes such payments land.
+- The disposition changes the account: *restrained* stops it receiving, and
+  *monitored* can reopen it.
+- Customers react to reimbursement decisions (accepted, chased, complained).
+- Merchant applications describe the business, and the risk band is read from it.
+
+With Laya down, keyword rules screen and rules pick reactions, and each event says
+so. The cadence is set by `BANKING_NEW_PAYMENT_MINUTES` (default 30 synthetic
+minutes) and `BANKING_SCAM_SHARE` (default 0.35). At the demo speed that opens a
+mule case every few minutes.
+
 ## 3. The walk
 
 | Time | Screen | Show | Say |

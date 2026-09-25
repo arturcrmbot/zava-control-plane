@@ -255,5 +255,119 @@ def main() -> None:
         print(json.dumps(row))
 
 
-if __name__ == "__main__":
+if __name__ == "__main__" and not (len(sys.argv) > 1 and sys.argv[1] == "mule"):
     main()
+
+
+# --- Phase 2: the bank notices a mule pattern, decides, and the world changes --------------
+
+MULE_REASONING = (
+    "Several customers' payments into this account match scam patterns. Restraining the account preserves "
+    "the money still in it for the victims' recovery. Doing nothing would let the controller move the money out."
+)
+
+
+async def step_until_mule_case(world: ZavaBankWorld, limit: int = 400_000):
+    """Step the world, letting screening tasks read with Laya, until the mule sensor trips."""
+    from verticals.banking.support_constants import MULE_SENSOR_ID
+
+    seen = len(world.runtime.journal)
+    for step in range(limit):
+        world.runtime.step()
+        if step % 25 == 0:
+            await asyncio.sleep(0.005)
+        journal = world.runtime.journal
+        for event in journal[seen:]:
+            if event.type == "sensor.tripped" and event.payload.get("sensor_id") == MULE_SENSOR_ID:
+                return event
+        seen = len(journal)
+    raise RuntimeError("the bank noticed no mule pattern")
+
+
+class LiveCaseContext(LiveContext):
+    def __init__(self, workflow_id: str, world: ZavaBankWorld, input_: dict) -> None:
+        super().__init__(workflow_id, world, ranking_for=None)
+        self._input = input_
+
+    def get_input(self) -> dict:
+        return self._input
+
+    def run(self, name: str, payload: dict):
+        from verticals.banking import supporting_durable as sd
+
+        if name == "checkpoint_activity_trigger":
+            if payload["kind"] == "suspended":
+                self.suspended = payload["payload"]
+                self._decide_gate(payload["payload"])
+            return None
+        if name == "case_evidence_activity_trigger":
+            return sd.case_evidence_activity(payload)
+        if name == "case_agent_activity_trigger":
+            evidence = payload["evidence"]
+            ids = [o["option_id"] for o in evidence["admitted_options"]]
+            ids.sort(key=lambda option: 0 if option.endswith("RESTRAIN") else 1)
+            return {"phase": "Analyse Mule Network", "ranked_option_ids": ids, "reasoning": MULE_REASONING,
+                    "evidence_versions": evidence["evidence_versions"], "actor_ids": evidence["actor_ids"],
+                    "event_ids": evidence["event_ids"]}
+        if name == "case_governance_activity_trigger":
+            return sd.case_governance_activity(payload)
+        if name == "case_command_activity_trigger":
+            return sd.case_command_activity(payload)
+        raise KeyError(name)
+
+
+def drive_case(context: LiveCaseContext) -> dict:
+    from verticals.banking.supporting_durable import MULE_PROFILE, case_orchestration
+
+    orchestration = case_orchestration(MULE_PROFILE, context)
+    sent = None
+    try:
+        while True:
+            step = orchestration.send(sent)
+            if step[0] == "activity":
+                sent = context.run(step[1], step[2])
+            else:
+                decision, timer = step[1]
+                sent = decision if context.approval is not None else timer
+    except StopIteration as stop:
+        return stop.value
+
+
+def run_mule() -> dict:
+    from api.server.world.model import SimulationCommand
+
+    os.environ["BANKING_WORLD_SCREENING"] = "1"
+    app_state = importlib.import_module("api.server.state").app_state
+    persona_responder.PERSONA_DEFINITIONS = persona_responder._load_personae()
+    world = world_with()
+    started = time.perf_counter()
+    trip = asyncio.run(step_until_mule_case(world))
+    noticed_s = time.perf_counter() - started
+    state = world.render_state()["screening"]
+    bene = trip.payload["beneficiary_id"]
+    observation = world.build_observation(trip.to_dict())
+    workflow_id = "BMUL-E2E-1"
+    now = time.time()
+    app_state.store.upsert_workflow(Workflow(
+        id=workflow_id, type="mule-account-investigation", status="awaiting_hitl",
+        current_phase="Approve Account Disposition", created_at=now, sla_due_at=now + 3600,
+        jurisdiction="SYN-UK-Zava", agency="Zava Bank", payload={"observation": observation}))
+    context = LiveCaseContext(workflow_id, world, {
+        "workflow_id": workflow_id, "type": "mule-account-investigation", "trace_id": trip.trace_id,
+        "objective_id": "obj-e2e", "observation": observation})
+    output = drive_case(context)
+    applied = world.apply_command(SimulationCommand(**output["command"])) if output.get("command") else None
+    decisions = app_state.store.get_workflow(workflow_id).payload.get("decisions") or []
+    return {
+        "noticed_after_s": round(noticed_s, 2),
+        "screened": state["payments_screened"], "flagged": state["payments_flagged"],
+        "flags": [(f["reference"], f["pattern"], f["screened_by"]) for f in observation["case"]["flagged_payments"]],
+        "account": bene, "band": observation["case"]["risk_band"], "customers": observation["case"]["linked_claim_count"],
+        "decision": [(d["persona_role"], d["verdict"], d.get("decided_by"), d.get("reason")) for d in decisions],
+        "outcome": output.get("status"), "applied": applied.type if applied else None,
+        "account_status": world.beneficiaries[bene].status,
+    }
+
+
+if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "mule":
+    print(json.dumps(run_mule(), indent=1))

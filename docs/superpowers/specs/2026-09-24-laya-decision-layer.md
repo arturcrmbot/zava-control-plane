@@ -1,7 +1,7 @@
 # Laya decision layer: agentic thinking without the token bill
 
 **Date:** 2026-09-24
-**Status:** Approved design. Nothing is built yet.
+**Status:** Approved design. Phase 1 (personas judge) and phase 2 (the world notices and reacts) are built and verified behind flags; phase 3 is next.
 **Scope:** a shared platform capability, proved on the banking vertical first.
 **Author's evidence:** code read in this worktree, plus 241 live calls to a local Laya server on this Mac.
 
@@ -318,6 +318,37 @@ Live golden set (`tests/api/judgement/test_laya_live.py`): 9/9 on repeated runs.
 
 **Size: large** (world data, a screening loop with rate limiting, a mule
 command gateway, reactions).
+
+### 8.1 Built and verified (25 Sep 2026), behind `BANKING_WORLD_SCREENING=1`
+
+- **New payments carry references,** screened as they arrive. This is cached per
+  reference, and the world never waits: an unseen reference is read on an asyncio
+  task.
+  - Measured reference lists: 0 of 30 ordinary references flagged; 13 of 18 scam
+    references flagged. The five misses stay, as a real screen misses some.
+  - If Laya is down, keyword rules screen, and every flag says which read it.
+- **Mule cases open when the world notices.** Flagged payments from two or more
+  customers into one account trip `sensor:mule_pattern`. The world bridge then
+  starts the mule orchestration with the account's real band, balance and flagged
+  payments. The mule timer is retired; merchants still arrive on the ramp.
+- **Dispositions change the world.** Restrained accounts stop receiving and
+  monitored ones keep collecting, then reopen as round 2. A second command for a
+  decided case is rejected.
+- **Customers react** after a reimbursement: accepts, chases or complains, drawn
+  from Laya's upset scale with a seeded stream. The scale is measured monotone:
+  full < capped < refused.
+- **Merchant applications describe the business.** Laya picks the kind of business
+  and a code table sets the band. Measured: 13 of 20 right with a clear lead, none
+  confidently wrong. Businesses paid months ahead mostly read as unclear, which maps
+  to medium.
+- **End to end** (`tools/laya_eval/e2e_banking.py mule`):
+  1. The world stepped with the live Laya screener; 12 payments were screened and 5
+     flagged.
+  2. The sensor tripped for a low-band account with two customers, and the rules
+     permitted only monitoring.
+  3. The stand-in reasoning argued for restraint, so the Financial Crime Lead held
+     it and the deep review decided.
+  4. The disposition was applied back to the account.
 
 ## 9. Phase 3: the presenter steers live
 

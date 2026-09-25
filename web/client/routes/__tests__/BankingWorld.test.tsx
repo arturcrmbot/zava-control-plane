@@ -255,6 +255,31 @@ describe("BankingWorld", () => {
     expect(within(strip).getByText("Fraud decision manager approved after re-assessment")).toBeTruthy();
   });
 
+  it("asks the world for mule activity when the bank screens payments", () => {
+    const onRunScenario = vi.fn(async () => {});
+    renderBank({ onRunScenario, state: { ...STATE, screening: { payments_screened: 4, payments_flagged: 1 } } as WorldState });
+    fireEvent.click(screen.getByRole("button", { name: "Mule activity detected" }));
+    expect(onRunScenario).toHaveBeenCalledWith("mule-activity");
+    expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining("inject-burst"), expect.anything());
+  });
+
+  it("shows what the bank noticed and how customers reacted", () => {
+    renderBank({ state: { ...STATE, screening: {
+      payments_screened: 40, payments_flagged: 3, mule_cases_open: 1, mule_cases_decided: 2,
+      recent_flags: [{ payment_id: "SYN-PAY-N00007", beneficiary_id: "SYN-BENE-002", reference: "Release fee to unlock withdrawal",
+        pattern: "unlock_fee", lead: 1, screened_by: "laya", amount_gbp: 900 }],
+      customer_reactions: { accepts: 2, chases: 1, complains: 1 },
+    } } as WorldState });
+    expect(screen.getByTestId("noticed-counts").textContent).toBe("3 flagged of 40 screened · 1 mule cases open · 2 decided");
+    expect(screen.getByTestId("customer-reactions").textContent).toBe("Customers: 2 accepted · 1 chased · 1 complained");
+    expect(screen.getByTestId("flag-SYN-PAY-N00007").textContent).toContain("unlock fee · read by Laya");
+  });
+
+  it("hides the noticed panel when the bank does not screen", () => {
+    renderBank();
+    expect(screen.queryByTestId("bank-noticed")).toBeNull();
+  });
+
   it("names who approved when the decision was handed up", () => {
     const escalated = APPROVED_OUTCOME.map((e) => e.type === "responder.decided"
       ? { ...e, payload: { ...e.payload, command: { payload: { option_id: "SYN-APP-OPTION-REIMBURSE-CAPPED", value_gbp: 85_000, persona: "financial_crime_lead" } } } }
