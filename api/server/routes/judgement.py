@@ -39,7 +39,7 @@ async def judgement_status() -> dict:
 class WhatIf(BaseModel):
     workflow_id: str = Field(min_length=1, max_length=128)
     persona: str | None = None
-    reasoning: str | None = Field(default=None, max_length=2000)
+    reasoning: str | None = Field(default=None, max_length=8000)
     vulnerable: bool | None = None
 
 

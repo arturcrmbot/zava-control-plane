@@ -147,18 +147,27 @@ const SCAM_LABELS: Record<string, string> = {
 
 /** The presenter reports a customer's call about one of the payments on the floor. */
 function CustomerCallPanel({ settlements }: { settlements: RecentSettlement[] }) {
+  // The floor's settlements turn over every few seconds, so the presenter
+  // picks from a steady list and refreshes it when they want newer payments.
+  const [options, setOptions] = useState<RecentSettlement[]>(settlements);
   const [paymentId, setPaymentId] = useState("");
   const [statement, setStatement] = useState("");
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
-  const chosen = paymentId || settlements[0]?.payment_id || "";
+  useEffect(() => {
+    if (!options.length && settlements.length) setOptions(settlements);
+  }, [options.length, settlements]);
+  function refresh() {
+    const picked = options.find((s) => s.payment_id === paymentId);
+    setOptions(picked ? [picked, ...settlements.filter((s) => s.payment_id !== paymentId)] : settlements);
+  }
   async function report() {
     setSending(true);
     try {
       const response = await fetch("/api/world/customer-calls", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payment_id: chosen, statement }),
+        body: JSON.stringify({ payment_id: paymentId, statement }),
       });
       const body = (await response.json()) as { ok?: boolean; claim_id?: string; error?: string; reading?: StatementReading | null };
       if (!body.ok) {
@@ -171,6 +180,8 @@ function CustomerCallPanel({ settlements }: { settlements: RecentSettlement[] })
         : "no reading";
       setResult({ ok: true, text: `Claim ${body.claim_id} raised · ${read} (advisory; the record decides)` });
       setStatement("");
+      setPaymentId("");
+      setOptions(settlements);
     } catch {
       setResult({ ok: false, text: "could not reach the bank" });
     } finally {
@@ -181,11 +192,13 @@ function CustomerCallPanel({ settlements }: { settlements: RecentSettlement[] })
     <section data-testid="customer-call" aria-label="A customer calls" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">A customer calls about a payment</div>
       <div className="flex flex-wrap items-start gap-2">
-        <select aria-label="Payment" value={chosen} onChange={(e) => setPaymentId(e.target.value)} className="rounded-lg border border-slate-300 bg-slate-50 px-2 py-1.5 font-mono text-xs dark:border-slate-700 dark:bg-slate-800">
-          {settlements.map((s) => <option key={s.payment_id} value={s.payment_id}>{s.payment_id} · {money(s.amount_gbp)}{s.reference ? ` · ${s.reference}` : ""}</option>)}
+        <select aria-label="Payment" value={paymentId} onChange={(e) => setPaymentId(e.target.value)} className="rounded-lg border border-slate-300 bg-slate-50 px-2 py-1.5 font-mono text-xs dark:border-slate-700 dark:bg-slate-800">
+          <option value="">Choose a payment…</option>
+          {options.map((s) => <option key={s.payment_id} value={s.payment_id}>{s.payment_id} · {money(s.amount_gbp)}{s.reference ? ` · ${s.reference}` : ""}</option>)}
         </select>
+        <button type="button" aria-label="Refresh payments" title="Show the latest payments" onClick={refresh} className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">↻</button>
         <textarea aria-label="What the customer says" value={statement} onChange={(e) => setStatement(e.target.value)} maxLength={1200} rows={2} placeholder="What the customer says, in their own words" className="min-w-[16rem] flex-1 rounded-lg border border-slate-300 bg-slate-50 px-2 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800" />
-        <button type="button" disabled={sending || !chosen || !statement.trim()} onClick={() => void report()} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Report the call</button>
+        <button type="button" disabled={sending || !paymentId || !statement.trim()} onClick={() => void report()} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Report the call</button>
       </div>
       {result && <div data-testid="customer-call-result" className={`mt-2 text-xs ${result.ok ? "text-slate-700 dark:text-slate-200" : "text-red-700 dark:text-red-300"}`}>{result.text}</div>}
     </section>
@@ -205,13 +218,21 @@ function AskPersonaPanel({ workflowId, gate }: { workflowId: string; gate: GateC
     setAnswer(null);
   }, [workflowId, gate.reasoning, gate.vulnerable]);
   async function ask() {
+    // Only what the presenter changed is sent; the rest is the case as it stands.
+    const question: Record<string, unknown> = { workflow_id: workflowId };
+    if (reasoning !== (gate.reasoning ?? "")) question.reasoning = reasoning;
+    if (vulnerable !== Boolean(gate.vulnerable)) question.vulnerable = vulnerable;
     try {
       const response = await fetch("/api/judgement/what-if", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workflow_id: workflowId, reasoning, vulnerable }),
+        body: JSON.stringify(question),
       });
-      const body = (await response.json()) as { ok?: boolean; error?: string; decision?: string; summary?: string };
+      const body = (await response.json()) as { ok?: boolean; error?: string; decision?: string; summary?: string; detail?: unknown };
+      if (!response.ok) {
+        setAnswer(notAccepted(body.detail));
+        return;
+      }
       setAnswer(body.ok ? `${roleLabel(gate.persona ?? "persona")} would ${body.decision === "approve" ? "approve" : body.decision === "escalate" ? "hand it up" : body.decision === "send_back" ? "send it back" : body.decision}: ${body.summary}` : body.error ?? "no answer");
     } catch {
       setAnswer("could not reach the persona");
@@ -220,7 +241,7 @@ function AskPersonaPanel({ workflowId, gate }: { workflowId: string; gate: GateC
   return (
     <section data-testid="ask-persona" aria-label="Ask the persona" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ask the {roleLabel(gate.persona ?? "persona").toLowerCase()}: what if…</div>
-      <textarea aria-label="The agent's reasoning" value={reasoning} onChange={(e) => setReasoning(e.target.value)} rows={3} maxLength={2000} className="w-full rounded-lg border border-slate-300 bg-slate-50 px-2 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800" />
+      <textarea aria-label="The agent's reasoning" value={reasoning} onChange={(e) => setReasoning(e.target.value)} rows={3} maxLength={8000} className="w-full rounded-lg border border-slate-300 bg-slate-50 px-2 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800" />
       <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
         <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={vulnerable} onChange={(e) => setVulnerable(e.target.checked)} /> customer carries a vulnerability marker</label>
         <button type="button" onClick={() => void ask()} className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300">Ask</button>
@@ -228,6 +249,14 @@ function AskPersonaPanel({ workflowId, gate }: { workflowId: string; gate: GateC
       {answer && <div data-testid="ask-persona-answer" className="mt-2 text-xs text-slate-700 dark:text-slate-200">{answer}</div>}
     </section>
   );
+}
+
+/** Why the API refused a question, from its validation detail. */
+function notAccepted(detail: unknown): string {
+  const messages = typeof detail === "string" ? [detail]
+    : Array.isArray(detail) ? detail.map((d) => (d && typeof d === "object" && "msg" in d ? String((d as { msg: unknown }).msg) : "")).filter(Boolean)
+    : [];
+  return messages.length ? `The question was not accepted: ${messages.join("; ")}` : "The question was not accepted";
 }
 
 /** A judged persona's decline, as the orchestrator words it. */

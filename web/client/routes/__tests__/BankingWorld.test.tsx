@@ -82,6 +82,7 @@ let queue: unknown[] = [];
 let details: Record<string, unknown> = {};
 let workflows: unknown[] = [];
 let posted: Record<string, unknown> = {};
+let statuses: Record<string, number> = {};
 
 function renderBank(overrides: Partial<ComponentProps<typeof BankingWorld>> = {}) {
   const props = {
@@ -101,6 +102,7 @@ beforeEach(() => {
   details = {};
   workflows = [];
   posted = {};
+  statuses = {};
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
     const path = String(url);
     const body = path === "/api/workflows" ? workflows
@@ -108,7 +110,7 @@ beforeEach(() => {
       : path.startsWith("/api/simulator/inject-burst") ? { ok: true }
       : path in posted ? posted[path]
       : queue;
-    return new Response(JSON.stringify(body), { status: 200 });
+    return new Response(JSON.stringify(body), { status: statuses[path] ?? 200 });
   }));
 });
 
@@ -288,6 +290,7 @@ describe("BankingWorld", () => {
       reading: { scam_type: "bank_impersonation", scam_lead: 0.8, cues: ["bereavement"], read_by: "laya" } };
     renderBank();
     const panel = screen.getByTestId("customer-call");
+    fireEvent.change(within(panel).getByLabelText("Payment"), { target: { value: "SYN-PAY-0100" } });
     fireEvent.change(within(panel).getByLabelText("What the customer says"), { target: { value: "My bank's fraud team told me to move my savings." } });
     fireEvent.click(within(panel).getByRole("button", { name: "Report the call" }));
     const result = await within(panel).findByTestId("customer-call-result");
@@ -312,7 +315,47 @@ describe("BankingWorld", () => {
     const answer = await within(panel).findByTestId("ask-persona-answer");
     expect(answer.textContent).toContain("Fraud decision manager would hand it up: Held for a closer look");
     const call = (fetch as unknown as { mock: { calls: [string, RequestInit?][] } }).mock.calls.find(([url]) => url === "/api/judgement/what-if");
-    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ workflow_id: "bapp-evt-11", reasoning: "No vulnerability flag is present.", vulnerable: true });
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ workflow_id: "bapp-evt-11", vulnerable: true });
+  });
+
+  it("files a call on the payment the presenter chose while new payments settle", async () => {
+    posted["/api/world/customer-calls"] = { ok: true, claim_id: "SYN-CLAIM-C001", reading: null };
+    const { rerender, props } = renderBank();
+    const panel = screen.getByTestId("customer-call");
+    const report = within(panel).getByRole("button", { name: "Report the call" }) as HTMLButtonElement;
+    fireEvent.change(within(panel).getByLabelText("What the customer says"), { target: { value: "I was scammed." } });
+    expect(report.disabled).toBe(true); // nothing is chosen for the presenter
+    fireEvent.change(within(panel).getByLabelText("Payment"), { target: { value: "SYN-PAY-0100" } });
+    const newer = { ...STATE, recent_settlements: [{ payment_id: "SYN-PAY-0200", rail_id: "SYN-RAIL-FPS", amount_gbp: 99, sim_time: 430, event_id: "evt-2" }] };
+    rerender(<BankingWorld {...props} state={newer} />);
+    const select = within(panel).getByLabelText("Payment") as HTMLSelectElement;
+    const offered = () => [...select.options].map((o) => o.value);
+    expect(select.value).toBe("SYN-PAY-0100");
+    expect(offered()).toEqual(["", "SYN-PAY-0100"]); // a steady list until the presenter refreshes it
+    fireEvent.click(within(panel).getByRole("button", { name: "Refresh payments" }));
+    expect(offered()).toEqual(["", "SYN-PAY-0100", "SYN-PAY-0200"]); // the chosen payment stays
+    fireEvent.click(report);
+    await within(panel).findByTestId("customer-call-result");
+    const call = (fetch as unknown as { mock: { calls: [string, RequestInit?][] } }).mock.calls.find(([url]) => url === "/api/world/customer-calls");
+    expect(JSON.parse(String(call?.[1]?.body)).payment_id).toBe("SYN-PAY-0100");
+  });
+
+  it("says why the persona could not be asked", async () => {
+    details["/api/workflows/bapp-evt-11"] = { workflow: { payload: {
+      decisions: [{ persona_role: "fraud_decision_manager", verdict: "approve", decided_by: "laya", judgement: { summary: "Approved." } }],
+      hitl_context: { persona: "fraud_decision_manager", ranking: { reasoning: "No vulnerability flag is present." },
+        observation: { claim: { vulnerability_flag: false } } },
+    } } };
+    statuses["/api/judgement/what-if"] = 422;
+    posted["/api/judgement/what-if"] = { detail: [{ msg: "String should have at most 8000 characters" }] };
+    renderBank({ events: [ROUTINE, ...APPROVED_TRACE, ...APPROVED_OUTCOME] });
+    const panel = await screen.findByTestId("ask-persona");
+    fireEvent.change(within(panel).getByLabelText("The agent's reasoning"), { target: { value: "A much longer reasoning." } });
+    fireEvent.click(within(panel).getByRole("button", { name: "Ask" }));
+    const answer = await within(panel).findByTestId("ask-persona-answer");
+    expect(answer.textContent).toBe("The question was not accepted: String should have at most 8000 characters");
+    const call = (fetch as unknown as { mock: { calls: [string, RequestInit?][] } }).mock.calls.find(([url]) => url === "/api/judgement/what-if");
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ workflow_id: "bapp-evt-11", reasoning: "A much longer reasoning." });
   });
 
   it("names who approved when the decision was handed up", () => {
