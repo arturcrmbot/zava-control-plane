@@ -26,6 +26,10 @@ MULE_FUNCTION = "financial-crime"
 MULE_SKILL = "mule-network-analyst"
 MULE_MAX_VALUE_GBP = 250_000.0
 MULE_SPAWNER = "verticals.banking.spawners.spawn_mule_investigation_workflow"
+# With BANKING_WORLD_SCREENING=1 the world opens mule cases itself: a sensor
+# trips when flagged payments from two or more customers land in one account.
+MULE_SENSOR_ID = "sensor:mule_pattern"
+MULE_OBJECTIVE_TYPE = "investigate_mule_account"
 
 # --- Merchant onboarding risk (Payments) ----------------------------------
 

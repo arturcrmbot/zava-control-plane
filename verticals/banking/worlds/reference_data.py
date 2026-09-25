@@ -12,6 +12,7 @@ data does not become density on the screen.
 from __future__ import annotations
 
 import random
+from typing import Any
 
 from verticals.banking.fraud_constants import (
     FRAUD_BENEFICIARY_OVER_DELEGATION,
@@ -460,3 +461,51 @@ def build_collateral_agreements() -> list[CollateralAgreement]:
         )
         for index in range(1, COUNTERPARTY_COUNT + 1)
     ]
+
+
+# --- What the bank can notice (phase 2, BANKING_WORLD_SCREENING=1) --------------------
+# Payment references and which receiving accounts are mule accounts. Both come
+# from their own random streams, so the seeded book above is unchanged. Which
+# accounts are mules is hidden world truth: it is never put on a record the
+# bank's decisions read.
+#
+# The reference lists were measured against Laya's described-pattern question
+# (tools/laya_eval): none of the 30 ordinary references is flagged, 13 of the
+# 18 scam references are. The five it misses stay, as a real screen misses some.
+
+ORDINARY_REFERENCES: tuple[str, ...] = (
+    "Rent October flat 3", "Council tax September", "Payroll SEP26 ACME LTD", "Invoice 2291 kitchen units",
+    "Birthday present for Mia", "Gym membership", "Car insurance renewal", "Nursery fees autumn term",
+    "Electricity bill", "Groceries", "Dinner split", "Window cleaner", "Piano lessons", "Season ticket",
+    "School trip deposit", "Water bill Q3", "Mortgage overpayment", "Football subs", "Dentist invoice 118",
+    "Broadband October", "Wedding gift", "Plumber invoice 442", "Train fare refund", "Book club", "Pocket money",
+    "Car service", "Phone bill", "Taxi share", "Garden centre", "Vet bill",
+)
+SCAM_REFERENCES: tuple[str, ...] = (
+    "Safe account transfer as advised by bank", "HMRC penalty urgent payment",
+    "Crypto wallet top up guaranteed returns", "Release fee to unlock withdrawal",
+    "Loan insurance fee before payout", "Investment platform deposit 3 percent weekly",
+    "Transfer to secure account fraud team", "Tax refund processing fee", "Fee to release parcel",
+    "Bitcoin mining guaranteed profit", "Court fine settle today", "Account verification transfer",
+    "Prize claim admin fee", "Move savings protected account", "Police case funds protection",
+    "Customs fee for held parcel", "Forex trading 20 percent monthly", "Unlock inheritance fee",
+)
+MULE_ACCOUNT_COUNT = 12
+
+
+def mule_beneficiary_ids() -> tuple[str, ...]:
+    """Receiving accounts controlled by fraudsters: the three hero ones and nine more."""
+    rng = random.Random(SEED + 101)
+    named = {FRAUD_BENEFICIARY_STANDARD, FRAUD_BENEFICIARY_VULNERABLE, FRAUD_BENEFICIARY_OVER_DELEGATION}
+    others = [f"SYN-BENE-{index:03d}" for index in range(1, BENEFICIARY_COUNT + 1)]
+    others = [bene for bene in others if bene not in named]
+    return tuple(sorted(named | set(rng.sample(others, MULE_ACCOUNT_COUNT - len(named)))))
+
+
+def build_payment_references(payments: list[Payment] | Any, mule_ids: set[str]) -> dict[str, str]:
+    """A reference for every payment: scam patterns into mule accounts, ordinary otherwise."""
+    rng = random.Random(SEED + 202)
+    return {
+        payment.id: rng.choice(SCAM_REFERENCES if payment.to_beneficiary_id in mule_ids else ORDINARY_REFERENCES)
+        for payment in payments
+    }

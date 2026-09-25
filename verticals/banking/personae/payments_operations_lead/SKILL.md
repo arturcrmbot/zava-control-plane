@@ -49,6 +49,39 @@ decision_policy: |
         extra["selected_option_id"] = (context or {}).get("selected_option_id") or ""
         extra["evidence_versions"] = (context or {}).get("evidence_versions") or {}
         extra["rationale"] = reason
+personality:
+    risk_appetite: balanced
+    thoroughness: medium
+    escalation_style: quick
+judgement:
+    character: "Pragmatic: you approve sound applications quickly and hold one only for a serious concern."
+    gates:
+        merchant-onboarding-risk:
+            facts: verticals.banking.judgement_facts:merchant_gate
+            reads:
+                - id: argues_decline
+                  text: agent_reasoning
+                  ask: "Does the text argue that the application should be declined?"
+                - id: weighs_volume
+                  text: agent_reasoning
+                  ask: "Does the text discuss the merchant's expected card volume?"
+                - id: covers_no_action
+                  text: agent_reasoning
+                  ask: "Does the text mention what happens if nothing is done?"
+            checks:
+                - concern: "the agent argues for declining but recommends onboarding the merchant"
+                  when: {read: argues_decline, is: yes, fact: recommends_decline, equals: false}
+                - concern: "the agent offers standard terms without weighing a very large projected card volume"
+                  when: {read: weighs_volume, is: no, fact: standard_terms_for_large_volume, equals: true}
+                  severity: minor
+                - concern: "the agent does not say what happens if the bank does nothing"
+                  when: {read: covers_no_action, is: no}
+                  severity: minor
+            decide:
+                ask: "Given the findings, what should you do with the agent's recommended decision?"
+                approve: "Approve it now: no concerns were found"
+                hold: "Hold it: the concerns need a closer look"
+            min_lead: 0.3
 ---
 
 # Payments Operations Lead

@@ -23,8 +23,8 @@ other Copilot use of that account counts against the same limit.
 - **Keep the ramp slow**: `DEMO_TIME_WARP_FACTOR=15` opens a mule case about
   every 6 minutes and a merchant case about every 8, so the organisation stays
   visibly busy without spending the budget the stories need.
-- **Never press "Spawn 8 cases"** on the constellation: eight agent sessions
-  start at once.
+- **"Spawn 8 cases" opens eight real mule and merchant cases at once** — eight
+  agent sessions. Press it only if the budget can take it.
 - **Symptom of exhaustion**: a claim card reads `Workflow failed · …` and the
   Durable history says *"rate limit … try again in N minutes"*. The agent
   activity is retried once after 10 s, and each attempt already retries a hung
@@ -41,12 +41,16 @@ other Copilot use of that account counts against the same limit.
 | `LLM_RUNTIME` | `ghcp` | uses the `gh` CLI token; `aoai` needs a correct Azure tenant |
 | `SIMULATOR_RAMP_ENABLED` | `1` | the autonomy switch — `0` means no supporting cases open |
 | `DEMO_TIME_WARP_FACTOR` | `15` | supporting-case cadence (section 1) |
-| `PERSONA_AUTO_CLOSE` | `financial_crime_lead,payments_operations_lead` | the bank runs itself; the hero decision waits for the presenter |
+| `PERSONA_AUTO_CLOSE` | `*` | synthetic demo: every gate is decided by its persona within delegated authority; nobody approves by hand |
+| `MEMORY_BACKEND` | `fallback` | in-process memory; the configured Azure OpenAI endpoint rejects embeddings, so `auto` loses every write |
 
 ```bash
 bash scripts/down-demo.sh && make up
 curl -s 'localhost:3101/api/world/state?compact=true' | jq '.enabled, .bank.payments_settled_total'
 curl -s localhost:3101/api/personas/narrative-arcs | jq -r '.[].name'   # the bank's six decision-makers
+# memory is in-process, so seed it on every boot (no model calls)
+for f in verticals/banking/demo/memory-seed-round1.json verticals/banking/demo/memory-seed-round2.json; do
+  curl -s -X POST localhost:3101/api/memory/v2/seed-demo -H 'content-type: application/json' --data @"$f"; done
 ```
 
 Open both screens:
@@ -61,6 +65,84 @@ claims raised*. Let the ramp open a case or two before the first story: the
 first model sessions after a cold start can fail authentication once, and
 the retry absorbs it off stage rather than on it.
 
+## 2a. Persona judgement (optional, Laya)
+
+With judgement on, each persona reads the case before deciding instead of only
+checking the amount. Laya is a small local model: it answers narrow questions
+about the agent's reasoning in about 50-300 ms, at no token cost. Code then
+checks those answers against the record, and Laya weighs the concerns in the
+persona's character: approve, or hold and hand the case up. The rules
+(`decision_policy`), admission and the governance kernel still set the
+ceiling. Laya can hold a case, but it can never approve one the rules would
+not.
+
+Start Laya before `make up` (it stays up between takes):
+
+```bash
+LAYA_PORT=8765 ~/.copilot/skills/laya/scripts/start.sh   # run in the background; ready in ~5-15 s
+curl -s localhost:8765/health                             # {"status": "ok", "device": "mps", ...}
+```
+
+`.env` (both the API and the Functions host read it):
+
+| Setting | Value | Why |
+|---|---|---|
+| `JUDGEMENT_ENABLED` | `1` | personas with a `judgement:` profile read each case; over-authority claims go to who can decide |
+| `LAYA_URL` | `http://127.0.0.1:8765` | where Laya listens; empty means the rules decide (and say so) |
+| `JUDGEMENT_LLM_BUDGET_PER_HOUR` | `6` | unclear judgements go to an LLM deep review, at most this many an hour, on the same Copilot quota |
+| `JUDGEMENT_GATE_DEADLINE_S` | `180` (default) | a gate is judged within this, hand-ups included; if deep reviews are queued, the late ones are decided by the rules and say so |
+
+What changes in the walk:
+
+| Moment | With judgement on |
+|---|---|
+| 0:12 | The fraud decision manager reads the agent's reasoning. The chain shows *Fraud decision manager approved · fast judgement*, with the concerns it found, if any. |
+| A contradiction | If the agent's reasoning contradicts the record (e.g. says "no vulnerability marker" for a flagged customer), the manager holds it and hands it to the financial crime lead, who decides. Both steps show on the chain. |
+| A refusal | A refusal is never waved through on its £0 value: refusals always get a second pair of eyes. |
+| At the top of the chain | The last persona can send the case back to the agent with its reasons. The agent re-assesses once and the gate is raised again; the chain shows *sent it back to the agent*, then *approved after re-assessment*. |
+| 0:22 | The £92,000 claim no longer dead-ends. Governance names the financial crime lead, who decides the capped £85,000 within a £250,000 delegation. The chain shows *Decision approved · … · by Financial crime lead*. |
+
+Fallbacks are automatic and recorded on the decision:
+- Laya down or slow (2 s timeout; after three failures it is skipped for 30 s): the rules decide.
+- Deep-review budget spent or the LLM failing: the rules decide.
+
+Every decision records who decided (fast judgement, deep review or rules), each
+question with its probabilities, the lead over the runner-up, and the
+threshold. It shows in the drawer and in `persona.judgement` events. Laya needs
+about 3 GB of memory; stop it after the slot.
+
+## 2b. The world notices (optional, needs Laya for the best reading)
+
+With `BANKING_WORLD_SCREENING=1` the bank screens the payments it sees:
+- New payments arrive with references, and Laya matches each against described
+  scam patterns. The floor's *The bank noticed* panel lists the flags.
+- Flagged payments from two or more customers into one account open a mule
+  investigation through a world sensor, so mule cases stop arriving on a timer.
+  **Mule activity detected** now makes such payments land.
+- The disposition changes the account: *restrained* stops it receiving, and
+  *monitored* can reopen it.
+- Customers react to reimbursement decisions (accepted, chased, complained).
+- Merchant applications describe the business, and the risk band is read from it.
+
+With Laya down, keyword rules screen and rules pick reactions, and each event says
+so. The cadence is set by `BANKING_NEW_PAYMENT_MINUTES` (default 30 synthetic
+minutes) and `BANKING_SCAM_SHARE` (default 0.35). At the demo speed that opens a
+mule case every few minutes.
+
+## 2c. Steer it live (optional)
+
+- **A customer calls about a payment.** Pick any recent payment on the floor and type
+  what the customer says. The bank raises a claim on that payment and the whole hero
+  path runs on it. Laya's reading of the words shows next to it and is advisory: the
+  record decides vulnerability, and the rules decide what is permitted. The list of
+  payments holds still while you choose; press ↻ for newer ones. The bank refuses a
+  call while the same customer or receiving account already has a case being
+  decided, and says so: wait for that decision, then call again. For the same
+  reason, a story waits while a called claim on its account is being decided.
+- **Ask the persona.** Under the claim story, edit the agent's reasoning or tick
+  *customer carries a vulnerability marker* and press **Ask**. The persona says how it
+  would judge the case now. This uses no tokens and changes nothing.
+
 ## 3. The walk
 
 | Time | Screen | Show | Say |
@@ -70,13 +152,19 @@ the retry absorbs it off stage rather than on it.
 | 0:05 | Floor | Rails, settlements, credit, markets | The same world as an operations floor. Nothing here is a slide. |
 | 0:07 | Floor | **APP fraud claim · £18,400** | A customer reports a scam. Watch Retail banking flare on the constellation — the world raised a signal. |
 | 0:09 | Floor | Chain: claim raised → case opened → agents investigating | A real agent is reading the claim evidence and ranking the admitted options. |
-| 0:12 | Floor | *Waiting for a human decision* → **Review & decide** | The agent ranked. The human decides — within their delegation. |
+| 0:12 | Floor | Chain: decision approved | The agent ranked; the fraud decision manager persona approved within its £50,000 delegation, and the decision names the rule. |
 | 0:15 | Floor | Chain completes | £18,400 reimbursed; the mule account traced to `SYN-CORP-014`, a corporate client. |
 | 0:18 | Floor | **Vulnerable customer · £6,750** | Refusal was never admitted — the deterministic layer refused it, and no ranking can resurrect it. |
 | 0:22 | Floor | **Over-delegation · £92,000** | Capped at £85,000, still above the manager's £50,000 delegation. *Refused by authority · needs Financial crime lead* — governance refuses and names who can. |
 | 0:26 | Constellation / Knowledge | Decisions and the entity graph | Every decision is recorded; the mule account and the wholesale exposure are two ends of one bank. |
 
 ## 4. Reset between takes
+
+The workflow store and memory are in-process: restarting the API empties the
+feed and memory (re-seed memory afterwards). Between takes reset only the
+world, which keeps the feed's history. Show history with the feed's **All
+activity**; *All my decisions today* lists only decisions made by hand in this
+browser, and with personas deciding every gate it stays empty.
 
 A story runs once per world. Start a fresh world (claims dormant again):
 
@@ -148,3 +236,7 @@ before reaching governance.
 - Memory holds the seeded decision notes, but the dream pass distils no
   lessons here: memory runs on the in-process fallback without an Azure
   OpenAI endpoint. Do not claim learned lessons.
+- With judgement on, do not say Laya decides money. It reads and weighs.
+  Admission, the authority matrix and the rules still set every ceiling, and
+  the value and option never come from Laya. Its readings are probabilities:
+  quote the lead the drawer shows, not certainty.

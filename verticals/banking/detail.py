@@ -84,7 +84,8 @@ def _hero_detail(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _supporting_detail(payload: dict[str, Any]) -> dict[str, Any]:
-    case = _dict(payload.get("case"))
+    # A case the world noticed arrives as an observation that holds the case.
+    case = _dict(payload.get("case")) or _dict(_dict(payload.get("observation")).get("case"))
     if not case:
         return {}
     entry = {
@@ -95,6 +96,9 @@ def _supporting_detail(payload: dict[str, Any]) -> dict[str, Any]:
     }
     if case.get("sector"):
         entry["sector"] = case.get("sector")
+    flagged = _list(case.get("flagged_payments"))
+    if flagged:
+        entry["flaggedPayments"] = flagged
     return {"case": entry}
 
 
@@ -121,17 +125,29 @@ def workflow_detail(workflow: Any, app_state: Any = None) -> dict[str, Any] | No
         }
 
     # Every governed decision this workflow recorded, with the authority rule
-    # that permitted it. This is the governance story the drawer shows.
-    decisions = [
-        {
+    # that permitted it. This is the governance story the drawer shows. A
+    # judged decision also says who decided (fast judgement, deep review or
+    # rules) and the concerns the persona found.
+    decisions = []
+    for entry in _list(payload.get("decisions")):
+        if not isinstance(entry, dict):
+            continue
+        row = {
             "phase": entry.get("phase"),
             "persona": entry.get("persona_role"),
             "verdict": entry.get("verdict"),
             "reason": entry.get("reason"),
         }
-        for entry in _list(payload.get("decisions"))
-        if isinstance(entry, dict)
-    ]
+        judgement = _dict(entry.get("judgement"))
+        if entry.get("decided_by"):
+            row["decidedBy"] = entry.get("decided_by")
+        if judgement:
+            row["concerns"] = [str(c) for c in _list(judgement.get("concerns"))]
+            row["judgementSummary"] = judgement.get("summary")
+            verdict = _dict(judgement.get("judge"))
+            if verdict:
+                row["lead"] = verdict.get("lead")
+        decisions.append(row)
     if decisions:
         detail["governedDecisions"] = decisions
 

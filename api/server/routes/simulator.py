@@ -587,7 +587,7 @@ async def seed_kpis():
 # river immediately show activity across multiple functions, not just one.
 # ---------------------------------------------------------------------------
 @router.post("/inject-burst")
-async def inject_burst(n: int = 5):
+async def inject_burst(n: int = 5, workflow_type: str | None = None):
     """Spawn ~n varied workflows across multiple domains.
 
     Used by the Org Ops v2 page top-right "burst" button so an operator can
@@ -596,7 +596,9 @@ async def inject_burst(n: int = 5):
     of spawned workflow_ids.
     """
     import asyncio
+    from api.shared.vertical_loader import active_runtime
     from api.server.services.simulator_orchestrator import (  # noqa: E402
+        _resolve_spawner,
         spawn_fleet_vendor_kyc_workflow,
         spawn_fleet_ap_invoice_workflow,
         spawn_fleet_perf_review_workflow,
@@ -609,6 +611,44 @@ async def inject_burst(n: int = 5):
         spawn_hiring_workflow,
     )
     n = max(1, min(int(n or 5), 20))
+    pack = active_runtime().pack
+    if pack.name != "agency":
+        # Another pack bursts its own autonomous processes; the agency
+        # spawners below have no orchestrators outside the agency pack.
+        own = [pack.domains[t] for t in pack.ramp_workflow_types if t in pack.domains]
+        if workflow_type is not None:
+            own = [d for d in own if d.workflow_type == workflow_type]
+            if not own:
+                return {"ok": False, "error": f"{workflow_type!r} is not an autonomous process of this pack"}
+        # A world that raises cases on demand joins a mixed burst, so the
+        # burst is a random mix of the bank's work rather than a fixed list.
+        world_service = getattr(app_state, "world_service", None)
+        raise_case = getattr(world_service, "run_scenario", None) if workflow_type is None else None
+        kinds = [d.workflow_type for d in own] + (["world-case"] if raise_case is not None else [])
+        if not kinds:
+            return {"ok": True, "count": 0, "spawned": []}
+        rng = _random.Random()
+        plan = [kinds[i % len(kinds)] for i in range(n)]
+        rng.shuffle(plan)
+        by_type = {d.workflow_type: d for d in own}
+        spawned: list[dict] = []
+        coros = []
+        for kind in plan:
+            if kind == "world-case":
+                try:
+                    result = raise_case("new-fraud-claim")
+                    spawned.append({"domain": "world-case", "trace_id": result.get("event", {}).get("trace_id")})
+                except ValueError as exc:
+                    spawned.append({"domain": "world-case", "error": str(exc)})
+            else:
+                coros.append((kind, _resolve_spawner(by_type[kind])()))
+        results = await asyncio.gather(*[coro for _, coro in coros], return_exceptions=True)
+        spawned += [
+            {"domain": domain, "error": str(result)} if isinstance(result, Exception)
+            else {"domain": domain, "workflow_id": result}
+            for (domain, _), result in zip(coros, results)
+        ]
+        return {"ok": True, "count": len(spawned), "spawned": spawned}
     spawners = [
         ("vendor-kyc", spawn_fleet_vendor_kyc_workflow()),
         ("ap-invoice", spawn_fleet_ap_invoice_workflow()),

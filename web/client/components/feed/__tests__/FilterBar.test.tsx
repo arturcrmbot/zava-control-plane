@@ -40,6 +40,23 @@ describe("FilterBar", () => {
     );
   });
 
+  it("leaves the my-decisions view when a mode is chosen", () => {
+    const onChange = vi.fn();
+    render(
+      <FilterBar
+        filter={{ mode: "needs-you", domains: [], severity: null, search: "", mine: true }}
+        onChange={onChange}
+        selectMode={false}
+        onSelectModeChange={noop}
+        availableDomains={[]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /All activity/i }));
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: "all-activity", mine: false }),
+    );
+  });
+
   it("renders a domain chip per availableDomains entry and toggles it", () => {
     const onChange = vi.fn();
     render(

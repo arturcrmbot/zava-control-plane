@@ -80,6 +80,9 @@ const EVENTS = [ROUTINE, ...APPROVED_TRACE, ...APPROVED_OUTCOME, ...REFUSED_TRAC
 
 let queue: unknown[] = [];
 let details: Record<string, unknown> = {};
+let workflows: unknown[] = [];
+let posted: Record<string, unknown> = {};
+let statuses: Record<string, number> = {};
 
 function renderBank(overrides: Partial<ComponentProps<typeof BankingWorld>> = {}) {
   const props = {
@@ -97,9 +100,17 @@ function renderBank(overrides: Partial<ComponentProps<typeof BankingWorld>> = {}
 beforeEach(() => {
   queue = [];
   details = {};
+  workflows = [];
+  posted = {};
+  statuses = {};
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
-    const body = String(url).startsWith("/api/workflows/") ? details[String(url)] ?? {} : queue;
-    return new Response(JSON.stringify(body), { status: 200 });
+    const path = String(url);
+    const body = path === "/api/workflows" ? workflows
+      : path.startsWith("/api/workflows/") ? details[path] ?? {}
+      : path.startsWith("/api/simulator/inject-burst") ? { ok: true }
+      : path in posted ? posted[path]
+      : queue;
+    return new Response(JSON.stringify(body), { status: statuses[path] ?? 200 });
   }));
 });
 
@@ -118,11 +129,11 @@ describe("BankingWorld", () => {
     expect(screen.getByText("2 min window")).toBeTruthy();
   });
 
-  it("runs the three banking stories with their real scenario ids", () => {
+  it("raises a new claim of each kind from the world", () => {
     for (const [label, id] of [
-      ["APP fraud claim · £18,400", "synthetic-app-fraud-claim"],
-      ["Vulnerable customer · £6,750", "synthetic-app-fraud-vulnerable"],
-      ["Over-delegation · £92,000", "synthetic-app-fraud-over-delegation"],
+      ["Fraud claim reported", "new-fraud-claim"],
+      ["High-value claim", "new-fraud-claim:high-value"],
+      ["Vulnerable customer claim", "new-fraud-claim:vulnerable"],
     ] as const) {
       cleanup();
       const onRunScenario = vi.fn(async () => {});
@@ -130,6 +141,32 @@ describe("BankingWorld", () => {
       fireEvent.click(screen.getByRole("button", { name: label }));
       expect(onRunScenario).toHaveBeenCalledWith(id);
     }
+  });
+
+  it("opens a new autonomous case of the chosen process", () => {
+    renderBank();
+    fireEvent.click(screen.getByRole("button", { name: "Mule activity detected" }));
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/simulator/inject-burst?n=1&workflow_type=mule-account-investigation",
+      { method: "POST" },
+    );
+  });
+
+  it("lists recent cases newest first, each one openable", async () => {
+    workflows = [
+      { id: "BMUL-0001", type: "mule-account-investigation", status: "completed", currentPhase: "Verify Disposition", createdAt: 10, metadata: {} },
+      { id: "bapp-evt-00000200", type: "app-fraud-reimbursement", status: "failed", currentPhase: "Decide Reimbursement", createdAt: 20, metadata: { rejected: true } },
+      { id: "VKY-0001", type: "vendor-kyc", status: "in_progress", createdAt: 30, metadata: {} },
+    ];
+    renderBank();
+    const refused = await screen.findByTestId("case-bapp-evt-00000200");
+    expect(refused.getAttribute("href")).toBe("/workflows/bapp-evt-00000200");
+    expect(refused.textContent).toContain("refused by authority");
+    expect(screen.getByTestId("case-BMUL-0001").textContent).toContain("decided");
+    // Another pack's workflow never appears on the bank's floor.
+    expect(screen.queryByTestId("case-VKY-0001")).toBeNull();
+    const rows = screen.getByTestId("recent-cases").querySelectorAll("a");
+    expect(rows[0].getAttribute("data-testid")).toBe("case-bapp-evt-00000200");
   });
 
   it("never shows a dormant claim as open work", () => {
@@ -190,6 +227,166 @@ describe("BankingWorld", () => {
     expect(card).not.toContain("A third sentence");
     expect(card).toContain("Within delegated authority");
     expect(card).not.toContain("Fleet Manager");
+  });
+
+  it("tells the story of each persona's judgement before the outcome", async () => {
+    details["/api/workflows/bapp-evt-11"] = { workflow: { payload: { decisions: [
+      { persona_role: "fraud_decision_manager", verdict: "hold", decided_by: "laya",
+        judgement: { summary: "Held for a closer look: the agent's reasoning says there is no vulnerability marker, but the record shows one. Handed to the Financial crime lead." } },
+      { persona_role: "financial_crime_lead", verdict: "approve", decided_by: "llm",
+        judgement: { summary: "Deep review: The record is consistent." } },
+    ] } } };
+    renderBank({ events: [ROUTINE, ...APPROVED_TRACE, ...APPROVED_OUTCOME] });
+    const strip = screen.getByTestId("banking-intervention");
+    expect(await within(strip).findByText("Fraud decision manager held it")).toBeTruthy();
+    const chain = strip.textContent ?? "";
+    expect(chain).toContain("fast judgement · Held for a closer look");
+    expect(chain).toContain("Financial crime lead approved");
+    expect(chain).toContain("deep review · Deep review: The record is consistent.");
+    expect(chain.indexOf("held it")).toBeLessThan(chain.indexOf("Financial crime lead approved"));
+    expect(chain.indexOf("Financial crime lead approved")).toBeLessThan(chain.indexOf("Decision approved"));
+  });
+
+  it("shows a send-back to the agent and the decision after re-assessment", async () => {
+    details["/api/workflows/bapp-evt-11"] = { workflow: { payload: { decisions: [
+      { persona_role: "financial_crime_lead", verdict: "send_back", decided_by: "llm",
+        judgement: { summary: "Sent back to the agent: the reasoning contradicts the record." } },
+      { persona_role: "fraud_decision_manager", verdict: "approve", decided_by: "laya", round: 1,
+        judgement: { summary: "Approved after reading the agent's reasoning: no concerns found." } },
+    ] } } };
+    renderBank({ events: [ROUTINE, ...APPROVED_TRACE, ...APPROVED_OUTCOME] });
+    const strip = screen.getByTestId("banking-intervention");
+    expect(await within(strip).findByText("Financial crime lead sent it back to the agent")).toBeTruthy();
+    expect(within(strip).getByText("Fraud decision manager approved after re-assessment")).toBeTruthy();
+  });
+
+  it("asks the world for mule activity when the bank screens payments", () => {
+    const onRunScenario = vi.fn(async () => {});
+    renderBank({ onRunScenario, state: { ...STATE, screening: { payments_screened: 4, payments_flagged: 1 } } as WorldState });
+    fireEvent.click(screen.getByRole("button", { name: "Mule activity detected" }));
+    expect(onRunScenario).toHaveBeenCalledWith("mule-activity");
+    expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining("inject-burst"), expect.anything());
+  });
+
+  it("shows what the bank noticed and how customers reacted", () => {
+    renderBank({ state: { ...STATE, screening: {
+      payments_screened: 40, payments_flagged: 3, mule_cases_open: 1, mule_cases_decided: 2,
+      recent_flags: [{ payment_id: "SYN-PAY-N00007", beneficiary_id: "SYN-BENE-002", reference: "Release fee to unlock withdrawal",
+        pattern: "unlock_fee", lead: 1, screened_by: "laya", amount_gbp: 900 }],
+      customer_reactions: { accepts: 2, chases: 1, complains: 1 },
+    } } as WorldState });
+    expect(screen.getByTestId("noticed-counts").textContent).toBe("3 flagged of 40 screened · 1 mule cases open · 2 decided");
+    expect(screen.getByTestId("customer-reactions").textContent).toBe("Customers: 2 accepted · 1 chased · 1 complained");
+    expect(screen.getByTestId("flag-SYN-PAY-N00007").textContent).toContain("unlock fee · read by Laya");
+  });
+
+  it("hides the noticed panel when the bank does not screen", () => {
+    renderBank();
+    expect(screen.queryByTestId("bank-noticed")).toBeNull();
+  });
+
+  it("reports a customer's call about a payment and shows the advisory reading", async () => {
+    posted["/api/world/customer-calls"] = { ok: true, claim_id: "SYN-CLAIM-C001",
+      reading: { scam_type: "bank_impersonation", scam_lead: 0.8, cues: ["bereavement"], read_by: "laya" } };
+    renderBank();
+    const panel = screen.getByTestId("customer-call");
+    fireEvent.change(within(panel).getByLabelText("Payment"), { target: { value: "SYN-PAY-0100" } });
+    fireEvent.change(within(panel).getByLabelText("What the customer says"), { target: { value: "My bank's fraud team told me to move my savings." } });
+    fireEvent.click(within(panel).getByRole("button", { name: "Report the call" }));
+    const result = await within(panel).findByTestId("customer-call-result");
+    expect(result.textContent).toBe("Claim SYN-CLAIM-C001 raised · Laya read: bank impersonation · noted: bereavement (advisory; the record decides)");
+    const call = (fetch as unknown as { mock: { calls: [string, RequestInit?][] } }).mock.calls.find(([url]) => url === "/api/world/customer-calls");
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ payment_id: "SYN-PAY-0100", statement: "My bank's fraud team told me to move my savings." });
+  });
+
+  it("asks the persona how it would judge the case with one thing changed", async () => {
+    details["/api/workflows/bapp-evt-11"] = { workflow: { payload: {
+      decisions: [{ persona_role: "fraud_decision_manager", verdict: "approve", decided_by: "laya", judgement: { summary: "Approved." } }],
+      hitl_context: { persona: "fraud_decision_manager", ranking: { reasoning: "No vulnerability flag is present." },
+        observation: { claim: { vulnerability_flag: false } } },
+    } } };
+    posted["/api/judgement/what-if"] = { ok: true, decision: "escalate",
+      summary: "Held for a closer look: the agent's reasoning says there is no vulnerability marker, but the record shows one." };
+    renderBank({ events: [ROUTINE, ...APPROVED_TRACE, ...APPROVED_OUTCOME] });
+    const panel = await screen.findByTestId("ask-persona");
+    expect((within(panel).getByLabelText("The agent's reasoning") as HTMLTextAreaElement).value).toBe("No vulnerability flag is present.");
+    fireEvent.click(within(panel).getByRole("checkbox"));
+    fireEvent.click(within(panel).getByRole("button", { name: "Ask" }));
+    const answer = await within(panel).findByTestId("ask-persona-answer");
+    expect(answer.textContent).toContain("Fraud decision manager would hand it up: Held for a closer look");
+    const call = (fetch as unknown as { mock: { calls: [string, RequestInit?][] } }).mock.calls.find(([url]) => url === "/api/judgement/what-if");
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ workflow_id: "bapp-evt-11", vulnerable: true });
+  });
+
+  it("files a call on the payment the presenter chose while new payments settle", async () => {
+    posted["/api/world/customer-calls"] = { ok: true, claim_id: "SYN-CLAIM-C001", reading: null };
+    const { rerender, props } = renderBank();
+    const panel = screen.getByTestId("customer-call");
+    const report = within(panel).getByRole("button", { name: "Report the call" }) as HTMLButtonElement;
+    fireEvent.change(within(panel).getByLabelText("What the customer says"), { target: { value: "I was scammed." } });
+    expect(report.disabled).toBe(true); // nothing is chosen for the presenter
+    fireEvent.change(within(panel).getByLabelText("Payment"), { target: { value: "SYN-PAY-0100" } });
+    const newer = { ...STATE, recent_settlements: [{ payment_id: "SYN-PAY-0200", rail_id: "SYN-RAIL-FPS", amount_gbp: 99, sim_time: 430, event_id: "evt-2" }] };
+    rerender(<BankingWorld {...props} state={newer} />);
+    const select = within(panel).getByLabelText("Payment") as HTMLSelectElement;
+    const offered = () => [...select.options].map((o) => o.value);
+    expect(select.value).toBe("SYN-PAY-0100");
+    expect(offered()).toEqual(["", "SYN-PAY-0100"]); // a steady list until the presenter refreshes it
+    fireEvent.click(within(panel).getByRole("button", { name: "Refresh payments" }));
+    expect(offered()).toEqual(["", "SYN-PAY-0100", "SYN-PAY-0200"]); // the chosen payment stays
+    fireEvent.click(report);
+    await within(panel).findByTestId("customer-call-result");
+    const call = (fetch as unknown as { mock: { calls: [string, RequestInit?][] } }).mock.calls.find(([url]) => url === "/api/world/customer-calls");
+    expect(JSON.parse(String(call?.[1]?.body)).payment_id).toBe("SYN-PAY-0100");
+  });
+
+  it("says why the persona could not be asked", async () => {
+    details["/api/workflows/bapp-evt-11"] = { workflow: { payload: {
+      decisions: [{ persona_role: "fraud_decision_manager", verdict: "approve", decided_by: "laya", judgement: { summary: "Approved." } }],
+      hitl_context: { persona: "fraud_decision_manager", ranking: { reasoning: "No vulnerability flag is present." },
+        observation: { claim: { vulnerability_flag: false } } },
+    } } };
+    statuses["/api/judgement/what-if"] = 422;
+    posted["/api/judgement/what-if"] = { detail: [{ msg: "String should have at most 8000 characters" }] };
+    renderBank({ events: [ROUTINE, ...APPROVED_TRACE, ...APPROVED_OUTCOME] });
+    const panel = await screen.findByTestId("ask-persona");
+    fireEvent.change(within(panel).getByLabelText("The agent's reasoning"), { target: { value: "A much longer reasoning." } });
+    fireEvent.click(within(panel).getByRole("button", { name: "Ask" }));
+    const answer = await within(panel).findByTestId("ask-persona-answer");
+    expect(answer.textContent).toBe("The question was not accepted: String should have at most 8000 characters");
+    const call = (fetch as unknown as { mock: { calls: [string, RequestInit?][] } }).mock.calls.find(([url]) => url === "/api/judgement/what-if");
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ workflow_id: "bapp-evt-11", reasoning: "A much longer reasoning." });
+  });
+
+  it("names who approved when the decision was handed up", () => {
+    const escalated = APPROVED_OUTCOME.map((e) => e.type === "responder.decided"
+      ? { ...e, payload: { ...e.payload, command: { payload: { option_id: "SYN-APP-OPTION-REIMBURSE-CAPPED", value_gbp: 85_000, persona: "financial_crime_lead" } } } }
+      : e);
+    renderBank({ events: [ROUTINE, ...APPROVED_TRACE, ...escalated] });
+    expect(screen.getByTestId("banking-intervention").textContent).toContain(
+      "Reimburse to the £85k cap · £85,000 · by Financial crime lead",
+    );
+  });
+
+  it("reads a persona's decline as a decline, not a refusal by authority", () => {
+    const declined = REFUSED_TRACE.map((e) => e.type === "responder.deferred"
+      ? { ...e, payload: { ...e.payload, reasoning: "financial crime lead declined to approve: Deep review: the reasoning contradicts the record." } }
+      : e);
+    renderBank({ events: [ROUTINE, ...declined] });
+    expect(screen.getByTestId("claim-outcome-SYN-CLAIM-0033").textContent).toBe("Declined by Financial crime lead");
+    const chain = screen.getByTestId("banking-intervention").textContent ?? "";
+    expect(chain).toContain("Financial crime lead declined");
+    expect(chain).toContain("Claim declined");
+    expect(chain).not.toContain("Refused by authority");
+  });
+
+  it("shows on each recent case who decided and how", async () => {
+    workflows = [{
+      id: "BMUL-0002", type: "mule-account-investigation", status: "completed", currentPhase: "Verify Disposition", createdAt: 10, metadata: {},
+      payload: { decisions: [{ persona_role: "financial_crime_lead", verdict: "approve", decided_by: "laya", judgement: { summary: "Approved." } }] },
+    }];
+    renderBank();
+    expect((await screen.findByTestId("judged-BMUL-0002")).textContent).toBe("Financial crime lead · fast judgement");
   });
 
   it("shows no decisions waiting when the queue is empty", () => {

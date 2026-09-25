@@ -42,16 +42,281 @@ const ROUTINE_EVENTS = new Set([
 const FUNCTIONS = ["all", "payments", "retail-banking", "financial-crime", "credit-risk", "markets"] as const;
 type FunctionFilter = typeof FUNCTIONS[number];
 
-type BankingScenarioName =
-  | "synthetic-app-fraud-claim"
-  | "synthetic-app-fraud-vulnerable"
-  | "synthetic-app-fraud-over-delegation";
-
-const SCENARIOS: Array<{ id: BankingScenarioName; label: string }> = [
-  { id: "synthetic-app-fraud-claim", label: "APP fraud claim · £18,400" },
-  { id: "synthetic-app-fraud-vulnerable", label: "Vulnerable customer · £6,750" },
-  { id: "synthetic-app-fraud-over-delegation", label: "Over-delegation · £92,000" },
+// Each action opens a NEW case. A claim's outcome follows from the facts the
+// world draws for it; the kind only shapes those facts.
+interface CaseAction { id: string; label: string; hint: string; kind: "claim" | "process" }
+const CASE_ACTIONS: CaseAction[] = [
+  { id: "new-fraud-claim", label: "Fraud claim reported", hint: "A customer reports an authorised push payment scam", kind: "claim" },
+  { id: "new-fraud-claim:high-value", label: "High-value claim", hint: "A claim above the claims manager's delegated authority", kind: "claim" },
+  { id: "new-fraud-claim:vulnerable", label: "Vulnerable customer claim", hint: "A claim from a customer with a vulnerability marker", kind: "claim" },
+  { id: "mule-account-investigation", label: "Mule activity detected", hint: "A receiving account shows a mule pattern", kind: "process" },
+  { id: "merchant-onboarding-risk", label: "Merchant risk flagged", hint: "A merchant application needs a risk decision", kind: "process" },
 ];
+const CASE_LABELS: Record<string, string> = {
+  "app-fraud-reimbursement": "Fraud claim",
+  "mule-account-investigation": "Mule investigation",
+  "merchant-onboarding-risk": "Merchant review",
+};
+const RECENT_CASES_CAP = 8;
+
+interface RecentCase { id: string; type: string; status: string; phase?: string; createdAt: number; refused: boolean; judged?: JudgedDecision }
+
+/** A persona decision reached by judgement, as the persona responder records it. */
+interface JudgedDecision { persona: string; verdict: string; decidedBy: string; summary?: string; round?: number }
+
+const DECIDED_BY: Record<string, string> = { laya: "fast judgement", llm: "deep review", rules: "rules" };
+const VERDICT_WORDS: Record<string, string> = { approve: "approved", hold: "held it", reject: "declined", escalate: "escalated", send_back: "sent it back to the agent" };
+
+function judgedDecisions(decisions: unknown): JudgedDecision[] {
+  if (!Array.isArray(decisions)) return [];
+  return decisions.flatMap((entry) => {
+    const row = (entry ?? {}) as Record<string, unknown>;
+    const decidedBy = text(row.decided_by);
+    const persona = text(row.persona_role);
+    if (!decidedBy || !persona) return [];
+    const judgement = (row.judgement ?? {}) as Record<string, unknown>;
+    const round = Number(row.round ?? 0);
+    return [{ persona, verdict: String(row.verdict ?? ""), decidedBy, summary: text(judgement.summary) ?? text(row.reason), round: round > 0 ? round : undefined }];
+  });
+}
+
+/** The judged decisions on the story's workflow, polled while the story is on screen. */
+function useDecisionTrail(workflowId: string | undefined): { trail: JudgedDecision[]; gate?: GateContext } {
+  const [trail, setTrail] = useState<JudgedDecision[]>([]);
+  const [gate, setGate] = useState<GateContext | undefined>(undefined);
+  useEffect(() => {
+    setTrail([]);
+    setGate(undefined);
+    if (!workflowId) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await fetch(`/api/workflows/${encodeURIComponent(workflowId)}`);
+        if (!response.ok) return;
+        const detail = (await response.json()) as { workflow?: { payload?: Record<string, unknown> } } | null;
+        if (cancelled) return;
+        const payload = detail?.workflow?.payload ?? {};
+        setTrail(judgedDecisions(payload.decisions));
+        const hitl = payload.hitl_context as Record<string, unknown> | undefined;
+        if (hitl) {
+          const claim = ((hitl.observation ?? {}) as Record<string, unknown>).claim as Record<string, unknown> | undefined;
+          setGate({
+            persona: text(hitl.persona),
+            reasoning: text(((hitl.ranking ?? {}) as Record<string, unknown>).reasoning),
+            vulnerable: claim?.vulnerability_flag === true,
+          });
+        }
+      } catch {
+        // A transient failure keeps the last trail; the next poll retries.
+      }
+    };
+    void load();
+    const timer = window.setInterval(() => void load(), 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [workflowId]);
+  return { trail, gate };
+}
+
+/** Put each persona's judgement into the story, just before the outcome it led to. */
+function withJudgement(steps: InterventionStep[], trail: JudgedDecision[]): InterventionStep[] {
+  if (trail.length === 0) return steps;
+  const judged = trail.map((d, index) => ({
+    label: `${roleLabel(d.persona)} ${VERDICT_WORDS[d.verdict] ?? d.verdict}${d.round ? " after re-assessment" : ""}`,
+    detail: [DECIDED_BY[d.decidedBy] ?? d.decidedBy, d.summary].filter(Boolean).join(" · "),
+    eventId: `judgement-${index}-${d.persona}`,
+  }));
+  const at = steps.findIndex((s) => ["Decision approved", "Refused by authority", "Workflow failed"].includes(s.label) || s.label.endsWith(" declined"));
+  return at < 0 ? [...steps, ...judged] : [...steps.slice(0, at), ...judged, ...steps.slice(at)];
+}
+
+interface StatementReading { scam_type?: string; scam_lead?: number; cues?: string[]; read_by?: string }
+const SCAM_LABELS: Record<string, string> = {
+  bank_impersonation: "bank impersonation",
+  authority_impersonation: "police or tax impersonation",
+  romance: "romance scam",
+  investment: "investment scam",
+  purchase: "purchase scam",
+  invoice: "changed bank details",
+  advance_fee: "advance fee",
+  not_scam: "not a scam",
+  unclear: "unclear",
+};
+
+/** The presenter reports a customer's call about one of the payments on the floor. */
+function CustomerCallPanel({ settlements }: { settlements: RecentSettlement[] }) {
+  // The floor's settlements turn over every few seconds, so the presenter
+  // picks from a steady list and refreshes it when they want newer payments.
+  const [options, setOptions] = useState<RecentSettlement[]>(settlements);
+  const [paymentId, setPaymentId] = useState("");
+  const [statement, setStatement] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  useEffect(() => {
+    if (!options.length && settlements.length) setOptions(settlements);
+  }, [options.length, settlements]);
+  function refresh() {
+    const picked = options.find((s) => s.payment_id === paymentId);
+    setOptions(picked ? [picked, ...settlements.filter((s) => s.payment_id !== paymentId)] : settlements);
+  }
+  async function report() {
+    setSending(true);
+    try {
+      const response = await fetch("/api/world/customer-calls", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payment_id: paymentId, statement }),
+      });
+      const body = (await response.json()) as { ok?: boolean; claim_id?: string; error?: string; reading?: StatementReading | null };
+      if (!body.ok) {
+        setResult({ ok: false, text: body.error ?? "the world did not take the call" });
+        return;
+      }
+      const reading = body.reading;
+      const read = reading
+        ? `${reading.read_by === "laya" ? "Laya read" : "Rules read"}: ${SCAM_LABELS[reading.scam_type ?? "unclear"] ?? reading.scam_type}${reading.cues?.length ? ` · noted: ${reading.cues.join(", ")}` : ""}`
+        : "no reading";
+      setResult({ ok: true, text: `Claim ${body.claim_id} raised · ${read} (advisory; the record decides)` });
+      setStatement("");
+      setPaymentId("");
+      setOptions(settlements);
+    } catch {
+      setResult({ ok: false, text: "could not reach the bank" });
+    } finally {
+      setSending(false);
+    }
+  }
+  return (
+    <section data-testid="customer-call" aria-label="A customer calls" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">A customer calls about a payment</div>
+      <div className="flex flex-wrap items-start gap-2">
+        <select aria-label="Payment" value={paymentId} onChange={(e) => setPaymentId(e.target.value)} className="rounded-lg border border-slate-300 bg-slate-50 px-2 py-1.5 font-mono text-xs dark:border-slate-700 dark:bg-slate-800">
+          <option value="">Choose a payment…</option>
+          {options.map((s) => <option key={s.payment_id} value={s.payment_id}>{s.payment_id} · {money(s.amount_gbp)}{s.reference ? ` · ${s.reference}` : ""}</option>)}
+        </select>
+        <button type="button" aria-label="Refresh payments" title="Show the latest payments" onClick={refresh} className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">↻</button>
+        <textarea aria-label="What the customer says" value={statement} onChange={(e) => setStatement(e.target.value)} maxLength={1200} rows={2} placeholder="What the customer says, in their own words" className="min-w-[16rem] flex-1 rounded-lg border border-slate-300 bg-slate-50 px-2 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800" />
+        <button type="button" disabled={sending || !paymentId || !statement.trim()} onClick={() => void report()} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Report the call</button>
+      </div>
+      {result && <div data-testid="customer-call-result" className={`mt-2 text-xs ${result.ok ? "text-slate-700 dark:text-slate-200" : "text-red-700 dark:text-red-300"}`}>{result.text}</div>}
+    </section>
+  );
+}
+
+interface GateContext { persona?: string; reasoning?: string; vulnerable?: boolean }
+
+/** Ask the persona how it would judge this case with one thing changed. No tokens, no state change. */
+function AskPersonaPanel({ workflowId, gate }: { workflowId: string; gate: GateContext }) {
+  const [reasoning, setReasoning] = useState(gate.reasoning ?? "");
+  const [vulnerable, setVulnerable] = useState(Boolean(gate.vulnerable));
+  const [answer, setAnswer] = useState<string | null>(null);
+  useEffect(() => {
+    setReasoning(gate.reasoning ?? "");
+    setVulnerable(Boolean(gate.vulnerable));
+    setAnswer(null);
+  }, [workflowId, gate.reasoning, gate.vulnerable]);
+  async function ask() {
+    // Only what the presenter changed is sent; the rest is the case as it stands.
+    const question: Record<string, unknown> = { workflow_id: workflowId };
+    if (reasoning !== (gate.reasoning ?? "")) question.reasoning = reasoning;
+    if (vulnerable !== Boolean(gate.vulnerable)) question.vulnerable = vulnerable;
+    try {
+      const response = await fetch("/api/judgement/what-if", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(question),
+      });
+      const body = (await response.json()) as { ok?: boolean; error?: string; decision?: string; summary?: string; detail?: unknown };
+      if (!response.ok) {
+        setAnswer(notAccepted(body.detail));
+        return;
+      }
+      setAnswer(body.ok ? `${roleLabel(gate.persona ?? "persona")} would ${body.decision === "approve" ? "approve" : body.decision === "escalate" ? "hand it up" : body.decision === "send_back" ? "send it back" : body.decision}: ${body.summary}` : body.error ?? "no answer");
+    } catch {
+      setAnswer("could not reach the persona");
+    }
+  }
+  return (
+    <section data-testid="ask-persona" aria-label="Ask the persona" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ask the {roleLabel(gate.persona ?? "persona").toLowerCase()}: what if…</div>
+      <textarea aria-label="The agent's reasoning" value={reasoning} onChange={(e) => setReasoning(e.target.value)} rows={3} maxLength={8000} className="w-full rounded-lg border border-slate-300 bg-slate-50 px-2 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800" />
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+        <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={vulnerable} onChange={(e) => setVulnerable(e.target.checked)} /> customer carries a vulnerability marker</label>
+        <button type="button" onClick={() => void ask()} className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300">Ask</button>
+      </div>
+      {answer && <div data-testid="ask-persona-answer" className="mt-2 text-xs text-slate-700 dark:text-slate-200">{answer}</div>}
+    </section>
+  );
+}
+
+/** Why the API refused a question, from its validation detail. */
+function notAccepted(detail: unknown): string {
+  const messages = typeof detail === "string" ? [detail]
+    : Array.isArray(detail) ? detail.map((d) => (d && typeof d === "object" && "msg" in d ? String((d as { msg: unknown }).msg) : "")).filter(Boolean)
+    : [];
+  return messages.length ? `The question was not accepted: ${messages.join("; ")}` : "The question was not accepted";
+}
+
+/** A judged persona's decline, as the orchestrator words it. */
+function declineOf(reasoning: string): { persona: string; why: string } | undefined {
+  const match = reasoning.match(/^(.+?) declined to approve: ([\s\S]*)$/);
+  return match ? { persona: match[1], why: match[2] } : undefined;
+}
+
+function capitalised(words: string): string {
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** The bank's latest cases, newest first, each one openable. */
+function useRecentCases(): RecentCase[] {
+  const [cases, setCases] = useState<RecentCase[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await fetch("/api/workflows");
+        if (!response.ok) return;
+        const data: unknown = await response.json();
+        const rows = Array.isArray(data) ? data : [];
+        if (cancelled) return;
+        setCases(
+          rows
+            .filter((w: Record<string, unknown>) => typeof w.id === "string" && String(w.type) in CASE_LABELS)
+            .map((w: Record<string, unknown>) => ({
+              id: String(w.id),
+              type: String(w.type),
+              status: String(w.status ?? ""),
+              phase: text(w.currentPhase),
+              createdAt: Number(w.createdAt ?? 0),
+              refused: Boolean((w.metadata as Record<string, unknown> | undefined)?.rejected),
+              judged: judgedDecisions((w.payload as Record<string, unknown> | undefined)?.decisions).slice(-1)[0],
+            }))
+            .sort((a, b) => b.createdAt - a.createdAt)
+            .slice(0, RECENT_CASES_CAP),
+        );
+      } catch {
+        // Keep the last list on a transient failure; the next poll retries.
+      }
+    };
+    void load();
+    const timer = window.setInterval(() => void load(), 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+  return cases;
+}
+
+function caseStatus(c: RecentCase): { label: string; tone: string } {
+  if (c.refused) return { label: "refused by authority", tone: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300" };
+  if (c.status === "completed") return { label: "decided", tone: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" };
+  if (c.status === "failed") return { label: "failed", tone: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300" };
+  if (c.status === "awaiting_hitl") return { label: "awaiting decision", tone: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" };
+  return { label: "agents working", tone: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300" };
+}
 
 interface BankSnapshot extends WorldState {
   bank?: {
@@ -78,6 +343,51 @@ interface BankSnapshot extends WorldState {
   credit_limits?: CreditLimit[];
   exposures?: Exposure[];
   positions?: Position[];
+  /** Present when the bank screens new payments (BANKING_WORLD_SCREENING=1). */
+  screening?: Screening;
+}
+
+interface ScreeningFlag { payment_id: string; beneficiary_id: string; reference: string; pattern: string; lead: number; screened_by: string; amount_gbp: number }
+interface Screening {
+  payments_screened?: number;
+  payments_flagged?: number;
+  mule_cases_open?: number;
+  mule_cases_decided?: number;
+  recent_flags?: ScreeningFlag[];
+  customer_reactions?: Record<string, number>;
+}
+
+const PATTERN_LABELS: Record<string, string> = {
+  safe_account: "safe-account transfer",
+  authority_demand: "authority demand",
+  unlock_fee: "unlock fee",
+  high_returns: "guaranteed returns",
+};
+
+/** What the bank noticed in the payments it screened, and how customers reacted. */
+function NoticedPanel({ screening }: { screening: Screening }) {
+  const reactions = screening.customer_reactions ?? {};
+  const flags = [...(screening.recent_flags ?? [])].reverse();
+  return (
+    <section data-testid="bank-noticed" aria-label="What the bank noticed" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+        <span className="font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">The bank noticed</span>
+        <span data-testid="noticed-counts" className="text-slate-600 dark:text-slate-300">{compactInt(screening.payments_flagged)} flagged of {compactInt(screening.payments_screened)} screened · {compactInt(screening.mule_cases_open)} mule cases open · {compactInt(screening.mule_cases_decided)} decided</span>
+        <span data-testid="customer-reactions" className="text-slate-600 dark:text-slate-300">Customers: {compactInt(reactions.accepts)} accepted · {compactInt(reactions.chases)} chased · {compactInt(reactions.complains)} complained</span>
+      </div>
+      {flags.length === 0 ? (
+        <div className="text-xs text-slate-400">Nothing suspicious yet. New payments are screened as they arrive.</div>
+      ) : (
+        <ul className="grid gap-1 md:grid-cols-2">
+          {flags.map((flag) => (
+            <li key={flag.payment_id} data-testid={`flag-${flag.payment_id}`} className="truncate rounded-lg border border-red-100 bg-red-50/60 px-2.5 py-1 text-[11px] text-slate-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-slate-200">
+              “{flag.reference}” → <span className="font-mono">{flag.beneficiary_id}</span> · {PATTERN_LABELS[flag.pattern] ?? flag.pattern} · {flag.screened_by === "laya" ? "read by Laya" : "keyword rules"}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 interface PaymentRail {
@@ -88,7 +398,7 @@ interface PaymentRail {
   status?: string;
   last_event_id?: string | null;
 }
-interface RecentSettlement { payment_id: string; rail_id: string; amount_gbp: number; sim_time: number; event_id: string }
+interface RecentSettlement { payment_id: string; rail_id: string; amount_gbp: number; sim_time: number; event_id: string; reference?: string }
 interface FraudClaim {
   id: string;
   customer_id: string;
@@ -193,7 +503,7 @@ interface ClaimFacts {
   workflowId?: string;
   decidedOption?: string;
   decidedValue?: number;
-  refusal?: { reasoning: string; role?: string };
+  refusal?: { reasoning: string; role?: string; declinedBy?: string };
   failure?: string;
   closed?: boolean;
 }
@@ -221,7 +531,7 @@ function collectClaimFacts(events: WorldEvent[], into: Map<string, ClaimFacts>):
       if (Number.isFinite(value)) facts.decidedValue = value;
     } else if (event.type === "responder.deferred") {
       const reasoning = String(event.payload?.reasoning ?? "refused");
-      facts.refusal = { reasoning, role: authorisedRole(reasoning) };
+      facts.refusal = { reasoning, role: authorisedRole(reasoning), declinedBy: declineOf(reasoning)?.persona };
     } else if (event.type === "responder.failed") {
       facts.failure = String(event.payload?.error ?? "workflow failed");
     } else if (event.type === "objective.resolved" || event.type === "objective.failed") {
@@ -232,13 +542,15 @@ function collectClaimFacts(events: WorldEvent[], into: Map<string, ClaimFacts>):
 }
 
 /** The causal chain of the newest fraud claim, in the bank's language. */
-function deriveClaimStory(events: WorldEvent[]): { trace: string; steps: InterventionStep[] } | null {
+function deriveClaimStory(events: WorldEvent[]): { trace: string; steps: InterventionStep[]; workflowId?: string } | null {
   let trace: string | null = null;
   for (const event of events) if (event.type === "banking.app_fraud.claim_raised") trace = event.trace_id;
   if (!trace) return null;
   const steps: InterventionStep[] = [];
   const seen = new Set<string>();
   let refused = false;
+  let declined = false;
+  let workflowId: string | undefined;
   for (const event of events) {
     if (event.trace_id !== trace || seen.has(event.type)) continue;
     const p = event.payload ?? {};
@@ -254,18 +566,28 @@ function deriveClaimStory(events: WorldEvent[]): { trace: string; steps: Interve
         step = { label: "Case opened", detail: roleLabel(String(p.owner_function ?? "retail_banking").replaceAll("-", "_")) };
         break;
       case "responder.requested":
-        step = { label: "Agents investigating", detail: String(p.workflow_id ?? "") || undefined };
+        workflowId = String(p.workflow_id ?? "") || undefined;
+        step = { label: "Agents investigating", detail: workflowId };
         break;
       case "responder.decided": {
         const command = p.command as { payload?: Record<string, unknown> } | undefined;
         const option = String(command?.payload?.option_id ?? "");
         const value = Number(command?.payload?.value_gbp);
-        step = { label: "Decision approved", detail: [OPTION_LABELS[option] ?? option, Number.isFinite(value) ? money(value) : ""].filter(Boolean).join(" · ") };
+        const persona = String(command?.payload?.persona ?? "");
+        const by = persona && persona !== "fraud_decision_manager" ? `by ${roleLabel(persona)}` : "";
+        step = { label: "Decision approved", detail: [OPTION_LABELS[option] ?? option, Number.isFinite(value) ? money(value) : "", by].filter(Boolean).join(" · ") };
         break;
       }
       case "responder.deferred": {
+        const reasoning = String(p.reasoning ?? "");
+        const decline = declineOf(reasoning);
+        if (decline) {
+          declined = true;
+          step = { label: `${capitalised(decline.persona)} declined`, detail: excerpt(decline.why, 160) };
+          break;
+        }
         refused = true;
-        const role = authorisedRole(String(p.reasoning ?? ""));
+        const role = authorisedRole(reasoning);
         step = { label: "Refused by authority", detail: role ? `needs ${roleLabel(role)}` : "outside delegated authority" };
         break;
       }
@@ -285,14 +607,14 @@ function deriveClaimStory(events: WorldEvent[]): { trace: string; steps: Interve
         step = { label: "Case closed" };
         break;
       case "objective.failed":
-        step = { label: refused ? "Escalation required" : "Case left open" };
+        step = { label: declined ? "Claim declined" : refused ? "Escalation required" : "Case left open" };
         break;
     }
     if (!step) continue;
     seen.add(event.type);
     steps.push({ ...step, eventId: event.event_id });
   }
-  return { trace, steps };
+  return { trace, steps, workflowId };
 }
 
 interface DecisionContext {
@@ -402,8 +724,9 @@ export default function BankingWorld({
   const [functionFilter, setFunctionFilter] = useState<FunctionFilter>("all");
   const [showRoutine, setShowRoutine] = useState(false);
   const pendingDecisions = usePendingDecisions();
+  const recentCases = useRecentCases();
   const derived = useMemo(() => deriveClaimStory(events), [events]);
-  const [persistedStory, setPersistedStory] = useState<{ trace: string; steps: InterventionStep[] } | null>(null);
+  const [persistedStory, setPersistedStory] = useState<{ trace: string; steps: InterventionStep[]; workflowId?: string } | null>(null);
   // Facts accumulate so an outcome stays visible after its events leave the
   // ring; a world reset (the journal's newest seq going backwards) clears them.
   const newestSeq = events.length ? events[events.length - 1].seq : 0;
@@ -424,6 +747,8 @@ export default function BankingWorld({
   }, [newestSeq]);
 
   const story = derived ?? persistedStory;
+  const { trail, gate } = useDecisionTrail(story?.workflowId);
+  const storySteps = useMemo(() => (story ? withJudgement(story.steps, trail) : []), [story, trail]);
   const raisedClaims = useMemo(() => (bank.fraud_claims ?? []).filter((claim) => claim.raised), [bank.fraud_claims]);
   const openClaims = raisedClaims.filter((claim) => claim.status !== "reimbursed" && claim.status !== "refused" && !claimFacts.get(claim.id)?.closed);
   const pendingWorkflowIds = useMemo(() => new Set(pendingDecisions.map((row) => row.workflowId)), [pendingDecisions]);
@@ -450,9 +775,20 @@ export default function BankingWorld({
     return source.slice(-JOURNAL_CAP).reverse();
   }, [events, functionFilter, selectedActor, showRoutine]);
 
-  async function runScenario(name: BankingScenarioName) {
+  async function runAction(action: CaseAction) {
     setBusy(true);
-    try { await onRunScenario(name); } finally { setBusy(false); }
+    try {
+      if (action.kind === "claim") {
+        await onRunScenario(action.id);
+      } else if (action.id === "mule-account-investigation" && bank.screening) {
+        // The world owns mule cases: make suspicious payments land, and the bank notices.
+        await onRunScenario("mule-activity");
+      } else {
+        await fetch(`/api/simulator/inject-burst?n=1&workflow_type=${encodeURIComponent(action.id)}`, { method: "POST" });
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -474,7 +810,7 @@ export default function BankingWorld({
                   <span className={`h-2 w-2 rounded-full bg-emerald-500 ${bank.enabled && bank.status === "running" ? "bank-live-glow" : ""}`} /> Autonomous · world live
                 </span>
                 <span data-testid="humans-in-the-loop" className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium ${pendingDecisions.length > 0 ? "bg-amber-100 text-amber-800 ring-1 ring-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:ring-amber-800" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
-                  <Scale size={13} className={pendingDecisions.length > 0 ? "bank-live-glow" : ""} /><span>Humans in the loop: <span data-testid="decisions-waiting" className="tabular-nums">{pendingDecisions.length}</span> {pendingDecisions.length === 1 ? "decision" : "decisions"} waiting</span>
+                  <Scale size={13} className={pendingDecisions.length > 0 ? "bank-live-glow" : ""} /><span>Decisions waiting: <span data-testid="decisions-waiting" className="tabular-nums">{pendingDecisions.length}</span></span>
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"><Clock3 size={13} /> sim <span className="tabular-nums">{simClock(bank.sim_time)}</span></span>
               </div>
@@ -491,23 +827,47 @@ export default function BankingWorld({
 
         {error && <div data-testid="banking-error" className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">{error}</div>}
 
-        <section aria-label="Banking demo stories" className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+        <section aria-label="Make something happen" className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Stories</span>
-            {SCENARIOS.map((scenario) => (
-              <button key={scenario.id} type="button" disabled={busy || !bank.enabled} onClick={() => void runScenario(scenario.id)} className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-blue-950/30">
-                {scenario.label}
+            <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Make something happen</span>
+            {CASE_ACTIONS.map((action) => (
+              <button key={action.id} type="button" title={action.hint} disabled={busy || !bank.enabled} onClick={() => void runAction(action)} className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-blue-950/30">
+                {action.label}
               </button>
             ))}
           </div>
         </section>
 
+        <section data-testid="recent-cases" aria-label="Recent cases" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"><Activity size={15} /> Recent cases</div>
+          {recentCases.length === 0 ? (
+            <div data-testid="recent-cases-empty" className="text-xs text-slate-400">No cases yet. Make something happen above.</div>
+          ) : (
+            <div className="grid gap-1.5 md:grid-cols-2">
+              {recentCases.map((c) => {
+                const status = caseStatus(c);
+                return (
+                  <a key={c.id} data-testid={`case-${c.id}`} href={`/workflows/${encodeURIComponent(c.id)}`} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-xs transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-800 dark:bg-slate-950/50 dark:hover:bg-blue-950/30">
+                    <span className="min-w-0 truncate"><span className="font-medium text-slate-800 dark:text-slate-100">{CASE_LABELS[c.type]}</span> <span className="font-mono text-slate-500">{c.id}</span>{c.phase ? <span className="text-slate-400"> · {c.phase}</span> : null}</span>
+                    <span className="flex shrink-0 items-center gap-2">{c.judged && <span data-testid={`judged-${c.id}`} className="text-[10px] text-slate-500 dark:text-slate-400">{roleLabel(c.judged.persona)} · {DECIDED_BY[c.judged.decidedBy] ?? c.judged.decidedBy}</span>}<span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${status.tone}`}>{status.label}</span><span className="text-blue-600 dark:text-blue-400">Open →</span></span>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {(bank.recent_settlements ?? []).length > 0 && <CustomerCallPanel settlements={[...(bank.recent_settlements ?? [])].reverse()} />}
+
+        {bank.screening && <NoticedPanel screening={bank.screening} />}
+
         <WorldObjectiveStrip testId="banking-objective" objectives={bank.objectives} />
-        {story && story.steps.length > 0 && <WorldInterventionStrip testId="banking-intervention" trace={story.trace} steps={story.steps} onTrace={toggleActor} />}
+        {story && storySteps.length > 0 && <WorldInterventionStrip testId="banking-intervention" trace={story.trace} steps={storySteps} onTrace={toggleActor} />}
+        {story?.workflowId && gate && trail.length > 0 && <AskPersonaPanel workflowId={story.workflowId} gate={gate} />}
 
         {pendingDecisions.length > 0 && (
-          <section data-testid="pending-decisions" aria-label="Decisions waiting for a human" className="rounded-xl border border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-800 dark:bg-amber-950/30">
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200"><Scale size={15} className="bank-live-glow" /> Waiting for a human decision</div>
+          <section data-testid="pending-decisions" aria-label="Decisions waiting" className="rounded-xl border border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-800 dark:bg-amber-950/30">
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200"><Scale size={15} className="bank-live-glow" /> Waiting for a decision</div>
             <div className="grid gap-2 lg:grid-cols-2">
               {pendingDecisions.map((decision) => {
                 const context = decision.context;
@@ -629,7 +989,10 @@ function ClaimCard({ claim, evaluation, facts, awaitingHuman, selected, onClick 
   let tone = "text-slate-700 dark:text-slate-200";
   if (refused) {
     const role = facts?.refusal?.role;
-    outcome = role ? `Refused by authority · needs ${roleLabel(role)}` : "Refused by authority";
+    const declinedBy = facts?.refusal?.declinedBy;
+    outcome = declinedBy
+      ? `Declined by ${capitalised(declinedBy)}`
+      : role ? `Refused by authority · needs ${roleLabel(role)}` : "Refused by authority";
     tone = "text-red-700 dark:text-red-300";
   } else if (reimbursed !== undefined) {
     outcome = `${capped ? "Reimbursed to the cap" : "Reimbursed in full"} · ${money(reimbursed)}`;

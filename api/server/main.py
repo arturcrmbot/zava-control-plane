@@ -529,6 +529,7 @@ from api.server.routes.compose import router as compose_router
 # World simulator — internal state/events/inject (JSON only; specs
 # 2026-07-10 aggregate + 2026-07-13 actor).
 from api.server.routes.world import router as world_router
+from api.server.routes.judgement import router as judgement_router
 from api.server.routes.runtime import router as runtime_router
 # Per-lesson observability — D1.
 
@@ -566,7 +567,8 @@ routers = [stream_router, workflows_router, exceptions_router, policy_router,
           workflow_agui_router,
           compose_router,
           world_router,
-          runtime_router]
+          runtime_router,
+          judgement_router]
 
 if app_state.runtime.pack.name == "agency":
     from api.server.routes.functions_ambient import router as functions_ambient_router

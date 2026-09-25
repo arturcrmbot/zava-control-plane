@@ -19,7 +19,9 @@ export default function FilterBar({
   onSelectModeChange: (next: boolean) => void;
   availableDomains: string[];
 }) {
-  const setMode = (mode: FilterState["mode"]) => onChange({ ...filter, mode });
+  // Choosing a mode leaves the "my decisions today" view, whose `mine` filter
+  // would otherwise hide every other card under either mode.
+  const setMode = (mode: FilterState["mode"]) => onChange({ ...filter, mode, mine: false });
   const toggleDomain = (d: string) => {
     const has = filter.domains.includes(d);
     onChange({ ...filter, domains: has ? filter.domains.filter((x) => x !== d) : [...filter.domains, d] });

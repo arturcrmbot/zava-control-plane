@@ -37,6 +37,7 @@ from verticals.banking.mcp_tools.supporting import (
 )
 from verticals.banking.support_constants import (
     MERCHANT_COMMAND_TYPE,
+    MERCHANT_FUNCTION,
     MERCHANT_HITL_CATEGORY,
     MERCHANT_HITL_EVENT,
     MERCHANT_HITL_PERSONA,
@@ -45,6 +46,7 @@ from verticals.banking.support_constants import (
     MERCHANT_SUCCESS_EVENT,
     MERCHANT_WORKFLOW_TYPE,
     MULE_COMMAND_TYPE,
+    MULE_FUNCTION,
     MULE_HITL_CATEGORY,
     MULE_HITL_EVENT,
     MULE_HITL_PERSONA,
@@ -84,6 +86,7 @@ _CANONICAL_TOOL_CALL_KEYS = frozenset({
 })
 
 _AGENT_MAX_ATTEMPTS = 2
+_MAX_REASSESSMENTS = 1
 _AGENT_ATTEMPT_TIMEOUT_SECONDS = 150.0
 
 
@@ -104,6 +107,9 @@ class CaseProfile:
     commit_phase: str
     verify_phase: str
     options: tuple[tuple[str, str, float], ...]   # (option_id, impact, value)
+    # The organisational function that issues the typed command; a world case
+    # names it as the command's issuer so the world's gateway accepts it.
+    function: str = ""
 
 
 MULE_PROFILE = CaseProfile(
@@ -129,6 +135,7 @@ MULE_PROFILE = CaseProfile(
         ("SYN-MULE-OPTION-CLOSE",
          "Close the account and return residual funds.", 120_000.0),
     ),
+    function=MULE_FUNCTION,
 )
 
 MERCHANT_PROFILE = CaseProfile(
@@ -152,6 +159,7 @@ MERCHANT_PROFILE = CaseProfile(
         ("SYN-MER-OPTION-DECLINE",
          "Decline the application and record the reason.", 0.0),
     ),
+    function=MERCHANT_FUNCTION,
 )
 
 PROFILES: dict[str, CaseProfile] = {
@@ -190,7 +198,13 @@ def case_evidence_activity(payload: dict[str, Any]) -> dict[str, Any]:
     if profile is None:
         raise ValueError(f"unsupported supporting workflow type {workflow_type!r}")
     workflow_id = _required_string(payload.get("workflow_id"), name="workflow_id")
-    case = _required_object(payload.get("case"), name="case")
+    # A spawned case carries `case`; a case the world noticed arrives through
+    # the world bridge as an `observation` that holds the case.
+    world_observation = payload.get("observation") if isinstance(payload.get("observation"), dict) else None
+    case = _required_object(
+        payload.get("case") if world_observation is None else world_observation.get("case"),
+        name="case",
+    )
     case_id = _required_string(case.get("id"), name="case.id")
 
     risk_band = str(case.get("risk_band") or "medium")
@@ -235,9 +249,9 @@ def case_evidence_activity(payload: dict[str, Any]) -> dict[str, Any]:
         "case_id": case_id,
         "source_mode": "simulated",
         "actor_ids": [case_id, subject_id],
-        "event_ids": [f"seed-{case_id}"],
+        "event_ids": [f"seed-{case_id}" if world_observation is None else f"world-{case_id}"],
         "evidence_versions": versions,
-        "observation": {"case": case},
+        "observation": world_observation if world_observation is not None else {"case": case},
         "admitted_options": admitted,
         "rejected_options": rejected,
     }
@@ -255,6 +269,17 @@ async def run_agent_session(prompt: str, **kwargs: Any) -> dict[str, Any]:
     )
 
     return await _run(prompt, **kwargs)
+
+
+def _review_note(payload: dict[str, Any]) -> str:
+    feedback = payload.get("reviewer_feedback")
+    if not isinstance(feedback, str) or not feedback.strip():
+        return ""
+    return (
+        f"A reviewer sent your last assessment back: {feedback} Re-read the "
+        "evidence with the tools and correct your reasoning; it must agree "
+        "with the case.\n"
+    )
 
 
 def _agent_prompt(
@@ -291,6 +316,7 @@ def _agent_prompt(
         "uncertainty, and an explicit no-action comparison. "
         "Preserve the supplied actor_ids, event_ids and evidence_versions "
         "exactly.\n"
+        f"{_review_note(payload)}"
         f"workflow_id={payload.get('workflow_id')}\n"
         f"instance_id={payload.get('instance_id')}\n"
         f"phase={profile.agent_phase}\n"
@@ -541,6 +567,10 @@ def case_command_activity(payload: dict[str, Any]) -> dict[str, Any]:
     hitl_context = _required_object(payload.get("hitl_context"), name="hitl_context")
 
     if approval.get("decision") != "approve":
+        if approval.get("decision") == "reject" and approval.get("decided_by"):
+            # A judged decline says why, in the persona's own words.
+            who = str(approval.get("persona") or "the persona").replace("_", " ")
+            return _denied(f"{who} declined to approve: {approval.get('reason') or 'no reason given'}")
         return _denied("decision must be approve")
     if approval.get("persona") != profile.hitl_persona:
         return _denied(f"approval persona must be {profile.hitl_persona}")
@@ -572,13 +602,21 @@ def case_command_activity(payload: dict[str, Any]) -> dict[str, Any]:
             "expected_event_type": profile.success_event,
         },
     }
+    observation = hitl_context.get("observation") if isinstance(hitl_context.get("observation"), dict) else {}
+    world_trace = observation.get("trace_id")
+    if world_trace and profile.function:
+        # A case the world noticed: the bridge applies this command back to the
+        # world, whose gateway needs the case's trace and the owning function.
+        command["trace_id"] = world_trace
+        command["issued_by"] = profile.function
+        command["payload"]["subject_id"] = (observation.get("case") or {}).get("subject_id")
     return {
         "status": "decision_ready",
         "command": command,
         "evaluation": {
             "status": "recorded",
             "success_event": profile.success_event,
-            "world_mutation": "not_applicable",
+            "world_mutation": "applied_by_world_bridge" if world_trace else "not_applicable",
         },
     }
 
@@ -620,88 +658,105 @@ def case_orchestration(
     )
     yield checkpoint("step.completed", {"step": profile.evidence_phase})
 
-    yield checkpoint("step.started", {"step": profile.agent_phase})
-    ranking = yield context.call_activity_with_retry(
-        "case_agent_activity_trigger",
-        _AGENT_RETRY,
-        {
-            **input_dict,
+    # A judged persona may send the case back to the agent with its reasons;
+    # the agent then re-assesses once. Without judgement this runs once.
+    reassessment_round = 0
+    reviewer_feedback: str | None = None
+    while True:
+        yield checkpoint("step.started", {"step": profile.agent_phase})
+        ranking = yield context.call_activity_with_retry(
+            "case_agent_activity_trigger",
+            _AGENT_RETRY,
+            {
+                **input_dict,
+                "instance_id": instance_id,
+                "workflow_type": profile.workflow_type,
+                "phase": profile.agent_phase,
+                "evidence": evidence,
+                **({"reviewer_feedback": reviewer_feedback} if reviewer_feedback else {}),
+            },
+        )
+        yield checkpoint("step.completed", {"step": profile.agent_phase})
+
+        selected_option_id = ranking["ranked_option_ids"][0]
+        selected_option = next(
+            option
+            for option in evidence["admitted_options"]
+            if option["option_id"] == selected_option_id
+        )
+
+        authority = yield context.call_activity(
+            "case_governance_activity_trigger",
+            {
+                "workflow_id": workflow_id,
+                "workflow_type": profile.workflow_type,
+                "selected_option": selected_option,
+            },
+        )
+        if not authority.get("allowed"):
+            denial = _denied(
+                f"{profile.hitl_persona} is not authorised for this value: "
+                f"{authority.get('reason') or 'governance denied'}"
+            )
+            yield terminal_checkpoint(denial)
+            return denial
+
+        hitl_context = {
+            "workflow_id": workflow_id,
             "instance_id": instance_id,
             "workflow_type": profile.workflow_type,
-            "phase": profile.agent_phase,
-            "evidence": evidence,
-        },
-    )
-    yield checkpoint("step.completed", {"step": profile.agent_phase})
-
-    selected_option_id = ranking["ranked_option_ids"][0]
-    selected_option = next(
-        option
-        for option in evidence["admitted_options"]
-        if option["option_id"] == selected_option_id
-    )
-
-    authority = yield context.call_activity(
-        "case_governance_activity_trigger",
-        {
-            "workflow_id": workflow_id,
-            "workflow_type": profile.workflow_type,
-            "selected_option": selected_option,
-        },
-    )
-    if not authority.get("allowed"):
-        denial = _denied(
-            f"{profile.hitl_persona} is not authorised for this value: "
-            f"{authority.get('reason') or 'governance denied'}"
-        )
-        yield terminal_checkpoint(denial)
-        return denial
-
-    hitl_context = {
-        "workflow_id": workflow_id,
-        "instance_id": instance_id,
-        "workflow_type": profile.workflow_type,
-        "story_id": evidence["story_id"],
-        "case_id": evidence["case_id"],
-        "persona": profile.hitl_persona,
-        "external_event": profile.hitl_event,
-        "phase": profile.hitl_phase,
-        "action": profile.command_type,
-        "request": {
-            "amount_gbp": selected_option["value_gbp"],
-            "category": profile.hitl_category,
-        },
-        "observation": evidence["observation"],
-        "admitted_options": evidence["admitted_options"],
-        "rejected_options": evidence["rejected_options"],
-        "ranking": ranking,
-        "selected_option": selected_option,
-        "selected_option_id": selected_option_id,
-        "decision_id": f"SYN-{profile.prefix.upper()}-DECISION-{workflow_id}",
-        "evidence_versions": evidence["evidence_versions"],
-        "authority": authority,
-    }
-    yield checkpoint(
-        "suspended",
-        {
-            "reason": "awaiting_approval",
-            "phase": profile.hitl_phase,
+            "story_id": evidence["story_id"],
+            "case_id": evidence["case_id"],
             "persona": profile.hitl_persona,
             "external_event": profile.hitl_event,
-            "context": hitl_context,
-            "hitl_context": hitl_context,
-        },
-    )
-    decision_event = context.wait_for_external_event(profile.hitl_event)
-    timer = context.create_timer(context.current_utc_datetime + timedelta(minutes=5))
-    winner = yield context.task_any([decision_event, timer])
-    if winner == timer:
-        denial = _denied(f"{profile.hitl_phase} timed out")
-        yield terminal_checkpoint(denial)
-        return denial
-    timer.cancel()
-    approval = decision_event.result
-    yield checkpoint("resumed", {"phase": profile.hitl_phase})
+            "phase": profile.hitl_phase,
+            "action": profile.command_type,
+            "request": {
+                "amount_gbp": selected_option["value_gbp"],
+                "category": profile.hitl_category,
+            },
+            "observation": evidence["observation"],
+            "admitted_options": evidence["admitted_options"],
+            "rejected_options": evidence["rejected_options"],
+            "ranking": ranking,
+            "selected_option": selected_option,
+            "selected_option_id": selected_option_id,
+            "decision_id": f"SYN-{profile.prefix.upper()}-DECISION-{workflow_id}",
+            "evidence_versions": evidence["evidence_versions"],
+            "authority": authority,
+        }
+        if reassessment_round:
+            hitl_context["reassessment_round"] = reassessment_round
+        yield checkpoint(
+            "suspended",
+            {
+                "reason": "awaiting_approval",
+                "phase": profile.hitl_phase,
+                "persona": profile.hitl_persona,
+                "external_event": profile.hitl_event,
+                "context": hitl_context,
+                "hitl_context": hitl_context,
+            },
+        )
+        decision_event = context.wait_for_external_event(profile.hitl_event)
+        timer = context.create_timer(context.current_utc_datetime + timedelta(minutes=5))
+        winner = yield context.task_any([decision_event, timer])
+        if winner == timer:
+            denial = _denied(f"{profile.hitl_phase} timed out")
+            yield terminal_checkpoint(denial)
+            return denial
+        timer.cancel()
+        approval = decision_event.result
+        yield checkpoint("resumed", {"phase": profile.hitl_phase})
+        if (
+            isinstance(approval, dict)
+            and approval.get("decision") == "send_back"
+            and reassessment_round < _MAX_REASSESSMENTS
+        ):
+            reassessment_round += 1
+            reviewer_feedback = str(approval.get("feedback") or approval.get("reason") or "")
+            continue
+        break
 
     yield checkpoint("step.started", {"step": profile.commit_phase})
     decision = yield context.call_activity(
