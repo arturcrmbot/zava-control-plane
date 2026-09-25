@@ -550,12 +550,13 @@ class ZavaBankWorld:
             return None
         if self._mule_case_waits(beneficiary_id):
             return None
-        if self.life is not None and not self.life.dial.take():
-            return None
         flags = self._flags.get(beneficiary_id, [])
         fresh = flags[case["flags_at_decision"]:] if case is not None else flags
         customers = sorted({f["customer_id"] for f in fresh if f["customer_id"]})
         if len(customers) < _MULE_CASE_CUSTOMERS:
+            return None
+        # Only a case that will open spends one of the world's case tokens.
+        if self.life is not None and not self.life.dial.take():
             return None
         beneficiary = self.beneficiaries[beneficiary_id]
         took_review = beneficiary.status == "open"

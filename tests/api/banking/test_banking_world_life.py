@@ -132,6 +132,26 @@ def test_the_case_dial_lets_about_its_rate_through() -> None:
     assert dial.take() is True
 
 
+def test_a_flag_that_opens_no_case_spends_no_case_token(life_on) -> None:
+    from types import SimpleNamespace
+
+    from verticals.banking.worlds import reference_data
+
+    world = _world()
+    world.life.dial = CaseDial(4)  # a single token, as a victim's call would need it
+    stories = {c.beneficiary_id for c in world.fraud_claims.values()}
+    mule = next(b for b in reference_data.mule_beneficiary_ids() if b not in stories)
+    first = next(iter(world.payments.values()))
+    first_customer = world.accounts[first.from_account_id].customer_id
+    second = next(p for p in world.payments.values() if world.accounts[p.from_account_id].customer_id != first_customer)
+    first.to_beneficiary_id = second.to_beneficiary_id = mule
+    screening = SimpleNamespace(flagged=True, to_dict=lambda: {"pattern": "safe_account", "lead": 1.0, "screened_by": "rules"})
+    world._apply_screening(first.id, screening)
+    assert world.life.dial.taken == 0  # one customer: no case, so no token spent
+    opened = world._apply_screening(second.id, screening)
+    assert opened is not None and opened.type == "sensor.tripped" and world.life.dial.taken == 1
+
+
 def test_a_customer_let_down_by_the_bank_may_leave(life_on) -> None:
     world = _world()
     person = next(iter(world.life.people.values()))
