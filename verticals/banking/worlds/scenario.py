@@ -172,6 +172,9 @@ class ZavaBankWorld:
         self._claim_by_sensor: dict[str, str] = {}
         self._ended_claims: set[str] = set()
         self._endings_read = 0
+        # Claims copied in from another replica (the Functions worker's copy);
+        # this copy never sees how they end, and the API world owns the rules.
+        self._adopted_claims: set[str] = set()
         self._new_payments = 0
         self._scam_rng = random.Random(seed + 303)
         self.payments_screened_total = 0
@@ -672,7 +675,8 @@ class ZavaBankWorld:
         self._note_ended_cases()
         busy = [
             claim for claim in self._live_claims(customer_id=customer_id, beneficiary_id=beneficiary_id)
-            if not called_only or self._claim_scenarios.get(claim.id, "").startswith("call:")
+            if claim.id not in self._adopted_claims
+            and (not called_only or self._claim_scenarios.get(claim.id, "").startswith("call:"))
         ]
         if not busy:
             return None
@@ -993,6 +997,7 @@ class ZavaBankWorld:
             if isinstance(view, dict) and view.get("id") in store:
                 _sync_record(store[view["id"]], view)
         claim_id = claim_view["id"]
+        self._adopted_claims.add(claim_id)
         self._claim_scenarios[claim_id] = str(observation["scenario_id"])
         self._claim_traces[claim_id] = str(observation["trace_id"])
         self.claim_story_status[str(observation["story_id"])] = "active"

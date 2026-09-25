@@ -347,3 +347,19 @@ def test_a_hero_story_waits_while_a_called_claim_is_decided_on_its_account() -> 
         world.activate_scenario(FRAUD_SCENARIO_VULNERABLE)
     assert world.apply_command(approval).type == "banking.reimbursement.applied"
     assert world.activate_scenario(FRAUD_SCENARIO_VULNERABLE).type == "sensor.tripped"
+
+
+def test_the_workers_copy_of_the_world_starts_a_story_the_bank_allowed() -> None:
+    # The Functions worker copies called claims in and never sees how they end;
+    # the API world has already applied the one-live-claim rule for it.
+    from verticals.banking.fraud_constants import FRAUD_BENEFICIARY_VULNERABLE, FRAUD_SCENARIO_VULNERABLE
+
+    bank, worker = _world(), _world()
+    payment_id = next(p.id for p in bank.payments.values()
+                      if p.to_beneficiary_id == FRAUD_BENEFICIARY_VULNERABLE and p.status == "settled"
+                      and bank.customers[bank.accounts[p.from_account_id].customer_id].status == "active")
+    sensor = bank.customer_calls(payment_id, STATEMENT, None)
+    worker.adopt_claim(bank.build_observation(sensor.to_dict()))
+    _fail_objective(bank, sensor, "fraud_decision_manager declined to approve")
+    assert bank.activate_scenario(FRAUD_SCENARIO_VULNERABLE).type == "sensor.tripped"
+    assert worker.activate_scenario(FRAUD_SCENARIO_VULNERABLE).type == "sensor.tripped"
