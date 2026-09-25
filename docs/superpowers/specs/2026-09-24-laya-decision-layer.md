@@ -186,11 +186,11 @@ judgement:
     ask: "Given the findings, what should you do with the agent's recommendation?"
     approve: "Approve it now: no concerns were found"
     hold: "Hold it: the concerns need someone else's judgement"
-  min_gap: 0.3
+  min_lead: 0.3
 ```
 
 Checks use a small fixed vocabulary (`read`/`is`, `fact`/`equals`, `unless`), not
-code, so a profile stays declarative and reviewable. `min_gap` is the minimum lead
+code, so a profile stays declarative and reviewable. `min_lead` is the minimum lead
 the verdict needs before the persona acts on it.
 
 ### 6.3 Flags
@@ -199,9 +199,11 @@ the verdict needs before the persona acts on it.
 |---|---|---|
 | `LAYA_URL` | unset | Where Laya listens. Unset means Laya is off |
 | `JUDGEMENT_ENABLED` | `0` | Master switch |
-| pack manifest `judgement_personas` | empty | Which personas a pack switches on |
 | `JUDGEMENT_LLM_BUDGET_PER_HOUR` | 6 | LLM deep reviews allowed per hour. After that, the rules decide |
-| `JUDGEMENT_MIN_GAP` | per question | Overrides the profile's threshold |
+| `JUDGEMENT_MIN_LEAD` | per gate | Overrides the profile's threshold |
+
+A persona opts in by carrying a `judgement:` block for the gate's workflow type
+in its SKILL.md. A pack with no such blocks is untouched.
 
 ## 7. Phase 1: personas that judge (banking first)
 
@@ -366,9 +368,10 @@ Each step ships behind its flag, with its tests, and is reviewed before the next
 
 ## Appendix A: evaluation inputs and raw results
 
-The harness and every logged call (state, questions, probabilities, latency) are in
-the session folder (`files/laya_eval/`: `eval_banking.py`, `eval_redesign.py`,
-`results/*.jsonl`). Step 0 moves them into the repo as the golden-set harness.
+The harness is in `tools/laya_eval/` (`eval_banking.py`, `eval_redesign.py`); it
+logs every call (state, questions, probabilities, latency) to `$LAYA_EVAL_OUT`.
+The golden cases also run as `tests/api/judgement/test_laya_live.py` whenever
+Laya is up.
 Cases: the three seeded claims from the real world; variants built by changing one
 claim field and re-running real admission; the two real LLM reasonings from the 22
 Sep tapes plus four authored flawed texts; 12 authored customer statements; 19

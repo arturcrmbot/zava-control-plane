@@ -65,6 +65,50 @@ claims raised*. Let the ramp open a case or two before the first story: the
 first model sessions after a cold start can fail authentication once, and
 the retry absorbs it off stage rather than on it.
 
+## 2a. Persona judgement (optional, Laya)
+
+With judgement on, each persona reads the case before deciding instead of only
+checking the amount. Laya is a small local model: it answers narrow questions
+about the agent's reasoning in about 50-300 ms, at no token cost. Code then
+checks those answers against the record, and Laya weighs the concerns in the
+persona's character: approve, or hold and hand the case up. The rules
+(`decision_policy`), admission and the governance kernel still set the
+ceiling. Laya can hold a case, but it can never approve one the rules would
+not.
+
+Start Laya before `make up` (it stays up between takes):
+
+```bash
+LAYA_PORT=8765 ~/.copilot/skills/laya/scripts/start.sh   # run in the background; ready in ~5-15 s
+curl -s localhost:8765/health                             # {"status": "ok", "device": "mps", ...}
+```
+
+`.env` (both the API and the Functions host read it):
+
+| Setting | Value | Why |
+|---|---|---|
+| `JUDGEMENT_ENABLED` | `1` | personas with a `judgement:` profile read each case; over-authority claims go to who can decide |
+| `LAYA_URL` | `http://127.0.0.1:8765` | where Laya listens; empty means the rules decide (and say so) |
+| `JUDGEMENT_LLM_BUDGET_PER_HOUR` | `6` | unclear judgements go to an LLM deep review, at most this many an hour, on the same Copilot quota |
+
+What changes in the walk:
+
+| Moment | With judgement on |
+|---|---|
+| 0:12 | The fraud decision manager reads the agent's reasoning. The chain shows *Fraud decision manager approved · fast judgement*, with the concerns it found, if any. |
+| A contradiction | If the agent's reasoning contradicts the record (e.g. says "no vulnerability marker" for a flagged customer), the manager holds it and hands it to the financial crime lead, who decides. Both steps show on the chain. |
+| A refusal | A refusal is never waved through on its £0 value: refusals always get a second pair of eyes. |
+| 0:22 | The £92,000 claim no longer dead-ends. Governance names the financial crime lead, who decides the capped £85,000 within a £250,000 delegation. The chain shows *Decision approved · … · by Financial crime lead*. |
+
+Fallbacks are automatic and recorded on the decision:
+- Laya down or slow (2 s timeout; after three failures it is skipped for 30 s): the rules decide.
+- Deep-review budget spent or the LLM failing: the rules decide.
+
+Every decision records who decided (fast judgement, deep review or rules), each
+question with its probabilities, the lead over the runner-up, and the
+threshold. It shows in the drawer and in `persona.judgement` events. Laya needs
+about 3 GB of memory; stop it after the slot.
+
 ## 3. The walk
 
 | Time | Screen | Show | Say |
@@ -158,3 +202,7 @@ before reaching governance.
 - Memory holds the seeded decision notes, but the dream pass distils no
   lessons here: memory runs on the in-process fallback without an Azure
   OpenAI endpoint. Do not claim learned lessons.
+- With judgement on, do not say Laya decides money. It reads and weighs.
+  Admission, the authority matrix and the rules still set every ceiling, and
+  the value and option never come from Laya. Its readings are probabilities:
+  quote the lead the drawer shows, not certainty.
