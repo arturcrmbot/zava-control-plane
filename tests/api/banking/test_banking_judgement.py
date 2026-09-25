@@ -173,3 +173,234 @@ def test_option_words_cover_every_fraud_option() -> None:
         context = _fraud_context(observation)
         context["selected_option"] = {"option_id": option_id, "value_gbp": 1_000.0}
         assert "(GBP 1,000)" in fraud_gate(context).recommendation
+
+
+# --- Escalation: the org hands work up ------------------------------------------------
+
+from datetime import datetime, timezone  # noqa: E402
+
+from api.shared.vertical_loader import active_runtime  # noqa: E402
+from verticals.banking import fraud_durable  # noqa: E402
+from verticals.banking.fraud_constants import FRAUD_HITL_EVENT  # noqa: E402
+
+
+@pytest.fixture
+def banking_governance(monkeypatch):
+    import importlib
+
+    kernel_module = importlib.import_module("api.server.services.governance.kernel")
+
+    monkeypatch.setenv("ZAVA_VERTICAL", "banking")
+    monkeypatch.delenv("ZAVA_WORLD", raising=False)
+    active_runtime.cache_clear()
+    kernel_module._reset_for_tests()
+    yield
+    kernel_module._reset_for_tests()
+    active_runtime.cache_clear()
+
+
+def _governance(value: float, *, role: str | None = None) -> dict:
+    payload = {"selected_option": {"option_id": OPTION_REIMBURSE_CAPPED, "value_gbp": value}}
+    if role:
+        payload["role"] = role
+    return fraud_durable.fraud_governance_activity(payload)
+
+
+def test_with_judgement_off_governance_names_nobody_new(banking_governance, monkeypatch) -> None:
+    monkeypatch.setenv("JUDGEMENT_ENABLED", "0")
+    result = _governance(85_000.0)
+    assert result["allowed"] is False
+    assert "escalation" not in result and "escalate_to" not in result
+
+
+def test_governance_names_the_financial_crime_lead_above_the_managers_delegation(
+    banking_governance, monkeypatch
+) -> None:
+    monkeypatch.setenv("JUDGEMENT_ENABLED", "1")
+    capped = _governance(85_000.0)
+    assert capped["allowed"] is False
+    assert capped["escalation"]["role"] == "financial_crime_lead"
+    assert capped["escalation"]["allowed"] is True
+    assert capped["escalate_to"] == "financial_crime_lead"
+    within = _governance(18_400.0)
+    assert within["allowed"] is True and "escalation" not in within
+    assert within["escalate_to"] == "financial_crime_lead"
+    lead = _governance(85_000.0, role="financial_crime_lead")
+    assert lead["allowed"] is True and "escalate_to" not in lead
+    beyond = _governance(300_000.0)
+    assert beyond["allowed"] is False and "escalation" not in beyond
+
+
+class _Task:
+    def __init__(self, name: str, result=None) -> None:
+        self.name, self.result, self.cancelled = name, result, False
+
+    def cancel(self) -> None:
+        self.cancelled = True
+
+
+class _GateContext:
+    """Enough of DurableOrchestrationContext to run the fraud orchestration through its gate."""
+
+    instance_id = "inst-escalation"
+    current_utc_datetime = datetime(2026, 9, 25, tzinfo=timezone.utc)
+
+    def __init__(self, approval: dict, results: dict) -> None:
+        self.approval = approval
+        self.results = {name: list(values) for name, values in results.items()}
+        self.activities: list[tuple[str, dict]] = []
+        self.waited_for: str | None = None
+
+    def get_input(self) -> dict:
+        return {"workflow_id": "BAPP-escalation"}
+
+    def call_activity(self, name: str, payload: dict):
+        self.activities.append((name, payload))
+        queue = self.results.get(name)
+        return ("result", queue.pop(0) if queue else None)
+
+    def call_activity_with_retry(self, name: str, retry, payload: dict):
+        return self.call_activity(name, payload)
+
+    def wait_for_external_event(self, name: str) -> _Task:
+        self.waited_for = name
+        return _Task("decision", self.approval)
+
+    def create_timer(self, when) -> _Task:
+        return _Task("timer")
+
+    def task_any(self, tasks: list):
+        return ("any", tasks)
+
+
+def _drive(context: _GateContext) -> dict:
+    orchestration = fraud_durable.fraud_orchestration(context)
+    sent = None
+    try:
+        while True:
+            kind, value = orchestration.send(sent)
+            sent = value if kind == "result" else value[0]
+    except StopIteration as stop:
+        return stop.value
+
+
+_VERSIONS = {"SYN-CLAIM-0033": 2}
+
+
+def _approval(persona: str, **extra) -> dict:
+    return {
+        "decision": "approve", "persona": persona, "decision_id": "SYN-APP-DECISION-001",
+        "selected_option_id": OPTION_REIMBURSE_CAPPED, "evidence_versions": _VERSIONS, **extra,
+    }
+
+
+def _results(governance: list[dict]) -> dict:
+    return {
+        "fraud_evidence_activity_trigger": [{
+            "story_id": "SYN-STORY-APP-003", "claim_id": "SYN-CLAIM-0033",
+            "evidence_versions": _VERSIONS, "observation": {"claim": {"id": "SYN-CLAIM-0033"}},
+        }],
+        "fraud_trace_activity_trigger": [{
+            "admitted_options": [{"option_id": OPTION_REIMBURSE_CAPPED, "value_gbp": 85_000.0}],
+            "rejected_options": [], "beneficiary_path": {},
+        }],
+        "fraud_agent_activity_trigger": [{"ranked_option_ids": [OPTION_REIMBURSE_CAPPED], "reasoning": "Capped."}],
+        "fraud_governance_activity_trigger": governance,
+        "fraud_command_activity_trigger": [{"status": "decision_ready", "command": {"type": "x"}}],
+    }
+
+
+def _suspended(context: _GateContext) -> dict:
+    return next(p["payload"] for name, p in context.activities
+                if name == "checkpoint_activity_trigger" and p["kind"] == "suspended")
+
+
+def _command_payload(context: _GateContext) -> dict | None:
+    return next((p for name, p in context.activities if name == "fraud_command_activity_trigger"), None)
+
+
+ESCALATED = {
+    "allowed": False, "reason": "matched rule requires 'financial_crime_lead'",
+    "governing_rule_id": "AUTH-financial_crime_lead-banking.commit_reimbursement_decision",
+    "escalate_to": "financial_crime_lead",
+    "escalation": {"role": "financial_crime_lead", "allowed": True, "reason": "approver",
+                   "governing_rule_id": "AUTH-financial_crime_lead-banking.commit_reimbursement_decision"},
+}
+
+
+def test_an_over_authority_claim_is_decided_by_the_persona_governance_names() -> None:
+    context = _GateContext(_approval("financial_crime_lead"), _results([ESCALATED]))
+    output = _drive(context)
+    suspended = _suspended(context)
+    assert suspended["persona"] == "financial_crime_lead"
+    assert suspended["external_event"] == FRAUD_HITL_EVENT == context.waited_for
+    hitl = suspended["hitl_context"]
+    assert hitl["persona"] == "financial_crime_lead" and hitl["escalated_from"] == "fraud_decision_manager"
+    assert hitl["authority"]["allowed"] is True and "escalate_to" not in hitl
+    assert output["status"] == "decision_ready"
+    assert _command_payload(context)["approval"]["persona"] == "financial_crime_lead"
+
+
+def test_an_over_authority_claim_still_refuses_the_manager() -> None:
+    context = _GateContext(_approval("fraud_decision_manager"), _results([ESCALATED]))
+    output = _drive(context)
+    assert output["status"] == "denied" and "approval persona must be financial_crime_lead" in output["reason"]
+    assert _command_payload(context) is None
+
+
+WITHIN = {"allowed": True, "reason": "approver", "governing_rule_id": "AUTH-fraud_decision_manager-x",
+          "escalate_to": "financial_crime_lead"}
+
+
+def test_a_hold_handed_up_is_rechecked_by_governance_before_the_command() -> None:
+    context = _GateContext(_approval("financial_crime_lead"),
+                           _results([WITHIN, {"allowed": True, "reason": "approver"}]))
+    output = _drive(context)
+    governance_calls = [p for name, p in context.activities if name == "fraud_governance_activity_trigger"]
+    assert [call.get("role") for call in governance_calls] == [None, "financial_crime_lead"]
+    assert _suspended(context)["hitl_context"]["escalate_to"] == "financial_crime_lead"
+    assert output["status"] == "decision_ready"
+
+
+def test_a_hold_handed_up_to_someone_without_authority_is_denied() -> None:
+    context = _GateContext(_approval("financial_crime_lead"),
+                           _results([WITHIN, {"allowed": False, "reason": "value exceeds spend limit"}]))
+    output = _drive(context)
+    assert output["status"] == "denied" and "not authorised" in output["reason"]
+    assert _command_payload(context) is None
+
+
+def test_an_approval_from_outside_the_chain_is_denied() -> None:
+    context = _GateContext(_approval("payments_operations_lead"), _results([WITHIN]))
+    output = _drive(context)
+    assert output["status"] == "denied"
+    assert "financial_crime_lead or fraud_decision_manager" in output["reason"]
+
+
+def test_a_judged_decline_carries_the_personas_reason() -> None:
+    decline = _approval("financial_crime_lead", decision="reject", decided_by="llm",
+                        reason="Deep review: the reasoning contradicts the record.")
+    output = _drive(_GateContext(decline, _results([ESCALATED])))
+    assert output["status"] == "denied"
+    assert output["reasoning"] == (
+        "financial crime lead declined to approve: Deep review: the reasoning contradicts the record."
+    )
+
+
+def test_the_command_records_the_persona_who_approved() -> None:
+    world = ZavaBankWorld(seed=42, runtime=SimulationRuntime(42))
+    world.install()
+    world.activate_scenario(FRAUD_SCENARIO_OVER_DELEGATION)
+    observation = world.current_fraud_observation()
+    result = fraud_durable.fraud_command_activity(
+        {
+            "workflow_id": "BAPP-escalation",
+            "approval": _approval("financial_crime_lead", evidence_versions=observation["evidence_versions"]),
+            "hitl_context": {"claim_id": observation["claim"]["id"],
+                             "evidence_versions": observation["evidence_versions"],
+                             "observation": observation},
+        },
+        world=world,
+    )
+    assert result["status"] == "decision_ready"
+    assert result["command"]["payload"]["persona"] == "financial_crime_lead"

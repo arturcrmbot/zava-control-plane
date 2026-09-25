@@ -541,6 +541,10 @@ def case_command_activity(payload: dict[str, Any]) -> dict[str, Any]:
     hitl_context = _required_object(payload.get("hitl_context"), name="hitl_context")
 
     if approval.get("decision") != "approve":
+        if approval.get("decision") == "reject" and approval.get("decided_by"):
+            # A judged decline says why, in the persona's own words.
+            who = str(approval.get("persona") or "the persona").replace("_", " ")
+            return _denied(f"{who} declined to approve: {approval.get('reason') or 'no reason given'}")
         return _denied("decision must be approve")
     if approval.get("persona") != profile.hitl_persona:
         return _denied(f"approval persona must be {profile.hitl_persona}")
