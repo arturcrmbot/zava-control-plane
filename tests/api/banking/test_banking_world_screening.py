@@ -10,6 +10,7 @@ from verticals.banking.fraud_constants import (
     FRAUD_BENEFICIARY_OVER_DELEGATION,
     FRAUD_BENEFICIARY_STANDARD,
     FRAUD_BENEFICIARY_VULNERABLE,
+    FRAUD_SCENARIO_VULNERABLE,
 )
 from verticals.banking.worlds import reference_data
 from verticals.banking.worlds.screening import (
@@ -206,12 +207,15 @@ def test_mule_activity_on_demand_opens_a_case(screening_on) -> None:
     assert event["type"] == "sensor.tripped" and event["payload"]["sensor_id"] == MULE_SENSOR_ID
 
 
-def _command(world: ZavaBankWorld, trip: dict, option: str, number: int = 1) -> SimulationCommand:
+def _command(world: ZavaBankWorld, trip: dict, option: str, number: int = 1, evidence: dict | None = None) -> SimulationCommand:
+    bene = trip["payload"]["beneficiary_id"]
+    if evidence is None:
+        evidence = world.mule_observation(bene)["evidence_versions"] if bene in world._mule_cases else {}
     return SimulationCommand(
         command_id=f"SYN-MULE-CMD-{number}", trace_id=trip["trace_id"], issued_by=MULE_FUNCTION,
         type=MULE_COMMAND_TYPE,
-        payload={"subject_id": trip["payload"]["beneficiary_id"], "option_id": option, "persona": "financial_crime_lead",
-                 "decision_id": "d", "workflow_id": f"BMUL-{number}"},
+        payload={"subject_id": bene, "option_id": option, "persona": "financial_crime_lead",
+                 "decision_id": "d", "workflow_id": f"BMUL-{number}", "evidence_versions": evidence},
     )
 
 
@@ -240,6 +244,96 @@ def test_monitoring_lets_the_pattern_continue_and_reopen(screening_on) -> None:
     assert again["type"] == "sensor.tripped" and again["payload"]["beneficiary_id"] == bene
     assert again["payload"]["round"] == 2
     assert len([t for t in _mule_trips(world) if t.payload["beneficiary_id"] == bene]) == 2
+
+
+def test_a_disposition_decided_on_moved_evidence_is_rejected(screening_on) -> None:
+    world = _world()
+    trip = world.run_scenario("mule-activity")["event"]
+    bene = trip["payload"]["beneficiary_id"]
+    stale = world.mule_observation(bene)["evidence_versions"]
+    world.beneficiaries[bene].version += 1  # something changed the account after the gate's snapshot
+    rejected = world.apply_command(_command(world, trip, "SYN-MULE-OPTION-MONITOR", evidence=stale))
+    assert rejected.type == "command.rejected"
+    assert rejected.payload["reason"] == "world evidence moved after the approval checkpoint"
+    assert world.beneficiaries[bene].status == "under_review"
+
+
+def test_a_restraint_holds_everything_including_funds_already_frozen(screening_on) -> None:
+    world = _world()
+    trip = world.run_scenario("mule-activity")["event"]
+    account = world.beneficiaries[trip["payload"]["beneficiary_id"]]
+    account.frozen_gbp, account.balance_gbp = 1_000.0, 5_000.0
+    trip_evidence = world.mule_observation(account.id)["evidence_versions"]
+    applied = world.apply_command(_command(world, trip, "SYN-MULE-OPTION-RESTRAIN", evidence=trip_evidence))
+    assert applied.type == MULE_SUCCESS_EVENT
+    assert (account.frozen_gbp, account.balance_gbp) == (6_000.0, 0.0)
+
+
+def test_a_case_that_ends_without_a_disposition_closes_and_the_pattern_can_reopen_it(screening_on) -> None:
+    world = _world()
+    trip = world.run_scenario("mule-activity")["event"]
+    bene = trip["payload"]["beneficiary_id"]
+    assert world.beneficiaries[bene].status == "under_review"
+    world.bind_story_workflow(trip, "BMUL-1")
+    world.fail_story_workflow("BMUL-1", "financial_crime_lead declined to approve")
+    assert world._mule_cases[bene]["status"] == "unresolved"
+    assert world.beneficiaries[bene].status == "open"
+    unresolved = [e for e in world.runtime.journal if e.type == "banking.mule_case.unresolved"]
+    assert unresolved and unresolved[-1].payload["reason"] == "financial_crime_lead declined to approve"
+    assert unresolved[-1].trace_id == trip["trace_id"]
+    assert world.render_state()["screening"]["mule_cases_open"] == 0
+    again = world.run_scenario(f"mule-activity:{bene}")["event"]
+    assert again["type"] == "sensor.tripped" and again["payload"]["round"] == 2
+
+
+def test_the_story_hooks_leave_fraud_claims_alone(screening_on) -> None:
+    world = _world()
+    sensor = world.raise_claim("any")
+    claim_id = sensor.payload["claim_id"]
+    mark = len(world.runtime.journal)
+    world.bind_story_workflow(sensor.to_dict(), "BAPP-1")
+    world.fail_story_workflow("BAPP-1", "timed out")
+    assert world.fraud_claims[claim_id].status == "reported"
+    assert len(world.runtime.journal) == mark
+
+
+def test_a_mule_case_opening_leaves_a_waiting_claim_on_that_account_valid(screening_on) -> None:
+    world = _world()
+    sensor = world.activate_scenario(FRAUD_SCENARIO_VULNERABLE)
+    claim_id = sensor.payload["claim_id"]
+    bene = world.fraud_claims[claim_id].beneficiary_id
+    assert bene in reference_data.mule_beneficiary_ids()
+    before = world.observation_for_claim(claim_id)["evidence_versions"]
+    approval = world.command_for_claim_option(
+        claim_id=claim_id, option_id=OPTION_REIMBURSE_FULL, workflow_id="BAPP-V1",
+        decision_id="SYN-APP-DECISION-001", persona=FRAUD_HITL_PERSONA)
+    trip = world.run_scenario(f"mule-activity:{bene}")["event"]
+    assert trip["type"] == "sensor.tripped" and trip["payload"]["beneficiary_id"] == bene
+    assert world.observation_for_claim(claim_id)["evidence_versions"] == before
+    assert world.apply_command(approval).type == "banking.reimbursement.applied"
+
+
+def test_a_call_about_a_restrained_mule_keeps_it_restrained(screening_on) -> None:
+    world = _world()
+    trip = world.run_scenario("mule-activity")["event"]
+    bene = trip["payload"]["beneficiary_id"]
+    assert world.apply_command(_command(world, trip, "SYN-MULE-OPTION-RESTRAIN")).type == MULE_SUCCESS_EVENT
+    payment_id = next(p.id for p in world.payments.values() if p.to_beneficiary_id == bene and p.status == "settled"
+                      and world.customers[world.accounts[p.from_account_id].customer_id].status == "active")
+    world.customer_calls(payment_id, "A man from the bank's fraud team told me to move my savings.", None)
+    assert world.beneficiaries[bene].status == "restrained"
+    assert bene not in world._active_mules()
+
+
+def test_a_call_is_refused_while_the_receiving_account_is_under_a_mule_investigation(screening_on) -> None:
+    world = _world()
+    trip = world.run_scenario("mule-activity")["event"]
+    bene = trip["payload"]["beneficiary_id"]
+    evidence = world.mule_observation(bene)["evidence_versions"]
+    payment_id = next(p.id for p in world.payments.values() if p.to_beneficiary_id == bene and p.status == "settled")
+    with pytest.raises(ValueError, match="mule investigation"):
+        world.customer_calls(payment_id, "A man from the bank's fraud team told me to move my savings.", None)
+    assert world.mule_observation(bene)["evidence_versions"] == evidence
 
 
 # --- The world owns mule cases when screening is on ----------------------------------------

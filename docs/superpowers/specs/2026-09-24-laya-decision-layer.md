@@ -335,7 +335,15 @@ command gateway, reactions).
   payments. The mule timer is retired; merchants still arrive on the ramp.
 - **Dispositions change the world.** Restrained accounts stop receiving and
   monitored ones keep collecting, then reopen as round 2. A second command for a
-  decided case is rejected.
+  decided case is rejected, and so is one decided on evidence that has moved
+  since the gate. A restraint holds the whole balance, adding to anything a
+  reimbursement already froze.
+- **A case the bank could not decide closes as unresolved.** If the mule case ends
+  with no disposition (a decline, a timeout, a failure), the account goes back to
+  normal, and two more flagged customers reopen the case as the next round.
+- **Nothing moves another case's evidence while it is decided.** Opening a mule
+  case on an account a claim is already reviewing leaves that claim's evidence
+  alone, and the payments loop never re-settles a payment under a claim.
 - **Customers react** after a reimbursement: accepts, chases or complains, drawn
   from Laya's upset scale with a seeded stream. The scale is measured monotone:
   full < capped < refused.
@@ -375,6 +383,10 @@ command gateway, reactions).
     scam types measured right. Rules read if Laya is down.
   - The world raises a claim on that payment from the record's facts, so the
     vulnerability marker on the record still decides.
+  - A call is refused while the same customer or receiving account has a claim
+    being decided, or the account is under a mule investigation: raising it would
+    move the evidence that decision rests on. A call about a restrained mule keeps
+    it restrained.
   - The customer's words and the reading travel in the evidence the agent reads.
   - Verified live: "bank impersonation" (lead 0.86) with bereavement noted, read in
     0.48 s. The claim was raised on a GBP 8,940 payment, and the fraud manager

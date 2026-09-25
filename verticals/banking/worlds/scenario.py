@@ -166,6 +166,7 @@ class ZavaBankWorld:
         self._references: dict[str, str] = {}
         self._flags: dict[str, list[dict[str, Any]]] = {}
         self._mule_cases: dict[str, dict[str, Any]] = {}
+        self._mule_workflows: dict[str, str] = {}
         self._new_payments = 0
         self._scam_rng = random.Random(seed + 303)
         self.payments_screened_total = 0
@@ -329,6 +330,8 @@ class ZavaBankWorld:
                 continue
             for _ in range(_PAYMENTS_PER_TICK):
                 payment = self.payments[rng.choice(payment_ids)]
+                if payment.status != "settled":
+                    continue  # a customer called about it: it is under a claim now
                 payment.version += 1
                 event = self.runtime.emit(
                     "banking.payment.settled",
@@ -531,9 +534,10 @@ class ZavaBankWorld:
         if len(customers) < _MULE_CASE_CUSTOMERS:
             return None
         beneficiary = self.beneficiaries[beneficiary_id]
-        if beneficiary.status == "open":
+        took_review = beneficiary.status == "open"
+        if took_review:
             beneficiary.status = "under_review"
-        beneficiary.version += 1
+            beneficiary.version += 1
         round_ = (case["round"] + 1) if case is not None else 1
         sensor = self.runtime.emit(
             "sensor.tripped",
@@ -552,12 +556,56 @@ class ZavaBankWorld:
                 "function": FUNCTION_FINCRIME,
             },
         )
-        beneficiary.last_event_id = sensor.event_id
+        if took_review:
+            beneficiary.last_event_id = sensor.event_id
         self._mule_cases[beneficiary_id] = {
             "status": "open", "trace_id": sensor.trace_id, "round": round_,
-            "flags": list(fresh), "flags_at_decision": len(flags),
+            "flags": list(fresh), "flags_at_decision": len(flags), "took_review": took_review,
         }
         return sensor
+
+    def bind_story_workflow(self, sensor_event: dict[str, Any], workflow_id: str) -> None:
+        """Remember which workflow decides a mule case the world opened."""
+        payload = sensor_event.get("payload") if isinstance(sensor_event, dict) else None
+        if not isinstance(payload, dict) or payload.get("sensor_id") != MULE_SENSOR_ID:
+            return
+        beneficiary_id = str(payload.get("beneficiary_id") or "")
+        case = self._mule_cases.get(beneficiary_id)
+        if case is not None and case["status"] == "open" and case["round"] == payload.get("round"):
+            case["workflow_id"] = workflow_id
+            self._mule_workflows[workflow_id] = beneficiary_id
+
+    def fail_story_workflow(self, workflow_id: str, reason: str) -> None:
+        """A mule case that ends with no disposition closes, so the pattern can reopen it."""
+        beneficiary_id = self._mule_workflows.pop(workflow_id, None)
+        case = self._mule_cases.get(beneficiary_id) if beneficiary_id else None
+        if case is None or case["status"] != "open" or case.get("workflow_id") != workflow_id:
+            return
+        case["status"] = "unresolved"
+        case["flags_at_decision"] = len(self._flags.get(beneficiary_id, []))
+        beneficiary = self.beneficiaries[beneficiary_id]
+        restore = (case.get("took_review") and beneficiary.status == "under_review"
+                   and not self._live_claims(beneficiary_id=beneficiary_id))
+        if restore:
+            beneficiary.status = "open"
+            beneficiary.version += 1
+        event = self.runtime.emit(
+            "banking.mule_case.unresolved",
+            actor_id=beneficiary_id,
+            trace_id=case["trace_id"],
+            payload={"beneficiary_id": beneficiary_id, "round": case["round"], "workflow_id": workflow_id,
+                     "reason": reason, "function": FUNCTION_FINCRIME},
+        )
+        if restore:
+            beneficiary.last_event_id = event.event_id
+
+    def _live_claims(self, *, customer_id: str | None = None, beneficiary_id: str | None = None) -> list[FraudClaim]:
+        """Raised claims still being decided that involve this customer or receiving account."""
+        return [
+            claim for claim in self.fraud_claims.values()
+            if claim.id in self._claim_scenarios and claim.status == "reported"
+            and (claim.customer_id == customer_id or claim.beneficiary_id == beneficiary_id)
+        ]
 
     def mule_observation(self, beneficiary_id: str) -> dict[str, Any]:
         """The case the bank investigates, built from the world's own records."""
@@ -600,6 +648,8 @@ class ZavaBankWorld:
             reason = f"unknown account {beneficiary_id!r}"
         elif case is None or case["status"] != "open":
             reason = f"no open mule case for {beneficiary_id}"
+        elif payload.get("evidence_versions") != self.mule_observation(beneficiary_id)["evidence_versions"]:
+            reason = "world evidence moved after the approval checkpoint"
         elif disposition is None:
             reason = f"unknown disposition {option_id!r}"
         if reason is not None:
@@ -610,7 +660,8 @@ class ZavaBankWorld:
         beneficiary = self.beneficiaries[beneficiary_id]
         beneficiary.status = disposition
         if disposition == "restrained":
-            beneficiary.frozen_gbp = beneficiary.balance_gbp
+            beneficiary.frozen_gbp = round(beneficiary.frozen_gbp + beneficiary.balance_gbp, 2)
+            beneficiary.balance_gbp = 0.0
         beneficiary.version += 1
         case["status"] = "decided"
         case["flags_at_decision"] = len(self._flags.get(beneficiary_id, []))
@@ -671,14 +722,16 @@ class ZavaBankWorld:
         story_id = FRAUD_STORY_BY_SCENARIO[scenario_id]
         return self._raise(self.fraud_claims[claim_id], scenario_id, story_id)
 
-    def _raise(self, claim: FraudClaim, scenario_id: str, story_id: str) -> SimulationEvent:
+    def _raise(self, claim: FraudClaim, scenario_id: str, story_id: str, *,
+               keep_inactive: bool = False) -> SimulationEvent:
         payment = self.payments[claim.payment_id]
         beneficiary = self.beneficiaries[claim.beneficiary_id]
         customer = self.customers[claim.customer_id]
 
         claim.status = "reported"
         claim.version += 1
-        beneficiary.status = "under_review"
+        if not (keep_inactive and beneficiary.status in _MULE_INACTIVE):
+            beneficiary.status = "under_review"
         beneficiary.version += 1
         customer.status = "in_claim"
         customer.version += 1
@@ -799,6 +852,14 @@ class ZavaBankWorld:
         account = self.accounts[payment.from_account_id]
         customer = self.customers[account.customer_id]
         beneficiary = self.beneficiaries[payment.to_beneficiary_id]
+        busy = self._live_claims(customer_id=customer.id, beneficiary_id=beneficiary.id)
+        if busy:
+            whose = f"customer {customer.id}" if busy[0].customer_id == customer.id else f"receiving account {beneficiary.id}"
+            raise ValueError(f"{whose} already has a claim being decided ({busy[0].id}); call again once it is decided")
+        mule_case = self._mule_cases.get(beneficiary.id)
+        if mule_case is not None and mule_case["status"] == "open":
+            raise ValueError(f"receiving account {beneficiary.id} is under a mule investigation; "
+                             "call again once it is decided")
         rng = self.runtime.rng
         self._called_claims += 1
         now = float(self.runtime.env.now)
@@ -814,7 +875,7 @@ class ZavaBankWorld:
         payment.version += 1
         self.fraud_claims[claim.id] = claim
         self._statements[claim.id] = {"text": text, **(reading or {})}
-        return self._raise(claim, f"call:{claim.id}", f"SYN-STORY-{claim.id}")
+        return self._raise(claim, f"call:{claim.id}", f"SYN-STORY-{claim.id}", keep_inactive=True)
 
     def read_customer_statement(self, statement: str):
         """Awaitable reading of a customer's words (Laya, rules when it is down)."""

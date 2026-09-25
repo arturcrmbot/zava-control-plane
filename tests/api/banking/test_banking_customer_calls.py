@@ -8,6 +8,7 @@ import pytest
 from api.server.services.judgement.laya_client import LayaAnswer, LayaResult, LayaUnavailable
 from api.server.world.runtime import SimulationRuntime
 from verticals.banking.fraud_constants import FRAUD_SENSOR_ID
+from verticals.banking.fraud_constraints import admit_claim_options
 from verticals.banking.worlds.scenario import ZavaBankWorld
 from verticals.banking.worlds.statements import StatementReading, read_statement, rules_reading
 
@@ -228,3 +229,79 @@ def test_status_reports_laya_and_the_budget(monkeypatch) -> None:
     status = asyncio.run(routes.judgement_status())
     assert set(status) == {"enabled", "laya", "deep_review"}
     assert {"budget_per_hour", "remaining", "model"} <= set(status["deep_review"])
+
+
+# --- A called claim's evidence stays put until it is decided -------------------------------
+
+
+def _run(world: ZavaBankWorld, minutes: float) -> None:
+    world.runtime.env.run(until=world.runtime.env.now + minutes)
+
+
+def test_the_payments_loop_leaves_called_payments_alone() -> None:
+    # The loop re-settles payments at random; a called payment is disputed now,
+    # and moving it would void the claim's approval at the gate.
+    world = _world()
+    _run(world, 1)  # the world is running before anyone calls
+    called: dict[str, str] = {}
+    customers: set[str] = set()
+    accounts: set[str] = set()
+    for payment in list(world.payments.values()):
+        customer = world.accounts[payment.from_account_id].customer_id
+        if (payment.status != "settled" or world.customers[customer].status != "active"
+                or customer in customers or payment.to_beneficiary_id in accounts):
+            continue
+        called[payment.id] = world.customer_calls(payment.id, STATEMENT, None).payload["claim_id"]
+        customers.add(customer)
+        accounts.add(payment.to_beneficiary_id)
+        if len(called) == 6:
+            break
+    before = {claim: world.observation_for_claim(claim)["evidence_versions"] for claim in called.values()}
+    versions = {payment: world.payments[payment].version for payment in called}
+    approvals = [
+        world.command_for_claim_option(
+            claim_id=claim, option_id=next(r.option.option_id for r in admit_claim_options(world.observation_for_claim(claim)) if r.feasible),
+            workflow_id=f"BAPP-CALL-{n}", decision_id="SYN-APP-DECISION-001", persona="fraud_decision_manager")
+        for n, claim in enumerate(called.values())
+    ]
+    _run(world, 3_000)
+    assert {payment: world.payments[payment].version for payment in called} == versions
+    assert {claim: world.observation_for_claim(claim)["evidence_versions"] for claim in called.values()} == before
+    assert [world.apply_command(command).type for command in approvals] == ["banking.reimbursement.applied"] * len(approvals)
+
+
+def _two_settled(world: ZavaBankWorld, *, same: str) -> tuple[str, str]:
+    """Two settled payments sharing a customer (same="customer") or a receiving account."""
+    seen: dict[str, str] = {}
+    for payment in world.payments.values():
+        customer = world.accounts[payment.from_account_id].customer_id
+        if payment.status != "settled" or world.customers[customer].status != "active":
+            continue
+        key = customer if same == "customer" else payment.to_beneficiary_id
+        other = seen.get(key)
+        if other is not None and (same == "customer" or world.accounts[world.payments[other].from_account_id].customer_id != customer):
+            return other, payment.id
+        seen.setdefault(key, payment.id)
+    raise AssertionError(f"no two settled payments sharing a {same}")
+
+
+@pytest.mark.parametrize("same", ["customer", "account"])
+def test_a_second_call_is_refused_while_the_first_claim_is_decided(same: str) -> None:
+    world = _world()
+    first, second = _two_settled(world, same=same)
+    claim_id = world.customer_calls(first, STATEMENT, None).payload["claim_id"]
+    before = world.observation_for_claim(claim_id)["evidence_versions"]
+    with pytest.raises(ValueError, match="already has a claim being decided"):
+        world.customer_calls(second, STATEMENT, None)
+    assert world.observation_for_claim(claim_id)["evidence_versions"] == before
+    assert world.payments[second].status == "settled"
+
+
+def test_ask_the_persona_takes_a_long_agent_reasoning() -> None:
+    from pydantic import ValidationError
+
+    from api.server.routes.judgement import WhatIf
+
+    assert WhatIf(workflow_id="BAPP-1", reasoning="x" * 3_000).reasoning == "x" * 3_000
+    with pytest.raises(ValidationError):
+        WhatIf(workflow_id="BAPP-1", reasoning="x" * 8_001)
