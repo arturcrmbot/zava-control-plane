@@ -26,6 +26,8 @@ from __future__ import annotations
 import copy
 import dataclasses
 import math
+import os
+import random
 from collections import deque
 from typing import Any
 
@@ -45,7 +47,15 @@ from verticals.banking.fraud_constants import (
     FRAUD_SUCCESS_EVENT,
     FRAUD_WORKFLOW_TYPE,
 )
+from verticals.banking.flags import world_screening_enabled
+from verticals.banking.support_constants import (
+    MULE_COMMAND_TYPE,
+    MULE_SENSOR_ID,
+    MULE_SUCCESS_EVENT,
+    MULE_WORKFLOW_TYPE,
+)
 from verticals.banking.worlds import reference_data
+from verticals.banking.worlds.screening import default_screener
 from verticals.banking.worlds.model import (
     Account,
     BeneficiaryAccount,
@@ -84,6 +94,20 @@ FUNCTION_FINCRIME = "financial-crime"
 # full book (2,400 customers, 3,000+ payments) stays in the world; the
 # snapshot carries counts plus the records a person can actually read.
 _RECENT_SETTLEMENTS = 24
+_RECENT_FLAGS = 8
+
+# Phase 2 cadence, in synthetic minutes: a new payment arrives about every
+# half hour and about a third are scams into a mule account. At the demo
+# speed that opens a mule case every few minutes.
+_NEW_PAYMENT_MINUTES = float(os.environ.get("BANKING_NEW_PAYMENT_MINUTES", "30"))
+_SCAM_SHARE = float(os.environ.get("BANKING_SCAM_SHARE", "0.35"))
+_MULE_CASE_CUSTOMERS = 2
+_MULE_DISPOSITIONS = {
+    "SYN-MULE-OPTION-RESTRAIN": "restrained",
+    "SYN-MULE-OPTION-MONITOR": "monitored",
+    "SYN-MULE-OPTION-CLOSE": "closed",
+}
+_MULE_INACTIVE = {"restrained", "closed", "frozen"}
 _TOP_POSITIONS = 12
 
 
@@ -128,9 +152,23 @@ class ZavaBankWorld:
         seed: int = reference_data.SEED,
         *,
         runtime: SimulationRuntime | None = None,
+        screener: Any = None,
     ) -> None:
         self.seed = seed
         self.runtime = runtime if runtime is not None else SimulationRuntime(seed)
+        # Phase 2 (BANKING_WORLD_SCREENING=1): new payments carry references
+        # the bank screens; mule accounts are hidden world truth.
+        self._screening = world_screening_enabled()
+        self._screener = screener
+        self._mule_ids: set[str] = set()
+        self._references: dict[str, str] = {}
+        self._flags: dict[str, list[dict[str, Any]]] = {}
+        self._mule_cases: dict[str, dict[str, Any]] = {}
+        self._new_payments = 0
+        self._scam_rng = random.Random(seed + 303)
+        self.payments_screened_total = 0
+        self.payments_flagged_total = 0
+        self.recent_flags: deque[dict[str, Any]] = deque(maxlen=_RECENT_FLAGS)
 
         self.customers: dict[str, Customer] = {}
         self.accounts: dict[str, Account] = {}
@@ -213,6 +251,14 @@ class ZavaBankWorld:
 
         self.runtime.process(self._payments_loop())
         self.runtime.process(self._market_loop())
+        if self._screening:
+            self._mule_ids = set(reference_data.mule_beneficiary_ids())
+            self._references = reference_data.build_payment_references(
+                self.payments.values(), self._mule_ids
+            )
+            if self._screener is None:
+                self._screener = default_screener()
+            self.runtime.process(self._new_payments_loop())
         self.runtime.process(self._rail_loop())
         self._installed = True
 
@@ -380,6 +426,214 @@ class ZavaBankWorld:
                 )
                 position.last_event_id = event.event_id
                 self.positions_marked_total += 1
+
+    # -- what the bank notices (phase 2) ------------------------------------
+
+    def _new_payments_loop(self):
+        """New payments arrive; some are scams into mule accounts. All are screened."""
+        rng = self._scam_rng
+        customers = sorted(c for c, customer in self.customers.items() if customer.status == "active")
+        ordinary = sorted(b for b in self.beneficiaries if b not in self._mule_ids)
+        while True:
+            yield self.runtime.env.timeout(_NEW_PAYMENT_MINUTES * rng.uniform(0.6, 1.4))
+            mules = self._active_mules()
+            if mules and rng.random() < _SCAM_SHARE:
+                amount = round(math.exp(rng.uniform(math.log(150), math.log(9_000))) / 5) * 5
+                self._new_payment(rng.choice(customers), rng.choice(mules),
+                                  rng.choice(reference_data.SCAM_REFERENCES), float(amount))
+            else:
+                self._new_payment(rng.choice(customers), rng.choice(ordinary),
+                                  rng.choice(reference_data.ORDINARY_REFERENCES), float(rng.randint(5, 2_500)))
+
+    def _active_mules(self) -> list[str]:
+        return [b for b in sorted(self._mule_ids) if self.beneficiaries[b].status not in _MULE_INACTIVE]
+
+    def _new_payment(self, customer_id: str, beneficiary_id: str, reference: str, amount: float) -> Payment:
+        self._new_payments += 1
+        customer = self.customers[customer_id]
+        payment = Payment(
+            id=f"SYN-PAY-N{self._new_payments:05d}", from_account_id=customer.account_id,
+            to_beneficiary_id=beneficiary_id, rail_id=FRAUD_RAIL_FPS if amount < 5_000 else FRAUD_RAIL_CHAPS,
+            amount_gbp=amount, location_id=customer.home_location_id,
+        )
+        self.payments[payment.id] = payment
+        self._references[payment.id] = reference
+        event = self.runtime.emit(
+            "banking.payment.settled",
+            actor_id=payment.id,
+            target_id=beneficiary_id,
+            payload={
+                "rail_id": payment.rail_id,
+                "amount_gbp": amount,
+                "reference": reference,
+                "customer_id": customer_id,
+                "location_id": payment.location_id,
+                "function": FUNCTION_PAYMENTS,
+            },
+        )
+        payment.last_event_id = event.event_id
+        self.payments_settled_total += 1
+        self.settled_value_gbp += amount
+        self.recent_settlements.append({
+            "payment_id": payment.id, "rail_id": payment.rail_id, "amount_gbp": amount,
+            "sim_time": event.sim_time, "event_id": event.event_id, "reference": reference,
+        })
+        self._screener.submit(reference, lambda screening, pid=payment.id: self._apply_screening(pid, screening))
+        return payment
+
+    def _apply_screening(self, payment_id: str, screening: Any) -> SimulationEvent | None:
+        """The screen's answer for one payment; flag it and maybe open a mule case."""
+        payment = self.payments.get(payment_id)
+        if payment is None:
+            return None
+        self.payments_screened_total += 1
+        if not screening.flagged:
+            return None
+        account = self.accounts.get(payment.from_account_id)
+        customer_id = account.customer_id if account is not None else None
+        reference = self._references.get(payment_id, "")
+        record = {
+            "payment_id": payment_id, "customer_id": customer_id, "reference": reference,
+            "amount_gbp": payment.amount_gbp, **screening.to_dict(),
+        }
+        beneficiary_id = payment.to_beneficiary_id
+        self._flags.setdefault(beneficiary_id, []).append(record)
+        self.payments_flagged_total += 1
+        flagged = self.runtime.emit(
+            "banking.payment.flagged",
+            actor_id=payment_id,
+            target_id=beneficiary_id,
+            cause_event_id=payment.last_event_id,
+            payload={**record, "beneficiary_id": beneficiary_id, "function": FUNCTION_FINCRIME},
+        )
+        self.recent_flags.append({**record, "beneficiary_id": beneficiary_id, "event_id": flagged.event_id})
+        return self._maybe_open_mule_case(beneficiary_id, flagged) or flagged
+
+    def _maybe_open_mule_case(self, beneficiary_id: str, cause: SimulationEvent) -> SimulationEvent | None:
+        """Trip the mule sensor once flagged payments from enough customers land here."""
+        case = self._mule_cases.get(beneficiary_id)
+        if case is not None and case["status"] == "open":
+            return None
+        flags = self._flags.get(beneficiary_id, [])
+        fresh = flags[case["flags_at_decision"]:] if case is not None else flags
+        customers = sorted({f["customer_id"] for f in fresh if f["customer_id"]})
+        if len(customers) < _MULE_CASE_CUSTOMERS:
+            return None
+        beneficiary = self.beneficiaries[beneficiary_id]
+        if beneficiary.status == "open":
+            beneficiary.status = "under_review"
+        beneficiary.version += 1
+        round_ = (case["round"] + 1) if case is not None else 1
+        sensor = self.runtime.emit(
+            "sensor.tripped",
+            actor_id=MULE_SENSOR_ID,
+            target_id=beneficiary_id,
+            cause_event_id=cause.event_id,
+            trace_id=cause.trace_id,
+            payload={
+                "sensor_id": MULE_SENSOR_ID,
+                "workflow_type": MULE_WORKFLOW_TYPE,
+                "beneficiary_id": beneficiary_id,
+                "customer_count": len(customers),
+                "flagged_payment_ids": [f["payment_id"] for f in fresh],
+                "round": round_,
+                "source_event_id": cause.event_id,
+                "function": FUNCTION_FINCRIME,
+            },
+        )
+        beneficiary.last_event_id = sensor.event_id
+        self._mule_cases[beneficiary_id] = {
+            "status": "open", "trace_id": sensor.trace_id, "round": round_,
+            "flags": list(fresh), "flags_at_decision": len(flags),
+        }
+        return sensor
+
+    def mule_observation(self, beneficiary_id: str) -> dict[str, Any]:
+        """The case the bank investigates, built from the world's own records."""
+        case = self._mule_cases.get(beneficiary_id)
+        if case is None:
+            raise ClaimObservationUnavailableError(f"no mule case for {beneficiary_id!r}")
+        beneficiary = self.beneficiaries[beneficiary_id]
+        case_id = f"SYN-MULE-CASE-{beneficiary_id.removeprefix('SYN-')}-{case['round']}"
+        customers = sorted({f["customer_id"] for f in case["flags"] if f["customer_id"]})
+        return {
+            "story_id": case_id,
+            "scenario_id": "mule-pattern",
+            "trace_id": case["trace_id"],
+            "case": {
+                "id": case_id,
+                "subject_id": beneficiary_id,
+                "subject_kind": "beneficiary",
+                "risk_band": beneficiary.risk_band,
+                "holder_kind": beneficiary.holder_kind,
+                "linked_claim_count": len(customers),
+                "balance_gbp": beneficiary.balance_gbp,
+                "flagged_payments": [
+                    {k: f[k] for k in ("payment_id", "reference", "pattern", "amount_gbp", "screened_by")}
+                    for f in case["flags"]
+                ],
+                "round": case["round"],
+                "version": beneficiary.version,
+            },
+            "evidence_versions": {case_id: beneficiary.version},
+        }
+
+    def _apply_mule_command(self, command: SimulationCommand) -> SimulationEvent:
+        payload = command.payload
+        beneficiary_id = str(payload.get("subject_id") or "")
+        option_id = str(payload.get("option_id") or "")
+        case = self._mule_cases.get(beneficiary_id)
+        disposition = _MULE_DISPOSITIONS.get(option_id)
+        reason = None
+        if beneficiary_id not in self.beneficiaries:
+            reason = f"unknown account {beneficiary_id!r}"
+        elif case is None or case["status"] != "open":
+            reason = f"no open mule case for {beneficiary_id}"
+        elif disposition is None:
+            reason = f"unknown disposition {option_id!r}"
+        if reason is not None:
+            return self.runtime.emit(
+                "command.rejected", actor_id=command.issued_by, trace_id=command.trace_id,
+                payload={"command": command.to_dict(), "reason": reason},
+            )
+        beneficiary = self.beneficiaries[beneficiary_id]
+        beneficiary.status = disposition
+        if disposition == "restrained":
+            beneficiary.frozen_gbp = beneficiary.balance_gbp
+        beneficiary.version += 1
+        case["status"] = "decided"
+        case["flags_at_decision"] = len(self._flags.get(beneficiary_id, []))
+        event = self.runtime.emit(
+            MULE_SUCCESS_EVENT,
+            actor_id=beneficiary_id,
+            trace_id=command.trace_id,
+            payload={
+                "beneficiary_id": beneficiary_id, "disposition": disposition, "option_id": option_id,
+                "workflow_id": payload.get("workflow_id"), "persona": payload.get("persona"),
+                "function": FUNCTION_FINCRIME,
+            },
+        )
+        beneficiary.last_event_id = event.event_id
+        return event
+
+    def _mule_activity(self, beneficiary_id: str | None = None) -> SimulationEvent:
+        """Two scam payments from different customers into one mule account."""
+        if not self._screening:
+            raise ValueError("mule activity needs BANKING_WORLD_SCREENING=1")
+        mules = self._active_mules()
+        target = beneficiary_id or (self._scam_rng.choice(mules) if mules else None)
+        if target is None or target not in mules:
+            raise ValueError("no active mule account to send payments to")
+        customers = sorted(c for c, customer in self.customers.items() if customer.status == "active")
+        start = len(self.runtime.journal)
+        for customer_id, reference in zip(self._scam_rng.sample(customers, 2),
+                                          ("Safe account transfer as advised by bank", "Release fee to unlock withdrawal")):
+            last = self._new_payment(customer_id, target, reference, float(self._scam_rng.randint(400, 6_000)))
+        opened = [e for e in self.runtime.journal[start:]
+                  if e.type == "sensor.tripped" and e.payload.get("sensor_id") == MULE_SENSOR_ID]
+        if opened:
+            return opened[-1]
+        return next(e for e in reversed(self.runtime.journal) if e.actor_id == last.id)
 
     # -- scenarios ---------------------------------------------------------
 
@@ -549,6 +803,8 @@ class ZavaBankWorld:
     def run_scenario(self, scenario_id: str) -> dict[str, Any]:
         if scenario_id == "new-fraud-claim" or scenario_id.startswith("new-fraud-claim:"):
             event = self.raise_claim(scenario_id.partition(":")[2] or "any")
+        elif scenario_id == "mule-activity" or scenario_id.startswith("mule-activity:"):
+            event = self._mule_activity(scenario_id.partition(":")[2] or None)
         else:
             event = self.activate_scenario(scenario_id)
         return {"scenario": scenario_id, "event": event.to_dict()}
@@ -625,6 +881,8 @@ class ZavaBankWorld:
         now: float | None = None,
     ) -> dict[str, Any]:
         payload = source_sensor_event.get("payload") or {}
+        if payload.get("sensor_id") == MULE_SENSOR_ID:
+            return self.mule_observation(str(payload.get("beneficiary_id") or ""))
         claim_id = payload.get("claim_id") or self._active_claim_id
         if not isinstance(claim_id, str):
             raise ClaimObservationUnavailableError(
@@ -663,6 +921,11 @@ class ZavaBankWorld:
         processed = self._processed_commands.get(command.command_id)
         if processed is not None:
             return processed[1]
+        if command.type == MULE_COMMAND_TYPE and self._screening:
+            event = self._apply_mule_command(command)
+            if event.type == MULE_SUCCESS_EVENT:
+                self._processed_commands[command.command_id] = (command, event)
+            return event
         if command.type != FRAUD_COMMAND_TYPE:
             return self.runtime.emit(
                 "command.rejected",
@@ -750,4 +1013,14 @@ class ZavaBankWorld:
             "collateral_agreements": [
                 _record_view(r) for r in self.collateral_agreements.values()
             ],
+            **({"screening": self._screening_state()} if self._screening else {}),
+        }
+
+    def _screening_state(self) -> dict[str, Any]:
+        return {
+            "payments_screened": self.payments_screened_total,
+            "payments_flagged": self.payments_flagged_total,
+            "mule_cases_open": sum(1 for case in self._mule_cases.values() if case["status"] == "open"),
+            "mule_cases_decided": sum(1 for case in self._mule_cases.values() if case["status"] == "decided"),
+            "recent_flags": list(self.recent_flags),
         }

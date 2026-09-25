@@ -15,6 +15,7 @@ Three live workflows and a set of declared-but-unbuilt placeholders.
 from __future__ import annotations
 
 from api.shared.domain_contracts import Domain, HitlGate, Phase
+from verticals.banking.flags import world_screening_enabled
 from verticals.banking.fraud_constants import (
     FRAUD_DISPLAY_NAME,
     FRAUD_HITL_EVENT,
@@ -114,8 +115,12 @@ BANKING_DOMAINS: dict[str, Domain] = {
         ),
         skills=(MULE_SKILL,),
         stub=False,
-        spawn_fn=MULE_SPAWNER,
-        realistic_interval_seconds=MULE_REALISTIC_INTERVAL_SECONDS,
+        # With BANKING_WORLD_SCREENING=1 the world opens mule cases when it
+        # notices a pattern, so the timer is retired.
+        spawn_fn=None if world_screening_enabled() else MULE_SPAWNER,
+        realistic_interval_seconds=(
+            None if world_screening_enabled() else MULE_REALISTIC_INTERVAL_SECONDS
+        ),
     ),
     MERCHANT_WORKFLOW_TYPE: Domain(
         workflow_type=MERCHANT_WORKFLOW_TYPE,

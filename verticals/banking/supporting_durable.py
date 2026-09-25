@@ -37,6 +37,7 @@ from verticals.banking.mcp_tools.supporting import (
 )
 from verticals.banking.support_constants import (
     MERCHANT_COMMAND_TYPE,
+    MERCHANT_FUNCTION,
     MERCHANT_HITL_CATEGORY,
     MERCHANT_HITL_EVENT,
     MERCHANT_HITL_PERSONA,
@@ -45,6 +46,7 @@ from verticals.banking.support_constants import (
     MERCHANT_SUCCESS_EVENT,
     MERCHANT_WORKFLOW_TYPE,
     MULE_COMMAND_TYPE,
+    MULE_FUNCTION,
     MULE_HITL_CATEGORY,
     MULE_HITL_EVENT,
     MULE_HITL_PERSONA,
@@ -105,6 +107,9 @@ class CaseProfile:
     commit_phase: str
     verify_phase: str
     options: tuple[tuple[str, str, float], ...]   # (option_id, impact, value)
+    # The organisational function that issues the typed command; a world case
+    # names it as the command's issuer so the world's gateway accepts it.
+    function: str = ""
 
 
 MULE_PROFILE = CaseProfile(
@@ -130,6 +135,7 @@ MULE_PROFILE = CaseProfile(
         ("SYN-MULE-OPTION-CLOSE",
          "Close the account and return residual funds.", 120_000.0),
     ),
+    function=MULE_FUNCTION,
 )
 
 MERCHANT_PROFILE = CaseProfile(
@@ -153,6 +159,7 @@ MERCHANT_PROFILE = CaseProfile(
         ("SYN-MER-OPTION-DECLINE",
          "Decline the application and record the reason.", 0.0),
     ),
+    function=MERCHANT_FUNCTION,
 )
 
 PROFILES: dict[str, CaseProfile] = {
@@ -191,7 +198,13 @@ def case_evidence_activity(payload: dict[str, Any]) -> dict[str, Any]:
     if profile is None:
         raise ValueError(f"unsupported supporting workflow type {workflow_type!r}")
     workflow_id = _required_string(payload.get("workflow_id"), name="workflow_id")
-    case = _required_object(payload.get("case"), name="case")
+    # A spawned case carries `case`; a case the world noticed arrives through
+    # the world bridge as an `observation` that holds the case.
+    world_observation = payload.get("observation") if isinstance(payload.get("observation"), dict) else None
+    case = _required_object(
+        payload.get("case") if world_observation is None else world_observation.get("case"),
+        name="case",
+    )
     case_id = _required_string(case.get("id"), name="case.id")
 
     risk_band = str(case.get("risk_band") or "medium")
@@ -236,9 +249,9 @@ def case_evidence_activity(payload: dict[str, Any]) -> dict[str, Any]:
         "case_id": case_id,
         "source_mode": "simulated",
         "actor_ids": [case_id, subject_id],
-        "event_ids": [f"seed-{case_id}"],
+        "event_ids": [f"seed-{case_id}" if world_observation is None else f"world-{case_id}"],
         "evidence_versions": versions,
-        "observation": {"case": case},
+        "observation": world_observation if world_observation is not None else {"case": case},
         "admitted_options": admitted,
         "rejected_options": rejected,
     }
@@ -589,13 +602,21 @@ def case_command_activity(payload: dict[str, Any]) -> dict[str, Any]:
             "expected_event_type": profile.success_event,
         },
     }
+    observation = hitl_context.get("observation") if isinstance(hitl_context.get("observation"), dict) else {}
+    world_trace = observation.get("trace_id")
+    if world_trace and profile.function:
+        # A case the world noticed: the bridge applies this command back to the
+        # world, whose gateway needs the case's trace and the owning function.
+        command["trace_id"] = world_trace
+        command["issued_by"] = profile.function
+        command["payload"]["subject_id"] = (observation.get("case") or {}).get("subject_id")
     return {
         "status": "decision_ready",
         "command": command,
         "evaluation": {
             "status": "recorded",
             "success_event": profile.success_event,
-            "world_mutation": "not_applicable",
+            "world_mutation": "applied_by_world_bridge" if world_trace else "not_applicable",
         },
     }
 

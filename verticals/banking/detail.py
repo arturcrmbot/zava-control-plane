@@ -84,7 +84,8 @@ def _hero_detail(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _supporting_detail(payload: dict[str, Any]) -> dict[str, Any]:
-    case = _dict(payload.get("case"))
+    # A case the world noticed arrives as an observation that holds the case.
+    case = _dict(payload.get("case")) or _dict(_dict(payload.get("observation")).get("case"))
     if not case:
         return {}
     entry = {
@@ -95,6 +96,9 @@ def _supporting_detail(payload: dict[str, Any]) -> dict[str, Any]:
     }
     if case.get("sector"):
         entry["sector"] = case.get("sector")
+    flagged = _list(case.get("flagged_payments"))
+    if flagged:
+        entry["flaggedPayments"] = flagged
     return {"case": entry}
 
 

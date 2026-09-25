@@ -64,10 +64,13 @@ def test_banking_pack_is_discovered_and_valid(tmp_path) -> None:
     }
     # Every live process does real agent work.
     assert all(any(p.kind == "agent" for p in d.phases) for d in live)
-    # The hero is world-owned, so only the supporting processes ramp.
+    # The hero is world-owned, so only the supporting processes ramp. With
+    # world screening on, the world opens mule cases too, so only merchants ramp.
+    from verticals.banking.flags import world_screening_enabled
+
     assert set(runtime.pack.ramp_workflow_types) == {
-        "mule-account-investigation",
         "merchant-onboarding-risk",
+        *(() if world_screening_enabled() else ("mule-account-investigation",)),
     }
 
 
@@ -536,14 +539,20 @@ def test_a_burst_spawns_the_banks_own_processes(monkeypatch) -> None:
         mule_only = asyncio.run(simulator.inject_burst(n=2, workflow_type="mule-account-investigation"))
     finally:
         active_runtime.cache_clear()
+    from verticals.banking.flags import world_screening_enabled
+
     assert mixed["count"] == 8
     assert {row["domain"] for row in mixed["spawned"]} == {
-        "mule-account-investigation",
         "merchant-onboarding-risk",
         "world-case",
+        *(() if world_screening_enabled() else ("mule-account-investigation",)),
     }
     assert raised and set(raised) == {"new-fraud-claim"}
-    assert [row["domain"] for row in mule_only["spawned"]] == ["mule-account-investigation"] * 2
+    if world_screening_enabled():
+        # The world owns mule cases, so a burst cannot time one.
+        assert mule_only["ok"] is False
+    else:
+        assert [row["domain"] for row in mule_only["spawned"]] == ["mule-account-investigation"] * 2
 
 
 def test_the_pack_owns_its_dream_skill(monkeypatch) -> None:

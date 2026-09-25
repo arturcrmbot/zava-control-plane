@@ -23,6 +23,16 @@ from verticals.banking.fraud_constants import (
     FRAUD_SUCCESS_EVENT,
     FRAUD_WORKFLOW_TYPE,
 )
+from verticals.banking.flags import world_screening_enabled
+from verticals.banking.support_constants import (
+    MULE_COMMAND_TYPE,
+    MULE_FUNCTION,
+    MULE_OBJECTIVE_TYPE,
+    MULE_ORCHESTRATOR,
+    MULE_SENSOR_ID,
+    MULE_SUCCESS_EVENT,
+    MULE_WORKFLOW_TYPE,
+)
 from verticals.banking.worlds.diagnostics import build_diagnostic_input
 from verticals.banking.worlds.scenario import ZavaBankWorld
 
@@ -55,6 +65,33 @@ _RESPONDERS = {
         lifecycle_start_via_bridge=True,
     ),
 }
+
+# With BANKING_WORLD_SCREENING=1 mule investigations are world-owned too: the
+# bank's screening trips the mule sensor, and the disposition is applied back
+# to the receiving account.
+if world_screening_enabled():
+    _ROUTES = _ROUTES + (
+        ObjectiveRoute(
+            sensor_id=MULE_SENSOR_ID,
+            objective_type=MULE_OBJECTIVE_TYPE,
+            allowed_command_types=frozenset({MULE_COMMAND_TYPE}),
+            success_event_types=frozenset({MULE_SUCCESS_EVENT}),
+            failure_event_types=frozenset({"command.rejected"}),
+            evaluation_timeout_minutes=120.0,
+        ),
+    )
+    _RESPONDERS = {
+        **_RESPONDERS,
+        MULE_OBJECTIVE_TYPE: ResponderRegistration(
+            objective_type=MULE_OBJECTIVE_TYPE,
+            orchestrator=MULE_ORCHESTRATOR,
+            workflow_type=MULE_WORKFLOW_TYPE,
+            prefix="bmul",
+            owner_function=MULE_FUNCTION,
+            timeout_seconds=900.0,
+            lifecycle_start_via_bridge=True,
+        ),
+    }
 
 _SCALES = {
     "demo": WorldScaleProfile(
