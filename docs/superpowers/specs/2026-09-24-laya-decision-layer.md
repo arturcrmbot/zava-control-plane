@@ -410,7 +410,10 @@ command gateway, reactions).
 - **`GET /api/judgement/status`** reports whether Laya is up and how many deep reviews
   are left this hour.
 
-### 9.2 Hardened after two independent code reviews (25 Sep 2026)
+### 9.2 Hardened after independent code reviews (25 Sep 2026)
+
+Three rounds of review found 16 real issues. All are fixed, each with a regression
+test.
 
 - **Deep reviews cannot outlast the gate.** Reviews run one at a time, and the
   orchestrator waits 300 s for a gate, hand-ups included. Each gate now has one
@@ -432,6 +435,11 @@ command gateway, reactions).
 - **A retried gate keeps its first deadline**, so the sweep's retry after a failed
   delivery goes straight to the rules instead of starting a review that could
   outlast the timer.
+- **Judged gates are keyed by the Durable instance.** World workflow ids repeat
+  after a world reset, so without this a second take could inherit the first
+  take's expired deadline.
+- **The worker's copy of the world never blocks a story the bank allowed.** It
+  copies called claims in but never sees how they end.
 - **The floor files what the presenter chose.** The call picker holds a steady
   list. Ask the persona sends only what was edited and shows why a question failed.
 - **Flags off is still exactly main.** For the same scripted run, the world journal,
@@ -440,7 +448,7 @@ command gateway, reactions).
   approvals and 8,500 sim-minutes (23,044 events).
 
 Final checks:
-- `tests/api/banking` and `tests/api/judgement`: 202 passed, flags off and flags on.
+- `tests/api/banking` and `tests/api/judgement`: 204 passed, flags off and flags on.
 - The live Laya sets pass (15), and `tests/api/world` passes (301).
 - `tests/api/shared` (agency) passes, and so do the persona responder files, each on
   its own and together.
