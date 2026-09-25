@@ -56,6 +56,7 @@ from verticals.banking.support_constants import (
 )
 from verticals.banking.worlds import reference_data
 from verticals.banking.worlds.screening import default_screener
+from verticals.banking.worlds.reactions import DECISION_WORDS, decision_kind, default_reactor, draw, reaction_odds
 from verticals.banking.worlds.model import (
     Account,
     BeneficiaryAccount,
@@ -153,6 +154,7 @@ class ZavaBankWorld:
         *,
         runtime: SimulationRuntime | None = None,
         screener: Any = None,
+        reactor: Any = None,
     ) -> None:
         self.seed = seed
         self.runtime = runtime if runtime is not None else SimulationRuntime(seed)
@@ -169,6 +171,9 @@ class ZavaBankWorld:
         self.payments_screened_total = 0
         self.payments_flagged_total = 0
         self.recent_flags: deque[dict[str, Any]] = deque(maxlen=_RECENT_FLAGS)
+        self._reactor = reactor
+        self._reaction_rng = random.Random(seed + 404)
+        self.customer_reactions: dict[str, int] = {"accepts": 0, "chases": 0, "complains": 0}
 
         self.customers: dict[str, Customer] = {}
         self.accounts: dict[str, Account] = {}
@@ -258,6 +263,8 @@ class ZavaBankWorld:
             )
             if self._screener is None:
                 self._screener = default_screener()
+            if self._reactor is None:
+                self._reactor = default_reactor()
             self.runtime.process(self._new_payments_loop())
         self.runtime.process(self._rail_loop())
         self._installed = True
@@ -939,7 +946,39 @@ class ZavaBankWorld:
         event = apply_reimbursement_command(self, command)
         if event.type == FRAUD_SUCCESS_EVENT:
             self._processed_commands[command.command_id] = (command, event)
+            if self._screening:
+                self._customer_reacts(event)
         return event
+
+    def _customer_reacts(self, applied: SimulationEvent) -> None:
+        """The customer reacts to the decision, read from the model's mood."""
+        claim = self.fraud_claims.get(str(applied.payload.get("claim_id")))
+        if claim is None:
+            return
+        customer = self.customers[claim.customer_id]
+        kind = decision_kind(str(applied.payload.get("option_id")))
+        who = (
+            f"A {'vulnerable ' if claim.vulnerability_flag else ''}{customer.segment} customer who "
+            f"lost GBP {claim.amount_gbp:,.0f} to a scam"
+        )
+
+        def react(mood: Any) -> None:
+            reaction = draw(reaction_odds(mood), self._reaction_rng)
+            self.customer_reactions[reaction] = self.customer_reactions.get(reaction, 0) + 1
+            self.runtime.emit(
+                "banking.customer.reacted",
+                actor_id=customer.id,
+                target_id=claim.id,
+                cause_event_id=applied.event_id,
+                trace_id=applied.trace_id,
+                payload={
+                    "customer_id": customer.id, "claim_id": claim.id, "decision": kind,
+                    "reaction": reaction, "upset": round(mood.score, 2), "reacted_by": mood.by,
+                    "function": FRAUD_FUNCTION,
+                },
+            )
+
+        self._reactor.submit(who, DECISION_WORDS[kind], kind, react)
 
     # -- snapshot ----------------------------------------------------------
 
@@ -1023,4 +1062,5 @@ class ZavaBankWorld:
             "mule_cases_open": sum(1 for case in self._mule_cases.values() if case["status"] == "open"),
             "mule_cases_decided": sum(1 for case in self._mule_cases.values() if case["status"] == "decided"),
             "recent_flags": list(self.recent_flags),
+            "customer_reactions": dict(self.customer_reactions),
         }

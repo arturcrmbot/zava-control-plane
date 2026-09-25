@@ -345,3 +345,107 @@ def test_a_spawned_case_command_is_unchanged() -> None:
     assert set(result["command"]) == {"command_id", "type", "payload"}
     assert "subject_id" not in result["command"]["payload"]
     assert result["evaluation"]["world_mutation"] == "not_applicable"
+
+
+# --- Customers react to decisions ------------------------------------------------------------
+
+import random as _random  # noqa: E402
+
+from verticals.banking.fraud_constants import FRAUD_HITL_PERSONA, FRAUD_SCENARIO_STANDARD  # noqa: E402
+from verticals.banking.fraud_constraints import OPTION_REIMBURSE_CAPPED, OPTION_REIMBURSE_FULL, OPTION_REFUSE_CAUTION  # noqa: E402
+from verticals.banking.worlds.reactions import (  # noqa: E402
+    LayaReactor,
+    Mood,
+    RulesReactor,
+    draw,
+    reaction_odds,
+)
+
+
+def test_rules_reactions_follow_the_outcome() -> None:
+    moods: list[Mood] = []
+    reactor = RulesReactor()
+    for kind in ("full", "capped", "refused"):
+        reactor.submit("A personal customer", "decision", kind, moods.append)
+    assert [max(reaction_odds(m), key=reaction_odds(m).get) for m in moods] == ["accepts", "chases", "complains"]
+    assert all(m.by == "rules" for m in moods)
+
+
+def test_the_upset_scale_becomes_reaction_odds_and_a_seeded_draw() -> None:
+    calm = reaction_odds(Mood((0.9, 0.1, 0.0, 0.0), 0.1, "laya"))
+    angry = reaction_odds(Mood((0.0, 0.0, 0.3, 0.7), 2.7, "laya"))
+    assert calm["accepts"] > 0.9 and angry["complains"] > 0.6
+    assert abs(sum(angry.values()) - 1.0) < 1e-9
+    rng = _random.Random(7)
+    assert draw(calm, _random.Random(7)) == draw(calm, rng)  # seeded
+
+
+class _UpsetClient:
+    enabled = True
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def available(self) -> bool:
+        return True
+
+    async def ask(self, state, questions):
+        self.calls += 1
+        levels = {"0": 0.05, "1": 0.15, "2": 0.4, "3": 0.4} if "refused" in state["decision"] else {"0": 0.8, "1": 0.2, "2": 0.0, "3": 0.0}
+        score = sum(int(k) * v for k, v in levels.items())
+        return LayaResult({"upset": LayaAnswer("score", levels, max(levels, key=levels.get), 0.0, score)}, 30.0, 31.0)
+
+
+def test_the_laya_reactor_reads_the_mood_once_per_situation() -> None:
+    client = _UpsetClient()
+    reactor = LayaReactor(client_factory=lambda: client)
+    moods: list[Mood] = []
+
+    async def run() -> None:
+        for _ in range(3):
+            reactor.submit("A personal customer who lost GBP 900", "The bank refused the claim.", "refused", moods.append)
+        for _ in range(10):
+            await asyncio.sleep(0)
+        reactor.submit("A personal customer who lost GBP 900", "The bank refused the claim.", "refused", moods.append)
+
+    asyncio.run(run())
+    assert len(moods) == 4 and client.calls == 1
+    assert all(m.by == "laya" and m.score > 2 for m in moods)
+
+
+def test_a_reimbursed_customer_reacts_in_the_world(screening_on) -> None:
+    world = _world()
+    world.activate_scenario(FRAUD_SCENARIO_STANDARD)
+    observation = world.current_fraud_observation()
+    command = world.command_for_claim_option(
+        claim_id=observation["claim"]["id"], option_id=OPTION_REIMBURSE_FULL, workflow_id="BAPP-R1",
+        decision_id="SYN-APP-DECISION-001", persona=FRAUD_HITL_PERSONA)
+    applied = world.apply_command(command)
+    assert applied.type == "banking.reimbursement.applied"
+    reacted = [e for e in world.runtime.journal if e.type == "banking.customer.reacted"]
+    assert len(reacted) == 1
+    event = reacted[0]
+    assert event.trace_id == applied.trace_id and event.payload["reaction"] == "accepts"
+    assert event.payload["reacted_by"] == "rules" and event.payload["customer_id"] == observation["customer"]["id"]
+    assert event.payload["function"] == "retail-banking"
+    assert world.render_state()["screening"]["customer_reactions"] == {"accepts": 1, "chases": 0, "complains": 0}
+
+
+def test_without_screening_customers_do_not_react(monkeypatch) -> None:
+    monkeypatch.delenv("BANKING_WORLD_SCREENING", raising=False)
+    world = ZavaBankWorld(seed=42, runtime=SimulationRuntime(42))
+    world.install()
+    world.activate_scenario(FRAUD_SCENARIO_STANDARD)
+    observation = world.current_fraud_observation()
+    world.apply_command(world.command_for_claim_option(
+        claim_id=observation["claim"]["id"], option_id=OPTION_REIMBURSE_FULL, workflow_id="BAPP-R2",
+        decision_id="SYN-APP-DECISION-001", persona=FRAUD_HITL_PERSONA))
+    assert not any(e.type == "banking.customer.reacted" for e in world.runtime.journal)
+
+
+def test_reactions_cover_every_decision_word() -> None:
+    from verticals.banking.worlds.reactions import decision_kind
+
+    assert decision_kind(OPTION_REIMBURSE_FULL) == "full"
+    assert decision_kind(OPTION_REIMBURSE_CAPPED) == "capped"
+    assert decision_kind(OPTION_REFUSE_CAUTION) == "refused"
