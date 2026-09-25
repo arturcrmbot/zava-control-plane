@@ -49,6 +49,47 @@ decision_policy: |
         extra["selected_option_id"] = (context or {}).get("selected_option_id") or ""
         extra["evidence_versions"] = (context or {}).get("evidence_versions") or {}
         extra["rationale"] = reason
+personality:
+    risk_appetite: conservative
+    thoroughness: high
+    escalation_style: standard
+judgement:
+    character: "Thorough: you hold a case whenever the agent's reasoning and the record disagree, and no refusal goes through without a second pair of eyes."
+    gates:
+        app-fraud-reimbursement:
+            facts: verticals.banking.judgement_facts:fraud_gate
+            reads:
+                - id: says_vulnerable
+                  text: agent_reasoning
+                  ask: "Does the text say the customer is vulnerable or carries a vulnerability marker?"
+                - id: says_no_marker
+                  text: agent_reasoning
+                  ask: "Does the text say no vulnerability flag or marker is present?"
+                - id: argues_refusal
+                  text: agent_reasoning
+                  ask: "Does the text argue that the bank should refuse the customer's claim?"
+                - id: covers_no_action
+                  text: agent_reasoning
+                  ask: "Does the text say what would happen if the bank did nothing?"
+            checks:
+                - concern: "the agent's reasoning says there is no vulnerability marker, but the record shows one"
+                  when: {read: says_no_marker, is: yes, fact: customer_vulnerable, equals: true}
+                  unless: says_vulnerable
+                - concern: "the agent's reasoning says the customer is vulnerable, but the record shows no marker"
+                  when: {read: says_vulnerable, is: yes, fact: customer_vulnerable, equals: false}
+                  unless: says_no_marker
+                - concern: "the agent argues for refusal but recommends paying the customer"
+                  when: {read: argues_refusal, is: yes, fact: recommends_refusal, equals: false}
+                - concern: "the agent does not say what happens if the bank does nothing"
+                  when: {read: covers_no_action, is: no}
+                  severity: minor
+                - concern: "the recommendation refuses a fraud victim; refusals always get a second pair of eyes"
+                  when: {fact: recommends_refusal, equals: true}
+            decide:
+                ask: "Given the findings, what should you do with the agent's recommendation?"
+                approve: "Approve it now: no concerns were found"
+                hold: "Hold it: the concerns need someone else's judgement"
+            min_lead: 0.3
 ---
 
 # Fraud Decision Manager
