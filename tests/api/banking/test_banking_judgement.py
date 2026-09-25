@@ -404,3 +404,28 @@ def test_the_command_records_the_persona_who_approved() -> None:
     )
     assert result["status"] == "decision_ready"
     assert result["command"]["payload"]["persona"] == "financial_crime_lead"
+
+
+# --- The drawer shows how each decision was reached -----------------------------------
+
+from types import SimpleNamespace  # noqa: E402
+
+from verticals.banking.detail import workflow_detail  # noqa: E402
+
+
+def test_governed_decisions_say_who_decided_and_why() -> None:
+    judged = {
+        "phase": "Decide Reimbursement", "persona_role": "fraud_decision_manager", "verdict": "hold",
+        "reason": "Held for a closer look: x.", "decided_by": "laya",
+        "judgement": {"concerns": ["x"], "summary": "Held for a closer look: x.", "judge": {"lead": 0.6}},
+    }
+    plain = {"phase": "Approve Account Disposition", "persona_role": "financial_crime_lead",
+             "verdict": "approve", "reason": "within delegation"}
+    detail = workflow_detail(SimpleNamespace(payload={"case": {"id": "SYN-MULE-CASE-1"}, "decisions": [judged, plain]},
+                                             metadata={}))
+    first, second = detail["governedDecisions"]
+    assert first == {"phase": "Decide Reimbursement", "persona": "fraud_decision_manager", "verdict": "hold",
+                     "reason": "Held for a closer look: x.", "decidedBy": "laya", "concerns": ["x"],
+                     "judgementSummary": "Held for a closer look: x.", "lead": 0.6}
+    assert second == {"phase": "Approve Account Disposition", "persona": "financial_crime_lead",
+                      "verdict": "approve", "reason": "within delegation"}

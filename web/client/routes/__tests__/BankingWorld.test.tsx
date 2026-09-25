@@ -224,6 +224,55 @@ describe("BankingWorld", () => {
     expect(card).not.toContain("Fleet Manager");
   });
 
+  it("tells the story of each persona's judgement before the outcome", async () => {
+    details["/api/workflows/bapp-evt-11"] = { workflow: { payload: { decisions: [
+      { persona_role: "fraud_decision_manager", verdict: "hold", decided_by: "laya",
+        judgement: { summary: "Held for a closer look: the agent's reasoning says there is no vulnerability marker, but the record shows one. Handed to the Financial crime lead." } },
+      { persona_role: "financial_crime_lead", verdict: "approve", decided_by: "llm",
+        judgement: { summary: "Deep review: The record is consistent." } },
+    ] } } };
+    renderBank({ events: [ROUTINE, ...APPROVED_TRACE, ...APPROVED_OUTCOME] });
+    const strip = screen.getByTestId("banking-intervention");
+    expect(await within(strip).findByText("Fraud decision manager held it")).toBeTruthy();
+    const chain = strip.textContent ?? "";
+    expect(chain).toContain("fast judgement · Held for a closer look");
+    expect(chain).toContain("Financial crime lead approved");
+    expect(chain).toContain("deep review · Deep review: The record is consistent.");
+    expect(chain.indexOf("held it")).toBeLessThan(chain.indexOf("Financial crime lead approved"));
+    expect(chain.indexOf("Financial crime lead approved")).toBeLessThan(chain.indexOf("Decision approved"));
+  });
+
+  it("names who approved when the decision was handed up", () => {
+    const escalated = APPROVED_OUTCOME.map((e) => e.type === "responder.decided"
+      ? { ...e, payload: { ...e.payload, command: { payload: { option_id: "SYN-APP-OPTION-REIMBURSE-CAPPED", value_gbp: 85_000, persona: "financial_crime_lead" } } } }
+      : e);
+    renderBank({ events: [ROUTINE, ...APPROVED_TRACE, ...escalated] });
+    expect(screen.getByTestId("banking-intervention").textContent).toContain(
+      "Reimburse to the £85k cap · £85,000 · by Financial crime lead",
+    );
+  });
+
+  it("reads a persona's decline as a decline, not a refusal by authority", () => {
+    const declined = REFUSED_TRACE.map((e) => e.type === "responder.deferred"
+      ? { ...e, payload: { ...e.payload, reasoning: "financial crime lead declined to approve: Deep review: the reasoning contradicts the record." } }
+      : e);
+    renderBank({ events: [ROUTINE, ...declined] });
+    expect(screen.getByTestId("claim-outcome-SYN-CLAIM-0033").textContent).toBe("Declined by Financial crime lead");
+    const chain = screen.getByTestId("banking-intervention").textContent ?? "";
+    expect(chain).toContain("Financial crime lead declined");
+    expect(chain).toContain("Claim declined");
+    expect(chain).not.toContain("Refused by authority");
+  });
+
+  it("shows on each recent case who decided and how", async () => {
+    workflows = [{
+      id: "BMUL-0002", type: "mule-account-investigation", status: "completed", currentPhase: "Verify Disposition", createdAt: 10, metadata: {},
+      payload: { decisions: [{ persona_role: "financial_crime_lead", verdict: "approve", decided_by: "laya", judgement: { summary: "Approved." } }] },
+    }];
+    renderBank();
+    expect((await screen.findByTestId("judged-BMUL-0002")).textContent).toBe("Financial crime lead · fast judgement");
+  });
+
   it("shows no decisions waiting when the queue is empty", () => {
     renderBank();
     expect(screen.getByTestId("decisions-waiting").textContent).toBe("0");

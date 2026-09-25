@@ -121,17 +121,29 @@ def workflow_detail(workflow: Any, app_state: Any = None) -> dict[str, Any] | No
         }
 
     # Every governed decision this workflow recorded, with the authority rule
-    # that permitted it. This is the governance story the drawer shows.
-    decisions = [
-        {
+    # that permitted it. This is the governance story the drawer shows. A
+    # judged decision also says who decided (fast judgement, deep review or
+    # rules) and the concerns the persona found.
+    decisions = []
+    for entry in _list(payload.get("decisions")):
+        if not isinstance(entry, dict):
+            continue
+        row = {
             "phase": entry.get("phase"),
             "persona": entry.get("persona_role"),
             "verdict": entry.get("verdict"),
             "reason": entry.get("reason"),
         }
-        for entry in _list(payload.get("decisions"))
-        if isinstance(entry, dict)
-    ]
+        judgement = _dict(entry.get("judgement"))
+        if entry.get("decided_by"):
+            row["decidedBy"] = entry.get("decided_by")
+        if judgement:
+            row["concerns"] = [str(c) for c in _list(judgement.get("concerns"))]
+            row["judgementSummary"] = judgement.get("summary")
+            verdict = _dict(judgement.get("judge"))
+            if verdict:
+                row["lead"] = verdict.get("lead")
+        decisions.append(row)
     if decisions:
         detail["governedDecisions"] = decisions
 

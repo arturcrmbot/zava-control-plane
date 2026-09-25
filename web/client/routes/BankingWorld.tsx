@@ -59,7 +59,74 @@ const CASE_LABELS: Record<string, string> = {
 };
 const RECENT_CASES_CAP = 8;
 
-interface RecentCase { id: string; type: string; status: string; phase?: string; createdAt: number; refused: boolean }
+interface RecentCase { id: string; type: string; status: string; phase?: string; createdAt: number; refused: boolean; judged?: JudgedDecision }
+
+/** A persona decision reached by judgement, as the persona responder records it. */
+interface JudgedDecision { persona: string; verdict: string; decidedBy: string; summary?: string }
+
+const DECIDED_BY: Record<string, string> = { laya: "fast judgement", llm: "deep review", rules: "rules" };
+const VERDICT_WORDS: Record<string, string> = { approve: "approved", hold: "held it", reject: "declined", escalate: "escalated" };
+
+function judgedDecisions(decisions: unknown): JudgedDecision[] {
+  if (!Array.isArray(decisions)) return [];
+  return decisions.flatMap((entry) => {
+    const row = (entry ?? {}) as Record<string, unknown>;
+    const decidedBy = text(row.decided_by);
+    const persona = text(row.persona_role);
+    if (!decidedBy || !persona) return [];
+    const judgement = (row.judgement ?? {}) as Record<string, unknown>;
+    return [{ persona, verdict: String(row.verdict ?? ""), decidedBy, summary: text(judgement.summary) ?? text(row.reason) }];
+  });
+}
+
+/** The judged decisions on the story's workflow, polled while the story is on screen. */
+function useDecisionTrail(workflowId: string | undefined): JudgedDecision[] {
+  const [trail, setTrail] = useState<JudgedDecision[]>([]);
+  useEffect(() => {
+    setTrail([]);
+    if (!workflowId) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await fetch(`/api/workflows/${encodeURIComponent(workflowId)}`);
+        if (!response.ok) return;
+        const detail = (await response.json()) as { workflow?: { payload?: Record<string, unknown> } } | null;
+        if (!cancelled) setTrail(judgedDecisions(detail?.workflow?.payload?.decisions));
+      } catch {
+        // A transient failure keeps the last trail; the next poll retries.
+      }
+    };
+    void load();
+    const timer = window.setInterval(() => void load(), 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [workflowId]);
+  return trail;
+}
+
+/** Put each persona's judgement into the story, just before the outcome it led to. */
+function withJudgement(steps: InterventionStep[], trail: JudgedDecision[]): InterventionStep[] {
+  if (trail.length === 0) return steps;
+  const judged = trail.map((d, index) => ({
+    label: `${roleLabel(d.persona)} ${VERDICT_WORDS[d.verdict] ?? d.verdict}`,
+    detail: [DECIDED_BY[d.decidedBy] ?? d.decidedBy, d.summary].filter(Boolean).join(" · "),
+    eventId: `judgement-${index}-${d.persona}`,
+  }));
+  const at = steps.findIndex((s) => ["Decision approved", "Refused by authority", "Workflow failed"].includes(s.label) || s.label.endsWith(" declined"));
+  return at < 0 ? [...steps, ...judged] : [...steps.slice(0, at), ...judged, ...steps.slice(at)];
+}
+
+/** A judged persona's decline, as the orchestrator words it. */
+function declineOf(reasoning: string): { persona: string; why: string } | undefined {
+  const match = reasoning.match(/^(.+?) declined to approve: ([\s\S]*)$/);
+  return match ? { persona: match[1], why: match[2] } : undefined;
+}
+
+function capitalised(words: string): string {
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 /** The bank's latest cases, newest first, each one openable. */
 function useRecentCases(): RecentCase[] {
@@ -83,6 +150,7 @@ function useRecentCases(): RecentCase[] {
               phase: text(w.currentPhase),
               createdAt: Number(w.createdAt ?? 0),
               refused: Boolean((w.metadata as Record<string, unknown> | undefined)?.rejected),
+              judged: judgedDecisions((w.payload as Record<string, unknown> | undefined)?.decisions).slice(-1)[0],
             }))
             .sort((a, b) => b.createdAt - a.createdAt)
             .slice(0, RECENT_CASES_CAP),
@@ -249,7 +317,7 @@ interface ClaimFacts {
   workflowId?: string;
   decidedOption?: string;
   decidedValue?: number;
-  refusal?: { reasoning: string; role?: string };
+  refusal?: { reasoning: string; role?: string; declinedBy?: string };
   failure?: string;
   closed?: boolean;
 }
@@ -277,7 +345,7 @@ function collectClaimFacts(events: WorldEvent[], into: Map<string, ClaimFacts>):
       if (Number.isFinite(value)) facts.decidedValue = value;
     } else if (event.type === "responder.deferred") {
       const reasoning = String(event.payload?.reasoning ?? "refused");
-      facts.refusal = { reasoning, role: authorisedRole(reasoning) };
+      facts.refusal = { reasoning, role: authorisedRole(reasoning), declinedBy: declineOf(reasoning)?.persona };
     } else if (event.type === "responder.failed") {
       facts.failure = String(event.payload?.error ?? "workflow failed");
     } else if (event.type === "objective.resolved" || event.type === "objective.failed") {
@@ -288,13 +356,15 @@ function collectClaimFacts(events: WorldEvent[], into: Map<string, ClaimFacts>):
 }
 
 /** The causal chain of the newest fraud claim, in the bank's language. */
-function deriveClaimStory(events: WorldEvent[]): { trace: string; steps: InterventionStep[] } | null {
+function deriveClaimStory(events: WorldEvent[]): { trace: string; steps: InterventionStep[]; workflowId?: string } | null {
   let trace: string | null = null;
   for (const event of events) if (event.type === "banking.app_fraud.claim_raised") trace = event.trace_id;
   if (!trace) return null;
   const steps: InterventionStep[] = [];
   const seen = new Set<string>();
   let refused = false;
+  let declined = false;
+  let workflowId: string | undefined;
   for (const event of events) {
     if (event.trace_id !== trace || seen.has(event.type)) continue;
     const p = event.payload ?? {};
@@ -310,18 +380,28 @@ function deriveClaimStory(events: WorldEvent[]): { trace: string; steps: Interve
         step = { label: "Case opened", detail: roleLabel(String(p.owner_function ?? "retail_banking").replaceAll("-", "_")) };
         break;
       case "responder.requested":
-        step = { label: "Agents investigating", detail: String(p.workflow_id ?? "") || undefined };
+        workflowId = String(p.workflow_id ?? "") || undefined;
+        step = { label: "Agents investigating", detail: workflowId };
         break;
       case "responder.decided": {
         const command = p.command as { payload?: Record<string, unknown> } | undefined;
         const option = String(command?.payload?.option_id ?? "");
         const value = Number(command?.payload?.value_gbp);
-        step = { label: "Decision approved", detail: [OPTION_LABELS[option] ?? option, Number.isFinite(value) ? money(value) : ""].filter(Boolean).join(" · ") };
+        const persona = String(command?.payload?.persona ?? "");
+        const by = persona && persona !== "fraud_decision_manager" ? `by ${roleLabel(persona)}` : "";
+        step = { label: "Decision approved", detail: [OPTION_LABELS[option] ?? option, Number.isFinite(value) ? money(value) : "", by].filter(Boolean).join(" · ") };
         break;
       }
       case "responder.deferred": {
+        const reasoning = String(p.reasoning ?? "");
+        const decline = declineOf(reasoning);
+        if (decline) {
+          declined = true;
+          step = { label: `${capitalised(decline.persona)} declined`, detail: excerpt(decline.why, 160) };
+          break;
+        }
         refused = true;
-        const role = authorisedRole(String(p.reasoning ?? ""));
+        const role = authorisedRole(reasoning);
         step = { label: "Refused by authority", detail: role ? `needs ${roleLabel(role)}` : "outside delegated authority" };
         break;
       }
@@ -341,14 +421,14 @@ function deriveClaimStory(events: WorldEvent[]): { trace: string; steps: Interve
         step = { label: "Case closed" };
         break;
       case "objective.failed":
-        step = { label: refused ? "Escalation required" : "Case left open" };
+        step = { label: declined ? "Claim declined" : refused ? "Escalation required" : "Case left open" };
         break;
     }
     if (!step) continue;
     seen.add(event.type);
     steps.push({ ...step, eventId: event.event_id });
   }
-  return { trace, steps };
+  return { trace, steps, workflowId };
 }
 
 interface DecisionContext {
@@ -460,7 +540,7 @@ export default function BankingWorld({
   const pendingDecisions = usePendingDecisions();
   const recentCases = useRecentCases();
   const derived = useMemo(() => deriveClaimStory(events), [events]);
-  const [persistedStory, setPersistedStory] = useState<{ trace: string; steps: InterventionStep[] } | null>(null);
+  const [persistedStory, setPersistedStory] = useState<{ trace: string; steps: InterventionStep[]; workflowId?: string } | null>(null);
   // Facts accumulate so an outcome stays visible after its events leave the
   // ring; a world reset (the journal's newest seq going backwards) clears them.
   const newestSeq = events.length ? events[events.length - 1].seq : 0;
@@ -481,6 +561,8 @@ export default function BankingWorld({
   }, [newestSeq]);
 
   const story = derived ?? persistedStory;
+  const trail = useDecisionTrail(story?.workflowId);
+  const storySteps = useMemo(() => (story ? withJudgement(story.steps, trail) : []), [story, trail]);
   const raisedClaims = useMemo(() => (bank.fraud_claims ?? []).filter((claim) => claim.raised), [bank.fraud_claims]);
   const openClaims = raisedClaims.filter((claim) => claim.status !== "reimbursed" && claim.status !== "refused" && !claimFacts.get(claim.id)?.closed);
   const pendingWorkflowIds = useMemo(() => new Set(pendingDecisions.map((row) => row.workflowId)), [pendingDecisions]);
@@ -578,7 +660,7 @@ export default function BankingWorld({
                 return (
                   <a key={c.id} data-testid={`case-${c.id}`} href={`/workflows/${encodeURIComponent(c.id)}`} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-xs transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-800 dark:bg-slate-950/50 dark:hover:bg-blue-950/30">
                     <span className="min-w-0 truncate"><span className="font-medium text-slate-800 dark:text-slate-100">{CASE_LABELS[c.type]}</span> <span className="font-mono text-slate-500">{c.id}</span>{c.phase ? <span className="text-slate-400"> · {c.phase}</span> : null}</span>
-                    <span className="flex shrink-0 items-center gap-2"><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${status.tone}`}>{status.label}</span><span className="text-blue-600 dark:text-blue-400">Open →</span></span>
+                    <span className="flex shrink-0 items-center gap-2">{c.judged && <span data-testid={`judged-${c.id}`} className="text-[10px] text-slate-500 dark:text-slate-400">{roleLabel(c.judged.persona)} · {DECIDED_BY[c.judged.decidedBy] ?? c.judged.decidedBy}</span>}<span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${status.tone}`}>{status.label}</span><span className="text-blue-600 dark:text-blue-400">Open →</span></span>
                   </a>
                 );
               })}
@@ -587,7 +669,7 @@ export default function BankingWorld({
         </section>
 
         <WorldObjectiveStrip testId="banking-objective" objectives={bank.objectives} />
-        {story && story.steps.length > 0 && <WorldInterventionStrip testId="banking-intervention" trace={story.trace} steps={story.steps} onTrace={toggleActor} />}
+        {story && storySteps.length > 0 && <WorldInterventionStrip testId="banking-intervention" trace={story.trace} steps={storySteps} onTrace={toggleActor} />}
 
         {pendingDecisions.length > 0 && (
           <section data-testid="pending-decisions" aria-label="Decisions waiting" className="rounded-xl border border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-800 dark:bg-amber-950/30">
@@ -713,7 +795,10 @@ function ClaimCard({ claim, evaluation, facts, awaitingHuman, selected, onClick 
   let tone = "text-slate-700 dark:text-slate-200";
   if (refused) {
     const role = facts?.refusal?.role;
-    outcome = role ? `Refused by authority · needs ${roleLabel(role)}` : "Refused by authority";
+    const declinedBy = facts?.refusal?.declinedBy;
+    outcome = declinedBy
+      ? `Declined by ${capitalised(declinedBy)}`
+      : role ? `Refused by authority · needs ${roleLabel(role)}` : "Refused by authority";
     tone = "text-red-700 dark:text-red-300";
   } else if (reimbursed !== undefined) {
     outcome = `${capped ? "Reimbursed to the cap" : "Reimbursed in full"} · ${money(reimbursed)}`;
