@@ -130,6 +130,7 @@ def harness(monkeypatch):
     persona_responder.PERSONA_DEFINITIONS = persona_responder._load_personae()
     persona_responder._JUDGING.clear()
     persona_responder._RECENTLY_JUDGED.clear()
+    persona_responder._GATE_DEADLINES.clear()
 
     raised: list[tuple] = []
 
@@ -157,6 +158,7 @@ def harness(monkeypatch):
                           app_state=app_state, contexts=contexts, reviewer=reviewer)
     persona_responder._JUDGING.clear()
     persona_responder._RECENTLY_JUDGED.clear()
+    persona_responder._GATE_DEADLINES.clear()
 
 
 def _store(app_state, workflow_id: str) -> None:
@@ -287,3 +289,17 @@ def test_a_busy_deep_review_queue_never_holds_a_gate_past_its_deadline(harness, 
     assert all("no time left" in payload["reason"] for payload in late)
     assert all(payload["decision"] == "approve" for _, _, payload in harness.raised)
     assert budget.remaining() == 4
+
+
+def test_a_retried_gate_keeps_the_deadline_it_was_first_given(harness) -> None:
+    # A decision that fails to reach the orchestrator is retried by the sweep;
+    # the gate's timer started at the first attempt, so its deadline does too.
+    context = _hitl_context(FRAUD_SCENARIO_VULNERABLE, "BAPP-J6", escalate_to="financial_crime_lead")
+    _store(harness.app_state, "BAPP-J6")
+    asyncio.run(harness.responder._handle_hitl(_event(context)))
+    first = len(harness.reviewer.deadlines)
+    harness.responder._RECENTLY_JUDGED.clear()
+    time.sleep(0.05)
+    asyncio.run(harness.responder._handle_hitl(_event(context)))
+    assert len(harness.reviewer.deadlines) > first
+    assert len(set(harness.reviewer.deadlines)) == 1

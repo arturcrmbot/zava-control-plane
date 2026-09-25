@@ -996,10 +996,13 @@ _JUDGING: set[tuple[str, ...]] = set()
 _RECENTLY_JUDGED: dict[tuple[str, ...], float] = {}
 _RECENTLY_JUDGED_TTL_S = 90.0
 # When a judged gate's answer is due (time.monotonic()); set once per gate and
-# shared by every persona the hold is handed to.
+# shared by every persona the hold is handed to. A gate retried by the sweep
+# keeps the deadline of its first attempt, as the orchestrator's timer does.
 _GATE_DEADLINE: contextvars.ContextVar[float | None] = contextvars.ContextVar(
     "judgement_gate_deadline", default=None
 )
+_GATE_DEADLINES: dict[tuple[str, ...], float] = {}
+_GATE_DEADLINE_KEEP_S = 600.0
 
 
 def _judged(persona: PersonaDefinition | None, context: Any) -> bool:
@@ -1200,13 +1203,15 @@ async def _handle_hitl(event: FleetEvent) -> None:
     now = time.monotonic()
     for stale in [k for k, at in _RECENTLY_JUDGED.items() if now - at > _RECENTLY_JUDGED_TTL_S]:
         _RECENTLY_JUDGED.pop(stale, None)
+    for stale in [k for k, due in _GATE_DEADLINES.items() if now - due > _GATE_DEADLINE_KEEP_S]:
+        _GATE_DEADLINES.pop(stale, None)
     if key in _JUDGING or key in _RECENTLY_JUDGED:
         print(f"[persona_responder] gate {key} is already judged or being judged; skipping")
         return
     _JUDGING.add(key)
     from api.server.services.judgement.engine import gate_deadline_s
 
-    deadline = _GATE_DEADLINE.set(time.monotonic() + gate_deadline_s())
+    deadline = _GATE_DEADLINE.set(_GATE_DEADLINES.setdefault(key, now + gate_deadline_s()))
     try:
         await _handle_hitl_unguarded(event)
     finally:
