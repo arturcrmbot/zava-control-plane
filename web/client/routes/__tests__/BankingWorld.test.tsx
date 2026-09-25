@@ -342,6 +342,23 @@ describe("BankingWorld", () => {
     expect(page.replace(about.textContent ?? "", "")).not.toMatch(/Laya| ms\b|tokens/);
   });
 
+  it("holds a customer's story still while the pointer is on it", () => {
+    const scam = (who: string, t: number) => ({ t, when: "Monday night", kind: "scam", who, profile: `${who}, 46.`, title: `Crew North tried a tax office penalty scam on ${who}`,
+      steps: [{ by: "laya", question: `Which scam would most likely work on ${who}?`, chose: "", options: [{ id: "tax", label: "A threatening message from the tax office", p: 0.6 }] }],
+      outcome: "fell for a tax office penalty scam" });
+    const living = (who: string, t: number) => ({ ...STATE, life: { people: 200, scam_decisions: [scam(who, t)], decisions: [] } }) as WorldState;
+    const { rerender, props } = renderBank({ state: living("Priya Jones", 1) });
+    const panel = screen.getByTestId("customer-decisions");
+    fireEvent.mouseEnter(panel);
+    rerender(<BankingWorld {...props} state={living("Sian Shah", 2)} />);
+    expect(panel.textContent).toContain("Priya Jones");
+    expect(panel.textContent).not.toContain("Sian Shah");
+    expect(screen.getByTestId("decisions-held").textContent).toBe("held while you read");
+    fireEvent.mouseLeave(panel);
+    expect(panel.textContent).toContain("Sian Shah");
+    expect(screen.queryByTestId("decisions-held")).toBeNull();
+  });
+
   it("names the claimant on the latest claim when the world knows who they are", () => {
     renderBank({ events: [ROUTINE, ...APPROVED_TRACE], state: { ...STATE, life: { people: 200, claimants: { "SYN-CUST-0007": "Rosa Taylor" } } } as WorldState });
     const strip = screen.getByTestId("banking-intervention");

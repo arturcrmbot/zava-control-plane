@@ -4,6 +4,8 @@
  * responds. Read from the world's own snapshot (BANKING_WORLD_LIFE=1). How the
  * simulation works (and the model behind it) is kept to one folded section.
  */
+import { useState } from "react";
+
 export interface LifeOption { id: string; label: string; p: number }
 export interface LifeStep { by: string; question: string; chose: string; chose_label?: string; ms?: number | null; options: LifeOption[] }
 export interface LifeDecision { t: number; when: string; kind: string; who?: string | null; profile?: string; title: string; steps: LifeStep[]; outcome: string }
@@ -59,10 +61,16 @@ const STORY_TAGS: Record<string, { label: string; border: string }> = {
   stay: { label: "stayed", border: "border-slate-300" },
 };
 
-function Card({ testId, title, explain, children, className = "" }: { testId: string; title: string; explain?: string; children: React.ReactNode; className?: string }) {
+function Card({ testId, title, explain, children, className = "", aside, onMouseEnter, onMouseLeave }: {
+  testId: string; title: string; explain?: string; children: React.ReactNode; className?: string;
+  aside?: React.ReactNode; onMouseEnter?: () => void; onMouseLeave?: () => void;
+}) {
   return (
-    <section data-testid={testId} className={`rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 ${className}`}>
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{title}</h2>
+    <section data-testid={testId} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} className={`rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 ${className}`}>
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{title}</h2>
+        {aside}
+      </div>
       {explain && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{explain}</p>}
       <div className="mt-2">{children}</div>
     </section>
@@ -150,10 +158,15 @@ export function DecisionCard({ decision }: { decision: LifeDecision }) {
 
 /** Real choices as they happen: who the customer is, what weighed on it, what they did. */
 export function CustomerDecisions({ life }: { life: Life }) {
-  const scam = (life.scam_decisions ?? [])[0];
-  const others = (life.decisions ?? []).slice(0, scam ? 2 : 3);
+  // A new moment arrives every few seconds; hold the cards while someone is reading them.
+  const [held, setHeld] = useState<{ scam?: LifeDecision; others: LifeDecision[] } | null>(null);
+  const liveScam = (life.scam_decisions ?? [])[0];
+  const live = { scam: liveScam, others: (life.decisions ?? []).slice(0, liveScam ? 2 : 3) };
+  const { scam, others } = held ?? live;
   return (
     <Card testId="customer-decisions" title="Why customers did what they did"
+      onMouseEnter={() => setHeld(live)} onMouseLeave={() => setHeld(null)}
+      aside={held && <span data-testid="decisions-held" className="shrink-0 text-[10px] uppercase tracking-wide text-slate-400">held while you read</span>}
       explain="Each customer decides from who they are and what is going on in their life. The bars show how likely each choice was: the same moment can go either way.">
       {!scam && others.length === 0 ? <div className="text-xs text-slate-400">Waiting for the first choices…</div> : (
         <div className="space-y-2">
