@@ -52,6 +52,7 @@ import ast
 import asyncio
 import os
 import textwrap
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -95,6 +96,13 @@ class PersonaDefinition:
     # body in the written Insight node. Returning None / not setting body
     # falls through to the structured body.
     voice: PersonaHandler | None = None
+    # Optional ``judgement:`` profile (api.server.services.judgement). When
+    # present and JUDGEMENT_ENABLED=1, the persona reads the case with Laya
+    # before acting on its decision_policy, which stays the ceiling.
+    judgement: Any = None
+    # The SKILL.md body: the persona's own instructions, given to the LLM
+    # when an unclear judgement goes to a deep review.
+    skill_body: str = ""
 
 
 # Populated at attach() time.
@@ -785,6 +793,14 @@ def _load_personae() -> dict[str, PersonaDefinition]:
                     voice = _compile_voice_render(str(role), voice_src)
                 except ValueError as ex:
                     print(f"[persona_responder] {skill_path}: {ex}")
+            judgement = None
+            if fm.get("judgement") is not None:
+                try:
+                    from api.server.services.judgement.profiles import parse_profile
+
+                    judgement = parse_profile(str(role), fm.get("judgement"))
+                except ValueError as ex:
+                    print(f"[persona_responder] {skill_path}: judgement ignored: {ex}")
             out[str(role)] = PersonaDefinition(
                 role=str(role),
                 description=str(description),
@@ -795,6 +811,8 @@ def _load_personae() -> dict[str, PersonaDefinition]:
                 personality=personality,
                 summarise=summarise,
                 voice=voice,
+                judgement=judgement,
+                skill_body=_body.strip(),
             )
         except Exception as ex:
             print(f"[persona_responder] failed to load {skill_path}: {ex}")
@@ -973,7 +991,211 @@ async def _cascade_to_delegate(
     await _handle_hitl(cascade_event)
 
 
+_JUDGING: set[tuple[str, str]] = set()
+_RECENTLY_JUDGED: dict[tuple[str, str], float] = {}
+_RECENTLY_JUDGED_TTL_S = 90.0
+
+
+def _judged(persona: PersonaDefinition | None, context: Any) -> bool:
+    """True when this gate is decided by judgement rather than rules alone."""
+    profile = getattr(persona, "judgement", None) if persona is not None else None
+    if profile is None:
+        return False
+    from api.server.services.judgement import judgement_enabled
+
+    if not judgement_enabled():
+        return False
+    workflow_type = context.get("workflow_type") if isinstance(context, dict) else None
+    return profile.gate(workflow_type) is not None
+
+
+def _next_role(
+    persona_role: str,
+    context: dict[str, Any],
+    cascade_depth: int,
+    auto_close: set[str],
+) -> str | None:
+    """The persona a hold would be handed to, or None at the top of the chain."""
+    explicit_chain = context.get("escalation_chain")
+    if isinstance(explicit_chain, (list, tuple)) and cascade_depth < len(explicit_chain):
+        candidate = str(explicit_chain[cascade_depth])
+    elif context.get("escalate_to"):
+        candidate = str(context["escalate_to"])
+    else:
+        candidate = _escalation_parent(persona_role)
+    if (
+        not candidate
+        or candidate == persona_role
+        or not _role_auto_closes(candidate, auto_close)
+        or PERSONA_DEFINITIONS.get(candidate) is None
+    ):
+        return None
+    return candidate
+
+
+def _persona_label(role: str) -> str:
+    try:
+        from api.shared.personas import PERSONAS
+
+        label = getattr(PERSONAS.get(role), "workflow_label", None)
+        if label:
+            return str(label)
+    except Exception:
+        pass
+    words = role.replace("_", " ")
+    return words[:1].upper() + words[1:]
+
+
+def _with_hold(context: dict[str, Any], persona_role: str, record: Any) -> dict[str, Any]:
+    """Carry a persona's hold up the chain so the next persona sees why."""
+    held = [entry for entry in (context.get("held_by") or []) if isinstance(entry, dict)]
+    held.append({"persona": persona_role, "concerns": list(record.concerns), "summary": record.summary()})
+    return {**context, "held_by": held}
+
+
+def _stash_decision(
+    *,
+    workflow_id: str | None,
+    gate_phase: str | None,
+    persona_role: str,
+    verdict: Any,
+    reason: Any,
+    event_name: str,
+    judgement: Any = None,
+) -> None:
+    """Record the decision on workflow.payload['decisions'].
+
+    The Durable external event carries the verdict to the orchestrator but
+    doesn't write it back to the Workflow record; without this stash,
+    projections see no decisions and Decision nodes never materialise. A
+    silent no-op when the workflow isn't in the store (tests, torn-down
+    state).
+    """
+    if not (workflow_id and gate_phase):
+        return
+    try:
+        from api.server.state import app_state
+        import datetime as _dt
+        w = app_state.store.get_workflow(workflow_id)
+        if w is None:
+            return
+        if not isinstance(w.payload, dict):
+            w.payload = {}
+        decisions = list(w.payload.get("decisions") or [])
+        # Idempotent on the natural key (phase, persona_role) — re-emits
+        # of the same gate update in place rather than appending dupes.
+        key = (str(gate_phase).lower(), str(persona_role).lower())
+        decisions = [
+            d for d in decisions
+            if (str(d.get("phase", "")).lower(),
+                str(d.get("persona_role", "")).lower()) != key
+        ]
+        entry = {
+            "phase": gate_phase,
+            "persona_role": persona_role,
+            "verdict": verdict,
+            "reason": reason,
+            "decided_at": _dt.datetime.now(tz=_dt.timezone.utc).isoformat(),
+            "source_event": event_name,
+        }
+        if judgement is not None:
+            entry["decided_by"] = judgement.decided_by
+            entry["judgement"] = judgement.to_dict()
+        decisions.append(entry)
+        w.payload["decisions"] = decisions
+        app_state.store.upsert_workflow(w)
+    except Exception as ex:
+        print(f"[persona_responder] failed to stash decision: {ex}")
+
+
+async def _judge_decision(
+    *,
+    persona: PersonaDefinition,
+    persona_role: str,
+    context: dict[str, Any],
+    decision_payload: dict[str, Any],
+    workflow_id: str | None,
+    gate_phase: str | None,
+    instance_id: str | None,
+    cascade_depth: int,
+    auto_close: set[str],
+) -> tuple[Any, bool, dict[str, Any]]:
+    """Run the judgement engine over the rules decision (the ceiling)."""
+    from api.server.services.judgement import engine as judgement_engine
+
+    try:
+        outcome = await judgement_engine.judge_gate(
+            persona_role=persona_role,
+            persona_label=_persona_label(persona_role),
+            instructions=getattr(persona, "skill_body", ""),
+            profile=getattr(persona, "judgement", None),
+            context=context,
+            ceiling=decision_payload,
+            workflow_id=workflow_id,
+            gate_phase=gate_phase,
+            next_role=_next_role(persona_role, context, cascade_depth, auto_close),
+        )
+    except Exception as ex:  # the engine falls back itself; this is the last guard
+        print(f"[persona_responder] judgement failed for {persona_role}: {ex}; the rules decide")
+        return None, False, decision_payload
+    record = outcome.judgement
+    if record is not None:
+        print(
+            f"[persona_responder] {persona_role} judged {workflow_id} "
+            f"({record.decided_by}): {record.summary()}"
+        )
+        try:
+            from api.server.state import app_state
+            app_state.bus.emit(FleetEvent(
+                type="persona.judgement",
+                workflow_id=workflow_id,
+                persona=persona_role,
+                phase=gate_phase,
+                instance_id=instance_id,
+                decided_by=record.decided_by,
+                verdict=record.verdict,
+                summary=record.summary(),
+                judgement=record.to_dict(),
+            ))
+        except Exception as ex:  # pragma: no cover — bus emit is best-effort
+            print(f"[persona_responder] failed to emit persona.judgement: {ex}")
+    return record, outcome.hold, outcome.payload
+
+
 async def _handle_hitl(event: FleetEvent) -> None:
+    """Handle a gate, judging it at most once at a time.
+
+    The periodic sweep re-handles every open gate. A judged gate can take a
+    deep review of 20-60 s, so without this guard the sweep would judge (and
+    spend on) the same gate twice. Rules-only gates are passed straight
+    through, exactly as before judgement existed.
+    """
+    data = event.model_dump()
+    context = data.get("context") or {}
+    if int(data.get("_cascade_depth") or 0) > 0 or not _judged(
+        PERSONA_DEFINITIONS.get(data.get("persona") or ""), context
+    ):
+        await _handle_hitl_unguarded(event)
+        return
+    key = (
+        str(data.get("workflow_id") or data.get("instance_id") or ""),
+        str(data.get("phase") or context.get("phase") or ""),
+    )
+    now = time.monotonic()
+    for stale in [k for k, at in _RECENTLY_JUDGED.items() if now - at > _RECENTLY_JUDGED_TTL_S]:
+        _RECENTLY_JUDGED.pop(stale, None)
+    if key in _JUDGING or key in _RECENTLY_JUDGED:
+        print(f"[persona_responder] gate {key} is already judged or being judged; skipping")
+        return
+    _JUDGING.add(key)
+    try:
+        await _handle_hitl_unguarded(event)
+    finally:
+        _JUDGING.discard(key)
+        _RECENTLY_JUDGED[key] = time.monotonic()
+
+
+async def _handle_hitl_unguarded(event: FleetEvent) -> None:
     """Apply the matching persona's decision policy and raise the resolving event.
 
     Skipped silently for any persona NOT in PERSONA_AUTO_CLOSE, so real
@@ -1174,8 +1396,11 @@ async def _handle_hitl(event: FleetEvent) -> None:
         print(f"[persona_responder] failed to emit persona.thinking: {ex}")
 
     # v2: simulate human reaction time so the demo isn't a blur. Off by
-    # default in tests / production-honest mode; on when DEMO_LOUD=1.
-    if os.environ.get("DEMO_LOUD", "0") == "1":
+    # default in tests / production-honest mode; on when DEMO_LOUD=1. A
+    # judged gate takes real time instead (fast read or deep review), so it
+    # never adds a random sleep.
+    judged = _judged(persona, context)
+    if os.environ.get("DEMO_LOUD", "0") == "1" and not judged:
         delay = _rand.uniform(2.0, 8.0)
         await asyncio.sleep(delay)
 
@@ -1196,11 +1421,31 @@ async def _handle_hitl(event: FleetEvent) -> None:
         ),
     }
 
+    # Judgement: the decision_policy result above is the ceiling. The
+    # persona reads the case with Laya and may hold it (hand it up) but can
+    # never turn a rules decline into an approval.
+    judgement_record = None
+    judged_hold = False
+    if judged:
+        judgement_record, judged_hold, decision_payload = await _judge_decision(
+            persona=persona,
+            persona_role=persona_role,
+            context=context,
+            decision_payload=decision_payload,
+            workflow_id=workflow_id,
+            gate_phase=gate_phase,
+            instance_id=instance_id,
+            cascade_depth=cascade_depth,
+            auto_close=auto_close,
+        )
+        decision_str = decision_payload.get("decision")
+
     # Pitch-c6: override roll won — invert the persona's policy decision
     # to demo human defiance. approve→reject, reject→approve,
     # escalate→approve. Keep the original reason but mark with a tag
-    # so logs + decision-stash callers can see the override clearly.
-    if override_invert:
+    # so logs + decision-stash callers can see the override clearly. A
+    # judged persona pushes back for reasons it can name instead.
+    if override_invert and not judged:
         invert_map = {"approve": "reject", "reject": "approve", "escalate": "approve"}
         original_decision = decision_str
         new_decision = invert_map.get(decision_str or "", decision_str)
@@ -1228,6 +1473,19 @@ async def _handle_hitl(event: FleetEvent) -> None:
             f"{data.get('workflow_id')} ({decision_payload.get('reason')}); "
             f"gate {event_name!r} stays open for FM/operator"
         )
+        if judged_hold and judgement_record is not None:
+            # The hold is a decision in its own right: record it, and let the
+            # next persona see what this one found.
+            _stash_decision(
+                workflow_id=workflow_id,
+                gate_phase=gate_phase,
+                persona_role=persona_role,
+                verdict="hold",
+                reason=decision_payload.get("reason"),
+                event_name=event_name,
+                judgement=judgement_record,
+            )
+            context = _with_hold(context, persona_role, judgement_record)
         try:
             from api.server.state import app_state
             app_state.bus.emit(FleetEvent(
@@ -1261,6 +1519,10 @@ async def _handle_hitl(event: FleetEvent) -> None:
             parent_role = str(context["escalate_to"])
         else:
             parent_role = _escalation_parent(persona_role)
+        if parent_role == persona_role:
+            # An escalate_to naming the persona itself would loop to the
+            # depth limit and leave the gate open.
+            parent_role = None
         if not parent_role:
             print(
                 f"[persona_responder] {persona_role} has no parent in any "
@@ -1309,46 +1571,28 @@ async def _handle_hitl(event: FleetEvent) -> None:
     # Phase 1 sub-phase 3 follow-up — stash the decision into
     # workflow.payload['decisions'] so the entity-graph projection's
     # ``find_decision`` helper can pick it up when ``workflow.completed``
-    # fires. The Durable external event we raise below carries the verdict
-    # to the orchestrator but doesn't write it back to the Workflow record;
-    # without this stash, projections see no decisions and Decision nodes
-    # never materialise. Gate the write so it's a silent no-op when the
-    # workflow isn't in the store (e.g. tests, half-torn-down state).
-    if workflow_id and gate_phase:
-        try:
-            from api.server.state import app_state
-            import datetime as _dt
-            w = app_state.store.get_workflow(workflow_id)
-            if w is not None:
-                if not isinstance(w.payload, dict):
-                    w.payload = {}
-                decisions = list(w.payload.get("decisions") or [])
-                # Idempotent on the natural key (phase, persona_role) — re-emits
-                # of the same gate update in place rather than appending dupes.
-                key = (str(gate_phase).lower(), str(persona_role).lower())
-                decisions = [
-                    d for d in decisions
-                    if (str(d.get("phase", "")).lower(),
-                        str(d.get("persona_role", "")).lower()) != key
-                ]
-                decisions.append({
-                    "phase": gate_phase,
-                    "persona_role": persona_role,
-                    "verdict": decision_str,
-                    "reason": decision_payload.get("reason"),
-                    "decided_at": _dt.datetime.now(tz=_dt.timezone.utc).isoformat(),
-                    "source_event": event_name,
-                })
-                w.payload["decisions"] = decisions
-                app_state.store.upsert_workflow(w)
-        except Exception as ex:
-            print(f"[persona_responder] failed to stash decision: {ex}")
+    # fires.
+    _stash_decision(
+        workflow_id=workflow_id,
+        gate_phase=gate_phase,
+        persona_role=persona_role,
+        verdict=decision_str,
+        reason=decision_payload.get("reason"),
+        event_name=event_name,
+        judgement=judgement_record,
+    )
 
     # v2: announce the decision. Ops live stream renders a green/red row;
     # conversations view shows the message as @persona; river highlights the
     # gate chip and slides the workflow forward.
     try:
         from api.server.state import app_state
+        judged_fields: dict[str, Any] = {}
+        if judgement_record is not None:
+            judged_fields = {
+                "decided_by": judgement_record.decided_by,
+                "judgement_summary": judgement_record.summary(),
+            }
         app_state.bus.emit(FleetEvent(
             type="persona.decided",
             workflow_id=workflow_id,
@@ -1359,6 +1603,7 @@ async def _handle_hitl(event: FleetEvent) -> None:
             instance_id=instance_id,
             external_event=event_name,
             personality=dict(persona.personality),
+            **judged_fields,
         ))
     except Exception as ex:
         print(f"[persona_responder] failed to emit persona.decided: {ex}")
