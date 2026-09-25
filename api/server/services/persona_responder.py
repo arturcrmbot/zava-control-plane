@@ -1195,8 +1195,10 @@ async def _handle_hitl(event: FleetEvent) -> None:
     ):
         await _handle_hitl_unguarded(event)
         return
+    # Keyed by the Durable instance, which the event and the sweep share: world
+    # workflow ids repeat after a world reset, instance ids never do.
     key = (
-        str(data.get("workflow_id") or data.get("instance_id") or ""),
+        str(data.get("instance_id") or data.get("workflow_id") or ""),
         str(data.get("phase") or context.get("phase") or ""),
         str(context.get("reassessment_round") or 0),
     )

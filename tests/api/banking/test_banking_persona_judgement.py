@@ -303,3 +303,17 @@ def test_a_retried_gate_keeps_the_deadline_it_was_first_given(harness) -> None:
     asyncio.run(harness.responder._handle_hitl(_event(context)))
     assert len(harness.reviewer.deadlines) > first
     assert len(set(harness.reviewer.deadlines)) == 1
+
+
+def test_a_new_run_with_the_same_workflow_id_is_judged_afresh(harness) -> None:
+    # After a world reset, workflow ids repeat (they come from the world's event
+    # sequence) but Durable instance ids don't: a new take is a new gate.
+    context = _hitl_context(FRAUD_SCENARIO_VULNERABLE, "BAPP-J7", escalate_to="financial_crime_lead")
+    _store(harness.app_state, "BAPP-J7")
+    asyncio.run(harness.responder._handle_hitl(_event(context)))
+    first = set(harness.reviewer.deadlines)
+    time.sleep(0.05)
+    asyncio.run(harness.responder._handle_hitl(_event({**context, "instance_id": "inst-BAPP-J7-take-2"})))
+    assert len(harness.raised) == 2
+    later = set(harness.reviewer.deadlines) - first
+    assert later and min(later) > max(first)
