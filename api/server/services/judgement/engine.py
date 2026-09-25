@@ -49,6 +49,19 @@ def _min_lead(gate: GateProfile) -> float:
     return value if 0.0 <= value <= 1.0 else gate.min_lead
 
 
+def _role_label(role: str) -> str:
+    try:
+        from api.shared.personas import PERSONAS
+
+        label = getattr(PERSONAS.get(role), "workflow_label", None)
+        if label:
+            return str(label)
+    except Exception:
+        pass
+    words = role.replace("_", " ")
+    return words[:1].upper() + words[1:]
+
+
 def _with_evidence(ceiling: dict[str, Any], record: Judgement, **changes: Any) -> dict[str, Any]:
     summary = record.summary()
     return {
@@ -214,10 +227,12 @@ async def judge_gate(
         record.decided_by, record.verdict = "laya", "hold"
         return Outcome(_with_evidence(ceiling, record, decision="escalate"), record, hold=True)
 
+    final = bool(context.get("reassessment_round"))
     review = await reviewer.review(ReviewRequest(
         persona_role=persona_role, persona_label=persona_label, instructions=instructions,
         character=profile.character, facts=facts, concerns=list(record.concerns),
-        unclear=list(record.unclear),
+        unclear=list(record.unclear), next_role_label=_role_label(next_role) if next_role else None,
+        final=final,
     ))
     if review is None:
         return _rules(ceiling, record, "the LLM budget for this hour is spent")
@@ -231,5 +246,10 @@ async def judge_gate(
     if next_role:
         record.verdict = "hold"
         return Outcome(_with_evidence(ceiling, record, decision="escalate"), record, hold=True)
+    if not final:
+        # The last reviewer holds: the agent re-assesses once, with the reasons.
+        record.verdict = "send_back"
+        feedback = " ".join([*(f"{c[:1].upper()}{c[1:]}." for c in record.concerns), review.rationale])
+        return Outcome(_with_evidence(ceiling, record, decision="send_back", feedback=feedback), record)
     record.verdict = "reject"
     return Outcome(_with_evidence(ceiling, record, decision="reject"), record)

@@ -109,3 +109,18 @@ def test_a_spent_budget_skips_the_llm() -> None:
 def test_parse_verdict_rejects_missing_rationale() -> None:
     with pytest.raises(ValueError):
         parse_verdict('{"decision": "approve", "rationale": "  "}')
+
+
+def test_the_prompt_says_what_a_hold_does_at_the_top_of_the_chain() -> None:
+    from dataclasses import replace
+
+    from api.server.services.judgement.deep_review import build_prompt
+
+    first = build_prompt(replace(_request(), next_role_label=None))
+    assert "Nobody above you can take this case" in first
+    assert "goes back to the agent with your reasons" in first
+    final = build_prompt(replace(_request(), next_role_label=None, final=True))
+    assert "already re-assessed it once" in final and "declined" in final
+    handed = build_prompt(replace(_request(), next_role_label="Financial Crime Lead"))
+    assert "If you hold it, the case goes to the Financial Crime Lead" in handed
+    assert "Nobody above you" not in handed

@@ -84,3 +84,11 @@ def test_summary_for_rules() -> None:
         "Decided by rules: Laya unavailable."
     )
     assert _judgement(decided_by="rules").summary() == "Decided by rules."
+
+
+def test_summary_for_a_send_back() -> None:
+    record = _judgement(
+        decided_by="llm", verdict="send_back",
+        deep_review=DeepReviewRecord("hold", "The reasoning contradicts the record. Correct it first.", 9_000.0),
+    )
+    assert record.summary() == "Sent back to the agent: The reasoning contradicts the record. Correct it first."

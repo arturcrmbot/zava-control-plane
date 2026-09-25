@@ -59,6 +59,10 @@ class ReviewRequest:
     facts: GateFacts
     concerns: list[str] = field(default_factory=list)
     unclear: list[str] = field(default_factory=list)
+    # Who a hold goes to; None when this persona has the last word.
+    next_role_label: str | None = None
+    # True once the agent has already re-assessed the case after a send-back.
+    final: bool = False
 
 
 def _bullets(items: list[str] | tuple[str, ...]) -> str:
@@ -79,10 +83,22 @@ def build_prompt(request: ReviewRequest) -> str:
     ]
     if request.facts.prior_concerns:
         parts.append("An earlier reviewer held this case because:\n" + _bullets(request.facts.prior_concerns))
+    if request.next_role_label:
+        consequence = f"If you hold it, the case goes to the {request.next_role_label}."
+    elif request.final:
+        consequence = (
+            "Nobody above you can take this case and the agent has already re-assessed it once: if you "
+            "hold it, the recommendation is declined and will not be carried out."
+        )
+    else:
+        consequence = (
+            "Nobody above you can take this case: if you hold it, it goes back to the agent with your "
+            "reasons to be re-assessed once."
+        )
     parts.append(
         "Governance has already confirmed the value is within your delegated authority, and the "
         "rules have already admitted this option. You cannot change the option or the amount. "
-        "Decide whether to approve it now or hold it."
+        f"Decide whether to approve it now or hold it. {consequence}"
     )
     parts.append(
         'Return one JSON object only, no markdown: {"decision": "approve" or "hold", '

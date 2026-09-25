@@ -102,6 +102,7 @@ _CANONICAL_TOOL_CALL_KEYS = frozenset({
 })
 
 _AGENT_MAX_ATTEMPTS = 2
+_MAX_REASSESSMENTS = 1
 _AGENT_ATTEMPT_TIMEOUT_SECONDS = 150.0
 
 
@@ -338,6 +339,14 @@ def _agent_prompt(payload: dict[str, Any]) -> str:
         },
     }
     output_keys = sorted(_RANKING_KEYS)
+    feedback = payload.get("reviewer_feedback")
+    review_note = (
+        "A reviewer sent your last assessment back: "
+        f"{feedback} Re-read the evidence with the tools and correct your "
+        "reasoning; it must agree with the record.\n"
+        if isinstance(feedback, str) and feedback.strip()
+        else ""
+    )
     return (
         "Use BOTH registered claim tools before responding. "
         "First call banking_read_claim_evidence, then "
@@ -352,6 +361,7 @@ def _agent_prompt(payload: dict[str, Any]) -> str:
         "trade-offs. "
         "Preserve the supplied actor_ids, event_ids, and evidence_versions "
         "exactly.\n"
+        f"{review_note}"
         f"workflow_id={payload.get('workflow_id')}\n"
         f"instance_id={payload.get('instance_id')}\n"
         f"phase={_AGENT_PHASE}\n"
@@ -817,128 +827,146 @@ def fraud_orchestration(
     yield checkpoint("step.completed", {"step": _TRACE_PHASE})
     admitted_options = admission["admitted_options"]
 
-    # --- Phase 3 ---
-    yield checkpoint("step.started", {"step": _AGENT_PHASE})
-    ranking = yield context.call_activity_with_retry(
-        "fraud_agent_activity_trigger",
-        _AGENT_RETRY,
-        {
-            **input_dict,
-            "instance_id": instance_id,
-            "phase": _AGENT_PHASE,
-            "evidence": evidence,
-            "admitted_options": admitted_options,
-        },
-    )
-    yield checkpoint("step.completed", {"step": _AGENT_PHASE})
-
-    selected_option_id = ranking["ranked_option_ids"][0]
-    selected_option = next(
-        option for option in admitted_options if option["option_id"] == selected_option_id
-    )
-
-    # Authority is resolved before the gate is raised.
-    authority = yield context.call_activity(
-        "fraud_governance_activity_trigger",
-        {
-            "workflow_id": workflow_id,
-            "instance_id": instance_id,
-            "selected_option": selected_option,
-        },
-    )
-    # With judgement enabled the governance result may name who else can
-    # decide: `escalation` when the manager is not authorised for this value,
-    # and `escalate_to` for a hold. Without judgement neither key exists and
-    # the gate below is exactly the manager's, as before.
-    gate_persona = HITL_PERSONA
-    gate_authority = authority
-    escalation = authority.get("escalation")
-    if (
-        not authority.get("allowed")
-        and isinstance(escalation, dict)
-        and escalation.get("allowed") is True
-        and isinstance(escalation.get("role"), str)
-    ):
-        gate_persona = escalation["role"]
-        gate_authority = {**escalation, "escalated_from": HITL_PERSONA, "manager_authority": authority}
-    elif not authority.get("allowed"):
-        # Stamp the decision phase and carry the governing rule in the reason.
-        # The rejection handler persists `phase` as `rejected_at_phase` and the
-        # reason as `rejection_reason`, so the surfaces can say the workflow
-        # was refused *at the decision* by the authority matrix, rather than
-        # appearing to have failed in the preceding agent phase.
-        rule_id = authority.get("governing_rule_id") or "no matching rule"
-        why = authority.get("reason") or "governance denied"
-        denial = _denied(
-            f"{HITL_PERSONA} is not authorised to approve "
-            f"GBP {float(selected_option['value_gbp']):,.2f} for "
-            f"{HITL_CATEGORY}: {why}"
-            + ("" if rule_id in why else f" (matched rule {rule_id})")
-        )
-        yield checkpoint(
-            "workflow.completed",
+    # A judged persona at the top of the chain may send the case back to the
+    # agent with its reasons; the agent then re-assesses once. Without
+    # judgement no persona sends back, so this runs exactly once.
+    reassessment_round = 0
+    reviewer_feedback: str | None = None
+    while True:
+        # --- Phase 3 ---
+        yield checkpoint("step.started", {"step": _AGENT_PHASE})
+        ranking = yield context.call_activity_with_retry(
+            "fraud_agent_activity_trigger",
+            _AGENT_RETRY,
             {
-                "status": denial["status"],
-                "reason": denial["reason"],
-                "phase": _HITL_PHASE,
+                **input_dict,
+                "instance_id": instance_id,
+                "phase": _AGENT_PHASE,
+                "evidence": evidence,
+                "admitted_options": admitted_options,
+                **({"reviewer_feedback": reviewer_feedback} if reviewer_feedback else {}),
             },
         )
-        return denial
-    escalate_to = authority.get("escalate_to") if gate_persona == HITL_PERSONA else None
-    allowed_personas = frozenset({gate_persona, *([escalate_to] if escalate_to else [])})
+        yield checkpoint("step.completed", {"step": _AGENT_PHASE})
 
-    # --- Phase 4 (HITL) ---
-    hitl_context = {
-        "workflow_id": workflow_id,
-        "instance_id": instance_id,
-        "workflow_type": WORKFLOW_TYPE,
-        "story_id": evidence["story_id"],
-        "claim_id": evidence["claim_id"],
-        "persona": gate_persona,
-        "external_event": HITL_EVENT,
-        "phase": _HITL_PHASE,
-        "action": COMMAND_TYPE,
-        "request": {
-            "amount_gbp": selected_option["value_gbp"],
-            "category": HITL_CATEGORY,
-        },
-        "observation": evidence["observation"],
-        "evidence": evidence,
-        "admitted_options": admitted_options,
-        "rejected_options": admission["rejected_options"],
-        "beneficiary_path": admission["beneficiary_path"],
-        "ranking": ranking,
-        "selected_option": selected_option,
-        "selected_option_id": selected_option_id,
-        "decision_id": FRAUD_DECISION_ID,
-        "evidence_versions": evidence["evidence_versions"],
-        "authority": gate_authority,
-    }
-    if escalate_to:
-        hitl_context["escalate_to"] = escalate_to
-    if gate_persona != HITL_PERSONA:
-        hitl_context["escalated_from"] = HITL_PERSONA
-    yield checkpoint(
-        "suspended",
-        {
-            "reason": "awaiting_approval",
-            "phase": _HITL_PHASE,
+        selected_option_id = ranking["ranked_option_ids"][0]
+        selected_option = next(
+            option for option in admitted_options if option["option_id"] == selected_option_id
+        )
+
+        # Authority is resolved before the gate is raised.
+        authority = yield context.call_activity(
+            "fraud_governance_activity_trigger",
+            {
+                "workflow_id": workflow_id,
+                "instance_id": instance_id,
+                "selected_option": selected_option,
+            },
+        )
+        # With judgement enabled the governance result may name who else can
+        # decide: `escalation` when the manager is not authorised for this value,
+        # and `escalate_to` for a hold. Without judgement neither key exists and
+        # the gate below is exactly the manager's, as before.
+        gate_persona = HITL_PERSONA
+        gate_authority = authority
+        escalation = authority.get("escalation")
+        if (
+            not authority.get("allowed")
+            and isinstance(escalation, dict)
+            and escalation.get("allowed") is True
+            and isinstance(escalation.get("role"), str)
+        ):
+            gate_persona = escalation["role"]
+            gate_authority = {**escalation, "escalated_from": HITL_PERSONA, "manager_authority": authority}
+        elif not authority.get("allowed"):
+            # Stamp the decision phase and carry the governing rule in the reason.
+            # The rejection handler persists `phase` as `rejected_at_phase` and the
+            # reason as `rejection_reason`, so the surfaces can say the workflow
+            # was refused *at the decision* by the authority matrix, rather than
+            # appearing to have failed in the preceding agent phase.
+            rule_id = authority.get("governing_rule_id") or "no matching rule"
+            why = authority.get("reason") or "governance denied"
+            denial = _denied(
+                f"{HITL_PERSONA} is not authorised to approve "
+                f"GBP {float(selected_option['value_gbp']):,.2f} for "
+                f"{HITL_CATEGORY}: {why}"
+                + ("" if rule_id in why else f" (matched rule {rule_id})")
+            )
+            yield checkpoint(
+                "workflow.completed",
+                {
+                    "status": denial["status"],
+                    "reason": denial["reason"],
+                    "phase": _HITL_PHASE,
+                },
+            )
+            return denial
+        escalate_to = authority.get("escalate_to") if gate_persona == HITL_PERSONA else None
+        allowed_personas = frozenset({gate_persona, *([escalate_to] if escalate_to else [])})
+
+        # --- Phase 4 (HITL) ---
+        hitl_context = {
+            "workflow_id": workflow_id,
+            "instance_id": instance_id,
+            "workflow_type": WORKFLOW_TYPE,
+            "story_id": evidence["story_id"],
+            "claim_id": evidence["claim_id"],
             "persona": gate_persona,
             "external_event": HITL_EVENT,
-            "context": hitl_context,
-            "hitl_context": hitl_context,
-        },
-    )
-    decision_event = context.wait_for_external_event(HITL_EVENT)
-    timer = context.create_timer(context.current_utc_datetime + timedelta(minutes=5))
-    winner = yield context.task_any([decision_event, timer])
-    if winner == timer:
-        denial = _denied(f"{_HITL_PHASE} timed out")
-        yield terminal_checkpoint(denial)
-        return denial
-    timer.cancel()
-    approval = decision_event.result
-    yield checkpoint("resumed", {"phase": _HITL_PHASE})
+            "phase": _HITL_PHASE,
+            "action": COMMAND_TYPE,
+            "request": {
+                "amount_gbp": selected_option["value_gbp"],
+                "category": HITL_CATEGORY,
+            },
+            "observation": evidence["observation"],
+            "evidence": evidence,
+            "admitted_options": admitted_options,
+            "rejected_options": admission["rejected_options"],
+            "beneficiary_path": admission["beneficiary_path"],
+            "ranking": ranking,
+            "selected_option": selected_option,
+            "selected_option_id": selected_option_id,
+            "decision_id": FRAUD_DECISION_ID,
+            "evidence_versions": evidence["evidence_versions"],
+            "authority": gate_authority,
+        }
+        if escalate_to:
+            hitl_context["escalate_to"] = escalate_to
+        if gate_persona != HITL_PERSONA:
+            hitl_context["escalated_from"] = HITL_PERSONA
+        if reassessment_round:
+            hitl_context["reassessment_round"] = reassessment_round
+        yield checkpoint(
+            "suspended",
+            {
+                "reason": "awaiting_approval",
+                "phase": _HITL_PHASE,
+                "persona": gate_persona,
+                "external_event": HITL_EVENT,
+                "context": hitl_context,
+                "hitl_context": hitl_context,
+            },
+        )
+        decision_event = context.wait_for_external_event(HITL_EVENT)
+        timer = context.create_timer(context.current_utc_datetime + timedelta(minutes=5))
+        winner = yield context.task_any([decision_event, timer])
+        if winner == timer:
+            denial = _denied(f"{_HITL_PHASE} timed out")
+            yield terminal_checkpoint(denial)
+            return denial
+        timer.cancel()
+        approval = decision_event.result
+        yield checkpoint("resumed", {"phase": _HITL_PHASE})
+        if (
+            isinstance(approval, dict)
+            and approval.get("decision") == "send_back"
+            and reassessment_round < _MAX_REASSESSMENTS
+        ):
+            reassessment_round += 1
+            reviewer_feedback = str(approval.get("feedback") or approval.get("reason") or "")
+            continue
+        break
 
     denial_reason = _approval_reason(
         approval,

@@ -84,6 +84,7 @@ _CANONICAL_TOOL_CALL_KEYS = frozenset({
 })
 
 _AGENT_MAX_ATTEMPTS = 2
+_MAX_REASSESSMENTS = 1
 _AGENT_ATTEMPT_TIMEOUT_SECONDS = 150.0
 
 
@@ -257,6 +258,17 @@ async def run_agent_session(prompt: str, **kwargs: Any) -> dict[str, Any]:
     return await _run(prompt, **kwargs)
 
 
+def _review_note(payload: dict[str, Any]) -> str:
+    feedback = payload.get("reviewer_feedback")
+    if not isinstance(feedback, str) or not feedback.strip():
+        return ""
+    return (
+        f"A reviewer sent your last assessment back: {feedback} Re-read the "
+        "evidence with the tools and correct your reasoning; it must agree "
+        "with the case.\n"
+    )
+
+
 def _agent_prompt(
     profile: CaseProfile,
     evidence: dict[str, Any],
@@ -291,6 +303,7 @@ def _agent_prompt(
         "uncertainty, and an explicit no-action comparison. "
         "Preserve the supplied actor_ids, event_ids and evidence_versions "
         "exactly.\n"
+        f"{_review_note(payload)}"
         f"workflow_id={payload.get('workflow_id')}\n"
         f"instance_id={payload.get('instance_id')}\n"
         f"phase={profile.agent_phase}\n"
@@ -624,88 +637,105 @@ def case_orchestration(
     )
     yield checkpoint("step.completed", {"step": profile.evidence_phase})
 
-    yield checkpoint("step.started", {"step": profile.agent_phase})
-    ranking = yield context.call_activity_with_retry(
-        "case_agent_activity_trigger",
-        _AGENT_RETRY,
-        {
-            **input_dict,
+    # A judged persona may send the case back to the agent with its reasons;
+    # the agent then re-assesses once. Without judgement this runs once.
+    reassessment_round = 0
+    reviewer_feedback: str | None = None
+    while True:
+        yield checkpoint("step.started", {"step": profile.agent_phase})
+        ranking = yield context.call_activity_with_retry(
+            "case_agent_activity_trigger",
+            _AGENT_RETRY,
+            {
+                **input_dict,
+                "instance_id": instance_id,
+                "workflow_type": profile.workflow_type,
+                "phase": profile.agent_phase,
+                "evidence": evidence,
+                **({"reviewer_feedback": reviewer_feedback} if reviewer_feedback else {}),
+            },
+        )
+        yield checkpoint("step.completed", {"step": profile.agent_phase})
+
+        selected_option_id = ranking["ranked_option_ids"][0]
+        selected_option = next(
+            option
+            for option in evidence["admitted_options"]
+            if option["option_id"] == selected_option_id
+        )
+
+        authority = yield context.call_activity(
+            "case_governance_activity_trigger",
+            {
+                "workflow_id": workflow_id,
+                "workflow_type": profile.workflow_type,
+                "selected_option": selected_option,
+            },
+        )
+        if not authority.get("allowed"):
+            denial = _denied(
+                f"{profile.hitl_persona} is not authorised for this value: "
+                f"{authority.get('reason') or 'governance denied'}"
+            )
+            yield terminal_checkpoint(denial)
+            return denial
+
+        hitl_context = {
+            "workflow_id": workflow_id,
             "instance_id": instance_id,
             "workflow_type": profile.workflow_type,
-            "phase": profile.agent_phase,
-            "evidence": evidence,
-        },
-    )
-    yield checkpoint("step.completed", {"step": profile.agent_phase})
-
-    selected_option_id = ranking["ranked_option_ids"][0]
-    selected_option = next(
-        option
-        for option in evidence["admitted_options"]
-        if option["option_id"] == selected_option_id
-    )
-
-    authority = yield context.call_activity(
-        "case_governance_activity_trigger",
-        {
-            "workflow_id": workflow_id,
-            "workflow_type": profile.workflow_type,
-            "selected_option": selected_option,
-        },
-    )
-    if not authority.get("allowed"):
-        denial = _denied(
-            f"{profile.hitl_persona} is not authorised for this value: "
-            f"{authority.get('reason') or 'governance denied'}"
-        )
-        yield terminal_checkpoint(denial)
-        return denial
-
-    hitl_context = {
-        "workflow_id": workflow_id,
-        "instance_id": instance_id,
-        "workflow_type": profile.workflow_type,
-        "story_id": evidence["story_id"],
-        "case_id": evidence["case_id"],
-        "persona": profile.hitl_persona,
-        "external_event": profile.hitl_event,
-        "phase": profile.hitl_phase,
-        "action": profile.command_type,
-        "request": {
-            "amount_gbp": selected_option["value_gbp"],
-            "category": profile.hitl_category,
-        },
-        "observation": evidence["observation"],
-        "admitted_options": evidence["admitted_options"],
-        "rejected_options": evidence["rejected_options"],
-        "ranking": ranking,
-        "selected_option": selected_option,
-        "selected_option_id": selected_option_id,
-        "decision_id": f"SYN-{profile.prefix.upper()}-DECISION-{workflow_id}",
-        "evidence_versions": evidence["evidence_versions"],
-        "authority": authority,
-    }
-    yield checkpoint(
-        "suspended",
-        {
-            "reason": "awaiting_approval",
-            "phase": profile.hitl_phase,
+            "story_id": evidence["story_id"],
+            "case_id": evidence["case_id"],
             "persona": profile.hitl_persona,
             "external_event": profile.hitl_event,
-            "context": hitl_context,
-            "hitl_context": hitl_context,
-        },
-    )
-    decision_event = context.wait_for_external_event(profile.hitl_event)
-    timer = context.create_timer(context.current_utc_datetime + timedelta(minutes=5))
-    winner = yield context.task_any([decision_event, timer])
-    if winner == timer:
-        denial = _denied(f"{profile.hitl_phase} timed out")
-        yield terminal_checkpoint(denial)
-        return denial
-    timer.cancel()
-    approval = decision_event.result
-    yield checkpoint("resumed", {"phase": profile.hitl_phase})
+            "phase": profile.hitl_phase,
+            "action": profile.command_type,
+            "request": {
+                "amount_gbp": selected_option["value_gbp"],
+                "category": profile.hitl_category,
+            },
+            "observation": evidence["observation"],
+            "admitted_options": evidence["admitted_options"],
+            "rejected_options": evidence["rejected_options"],
+            "ranking": ranking,
+            "selected_option": selected_option,
+            "selected_option_id": selected_option_id,
+            "decision_id": f"SYN-{profile.prefix.upper()}-DECISION-{workflow_id}",
+            "evidence_versions": evidence["evidence_versions"],
+            "authority": authority,
+        }
+        if reassessment_round:
+            hitl_context["reassessment_round"] = reassessment_round
+        yield checkpoint(
+            "suspended",
+            {
+                "reason": "awaiting_approval",
+                "phase": profile.hitl_phase,
+                "persona": profile.hitl_persona,
+                "external_event": profile.hitl_event,
+                "context": hitl_context,
+                "hitl_context": hitl_context,
+            },
+        )
+        decision_event = context.wait_for_external_event(profile.hitl_event)
+        timer = context.create_timer(context.current_utc_datetime + timedelta(minutes=5))
+        winner = yield context.task_any([decision_event, timer])
+        if winner == timer:
+            denial = _denied(f"{profile.hitl_phase} timed out")
+            yield terminal_checkpoint(denial)
+            return denial
+        timer.cancel()
+        approval = decision_event.result
+        yield checkpoint("resumed", {"phase": profile.hitl_phase})
+        if (
+            isinstance(approval, dict)
+            and approval.get("decision") == "send_back"
+            and reassessment_round < _MAX_REASSESSMENTS
+        ):
+            reassessment_round += 1
+            reviewer_feedback = str(approval.get("feedback") or approval.get("reason") or "")
+            continue
+        break
 
     yield checkpoint("step.started", {"step": profile.commit_phase})
     decision = yield context.call_activity(

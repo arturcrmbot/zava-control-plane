@@ -47,10 +47,13 @@ from verticals.banking.fraud_constants import (  # noqa: E402
 from verticals.banking.fraud_constraints import OPTION_REFUSE_CAUTION  # noqa: E402
 from verticals.banking.worlds.scenario import ZavaBankWorld  # noqa: E402
 
-FakeRuntime.canned_text = json.dumps({
-    "decision": "approve",
-    "rationale": "Set against the record, the recommendation stands: the admitted option is the only one the rules permit.",
-})
+# FAKE_REVIEW=hold makes the fake deep review hold, which exercises the send-back loop.
+FakeRuntime.canned_text = json.dumps(
+    {"decision": "hold", "rationale": "The reasoning does not agree with the record. The agent should correct it."}
+    if os.environ.get("FAKE_REVIEW") == "hold" else
+    {"decision": "approve",
+     "rationale": "Set against the record, the recommendation stands: the admitted option is the only one the rules permit."}
+)
 
 REASONING = {
     "standard": (
@@ -162,13 +165,16 @@ def drive(context: LiveContext) -> dict:
         return stop.value
 
 
-def ranking(kind: str, *, prefer_refusal: bool = False):
+def ranking(kind: str, *, prefer_refusal: bool = False, corrected: str | None = None):
+    """The stand-in agent. Sent back with a reviewer's reasons, it re-assesses as ``corrected``."""
     def build(payload: dict) -> dict:
         evidence = payload["evidence"]
         ids = [o["option_id"] for o in payload["admitted_options"]]
-        if prefer_refusal and OPTION_REFUSE_CAUTION in ids:
+        sent_back = bool(payload.get("reviewer_feedback"))
+        if prefer_refusal and OPTION_REFUSE_CAUTION in ids and not sent_back:
             ids = [OPTION_REFUSE_CAUTION] + [i for i in ids if i != OPTION_REFUSE_CAUTION]
-        return {"phase": "Assess Claim Evidence", "ranked_option_ids": ids, "reasoning": REASONING[kind],
+        text = REASONING[corrected if sent_back and corrected else kind]
+        return {"phase": "Assess Claim Evidence", "ranked_option_ids": ids, "reasoning": text,
                 "evidence_versions": evidence["evidence_versions"], "actor_ids": evidence["actor_ids"],
                 "event_ids": evidence["event_ids"]}
     return build
@@ -201,10 +207,10 @@ def high_value_world() -> ZavaBankWorld:
 CASES = [
     ("Standard GBP 18,400", lambda: world_with(FRAUD_SCENARIO_STANDARD), ranking("standard")),
     ("Vulnerable GBP 6,750", lambda: world_with(FRAUD_SCENARIO_VULNERABLE), ranking("vulnerable")),
-    ("Vulnerable, reasoning says no marker", lambda: world_with(FRAUD_SCENARIO_VULNERABLE), ranking("standard")),
+    ("Vulnerable, reasoning says no marker", lambda: world_with(FRAUD_SCENARIO_VULNERABLE), ranking("standard", corrected="vulnerable")),
     ("Over delegation GBP 92,000", lambda: world_with(FRAUD_SCENARIO_OVER_DELEGATION), ranking("capped")),
     ("Generated high-value claim", high_value_world, ranking("capped")),
-    ("Generated claim, agent ranks refusal first", refusal_world, ranking("refusal", prefer_refusal=True)),
+    ("Generated claim, agent ranks refusal first", refusal_world, ranking("refusal", prefer_refusal=True, corrected="standard")),
 ]
 
 
@@ -228,7 +234,9 @@ def main() -> None:
         elapsed = (time.perf_counter() - started) * 1000
         decisions = app_state.store.get_workflow(workflow_id).payload.get("decisions") or []
         trail = " -> ".join(
-            f"{d['persona_role']}:{d['verdict']}({d.get('decided_by', 'rules')})" for d in decisions
+            f"{d['persona_role']}:{d['verdict']}({d.get('decided_by', 'rules')})"
+            + (f"[round {d['round']}]" if d.get("round") else "")
+            for d in decisions
         ) or "(no gate)"
         command = (output.get("command") or {}).get("payload") or {}
         rows.append({

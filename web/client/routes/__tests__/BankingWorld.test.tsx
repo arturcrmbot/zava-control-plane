@@ -242,6 +242,19 @@ describe("BankingWorld", () => {
     expect(chain.indexOf("Financial crime lead approved")).toBeLessThan(chain.indexOf("Decision approved"));
   });
 
+  it("shows a send-back to the agent and the decision after re-assessment", async () => {
+    details["/api/workflows/bapp-evt-11"] = { workflow: { payload: { decisions: [
+      { persona_role: "financial_crime_lead", verdict: "send_back", decided_by: "llm",
+        judgement: { summary: "Sent back to the agent: the reasoning contradicts the record." } },
+      { persona_role: "fraud_decision_manager", verdict: "approve", decided_by: "laya", round: 1,
+        judgement: { summary: "Approved after reading the agent's reasoning: no concerns found." } },
+    ] } } };
+    renderBank({ events: [ROUTINE, ...APPROVED_TRACE, ...APPROVED_OUTCOME] });
+    const strip = screen.getByTestId("banking-intervention");
+    expect(await within(strip).findByText("Financial crime lead sent it back to the agent")).toBeTruthy();
+    expect(within(strip).getByText("Fraud decision manager approved after re-assessment")).toBeTruthy();
+  });
+
   it("names who approved when the decision was handed up", () => {
     const escalated = APPROVED_OUTCOME.map((e) => e.type === "responder.decided"
       ? { ...e, payload: { ...e.payload, command: { payload: { option_id: "SYN-APP-OPTION-REIMBURSE-CAPPED", value_gbp: 85_000, persona: "financial_crime_lead" } } } }

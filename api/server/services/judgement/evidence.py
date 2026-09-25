@@ -102,6 +102,8 @@ class Judgement:
         if self.decided_by == "rules":
             return f"Decided by rules: {_sentence(self.fallback_reason)}" if self.fallback_reason else "Decided by rules."
         if self.decided_by == "llm" and self.deep_review is not None:
+            if self.verdict == "send_back":
+                return "Sent back to the agent: " + first_sentences(self.deep_review.rationale)
             text = "Deep review: " + first_sentences(self.deep_review.rationale)
             if self.verdict == "hold" and self.next_role:
                 text = _sentence(text) + f" Handed to the {_role_words(self.next_role)}."

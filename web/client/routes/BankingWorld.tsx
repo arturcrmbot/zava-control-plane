@@ -62,10 +62,10 @@ const RECENT_CASES_CAP = 8;
 interface RecentCase { id: string; type: string; status: string; phase?: string; createdAt: number; refused: boolean; judged?: JudgedDecision }
 
 /** A persona decision reached by judgement, as the persona responder records it. */
-interface JudgedDecision { persona: string; verdict: string; decidedBy: string; summary?: string }
+interface JudgedDecision { persona: string; verdict: string; decidedBy: string; summary?: string; round?: number }
 
 const DECIDED_BY: Record<string, string> = { laya: "fast judgement", llm: "deep review", rules: "rules" };
-const VERDICT_WORDS: Record<string, string> = { approve: "approved", hold: "held it", reject: "declined", escalate: "escalated" };
+const VERDICT_WORDS: Record<string, string> = { approve: "approved", hold: "held it", reject: "declined", escalate: "escalated", send_back: "sent it back to the agent" };
 
 function judgedDecisions(decisions: unknown): JudgedDecision[] {
   if (!Array.isArray(decisions)) return [];
@@ -75,7 +75,8 @@ function judgedDecisions(decisions: unknown): JudgedDecision[] {
     const persona = text(row.persona_role);
     if (!decidedBy || !persona) return [];
     const judgement = (row.judgement ?? {}) as Record<string, unknown>;
-    return [{ persona, verdict: String(row.verdict ?? ""), decidedBy, summary: text(judgement.summary) ?? text(row.reason) }];
+    const round = Number(row.round ?? 0);
+    return [{ persona, verdict: String(row.verdict ?? ""), decidedBy, summary: text(judgement.summary) ?? text(row.reason), round: round > 0 ? round : undefined }];
   });
 }
 
@@ -110,7 +111,7 @@ function useDecisionTrail(workflowId: string | undefined): JudgedDecision[] {
 function withJudgement(steps: InterventionStep[], trail: JudgedDecision[]): InterventionStep[] {
   if (trail.length === 0) return steps;
   const judged = trail.map((d, index) => ({
-    label: `${roleLabel(d.persona)} ${VERDICT_WORDS[d.verdict] ?? d.verdict}`,
+    label: `${roleLabel(d.persona)} ${VERDICT_WORDS[d.verdict] ?? d.verdict}${d.round ? " after re-assessment" : ""}`,
     detail: [DECIDED_BY[d.decidedBy] ?? d.decidedBy, d.summary].filter(Boolean).join(" · "),
     eventId: `judgement-${index}-${d.persona}`,
   }));

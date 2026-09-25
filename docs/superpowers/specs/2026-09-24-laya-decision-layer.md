@@ -166,7 +166,8 @@ facts and texts, e.g. `customer_vulnerable`, `recommends_refusal`,
           -> otherwise the rules ceiling, recorded as "decided by rules"
 8. approve -> today's approval payload, plus rationale and evidence
    hold    -> hand to the next persona up (section 7.2); at the top of the chain,
-              the deep review decides approve or decline
+              the deep review decides: approve, or send the case back to the agent
+              with its reasons to re-assess once; a hold after that declines
 ```
 
 ### 6.2 What a profile looks like (fraud decision manager)
@@ -235,7 +236,9 @@ Functions host has only the two supporting leads today.
 - **A hold.** The case goes to the next persona named by the authority row's
   `delegate_to` or the kernel's escalation chain. That persona judges it fresh,
   seeing the first persona's concerns. At the top of the chain, the LLM deep review
-  decides approve or decline, or the rules decide if the budget is spent.
+  decides: approve, or send the case back to the agent with its reasons. The
+  agent re-assesses once and the gate is raised again. A hold after that
+  declines. The rules decide if the budget is spent.
 - **Code changes this needs:** `fraud_durable.py` must accept the approving persona
   named in the gate context rather than a constant, pass it to the command, and
   re-check governance for that persona. `persona_responder.py` must address
@@ -265,6 +268,29 @@ Functions host has only the two supporting leads today.
 - Every decision carries its evidence, and the tape records it.
 
 **Size: medium** (engine, profiles, adapter, escalation, UI surfacing, tests).
+
+### 7.5 Verified (25 Sep 2026)
+
+End to end, in process: the real fraud orchestration, real activities (world,
+admission, governance kernel, reimbursement command), the real persona responder
+and live Laya, with authored agent reasoning (`tools/laya_eval/e2e_banking.py`).
+
+| Case | Trail | Outcome |
+|---|---|---|
+| Standard GBP 18,400 | fraud manager approves (fast judgement) | reimbursed in full |
+| Vulnerable GBP 6,750 | fraud manager approves (fast judgement) | reimbursed in full |
+| Vulnerable, reasoning says "no marker" | manager holds (fast) -> crime lead deep review sends it back -> agent re-assesses -> manager approves (fast) | reimbursed in full |
+| Over delegation GBP 92,000 | governance names the crime lead -> approves (fast) | reimbursed to the GBP 85,000 cap by the crime lead |
+| Generated high-value claim | crime lead approves (fast) | reimbursed to the cap |
+| Agent ranks refusal first | manager holds (four eyes) -> crime lead sends it back -> agent re-ranks -> manager approves | reimbursed in full |
+
+Fast judgements took 60-135 ms of Laya time per gate. The real deep review
+(gpt-4.1 through Copilot) took 8.5-13.3 s and returned a valid verdict each time.
+With `JUDGEMENT_ENABLED=0` the same run is decided exactly as before: the two
+high-value claims end "refused by authority", and the refusal of a fraud victim
+is approved on its GBP 0 value.
+
+Live golden set (`tests/api/judgement/test_laya_live.py`): 9/9 on repeated runs.
 
 ## 8. Phase 2: the world notices and reacts (banking world)
 

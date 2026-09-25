@@ -991,8 +991,8 @@ async def _cascade_to_delegate(
     await _handle_hitl(cascade_event)
 
 
-_JUDGING: set[tuple[str, str]] = set()
-_RECENTLY_JUDGED: dict[tuple[str, str], float] = {}
+_JUDGING: set[tuple[str, ...]] = set()
+_RECENTLY_JUDGED: dict[tuple[str, ...], float] = {}
 _RECENTLY_JUDGED_TTL_S = 90.0
 
 
@@ -1062,6 +1062,7 @@ def _stash_decision(
     reason: Any,
     event_name: str,
     judgement: Any = None,
+    round_: int = 0,
 ) -> None:
     """Record the decision on workflow.payload['decisions'].
 
@@ -1069,7 +1070,8 @@ def _stash_decision(
     doesn't write it back to the Workflow record; without this stash,
     projections see no decisions and Decision nodes never materialise. A
     silent no-op when the workflow isn't in the store (tests, torn-down
-    state).
+    state). A re-assessed gate (after a send-back) records a new round
+    rather than overwriting the first.
     """
     if not (workflow_id and gate_phase):
         return
@@ -1082,13 +1084,14 @@ def _stash_decision(
         if not isinstance(w.payload, dict):
             w.payload = {}
         decisions = list(w.payload.get("decisions") or [])
-        # Idempotent on the natural key (phase, persona_role) — re-emits
+        # Idempotent on the natural key (phase, persona_role, round) — re-emits
         # of the same gate update in place rather than appending dupes.
-        key = (str(gate_phase).lower(), str(persona_role).lower())
+        key = (str(gate_phase).lower(), str(persona_role).lower(), int(round_ or 0))
         decisions = [
             d for d in decisions
             if (str(d.get("phase", "")).lower(),
-                str(d.get("persona_role", "")).lower()) != key
+                str(d.get("persona_role", "")).lower(),
+                int(d.get("round") or 0)) != key
         ]
         entry = {
             "phase": gate_phase,
@@ -1098,6 +1101,8 @@ def _stash_decision(
             "decided_at": _dt.datetime.now(tz=_dt.timezone.utc).isoformat(),
             "source_event": event_name,
         }
+        if round_:
+            entry["round"] = int(round_)
         if judgement is not None:
             entry["decided_by"] = judgement.decided_by
             entry["judgement"] = judgement.to_dict()
@@ -1180,6 +1185,7 @@ async def _handle_hitl(event: FleetEvent) -> None:
     key = (
         str(data.get("workflow_id") or data.get("instance_id") or ""),
         str(data.get("phase") or context.get("phase") or ""),
+        str(context.get("reassessment_round") or 0),
     )
     now = time.monotonic()
     for stale in [k for k, at in _RECENTLY_JUDGED.items() if now - at > _RECENTLY_JUDGED_TTL_S]:
@@ -1484,6 +1490,7 @@ async def _handle_hitl_unguarded(event: FleetEvent) -> None:
                 reason=decision_payload.get("reason"),
                 event_name=event_name,
                 judgement=judgement_record,
+                round_=int(context.get("reassessment_round") or 0),
             )
             context = _with_hold(context, persona_role, judgement_record)
         try:
@@ -1580,6 +1587,7 @@ async def _handle_hitl_unguarded(event: FleetEvent) -> None:
         reason=decision_payload.get("reason"),
         event_name=event_name,
         judgement=judgement_record,
+        round_=int(context.get("reassessment_round") or 0) if isinstance(context, dict) else 0,
     )
 
     # v2: announce the decision. Ops live stream renders a green/red row;

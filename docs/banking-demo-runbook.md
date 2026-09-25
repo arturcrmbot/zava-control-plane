@@ -98,6 +98,7 @@ What changes in the walk:
 | 0:12 | The fraud decision manager reads the agent's reasoning. The chain shows *Fraud decision manager approved · fast judgement*, with the concerns it found, if any. |
 | A contradiction | If the agent's reasoning contradicts the record (e.g. says "no vulnerability marker" for a flagged customer), the manager holds it and hands it to the financial crime lead, who decides. Both steps show on the chain. |
 | A refusal | A refusal is never waved through on its £0 value: refusals always get a second pair of eyes. |
+| At the top of the chain | The last persona can send the case back to the agent with its reasons. The agent re-assesses once and the gate is raised again; the chain shows *sent it back to the agent*, then *approved after re-assessment*. |
 | 0:22 | The £92,000 claim no longer dead-ends. Governance names the financial crime lead, who decides the capped £85,000 within a £250,000 delegation. The chain shows *Decision approved · … · by Financial crime lead*. |
 
 Fallbacks are automatic and recorded on the decision:

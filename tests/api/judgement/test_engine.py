@@ -211,17 +211,27 @@ def test_minor_concerns_are_weighed_in_character() -> None:
     assert set(judge_questions["decide"]["criteria"]) == {"approve", "hold"}
 
 
-@pytest.mark.parametrize(("review", "decision"), [("approve", "approve"), ("hold", "reject")])
-def test_at_the_top_of_the_chain_the_deep_review_decides_a_hold(review: str, decision: str) -> None:
+@pytest.mark.parametrize(
+    ("review", "round_", "decision"),
+    [("approve", 0, "approve"), ("hold", 0, "send_back"), ("hold", 1, "reject")],
+)
+def test_at_the_top_of_the_chain_the_deep_review_decides_a_hold(review: str, round_: int, decision: str) -> None:
     reviewer = FakeReviewer(review)
     laya = FakeLaya({"says_vulnerable": 0.05, "says_no_marker": 0.95, "covers_no_action": 0.9},
                     {"approve": 0.2, "hold": 0.8})
-    outcome = _judge({"vulnerable": True}, laya=laya, reviewer=reviewer, next_role=None)
+    outcome = _judge({"vulnerable": True, "reassessment_round": round_}, laya=laya, reviewer=reviewer, next_role=None)
     assert outcome.payload["decision"] == decision and outcome.hold is False
     assert outcome.judgement.decided_by == "llm"
-    assert outcome.payload["reason"] == "Deep review: The reasoning and the record disagree. Second sentence."
     request = reviewer.requests[0]
     assert request.concerns == outcome.judgement.concerns and request.persona_label == "Fraud Decision Manager"
+    assert request.final is (round_ >= 1)
+    if decision == "send_back":
+        assert outcome.judgement.verdict == "send_back"
+        assert outcome.payload["reason"].startswith("Sent back to the agent:")
+        assert "the record shows one" in outcome.payload["feedback"]
+        assert "The reasoning and the record disagree." in outcome.payload["feedback"]
+    else:
+        assert outcome.payload["reason"] == "Deep review: The reasoning and the record disagree. Second sentence."
 
 
 def test_a_deep_review_hold_below_the_top_still_hands_up() -> None:
@@ -335,3 +345,12 @@ def test_the_min_lead_can_be_raised_from_the_environment(monkeypatch) -> None:
                     {"approve": 0.9, "hold": 0.1})
     _judge(laya=laya, reviewer=reviewer)
     assert reviewer.requests
+
+
+def test_the_deep_review_is_told_who_a_hold_goes_to() -> None:
+    reviewer = FakeReviewer("approve")
+    laya = FakeLaya({"says_vulnerable": 0.05, "says_no_marker": 0.6, "covers_no_action": 0.9})
+    _judge({"vulnerable": True}, laya=laya, reviewer=reviewer, next_role="financial_crime_lead")
+    assert reviewer.requests[-1].next_role_label == "Financial Crime Lead"
+    _judge({"vulnerable": True}, laya=laya, reviewer=reviewer, next_role=None)
+    assert reviewer.requests[-1].next_role_label is None
