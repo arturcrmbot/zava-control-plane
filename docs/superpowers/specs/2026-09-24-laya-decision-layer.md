@@ -292,7 +292,10 @@ With `JUDGEMENT_ENABLED=0` the same run is decided exactly as before: the two
 high-value claims end "refused by authority", and the refusal of a fraud victim
 is approved on its GBP 0 value.
 
-Live golden set (`tests/api/judgement/test_laya_live.py`): 9/9 on repeated runs.
+Live golden set (`tests/api/judgement/test_laya_live.py`): 12/12 on repeated runs.
+Re-run after the fixes in §9.2 with the real deep review: both holds reached
+gpt-4.1 (9.0 s and 10.0 s), were sent back with reasons, and were approved on
+re-assessment.
 
 ## 8. Phase 2: the world notices and reacts (banking world)
 
@@ -401,6 +404,36 @@ command gateway, reactions).
     because the reasoning would then contradict the record.
 - **`GET /api/judgement/status`** reports whether Laya is up and how many deep reviews
   are left this hour.
+
+### 9.2 Hardened after two independent code reviews (25 Sep 2026)
+
+- **Deep reviews cannot outlast the gate.** Reviews run one at a time, and the
+  orchestrator waits 300 s for a gate, hand-ups included. Each gate now has one
+  judging deadline (`JUDGEMENT_GATE_DEADLINE_S`, 180 s), shared by the whole chain.
+  A review waits in the queue only while it could still finish, takes its budget
+  slot only when it starts, and is cut off at the deadline; otherwise the rules
+  decide and say so. Reproduced first: four gates at once took 3.6 s against a
+  2.0 s deadline, and all four answer inside it after the fix.
+- **A live case's evidence stays still.** The payments loop no longer re-settles a
+  payment under a claim. A mule case opening no longer bumps an account a claim is
+  already reviewing. A second call can't void the first claim, and a mule
+  disposition must match the evidence it was decided on.
+- **Mule cases can't stick.** A case that ends with no disposition closes as
+  unresolved and can reopen. A call about a restrained mule no longer makes it
+  active again.
+- **The floor files what the presenter chose.** The call picker holds a steady
+  list. Ask the persona sends only what was edited and shows why a question failed.
+- **Flags off is still exactly main.** For the same scripted run (16,912 events), the
+  world journal, state, record versions and next random draw are identical to main
+  (`afe760fd`).
+
+Final checks:
+- `tests/api/banking` and `tests/api/judgement`: 196 passed, flags off and flags on.
+- The live Laya sets pass (15), and `tests/api/world` passes (301).
+- `tests/api/shared` (agency) passes, and so do the persona responder files, each on
+  its own and together.
+- Four server tests fail, and they are the same four on main.
+- The floor's tests pass (23), and `tsc` is clean.
 
 ## 10. Where Laya will not be used
 
