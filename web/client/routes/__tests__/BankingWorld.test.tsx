@@ -280,17 +280,53 @@ describe("BankingWorld", () => {
     expect(screen.getByTestId("flag-SYN-PAY-N00007").textContent).toContain("unlock fee · read by Laya");
   });
 
-  it("shows people living their lives and what happens to them", () => {
-    renderBank({ state: { ...STATE, life: {
-      people: 214, payments: 945, scams_tried: 54, scams_paid: 18, scams_stopped: 18, calls: 1, joined: 14, left: 0, laya_share: 0.83,
-      feed: [{ t: 1, when: "Tuesday morning", who: "Grace Young", text: "Grace Young paid Bella Pizza GBP 51: \"Takeaway\"", by: "laya", kind: "payment" }],
-      stories: [{ t: 2, when: "Tuesday morning", who: "Joan Chen", text: "Joan Chen fell for a tax office penalty scam and sent GBP 900", by: "laya", kind: "scam" }],
+  it("explains the living world: the loop, Laya's odds, what the bank doesn't know", () => {
+    const decision = (kind: string, title: string, steps: unknown[], outcome: string) => ({ t: 1, when: "Friday night", kind, who: "x", profile: "Liam Chen, 21, a student.", title, steps, outcome });
+    renderBank({ state: { ...STATE, screening: { payments_screened: 90, payments_flagged: 3 }, life: {
+      people: 214, payments: 945, scams_tried: 54, scams_paid: 18, scams_stopped: 18, calls: 1, joined: 14, left: 0, life_events: 5,
+      decided_by_laya: 300, decided_by_rules: 20, laya_share: 0.94, laya_avg_ms: 88, cases_opened: 2, cases_per_hour: 10,
+      decisions: [decision("spend", "Liam Chen, Friday night", [{ by: "laya", question: "What is Liam most likely to spend money on right now?", chose: "eat_out", ms: 71,
+        options: [{ id: "eat_out", label: "Eating out or ordering a takeaway", p: 0.48 }, { id: "treat", label: "A night out", p: 0.21 }] }], "paid Lucky Noodle GBP 22: \"Takeaway\"")],
+      scam_decisions: [decision("scam", "Crew Harbour tried a romance scam on Dorothy Walsh", [
+        { by: "laya", question: "Which scam would most likely work on Dorothy?", chose: "romance", options: [{ id: "romance", label: "A fake online romance asking for money", p: 0.6 }] },
+        { by: "code", question: "Combines that caution, how well the scam fits and the bank's warning", chose: "pay", options: [{ id: "pay", label: "Do what the message asks and send the money", p: 0.62 }] },
+      ], "fell for a romance scam and sent GBP 900 despite the bank's warning")],
+      unknown_to_bank: [{ name: "Gareth Rossi", circumstance: "just out of hospital after a stroke" }],
+      crews: { "Crew Harbour": { romance: { tried: 2, paid: 1 } } },
+      stories: [{ t: 2, when: "Friday night", who: "Joan Chen", text: "Joan Chen called Zava Bank before paying a tax office penalty scam", by: "laya", kind: "scam" }],
+      feed: [],
     } } });
-    const panel = screen.getByTestId("life");
-    expect(within(panel).getByTestId("life-counts").textContent).toBe("214 people · 945 payments · scams 54 tried, 18 paid, 18 stopped · 1 called the bank · 14 joined, 0 left");
-    expect(within(panel).getByTestId("life-laya").textContent).toBe("83% of choices made by Laya");
-    expect(panel.textContent).toContain("Grace Young paid Bella Pizza GBP 51");
-    expect(panel.textContent).toContain("Joan Chen fell for a tax office penalty scam");
+    const how = screen.getByTestId("how-it-works");
+    expect(how.textContent).toContain("214people");
+    expect(how.textContent).toContain("94% of all choices · 88 ms each · no tokens");
+    expect(how.textContent).toContain("2 cases opened (limit 10/h)");
+    const decisions = screen.getByTestId("laya-decisions");
+    expect(within(decisions).getByTestId("decision-scam").textContent).toContain("Crew Harbour tried a romance scam on Dorothy Walsh");
+    const spend = within(decisions).getByTestId("decision-spend");
+    expect(spend.textContent).toContain("Laya · 71 msWhat is Liam most likely to spend money on right now?");
+    expect(spend.textContent).toContain("✓ Eating out or ordering a takeaway");
+    expect(spend.textContent).toContain("48%");
+    expect(spend.textContent).toContain("→ paid Lucky Noodle GBP 22");
+    expect(screen.getByTestId("unknown-to-bank").textContent).toContain("Gareth Rossi just out of hospital after a stroke");
+    expect(screen.getByTestId("crew-board").textContent).toContain("romance 1/2");
+    expect(screen.getByTestId("life-stories").textContent).toContain("Joan Chen called Zava Bank before paying");
+    expect((screen.getByTestId("bank-infrastructure") as HTMLDetailsElement).open).toBe(false);
+    expect(screen.getByTestId("laya-chip").textContent?.trim()).toBe("Laya · 88 ms per choice · no tokens");
+    expect(screen.queryByTestId("bank-stat-mtm")).toBeNull();
+  });
+
+  it("shows how the persona read the agent's reasoning for the case on screen", async () => {
+    details["/api/workflows/bapp-evt-11"] = { workflow: { payload: {
+      decisions: [{ persona_role: "fraud_decision_manager", verdict: "hold", decided_by: "laya", judgement: {
+        summary: "Held for a closer look.", laya_ms: 154, concerns: ["the agent's reasoning says there is no vulnerability marker, but the record shows one"],
+        readings: [{ id: "says_no_marker", question: "Does the text say there is no vulnerability flag?", p_yes: 0.94, lead: 0.88, clear: true }] } }],
+    } } };
+    renderBank({ events: [ROUTINE, ...APPROVED_TRACE, ...APPROVED_OUTCOME], state: { ...STATE, life: { people: 200, decisions: [], scam_decisions: [] } } });
+    const panel = await screen.findByTestId("persona-readings");
+    expect(panel.textContent).toContain("How the fraud decision manager read the agent's reasoning");
+    expect(panel.textContent).toContain("Does the text say there is no vulnerability flag?");
+    expect(panel.textContent).toContain("94% yes");
+    expect(panel.textContent).toContain("Decided by fast judgement in 154 ms: Held for a closer look.");
   });
 
   it("hides the noticed panel when the bank does not screen", () => {

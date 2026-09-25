@@ -23,6 +23,7 @@ import { type WorldEvent, type WorldState } from "@client/hooks/useWorldSimulati
 import { WorldInterventionStrip } from "@client/components/WorldInterventionStrip";
 import { WorldObjectiveStrip } from "@client/components/WorldObjectiveStrip";
 import { type InterventionStep } from "@client/lib/worldIntervention";
+import { CrewBoard, HowItWorks, LayaDecisions, LifeStories, PersonaReadings, UnknownToBank, type JudgedCounts, type Life, type PersonaReading } from "./LivingWorld";
 
 const RAIL_CAP = 8;
 const CLAIM_CAP = 8;
@@ -62,7 +63,10 @@ const RECENT_CASES_CAP = 8;
 interface RecentCase { id: string; type: string; status: string; phase?: string; createdAt: number; refused: boolean; judged?: JudgedDecision }
 
 /** A persona decision reached by judgement, as the persona responder records it. */
-interface JudgedDecision { persona: string; verdict: string; decidedBy: string; summary?: string; round?: number }
+interface JudgedDecision {
+  persona: string; verdict: string; decidedBy: string; summary?: string; round?: number;
+  readings?: PersonaReading[]; concerns?: string[]; layaMs?: number; reviewMs?: number;
+}
 
 const DECIDED_BY: Record<string, string> = { laya: "fast judgement", llm: "deep review", rules: "rules" };
 const VERDICT_WORDS: Record<string, string> = { approve: "approved", hold: "held it", reject: "declined", escalate: "escalated", send_back: "sent it back to the agent" };
@@ -76,7 +80,14 @@ function judgedDecisions(decisions: unknown): JudgedDecision[] {
     if (!decidedBy || !persona) return [];
     const judgement = (row.judgement ?? {}) as Record<string, unknown>;
     const round = Number(row.round ?? 0);
-    return [{ persona, verdict: String(row.verdict ?? ""), decidedBy, summary: text(judgement.summary) ?? text(row.reason), round: round > 0 ? round : undefined }];
+    const review = (judgement.deep_review ?? {}) as Record<string, unknown>;
+    return [{
+      persona, verdict: String(row.verdict ?? ""), decidedBy, summary: text(judgement.summary) ?? text(row.reason), round: round > 0 ? round : undefined,
+      readings: Array.isArray(judgement.readings) ? (judgement.readings as PersonaReading[]) : undefined,
+      concerns: Array.isArray(judgement.concerns) ? (judgement.concerns as unknown[]).map(String) : undefined,
+      layaMs: typeof judgement.laya_ms === "number" ? judgement.laya_ms : undefined,
+      reviewMs: typeof review.latency_ms === "number" ? review.latency_ms : undefined,
+    }];
   });
 }
 
@@ -349,69 +360,6 @@ interface BankSnapshot extends WorldState {
   life?: Life;
 }
 
-interface LifeEntry { t: number; when: string; who?: string | null; text: string; by: string; kind: string }
-interface Life {
-  people?: number;
-  payments?: number;
-  scams_tried?: number;
-  scams_paid?: number;
-  scams_stopped?: number;
-  scams_ignored?: number;
-  calls?: number;
-  joined?: number;
-  left?: number;
-  life_events?: number;
-  laya_share?: number;
-  feed?: LifeEntry[];
-  stories?: LifeEntry[];
-}
-
-const LIFE_TONES: Record<string, string> = {
-  scam: "text-red-700 dark:text-red-300",
-  call: "text-amber-700 dark:text-amber-300",
-  life: "text-violet-700 dark:text-violet-300",
-  join: "text-sky-700 dark:text-sky-300",
-  leave: "text-sky-700 dark:text-sky-300",
-};
-
-function LifeLine({ entry }: { entry: LifeEntry }) {
-  const by = entry.by === "laya" ? "Laya" : entry.by === "rules" ? "rules" : "world";
-  return (
-    <li className="flex items-baseline gap-2 truncate text-[11px] text-slate-700 dark:text-slate-200">
-      <span className="shrink-0 text-slate-400">{entry.when}</span>
-      <span className={`truncate ${LIFE_TONES[entry.kind] ?? ""}`}>{entry.text}</span>
-      <span className={`shrink-0 rounded px-1 text-[10px] ${by === "Laya" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"}`}>{by}</span>
-    </li>
-  );
-}
-
-/** The people who live in the bank's world: what they do, and what happens to them. */
-function LifePanel({ life }: { life: Life }) {
-  const payments = (life.feed ?? []).filter((e) => e.kind === "payment" || e.kind === "money").slice(0, 8);
-  const stories = (life.stories ?? []).slice(0, 8);
-  return (
-    <section data-testid="life" aria-label="Life in the bank" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-        <span className="font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Life in the bank</span>
-        <span data-testid="life-counts" className="text-slate-600 dark:text-slate-300">
-          {compactInt(life.people)} people · {compactInt(life.payments)} payments · scams {compactInt(life.scams_tried)} tried, {compactInt(life.scams_paid)} paid, {compactInt(life.scams_stopped)} stopped · {compactInt(life.calls)} called the bank · {compactInt(life.joined)} joined, {compactInt(life.left)} left
-        </span>
-        <span data-testid="life-laya" className="text-emerald-700 dark:text-emerald-300">{Math.round((life.laya_share ?? 0) * 100)}% of choices made by Laya</span>
-      </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <div>
-          <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-400">What people are doing</div>
-          <ul className="space-y-0.5">{payments.map((e, i) => <LifeLine key={`${e.t}-${i}`} entry={e} />)}</ul>
-        </div>
-        <div>
-          <div className="mb-1 text-[10px] uppercase tracking-wide text-slate-400">What is happening to them</div>
-          {stories.length === 0 ? <div className="text-[11px] text-slate-400">Nothing yet.</div>
-            : <ul className="space-y-0.5">{stories.map((e, i) => <LifeLine key={`${e.t}-${i}`} entry={e} />)}</ul>}
-        </div>
-      </div>
-    </section>
-  );
-}
 
 interface ScreeningFlag { payment_id: string; beneficiary_id: string; reference: string; pattern: string; lead: number; screened_by: string; amount_gbp: number }
 interface Screening {
@@ -818,6 +766,13 @@ export default function BankingWorld({
   const raisedClaims = useMemo(() => (bank.fraud_claims ?? []).filter((claim) => claim.raised), [bank.fraud_claims]);
   const openClaims = raisedClaims.filter((claim) => claim.status !== "reimbursed" && claim.status !== "refused" && !claimFacts.get(claim.id)?.closed);
   const pendingWorkflowIds = useMemo(() => new Set(pendingDecisions.map((row) => row.workflowId)), [pendingDecisions]);
+  const living = Boolean(bank.life);
+  const judgedCounts = useMemo<JudgedCounts>(() => {
+    const counts: JudgedCounts = { laya: 0, llm: 0, rules: 0 };
+    for (const c of recentCases) if (c.judged && c.judged.decidedBy in counts) counts[c.judged.decidedBy as keyof JudgedCounts] += 1;
+    return counts;
+  }, [recentCases]);
+  const personaReading = useMemo(() => [...trail].reverse().find((d) => (d.readings ?? []).length > 0), [trail]);
   const toggleActor = (id: string | null) => setSelectedActor((cur) => (cur === id ? null : id));
   const recentRefs = useMemo(() => {
     const refs = new Map<string, number>();
@@ -868,7 +823,7 @@ export default function BankingWorld({
                 <div className="rounded-xl bg-blue-600 p-2 text-white shadow-sm shadow-blue-500/30"><Landmark size={22} /></div>
                 <div>
                   <h1 className="text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">Bank operations</h1>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Zava Bank · synthetic</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{bank.life ? `Zava Bank · synthetic · ${compactInt(bank.life.people)} people living their lives through Laya, a small model on this machine` : "Zava Bank · synthetic"}</p>
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
@@ -879,8 +834,10 @@ export default function BankingWorld({
                   <Scale size={13} className={pendingDecisions.length > 0 ? "bank-live-glow" : ""} /><span>Decisions waiting: <span data-testid="decisions-waiting" className="tabular-nums">{pendingDecisions.length}</span></span>
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"><Clock3 size={13} /> sim <span className="tabular-nums">{simClock(bank.sim_time)}</span></span>
+                {bank.life && <span data-testid="laya-chip" className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"><Activity size={13} /> Laya · {bank.life.laya_avg_ms ? `${Math.round(bank.life.laya_avg_ms)} ms per choice` : "starting"} · no tokens</span>}
               </div>
             </div>
+            {bank.life ? null : (
             <div className="grid w-full gap-2 sm:grid-cols-2 lg:w-auto lg:grid-cols-5">
               <HeaderMetric testId="bank-stat-payments" icon={<Banknote size={16} />} label="Payments settled" value={compactInt(bank.bank?.payments_settled_total)} sub={money(bank.bank?.settled_value_gbp, true)} />
               <HeaderMetric testId="bank-stat-customers" icon={<UsersRound size={16} />} label="Customers" value={compactInt(bank.bank?.customer_count)} sub={`${compactInt(bank.bank?.vulnerable_customer_count)} vulnerable`} />
@@ -888,153 +845,316 @@ export default function BankingWorld({
               <HeaderMetric testId="bank-stat-beneficiaries" icon={<LockKeyhole size={16} />} label="Beneficiaries watched" value={compactInt((bank.beneficiaries ?? []).filter((b) => b.status === "under_review" || b.status === "frozen").length)} sub="under review / frozen" />
               <HeaderMetric testId="bank-stat-mtm" icon={<TrendingUp size={16} />} label="Positions MTM" value={money(bank.bank?.positions_mtm_gbp, true)} sub={`${compactInt(bank.bank?.positions_marked_total)} marks`} />
             </div>
+            )}
           </div>
         </header>
 
         {error && <div data-testid="banking-error" className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300">{error}</div>}
 
-        <section aria-label="Make something happen" className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Make something happen</span>
-            {CASE_ACTIONS.map((action) => (
-              <button key={action.id} type="button" title={action.hint} disabled={busy || !bank.enabled} onClick={() => void runAction(action)} className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-blue-950/30">
-                {action.label}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section data-testid="recent-cases" aria-label="Recent cases" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"><Activity size={15} /> Recent cases</div>
-          {recentCases.length === 0 ? (
-            <div data-testid="recent-cases-empty" className="text-xs text-slate-400">No cases yet. Make something happen above.</div>
-          ) : (
-            <div className="grid gap-1.5 md:grid-cols-2">
-              {recentCases.map((c) => {
-                const status = caseStatus(c);
-                return (
-                  <a key={c.id} data-testid={`case-${c.id}`} href={`/workflows/${encodeURIComponent(c.id)}`} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-xs transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-800 dark:bg-slate-950/50 dark:hover:bg-blue-950/30">
-                    <span className="min-w-0 truncate"><span className="font-medium text-slate-800 dark:text-slate-100">{CASE_LABELS[c.type]}</span> <span className="font-mono text-slate-500">{c.id}</span>{c.phase ? <span className="text-slate-400"> · {c.phase}</span> : null}</span>
-                    <span className="flex shrink-0 items-center gap-2">{c.judged && <span data-testid={`judged-${c.id}`} className="text-[10px] text-slate-500 dark:text-slate-400">{roleLabel(c.judged.persona)} · {DECIDED_BY[c.judged.decidedBy] ?? c.judged.decidedBy}</span>}<span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${status.tone}`}>{status.label}</span><span className="text-blue-600 dark:text-blue-400">Open →</span></span>
-                  </a>
-                );
-              })}
+        {living && bank.life ? (
+          <>
+            <HowItWorks life={bank.life} judged={judgedCounts} flagged={bank.screening?.payments_flagged ?? 0} />
+            <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-5">
+              <div className="xl:col-span-3"><LayaDecisions life={bank.life} /></div>
+              <div className="space-y-3 xl:col-span-2">
+                <LifeStories life={bank.life} />
+                <UnknownToBank people={bank.life.unknown_to_bank ?? []} />
+                <CrewBoard crews={bank.life.crews} />
+              </div>
             </div>
-          )}
-        </section>
+            <h2 className="pt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">The bank's side: cases, and how its personas decided</h2>
+            <section data-testid="recent-cases" aria-label="Recent cases" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"><Activity size={15} /> Recent cases</div>
+              {recentCases.length === 0 ? (
+                <div data-testid="recent-cases-empty" className="text-xs text-slate-400">No cases yet. Make something happen above.</div>
+              ) : (
+                <div className="grid gap-1.5 md:grid-cols-2">
+                  {recentCases.map((c) => {
+                    const status = caseStatus(c);
+                    return (
+                      <a key={c.id} data-testid={`case-${c.id}`} href={`/workflows/${encodeURIComponent(c.id)}`} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-xs transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-800 dark:bg-slate-950/50 dark:hover:bg-blue-950/30">
+                        <span className="min-w-0 truncate"><span className="font-medium text-slate-800 dark:text-slate-100">{CASE_LABELS[c.type]}</span> <span className="font-mono text-slate-500">{c.id}</span>{c.phase ? <span className="text-slate-400"> · {c.phase}</span> : null}</span>
+                        <span className="flex shrink-0 items-center gap-2">{c.judged && <span data-testid={`judged-${c.id}`} className="text-[10px] text-slate-500 dark:text-slate-400">{roleLabel(c.judged.persona)} · {DECIDED_BY[c.judged.decidedBy] ?? c.judged.decidedBy}</span>}<span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${status.tone}`}>{status.label}</span><span className="text-blue-600 dark:text-blue-400">Open →</span></span>
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
 
-        {bank.life && <LifePanel life={bank.life} />}
+            <WorldObjectiveStrip testId="banking-objective" objectives={bank.objectives} />
+            {story && storySteps.length > 0 && <WorldInterventionStrip testId="banking-intervention" trace={story.trace} steps={storySteps} onTrace={toggleActor} />}
+            {story?.workflowId && gate && trail.length > 0 && <AskPersonaPanel workflowId={story.workflowId} gate={gate} />}
 
-        {(bank.recent_settlements ?? []).length > 0 && <CustomerCallPanel settlements={[...(bank.recent_settlements ?? [])].reverse()} />}
-
-        {bank.screening && <NoticedPanel screening={bank.screening} />}
-
-        <WorldObjectiveStrip testId="banking-objective" objectives={bank.objectives} />
-        {story && storySteps.length > 0 && <WorldInterventionStrip testId="banking-intervention" trace={story.trace} steps={storySteps} onTrace={toggleActor} />}
-        {story?.workflowId && gate && trail.length > 0 && <AskPersonaPanel workflowId={story.workflowId} gate={gate} />}
-
-        {pendingDecisions.length > 0 && (
-          <section data-testid="pending-decisions" aria-label="Decisions waiting" className="rounded-xl border border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-800 dark:bg-amber-950/30">
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200"><Scale size={15} className="bank-live-glow" /> Waiting for a decision</div>
-            <div className="grid gap-2 lg:grid-cols-2">
-              {pendingDecisions.map((decision) => {
-                const context = decision.context;
-                const recommendation = context?.impact ?? (context?.optionId ? OPTION_LABELS[context.optionId] ?? context.optionId : undefined);
-                return (
-                  <div key={decision.id} data-testid={`pending-${decision.workflowId}`} className="flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-white px-3 py-2 dark:border-amber-900 dark:bg-slate-900">
-                    <div className="min-w-0">
-                      <div className="font-mono text-[11px] text-slate-500">{decision.workflowId}</div>
-                      {context?.persona ? (
-                        <>
-                          <div className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">{roleLabel(context.persona)}{context.phase ? ` · ${context.phase}` : ""}</div>
-                          {recommendation && <div className="mt-1 text-xs text-slate-700 dark:text-slate-200">Agents recommend: {recommendation}{context.value !== undefined ? ` · ${money(context.value)}` : ""}</div>}
-                          {context.reasoning && <div className="mt-1 text-xs italic text-slate-500 dark:text-slate-400">“{excerpt(context.reasoning)}”</div>}
-                          {context.allowed !== undefined && (
-                            <span className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${context.allowed ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"}`}>
-                              {context.allowed ? "Within delegated authority" : "Outside delegated authority"}
-                            </span>
+            {personaReading && <PersonaReadings persona={roleLabel(personaReading.persona)} readings={personaReading.readings ?? []} concerns={personaReading.concerns ?? []} decidedBy={personaReading.decidedBy} layaMs={personaReading.layaMs} reviewMs={personaReading.reviewMs} summary={personaReading.summary} />}
+            {pendingDecisions.length > 0 && (
+              <section data-testid="pending-decisions" aria-label="Decisions waiting" className="rounded-xl border border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-800 dark:bg-amber-950/30">
+                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200"><Scale size={15} className="bank-live-glow" /> Waiting for a decision</div>
+                <div className="grid gap-2 lg:grid-cols-2">
+                  {pendingDecisions.map((decision) => {
+                    const context = decision.context;
+                    const recommendation = context?.impact ?? (context?.optionId ? OPTION_LABELS[context.optionId] ?? context.optionId : undefined);
+                    return (
+                      <div key={decision.id} data-testid={`pending-${decision.workflowId}`} className="flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-white px-3 py-2 dark:border-amber-900 dark:bg-slate-900">
+                        <div className="min-w-0">
+                          <div className="font-mono text-[11px] text-slate-500">{decision.workflowId}</div>
+                          {context?.persona ? (
+                            <>
+                              <div className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">{roleLabel(context.persona)}{context.phase ? ` · ${context.phase}` : ""}</div>
+                              {recommendation && <div className="mt-1 text-xs text-slate-700 dark:text-slate-200">Agents recommend: {recommendation}{context.value !== undefined ? ` · ${money(context.value)}` : ""}</div>}
+                              {context.reasoning && <div className="mt-1 text-xs italic text-slate-500 dark:text-slate-400">“{excerpt(context.reasoning)}”</div>}
+                              {context.allowed !== undefined && (
+                                <span className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${context.allowed ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"}`}>
+                                  {context.allowed ? "Within delegated authority" : "Outside delegated authority"}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <div className="mt-0.5 text-sm font-medium text-slate-900 dark:text-white">{decision.summary ?? "Decision requested"}</div>
                           )}
-                        </>
-                      ) : (
-                        <div className="mt-0.5 text-sm font-medium text-slate-900 dark:text-white">{decision.summary ?? "Decision requested"}</div>
-                      )}
-                    </div>
-                    <a href={`/workflows/${encodeURIComponent(decision.workflowId)}`} className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">Review &amp; decide →</a>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        <Panel title="Payment rails" icon={<Activity size={16} />}>
-          <div className="grid gap-3 md:grid-cols-3">
-            {(bank.payment_rails ?? []).slice(0, RAIL_CAP).map((rail) => (
-              <RailCard key={`${rail.id}:${recentRefs.get(rail.id) ?? rail.last_event_id ?? 0}`} rail={rail} pulse={recentRefs.has(rail.id)} selected={selectedActor === rail.id} onClick={() => toggleActor(rail.id)} />
-            ))}
-          </div>
-          <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500"><BadgePoundSterling size={14} /> Recent settlements</div>
-          <div data-testid="recent-settlements" className="mt-2 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
-            {(bank.recent_settlements ?? []).slice(-RAIL_CAP).reverse().map((settlement) => (
-              <button key={`${settlement.event_id}:${settlement.payment_id}`} type="button" onClick={() => toggleActor(settlement.payment_id)} className="bank-pulse flex w-full items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2 py-1.5 text-left text-[11px] dark:border-slate-800 dark:bg-slate-950/50">
-                <span className="min-w-0 truncate font-mono text-slate-700 dark:text-slate-200">{settlement.payment_id}</span>
-                <span className="shrink-0 tabular-nums text-slate-500">{money(settlement.amount_gbp)} · {settlement.rail_id.replace("SYN-RAIL-", "")}</span>
-              </button>
-            ))}
-          </div>
-        </Panel>
-
-        <section className="grid grid-cols-1 items-start gap-3 xl:grid-cols-3">
-          <Panel title="Fraud claims" icon={<ShieldCheck size={16} />} className="xl:col-span-2">
-            {raisedClaims.length === 0 ? (
-              <div data-testid="claims-empty" className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500 dark:border-slate-800">
-                No fraud claims raised. Start a story above and watch the bank respond.
-              </div>
-            ) : (
-              <div className="grid gap-3 lg:grid-cols-3">
-                {raisedClaims.slice(0, CLAIM_CAP).map((claim) => {
-                  const facts = claimFacts.get(claim.id);
-                  return (
-                    <ClaimCard key={`${claim.id}:${recentRefs.get(claim.id) ?? claim.last_event_id ?? 0}`} claim={claim} evaluation={(bank.reimbursement_evaluations ?? []).find((e) => e.claim_id === claim.id)} facts={facts} awaitingHuman={Boolean(facts?.workflowId && pendingWorkflowIds.has(facts.workflowId))} selected={selectedActor === claim.id} onClick={() => toggleActor(claim.id)} />
-                  );
-                })}
-              </div>
+                        </div>
+                        <a href={`/workflows/${encodeURIComponent(decision.workflowId)}`} className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">Review &amp; decide →</a>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
             )}
-          </Panel>
-          <Panel title="Financial crime" icon={<ShieldAlert size={16} />}>
-            <div className="space-y-3">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Beneficiaries under review / frozen</div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {(bank.beneficiaries ?? []).slice(0, BENEFICIARY_CAP).map((beneficiary) => <StatusChip key={beneficiary.id} label={beneficiary.id} status={beneficiary.status ?? "review"} onClick={() => toggleActor(beneficiary.id)} />)}
-                  {(bank.beneficiaries ?? []).length === 0 && <span className="text-xs text-slate-400">none in play</span>}
-                </div>
-              </div>
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Investigations</div>
-                <div className="mt-1.5 space-y-1.5">
-                  {(bank.investigations ?? []).slice(0, INVESTIGATION_CAP).map((investigation) => (
-                    <button key={investigation.id} type="button" onClick={() => toggleActor(investigation.id)} className="w-full rounded-lg bg-slate-50 px-2 py-1.5 text-left text-[11px] dark:bg-slate-950/50">
-                      <span className="font-mono font-semibold">{investigation.id}</span><span className="text-slate-500"> · {investigation.subject_id} · {investigation.status ?? "open"}</span>
-                    </button>
-                  ))}
-                  {(bank.investigations ?? []).length === 0 && <div className="text-xs text-slate-400">no open investigations</div>}
-                </div>
-              </div>
-            </div>
-          </Panel>
-        </section>
 
-        <section className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
-          <Panel title="Credit risk" icon={<Building2 size={16} />}>
-            <ExposureList exposures={bank.exposures ?? []} limits={bank.credit_limits ?? []} counterparties={bank.counterparties ?? []} onActor={toggleActor} />
-          </Panel>
-          <Panel title="Markets" icon={<TrendingUp size={16} />}>
-            <PositionList positions={bank.positions ?? []} counterparties={bank.counterparties ?? []} onActor={toggleActor} />
-          </Panel>
-        </section>
+            {bank.screening && <NoticedPanel screening={bank.screening} />}
 
-        <Journal events={journal} selectedActor={selectedActor} functionFilter={functionFilter} showRoutine={showRoutine} loading={loading} onFunctionFilter={setFunctionFilter} onRoutine={setShowRoutine} onActor={toggleActor} onClear={() => setSelectedActor(null)} />
+            <h2 className="pt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Steer the world</h2>
+            <section aria-label="Make something happen" className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Make something happen</span>
+                {CASE_ACTIONS.map((action) => (
+                  <button key={action.id} type="button" title={action.hint} disabled={busy || !bank.enabled} onClick={() => void runAction(action)} className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-blue-950/30">
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            {(bank.recent_settlements ?? []).length > 0 && <CustomerCallPanel settlements={[...(bank.recent_settlements ?? [])].reverse()} />}
+
+            <details data-testid="bank-infrastructure" className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+              <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Bank infrastructure: payment rails, claims, credit, markets and the event stream</summary>
+              <div className="mt-3 space-y-4">
+                <Panel title="Payment rails" icon={<Activity size={16} />}>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {(bank.payment_rails ?? []).slice(0, RAIL_CAP).map((rail) => (
+                      <RailCard key={`${rail.id}:${recentRefs.get(rail.id) ?? rail.last_event_id ?? 0}`} rail={rail} pulse={recentRefs.has(rail.id)} selected={selectedActor === rail.id} onClick={() => toggleActor(rail.id)} />
+                    ))}
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500"><BadgePoundSterling size={14} /> Recent settlements</div>
+                  <div data-testid="recent-settlements" className="mt-2 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
+                    {(bank.recent_settlements ?? []).slice(-RAIL_CAP).reverse().map((settlement) => (
+                      <button key={`${settlement.event_id}:${settlement.payment_id}`} type="button" onClick={() => toggleActor(settlement.payment_id)} className="bank-pulse flex w-full items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2 py-1.5 text-left text-[11px] dark:border-slate-800 dark:bg-slate-950/50">
+                        <span className="min-w-0 truncate font-mono text-slate-700 dark:text-slate-200">{settlement.payment_id}</span>
+                        <span className="shrink-0 tabular-nums text-slate-500">{money(settlement.amount_gbp)} · {settlement.rail_id.replace("SYN-RAIL-", "")}</span>
+                      </button>
+                    ))}
+                  </div>
+                </Panel>
+
+                <section className="grid grid-cols-1 items-start gap-3 xl:grid-cols-3">
+                  <Panel title="Fraud claims" icon={<ShieldCheck size={16} />} className="xl:col-span-2">
+                    {raisedClaims.length === 0 ? (
+                      <div data-testid="claims-empty" className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500 dark:border-slate-800">
+                        No fraud claims raised. Start a story above and watch the bank respond.
+                      </div>
+                    ) : (
+                      <div className="grid gap-3 lg:grid-cols-3">
+                        {raisedClaims.slice(0, CLAIM_CAP).map((claim) => {
+                          const facts = claimFacts.get(claim.id);
+                          return (
+                            <ClaimCard key={`${claim.id}:${recentRefs.get(claim.id) ?? claim.last_event_id ?? 0}`} claim={claim} evaluation={(bank.reimbursement_evaluations ?? []).find((e) => e.claim_id === claim.id)} facts={facts} awaitingHuman={Boolean(facts?.workflowId && pendingWorkflowIds.has(facts.workflowId))} selected={selectedActor === claim.id} onClick={() => toggleActor(claim.id)} />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </Panel>
+                  <Panel title="Financial crime" icon={<ShieldAlert size={16} />}>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Beneficiaries under review / frozen</div>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {(bank.beneficiaries ?? []).slice(0, BENEFICIARY_CAP).map((beneficiary) => <StatusChip key={beneficiary.id} label={beneficiary.id} status={beneficiary.status ?? "review"} onClick={() => toggleActor(beneficiary.id)} />)}
+                          {(bank.beneficiaries ?? []).length === 0 && <span className="text-xs text-slate-400">none in play</span>}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Investigations</div>
+                        <div className="mt-1.5 space-y-1.5">
+                          {(bank.investigations ?? []).slice(0, INVESTIGATION_CAP).map((investigation) => (
+                            <button key={investigation.id} type="button" onClick={() => toggleActor(investigation.id)} className="w-full rounded-lg bg-slate-50 px-2 py-1.5 text-left text-[11px] dark:bg-slate-950/50">
+                              <span className="font-mono font-semibold">{investigation.id}</span><span className="text-slate-500"> · {investigation.subject_id} · {investigation.status ?? "open"}</span>
+                            </button>
+                          ))}
+                          {(bank.investigations ?? []).length === 0 && <div className="text-xs text-slate-400">no open investigations</div>}
+                        </div>
+                      </div>
+                    </div>
+                  </Panel>
+                </section>
+
+                <section className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
+                  <Panel title="Credit risk" icon={<Building2 size={16} />}>
+                    <ExposureList exposures={bank.exposures ?? []} limits={bank.credit_limits ?? []} counterparties={bank.counterparties ?? []} onActor={toggleActor} />
+                  </Panel>
+                  <Panel title="Markets" icon={<TrendingUp size={16} />}>
+                    <PositionList positions={bank.positions ?? []} counterparties={bank.counterparties ?? []} onActor={toggleActor} />
+                  </Panel>
+                </section>
+
+                <Journal events={journal} selectedActor={selectedActor} functionFilter={functionFilter} showRoutine={showRoutine} loading={loading} onFunctionFilter={setFunctionFilter} onRoutine={setShowRoutine} onActor={toggleActor} onClear={() => setSelectedActor(null)} />
+              </div>
+            </details>
+          </>
+        ) : (
+          <>
+            <section aria-label="Make something happen" className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="mr-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Make something happen</span>
+                {CASE_ACTIONS.map((action) => (
+                  <button key={action.id} type="button" title={action.hint} disabled={busy || !bank.enabled} onClick={() => void runAction(action)} className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-blue-950/30">
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section data-testid="recent-cases" aria-label="Recent cases" className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"><Activity size={15} /> Recent cases</div>
+              {recentCases.length === 0 ? (
+                <div data-testid="recent-cases-empty" className="text-xs text-slate-400">No cases yet. Make something happen above.</div>
+              ) : (
+                <div className="grid gap-1.5 md:grid-cols-2">
+                  {recentCases.map((c) => {
+                    const status = caseStatus(c);
+                    return (
+                      <a key={c.id} data-testid={`case-${c.id}`} href={`/workflows/${encodeURIComponent(c.id)}`} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5 text-xs transition hover:border-blue-300 hover:bg-blue-50 dark:border-slate-800 dark:bg-slate-950/50 dark:hover:bg-blue-950/30">
+                        <span className="min-w-0 truncate"><span className="font-medium text-slate-800 dark:text-slate-100">{CASE_LABELS[c.type]}</span> <span className="font-mono text-slate-500">{c.id}</span>{c.phase ? <span className="text-slate-400"> · {c.phase}</span> : null}</span>
+                        <span className="flex shrink-0 items-center gap-2">{c.judged && <span data-testid={`judged-${c.id}`} className="text-[10px] text-slate-500 dark:text-slate-400">{roleLabel(c.judged.persona)} · {DECIDED_BY[c.judged.decidedBy] ?? c.judged.decidedBy}</span>}<span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${status.tone}`}>{status.label}</span><span className="text-blue-600 dark:text-blue-400">Open →</span></span>
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            {(bank.recent_settlements ?? []).length > 0 && <CustomerCallPanel settlements={[...(bank.recent_settlements ?? [])].reverse()} />}
+
+            {bank.screening && <NoticedPanel screening={bank.screening} />}
+
+            <WorldObjectiveStrip testId="banking-objective" objectives={bank.objectives} />
+            {story && storySteps.length > 0 && <WorldInterventionStrip testId="banking-intervention" trace={story.trace} steps={storySteps} onTrace={toggleActor} />}
+            {story?.workflowId && gate && trail.length > 0 && <AskPersonaPanel workflowId={story.workflowId} gate={gate} />}
+
+            {pendingDecisions.length > 0 && (
+              <section data-testid="pending-decisions" aria-label="Decisions waiting" className="rounded-xl border border-amber-300 bg-amber-50 p-3 shadow-sm dark:border-amber-800 dark:bg-amber-950/30">
+                <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-200"><Scale size={15} className="bank-live-glow" /> Waiting for a decision</div>
+                <div className="grid gap-2 lg:grid-cols-2">
+                  {pendingDecisions.map((decision) => {
+                    const context = decision.context;
+                    const recommendation = context?.impact ?? (context?.optionId ? OPTION_LABELS[context.optionId] ?? context.optionId : undefined);
+                    return (
+                      <div key={decision.id} data-testid={`pending-${decision.workflowId}`} className="flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-white px-3 py-2 dark:border-amber-900 dark:bg-slate-900">
+                        <div className="min-w-0">
+                          <div className="font-mono text-[11px] text-slate-500">{decision.workflowId}</div>
+                          {context?.persona ? (
+                            <>
+                              <div className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">{roleLabel(context.persona)}{context.phase ? ` · ${context.phase}` : ""}</div>
+                              {recommendation && <div className="mt-1 text-xs text-slate-700 dark:text-slate-200">Agents recommend: {recommendation}{context.value !== undefined ? ` · ${money(context.value)}` : ""}</div>}
+                              {context.reasoning && <div className="mt-1 text-xs italic text-slate-500 dark:text-slate-400">“{excerpt(context.reasoning)}”</div>}
+                              {context.allowed !== undefined && (
+                                <span className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${context.allowed ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"}`}>
+                                  {context.allowed ? "Within delegated authority" : "Outside delegated authority"}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <div className="mt-0.5 text-sm font-medium text-slate-900 dark:text-white">{decision.summary ?? "Decision requested"}</div>
+                          )}
+                        </div>
+                        <a href={`/workflows/${encodeURIComponent(decision.workflowId)}`} className="shrink-0 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">Review &amp; decide →</a>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            <Panel title="Payment rails" icon={<Activity size={16} />}>
+              <div className="grid gap-3 md:grid-cols-3">
+                {(bank.payment_rails ?? []).slice(0, RAIL_CAP).map((rail) => (
+                  <RailCard key={`${rail.id}:${recentRefs.get(rail.id) ?? rail.last_event_id ?? 0}`} rail={rail} pulse={recentRefs.has(rail.id)} selected={selectedActor === rail.id} onClick={() => toggleActor(rail.id)} />
+                ))}
+              </div>
+              <div className="mt-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500"><BadgePoundSterling size={14} /> Recent settlements</div>
+              <div data-testid="recent-settlements" className="mt-2 grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
+                {(bank.recent_settlements ?? []).slice(-RAIL_CAP).reverse().map((settlement) => (
+                  <button key={`${settlement.event_id}:${settlement.payment_id}`} type="button" onClick={() => toggleActor(settlement.payment_id)} className="bank-pulse flex w-full items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2 py-1.5 text-left text-[11px] dark:border-slate-800 dark:bg-slate-950/50">
+                    <span className="min-w-0 truncate font-mono text-slate-700 dark:text-slate-200">{settlement.payment_id}</span>
+                    <span className="shrink-0 tabular-nums text-slate-500">{money(settlement.amount_gbp)} · {settlement.rail_id.replace("SYN-RAIL-", "")}</span>
+                  </button>
+                ))}
+              </div>
+            </Panel>
+
+            <section className="grid grid-cols-1 items-start gap-3 xl:grid-cols-3">
+              <Panel title="Fraud claims" icon={<ShieldCheck size={16} />} className="xl:col-span-2">
+                {raisedClaims.length === 0 ? (
+                  <div data-testid="claims-empty" className="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500 dark:border-slate-800">
+                    No fraud claims raised. Start a story above and watch the bank respond.
+                  </div>
+                ) : (
+                  <div className="grid gap-3 lg:grid-cols-3">
+                    {raisedClaims.slice(0, CLAIM_CAP).map((claim) => {
+                      const facts = claimFacts.get(claim.id);
+                      return (
+                        <ClaimCard key={`${claim.id}:${recentRefs.get(claim.id) ?? claim.last_event_id ?? 0}`} claim={claim} evaluation={(bank.reimbursement_evaluations ?? []).find((e) => e.claim_id === claim.id)} facts={facts} awaitingHuman={Boolean(facts?.workflowId && pendingWorkflowIds.has(facts.workflowId))} selected={selectedActor === claim.id} onClick={() => toggleActor(claim.id)} />
+                      );
+                    })}
+                  </div>
+                )}
+              </Panel>
+              <Panel title="Financial crime" icon={<ShieldAlert size={16} />}>
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Beneficiaries under review / frozen</div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {(bank.beneficiaries ?? []).slice(0, BENEFICIARY_CAP).map((beneficiary) => <StatusChip key={beneficiary.id} label={beneficiary.id} status={beneficiary.status ?? "review"} onClick={() => toggleActor(beneficiary.id)} />)}
+                      {(bank.beneficiaries ?? []).length === 0 && <span className="text-xs text-slate-400">none in play</span>}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Investigations</div>
+                    <div className="mt-1.5 space-y-1.5">
+                      {(bank.investigations ?? []).slice(0, INVESTIGATION_CAP).map((investigation) => (
+                        <button key={investigation.id} type="button" onClick={() => toggleActor(investigation.id)} className="w-full rounded-lg bg-slate-50 px-2 py-1.5 text-left text-[11px] dark:bg-slate-950/50">
+                          <span className="font-mono font-semibold">{investigation.id}</span><span className="text-slate-500"> · {investigation.subject_id} · {investigation.status ?? "open"}</span>
+                        </button>
+                      ))}
+                      {(bank.investigations ?? []).length === 0 && <div className="text-xs text-slate-400">no open investigations</div>}
+                    </div>
+                  </div>
+                </div>
+              </Panel>
+            </section>
+
+            <section className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
+              <Panel title="Credit risk" icon={<Building2 size={16} />}>
+                <ExposureList exposures={bank.exposures ?? []} limits={bank.credit_limits ?? []} counterparties={bank.counterparties ?? []} onActor={toggleActor} />
+              </Panel>
+              <Panel title="Markets" icon={<TrendingUp size={16} />}>
+                <PositionList positions={bank.positions ?? []} counterparties={bank.counterparties ?? []} onActor={toggleActor} />
+              </Panel>
+            </section>
+
+            <Journal events={journal} selectedActor={selectedActor} functionFilter={functionFilter} showRoutine={showRoutine} loading={loading} onFunctionFilter={setFunctionFilter} onRoutine={setShowRoutine} onActor={toggleActor} onClear={() => setSelectedActor(null)} />
+          </>
+        )}
       </div>
     </div>
   );

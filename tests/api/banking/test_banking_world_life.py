@@ -88,7 +88,7 @@ def _choose(chooser: Chooser, fallback: dict[str, float]) -> list[tuple[str, str
 
     async def run() -> None:
         chooser.choose({"person": "x"}, {"type": "choice", "instructions": "?", "criteria": {"a": "A", "b": "B"}},
-                       fallback, lambda choice, by: got.append((choice, by)))
+                       fallback, lambda d: got.append((d.choice, d.by)))
         for _ in range(5):
             await asyncio.sleep(0)
 

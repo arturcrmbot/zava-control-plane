@@ -200,6 +200,21 @@ def draw(weights: dict[str, float], rng: random.Random) -> str:
     return next(iter(weights))
 
 
+@dataclass
+class Decision:
+    """One choice: what was picked, who picked it, the odds and Laya's time."""
+
+    choice: str
+    by: str  # laya | rules
+    odds: dict[str, float]
+    ms: float | None = None
+
+
+def _normalised(weights: dict[str, float]) -> dict[str, float]:
+    total = sum(max(0.0, w) for w in weights.values()) or 1.0
+    return {k: max(0.0, w) / total for k, w in weights.items()}
+
+
 class Chooser:
     """Laya reads a situation and gives odds over a menu; a seeded draw decides."""
 
@@ -211,63 +226,54 @@ class Chooser:
         self._min_lead = min_lead
         self._in_flight = 0
         self.decided = {"laya": 0, "rules": 0}
+        self.latencies: deque[float] = deque(maxlen=60)
+
+    def avg_ms(self) -> float | None:
+        return round(sum(self.latencies) / len(self.latencies), 1) if self.latencies else None
 
     def choose(self, state: dict[str, str], question: dict[str, Any], fallback: dict[str, float],
-               done: Callable[[str, str], None], *, min_lead: float | None = None) -> None:
+               done: Callable[[Decision], None], *, min_lead: float | None = None, draw_it: bool = True) -> None:
+        """Ask Laya for odds over the menu; draw from them (or the fallback) and call back."""
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = None
         client = self._client_factory() if loop is not None else None
         if client is None or not client.available() or self._in_flight >= self._max_in_flight:
-            self._finish(draw(fallback, self._rng), "rules", done)
+            odds = _normalised(fallback)
+            self._finish(Decision(draw(odds, self._rng) if draw_it else max(odds, key=odds.get), "rules", odds), done)
             return
         self._in_flight += 1
         threshold = self._min_lead if min_lead is None else min_lead
-        loop.create_task(self._ask(client, state, question, fallback, done, threshold))
+        loop.create_task(self._ask(client, state, question, fallback, done, threshold, draw_it))
 
-    async def _ask(self, client, state, question, fallback, done, threshold: float) -> None:
-        choice, by = None, "rules"
+    async def _ask(self, client, state, question, fallback, done, threshold: float, draw_it: bool) -> None:
+        decision = None
+        started = time.perf_counter()
         try:
             answer = (await client.ask(state, {"q": question})).answers["q"]
+            ms = (time.perf_counter() - started) * 1000
+            self.latencies.append(ms)
             if answer.lead >= threshold:
-                choice, by = draw(dict(answer.probabilities), self._rng), "laya"
+                odds = _normalised(dict(answer.probabilities))
+                decision = Decision(draw(odds, self._rng) if draw_it else answer.top, "laya", odds, ms)
         except Exception:  # Laya down or slow: the library decides
             pass
         finally:
             self._in_flight -= 1
-        self._finish(choice or draw(fallback, self._rng), by, done)
+        if decision is None:
+            odds = _normalised(fallback)
+            decision = Decision(draw(odds, self._rng) if draw_it else max(odds, key=odds.get), "rules", odds)
+        self._finish(decision, done)
 
-    def _finish(self, choice: str, by: str, done: Callable[[str, str], None]) -> None:
-        self.decided[by] += 1
-        done(choice, by)
+    def _finish(self, decision: Decision, done: Callable[[Decision], None]) -> None:
+        self.decided[decision.by] += 1
+        done(decision)
 
     def odds(self, state: dict[str, str], question: dict[str, Any], fallback: dict[str, float],
-             done: Callable[[dict[str, float], str], None]) -> None:
-        """Laya's odds over the menu (the fallback weights when it is down), undrawn."""
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
-        client = self._client_factory() if loop is not None else None
-        if client is None or not client.available() or self._in_flight >= self._max_in_flight:
-            self.decided["rules"] += 1
-            done(dict(fallback), "rules")
-            return
-        self._in_flight += 1
-
-        async def ask() -> None:
-            got, by = dict(fallback), "rules"
-            try:
-                got, by = dict((await client.ask(state, {"q": question})).answers["q"].probabilities), "laya"
-            except Exception:
-                pass
-            finally:
-                self._in_flight -= 1
-            self.decided[by] += 1
-            done(got, by)
-
-        loop.create_task(ask())
+             done: Callable[[Decision], None]) -> None:
+        """Laya's odds over the menu (the fallback weights when it is down), not drawn."""
+        self.choose(state, question, fallback, done, min_lead=0.0, draw_it=False)
 
 
 def choice_question(instructions: str, options: dict[str, str]) -> dict[str, Any]:
@@ -282,6 +288,21 @@ def rating(instructions: str, levels: tuple[str, ...]) -> dict[str, Any]:
     return {"type": "score", "instructions": instructions, "criteria": list(levels)}
 
 
+def step(question: str, labels: dict[Any, str], decision: "Decision", top: int = 4, *, mark: bool = True) -> dict[str, Any]:
+    """One step of a decision for the floor: the question, the top odds, what was chosen.
+
+    ``mark=False`` for a step that only gives odds another step draws from.
+    """
+    names = {str(k): v for k, v in labels.items()}
+    ranked = sorted(decision.odds.items(), key=lambda kv: -kv[1])[:top]
+    if decision.choice not in {k for k, _ in ranked} and decision.choice in decision.odds:
+        ranked = ranked[: top - 1] + [(decision.choice, decision.odds[decision.choice])]
+    return {"by": decision.by, "question": question, "chose": decision.choice if mark else "",
+            "chose_label": names.get(decision.choice, decision.choice) if mark else "",
+            "ms": round(decision.ms) if decision.ms else None,
+            "options": [{"id": k, "label": names.get(k, k), "p": round(p, 3)} for k, p in ranked]}
+
+
 class CaseDial:
     """At most ``per_hour`` cases the world opens on its own, in wall-clock time."""
 
@@ -291,6 +312,7 @@ class CaseDial:
         self._capacity = max(1.0, self.per_hour / 4)
         self._tokens = self._capacity
         self._at = clock()
+        self.taken = 0
 
     def take(self) -> bool:
         now = self._clock()
@@ -298,11 +320,13 @@ class CaseDial:
         self._at = now
         if self._tokens >= 1:
             self._tokens -= 1
+            self.taken += 1
             return True
         return False
 
     def give_back(self) -> None:
         self._tokens = min(self._capacity, self._tokens + 1)
+        self.taken = max(0, self.taken - 1)
 
 
 # -- the people -------------------------------------------------------------------------------
@@ -322,6 +346,8 @@ class Person:
     rent_day: int = -1
     caution: int | None = None
     caution_by: str = "rules"
+    caution_odds: dict[str, float] | None = None
+    since: float = -1.0
     diary: deque = field(default_factory=lambda: deque(maxlen=4))
 
     def who(self) -> str:
@@ -350,6 +376,10 @@ class Life:
         self.crew_record: dict[str, dict[str, list[int]]] = {}
         self.feed: deque[dict[str, Any]] = deque(maxlen=_FEED_SIZE)
         self.stories: deque[dict[str, Any]] = deque(maxlen=_FEED_SIZE)
+        # Each decision as steps: what Laya was asked and its odds, what code
+        # weighed, what happened. Scams are kept apart: they are rarer.
+        self.decisions: deque[dict[str, Any]] = deque(maxlen=8)
+        self.scam_decisions: deque[dict[str, Any]] = deque(maxlen=4)
         self.counts = {"payments": 0, "scams_tried": 0, "scams_paid": 0, "scams_stopped": 0,
                        "scams_ignored": 0, "calls": 0, "joined": 0, "left": 0, "life_events": 0}
         self._spent_gbp = 0.0
@@ -424,6 +454,12 @@ class Life:
         if person is not None:
             person.diary.append(text)
 
+    def _trace(self, kind: str, person: Person, title: str, steps: list[dict[str, Any]], outcome: str) -> None:
+        now = float(self.world.runtime.now)
+        entry = {"t": round(now, 1), "when": _when(now), "kind": kind, "who": person.name, "profile": person.who(),
+                 "title": title, "steps": steps, "outcome": outcome}
+        (self.scam_decisions if kind == "scam" else self.decisions).appendleft(entry)
+
     def _emit(self, event_type: str, person: Person, payload: dict[str, Any], function: str = FUNCTION_RETAIL):
         return self.world.runtime.emit(event_type, actor_id=person.customer_id,
                                        payload={"customer_id": person.customer_id, **payload, "function": function})
@@ -492,6 +528,7 @@ class Life:
         if self.rng.random() < 0.015 and not person.circumstance:
             event = self.rng.choice(tuple(LIFE_EVENTS))
             person.circumstance = event
+            person.since = now
             self.counts["life_events"] += 1
             self._emit("banking.customer.life_event", person, {"event": event})
             self._note(person, LIFE_EVENTS[event].format(name=person.name) + " (the bank doesn't know)", "world", "life")
@@ -509,9 +546,9 @@ class Life:
         state = {"person": person.who(), "time": f"It is {_when(now)}."}
         fallback = {"groceries": 3, "eat_out": 2, "shop_online": 2, "bills": 1, "transport": 2, "treat": 1}
         self.chooser.choose(state, choice_question("What is this person most likely to spend money on right now?", SPEND_OPTIONS),
-                            fallback, lambda choice, by: self._spend(person, choice, by), min_lead=0.0)
+                            fallback, lambda d: self._spend(person, d.choice, d.by, d), min_lead=0.0)
 
-    def _spend(self, person: Person, kind: str, by: str) -> None:
+    def _spend(self, person: Person, kind: str, by: str, decision: Decision | None = None) -> None:
         if not self._free(person):
             return
         if kind in ("nothing", "save"):
@@ -532,6 +569,11 @@ class Life:
         else:
             text = f"{person.name} sent GBP {amount:,.0f} to family: \"{reference}\""
         self._note(person, text, by, "payment")
+        if decision is not None:
+            first = person.name.split()[0]
+            self._trace("spend", person, f"{person.name}, {_when(float(self.world.runtime.now))}",
+                        [step(f"What is {first} most likely to spend money on right now?", SPEND_OPTIONS, decision)],
+                        text.replace(person.name + " ", "", 1))
 
     # -- scams that happen to someone ------------------------------------------------------------
 
@@ -547,17 +589,22 @@ class Life:
             person = self.rng.choices(targets, weights=weights, k=1)[0]
             record = self.crew_record.setdefault(crew, {t: [0, 0] for t in TACTICS})
 
-            def pick(fit: dict[str, float], by: str, crew=crew, person=person, record=record) -> None:
-                total = sum(fit.values()) or 1.0
-                odds = {t: (0.5 * fit.get(t, 0.0) / total + 0.5 / len(TACTICS)) * (1 + 2 * record[t][1]) / (1 + record[t][0])
-                        for t in TACTICS}
-                self._approach(crew, draw(odds, self.rng), person, by)
+            def pick(fit: Decision, crew=crew, person=person, record=record) -> None:
+                odds = _normalised({t: (0.5 * fit.odds.get(t, 0.0) + 0.5 / len(TACTICS)) * (1 + 2 * record[t][1]) / (1 + record[t][0])
+                                    for t in TACTICS})
+                tactic = draw(odds, self.rng)
+                first = person.name.split()[0]
+                steps = [step(f"Which scam would most likely work on {first}?", FIT_OPTIONS, fit, mark=False),
+                         step(f"{crew} weighs that against what has worked for it", FIT_OPTIONS,
+                              Decision(tactic, "code", odds))]
+                self._approach(crew, tactic, person, fit.by, steps)
 
             self.chooser.odds({"person": person.who()},
                               choice_question("Which of these scams would be most likely to work on this person?", FIT_OPTIONS),
                               {t: 1.0 for t in TACTICS}, pick)
 
-    def _approach(self, crew: str, tactic_id: str, person: Person, crew_by: str) -> None:
+    def _approach(self, crew: str, tactic_id: str, person: Person, crew_by: str,
+                  steps: list[dict[str, Any]] | None = None) -> None:
         if not self._free(person) or person.scam is not None or not self.world._active_mules():
             return
         self.crew_record.setdefault(crew, {t: [0, 0] for t in TACTICS})[tactic_id][0] += 1
@@ -576,8 +623,16 @@ class Life:
                 pay += 0.12
             pay = min(0.85, max(0.03, pay))
             check = (1 - pay) * (0.25 + 0.5 * (1 - trust))
-            choice = draw({"pay": pay, "check": check, "ignore": max(0.0, 1 - pay - check)}, self.rng)
-            self._victim(crew, tactic_id, person, amount, warning, choice, person.caution_by)
+            odds = {"pay": pay, "check": check, "ignore": max(0.0, 1 - pay - check)}
+            choice = draw(odds, self.rng)
+            first = person.name.split()[0]
+            caution = Decision(str(person.caution or 0), person.caution_by, person.caution_odds or {str(person.caution or 0): 1.0})
+            trail = list(steps or []) + [
+                step(f"How easily could a stranger talk {first} into sending money?", dict(enumerate(CAUTION_LEVELS)), caution),
+                step("Combines that caution, how well the scam fits and " + ("the bank's warning" if warning else "no warning shown"),
+                     VICTIM_OPTIONS, Decision(choice, "code", odds)),
+            ]
+            self._victim(crew, tactic_id, person, amount, warning, choice, person.caution_by, trail)
 
         if person.caution is not None:
             decide()
@@ -585,15 +640,16 @@ class Life:
         exposure = person.stage["exposure"] + (0.2 if person.circumstance else 0.0)
         fallback = {"0": 1 - exposure, "1": 1.2 - exposure, "2": exposure, "3": exposure * 0.8}
 
-        def read(level: str, by: str) -> None:
-            person.caution, person.caution_by = int(level), by
+        def read(d: Decision) -> None:
+            person.caution, person.caution_by, person.caution_odds = int(d.choice), d.by, d.odds
             decide()
 
         self.chooser.choose({"person": person.who()},
                             rating("How easily could a stranger talk this person into sending money?", CAUTION_LEVELS),
                             fallback, read, min_lead=0.0)
 
-    def _victim(self, crew: str, tactic_id: str, person: Person, amount: float, warning: bool, choice: str, by: str) -> None:
+    def _victim(self, crew: str, tactic_id: str, person: Person, amount: float, warning: bool, choice: str, by: str,
+                steps: list[dict[str, Any]] | None = None) -> None:
         record = self.crew_record.setdefault(crew, {t: [0, 0] for t in TACTICS})
         label = TACTICS[tactic_id]["label"]
         if choice == "pay" and self._free(person):
@@ -605,15 +661,21 @@ class Life:
                                "at": float(self.world.runtime.now), "called": False}
                 self.counts["scams_paid"] += 1
                 record[tactic_id][1] += 1
-                self._note(person, f"{person.name} fell for a {label} scam and sent GBP {amount:,.0f}"
-                           + (" despite the bank's warning" if warning else ""), by, "scam")
+                text = (f"{person.name} fell for a {label} scam and sent GBP {amount:,.0f}"
+                        + (" despite the bank's warning" if warning else ""))
+                self._note(person, text, by, "scam")
+                self._trace("scam", person, f"{crew} tried a {label} scam on {person.name}", steps or [],
+                            text.replace(person.name + " ", "", 1))
                 return
         if choice == "check":
             self.counts["scams_stopped"] += 1
-            self._note(person, f"{person.name} called Zava Bank before paying a {label} scam", by, "scam")
+            text = f"{person.name} called Zava Bank before paying a {label} scam"
         else:
             self.counts["scams_ignored"] += 1
-            self._note(person, f"{person.name} ignored a {label} message", by, "scam")
+            text = f"{person.name} ignored a {label} message"
+        self._note(person, text, by, "scam")
+        self._trace("scam", person, f"{crew} tried a {label} scam on {person.name}", steps or [],
+                    text.replace(person.name + " ", "", 1))
 
     def _maybe_realise(self, person: Person) -> None:
         scam = person.scam
@@ -622,8 +684,15 @@ class Life:
                  "what happened": f"{hours:.0f} hours ago they sent GBP {scam['amount']:,.0f} after this message: "
                                   f"{TACTICS[scam['tactic']]['pitch']} Since then nothing they were promised has happened."}
         fallback = {"yes": min(0.9, hours / 12), "no": 1.0}
-        self.chooser.choose(state, yes_no("Does this person now believe they were scammed?"),
-                            fallback, lambda answer, by: answer == "yes" and self._call_bank(person, by))
+        def realised(d: Decision) -> None:
+            first = person.name.split()[0]
+            outcome = "believes it was a scam and rings the bank" if d.choice == "yes" else "still hopes the money is coming"
+            self._trace("realise", person, f"{person.name}, {hours:.0f} hours after paying",
+                        [step(f"Does {first} now believe it was a scam?", {"yes": "Yes", "no": "Not yet"}, d)], outcome)
+            if d.choice == "yes":
+                self._call_bank(person, d.by)
+
+        self.chooser.choose(state, yes_no("Does this person now believe they were scammed?"), fallback, realised)
 
     def _call_bank(self, person: Person, by: str) -> None:
         scam = person.scam
@@ -699,9 +768,14 @@ class Life:
                  "what happened": f"Zava Bank {outcome} their GBP {claim.amount_gbp:,.0f} scam claim."}
         fallback = {"yes": 0.6 if outcome == "refused" else 0.05, "no": 1.0}
         self.chooser.choose(state, yes_no("Would this person move their account to another bank?"),
-                            fallback, lambda answer, by: self._leave(person, outcome, answer, by))
+                            fallback, lambda d: self._leave(person, outcome, d.choice, d.by, d))
 
-    def _leave(self, person: Person, outcome: str, answer: str, by: str) -> None:
+    def _leave(self, person: Person, outcome: str, answer: str, by: str, decision: Decision | None = None) -> None:
+        if decision is not None:
+            first = person.name.split()[0]
+            self._trace("leave", person, f"{person.name}, after being {outcome}",
+                        [step(f"Would {first} move their account to another bank?", {"yes": "Yes, leave", "no": "No, stay"}, decision)],
+                        "closes the account" if answer == "yes" else "stays with Zava Bank")
         if answer != "yes":
             self._note(person, f"{person.name} is staying with Zava Bank after being {outcome}", by, "stay")
             return
@@ -718,10 +792,21 @@ class Life:
         active = sum(1 for p in self.people.values() if self.world.customers[p.customer_id].status != "left")
         decided = self.chooser.decided
         total = decided["laya"] + decided["rules"]
+        unknown = sorted(
+            (p for p in self.people.values()
+             if p.circumstance and not self.world.customers[p.customer_id].vulnerability_flag
+             and self.world.customers[p.customer_id].status != "left"),
+            key=lambda p: p.since, reverse=True)[:8]
+        crews = {crew: {TACTICS[t]["label"]: {"tried": r[0], "paid": r[1]} for t, r in record.items() if r[0]}
+                 for crew, record in sorted(self.crew_record.items())}
         return {"people": active, **self.counts, "spent_gbp": round(self._spent_gbp, 2),
                 "decided_by_laya": decided["laya"], "decided_by_rules": decided["rules"],
                 "laya_share": round(decided["laya"] / total, 3) if total else 0.0,
-                "cases_per_hour": self.dial.per_hour, "feed": list(self.feed), "stories": list(self.stories)}
+                "laya_avg_ms": self.chooser.avg_ms(),
+                "cases_per_hour": self.dial.per_hour, "cases_opened": self.dial.taken,
+                "decisions": list(self.decisions), "scam_decisions": list(self.scam_decisions),
+                "unknown_to_bank": [{"name": p.name, "circumstance": CIRCUMSTANCES[p.circumstance][0]} for p in unknown],
+                "crews": crews, "feed": list(self.feed), "stories": list(self.stories)}
 
 
 _MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September",
