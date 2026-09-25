@@ -206,6 +206,7 @@ the verdict needs before the persona acts on it.
 | `JUDGEMENT_ENABLED` | `0` | Master switch |
 | `JUDGEMENT_LLM_BUDGET_PER_HOUR` | 6 | LLM deep reviews allowed per hour. After that, the rules decide |
 | `JUDGEMENT_MIN_LEAD` | per gate | Overrides the profile's threshold |
+| `JUDGEMENT_GATE_DEADLINE_S` | 180 | Time allowed to judge one gate, hand-ups included; the orchestrator waits 300 s. Deep reviews run one at a time, and one that cannot finish in time is not started (no budget spent), so the rules decide |
 
 A persona opts in by carrying a `judgement:` block for the gate's workflow type
 in its SKILL.md. A pack with no such blocks is untouched.
@@ -238,7 +239,8 @@ Functions host has only the two supporting leads today.
   seeing the first persona's concerns. At the top of the chain, the LLM deep review
   decides: approve, or send the case back to the agent with its reasons. The
   agent re-assesses once and the gate is raised again. A hold after that
-  declines. The rules decide if the budget is spent.
+  declines. The rules decide if the budget is spent, or if a deep review
+  could not finish before the gate's deadline.
 - **Code changes this needs:** `fraud_durable.py` must accept the approving persona
   named in the gate context rather than a constant, pass it to the command, and
   re-check governance for that persona. `persona_responder.py` must address

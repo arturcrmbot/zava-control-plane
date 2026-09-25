@@ -66,7 +66,11 @@ class ScriptedLaya:
 
 
 class NoReview:
-    async def review(self, request):
+    def __init__(self) -> None:
+        self.deadlines: list = []
+
+    async def review(self, request, *, deadline=None):
+        self.deadlines.append(deadline)
         return DeepReviewRecord("approve", "Consistent with the record.", 10.0, model="fake")
 
 
@@ -139,7 +143,8 @@ def harness(monkeypatch):
     monkeypatch.setattr(app_state.bus, "emit", events.append)
     laya = ScriptedLaya()
     monkeypatch.setattr(engine, "get_client", lambda: laya)
-    monkeypatch.setattr(engine, "get_reviewer", lambda: NoReview())
+    reviewer = NoReview()
+    monkeypatch.setattr(engine, "get_reviewer", lambda: reviewer)
     contexts: list[dict] = []
     real_judge = engine.judge_gate
 
@@ -149,7 +154,7 @@ def harness(monkeypatch):
 
     monkeypatch.setattr(engine, "judge_gate", spy)
     yield SimpleNamespace(responder=persona_responder, raised=raised, events=events, laya=laya,
-                          app_state=app_state, contexts=contexts)
+                          app_state=app_state, contexts=contexts, reviewer=reviewer)
     persona_responder._JUDGING.clear()
     persona_responder._RECENTLY_JUDGED.clear()
 
@@ -234,3 +239,51 @@ def test_a_judged_gate_takes_no_fake_thinking_time(harness, monkeypatch) -> None
     asyncio.run(harness.responder._handle_hitl(_event(context)))
     assert time.perf_counter() - started < 1.5
     assert len(harness.raised) == 1
+
+
+def test_the_whole_chain_shares_one_deadline_well_inside_the_gate_timer(harness) -> None:
+    # The orchestrator waits five minutes for this gate, hand-ups included.
+    context = _hitl_context(FRAUD_SCENARIO_VULNERABLE, "BAPP-J5", escalate_to="financial_crime_lead")
+    _store(harness.app_state, "BAPP-J5")
+    started = time.monotonic()
+    asyncio.run(harness.responder._handle_hitl(_event(context)))
+    assert len(harness.raised) == 1
+    deadlines = [d for d in harness.reviewer.deadlines]
+    assert deadlines and len(set(deadlines)) == 1
+    assert started + 60 < deadlines[0] <= started + 200
+
+
+def test_a_busy_deep_review_queue_never_holds_a_gate_past_its_deadline(harness, monkeypatch) -> None:
+    # Four vulnerable-customer gates at once, each ending in a deep review at
+    # the lead, with reviews that take most of the time a gate has: the ones
+    # that cannot start in time are decided by the rules, and spend nothing.
+    from api.server.services.judgement import deep_review, engine
+
+    class SlowLLM:
+        async def run_session(self, **_):
+            await asyncio.sleep(0.9)
+            return SimpleNamespace(text='{"decision": "approve", "rationale": "Consistent with the record."}')
+
+    budget = deep_review.Budget(6)
+    reviewer = deep_review.DeepReviewer(budget=budget, runtime_factory=SlowLLM, model="fake")
+    monkeypatch.setattr(engine, "get_reviewer", lambda: reviewer)
+    monkeypatch.setattr(deep_review, "MIN_REVIEW_S", 0.5)
+    monkeypatch.setenv("JUDGEMENT_GATE_DEADLINE_S", "2.0")
+    contexts = [_hitl_context(FRAUD_SCENARIO_VULNERABLE, f"BAPP-Q{i}", escalate_to="financial_crime_lead")
+                for i in range(4)]
+    for context in contexts:
+        _store(harness.app_state, context["workflow_id"])
+
+    async def all_at_once() -> None:
+        await asyncio.gather(*(harness.responder._handle_hitl(_event(context)) for context in contexts))
+
+    started = time.perf_counter()
+    asyncio.run(all_at_once())
+    assert time.perf_counter() - started < 2.0
+    assert len(harness.raised) == 4
+    by = sorted(payload["decided_by"] for _, _, payload in harness.raised)
+    assert by == ["llm", "llm", "rules", "rules"]
+    late = [payload for _, _, payload in harness.raised if payload["decided_by"] == "rules"]
+    assert all("no time left" in payload["reason"] for payload in late)
+    assert all(payload["decision"] == "approve" for _, _, payload in harness.raised)
+    assert budget.remaining() == 4

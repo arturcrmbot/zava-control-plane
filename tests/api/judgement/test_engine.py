@@ -7,7 +7,8 @@ import itertools
 import pytest
 import yaml
 
-from api.server.services.judgement.engine import judge_gate
+from api.server.services.judgement.deep_review import NoTimeToReview
+from api.server.services.judgement.engine import NO_TIME, judge_gate
 from api.server.services.judgement.evidence import DeepReviewRecord
 from api.server.services.judgement.laya_client import LayaAnswer, LayaResult, LayaUnavailable
 from api.server.services.judgement.profiles import GateFacts, parse_profile
@@ -96,12 +97,16 @@ class FakeLaya:
 
 
 class FakeReviewer:
-    def __init__(self, decision: str | None = "approve", *, spent=False, error=None) -> None:
-        self.decision, self.spent, self.error = decision, spent, error
+    def __init__(self, decision: str | None = "approve", *, spent=False, error=None, no_time=False) -> None:
+        self.decision, self.spent, self.error, self.no_time = decision, spent, error, no_time
         self.requests: list = []
+        self.deadlines: list = []
 
-    async def review(self, request):
+    async def review(self, request, *, deadline=None):
         self.requests.append(request)
+        self.deadlines.append(deadline)
+        if self.no_time:
+            raise NoTimeToReview()
         if self.spent:
             return None
         if self.error:
@@ -115,7 +120,8 @@ def _enabled(monkeypatch):
     monkeypatch.delenv("JUDGEMENT_MIN_LEAD", raising=False)
 
 
-def _judge(context=None, *, ceiling=None, laya=None, reviewer=None, next_role="financial_crime_lead", profile=PROFILE):
+def _judge(context=None, *, ceiling=None, laya=None, reviewer=None, next_role="financial_crime_lead", profile=PROFILE,
+           deadline=None):
     return asyncio.run(judge_gate(
         persona_role="fraud_decision_manager",
         persona_label="Fraud Decision Manager",
@@ -128,6 +134,7 @@ def _judge(context=None, *, ceiling=None, laya=None, reviewer=None, next_role="f
         next_role=next_role,
         client=laya or FakeLaya(),
         reviewer=reviewer or FakeReviewer(),
+        deadline=deadline,
     ))
 
 
@@ -354,3 +361,30 @@ def test_the_deep_review_is_told_who_a_hold_goes_to() -> None:
     assert reviewer.requests[-1].next_role_label == "Financial Crime Lead"
     _judge({"vulnerable": True}, laya=laya, reviewer=reviewer, next_role=None)
     assert reviewer.requests[-1].next_role_label is None
+
+
+def test_the_gate_deadline_reaches_the_deep_review() -> None:
+    import time as _time
+
+    reviewer, deadline = FakeReviewer("hold"), _time.monotonic() + 100
+    _judge({"vulnerable": True}, laya=FakeLaya({**ROUTINE_READS, "says_no_marker": 0.5}), reviewer=reviewer,
+           deadline=deadline)
+    assert reviewer.deadlines == [deadline]
+
+
+def test_with_no_time_for_a_deep_review_the_rules_decide() -> None:
+    outcome = _judge({"vulnerable": True}, laya=FakeLaya({**ROUTINE_READS, "says_no_marker": 0.5}),
+                     reviewer=FakeReviewer(no_time=True))
+    assert outcome.payload["decision"] == "approve" and outcome.payload["decided_by"] == "rules"
+    assert outcome.payload["reason"] == "Decided by rules: there was no time left to judge before the gate closes."
+    record = outcome.judgement
+    assert record.fallback_reason == NO_TIME and record.deep_review is None
+
+
+def test_past_the_deadline_nothing_is_asked_and_the_rules_decide() -> None:
+    import time as _time
+
+    laya, reviewer = FakeLaya(), FakeReviewer()
+    outcome = _judge(laya=laya, reviewer=reviewer, deadline=_time.monotonic() - 1)
+    assert outcome.payload["decision"] == "approve" and outcome.judgement.fallback_reason == NO_TIME
+    assert laya.calls == [] and reviewer.requests == []

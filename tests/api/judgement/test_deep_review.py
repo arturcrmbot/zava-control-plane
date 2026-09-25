@@ -2,13 +2,17 @@
 from __future__ import annotations
 
 import asyncio
+import time
+from types import SimpleNamespace
 
 import pytest
 
 from api.functions.graphs.executors.agents.runtime_fake import FakeRuntime
+from api.server.services.judgement import deep_review
 from api.server.services.judgement.deep_review import (
     Budget,
     DeepReviewer,
+    NoTimeToReview,
     ReviewRequest,
     parse_verdict,
 )
@@ -124,3 +128,48 @@ def test_the_prompt_says_what_a_hold_does_at_the_top_of_the_chain() -> None:
     handed = build_prompt(replace(_request(), next_role_label="Financial Crime Lead"))
     assert "If you hold it, the case goes to the Financial Crime Lead" in handed
     assert "Nobody above you" not in handed
+
+
+class _Slow:
+    """An LLM session that takes a while, counting the sessions it ran."""
+
+    def __init__(self, seconds: float) -> None:
+        self.seconds, self.ran = seconds, 0
+
+    async def run_session(self, **_: object):
+        self.ran += 1
+        await asyncio.sleep(self.seconds)
+        return SimpleNamespace(text='{"decision": "approve", "rationale": "Consistent with the record."}')
+
+
+def test_reviews_queued_behind_a_slow_one_give_up_before_the_gate_closes_and_spend_nothing(monkeypatch) -> None:
+    monkeypatch.setattr(deep_review, "MIN_REVIEW_S", 0.45)
+    runtime, budget = _Slow(0.3), Budget(6)
+    reviewer = _reviewer(runtime, budget)
+
+    async def three() -> list:
+        deadline = time.monotonic() + 0.6
+        return await asyncio.gather(
+            *(reviewer.review(_request(), deadline=deadline) for _ in range(3)), return_exceptions=True)
+
+    started = time.perf_counter()
+    results = asyncio.run(three())
+    assert time.perf_counter() - started < 0.55
+    assert results[0].decision == "approve"
+    assert [type(r) for r in results[1:]] == [NoTimeToReview, NoTimeToReview]
+    assert runtime.ran == 1 and budget.remaining() == 5
+
+
+def test_a_review_with_too_little_time_left_is_not_started() -> None:
+    runtime, budget = _Slow(0.0), Budget(6)
+    with pytest.raises(NoTimeToReview):
+        asyncio.run(_reviewer(runtime, budget).review(_request(), deadline=time.monotonic() + 1.0))
+    assert runtime.ran == 0 and budget.remaining() == 6
+
+
+def test_a_running_review_is_cut_off_at_the_deadline(monkeypatch) -> None:
+    monkeypatch.setattr(deep_review, "MIN_REVIEW_S", 0.1)
+    started = time.perf_counter()
+    record = asyncio.run(_reviewer(_Slow(5.0)).review(_request(), deadline=time.monotonic() + 0.3))
+    assert time.perf_counter() - started < 1.0
+    assert record is not None and record.decision is None and "TimeoutError" in (record.error or "")

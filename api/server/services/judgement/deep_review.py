@@ -21,7 +21,13 @@ from api.server.services.judgement.profiles import GateFacts
 DEFAULT_BUDGET_PER_HOUR = 6
 DEFAULT_MODEL = "gpt-4.1"
 DEFAULT_TIMEOUT_S = 90.0
+# A review that cannot have this long before the gate closes is not started.
+MIN_REVIEW_S = 30.0
 _WINDOW_S = 3600.0
+
+
+class NoTimeToReview(Exception):
+    """A deep review could not start in time to finish before the gate closes."""
 
 
 class Budget:
@@ -149,11 +155,30 @@ class DeepReviewer:
     def available(self) -> bool:
         return self.budget.remaining() > 0
 
-    async def review(self, request: ReviewRequest) -> DeepReviewRecord | None:
-        """Ask the LLM. ``None`` means the budget was spent and nothing was asked."""
-        if not self.budget.try_consume():
+    async def review(self, request: ReviewRequest, *, deadline: float | None = None) -> DeepReviewRecord | None:
+        """Ask the LLM. ``None`` means the budget was spent and nothing was asked.
+
+        Reviews run one at a time. ``deadline`` (``time.monotonic()``) is when
+        the gate's answer is due: a review waits in the queue only while it
+        could still finish in time, raising :class:`NoTimeToReview` otherwise,
+        and takes its budget slot only once it can start.
+        """
+        if not self.available():
             return None
-        async with self._lock:
+        wait_s = None if deadline is None else deadline - time.monotonic() - MIN_REVIEW_S
+        if wait_s is not None and wait_s <= 0:
+            raise NoTimeToReview()
+        try:
+            await asyncio.wait_for(self._lock.acquire(), timeout=wait_s)
+        except asyncio.TimeoutError:
+            raise NoTimeToReview() from None
+        try:
+            if not self.budget.try_consume():
+                return None
+            session_s, limit_s = self._timeout_s, self._timeout_s + 5.0
+            if deadline is not None:
+                limit_s = max(0.0, min(limit_s, deadline - time.monotonic()))
+                session_s = min(session_s, limit_s)
             started = time.perf_counter()
             try:
                 runtime = self._runtime_factory()
@@ -163,15 +188,17 @@ class DeepReviewer:
                         system_message=request.instructions or None,
                         tools=[],
                         model=self.model,
-                        timeout_s=self._timeout_s,
+                        timeout_s=session_s,
                     ),
-                    timeout=self._timeout_s + 5.0,
+                    timeout=limit_s,
                 )
                 decision, rationale = parse_verdict(getattr(result, "text", "") or "")
             except Exception as ex:  # a failed review falls back to the rules
                 return DeepReviewRecord(None, "", (time.perf_counter() - started) * 1000,
                                         error=f"{type(ex).__name__}: {ex}", model=self.model)
             return DeepReviewRecord(decision, rationale, (time.perf_counter() - started) * 1000, model=self.model)
+        finally:
+            self._lock.release()
 
 
 _REVIEWER: DeepReviewer | None = None

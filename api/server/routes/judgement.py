@@ -46,7 +46,7 @@ class WhatIf(BaseModel):
 class _NoDeepReview:
     """A what-if never spends tokens: it reports that a deep review would decide."""
 
-    async def review(self, request: Any) -> None:
+    async def review(self, request: Any, *, deadline: float | None = None) -> None:
         return None
 
 

@@ -66,7 +66,7 @@ class RecordingReviewer:
     def __init__(self) -> None:
         self.asked = 0
 
-    async def review(self, request):
+    async def review(self, request, *, deadline=None):
         self.asked += 1
         return DeepReviewRecord("hold", "Recorded for the golden set.", 1.0, model="fake")
 

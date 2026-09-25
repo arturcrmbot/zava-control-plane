@@ -50,6 +50,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import contextvars
 import os
 import textwrap
 import time
@@ -994,6 +995,11 @@ async def _cascade_to_delegate(
 _JUDGING: set[tuple[str, ...]] = set()
 _RECENTLY_JUDGED: dict[tuple[str, ...], float] = {}
 _RECENTLY_JUDGED_TTL_S = 90.0
+# When a judged gate's answer is due (time.monotonic()); set once per gate and
+# shared by every persona the hold is handed to.
+_GATE_DEADLINE: contextvars.ContextVar[float | None] = contextvars.ContextVar(
+    "judgement_gate_deadline", default=None
+)
 
 
 def _judged(persona: PersonaDefinition | None, context: Any) -> bool:
@@ -1128,6 +1134,9 @@ async def _judge_decision(
     """Run the judgement engine over the rules decision (the ceiling)."""
     from api.server.services.judgement import engine as judgement_engine
 
+    deadline = _GATE_DEADLINE.get()
+    if deadline is None:
+        deadline = time.monotonic() + judgement_engine.gate_deadline_s()
     try:
         outcome = await judgement_engine.judge_gate(
             persona_role=persona_role,
@@ -1139,6 +1148,7 @@ async def _judge_decision(
             workflow_id=workflow_id,
             gate_phase=gate_phase,
             next_role=_next_role(persona_role, context, cascade_depth, auto_close),
+            deadline=deadline,
         )
     except Exception as ex:  # the engine falls back itself; this is the last guard
         print(f"[persona_responder] judgement failed for {persona_role}: {ex}; the rules decide")
@@ -1194,9 +1204,13 @@ async def _handle_hitl(event: FleetEvent) -> None:
         print(f"[persona_responder] gate {key} is already judged or being judged; skipping")
         return
     _JUDGING.add(key)
+    from api.server.services.judgement.engine import gate_deadline_s
+
+    deadline = _GATE_DEADLINE.set(time.monotonic() + gate_deadline_s())
     try:
         await _handle_hitl_unguarded(event)
     finally:
+        _GATE_DEADLINE.reset(deadline)
         _JUDGING.discard(key)
         _RECENTLY_JUDGED[key] = time.monotonic()
 

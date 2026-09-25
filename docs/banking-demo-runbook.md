@@ -90,6 +90,7 @@ curl -s localhost:8765/health                             # {"status": "ok", "de
 | `JUDGEMENT_ENABLED` | `1` | personas with a `judgement:` profile read each case; over-authority claims go to who can decide |
 | `LAYA_URL` | `http://127.0.0.1:8765` | where Laya listens; empty means the rules decide (and say so) |
 | `JUDGEMENT_LLM_BUDGET_PER_HOUR` | `6` | unclear judgements go to an LLM deep review, at most this many an hour, on the same Copilot quota |
+| `JUDGEMENT_GATE_DEADLINE_S` | `180` (default) | a gate is judged within this, hand-ups included; if deep reviews are queued, the late ones are decided by the rules and say so |
 
 What changes in the walk:
 

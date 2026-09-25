@@ -21,17 +21,29 @@ approval is the ceiling payload plus evidence fields.
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 from typing import Any
 
 from api.server.services.judgement import judgement_enabled
-from api.server.services.judgement.deep_review import DeepReviewer, ReviewRequest, get_reviewer
+from api.server.services.judgement.deep_review import DeepReviewer, NoTimeToReview, ReviewRequest, get_reviewer
 from api.server.services.judgement.evidence import Judgement, Reading, Verdict
 from api.server.services.judgement.laya_client import LayaClient, LayaUnavailable, get_client
 from api.server.services.judgement.profiles import GateFacts, GateProfile, JudgementProfile
 
 NO_CONCERNS = "No concerns were found in the agent's reasoning."
 BUDGET_SPENT = "the LLM budget for this hour is spent"
+NO_TIME = "there was no time left to judge before the gate closes"
+# The orchestrator waits five minutes for a gate, hand-ups included; judging
+# (every persona in the chain) must be done well inside that.
+DEFAULT_GATE_DEADLINE_S = 180.0
+
+
+def gate_deadline_s() -> float:
+    try:
+        return float(os.environ.get("JUDGEMENT_GATE_DEADLINE_S", DEFAULT_GATE_DEADLINE_S))
+    except ValueError:
+        return DEFAULT_GATE_DEADLINE_S
 
 
 @dataclass
@@ -169,6 +181,7 @@ async def judge_gate(
     next_role: str | None,
     client: LayaClient | None = None,
     reviewer: DeepReviewer | None = None,
+    deadline: float | None = None,
 ) -> Outcome:
     workflow_type = context.get("workflow_type") if isinstance(context, dict) else None
     gate = profile.gate(workflow_type) if profile is not None and judgement_enabled() else None
@@ -196,6 +209,8 @@ async def judge_gate(
         return _rules(ceiling, record, f"the case could not be read: {ex}")
     if not client.available():
         return _rules(ceiling, record, "Laya unavailable" if client.enabled else "Laya is not configured")
+    if deadline is not None and time.monotonic() >= deadline:
+        return _rules(ceiling, record, NO_TIME)
 
     try:
         record.readings, read_ms = await _read(client, gate, facts, min_lead)
@@ -229,12 +244,15 @@ async def judge_gate(
         return Outcome(_with_evidence(ceiling, record, decision="escalate"), record, hold=True)
 
     final = bool(context.get("reassessment_round"))
-    review = await reviewer.review(ReviewRequest(
-        persona_role=persona_role, persona_label=persona_label, instructions=instructions,
-        character=profile.character, facts=facts, concerns=list(record.concerns),
-        unclear=list(record.unclear), next_role_label=_role_label(next_role) if next_role else None,
-        final=final,
-    ))
+    try:
+        review = await reviewer.review(ReviewRequest(
+            persona_role=persona_role, persona_label=persona_label, instructions=instructions,
+            character=profile.character, facts=facts, concerns=list(record.concerns),
+            unclear=list(record.unclear), next_role_label=_role_label(next_role) if next_role else None,
+            final=final,
+        ), deadline=deadline)
+    except NoTimeToReview:
+        return _rules(ceiling, record, NO_TIME)
     if review is None:
         return _rules(ceiling, record, BUDGET_SPENT)
     record.deep_review = review
