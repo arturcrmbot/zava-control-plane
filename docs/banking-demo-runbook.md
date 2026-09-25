@@ -137,7 +137,8 @@ mule case every few minutes.
   record decides vulnerability, and the rules decide what is permitted. The list of
   payments holds still while you choose; press ↻ for newer ones. The bank refuses a
   call while the same customer or receiving account already has a case being
-  decided, and says so: wait for that decision, then call again.
+  decided, and says so: wait for that decision, then call again. For the same
+  reason, a story waits while a called claim on its account is being decided.
 - **Ask the persona.** Under the claim story, edit the agent's reasoning or tick
   *customer carries a vulnerability marker* and press **Ask**. The persona says how it
   would judge the case now. This uses no tokens and changes nothing.

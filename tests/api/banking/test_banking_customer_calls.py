@@ -305,3 +305,45 @@ def test_ask_the_persona_takes_a_long_agent_reasoning() -> None:
     assert WhatIf(workflow_id="BAPP-1", reasoning="x" * 3_000).reasoning == "x" * 3_000
     with pytest.raises(ValidationError):
         WhatIf(workflow_id="BAPP-1", reasoning="x" * 8_001)
+
+
+def _fail_objective(world: ZavaBankWorld, sensor, reason: str = "the orchestration could not be scheduled") -> None:
+    """Journal a failed objective for this sensor, as the world bridge and gateway do."""
+    from api.server.world.objectives import ObjectiveManager
+    from api.server.world.registry import ObjectiveRoute
+
+    route = ObjectiveRoute(sensor_id="sensor:test", objective_type="test_case", allowed_command_types=frozenset(),
+                           success_event_types=frozenset(), failure_event_types=frozenset(),
+                           evaluation_timeout_minutes=5)
+    manager = ObjectiveManager(world.runtime)
+    event = sensor if isinstance(sensor, dict) else sensor.to_dict()
+    objective = manager.open(event, route, owner_function="test")
+    manager.transition(objective.id, "failed", payload={"reason": reason})
+
+
+def test_a_claim_whose_case_ended_undecided_no_longer_blocks_calls() -> None:
+    world = _world()
+    first, second = _two_settled(world, same="account")
+    sensor = world.customer_calls(first, STATEMENT, None)
+    with pytest.raises(ValueError, match="already has a claim being decided"):
+        world.customer_calls(second, STATEMENT, None)
+    _fail_objective(world, sensor, "fraud_decision_manager declined to approve")
+    raised = world.customer_calls(second, STATEMENT, None)
+    assert raised.type == "sensor.tripped" and world.payments[second].status == "disputed"
+
+
+def test_a_hero_story_waits_while_a_called_claim_is_decided_on_its_account() -> None:
+    from verticals.banking.fraud_constants import FRAUD_BENEFICIARY_VULNERABLE, FRAUD_SCENARIO_VULNERABLE
+
+    world = _world()
+    payment_id = next(p.id for p in world.payments.values()
+                      if p.to_beneficiary_id == FRAUD_BENEFICIARY_VULNERABLE and p.status == "settled"
+                      and world.customers[world.accounts[p.from_account_id].customer_id].status == "active")
+    claim_id = world.customer_calls(payment_id, STATEMENT, None).payload["claim_id"]
+    option = next(r.option.option_id for r in admit_claim_options(world.observation_for_claim(claim_id)) if r.feasible)
+    approval = world.command_for_claim_option(claim_id=claim_id, option_id=option, workflow_id="BAPP-CALL-1",
+                                              decision_id="SYN-APP-DECISION-001", persona="fraud_decision_manager")
+    with pytest.raises(ValueError, match="already has a claim being decided"):
+        world.activate_scenario(FRAUD_SCENARIO_VULNERABLE)
+    assert world.apply_command(approval).type == "banking.reimbursement.applied"
+    assert world.activate_scenario(FRAUD_SCENARIO_VULNERABLE).type == "sensor.tripped"

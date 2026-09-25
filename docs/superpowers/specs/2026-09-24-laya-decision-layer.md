@@ -341,12 +341,17 @@ command gateway, reactions).
   decided case is rejected, and so is one decided on evidence that has moved
   since the gate. A restraint holds the whole balance, adding to anything a
   reimbursement already froze.
-- **A case the bank could not decide closes as unresolved.** If the mule case ends
-  with no disposition (a decline, a timeout, a failure), the account goes back to
-  normal, and two more flagged customers reopen the case as the next round.
-- **Nothing moves another case's evidence while it is decided.** Opening a mule
-  case on an account a claim is already reviewing leaves that claim's evidence
-  alone, and the payments loop never re-settles a payment under a claim.
+- **A case the bank could not decide closes as unresolved.** A mule case can end
+  with no disposition: a decline, a timeout, a rejected command, or an
+  orchestration that could not start. The world reads that ending from its own
+  journal (the case's failed objective), the account goes back to normal, and two
+  more flagged customers reopen the case as the next round. A claim that ends
+  undecided stops blocking new calls the same way.
+- **One live case per account.** No mule case opens on an account a claim is being
+  decided on; its flags wait for the next look. The three story accounts are mules
+  by design, and their mule case also waits until their story has run, so a story
+  is never blocked or voided by one. The payments loop never re-settles a payment
+  under a claim.
 - **Customers react** after a reimbursement: accepts, chases or complains, drawn
   from Laya's upset scale with a seeded stream. The scale is measured monotone:
   full < capped < refused.
@@ -414,21 +419,28 @@ command gateway, reactions).
   slot only when it starts, and is cut off at the deadline; otherwise the rules
   decide and say so. Reproduced first: four gates at once took 3.6 s against a
   2.0 s deadline, and all four answer inside it after the fix.
-- **A live case's evidence stays still.** The payments loop no longer re-settles a
-  payment under a claim. A mule case opening no longer bumps an account a claim is
-  already reviewing. A second call can't void the first claim, and a mule
-  disposition must match the evidence it was decided on.
-- **Mule cases can't stick.** A case that ends with no disposition closes as
-  unresolved and can reopen. A call about a restrained mule no longer makes it
-  active again.
+- **A live case's evidence stays still.** One live case per account:
+  - The payments loop no longer re-settles a payment under a claim.
+  - A mule case waits while a claim on its account is decided.
+  - A second call, or a story started after a call, can't void a claim.
+  - A mule disposition must match the evidence it was decided on.
+- **Cases can't stick.** Every ending with no decision fails the case's objective,
+  and the world reads that from its journal: an unresolved mule case closes and can
+  reopen, and an undecided claim stops blocking calls. This includes an
+  orchestration that never started. Verified through the real world bridge.
+  Neither a call nor a story makes a restrained mule active again.
+- **A retried gate keeps its first deadline**, so the sweep's retry after a failed
+  delivery goes straight to the rules instead of starting a review that could
+  outlast the timer.
 - **The floor files what the presenter chose.** The call picker holds a steady
   list. Ask the persona sends only what was edited and shows why a question failed.
-- **Flags off is still exactly main.** For the same scripted run (16,912 events), the
-  world journal, state, record versions and next random draw are identical to main
-  (`afe760fd`).
+- **Flags off is still exactly main.** For the same scripted run, the world journal,
+  state, record versions and statuses, and the next random draw are identical to
+  main (`afe760fd`). The run covers all three stories, generated claims, five
+  approvals and 8,500 sim-minutes (23,044 events).
 
 Final checks:
-- `tests/api/banking` and `tests/api/judgement`: 196 passed, flags off and flags on.
+- `tests/api/banking` and `tests/api/judgement`: 202 passed, flags off and flags on.
 - The live Laya sets pass (15), and `tests/api/world` passes (301).
 - `tests/api/shared` (agency) passes, and so do the persona responder files, each on
   its own and together.

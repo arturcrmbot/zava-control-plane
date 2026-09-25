@@ -269,12 +269,26 @@ def test_a_restraint_holds_everything_including_funds_already_frozen(screening_o
     assert (account.frozen_gbp, account.balance_gbp) == (6_000.0, 0.0)
 
 
+def _fail_objective(world: ZavaBankWorld, sensor: dict, reason: str) -> None:
+    """Journal a failed objective for this sensor, as the world bridge and gateway do."""
+    from api.server.world.objectives import ObjectiveManager
+    from api.server.world.registry import ObjectiveRoute
+
+    route = ObjectiveRoute(sensor_id=MULE_SENSOR_ID, objective_type="mule_case", allowed_command_types=frozenset(),
+                           success_event_types=frozenset(), failure_event_types=frozenset(),
+                           evaluation_timeout_minutes=5)
+    manager = ObjectiveManager(world.runtime)
+    objective = manager.open(sensor, route, owner_function=MULE_FUNCTION)
+    manager.transition(objective.id, "failed", payload={"reason": reason})
+
+
 def test_a_case_that_ends_without_a_disposition_closes_and_the_pattern_can_reopen_it(screening_on) -> None:
     world = _world()
     trip = world.run_scenario("mule-activity")["event"]
     bene = trip["payload"]["beneficiary_id"]
     assert world.beneficiaries[bene].status == "under_review"
     world.bind_story_workflow(trip, "BMUL-1")
+    _fail_objective(world, trip, "financial_crime_lead declined to approve")
     world.fail_story_workflow("BMUL-1", "financial_crime_lead declined to approve")
     assert world._mule_cases[bene]["status"] == "unresolved"
     assert world.beneficiaries[bene].status == "open"
@@ -284,6 +298,18 @@ def test_a_case_that_ends_without_a_disposition_closes_and_the_pattern_can_reope
     assert world.render_state()["screening"]["mule_cases_open"] == 0
     again = world.run_scenario(f"mule-activity:{bene}")["event"]
     assert again["type"] == "sensor.tripped" and again["payload"]["round"] == 2
+
+
+def test_a_case_whose_orchestration_never_started_closes_too(screening_on) -> None:
+    # Scheduling failed: the bridge fails the objective before any workflow exists.
+    world = _world()
+    trip = world.run_scenario("mule-activity")["event"]
+    bene = trip["payload"]["beneficiary_id"]
+    _fail_objective(world, trip, "the Functions host did not answer")
+    _run(world, 60)
+    assert world._mule_cases[bene]["status"] == "unresolved"
+    unresolved = [e for e in world.runtime.journal if e.type == "banking.mule_case.unresolved"]
+    assert unresolved[-1].payload["reason"] == "the Functions host did not answer"
 
 
 def test_the_story_hooks_leave_fraud_claims_alone(screening_on) -> None:
@@ -297,7 +323,9 @@ def test_the_story_hooks_leave_fraud_claims_alone(screening_on) -> None:
     assert len(world.runtime.journal) == mark
 
 
-def test_a_mule_case_opening_leaves_a_waiting_claim_on_that_account_valid(screening_on) -> None:
+def test_no_mule_case_opens_on_an_account_a_claim_is_being_decided_on(screening_on) -> None:
+    # A case there would move the account under the claim's approval; the
+    # flags wait, and the bank looks once the claim is decided.
     world = _world()
     sensor = world.activate_scenario(FRAUD_SCENARIO_VULNERABLE)
     claim_id = sensor.payload["claim_id"]
@@ -307,10 +335,30 @@ def test_a_mule_case_opening_leaves_a_waiting_claim_on_that_account_valid(screen
     approval = world.command_for_claim_option(
         claim_id=claim_id, option_id=OPTION_REIMBURSE_FULL, workflow_id="BAPP-V1",
         decision_id="SYN-APP-DECISION-001", persona=FRAUD_HITL_PERSONA)
-    trip = world.run_scenario(f"mule-activity:{bene}")["event"]
-    assert trip["type"] == "sensor.tripped" and trip["payload"]["beneficiary_id"] == bene
+    flagged = world.run_scenario(f"mule-activity:{bene}")["event"]
+    assert flagged["type"] == "banking.payment.flagged" and bene not in world._mule_cases
     assert world.observation_for_claim(claim_id)["evidence_versions"] == before
     assert world.apply_command(approval).type == "banking.reimbursement.applied"
+
+
+def test_story_accounts_wait_for_their_story_before_a_mule_case(screening_on) -> None:
+    world = _world()
+    heroes = {FRAUD_BENEFICIARY_STANDARD, FRAUD_BENEFICIARY_VULNERABLE, FRAUD_BENEFICIARY_OVER_DELEGATION}
+    flagged = world.run_scenario(f"mule-activity:{FRAUD_BENEFICIARY_VULNERABLE}")["event"]
+    assert flagged["type"] == "banking.payment.flagged" and FRAUD_BENEFICIARY_VULNERABLE not in world._mule_cases
+    for _ in range(3):
+        trip = world.run_scenario("mule-activity")["event"]
+        assert trip["type"] == "sensor.tripped" and trip["payload"]["beneficiary_id"] not in heroes
+    _run(world, 6_000)
+    assert not heroes & {t.payload["beneficiary_id"] for t in _mule_trips(world)}
+
+
+def test_a_story_keeps_a_restrained_account_restrained(screening_on) -> None:
+    world = _world()
+    world.beneficiaries[FRAUD_BENEFICIARY_VULNERABLE].status = "restrained"
+    world.activate_scenario(FRAUD_SCENARIO_VULNERABLE)
+    assert world.beneficiaries[FRAUD_BENEFICIARY_VULNERABLE].status == "restrained"
+    assert FRAUD_BENEFICIARY_VULNERABLE not in world._active_mules()
 
 
 def test_a_call_about_a_restrained_mule_keeps_it_restrained(screening_on) -> None:
