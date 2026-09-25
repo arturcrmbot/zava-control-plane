@@ -1,7 +1,7 @@
 # Laya decision layer: agentic thinking without the token bill
 
 **Date:** 2026-09-24
-**Status:** Approved design. Phase 1 (personas judge) and phase 2 (the world notices and reacts) are built and verified behind flags; phase 3 is next.
+**Status:** Built and verified behind flags. Phase 1 (personas judge) needs `JUDGEMENT_ENABLED=1`, phase 2 (the world notices and reacts) needs `BANKING_WORLD_SCREENING=1`, and phase 3 (the presenter steers) is available whenever the world runs.
 **Scope:** a shared platform capability, proved on the banking vertical first.
 **Author's evidence:** code read in this worktree, plus 241 live calls to a local Laya server on this Mac.
 
@@ -363,6 +363,30 @@ command gateway, reactions).
   with that fact changed and answers instantly, at no token cost.
 
 **Size: medium to large** (dynamic claims in the world are the main work).
+
+### 9.1 Built and verified (25 Sep 2026)
+
+- **A customer calls** (`POST /api/world/customer-calls`, and the floor's *A customer
+  calls about a payment* panel):
+  - The presenter picks a recent payment and types what the customer says.
+  - Laya reads the kind of scam and any circumstances, which is advisory: 9 of 12
+    scam types measured right. Rules read if Laya is down.
+  - The world raises a claim on that payment from the record's facts, so the
+    vulnerability marker on the record still decides.
+  - The customer's words and the reading travel in the evidence the agent reads.
+  - Verified live: "bank impersonation" (lead 0.86) with bereavement noted, read in
+    0.48 s. The claim was raised on a GBP 8,940 payment, and the fraud manager
+    approved it by fast judgement.
+- **Ask the persona** (`POST /api/judgement/what-if`, and the *Ask the …: what if*
+  box under the claim story):
+  - Change the agent's reasoning or the vulnerability marker, and the persona
+    re-judges instantly.
+  - It uses the fast judgement only, costs no tokens and changes no state. It says
+    when a deep review would decide instead.
+  - Verified live: with the marker set, the manager would hold and hand the case up,
+    because the reasoning would then contradict the record.
+- **`GET /api/judgement/status`** reports whether Laya is up and how many deep reviews
+  are left this hour.
 
 ## 10. Where Laya will not be used
 

@@ -31,6 +31,7 @@ from api.server.services.judgement.laya_client import LayaClient, LayaUnavailabl
 from api.server.services.judgement.profiles import GateFacts, GateProfile, JudgementProfile
 
 NO_CONCERNS = "No concerns were found in the agent's reasoning."
+BUDGET_SPENT = "the LLM budget for this hour is spent"
 
 
 @dataclass
@@ -235,7 +236,7 @@ async def judge_gate(
         final=final,
     ))
     if review is None:
-        return _rules(ceiling, record, "the LLM budget for this hour is spent")
+        return _rules(ceiling, record, BUDGET_SPENT)
     record.deep_review = review
     if review.decision is None:
         return _rules(ceiling, record, f"the deep review failed: {review.error}")

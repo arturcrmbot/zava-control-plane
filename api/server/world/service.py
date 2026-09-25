@@ -332,6 +332,13 @@ class ActorWorldService:
         self._publish_new()
         return result
 
+    def call_scenario(self, name: str, *args: Any, **kwargs: Any) -> Any:
+        """Run a scenario-owned mutation by name and publish what it journaled."""
+        method = self._require_scenario_method(name)
+        result = method(*args, **kwargs)
+        self._publish_new()
+        return result
+
     def run_reference_process(self, workflow_type: str) -> dict[str, Any]:
         run = self._require_scenario_method("run_reference_process")
         result = run(workflow_type)

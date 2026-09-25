@@ -128,6 +128,16 @@ so. The cadence is set by `BANKING_NEW_PAYMENT_MINUTES` (default 30 synthetic
 minutes) and `BANKING_SCAM_SHARE` (default 0.35). At the demo speed that opens a
 mule case every few minutes.
 
+## 2c. Steer it live (optional)
+
+- **A customer calls about a payment.** Pick any recent payment on the floor and type
+  what the customer says. The bank raises a claim on that payment and the whole hero
+  path runs on it. Laya's reading of the words shows next to it and is advisory: the
+  record decides vulnerability, and the rules decide what is permitted.
+- **Ask the persona.** Under the claim story, edit the agent's reasoning or tick
+  *customer carries a vulnerability marker* and press **Ask**. The persona says how it
+  would judge the case now. This uses no tokens and changes nothing.
+
 ## 3. The walk
 
 | Time | Screen | Show | Say |

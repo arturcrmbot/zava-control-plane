@@ -81,6 +81,7 @@ const EVENTS = [ROUTINE, ...APPROVED_TRACE, ...APPROVED_OUTCOME, ...REFUSED_TRAC
 let queue: unknown[] = [];
 let details: Record<string, unknown> = {};
 let workflows: unknown[] = [];
+let posted: Record<string, unknown> = {};
 
 function renderBank(overrides: Partial<ComponentProps<typeof BankingWorld>> = {}) {
   const props = {
@@ -99,11 +100,13 @@ beforeEach(() => {
   queue = [];
   details = {};
   workflows = [];
+  posted = {};
   vi.stubGlobal("fetch", vi.fn(async (url: string) => {
     const path = String(url);
     const body = path === "/api/workflows" ? workflows
       : path.startsWith("/api/workflows/") ? details[path] ?? {}
       : path.startsWith("/api/simulator/inject-burst") ? { ok: true }
+      : path in posted ? posted[path]
       : queue;
     return new Response(JSON.stringify(body), { status: 200 });
   }));
@@ -278,6 +281,38 @@ describe("BankingWorld", () => {
   it("hides the noticed panel when the bank does not screen", () => {
     renderBank();
     expect(screen.queryByTestId("bank-noticed")).toBeNull();
+  });
+
+  it("reports a customer's call about a payment and shows the advisory reading", async () => {
+    posted["/api/world/customer-calls"] = { ok: true, claim_id: "SYN-CLAIM-C001",
+      reading: { scam_type: "bank_impersonation", scam_lead: 0.8, cues: ["bereavement"], read_by: "laya" } };
+    renderBank();
+    const panel = screen.getByTestId("customer-call");
+    fireEvent.change(within(panel).getByLabelText("What the customer says"), { target: { value: "My bank's fraud team told me to move my savings." } });
+    fireEvent.click(within(panel).getByRole("button", { name: "Report the call" }));
+    const result = await within(panel).findByTestId("customer-call-result");
+    expect(result.textContent).toBe("Claim SYN-CLAIM-C001 raised · Laya read: bank impersonation · noted: bereavement (advisory; the record decides)");
+    const call = (fetch as unknown as { mock: { calls: [string, RequestInit?][] } }).mock.calls.find(([url]) => url === "/api/world/customer-calls");
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ payment_id: "SYN-PAY-0100", statement: "My bank's fraud team told me to move my savings." });
+  });
+
+  it("asks the persona how it would judge the case with one thing changed", async () => {
+    details["/api/workflows/bapp-evt-11"] = { workflow: { payload: {
+      decisions: [{ persona_role: "fraud_decision_manager", verdict: "approve", decided_by: "laya", judgement: { summary: "Approved." } }],
+      hitl_context: { persona: "fraud_decision_manager", ranking: { reasoning: "No vulnerability flag is present." },
+        observation: { claim: { vulnerability_flag: false } } },
+    } } };
+    posted["/api/judgement/what-if"] = { ok: true, decision: "escalate",
+      summary: "Held for a closer look: the agent's reasoning says there is no vulnerability marker, but the record shows one." };
+    renderBank({ events: [ROUTINE, ...APPROVED_TRACE, ...APPROVED_OUTCOME] });
+    const panel = await screen.findByTestId("ask-persona");
+    expect((within(panel).getByLabelText("The agent's reasoning") as HTMLTextAreaElement).value).toBe("No vulnerability flag is present.");
+    fireEvent.click(within(panel).getByRole("checkbox"));
+    fireEvent.click(within(panel).getByRole("button", { name: "Ask" }));
+    const answer = await within(panel).findByTestId("ask-persona-answer");
+    expect(answer.textContent).toContain("Fraud decision manager would hand it up: Held for a closer look");
+    const call = (fetch as unknown as { mock: { calls: [string, RequestInit?][] } }).mock.calls.find(([url]) => url === "/api/judgement/what-if");
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ workflow_id: "bapp-evt-11", reasoning: "No vulnerability flag is present.", vulnerable: true });
   });
 
   it("names who approved when the decision was handed up", () => {

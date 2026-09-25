@@ -255,7 +255,7 @@ def main() -> None:
         print(json.dumps(row))
 
 
-if __name__ == "__main__" and not (len(sys.argv) > 1 and sys.argv[1] == "mule"):
+if __name__ == "__main__" and not (len(sys.argv) > 1 and sys.argv[1] in ("mule", "calls")):
     main()
 
 
@@ -371,3 +371,57 @@ def run_mule() -> dict:
 
 if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "mule":
     print(json.dumps(run_mule(), indent=1))
+
+
+# --- Phase 3: a customer calls, the bank decides, and the presenter asks "what if" -----------
+
+CALL = ("Someone rang saying they were from Zava Bank's fraud team. They said my account was compromised and "
+        "I had to move my savings to a safe account. Since my husband died last year I look after the money alone.")
+
+
+def run_calls() -> dict:
+    from api.server.routes import judgement as judgement_routes
+    from api.server.routes import world as world_routes
+    from api.server.services.event_bus import EventBus
+    from api.server.world.service import ActorWorldService
+
+    app_state = importlib.import_module("api.server.state").app_state
+    persona_responder.PERSONA_DEFINITIONS = persona_responder._load_personae()
+    service = ActorWorldService.for_world("banking", seed=42, bus=EventBus())
+    app_state.world_service = service
+    world = service.scenario
+    payment_id = next(p.id for p in world.payments.values()
+                      if p.status == "settled" and world.customers[world.accounts[p.from_account_id].customer_id].status == "active"
+                      and 5_000 < p.amount_gbp < 9_000)
+    started = time.perf_counter()
+    call = asyncio.run(world_routes.customer_calls(world_routes.CustomerCall(payment_id=payment_id, statement=CALL)))
+    read_ms = (time.perf_counter() - started) * 1000
+    claim_id = call["claim_id"]
+    observation = world.observation_for_claim(claim_id)
+
+    workflow_id = "BAPP-CALL-1"
+    now = time.time()
+    app_state.store.upsert_workflow(Workflow(
+        id=workflow_id, type="app-fraud-reimbursement", status="awaiting_hitl",
+        current_phase="Decide Reimbursement", created_at=now, sla_due_at=now + 3600,
+        jurisdiction="SYN-UK-Zava", agency="Zava Bank", payload={}))
+    context = LiveContext(workflow_id, world, ranking("standard"))
+    output = drive(context)
+    record = app_state.store.get_workflow(workflow_id)
+    record.payload["hitl_context"] = context.suspended["hitl_context"]
+    app_state.store.upsert_workflow(record)
+    decisions = record.payload.get("decisions") or []
+    what_if = asyncio.run(judgement_routes.what_if(judgement_routes.WhatIf(workflow_id=workflow_id, vulnerable=True)))
+    return {
+        "reading": call["reading"], "read_ms": round(read_ms),
+        "claim": claim_id, "amount": observation["claim"]["amount_gbp"],
+        "record_vulnerable": observation["claim"]["vulnerability_flag"],
+        "statement_in_evidence": "customer_statement" in context.suspended["hitl_context"]["observation"],
+        "decision": [(d["persona_role"], d["verdict"], d.get("decided_by")) for d in decisions],
+        "outcome": output.get("status"),
+        "what_if_vulnerable": {"decision": what_if.get("decision"), "summary": what_if.get("summary")},
+    }
+
+
+if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "calls":
+    print(json.dumps(run_calls(), indent=1))

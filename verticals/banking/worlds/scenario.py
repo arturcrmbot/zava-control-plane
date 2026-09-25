@@ -213,6 +213,10 @@ class ZavaBankWorld:
         self._claim_scenarios: dict[str, str] = {}
         self._claim_traces: dict[str, str] = {}
         self._generated_claims = 0
+        # Phase 3: claims raised when the presenter reports a customer's call,
+        # with the customer's words and the (advisory) reading of them.
+        self._statements: dict[str, dict[str, Any]] = {}
+        self._called_claims = 0
         self._processed_commands: dict[str, tuple[SimulationCommand, SimulationEvent]] = {}
 
     # -- lifecycle ---------------------------------------------------------
@@ -776,6 +780,48 @@ class ZavaBankWorld:
         self.fraud_claims[claim.id] = claim
         return self._raise(claim, f"generated:{claim.id}", f"SYN-STORY-{claim.id}")
 
+    def customer_calls(self, payment_id: str, statement: str, reading: dict[str, Any] | None) -> SimulationEvent:
+        """A customer calls about one of their payments: a new claim on that payment.
+
+        The claim is raised on the record's facts (amount, receiving account,
+        warning shown, the customer's vulnerability marker). The customer's
+        words and the reading of them travel with the claim as advisory context
+        for the agent; they never change what the rules admit.
+        """
+        text = (statement or "").strip()
+        if not text or len(text) > 1_200:
+            raise ValueError("the customer's statement must be 1-1,200 characters")
+        payment = self.payments.get(payment_id)
+        if payment is None:
+            raise ValueError(f"unknown payment {payment_id!r}")
+        if payment.status != "settled" or any(c.payment_id == payment_id for c in self.fraud_claims.values()):
+            raise ValueError(f"payment {payment_id} is already under a claim")
+        account = self.accounts[payment.from_account_id]
+        customer = self.customers[account.customer_id]
+        beneficiary = self.beneficiaries[payment.to_beneficiary_id]
+        rng = self.runtime.rng
+        self._called_claims += 1
+        now = float(self.runtime.env.now)
+        claim = FraudClaim(
+            id=f"SYN-CLAIM-C{self._called_claims:03d}", customer_id=customer.id, payment_id=payment.id,
+            beneficiary_id=beneficiary.id, rail_id=payment.rail_id, amount_gbp=payment.amount_gbp,
+            location_id=customer.home_location_id, reported_at_minutes=now,
+            deadline_minutes=now + _CLAIM_WINDOW_MINUTES, vulnerability_flag=customer.vulnerability_flag,
+            warning_shown=payment.warning_shown,
+            recoverable_gbp=float(min(beneficiary.balance_gbp, round(payment.amount_gbp * rng.uniform(0.1, 0.45) / 10) * 10)),
+        )
+        payment.status = "disputed"
+        payment.version += 1
+        self.fraud_claims[claim.id] = claim
+        self._statements[claim.id] = {"text": text, **(reading or {})}
+        return self._raise(claim, f"call:{claim.id}", f"SYN-STORY-{claim.id}")
+
+    def read_customer_statement(self, statement: str):
+        """Awaitable reading of a customer's words (Laya, rules when it is down)."""
+        from verticals.banking.worlds.statements import read_statement
+
+        return read_statement(statement)
+
     def adopt_claim(self, observation: dict[str, Any]) -> None:
         """Mirror a claim raised in another replica of this world.
 
@@ -873,6 +919,9 @@ class ZavaBankWorld:
                 record.last_event_id for record in records if record.last_event_id
             ],
         }
+        statement = self._statements.get(claim_id)
+        if statement is not None:
+            observation["customer_statement"] = dict(statement)
         return observation
 
     def current_fraud_observation(self) -> dict[str, Any]:

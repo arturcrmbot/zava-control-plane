@@ -401,6 +401,36 @@ async def inject_technician_unavailable(body: TechnicianUnavailableRequest) -> d
     }
 
 
+class CustomerCall(BaseModel):
+    payment_id: str = Field(min_length=1, max_length=64)
+    statement: str = Field(min_length=1, max_length=1200)
+
+
+@router.post("/customer-calls")
+async def customer_calls(call: CustomerCall) -> dict:
+    """A customer calls about one of their payments; the world raises the claim.
+
+    A world that reads the customer's words (``read_customer_statement``) gives
+    an advisory reading first; a failed reading never blocks the call.
+    """
+    service = getattr(app_state, "world_service", None)
+    scenario = getattr(service, "scenario", None) if service is not None else None
+    if scenario is None or not hasattr(scenario, "customer_calls"):
+        return {"ok": False, "error": "the active world does not take customer calls"}
+    reading = None
+    reader = getattr(scenario, "read_customer_statement", None)
+    if reader is not None:
+        try:
+            reading = (await reader(call.statement)).to_dict()
+        except Exception:  # noqa: BLE001 - the reading is advisory
+            reading = None
+    try:
+        event = service.call_scenario("customer_calls", call.payment_id, call.statement, reading)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"ok": True, "claim_id": event.payload.get("claim_id"), "reading": reading, "event": event.to_dict()}
+
+
 @router.post("/scenarios/{name}")
 async def run_world_scenario(name: str) -> dict:
     service = getattr(app_state, "world_service", None)
