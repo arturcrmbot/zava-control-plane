@@ -65,9 +65,6 @@ judgement:
                 - id: says_no_marker
                   text: agent_reasoning
                   ask: "Does the text say no vulnerability flag or marker is present?"
-                - id: argues_refusal
-                  text: agent_reasoning
-                  ask: "Does the text argue that the bank should refuse the customer's claim?"
                 - id: covers_no_action
                   text: agent_reasoning
                   ask: "Does the text say what would happen if the bank did nothing?"
@@ -78,8 +75,6 @@ judgement:
                 - concern: "the agent's reasoning says the customer is vulnerable, but the record shows no marker"
                   when: {read: says_vulnerable, is: yes, fact: customer_vulnerable, equals: false}
                   unless: says_no_marker
-                - concern: "the agent argues for refusal but recommends paying the customer"
-                  when: {read: argues_refusal, is: yes, fact: recommends_refusal, equals: false}
                 - concern: "the agent does not say what happens if the bank does nothing"
                   when: {read: covers_no_action, is: no}
                   severity: minor

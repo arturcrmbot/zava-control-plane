@@ -4,9 +4,14 @@
    is kept as it is: Laya can only move a decision towards caution.
 2. READ: Laya answers the profile's narrow questions about the gate's texts.
 3. CHECK: code compares those readings with the record and names concerns.
-4. JUDGE: Laya weighs the concerns in the persona's character: approve or hold.
-5. An unclear reading or a verdict without a clear lead goes to the LLM deep
-   review. A clear hold with nobody above to hand to also goes there.
+4. A serious concern holds the case. With no concerns the case is approved.
+   Only when every concern is minor does Laya weigh them in the persona's
+   character (approve or hold): measured on this Mac, a single approve/hold
+   question ignored some serious concerns, so it never gets to wave one
+   through.
+5. An unclear serious reading, or a minor-concern verdict without a clear
+   lead, goes to the LLM deep review. A hold with nobody above to hand to
+   also goes there.
 6. If the deep review is spent or fails, or Laya is down, the ceiling applies
    and the record says the rules decided.
 
@@ -85,31 +90,33 @@ async def _read(client: LayaClient, gate: GateProfile, facts: GateFacts, min_lea
     return readings, latency
 
 
-def _check(gate: GateProfile, readings: list[Reading], facts: GateFacts) -> tuple[list[str], list[str]]:
+def _check(gate: GateProfile, readings: list[Reading], facts: GateFacts) -> tuple[list[str], list[str], list[str]]:
+    """Compare readings with the record: (all concerns, serious concerns, unclear)."""
     by_id = {reading.id: reading for reading in readings}
     concerns: list[str] = []
+    serious: list[str] = []
     unclear: list[str] = []
     for check in gate.checks:
         if check.fact is not None and facts.facts.get(check.fact) != check.equals:
             continue
-        if check.read is None:
-            concerns.append(check.concern)
-            continue
-        reading = by_id[check.read]
-        if not reading.clear:
-            if check.severity == "serious":
-                unclear.append(f"could not tell whether {check.concern}")
-            continue
-        if reading.yes != (check.read_is == "yes"):
-            continue
-        if check.unless is not None:
-            guard = by_id[check.unless]
-            if not guard.clear or guard.yes:
+        if check.read is not None:
+            reading = by_id[check.read]
+            if not reading.clear:
                 if check.severity == "serious":
-                    unclear.append(f"conflicting readings on whether {check.concern}")
+                    unclear.append(f"could not tell whether {check.concern}")
                 continue
+            if reading.yes != (check.read_is == "yes"):
+                continue
+            if check.unless is not None:
+                guard = by_id[check.unless]
+                if not guard.clear or guard.yes:
+                    if check.severity == "serious":
+                        unclear.append(f"conflicting readings on whether {check.concern}")
+                    continue
         concerns.append(check.concern)
-    return concerns, unclear
+        if check.severity == "serious":
+            serious.append(check.concern)
+    return concerns, serious, unclear
 
 
 async def _judge(
@@ -175,16 +182,28 @@ async def judge_gate(
 
     try:
         record.readings, read_ms = await _read(client, gate, facts, min_lead)
-        record.concerns, record.unclear = _check(gate, record.readings, facts)
-        record.judge, judge_ms = await _judge(
-            client, gate, persona_label, profile.character, facts, record.concerns, min_lead
-        )
-        record.laya_ms = read_ms + judge_ms
+        record.laya_ms = read_ms
+        record.concerns, record.serious, record.unclear = _check(gate, record.readings, facts)
+        if record.concerns and not record.serious and not record.unclear:
+            # Only minor concerns: whether they matter is the persona's call,
+            # in its own character. Serious concerns and none need no weighing.
+            record.judge, judge_ms = await _judge(
+                client, gate, persona_label, profile.character, facts, record.concerns, min_lead
+            )
+            record.laya_ms += judge_ms
     except LayaUnavailable as ex:
         return _rules(ceiling, record, f"Laya unavailable: {ex}")
 
-    needs_review = bool(record.unclear) or not record.judge.clear
-    holds = record.judge.choice == "hold"
+    if record.serious:
+        # A serious concern Laya found in the reasoning holds the case: a
+        # verified contradiction is never waved through on a soft verdict.
+        holds, needs_review = True, False
+    elif record.unclear:
+        holds, needs_review = False, True
+    elif record.judge is not None:
+        holds, needs_review = record.judge.choice == "hold", not record.judge.clear
+    else:
+        holds, needs_review = False, False
     if not needs_review and not holds:
         record.decided_by, record.verdict = "laya", "approve"
         return Outcome(_with_evidence(ceiling, record), record)

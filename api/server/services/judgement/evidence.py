@@ -88,6 +88,7 @@ class Judgement:
     decided_by: str
     verdict: str
     concerns: list[str] = field(default_factory=list)
+    serious: list[str] = field(default_factory=list)
     unclear: list[str] = field(default_factory=list)
     readings: list[Reading] = field(default_factory=list)
     judge: Verdict | None = None
@@ -124,6 +125,7 @@ class Judgement:
             "decided_by": self.decided_by,
             "verdict": self.verdict,
             "concerns": list(self.concerns),
+            "serious": list(self.serious),
             "unclear": list(self.unclear),
             "readings": [reading.to_dict() for reading in self.readings],
             "judge": self.judge.to_dict() if self.judge else None,

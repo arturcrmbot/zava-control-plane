@@ -197,14 +197,14 @@ def test_a_hold_is_handed_to_the_financial_crime_lead_who_decides(harness) -> No
     # The recorded standard reasoning, wrongly given for a vulnerable customer.
     context = _hitl_context(FRAUD_SCENARIO_VULNERABLE, "BAPP-J2", escalate_to="financial_crime_lead")
     _store(harness.app_state, "BAPP-J2")
-    harness.laya.verdicts["Fraud Decision Manager"] = {"approve": 0.2, "hold": 0.8}
     asyncio.run(harness.responder._handle_hitl(_event(context)))
 
     (_, name, payload), = harness.raised
     assert name == FRAUD_HITL_EVENT
+    # The lead's own reading finds the same contradiction; at the top of the
+    # chain the deep review decides, and the lead's approval says so.
     assert payload["persona"] == "financial_crime_lead" and payload["decision"] == "approve"
-    assert payload["decided_by"] == "laya"
-    assert "no vulnerability marker, but the record shows one" in payload["reason"]
+    assert payload["decided_by"] == "llm" and payload["reason"] == "Deep review: Consistent with the record."
     lead_context = harness.contexts[-1]
     assert lead_context["held_by"][0]["persona"] == "fraud_decision_manager"
     assert "record shows one" in lead_context["held_by"][0]["concerns"][0]

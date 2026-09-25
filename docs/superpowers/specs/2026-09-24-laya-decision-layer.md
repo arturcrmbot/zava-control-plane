@@ -90,6 +90,7 @@ Laya's top answer is ahead of the runner-up (0 is a coin toss, 1 is certain).
 |---|---|---|
 | Reading the agent's reasoning with narrow yes/no questions | **31/36 right** (vulnerability mentioned 6/6, recovery 6/6, argues refusal 6/6) | Use narrow, positively phrased questions |
 | Persona gate as **read, then check, then judge** | **5/5 labelled cases right, and the ambiguous case held.** It caught the contradiction the broad question missed. Routine approvals led by 0.73-0.80 | Laya reads; code compares with the record; Laya judges |
+| The vulnerability pair ("says vulnerable" / "says no marker") on 10 texts (measured while building) | 19/20 right; the one confident error made both answers "yes", so the pair turned it into a hand-off, not a false concern | Pair any question prone to negation |
 | Persona character | With one broad question, "cautious" raised the hold probability over "pragmatic" in 10/10 cases. In read-then-judge it did so in 4 of 6 and reversed in 2 | Personality is a real input, but its wording needs calibrating |
 | Payment references against described scam patterns | **16/16 right on clear references** (safe account, tax/police demand, unlock fee, guaranteed returns); 9 of them with a clear lead, the other 7 would do nothing | Put the domain knowledge in the options |
 | How upset a customer is about a decision (0-3 scale) | Sensible order: full refund 0.27-0.35 < partial 0.69-0.90 < refusal 0.99-1.30 ≈ held 1.15-1.34 | Use the distribution to drive reactions |
@@ -105,6 +106,9 @@ Laya's top answer is ahead of the runner-up (0 is a coin toss, 1 is certain).
 | Scam type from the customer's own words | 8/12, with confident errors (police and tax impersonation read as "not a scam") | Advisory only; described patterns needed |
 | Vulnerability cues in the customer's words | Caught 2-3 of 4 real cues, with 2 false alarms on "money worries" | Never a determination (the pack forbids it anyway) |
 | "Would the customer complain?" yes/no | Flat 0.06-0.18 whatever the decision | Use the upset scale instead |
+| The approve/hold verdict weighing a list of concerns (measured while building) | Approved with a lead of 0.5-0.8 in all four phrasings even with "the agent argues for declining" listed | Serious concerns hold by rule; Laya weighs only minor ones, in character |
+| "Does the text argue for refusal?" (measured while building) | 3 of 6 confidently wrong in every wording, including a routine reimbursement read as arguing for refusal | Removed from the fraud profiles |
+| "Does the text argue for declining?" when the text names declining only to reject it | Unsure (about 0.46), never confidently wrong in 6 texts | Kept as serious: unsure goes to the deep review |
 
 ## 5. Principles
 
@@ -153,8 +157,10 @@ facts and texts, e.g. `customer_vulnerable`, `recommends_refusal`,
 4. READ   one Laya call: the profile's narrow questions about the texts
 5. CHECK  code compares readings with facts -> concerns in plain words
           paired questions that disagree     -> "unclear"
-6. JUDGE  one Laya call: character + recommendation + concerns -> approve | hold
-7. unclear reading or a small lead?
+6. a serious concern      -> hold (by rule: a verified contradiction is never waved through)
+   no concerns            -> approve
+   only minor concerns    -> JUDGE: one Laya call, character + recommendation + concerns
+7. an unclear serious reading, or a minor-concern verdict with a small lead
           -> LLM deep review if budget allows -> approve | hold
           -> otherwise the rules ceiling, recorded as "decided by rules"
 8. approve -> today's approval payload, plus rationale and evidence
@@ -170,14 +176,11 @@ judgement:
   reads:
     - {id: says_vulnerable,  text: agent_reasoning, ask: "Does the text say the customer is vulnerable or carries a vulnerability marker?"}
     - {id: says_no_marker,   text: agent_reasoning, ask: "Does the text say no vulnerability flag or marker is present?"}
-    - {id: argues_refusal,   text: agent_reasoning, ask: "Does the text argue that the bank should refuse the customer's claim?"}
     - {id: covers_no_action, text: agent_reasoning, ask: "Does the text say what would happen if the bank did nothing?"}
   checks:
     - concern: "the agent's reasoning says there is no vulnerability marker, but the record shows one"
       when: {read: says_no_marker, is: yes, fact: customer_vulnerable, equals: true}
       unless: says_vulnerable          # paired question: both yes means unclear
-    - concern: "the agent argues for refusal but recommends paying the customer"
-      when: {read: argues_refusal, is: yes, fact: recommends_refusal, equals: false}
     - concern: "the agent does not say what happens if the bank does nothing"
       when: {read: covers_no_action, is: no}
     - concern: "the recommendation refuses a fraud victim; refusals always get a second pair of eyes"

@@ -172,12 +172,9 @@ def test_a_clear_approval_keeps_the_approval_payload_and_adds_evidence() -> None
     assert outcome.payload["reason"] == record.summary() == outcome.payload["judgement_summary"]
     assert outcome.payload["authority_reason"] == CEILING["reason"]
     assert outcome.hold is False and record.concerns == [] and record.unclear == []
-    assert len(laya.calls) == 2  # one read call for the reasoning, one judge call
+    assert len(laya.calls) == 1 and record.judge is None  # nothing to weigh, so no verdict question
     read_state, read_questions = laya.calls[0]
     assert read_state == {"text": "The reasoning."} and set(read_questions) == set(ROUTINE_READS)
-    judge_state, _ = laya.calls[1]
-    assert judge_state["concerns_found"] == "No concerns were found in the agent's reasoning."
-    assert judge_state["your_style"] == "Thorough."
 
 
 def test_a_contradiction_holds_and_hands_up() -> None:
@@ -188,8 +185,30 @@ def test_a_contradiction_holds_and_hands_up() -> None:
     assert outcome.hold is True and outcome.payload["decision"] == "escalate"
     assert record.decided_by == "laya" and record.verdict == "hold"
     assert record.concerns == ["the agent's reasoning says there is no vulnerability marker, but the record shows one"]
+    assert record.serious == record.concerns
     assert "Handed to the Financial crime lead." in outcome.payload["reason"]
-    assert "the record shows one" in laya.calls[1][0]["concerns_found"]
+    assert len(laya.calls) == 1 and record.judge is None
+
+
+def test_a_serious_concern_holds_even_when_laya_would_approve() -> None:
+    laya = FakeLaya({"says_vulnerable": 0.05, "says_no_marker": 0.95, "covers_no_action": 0.9},
+                    {"approve": 0.99, "hold": 0.01})
+    outcome = _judge({"vulnerable": True}, laya=laya)
+    assert outcome.hold is True and outcome.payload["decision"] == "escalate"
+    assert outcome.judgement.judge is None
+
+
+def test_minor_concerns_are_weighed_in_character() -> None:
+    laya = FakeLaya({**ROUTINE_READS, "covers_no_action": 0.05}, {"approve": 0.1, "hold": 0.9})
+    outcome = _judge(laya=laya)
+    record = outcome.judgement
+    assert record.serious == [] and record.concerns == ["the agent does not say what happens if the bank does nothing"]
+    assert outcome.hold is True and record.decided_by == "laya" and record.judge.choice == "hold"
+    judge_state, judge_questions = laya.calls[1]
+    assert judge_state["your_style"] == "Thorough."
+    assert judge_state["concerns_found"] == "the agent does not say what happens if the bank does nothing"
+    assert judge_state["recommendation"] == "Reimburse the customer in full (GBP 18,400)"
+    assert set(judge_questions["decide"]["criteria"]) == {"approve", "hold"}
 
 
 @pytest.mark.parametrize(("review", "decision"), [("approve", "approve"), ("hold", "reject")])
@@ -225,7 +244,8 @@ def test_an_unclear_serious_reading_goes_to_the_deep_review_and_falls_back_to_ru
 
 def test_a_small_verdict_lead_goes_to_the_deep_review() -> None:
     reviewer = FakeReviewer("approve")
-    outcome = _judge(laya=FakeLaya(verdict={"approve": 0.55, "hold": 0.45}), reviewer=reviewer)
+    laya = FakeLaya({**ROUTINE_READS, "covers_no_action": 0.05}, {"approve": 0.55, "hold": 0.45})
+    outcome = _judge(laya=laya, reviewer=reviewer)
     assert reviewer.requests and outcome.judgement.decided_by == "llm"
     assert outcome.payload["decision"] == "approve"
 
@@ -268,7 +288,8 @@ def test_laya_or_adapter_failure_falls_back_to_the_rules(laya, context, reason) 
 
 
 def test_a_failed_deep_review_falls_back_to_the_rules() -> None:
-    outcome = _judge(laya=FakeLaya(verdict={"approve": 0.5, "hold": 0.5}),
+    outcome = _judge({"vulnerable": True},
+                     laya=FakeLaya({"says_vulnerable": 0.05, "says_no_marker": 0.6, "covers_no_action": 0.9}),
                      reviewer=FakeReviewer(error="RuntimeError: rate limit"))
     assert outcome.judgement.decided_by == "rules"
     assert "deep review failed" in outcome.judgement.fallback_reason
@@ -278,5 +299,7 @@ def test_a_failed_deep_review_falls_back_to_the_rules() -> None:
 def test_the_min_lead_can_be_raised_from_the_environment(monkeypatch) -> None:
     monkeypatch.setenv("JUDGEMENT_MIN_LEAD", "0.9")
     reviewer = FakeReviewer("approve")
-    _judge(laya=FakeLaya(verdict={"approve": 0.9, "hold": 0.1}), reviewer=reviewer)
+    laya = FakeLaya({"says_vulnerable": 0.01, "says_no_marker": 0.99, "covers_no_action": 0.02},
+                    {"approve": 0.9, "hold": 0.1})
+    _judge(laya=laya, reviewer=reviewer)
     assert reviewer.requests
