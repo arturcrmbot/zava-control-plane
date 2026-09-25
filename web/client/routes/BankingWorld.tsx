@@ -97,7 +97,7 @@ function useDecisionTrail(workflowId: string | undefined): { trail: JudgedDecisi
         if (cancelled) return;
         const payload = detail?.workflow?.payload ?? {};
         setTrail(judgedDecisions(payload.decisions));
-        const hitl = payload.hitl_context as Record<string, unknown> | undefined;
+        const hitl = (payload.hitl_context ?? payload.judged_gate_context) as Record<string, unknown> | undefined;
         if (hitl) {
           const claim = ((hitl.observation ?? {}) as Record<string, unknown>).claim as Record<string, unknown> | undefined;
           setGate({

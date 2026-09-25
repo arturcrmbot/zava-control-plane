@@ -340,6 +340,17 @@ describe("BankingWorld", () => {
     expect(JSON.parse(String(call?.[1]?.body)).payment_id).toBe("SYN-PAY-0100");
   });
 
+  it("still asks the persona after the gate has closed", async () => {
+    details["/api/workflows/bapp-evt-11"] = { workflow: { payload: {
+      decisions: [{ persona_role: "fraud_decision_manager", verdict: "approve", decided_by: "laya", judgement: { summary: "Approved." } }],
+      judged_gate_context: { persona: "fraud_decision_manager", ranking: { reasoning: "No vulnerability flag is present." },
+        observation: { claim: { vulnerability_flag: false } } },
+    } } };
+    renderBank({ events: [ROUTINE, ...APPROVED_TRACE, ...APPROVED_OUTCOME] });
+    const panel = await screen.findByTestId("ask-persona");
+    expect((within(panel).getByLabelText("The agent's reasoning") as HTMLTextAreaElement).value).toBe("No vulnerability flag is present.");
+  });
+
   it("says why the persona could not be asked", async () => {
     details["/api/workflows/bapp-evt-11"] = { workflow: { payload: {
       decisions: [{ persona_role: "fraud_decision_manager", verdict: "approve", decided_by: "laya", judgement: { summary: "Approved." } }],
