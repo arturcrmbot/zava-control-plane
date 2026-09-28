@@ -33,6 +33,41 @@ _export_env_file() {
   done <"$env_file"
 }
 
+start_laya() {
+  # Laya is the local model a pack's personas and world read with. Start it
+  # when .env points LAYA_URL at this machine and it is not already up.
+  # Without it those readings fall back to the pack's rules, and say so.
+  # Writes $PIDDIR/laya.pid only when this call started it.
+  local url port script
+  rm -f "$PIDDIR/laya.pid"
+  url="$( _export_env_file; printf '%s' "${LAYA_URL:-}" )"
+  case "$url" in
+    http://127.0.0.1:*|http://localhost:*) ;;
+    *) return 0 ;;
+  esac
+  port="${url#http://*:}"
+  port="${port%%/*}"
+  if curl -s --max-time 2 "http://127.0.0.1:$port/health" >/dev/null 2>&1; then
+    echo "    Laya already running on :$port"
+    return 0
+  fi
+  script="${LAYA_START_SCRIPT:-$HOME/.copilot/skills/laya/scripts/start.sh}"
+  if [ ! -x "$script" ]; then
+    echo "    warn: LAYA_URL is set but $script is missing; readings fall back to the rules"
+    return 0
+  fi
+  ( LAYA_PORT="$port" "$script" >>"$PIDDIR/laya.log" 2>&1 &
+    echo $! >"$PIDDIR/laya.pid" )
+  for _ in $(seq 1 45); do
+    sleep 1
+    if curl -s --max-time 1 "http://127.0.0.1:$port/health" >/dev/null 2>&1; then
+      echo "    Laya ready on :$port"
+      return 0
+    fi
+  done
+  echo "    warn: Laya not ready after 45 s (see $PIDDIR/laya.log); readings fall back to the rules"
+}
+
 start_api() {
   # --frozen --no-sync: use the committed lockfile + existing venv. A fresh
   # re-resolve fails on the pre-existing agent-framework/py-3.14 lock conflict.

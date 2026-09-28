@@ -29,6 +29,14 @@ for pat in "${patterns[@]}"; do
   pkill -f "$pat" 2>/dev/null || true
 done
 
+# Laya only if boot-demo started it (it frees ~3 GB). A Laya started by hand,
+# or serving other work, is left running.
+laya_pid_file="$(cd "$(dirname "$0")/.." && pwd)/.compose/laya.pid"
+if [[ -f "$laya_pid_file" ]]; then
+  kill "$(cat "$laya_pid_file")" 2>/dev/null || true
+  rm -f "$laya_pid_file"
+fi
+
 # Give children a moment to drain, then SIGKILL anything still bound to
 # our well-known ports (last-resort safety net).
 sleep 2
@@ -38,5 +46,10 @@ for port in 7071 3101 5273 5274 5275 10000 10001 10002 4101 4102 4103 4108; do
     kill -9 $pids 2>/dev/null || true
   fi
 done
+
+# A dying Functions host can spawn one more Python worker after the first
+# sweep; it orphans and keeps the vertical's stores locked. Sweep again.
+sleep 1
+pkill -f "azure-functions-core-tools/bin/workers/python" 2>/dev/null || true
 
 echo "[down] all known demo processes stopped"

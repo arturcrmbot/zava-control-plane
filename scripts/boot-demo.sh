@@ -88,11 +88,23 @@ if [[ -n "${BOOT_DEMO_SNAPSHOT:-}" ]]; then
   fi
 fi
 
+echo "==> laya (only when .env points LAYA_URL at this machine)"
+start_laya
+[ -f "$PIDDIR/laya.pid" ] && pids+=($(cat "$PIDDIR/laya.pid"))
+
 echo "==> fastapi + fleet manager (no reload)"
 start_api
 [ -f "$PIDDIR/api.pid" ] && pids+=($(cat "$PIDDIR/api.pid"))
 
 echo "==> vite preview (static)"
+# The control plane is served from its built bundle. Rebuild it when any of
+# its sources is newer, so a pull or merge never serves a stale UI.
+if [[ ! -f dist/index.html ]] || [[ -n "$(find web/client web/shared index.html vite.config.ts package.json \
+      -newer dist/index.html -type f -not -path '*/node_modules/*' -print -quit 2>/dev/null)" ]]; then
+  echo "    control-plane bundle is older than its sources — building..."
+  npm run build >>"$PIDDIR/ui-build.log" 2>&1 \
+    || echo "    warn: control-plane build FAILED (see $PIDDIR/ui-build.log); serving the previous bundle"
+fi
 npm run demo:ui &
 pids+=($!)
 
