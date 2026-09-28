@@ -1,7 +1,7 @@
 # Laya decision layer: agentic thinking without the token bill
 
 **Date:** 2026-09-24
-**Status:** Built and verified behind flags. Phase 1 (personas judge) needs `JUDGEMENT_ENABLED=1`, phase 2 (the world notices and reacts) needs `BANKING_WORLD_SCREENING=1`, and phase 3 (the presenter steers) is available whenever the world runs.
+**Status:** Built and verified behind flags, merged to `main` (#46, #47), and on in the banking demo configuration since 2026-09-28. Phase 1 (personas judge) needs `JUDGEMENT_ENABLED=1`, phase 2 (the world notices and reacts) needs `BANKING_WORLD_SCREENING=1`, people living in the world need `BANKING_WORLD_LIFE=1`, and phase 3 (the presenter steers) is available whenever the world runs. `.env.example` ships with all of them off; `docs/banking-demo-runbook.md` has the demo values.
 **Scope:** a shared platform capability, proved on the banking vertical first.
 **Author's evidence:** code read in this worktree, plus 241 live calls to a local Laya server on this Mac.
 
