@@ -146,6 +146,7 @@ from verticals.banking.worlds.scenario import ZavaBankWorld  # noqa: E402
 @pytest.fixture
 def screening_on(monkeypatch):
     monkeypatch.setenv("BANKING_WORLD_SCREENING", "1")
+    monkeypatch.delenv("BANKING_WORLD_LIFE", raising=False)
 
 
 def _world(screener=None) -> ZavaBankWorld:
@@ -165,6 +166,7 @@ def _mule_trips(world: ZavaBankWorld) -> list:
 
 def test_with_screening_off_the_world_is_as_before(monkeypatch) -> None:
     monkeypatch.delenv("BANKING_WORLD_SCREENING", raising=False)
+    monkeypatch.delenv("BANKING_WORLD_LIFE", raising=False)
     world = ZavaBankWorld(seed=42, runtime=SimulationRuntime(42))
     world.install()
     _run(world, 600)
@@ -403,11 +405,13 @@ def _reload_registry():
 def registry(monkeypatch):
     yield
     monkeypatch.delenv("BANKING_WORLD_SCREENING", raising=False)
+    monkeypatch.delenv("BANKING_WORLD_LIFE", raising=False)
     _reload_registry()
 
 
 def test_with_screening_on_the_world_owns_mule_cases(registry, monkeypatch) -> None:
     monkeypatch.setenv("BANKING_WORLD_SCREENING", "1")
+    monkeypatch.delenv("BANKING_WORLD_LIFE", raising=False)
     domains, registration = _reload_registry()
     mule = domains.BANKING_DOMAINS["mule-account-investigation"]
     assert mule.spawn_fn is None and mule.realistic_interval_seconds is None
@@ -423,6 +427,7 @@ def test_with_screening_on_the_world_owns_mule_cases(registry, monkeypatch) -> N
 
 def test_with_screening_off_mule_cases_are_spawned_as_before(registry, monkeypatch) -> None:
     monkeypatch.delenv("BANKING_WORLD_SCREENING", raising=False)
+    monkeypatch.delenv("BANKING_WORLD_LIFE", raising=False)
     domains, registration = _reload_registry()
     assert domains.BANKING_DOMAINS["mule-account-investigation"].spawn_fn is not None
     assert MULE_SENSOR_ID not in {route.sensor_id for route in registration.BANKING_WORLD.objective_routes}
@@ -575,6 +580,7 @@ def test_a_reimbursed_customer_reacts_in_the_world(screening_on) -> None:
 
 def test_without_screening_customers_do_not_react(monkeypatch) -> None:
     monkeypatch.delenv("BANKING_WORLD_SCREENING", raising=False)
+    monkeypatch.delenv("BANKING_WORLD_LIFE", raising=False)
     world = ZavaBankWorld(seed=42, runtime=SimulationRuntime(42))
     world.install()
     world.activate_scenario(FRAUD_SCENARIO_STANDARD)

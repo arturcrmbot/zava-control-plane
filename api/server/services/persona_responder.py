@@ -1072,6 +1072,7 @@ def _stash_decision(
     event_name: str,
     judgement: Any = None,
     round_: int = 0,
+    gate_context: dict[str, Any] | None = None,
 ) -> None:
     """Record the decision on workflow.payload['decisions'].
 
@@ -1117,6 +1118,10 @@ def _stash_decision(
             entry["judgement"] = judgement.to_dict()
         decisions.append(entry)
         w.payload["decisions"] = decisions
+        if judgement is not None and isinstance(gate_context, dict):
+            # The ingestor drops hitl_context when the orchestration resumes;
+            # keep the case as the persona judged it, for "ask the persona".
+            w.payload["judged_gate_context"] = {k: v for k, v in gate_context.items() if k != "held_by"}
         app_state.store.upsert_workflow(w)
     except Exception as ex:
         print(f"[persona_responder] failed to stash decision: {ex}")
@@ -1512,6 +1517,7 @@ async def _handle_hitl_unguarded(event: FleetEvent) -> None:
                 event_name=event_name,
                 judgement=judgement_record,
                 round_=int(context.get("reassessment_round") or 0),
+                gate_context=context,
             )
             context = _with_hold(context, persona_role, judgement_record)
         try:
@@ -1609,6 +1615,7 @@ async def _handle_hitl_unguarded(event: FleetEvent) -> None:
         event_name=event_name,
         judgement=judgement_record,
         round_=int(context.get("reassessment_round") or 0) if isinstance(context, dict) else 0,
+        gate_context=context if isinstance(context, dict) else None,
     )
 
     # v2: announce the decision. Ops live stream renders a green/red row;

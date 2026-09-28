@@ -363,3 +363,36 @@ def test_the_workers_copy_of_the_world_starts_a_story_the_bank_allowed() -> None
     _fail_objective(bank, sensor, "fraud_decision_manager declined to approve")
     assert bank.activate_scenario(FRAUD_SCENARIO_VULNERABLE).type == "sensor.tripped"
     assert worker.activate_scenario(FRAUD_SCENARIO_VULNERABLE).type == "sensor.tripped"
+
+
+def test_ask_the_persona_after_the_gate_has_closed(monkeypatch) -> None:
+    # On the live stack the ingestor drops hitl_context once the orchestration
+    # resumes; the context the persona judged is kept for what-ifs.
+    from api.server.routes import judgement as routes
+    from api.server.services import persona_responder
+    from api.server.services.judgement import engine
+    from api.server.services.judgement.laya_client import LayaAnswer as A, LayaResult as R
+    from api.server.state import app_state
+
+    class Reads:
+        enabled = True
+
+        def available(self) -> bool:
+            return True
+
+        async def ask(self, state, questions):
+            reads = {"says_vulnerable": 0.05, "says_no_marker": 0.95, "covers_no_action": 0.9}
+            return R({q: A("noul", {"yes": reads[q], "no": 1 - reads[q]}, "yes" if reads[q] >= 0.5 else "no",
+                           abs(2 * reads[q] - 1)) for q in questions}, 40.0, 41.0)
+
+    monkeypatch.setenv("JUDGEMENT_ENABLED", "1")
+    monkeypatch.setenv("PERSONA_AUTO_CLOSE", "*")
+    monkeypatch.setattr(engine, "get_client", lambda: Reads())
+    persona_responder.PERSONA_DEFINITIONS = persona_responder._load_personae()
+    _judged_workflow(app_state, "BAPP-WHATIF-2", "No vulnerability flag is present. Doing nothing leaves the loss.", False)
+    record = app_state.store.get_workflow("BAPP-WHATIF-2")
+    record.payload = {"judged_gate_context": record.payload.pop("hitl_context"), "decisions": []}
+    app_state.store.upsert_workflow(record)
+
+    flipped = asyncio.run(routes.what_if(routes.WhatIf(workflow_id="BAPP-WHATIF-2", vulnerable=True)))
+    assert flipped["ok"] and "the record shows one" in " ".join(flipped["judgement"]["concerns"])

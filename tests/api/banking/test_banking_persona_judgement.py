@@ -317,3 +317,22 @@ def test_a_new_run_with_the_same_workflow_id_is_judged_afresh(harness) -> None:
     assert len(harness.raised) == 2
     later = set(harness.reviewer.deadlines) - first
     assert later and min(later) > max(first)
+
+
+def test_a_judged_gate_keeps_the_context_it_judged_for_what_ifs(harness) -> None:
+    # The ingestor drops hitl_context when the orchestration resumes; a what-if
+    # afterwards needs the case as the persona saw it, without the hand-ups.
+    context = _hitl_context(FRAUD_SCENARIO_VULNERABLE, "BAPP-J8", escalate_to="financial_crime_lead")
+    _store(harness.app_state, "BAPP-J8")
+    asyncio.run(harness.responder._handle_hitl(_event(context)))
+    kept = harness.app_state.store.get_workflow("BAPP-J8").payload["judged_gate_context"]
+    assert kept["ranking"]["reasoning"] == context["ranking"]["reasoning"]
+    assert kept["persona"] == "fraud_decision_manager" and "held_by" not in kept
+
+
+def test_with_judgement_off_no_gate_context_is_kept(harness, monkeypatch) -> None:
+    monkeypatch.setenv("JUDGEMENT_ENABLED", "0")
+    context = _hitl_context(FRAUD_SCENARIO_STANDARD, "BAPP-J9")
+    _store(harness.app_state, "BAPP-J9")
+    asyncio.run(harness.responder._handle_hitl(_event(context)))
+    assert "judged_gate_context" not in harness.app_state.store.get_workflow("BAPP-J9").payload
